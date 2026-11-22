@@ -1,11 +1,12 @@
 import SwiftUI
 
 /// The right sidebar of an index page: the chosen container, with no buttons. It shows what the container holds
-/// (its latest items and the types in it), then the facts of the container. With nothing chosen it is empty, so the
-/// page beside it already says that nothing is.
+/// (its latest items and the types in it), then the facts of the container. With nothing chosen it asks for one, or is
+/// blank where the page lists none, which the page already says.
 struct IndexInspector: View {
     @CurrentLibrary private var library
     let choice: IndexChoice
+    let place: IndexPlace
     /// Every row of the page, so a container left out by the tab or the search stays shown until it goes.
     let rows: [IndexRow]
     let open: (IndexRow) -> Void
@@ -14,8 +15,10 @@ struct IndexInspector: View {
         if let row = choice.row(in: rows) {
             IndexInspectorContent(row: row, library: library, open: open)
                 .id(row.id)
-        } else {
+        } else if rows.isEmpty {
             Color.clear
+        } else {
+            InspectorPromptView(prompt: .forIndex(place))
         }
     }
 }

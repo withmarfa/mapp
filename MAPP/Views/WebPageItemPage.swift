@@ -10,7 +10,8 @@ import SwiftUI
 /// not edited on the page, except a pinned status, which keeps its menu; the inspector shows them all.
 ///
 /// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, a callout at the
-/// top of the page says how many and loads them, as the pictures banner on an item's page does (`PicturesWaitingCallout`).
+/// top of the page, above the title, says how many and loads them, as the pictures banner on an item's page does
+/// (`PicturesWaitingCallout`).
 /// Its close button hides it for the page until the page is opened again.
 struct WebPageItemPage: View {
     private enum Content: Equatable {
@@ -92,7 +93,8 @@ struct WebPageItemPage: View {
     /// How far the page has scrolled, which the header follows. Read only by the views that move with it, so a scroll
     /// redraws them and not the page.
     @State private var headerScroll = HeaderScroll()
-    /// The height of the title and pins, and with the callout under them, which the page starts below.
+    /// How far down the title and pins reach, below the callout when there is one: the distance the page scrolls before the
+    /// header is under the toolbar.
     @State private var headerHeight: CGFloat = 0
     @State private var blockHeight: CGFloat = 0
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsToolbarBackground = true
@@ -135,21 +137,24 @@ struct WebPageItemPage: View {
                 pageBody(toolbarHeight: geometry.safeAreaInsets.top)
                 ScrollingHeader(scroll: headerScroll) {
                     VStack(spacing: 0) {
-                        // Focus leaves only the page: its title is in the toolbar and its properties are hidden.
-                        if !drafts.isFocused(on: item.id) {
-                            WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
-                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
-                        }
-                        // At the top of the page, clearly further from the header than from the text it belongs to.
+                        // Above the title, so the page says it first. It stays in Focus, which leaves only the page.
                         if let pictures, pictures.waitingCount > 0, !calloutDismissal.isClosed(for: item.id) {
                             PicturesWaitingCallout(
                                 count: pictures.waitingCount, load: { pictures.loadWaiting() },
                                 close: { calloutDismissal.close(for: item.id) })
                                 .padding(.horizontal, inset)
-                                .padding(.top, calloutGap * 2)
-                                .padding(.bottom, calloutGap * 0.75)
+                                .padding(.top, calloutGap * 3)
+                                // The header's own space is under it, unless Focus has taken the header out.
+                                .padding(.bottom, drafts.isFocused(on: item.id) ? calloutGap * 3 : 0)
+                        }
+                        // Focus leaves only the page: its title is in the toolbar and its properties are hidden.
+                        if !drafts.isFocused(on: item.id) {
+                            WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
+                                // As far down as the header reaches, with the callout above it counted.
+                                .onGeometryChange(for: CGFloat.self) { [space = Self.headerBlock] in $0.frame(in: .named(space)).maxY } action: { headerHeight = $0 }
                         }
                     }
+                    .coordinateSpace(name: Self.headerBlock)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { blockHeight = $0 }
                     // Above the block too, so a page pulled past its start shows the window's color there and not the
                     // page's own.
@@ -197,6 +202,8 @@ struct WebPageItemPage: View {
         .onChange(of: remotePictures) { pictures?.redraw() }
         .onChange(of: library.savedPictureStates(of: item.id)) { pictures?.redraw() }
     }
+
+    private static let headerBlock = "headerBlock"
 
     /// How far a page pulled past its start can show above the header.
     private static let overscroll: CGFloat = 1_000
@@ -364,9 +371,8 @@ struct PicturesCalloutDismissal: Equatable {
 
 /// At the top of the page while some of its pictures wait for the person, in the words and the layout of the pictures
 /// banner at the top of an item's page (`#picture-bar` in the editor), which follows Mail's mailing-list banner: how
-/// many are not loaded, a button that loads them, and a small round close button that hides the banner for the
-/// page. Its spacing is the item page's, in steps of 4/13 of the interface text size (4 points at 13); its buttons are
-/// MAPP's own.
+/// many are not loaded, MAPP's small gray button that loads them, and a plain round close button that hides the banner
+/// for the page. Its spacing is the item page's, in steps of 4/13 of the interface text size (4 points at 13).
 struct PicturesWaitingCallout: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let count: Int
@@ -378,7 +384,7 @@ struct PicturesWaitingCallout: View {
         let step = size * 4 / 13
         HStack(spacing: step * 3) {
             Image(systemName: "photo")
-                .foregroundStyle(.tint)
+                .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             Group {
                 if count == 1 {
@@ -387,7 +393,6 @@ struct PicturesWaitingCallout: View {
                     Text("\(count) pictures from other websites aren’t loaded.")
                 }
             }
-            .fontWeight(.medium)
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
             // The close button sits two points (at 13) closer to Load Pictures than the other parts are to each other.
@@ -407,9 +412,9 @@ struct PicturesWaitingCallout: View {
             }
         }
         .font(.system(size: size))
-        .padding(.horizontal, step * 3)
-        .padding(.vertical, step * 2.5)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: step * 3.5))
+        // 9, 10, 9 and 14 points at 13, as the editor's banner is padded.
+        .padding(EdgeInsets(top: size * 9 / 13, leading: size * 14 / 13, bottom: size * 9 / 13, trailing: size * 10 / 13))
+        .background(.quinary, in: RoundedRectangle(cornerRadius: size * 10 / 13, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("PicturesWaitingCallout")
     }

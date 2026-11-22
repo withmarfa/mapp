@@ -79,6 +79,23 @@ extension ViewOptionCommand {
                 if place == .items { browser.orderSearch(byRelevance: false) }
             })
         }
+        if browser.indexPlaceHasTools {
+            commands.append(ViewOptionCommand(
+                title: String(localized: browser.toggleFiltersTitle), systemImage: "line.3.horizontal.decrease", key: .toggleFilters
+            ) {
+                browser.toggleIndexFilter()
+            })
+            if browser.indexIsFiltered {
+                commands.append(ViewOptionCommand(title: String(localized: "Clear Filters"), systemImage: "line.3.horizontal.decrease") {
+                    browser.clearIndexFilters()
+                })
+            }
+        }
+        if place == .items {
+            commands.append(ViewOptionCommand(title: String(localized: "Edit New Row…"), systemImage: "square.grid.2x2") {
+                browser.isEditingNewRow = true
+            })
+        }
         return commands
     }
 }

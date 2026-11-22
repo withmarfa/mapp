@@ -9,6 +9,8 @@ struct ItemDetail: View {
     let details: DetailsPresentation
     /// Whether the page backs the window's toolbar with glass. The modal draws its own toolbar and has no need.
     var backsToolbar = true
+    /// Whether the page has its corner. A modal's page has none.
+    var showsCorner = true
 
     var body: some View {
         if browser.selection.count > 1 {
@@ -19,11 +21,11 @@ struct ItemDetail: View {
         } else if let id = browser.selection.first, let item = library.item(id) {
             if library.pageLayout(of: item) != .text {
                 FileItemPage(item: item, drafts: details, open: { [editor] in editor.onOpenItem($0) }, onResolved: { browser.fileFetched(id, at: $0) }, backsToolbar: backsToolbar)
-                    .itemCorner(item, editor: nil, details: details)
+                    .itemCorner(item, editor: nil, details: details, isShown: showsCorner)
                     .onAppear { editor.close() }
             } else {
                 ItemPage(item: item, editor: editor, headerDrafts: details, backsToolbar: backsToolbar)
-                    .itemCorner(item, editor: editor, details: details)
+                    .itemCorner(item, editor: editor, details: details, isShown: showsCorner)
                     .onAppear(perform: grantFocusRequest)
                     .onChange(of: browser.focusRequest, grantFocusRequest)
             }

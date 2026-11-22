@@ -12,7 +12,8 @@ struct ListToolbar: CustomizableToolbarContent {
     }
 }
 
-/// Search and what sets up the view shown, in the order every view has them.
+/// Search and what sets up the view shown, in the order every view has them. The index pages have their own
+/// (`IndexToolbarItems`).
 struct ViewToolbarItems: CustomizableToolbarContent {
     @Bindable var browser: Browser
     let layout: ColumnSearch.Layout
@@ -25,16 +26,11 @@ struct ViewToolbarItems: CustomizableToolbarContent {
             prompt: String(localized: "Search"),
             layout: layout,
             focusRequests: browser.searchFocusRequests,
-            // Items' rows are items, so Down goes into its table; the other indexes list places, which a search filters.
-            onDown: { if !browser.showsSidebarIndex || browser.showsItemsIndex { browser.focusRequest = .list } }
+            onDown: { browser.focusRequest = .list }
         )
         .hidden(isHidden)
         ToolbarItem(id: "viewOptions") {
-            if let place = browser.indexPlace {
-                IndexViewOptionsMenu(place: place, browser: browser)
-            } else {
-                ViewOptionsMenu(browser: browser)
-            }
+            ViewOptionsMenu(browser: browser)
         }
         .hidden(isHidden)
     }

@@ -42,6 +42,7 @@ nonisolated extension RowContent {
         var content = make(
             for: item, look: look, catalogue: catalogue, list: list, relations: relations, includesDate: false,
             calendar: calendar, locale: locale)
+        content.picture = nil
         let status = catalogue.itemTypes[item.type]?.statusField?.key
         if shape.groupsByStatus || (status != nil && status == shape.leaving) {
             content.chips.removeAll { if case .status = $0 { true } else { false } }

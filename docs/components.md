@@ -14,7 +14,7 @@ The design system's Button and Toast components hold the exact fills and measure
 - Keyboard focus is a gray ring, never blue.
 - A menu among buttons is an outlined button with a chevron, the same height as the buttons beside it.
 - A sheet puts a destructive action alone at the leading edge, and Cancel and the primary action at the trailing edge. A text field has its label above it, such as Name. The button reads Delete, not Delete Collection.
-- The toolbar's glass buttons, the system's menus, alerts and text fields, and a Settings page's toggles, pop-ups and fields stay the system's. Settings draws its own gray buttons (`SettingsButton`; see [Views and lists](views-and-lists.md#settings)).
+- The toolbar's glass buttons, the system's menus, alerts and text fields, and a Settings page's buttons, toggles, pop-ups and fields stay the system's (`SettingsButton` sets the role and size; see [Views and lists](views-and-lists.md#settings)).
 - Not yet on the style: the empty states' Open Settings and Connect buttons, the sign-in, connecting and disconnecting views, and the buttons the item page's web editor draws itself.
 
 ## Keycaps

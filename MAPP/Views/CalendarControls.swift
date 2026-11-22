@@ -54,13 +54,10 @@ struct CalendarCornerView: View {
             .accessibilityLabel("Show a Week or a Month")
             .accessibilityIdentifier("CalendarScale")
         } else {
-            Picker("Show", selection: choice) {
-                ForEach(CalendarScale.allCases, id: \.self) { Text($0.title).tag($0) }
-            }
-            .cornerSegmented()
-            .help("Show a Week or a Month")
-            .accessibilityLabel("Show a Week or a Month")
-            .accessibilityIdentifier("CalendarScale")
+            CornerSegmented(label: "Show", selection: choice, options: CalendarScale.allCases) { $0.title }
+                .help("Show a Week or a Month")
+                .accessibilityLabel("Show a Week or a Month")
+                .accessibilityIdentifier("CalendarScale")
         }
     }
 }

@@ -59,15 +59,14 @@ struct SettingsHead<Trailing: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: SettingsTokens.Metric.sectionGap) {
             if let name {
                 name.settingsFont(.sectionName).accessibilityAddTraits(.isHeader)
+                    .frame(minHeight: SettingsTokens.Metric.sectionHeader, alignment: .bottom)
                     .padding(.horizontal, SettingsTokens.Metric.inset)
-                    .padding(.bottom, 2)
             }
             card
         }
-        .containerValue(\.settingsFirstInset, name == nil ? 0 : SettingsTokens.Metric.firstHeaderInset)
     }
 
     private var card: some View {
@@ -136,13 +135,14 @@ struct SettingsProblemRow: View {
     var line: Text?
     /// The lead's symbol: the warning triangle, or the lock for a refusal.
     var symbol = "exclamationmark.triangle"
-    var tone: SettingsTokens.Tone = .orange
+    /// The tile the symbol sits in. With none, the symbol stands plain, as the lock does beside its explanation.
+    var tone: SettingsTokens.Tone? = .orange
     let actions: [SettingsProblemAction]
     /// A problem's words are told whole: an explanation is never cut to two lines.
     var lines: Int? = nil
 
     var body: some View {
-        SettingsRow(title: title, line: line, lead: .tint(symbol, tone), lines: lines) {
+        SettingsRow(title: title, line: line, lead: tone.map { .tint(symbol, $0) } ?? .symbol(symbol), lines: lines) {
             HStack(spacing: SettingsTokens.Metric.buttonGap) {
                 if actions.count <= 2 {
                     ForEach(actions) { action in

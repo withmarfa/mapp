@@ -76,8 +76,11 @@ enum GalleryArtworkCache {
 
     /// Widths round up to a step so a window resize does not make every card again.
     private static let step: CGFloat = 96
+    /// A list row's picture is far smaller than a card's, so it keeps a size of its own and each takes a fraction of the
+    /// room in the cache.
+    private static let smallest: CGFloat = 48
 
-    private static func bucket(_ width: CGFloat) -> CGFloat { (width / step).rounded(.up) * step }
+    private static func bucket(_ width: CGFloat) -> CGFloat { width <= smallest ? smallest : (width / step).rounded(.up) * step }
 
     /// What is already made, so a card scrolled back into view draws its picture in its first frame.
     static func peek(_ basis: Basis, width: CGFloat) -> GalleryArtwork? {

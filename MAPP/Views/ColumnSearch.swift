@@ -26,13 +26,15 @@ struct ColumnSearch: CustomizableToolbarContent {
     var onSubmit: () -> Void = {}
     /// Down Arrow in the field, which hands the keyboard to the list.
     var onDown: () -> Void = {}
+    /// Whether the window's title comes back when the field goes (`ColumnSearchField.restoresTitle`).
+    var restoresTitle = true
 
     /// - Parameter trailing: The space after the clear button. In a column the options sit in the same glass
     ///   just past the field, so the field keeps less there.
     private func field(trailing: CGFloat) -> some View {
         ColumnSearchField(
             text: $text, prompt: prompt, focusRequests: focusRequests, trailingPadding: trailing,
-            onSubmit: onSubmit, onDown: onDown
+            onSubmit: onSubmit, onDown: onDown, restoresTitle: restoresTitle
         ) {
             text = ""
             setExpanded(false)
@@ -97,6 +99,8 @@ struct ColumnSearchField: View {
     let trailingPadding: CGFloat
     let onSubmit: () -> Void
     let onDown: () -> Void
+    /// Whether the window's title comes back when the field goes. A page that keeps its title out of the toolbar says no.
+    var restoresTitle = true
     let onEnd: () -> Void
     @State private var clears = 0
 
@@ -107,7 +111,7 @@ struct ColumnSearchField: View {
                 .accessibilityHidden(true)
             ToolbarSearchText(
                 text: $text, prompt: prompt, focusRequests: focusRequests + clears,
-                onSubmit: onSubmit, onDown: onDown, onEnd: onEnd
+                onSubmit: onSubmit, onDown: onDown, restoresTitle: restoresTitle, onEnd: onEnd
             )
             if !text.isEmpty {
                 Button("Clear Search", systemImage: "xmark.circle.fill") {
@@ -138,10 +142,12 @@ private struct ToolbarSearchText: NSViewRepresentable {
     let focusRequests: Int
     let onSubmit: () -> Void
     let onDown: () -> Void
+    let restoresTitle: Bool
     let onEnd: () -> Void
 
     func makeNSView(context: Context) -> ToolbarSearchTextField {
         let field = ToolbarSearchTextField()
+        field.restoresTitle = restoresTitle
         field.delegate = context.coordinator
         field.setAccessibilityIdentifier("ColumnSearch")
         field.onClickElsewhere = { [weak coordinator = context.coordinator] in coordinator?.parent.onEnd() }
@@ -201,6 +207,8 @@ private final class ToolbarSearchTextField: NSTextField {
     /// Set until the field has had the keyboard once. The toolbar moves its items between windows (full screen,
     /// Customize Toolbar, overflow), and an open field should not take the keyboard from the page each time.
     private var isAwaitingKeyboard = true
+    /// Whether the window's title is shown again when the field leaves its window.
+    var restoresTitle = true
     /// Called once a click has finished that landed outside the field and the toolbar items beside it while the
     /// field was open and empty.
     var onClickElsewhere: () -> Void = {}
@@ -232,7 +240,7 @@ private final class ToolbarSearchTextField: NSTextField {
     /// The field leaving its window is the search closing, whatever closed it, so the title the search hid
     /// (`ColumnSearch.setExpanded`) comes back, a pass later so the toolbar has narrowed the item first.
     override func viewWillMove(toWindow newWindow: NSWindow?) {
-        if newWindow == nil, let window {
+        if newWindow == nil, restoresTitle, let window {
             DispatchQueue.main.async { [weak window] in window?.titleVisibility = .visible }
         }
         super.viewWillMove(toWindow: newWindow)

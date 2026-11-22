@@ -19,52 +19,6 @@ What is not built yet. The built part is in [Value components](value-components.
 
 - Where a code block's language goes, and how it changes, is open. It stays as it is.
 
-Agreed with August on 21 November 2026, after trying v0.0.55, and drawn on the Pages tab of MAPP Pages (P39 to P43).
-
-### The modal
-
-- **Its toolbar** holds, from the leading side: close, then up and down as one pair. Full page and new window, Share and More, and the right sidebar trail. The buttons are the window toolbar's size, not smaller capsules.
-- **The whole window dims behind it, its toolbar too**, and nothing behind the modal answers a click or a key, as with a sheet.
-- **No corner.** The page in a modal shows neither Aa, the text size nor Focus.
-- **More room above the title**, so a long title never runs up under the buttons.
-
-### Pictures from other websites
-
-- The banner ("N pictures from other websites aren't loaded", with Load All) sits above the title, on a web page's page and the editor's page alike.
-- Each picture that is not loaded is one quiet line in the system font: a picture symbol, its description, and the standard Load button (the design system's `Button`). It is not a box, and it never takes the page's reading font.
-- A picture whose description repeats the item's title says "Picture" in place of the description.
-
-### The text size on every text page
-
-- **The text size is one control in the corner**, before Focus, drawn as an image's size is: the size, such as "13 pt", with a chevron that opens a menu. The menu holds the page's sizes (`PageStyle.textSizes`: 11, 12, 13, 14, 16, 18, 20 and 24 points) with the chosen one ticked, then Make Text Bigger (⌘+) and Make Text Smaller (⌘−), then Standard Width and Full Width. Each entry runs the View menu's command.
-- **A page that cannot be written**, such as a saved article or an RSS entry, has the text size and Focus, and no Aa.
-- **A page that is the editor** has Aa, the text size and Focus, in that order.
-
-### A note's formats
-
-- **Aa opens the formats as one bar floating at the foot of the page**, centered on the text, and Aa becomes Close. The bar holds a style pop-up ("Body", with Title, Heading and Subheading), then every format in one row: bold, italic, strikethrough, highlight, code and link; bulleted, numbered and checklist; quote, code block and table. Only a very narrow window folds the bar.
-- It replaces the formats card above the corner. Width and text size are no longer in it: the text size control beside Aa holds them.
-- Escape, Close and a change of item close the bar, as they close the card today. A click into the page leaves it open, since the bar formats what the caret is on.
-
-## Index pages
-
-Agreed with August on 21 November 2026 and drawn on the Library tab of MAPP Pages (L1, L2, L6 and L16 to L19). The built pages are in [Views and lists](views-and-lists.md#index-pages).
-
-### Items
-
-- **At rest:** a large title, "Items", then the tabs All, Yours and From Apps, with Search, Filter and New (+) as plain symbols at the tabs' trailing end. Under the tabs, **New** as a row of tiles, each a tinted tile with the type's icon and the type's name under it (Note, Table, Task, Bookmark and Event to start), then the table. A tile opens quick add in that type.
-- **Edit** is an ordinary toolbar item, with no fill. It opens a popover of the types: the ones ticked are in New, in their order, and dragging reorders them. While it is open the tiles show minus badges. Which types New holds is a Mac setting.
-- **Scrolled:** the title, the tabs and New scroll away, and the tabs, Edit, Search, Filter and New (+) come into the toolbar. The column headings stay, with a thin line under them.
-- **Filter** shows or hides the filter row ([Filters](views-and-lists.md#filters)). The row shows only while Filter is on, with no count of items beside it. While a filter is set, the filter row takes New's place and the table keeps what the filters allow.
-- **Search** opens into a field in place, at the tabs' trailing end, and the table keeps only what matches. Opening the Search Items panel in its place is acceptable too.
-- **New Table needs columns.** A table's `columns` property is required and quick add cannot set it (`QuickAdd.unsettableRequired`), so the Table tile needs a way to choose columns before MAPP can make a table. Until then it opens quick add with the note it shows for any such type.
-
-### Collections and Sources
-
-- Both are drawn as Items is, in a column 880 points wide: the large title, the tabs and the table, with no New row.
-- **Collections** has Search, Filter and New Collection (+) at the tabs' trailing end.
-- **Sources** has only its tabs, since a library holds a few sources and they come from apps and keys.
-- Collections are not grouped by kind, though Marfa has several (any type with the `container` role).
 
 ## Settings
 
@@ -76,9 +30,6 @@ The rules that are built (the window, the toolbar, rows, sections, changing thin
 
 - **A synced folder's page** shows what it holds as a tree of its folders, counted in files, which MAPP builds from the server's paths. Not built: the package's client offers no call for a folder's settings or paths (see [The Marfa's half of Settings](marfa-settings.md#left-out)).
 - **Not now:** custom CSS, plugins for MAPP itself, AI providers and Vim keys. Themes come later; every color and font is already a named value.
-- The button rows under a card (Restore Defaults…, Export Shortcuts…, Import…) are regular size, and Select All is an "All Events" checkbox row.
-- **The system's own controls** (August, 21 November 2026). The window's shared parts are the system's: the sidebar is the system's sidebar list with its search field, and the buttons, switches, pop-ups and text fields are the system's, so they look and behave as macOS does. A click outside a text field ends editing. The boards draw what the system draws, and the result is judged in a build.
-- **Keyboard's search** is a short field at the trailing end above the first card, its edge on the cards' edge, as a table's search sits at a section's name (board S13).
 
 ### MAPP's pages
 

@@ -7,11 +7,17 @@ import SwiftUI
 /// types, the title and the date. Nothing sits at the leading edge of a Standard row, so titles line up down the list.
 /// A search's row is always laid out as a Standard one, since its excerpt, which stands in the place of the line under the
 /// title, is the point.
+///
+/// A Standard row whose content has a picture (`RowContent.picture`, which the list decided) draws it at the trailing edge
+/// under the date, beside the lines under the title. That row is as tall as the picture needs, so it is the one row that is
+/// taller than its words; a Compact row never has one.
 struct ItemRow: View {
     let content: RowContent
     var density = Density.standard
     /// The words a search found in the item, in place of the line under its title.
     var excerpt: SearchExcerpt?
+    /// Whether the row draws a sample picture, for a preview with no item behind it (`SamplePicture`).
+    var showsSample = false
 
     /// A match in the title is shown in the title itself, since the excerpt would only say it again.
     private var titleExcerpt: SearchExcerpt? {
@@ -55,6 +61,26 @@ struct ItemRow: View {
                 Spacer(minLength: 8)
                 dateText
             }
+            if content.picture != nil || showsSample {
+                HStack(alignment: .top, spacing: 8) {
+                    if hasDetails { details.frame(maxWidth: .infinity, alignment: .leading) } else { Spacer(minLength: 0) }
+                    picture
+                }
+            } else if hasDetails {
+                details
+            }
+        }
+    }
+
+    private var hasSecondary: Bool {
+        (excerpt != nil && titleExcerpt == nil) || (excerpt == nil && content.secondary != nil)
+    }
+
+    private var hasDetails: Bool { hasSecondary || !content.chips.isEmpty || content.more > 0 }
+
+    /// The line under the title, then the bottom line of chips.
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 3) {
             if let excerpt, titleExcerpt == nil {
                 Text(excerpt.attributed())
                     .interfaceFont(.subheadline)
@@ -70,6 +96,14 @@ struct ItemRow: View {
                 ChipLine(content: content)
                     .padding(.top, 1)
             }
+        }
+    }
+
+    @ViewBuilder private var picture: some View {
+        if showsSample {
+            RowPictureFrame { SamplePicture() }
+        } else if let picture = content.picture {
+            RowPictureView(picture: picture, icon: content.typeIcon)
         }
     }
 

@@ -217,7 +217,7 @@ final class Browser {
     }
     /// What the next palette starts with typed, as ⌘K's "Search Items for" hands its words on.
     var paletteSeed = ""
-    /// Counts the ⌘K pressed while a palette is out, which opens or shuts its Actions.
+    /// Counts the ⌘J (Palette Actions) pressed while a palette is out, which opens or shuts its Actions.
     var paletteActionsRequests = 0
 
     /// Whether a floating panel, the palette or quick add, is out over the window, which the views beneath it
@@ -306,14 +306,19 @@ final class Browser {
     func reveal(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
         // An item reached from the modal, by a link or the palette, is shown in the modal.
         let staysInModal = isModalPresented
+        select(item, in: library, order: order)
+        if staysInModal { open([item.id], as: .modal) }
+        else if followsCollection { open([item.id], as: .fullPage) }
+        else { focusRequest = .list }
+    }
+
+    /// Selects `item`, showing the place that lists it when the window's list does not.
+    private func select(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
         if !items(in: library).contains(where: { $0.id == item.id }) {
             showListing(item, in: library, order: order)
         }
         selection = [item.id]
         if self.item == .allItems { revealOnItems(item) }
-        if staysInModal { open([item.id], as: .modal) }
-        else if followsCollection { open([item.id], as: .fullPage) }
-        else { focusRequest = .list }
     }
 
     /// Shows the item a link in the page names, as choosing it in the list does: the window's place, search, undo
@@ -322,6 +327,15 @@ final class Browser {
     func open(linked item: Item, in library: any ItemLibrary, order: ItemOrder) {
         reveal(item, in: library, order: order)
         if !followsCollection, !showsItemsIndex { focusRequest = .page }
+    }
+
+    /// Opens the item a link in the item's text names the way Settings > General > Open Items says, as Return does in
+    /// the list: the item is selected where the window lists it, then shown in the modal, as a full page or in a
+    /// window. An item reached from the modal stays in the modal, as `reveal` keeps it.
+    func follow(link item: Item, in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
+        let staysInModal = isModalPresented
+        select(item, in: library, order: order)
+        open([item.id], as: staysInModal ? .modal : nil, defaults: defaults)
     }
 
     /// Whether an earlier item the window showed can still be shown again.
@@ -873,6 +887,16 @@ final class Browser {
 
     /// Whether Add Filter… asked for its panel, which the row opens and then clears (`Browser+FilterRow`).
     var isAddFilterRequested = false
+
+    /// Whether the index page has scrolled its title and tabs out of view, which brings the tabs and their buttons into
+    /// the window's toolbar (`Browser+IndexPage`). The page reports it; nothing else sets it.
+    var isIndexHeaderAway = false
+
+    /// Whether the Items page's Edit popover is out, which puts a minus badge on each tile of the New row.
+    var isEditingNewRow = false
+
+    /// The sources the Collections page is narrowed to, by name; empty lists every collection (`Browser+IndexPage`).
+    var collectionSourceFilter: Set<String> = []
 
     /// What the gallery draws on each card in a place that is not a saved view, as its default view keeps it
     /// (`Browser+PlaceDefaults`).

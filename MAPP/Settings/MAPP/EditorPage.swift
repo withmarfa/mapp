@@ -20,11 +20,15 @@ struct EditorPage: View {
     @AppStorage(PasteAs.key) private var pasteAs = PageStyle().pasteAs
     @AppStorage(PageKey.foldsHeadings) private var foldsHeadings = PageStyle().foldsHeadings
     @AppStorage(PageKey.showsCodeLineNumbers) private var showsCodeLineNumbers = PageStyle().showsCodeLineNumbers
+    @AppStorage(PageKey.cornerShowsFormats) private var cornerShowsFormats = true
+    @AppStorage(PageKey.cornerShowsTextSize) private var cornerShowsTextSize = true
+    @AppStorage(PageKey.cornerShowsFocus) private var cornerShowsFocus = true
 
     var body: some View {
         SettingsPageColumn {
             text
             page
+            corner
             editing
             typing
             pasting
@@ -90,6 +94,20 @@ struct EditorPage: View {
         }
     }
 
+    private var corner: some View {
+        SettingsSection("Page Corner", footer: "A control turned off is in the page’s More menu, and the View menu keeps every command.") {
+            SettingsRow("Formats", line: "Aa, which opens the formats bar.") {
+                SettingsToggle(title: "Formats", isOn: $cornerShowsFormats).accessibilityIdentifier("CornerFormats")
+            }
+            SettingsRow("Text Size", line: "The page’s text size and width.") {
+                SettingsToggle(title: "Text Size", isOn: $cornerShowsTextSize).accessibilityIdentifier("CornerTextSize")
+            }
+            SettingsRow("Focus", line: "Hides the title and properties.") {
+                SettingsToggle(title: "Focus", isOn: $cornerShowsFocus).accessibilityIdentifier("CornerFocus")
+            }
+        }
+    }
+
     private var editing: some View {
         SettingsSection("Editing") {
             SettingsRow("Edit Pages As", line: "A page can switch on its own.") {
@@ -99,7 +117,7 @@ struct EditorPage: View {
                 }
                 .accessibilityIdentifier("EditingMode")
             }
-            SettingsRow("Articles Open In", line: "View > Show Original switches it.") {
+            SettingsRow("Articles Open In", line: "The View menu switches it.") {
                 SettingsPopUp(title: "Articles Open In", selection: $articlesOpenIn) {
                     Text("Reader").tag(SourceViewMode.reader)
                     Text("Original").tag(SourceViewMode.original)

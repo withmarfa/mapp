@@ -236,6 +236,8 @@ struct MainView: View {
 
     private var presentedWindow: some View {
         workspace
+        // The window's toolbar is part of what a modal covers: dimmed and silent, as behind a sheet.
+        .disabled(browser.isModalPresented)
         .escapesFromPage(details)
         .overlay {
             ZStack {
@@ -338,6 +340,9 @@ struct MainView: View {
             }
             editor.onOpenItem = { [browser, library, order] id in
                 if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }
+            }
+            editor.onFollowItemLink = { [browser, library, order] id in
+                if let item = library.item(id) { browser.follow(link: item, in: library, order: order) }
             }
             editor.onShowRefusedTitle = { [browser, library, order] id in
                 if let item = library.item(id) { browser.reveal(item, in: library, order: order) }

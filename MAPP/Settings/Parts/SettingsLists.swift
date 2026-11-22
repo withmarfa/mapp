@@ -8,7 +8,7 @@ struct SettingsListEntry: Identifiable, Hashable {
 
 /// A pop-up that chooses up to `limit` of its options, shown as their names joined with commas, in the order chosen. The
 /// system's menu draws it, with a check beside each chosen option; once the limit is reached the others are dimmed, so a
-/// choice is never dropped without being asked. It is 200 by 28 like every input, drawn as the system draws a menu button.
+/// choice is never dropped without being asked. The system draws the button, at its regular size and its own width.
 struct SettingsMultiPopUp: View {
     let title: LocalizedStringKey
     let options: [SettingsListEntry]
@@ -33,23 +33,16 @@ struct SettingsMultiPopUp: View {
                 .disabled(!isOn && selection.count >= limit)
             }
         } label: {
-            HStack(spacing: 6) {
-                if names.isEmpty {
-                    Text(emptyTitle).foregroundStyle(SettingsTokens.secondaryText)
-                } else {
-                    Text(verbatim: names.joined(separator: ", "))
-                }
-                Spacer(minLength: 0)
-                SettingsPopUpChevron()
+            if names.isEmpty {
+                Text(emptyTitle)
+            } else {
+                Text(verbatim: names.joined(separator: ", "))
             }
-            .lineLimit(1)
         }
         .menuStyle(.button)
         .buttonStyle(.bordered)
-        .controlSize(.large)
-        .buttonSizing(.flexible)
-        .menuIndicator(.hidden)
-        .frame(width: SettingsTokens.Metric.controlWidth, height: SettingsTokens.Metric.controlHeight)
+        .lineLimit(1)
+        .fixedSize()
         .accessibilityLabel(Text(title))
         .accessibilityValue(Text(verbatim: names.joined(separator: ", ")))
     }

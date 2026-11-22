@@ -48,8 +48,8 @@ The title is always the item's name. A clipboard item is titled "Clipboard Item"
 
 There are two: Standard and Compact.
 
-- **Standard.** The row has a Title, a Date, a Secondary line and a bottom line. See [Looks](looks.md).
-- **Compact.** One line: the type's mark, only in a list that mixes types, then the title, then the date.
+- **Standard.** The row has a Title, a Date, a Secondary line and a bottom line, and a small picture under the date where the item has one. See [Looks](looks.md).
+- **Compact.** One line: the type's mark, only in a list that mixes types, then the title, then the date. It shows no picture.
 
 The density a list uses is the first of these that has a choice:
 

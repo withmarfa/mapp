@@ -11,10 +11,10 @@ enum MacSettings {
             + IndexPlace.allCases.flatMap { [$0.tabKey, $0.sortKey] }
             + [
                 DateFormat.key, WeekStart.key, StartWith.key, StartWith.lastPlaceKey, ReopenWindows.key, NewItemType.key,
-                QuickAdd.lastTypeKey, RemotePictureSetting.key, Reporting.switchKey, SidebarTypeRow.subtypeIconsKey,
+                QuickAdd.lastTypeKey, NewRowTypes.key, RemotePictureSetting.key, Reporting.switchKey, SidebarTypeRow.subtypeIconsKey,
                 SourceViewMode.key, PlaceDensities.key, PlaceDefaults.key, ItemTableColumnLayouts.key, ViewLayouts.key,
                 PagePlacements.key, IncludedSubtypes.key, SidebarLayouts.defaultsKey, TypeLooks.defaultsKey, SearchLeaveOuts.defaultsKey,
-                ShortcutBindings.defaultsKey, AnyAppShortcuts.defaultsKey,
+                ShortcutBindings.defaultsKey, AnyAppShortcuts.defaultsKey, CalendarHourHeight.key,
             ] + SearchOptions.keys
     }
 

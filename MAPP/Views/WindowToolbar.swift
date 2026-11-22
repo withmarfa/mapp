@@ -44,18 +44,20 @@ struct WindowToolbar: CustomizableToolbarContent {
         // appear for the next. Any other page keeps no header to scroll, so its item is hidden.
         if hasListColumn || browser == nil {
             ToolbarItem(id: "scrolledTitle") {
-                ScrolledItemTitle(title: tools.scrolledTitle, subtitle: tools.scrolledSubtitle)
+                ScrolledItemTitle(title: tools.scrolledTitle, icon: tools.scrolledIcon, showsIcon: tools.hasHeaderAway, subtitle: tools.scrolledSubtitle)
             }
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
             .hidden((!showsScrolledTitle && !tools.isFocused) || !tools.hasScrollingHeader || browser?.showsCollection == true)
         } else if opensFromCollection, showsScrolledTitle || tools.isFocused, tools.hasHeaderAway {
             ToolbarItem(id: "scrolledTitle", placement: .navigation) {
-                ScrolledItemTitle(title: tools.scrolledTitle, subtitle: tools.scrolledSubtitle)
+                ScrolledItemTitle(title: tools.scrolledTitle, icon: tools.scrolledIcon, showsIcon: tools.hasHeaderAway, subtitle: tools.scrolledSubtitle)
             }
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
         }
+        // The index pages' tabs come into the toolbar once their own have scrolled away.
+        if let browser, browser.showsSidebarIndex, !hasListColumn { IndexTabsToolbarItem(browser: browser) }
         ToolbarSpacer(.flexible)
         // A hidden spacer still leaves its gap, so the fixed spacers are not hidden: each stands after a group that
         // shows and before another that does, which keeps one standard gap between groups in every state. They are
@@ -64,13 +66,19 @@ struct WindowToolbar: CustomizableToolbarContent {
         // More act on items, not on the view.
         let editsView = browser?.showsViewPanel == true
         let showsViewTools = browser != nil && !hasListColumn && !opensFromCollection
-        let showsViewMode = browser != nil && showsItem && !editsView
+        // A full page opened from a layout has no view options, so no layout to choose.
+        let showsViewMode = browser != nil && showsItem && !editsView && !opensFromCollection
         let showsActions = showsItem && !editsView
         let showsDetails = !tools.showsInspector
         let showsAfterViewMode = showsActions || showsDetails
         let showsAfterViewTools = showsViewMode || showsAfterViewMode
-        if let browser, !hasListColumn {
+        if let browser, browser.showsSidebarIndex, !hasListColumn {
+            IndexToolbarItems(browser: browser)
+        }
+        if let browser, !browser.showsSidebarIndex, !hasListColumn {
             ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
+        }
+        if let browser, !hasListColumn {
             if showsViewTools && showsAfterViewTools { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         }
         if let browser {
@@ -84,7 +92,9 @@ struct WindowToolbar: CustomizableToolbarContent {
             tools.moreMenu.disabled(items.isEmpty)
         }
         .hidden(!showsActions)
-        if showsActions && showsDetails { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
+        // With the right sidebar open its own toolbar holds the Details button, which would otherwise join Share and
+        // More into one capsule, so the gap stands whether Details is here or over the sidebar.
+        if showsActions { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         ToolbarItem(id: "details") { tools.detailsButton }
             .hidden(!showsDetails)
         ExtraToolbarItems(tools: tools)
@@ -203,7 +213,12 @@ struct ToolbarTrayWatch: ViewModifier {
 
 /// The title of the item on the page, in the toolbar once the page's header has scrolled away.
 struct ScrolledItemTitle: View {
+    @Environment(\.colorScheme) private var scheme
     let title: String
+    /// The item type's icon id, drawn before the title in the type's color. A type with none gets the generic mark.
+    var icon: String?
+    /// Whether the title is showing, and so its icon.
+    var showsIcon = false
     /// A second, quieter line, as the page's Focus gives under the title.
     var subtitle: String?
 
@@ -212,10 +227,18 @@ struct ScrolledItemTitle: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
-                .accessibilityIdentifier("ScrolledItemTitle")
-                .accessibilityHidden(title.isEmpty)
+            HStack(spacing: 5) {
+                if showsIcon {
+                    TypeGlyph(id: icon)
+                        .font(.system(size: TypeMark.Size.row.metrics.icon))
+                        .foregroundStyle(TypeTone(icon: icon).color(for: scheme))
+                        .accessibilityHidden(true)
+                }
+                Text(title)
+                    .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
+                    .accessibilityIdentifier("ScrolledItemTitle")
+                    .accessibilityHidden(title.isEmpty)
+            }
             if let subtitle {
                 Text(subtitle)
                     .interfaceFont(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
@@ -280,6 +303,8 @@ struct DetailsToggle: View {
             LayoutDoneButton(details: details, editor: editor)
         } else {
             Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
+                // Gray while on, as every on button is, rather than the accent color.
+                .tint(.secondary)
                 .help("Hide Details")
                 .accessibilityIdentifier("DetailsToggle")
         }
@@ -371,6 +396,12 @@ struct ItemToolbarActions {
         return library.pageLayout(of: item) == .text ? item.title : item.displayTitle
     }
 
+    /// The icon id of the item's type, shown before the title wherever the title is shown. Nil for a type with no icon.
+    var scrolledIcon: String? {
+        let item = focusedItem ?? itemWithScrollingHeader.flatMap { details.isHeaderAway(of: $0.id) ? $0 : nil }
+        return item.flatMap { library.catalogue.icon(for: $0.type) }
+    }
+
     /// The line under the title in Focus: the item's type, or for a PDF whose pages have been counted, its type and its
     /// page count. Nothing outside Focus, where the scrolled title stands alone.
     var scrolledSubtitle: String? {
@@ -451,11 +482,30 @@ private struct MoreMenu: View {
     let fileURL: URL?
     let browser: Browser?
     let editor: EditorController?
+    @AppStorage(PageKey.cornerShowsFormats) private var showsFormats = true
+    @AppStorage(PageKey.cornerShowsTextSize) private var showsTextSize = true
+    @AppStorage(PageKey.cornerShowsFocus) private var showsFocus = true
+
+    private var context: ItemCommandContext {
+        ItemCommandContext(library: library, ids: ids, browser: browser, editor: editor, details: details, fileURL: fileURL)
+    }
 
     private func command(_ command: ItemCommand) -> some View {
-        ItemCommandButton(
-            command: command, context: ItemCommandContext(library: library, ids: ids, browser: browser, editor: editor, details: details, fileURL: fileURL),
-            editor: editor)
+        ItemCommandButton(command: command, context: context, editor: editor)
+    }
+
+    private var pageLayout: ItemPageLayout {
+        context.item.flatMap { library.pageLayout(of: $0) } ?? .text
+    }
+
+    /// The corner's controls the person turned off in Settings > Editor, for the page this window shows.
+    private var cornerControlsInMore: [PageCornerButton] {
+        let context = context
+        guard let details, let item = context.item, context.showsPage, !context.hidesCorner, let library = context.library else { return [] }
+        return PageCorner.inMore(
+            layout: library.pageLayout(of: item), hasReader: details.pageLook?.item == item.id,
+            canWrite: item.isWritable && editor != nil, file: details.fileViewing(of: item.id)?.kind,
+            shows: PageCornerChoice(formats: showsFormats, textSize: showsTextSize, focus: showsFocus))
     }
 
     var body: some View {
@@ -480,6 +530,16 @@ private struct MoreMenu: View {
             }
             command(.toggleSource)
             command(.toggleReader)
+            ForEach(cornerControlsInMore, id: \.self) { button in
+                switch button {
+                case .formats: command(.toggleFormats)
+                case .textSize:
+                    Menu("Text Size", systemImage: "textformat.size") { TextSizeOptions() }
+                        .disabled(!PageCorner.sizesText(layout: pageLayout, look: details?.pageLook?.mode))
+                case .focus: command(.toggleFocus)
+                case .look, .pages, .zoom: EmptyView()
+                }
+            }
             Divider()
             command(.print)
             command(.exportPDF)

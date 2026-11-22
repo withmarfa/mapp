@@ -160,9 +160,3 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         return ([title] + searchWords).contains { $0.localizedStandardContains(query) }
     }
 }
-
-/// What a page's row in the sidebar shows at its trailing edge.
-nonisolated enum SettingsBadge: Hashable, Sendable {
-    case count(Int)
-    case dot
-}

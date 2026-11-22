@@ -58,7 +58,7 @@ struct AccountPage: View {
                 } else {
                     SettingsSection("Passkeys and Browsers") {
                         SettingsProblemRow(
-                            title: Text("Sign-Ins"), line: Text("MAPP isn’t allowed to list and end your sign-ins."), symbol: "lock", tone: .gray,
+                            title: Text("Sign-Ins"), line: Text("MAPP isn’t allowed to list and end your sign-ins."), symbol: "lock", tone: nil,
                             actions: [
                                 SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") {
                                     Task { await model.allowSignIns(); await model.load() }

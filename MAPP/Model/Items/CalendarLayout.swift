@@ -72,6 +72,17 @@ nonisolated enum CalendarLayout {
         return DateInterval(start: day, end: calendar.date(byAdding: .day, value: scale == .week ? 7 : 30, to: day) ?? day)
     }
 
+    /// The first day of the week that holds `day`: the calendar's first weekday on or before it.
+    static func firstDay(ofWeekHolding day: Date, calendar: Calendar) -> Date {
+        interval(of: .week, containing: day, calendar: calendar).start
+    }
+
+    /// The first day of the seven the calendar shows in a week: `shown`, the day a scroll settled on, or where none was
+    /// the week that holds `now`.
+    static func firstDayShown(_ shown: Date?, now: Date, calendar: Calendar) -> Date {
+        shown.map(calendar.startOfDay(for:)) ?? firstDay(ofWeekHolding: now, calendar: calendar)
+    }
+
     /// The date `steps` weeks or months from `anchor`.
     static func moved(_ anchor: Date, by steps: Int, scale: CalendarScale, calendar: Calendar) -> Date {
         calendar.date(byAdding: scale == .week ? .weekOfYear : .month, value: steps, to: anchor) ?? anchor
@@ -100,13 +111,15 @@ nonisolated enum CalendarLayout {
     }
 
     /// What a week's block shows for the room it has: the title first, on up to two lines, and the time only where
-    /// room is left for it, on a line of its own wide enough to read. A block with room for one line gets one.
+    /// room is left for it, on a line of its own wide enough to read; a block taller than that gives the rest of its
+    /// room to more lines of the title. A block with room for one line gets one.
     static func blockLabel(height: CGFloat, width: CGFloat, scale: CGFloat) -> (titleLines: Int, showsTime: Bool) {
         let line = 14 * scale
         let room = height - 6 * scale
-        let titleLines = max(1, min(2, Int(room / line)))
-        let timeFits = room - CGFloat(titleLines) * line >= 12 * scale && width >= 34 * scale
-        return (titleLines, timeFits)
+        let first = max(1, min(2, Int(room / line)))
+        let timeFits = room - CGFloat(first) * line >= 12 * scale && width >= 34 * scale
+        let left = room - CGFloat(first) * line - (timeFits ? 12 * scale : 0)
+        return (first + max(Int(left / line), 0), timeFits)
     }
 
     /// A title broken at word boundaries into at most `lines` lines, for a block too narrow for it on one. Each line but
@@ -140,8 +153,8 @@ nonisolated enum CalendarLayout {
 
 // MARK: Week
 
-/// A week of the calendar: seven day columns, each with its whole-day items above and its timed blocks laid out by the
-/// minute, side by side where they overlap.
+/// A run of days on the calendar, seven for a week: a column for each, with its whole-day items above and its timed
+/// blocks laid out by the minute, side by side where they overlap.
 nonisolated struct CalendarWeek: Equatable, Sendable {
     /// One timed item's stretch of one day. An item over midnight, or over several days, has a block on each.
     struct Block: Identifiable, Hashable, Sendable {
@@ -172,23 +185,40 @@ nonisolated struct CalendarWeek: Equatable, Sendable {
     let interval: DateInterval
     let days: [Day]
 
-    static func make(entries: [CalendarEntry], around anchor: Date, calendar: Calendar, now: Date) -> CalendarWeek {
-        let interval = CalendarLayout.interval(of: .week, containing: anchor, calendar: calendar)
+    /// `count` days from the start of the day `start`. `shortestBlock` is the fewest minutes a block takes when blocks are
+    /// set side by side (`CalendarHourHeight.shortestBlock`).
+    static func make(
+        entries: [CalendarEntry], startingOn start: Date, count: Int = 7, calendar: Calendar, now: Date,
+        shortestBlock: Int = CalendarLayout.shortestBlock
+    ) -> CalendarWeek {
+        let first = calendar.startOfDay(for: start)
+        let end = calendar.date(byAdding: .day, value: count, to: first) ?? first.addingTimeInterval(TimeInterval(count) * 86_400)
+        let interval = DateInterval(start: first, end: max(end, first))
         let today = calendar.startOfDay(for: now)
-        let inWeek = entries.filter { $0.start < interval.end && $0.end > interval.start }
-        let days = CalendarLayout.days(in: interval, calendar: calendar).map { day -> Day in
+        let inRun = entries.filter { $0.start < interval.end && $0.end > interval.start }
+        let days = (0..<count).map { offset -> Day in
+            let day = calendar.date(byAdding: .day, value: offset, to: first) ?? first.addingTimeInterval(TimeInterval(offset) * 86_400)
             let next = calendar.date(byAdding: .day, value: 1, to: day) ?? day.addingTimeInterval(86_400)
-            let here = inWeek.filter { CalendarLayout.covers($0, day: day, calendar: calendar) }
+            let here = inRun.filter { CalendarLayout.covers($0, day: day, calendar: calendar) }
             let whole = here.filter(\.isAllDay).sorted(by: CalendarLayout.precedes)
             let timed = here.filter { !$0.isAllDay }.sorted(by: CalendarLayout.precedes).map { entry in
-                Block(
-                    entry: entry, day: day, startMinute: minute(of: entry.start, day: day, next: next, calendar: calendar),
-                    endMinute: max(minute(of: entry.end, day: day, next: next, calendar: calendar), minute(of: entry.start, day: day, next: next, calendar: calendar) + 1),
+                let startMinute = minute(of: entry.start, day: day, next: next, calendar: calendar)
+                return Block(
+                    entry: entry, day: day, startMinute: startMinute,
+                    endMinute: max(minute(of: entry.end, day: day, next: next, calendar: calendar), startMinute + 1),
                     continuesBefore: entry.start < day, continuesAfter: entry.end > next)
             }
-            return Day(date: day, isToday: day == today, isWeekend: calendar.isDateInWeekend(day), allDay: whole, blocks: sideBySide(timed))
+            return Day(
+                date: day, isToday: day == today, isWeekend: calendar.isDateInWeekend(day), allDay: whole,
+                blocks: sideBySide(timed, shortest: shortestBlock))
         }
         return CalendarWeek(interval: interval, days: days)
+    }
+
+    /// Whether the All Day row is wanted: some day shown holds a whole-day or multi-day item. With none, the row is not
+    /// drawn and the hours begin at the top.
+    static func showsAllDay(_ shown: some Sequence<Day>) -> Bool {
+        shown.contains { !$0.allDay.isEmpty }
     }
 
     private static func minute(of date: Date, day: Date, next: Date, calendar: Calendar) -> Int {
@@ -200,7 +230,7 @@ nonisolated struct CalendarWeek: Equatable, Sendable {
 
     /// Gives each block of a day a column. Blocks that overlap, one reaching another through a chain, share the width
     /// of their group, each in the first column free where it starts.
-    static func sideBySide(_ blocks: [Block]) -> [Block] {
+    static func sideBySide(_ blocks: [Block], shortest: Int = CalendarLayout.shortestBlock) -> [Block] {
         var placed: [Block] = []
         var group: [Block] = []
         var columnEnds: [Int] = []
@@ -216,7 +246,7 @@ nonisolated struct CalendarWeek: Equatable, Sendable {
         }
         for block in blocks.sorted(by: { ($0.startMinute, $1.endMinute) < ($1.startMinute, $0.endMinute) }) {
             if !group.isEmpty, block.startMinute >= groupEnd { close() }
-            let shown = max(block.endMinute, block.startMinute + CalendarLayout.shortestBlock)
+            let shown = max(block.endMinute, block.startMinute + shortest)
             var block = block
             if let free = columnEnds.firstIndex(where: { $0 <= block.startMinute }) {
                 block.column = free
@@ -270,10 +300,10 @@ nonisolated struct CalendarMonth: Equatable, Sendable {
     /// How many items have time in the month itself.
     let itemCount: Int
 
-    /// The row of the week that `span` holds the start of, or nil where no row does. A span ends where the next week
-    /// begins, so the end itself belongs to the next row, which is not marked.
-    func row(startingIn span: DateInterval) -> Int? {
-        weeks.firstIndex { week in week.first.map { $0.date >= span.start && $0.date < span.end } ?? false }
+    /// Which days of each row `span` holds, for the card to mark the week the calendar shows. A week that starts
+    /// part way through one marks the rest of that row and the start of the next.
+    func marked(in span: DateInterval) -> [[Bool]] {
+        weeks.map { week in week.map { $0.date >= span.start && $0.date < span.end } }
     }
 
     static func make(entries: [CalendarEntry], around anchor: Date, calendar: Calendar, now: Date) -> CalendarMonth {

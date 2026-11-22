@@ -137,23 +137,6 @@ struct ViewsHeading: View {
     }
 }
 
-/// A view row's own commands in the sidebar.
-struct SavedViewRowMenu: View {
-    let view: ItemID
-    let browser: Browser
-    @CurrentLibrary private var library
-    @StoredOrder private var order
-
-    var body: some View {
-        Button("Edit View") { browser.editView(view, in: library, order: order) }
-        Button("Duplicate View") { Task { await browser.duplicateView(view, in: library, order: order) } }
-            .disabled(!library.reachesServer)
-        Divider()
-        Button("Delete View…") { browser.deletingView = view }
-            .disabled(!library.reachesServer)
-    }
-}
-
 extension View {
     /// Asks before deleting a view, opens each view with its own order, grouping and the layout and columns this Mac
     /// keeps for it, and gives the panel that edits one the right sidebar.

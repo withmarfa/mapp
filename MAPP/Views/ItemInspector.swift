@@ -68,12 +68,15 @@ struct ItemInspectorHost: View {
                     onHeading: { editor?.revealHeading(at: $0) }
                 )
                 .id(id)
-            } else if let browser, browser.showsItemsIndex, browser.selection.count > 1 {
-                // Items has no page beside the sidebar to say how many rows are chosen.
+            } else if let browser, browser.selection.count > 1 {
                 EmptyState(title: Text("^[\(browser.selection.count) item](inflect: true) selected"), detail: nil, actions: { EmptyView() })
+            } else if selectedID != nil {
+                // The library has not read the chosen item yet.
+                if library.isLoaded && library.syncReport.phase == .current { Color.clear } else { InspectorReadingView() }
+            } else if let browser, browser.viewMode != .list, !browser.items(in: library).isEmpty {
+                InspectorPromptView(prompt: .forItems(in: browser.viewMode))
             } else {
-                // Where a page sits beside the sidebar it says that nothing, or many, are selected; Items and the other
-                // indexes have none, and their table shows that nothing is chosen.
+                // A place with no items says so in the main area, and so does the list layout's page column.
                 Color.clear
             }
         }
@@ -145,8 +148,8 @@ struct ItemInspector: View {
     let onOpen: (ItemID) -> Void
     let onEdit: (ItemRelationship) -> Void
     let onRemove: (ItemRelationship, ItemID) async -> Bool
-    /// The tags the person manages, which exclude the favorite tag, and what removes one. Tags are added in the value
-    /// editor, which reaches the library itself.
+    /// The tags the person manages, which exclude the favorite tag, and what removes one. Tags are added in the Tags box,
+    /// whose editor reaches the library itself.
     var tags: [String] = []
     var onRemoveTag: (String) -> Void = { _ in }
     var drafts: DetailsPresentation? = nil
@@ -174,8 +177,8 @@ struct ItemInspector: View {
     @State private var revealed: Set<String> = []
     /// The property just added, whose row opens ready to edit.
     @State private var adding: String?
-    /// Where the Tags heading's plus opens the tag editor.
-    @State private var tagAnchor = ValueEditAnchorBox()
+    /// The Tags box while a tag is being added in it.
+    @State private var tagEditor: ValueEditModel?
     @Environment(\.library) private var library
     @Environment(\.undoManager) private var undoManager
 
@@ -310,22 +313,35 @@ struct ItemInspector: View {
     }
 
     private var tagSection: some View {
-        InspectorSectionView(.tags, title: "Tags", count: tags.count,
-                             placeholder: tags.isEmpty ? "No Tags" : nil, add: { hovering in
+        InspectorSectionView(.tags, title: "Tags", count: tags.count, boxed: false, add: { hovering in
             if item.canEditTags {
-                InspectorPlusButton(accessibilityLabel: "Add Tag", identifier: "ItemTagAdd", isRowHovered: hovering, action: addTag)
+                InspectorPlusButton(accessibilityLabel: "Add Tag", identifier: "ItemTagAdd", isRowHovered: hovering, action: beginTags)
             }
         }) {
-            ItemTagsSection(tags: tags, isEditable: item.canEditTags, onRemove: onRemoveTag)
+            InspectorTagsContent(
+                tags: tags, isEditable: item.canEditTags, onRemove: onRemoveTag, editor: tagEditor,
+                begin: beginTags, finish: finishTags, cancel: { tagEditor = nil })
         }
-        .background(ValueEditAnchor(box: tagAnchor))
+        .onDisappear(perform: finishTags)
         .showOnPageMenu(isShown: placement.showsOnPage(PagePlacement.tags), onChange: showOnPage(PagePlacement.tags))
     }
 
-    private func addTag() {
-        guard let library, let view = tagAnchor.view else { return }
-        ValueEditPresenter.shared.present(
-            ValueEditRequest(kind: .tags, library: library, item: item.id, undoManager: undoManager) { _ in false }, anchor: view)
+    /// Puts the text cursor in the Tags box, opening the section if it was folded.
+    private func beginTags() {
+        guard let library, item.canEditTags, tagEditor == nil else { return }
+        ValueEditPresenter.shared.dismiss(restoringFocus: false)
+        UserDefaults.standard.set(true, forKey: InspectorSectionKind.tags.key)
+        let model = ValueEditModel(ValueEditRequest(kind: .tags, library: library, item: item.id, undoManager: undoManager))
+        model.close = { tagEditor = nil }
+        tagEditor = model
+    }
+
+    /// Ends the editing without Escape: a tag typed and not yet added is added, or kept and told where the library
+    /// refuses it, so leaving the box, the item or the sidebar never drops it.
+    private func finishTags() {
+        guard let model = tagEditor else { return }
+        tagEditor = nil
+        model.finishTagField()
     }
 
     /// The items that link to this one, in a section of their own.

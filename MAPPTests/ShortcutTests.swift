@@ -62,6 +62,16 @@ struct ShortcutTests {
         #expect(key(String(UnicodeScalar(UInt32(NSLeftArrowFunctionKey))!), [.command, .option]).display == "⌥⌘←")
     }
 
+    @Test func paletteActionsIsCommandJAndCommandKOnlyOpensThePalette() {
+        #expect(ShortcutCommand.paletteActions.defaultShortcut == key("j"))
+        #expect(ShortcutCommand.commandPalette.defaultShortcut == key("k"))
+        #expect(ShortcutCommand.all.contains(.paletteActions))
+        let bindings = ShortcutBindings(defaults: defaults())
+        #expect(bindings.display(for: .paletteActions) == "⌘J")
+        bindings.set(nil, for: .paletteActions)
+        #expect(bindings.display(for: .paletteActions) == nil)
+    }
+
     @Test func aKeyPressBecomesAShortcutWithItsKeyCode() throws {
         func press(_ characters: String, _ modifiers: NSEvent.ModifierFlags, code: UInt16) throws -> Shortcut {
             let event = try #require(NSEvent.keyEvent(

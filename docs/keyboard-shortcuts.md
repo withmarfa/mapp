@@ -8,11 +8,12 @@ Settings > Keyboard gives every menu command MAPP adds a shortcut that its perso
 
 ## Menu commands
 
-- Every command is listed under the name of its menu, in the order of the menus, in a white shortcut field with a clear button. The system's own commands (Copy, Quit, Hide, Enter Full Screen, Close All, Emoji & Symbols, Help) are not MAPP's to change and are left out; a shortcut one of them holds can't be taken, by a menu command or by one that works in any app.
+- Every command is listed under the name of its menu, in the order of the menus, in a shortcut field, the system's bordered button with the keys in it and a clear button. The system's own commands (Copy, Quit, Hide, Enter Full Screen, Close All, Emoji & Symbols, Help) are not MAPP's to change and are left out; a shortcut one of them holds can't be taken, by a menu command or by one that works in any app.
 - A click on a field records the next keys pressed, taken before the menus can answer them. Escape stops, and Delete clears. Recording also stops when MAPP or the window stops being in front, or the page goes, and while a field records or the search waits for keys, the shortcuts that work in any app do not answer. A menu shortcut needs ⌘, ⌃ or ⌥ (or is a function key), since a bare key is typing.
 - A shortcut another command holds is shown as taken: the red ring, and under the row's title "⌘K is Command Palette's." An alert offers Replace, which leaves the other command with none, or Cancel.
 - The menus bind the chosen shortcut at once (`ShortcutBindings`), and so does the palette, which prints it beside the command. The Format commands also tell the item page, which answers the same keys.
 - The default of a command is in `ShortcutCommand`'s catalogue and is the shortcut it had before the page. Only a choice is stored, so a better default reaches every command nobody changed. No default is a key the system holds (`SystemShortcuts`, which includes the View menu's Show Toolbar, ⌥⌘T) or another command's: Insert Table is ⌃⌘T for that reason, and a test fails on any clash.
+- Palette Actions (Edit menu, ⌘J) opens or shuts Actions in the command palette or Search Items while one is out, and is off the rest of the time. ⌘K opens the command palette and nothing else. The palette's bar prints whatever key the person has given it, and none if cleared.
 - The toolbar's copy of a command and a row's menu bind no key, so a key is never registered twice.
 - A command whose title or action changes with the state of the window (Show Reader or Original, Add to Favorites or Remove from Favorites) is one command with one shortcut.
 
@@ -24,7 +25,7 @@ Settings > Keyboard gives every menu command MAPP adds a shortcut that its perso
 
 ## Search
 
-A small search at the top right filters by command name. Agreed, not built: its trailing edge on the cards' edge ([Agreed designs](agreed-designs.md#general-rules)). The keyboard button beside it searches by pressing keys instead (⌘K finds Command Palette), and typing searches by name again when it is off. While it searches by keys, each section says how many of its commands use the keys.
+A small search field, the system's, sits at the trailing end above the first card, its edge on the cards' edge, and filters by command name. The keyboard button beside it searches by pressing keys instead (⌘K finds Command Palette), and typing searches by name again when it is off. While it searches by keys, each section says how many of its commands use the keys.
 
 ## Files
 

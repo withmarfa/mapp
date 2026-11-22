@@ -30,18 +30,15 @@ enum SettingsTokens {
     static let hairline = adaptive(light: NSColor(white: 0, alpha: 0.09), dark: NSColor(white: 1, alpha: 0.12))
     /// A row's rule: lighter than the card's edge.
     static let rule = adaptive(light: NSColor(white: 0, alpha: 0.07), dark: NSColor(white: 1, alpha: 0.09))
-    /// A gray button's fill and the fill of a quiet control.
+    /// The fill of a quiet control.
     static let buttonFill = adaptive(light: NSColor(white: 0, alpha: 0.06), dark: NSColor(white: 1, alpha: 0.12))
-    static let buttonFillPressed = adaptive(light: NSColor(white: 0, alpha: 0.12), dark: NSColor(white: 1, alpha: 0.2))
-    /// A destructive button: a pale red fill with red text.
-    static let destructiveFill = adaptive(light: NSColor(red: 1, green: 0.23, blue: 0.19, alpha: 0.12), dark: NSColor(red: 1, green: 0.27, blue: 0.23, alpha: 0.24))
     /// A chosen row, card or table row: a soft gray, never blue.
     static let selection = adaptive(light: NSColor(white: 0, alpha: 0.07), dark: NSColor(white: 1, alpha: 0.1))
     /// Every other row of a section's table, a shade off the card's white.
     static let band = adaptive(light: NSColor(white: 0, alpha: 0.024), dark: NSColor(white: 1, alpha: 0.04))
     /// Where a row is under the pointer.
     static let hover = adaptive(light: NSColor(white: 0, alpha: 0.04), dark: NSColor(white: 1, alpha: 0.06))
-    /// The sidebar's field and the column's background.
+    /// A value that can't be changed, in a field's place.
     static let field = adaptive(light: .white, dark: NSColor(white: 0.12, alpha: 1))
     static let page = Color(nsColor: .windowBackgroundColor)
     static let errorRed = adaptive(light: NSColor(red: 0.78, green: 0.13, blue: 0.1, alpha: 1), dark: NSColor(red: 1, green: 0.42, blue: 0.38, alpha: 1))
@@ -74,30 +71,22 @@ enum SettingsTokens {
         static let darkLine = Color(nsColor: NSColor(white: 75 / 255, alpha: 1))
     }
 
-    /// The small list a row style's tile draws: a page, a title bar and a quieter line, which follow the appearance as a list does.
-    enum RowPreview {
-        static let page = card
-        static let title = adaptive(light: NSColor(white: 0.78, alpha: 1), dark: NSColor(white: 0.46, alpha: 1))
-        static let line = adaptive(light: NSColor(white: 0.88, alpha: 1), dark: NSColor(white: 0.3, alpha: 1))
-    }
-
     /// The interface fonts of Settings. A page asks for these by role.
     enum Role: Hashable, Sendable {
-        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, sidebar, sidebarHeader, largeGlyph, tableHeader
+        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, sidebar, largeGlyph, tableHeader
     }
 
     static func font(_ role: Role, scale: CGFloat = 1) -> Font {
         switch role {
         case .title, .sidebar: .system(size: 13 * scale)
-        case .line, .sectionLine, .footer: .system(size: 11 * scale)
+        case .line, .sectionLine, .footer: .system(size: 12 * scale)
         case .sectionName: .system(size: 13 * scale, weight: .semibold)
         case .small: .system(size: 12 * scale)
         case .mono: .system(size: 12 * scale, design: .monospaced)
         case .stateTitle: .system(size: 13 * scale, weight: .semibold)
         case .largeGlyph: .system(size: 15 * scale)
         case .headTitle: .system(size: 15 * scale, weight: .semibold)
-        case .tableHeader: .system(size: 11 * scale, weight: .semibold)
-        case .sidebarHeader: .system(size: 11 * scale, weight: .semibold)
+        case .tableHeader: .system(size: 12 * scale, weight: .medium)
         }
     }
 
@@ -119,18 +108,15 @@ enum SettingsTokens {
         static let rowHeightCompact: CGFloat = 36
         /// The space above and below a standard row's words beyond the row's own padding, which a line that wraps keeps by
         /// growing the row: a row of one line is then exactly its height.
-        static let rowTextPadding: CGFloat = 6
+        static let rowTextPadding: CGFloat = 1
         /// A card's side margin, where a row's text starts when it has no lead.
         static let inset: CGFloat = 16
         /// The lead column, in which a tile, a symbol or a mark sits; text starts after it, at 52.
         static let leadColumn: CGFloat = 24
         static let textInset: CGFloat = 52
         static let controlWidth: CGFloat = 200
+        /// A field's height, which the system draws and a read-only value is as tall as.
         static let controlHeight: CGFloat = 28
-        /// The chevrons that end a pop-up the system has no control for, sized and set to match the ones the system draws
-        /// in `SettingsPopUp`: `popUpChevronPull` is how far nearer the edge they sit than a bordered button's label ends.
-        static let popUpChevronSize: CGFloat = 13
-        static let popUpChevronPull: CGFloat = 5
         /// A table that is a page: its side margin, and the height of the bar above its columns and of the foot below them.
         static let pageTableInset: CGFloat = 24
         static let pageTableBar: CGFloat = 48
@@ -154,42 +140,24 @@ enum SettingsTokens {
         static let pageTableRow: CGFloat = 30
         /// The space above and below a table row's cells, which a cell that wraps keeps by growing the row.
         static let tableCellPadding: CGFloat = 7
-        static let cardRadius: CGFloat = 10
+        static let cardRadius: CGFloat = 12
         static let controlRadius: CGFloat = 7
-        static let buttonRadius: CGFloat = 9
         static let tile: CGFloat = 24
-        /// A tile's corner radius and symbol size, as shares of its side.
+        /// A tile's corner radius and the box its symbol is fitted in, as shares of its side: the symbol keeps even
+        /// padding whatever its shape, as in System Settings' sidebar.
         static let tileRounding: CGFloat = 0.27
-        static let tileGlyph: CGFloat = 0.55
+        static let tileGlyph: CGFloat = 0.62
         /// A well's symbol or mark, as a share of its side: 12 points in the 24 point well.
         static let wellGlyph: CGFloat = 0.5
         static let headTile: CGFloat = 44
-        static let smallButtonHeight: CGFloat = 22
         /// A small search field at a list's trailing edge, and the button beside it that changes what it searches by.
         static let searchWidth: CGFloat = 200
-        static let searchHeight: CGFloat = 24
-        static let searchRadius: CGFloat = 7
-        static let searchInset: CGFloat = 7
         static let searchSpacing: CGFloat = 8
-        static let searchGap: CGFloat = 5
-        /// The sidebar's tile, rows, field and headers.
+        /// The sidebar's tile.
         static let sidebarTile: CGFloat = 20
-        static let sidebarRowHeight: CGFloat = 28
-        static let sidebarRowRadius: CGFloat = 8
-        static let sidebarRowSpacing: CGFloat = 8
-        static let sidebarRowInset: CGFloat = 10
-        static let sidebarInset: CGFloat = 10
-        static let sidebarBottomInset: CGFloat = 12
-        static let sidebarHeaderInset: CGFloat = 20
-        static let sidebarHeaderTop: CGFloat = 14
-        static let sidebarHeaderBottom: CGFloat = 4
-        static let sidebarGroupGap: CGFloat = 10
-        static let sidebarEmptyTop: CGFloat = 24
-        static let sidebarFieldSpacing: CGFloat = 6
-        static let sidebarFieldInset: CGFloat = 8
-        static let sidebarFieldMargin: CGFloat = 12
-        static let sidebarFieldTop: CGFloat = 8
-        static let sidebarFieldBottom: CGFloat = 4
+        /// How far a sidebar section's name is moved in so that it starts where the tiles below it do; the system sets the
+        /// name a little to the left of them.
+        static let sidebarHeaderInset: CGFloat = 2.5
         /// A color swatch and the dot that marks the chosen one, and the space between swatches.
         static let swatch: CGFloat = 18
         static let swatchDot: CGFloat = 6
@@ -208,14 +176,6 @@ enum SettingsTokens {
         static let previewTop: CGFloat = 22
         static let previewSidebarPadding: CGFloat = 10
         static let previewHeading: CGFloat = 0.55
-        /// A row style tile's bars: height, space inside a row and between rows, the page's side and top padding, and how
-        /// wide a title bar and a quieter line run, as shares of the width.
-        static let rowPreviewBar: CGFloat = 4
-        static let rowPreviewInner: CGFloat = 4
-        static let rowPreviewGap: CGFloat = 8
-        static let rowPreviewPadding: CGFloat = 16
-        static let rowPreviewTitle: CGFloat = 0.6
-        static let rowPreviewLine: CGFloat = 0.45
         /// The space above and below the rows a preview card draws.
         static let previewCardInset: CGFloat = 4
         /// The gap between buttons or a value and a button at a row's end, and between a head card and what sits under it.
@@ -241,21 +201,19 @@ enum SettingsTokens {
             static let check: CGFloat = 18
         }
         /// The space between a page's sections, and above and below its column.
-        static let pageSpacing: CGFloat = 32
+        static let pageSpacing: CGFloat = 26
+        /// A section's name is at least this tall, with the name at its foot, and the gap between that and its card, so a name
+        /// alone sits nearer its card than the section above it, and a name with a line starts higher.
+        static let sectionHeader: CGFloat = 22
+        static let sectionGap: CGFloat = 8
         /// The space between a card and the row of buttons under it, which sit nearer than a section does.
         static let barGap: CGFloat = 14
         /// Below the toolbar: a head card sits 62 points under the window's top, as the boards draw.
         static let pageTop: CGFloat = 10
-        /// More room above the first section of a page when it opens with its name (the boards put the card 92.5 points under the
-        /// window's top), and above one that opens with its name and a line under it (105.5): a head card needs none.
-        static let firstHeaderInset: CGFloat = 5.5
+        /// More room above the first section of a page when it opens with its name and a line under it (the boards put the card
+        /// 105.5 points under the window's top).
         static let firstHeaderWithLineInset: CGFloat = 2
         static let pageBottom: CGFloat = 58
-        /// A count badge's side padding, smallest size and a dot badge's size.
-        static let badgeInset: CGFloat = 6
-        static let badgeSize: CGFloat = 18
-        static let badgeDot: CGFloat = 8
-        static let badgeLabelSpacing: CGFloat = 4
         /// The sheet that asks about changes that wait: its stack spacing, a change's spacing, padding and radius, and
         /// the tallest its list of texts grows.
         static let sheetSpacing: CGFloat = 12

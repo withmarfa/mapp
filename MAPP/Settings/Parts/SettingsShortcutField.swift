@@ -31,9 +31,10 @@ extension NSEvent {
     }
 }
 
-/// A shortcut at a row's trailing edge: white, 200 by 28, the keys centered. A set one has a clear button; an empty one reads
-/// Record Shortcut; one being recorded reads Type Shortcut with a gray focus ring; a refused one has the red ring, and the
-/// row's line says why. A click starts recording, the next key press is handed to `record`, Escape stops, and Delete clears.
+/// A shortcut at a row's trailing edge, the system has no recorder for, so it is the system's bordered button, 200 wide, with the
+/// keys in it. A set one has a clear button; an empty one reads Record Shortcut; one being recorded reads Type Shortcut with a
+/// gray focus ring; a refused one has the red ring, and the row's line says why. A click starts recording, the next key press is
+/// handed to `record`, Escape stops, and Delete clears.
 struct SettingsShortcutField: View {
     let title: LocalizedStringKey
     let keys: String?
@@ -47,30 +48,27 @@ struct SettingsShortcutField: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius, style: .continuous)
-        Button(action: startRecording) {
-            label
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(shape)
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .trailing) {
-            if keys != nil, !isRecording {
-                Button(action: clear) {
-                    Image(systemName: "xmark.circle.fill")
-                        .settingsFont(.small)
-                        .foregroundStyle(SettingsTokens.tertiaryText)
-                        .frame(width: SettingsTokens.Metric.controlHeight, height: SettingsTokens.Metric.controlHeight)
-                        .contentShape(.rect)
+        Button(action: startRecording) { label.frame(maxWidth: .infinity) }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.roundedRectangle(radius: SettingsTokens.Metric.controlRadius))
+            .buttonSizing(.flexible)
+            .controlSize(.large)
+            .overlay(alignment: .trailing) {
+                if keys != nil, !isRecording {
+                    Button(action: clear) {
+                        Image(systemName: "xmark.circle.fill")
+                            .settingsFont(.small)
+                            .foregroundStyle(SettingsTokens.tertiaryText)
+                            .padding(.horizontal, 6)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear Shortcut")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear Shortcut")
             }
-        }
-        .frame(width: SettingsTokens.Metric.controlWidth, height: SettingsTokens.Metric.controlHeight)
-        .background(SettingsTokens.field, in: shape)
-        .overlay { shape.strokeBorder(SettingsTokens.hairline, lineWidth: 1) }
-        .overlay { if isRecording { shape.stroke(SettingsTokens.focusRing, lineWidth: 3).padding(-1.5).allowsHitTesting(false) } }
-        .settingsErrorRing(isError)
+            .frame(width: SettingsTokens.Metric.controlWidth)
+            .overlay { if isRecording { shape.stroke(SettingsTokens.focusRing, lineWidth: 3).padding(-1.5).allowsHitTesting(false) } }
+            .settingsErrorRing(isError)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
         .accessibilityValue(keys ?? "")
@@ -102,11 +100,11 @@ struct SettingsShortcutField: View {
 
     @ViewBuilder private var label: some View {
         if isRecording {
-            Text("Type Shortcut").settingsFont(.title).foregroundStyle(SettingsTokens.tertiaryText)
+            Text("Type Shortcut").foregroundStyle(.secondary)
         } else if let keys {
-            Text(verbatim: keys).settingsFont(.title).foregroundStyle(SettingsTokens.primaryText)
+            Text(verbatim: keys)
         } else {
-            Text("Record Shortcut").settingsFont(.title).foregroundStyle(SettingsTokens.tertiaryText)
+            Text("Record Shortcut").foregroundStyle(.secondary)
         }
     }
 }
@@ -124,34 +122,17 @@ struct SettingsShortcutSearch: View {
 
     var body: some View {
         HStack(spacing: SettingsTokens.Metric.searchSpacing) {
-            Button { byKeys.toggle() } label: {
-                Image(systemName: "keyboard")
-                    .settingsFont(.small)
-                    .foregroundStyle(byKeys ? SettingsTokens.primaryText : SettingsTokens.secondaryText)
-                    .frame(width: SettingsTokens.Metric.searchHeight, height: SettingsTokens.Metric.searchHeight)
-                    .background(byKeys ? SettingsTokens.buttonFill : Color.clear, in: .rect(cornerRadius: SettingsTokens.Metric.searchRadius, style: .continuous))
-                    .contentShape(.rect)
+            Toggle(isOn: $byKeys) {
+                Label("Search by Pressing a Shortcut", systemImage: "keyboard").labelStyle(.iconOnly)
             }
-            .buttonStyle(.plain)
+            .toggleStyle(.button)
+            .controlSize(.small)
             .help("Search by Pressing a Shortcut")
-            .accessibilityLabel("Search by Pressing a Shortcut")
-            .accessibilityAddTraits(byKeys ? .isSelected : [])
             .accessibilityIdentifier("ShortcutSearchByKeys")
-            SettingsSearchPill {
-                if byKeys {
-                    if let pressed {
-                        Text(verbatim: pressed).settingsFont(.small).foregroundStyle(SettingsTokens.primaryText)
-                    } else {
-                        Text("Press a Shortcut").settingsFont(.small).foregroundStyle(SettingsTokens.tertiaryText)
-                    }
-                    Spacer(minLength: 0)
-                } else {
-                    TextField("Search Shortcuts", text: $text)
-                        .labelsHidden()
-                        .textFieldStyle(.plain)
-                        .settingsFont(.small)
-                        .accessibilityIdentifier("ShortcutSearch")
-                }
+            if byKeys {
+                SettingsSearchField(prompt: String(localized: "Press a Shortcut"), text: .constant(pressed ?? ""), identifier: "ShortcutSearch")
+            } else {
+                SettingsSearchField(prompt: String(localized: "Search Shortcuts"), text: $text, identifier: "ShortcutSearch")
             }
         }
         .onChange(of: byKeys, initial: true) { _, on in

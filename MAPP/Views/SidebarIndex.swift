@@ -27,14 +27,14 @@ struct SidebarIndex: View {
     var body: some View {
         let rows = model.rows(for: place)
         IndexContent(
-            place: place, rows: rows, isBuilt: model.isBuilt(for: place), browser: browser, tab: tabBinding, choice: choice,
+            place: place, title: library.name(of: browser.item), rows: rows, isBuilt: model.isBuilt(for: place), browser: browser, tab: tabBinding, choice: choice,
             edit: place == .sources ? { editing = $0 } : nil, delete: place == .collections ? { ask($0) } : nil,
-            newCollection: place == .collections ? { browser.openQuickAdd(in: library) } : nil
+            newCollection: place == .collections ? { browser.openQuickAddFromIndex(remembered: "", in: library) } : nil
         ) { row in
             browser.show(row.place, in: library, order: order)
         }
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
-            IndexInspector(choice: choice, rows: rows) { browser.show($0.place, in: library, order: order) }
+            IndexInspector(choice: choice, place: place, rows: rows) { browser.show($0.place, in: library, order: order) }
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
                 .toolbar(id: WindowToolbarLayout.index) { InspectorToolbar(details: details, editor: nil, browser: browser) }
         }
@@ -67,8 +67,9 @@ struct SidebarIndex: View {
         }
         .focusedSceneValue(\.indexActions, actions(in: rows))
         .onDisappear { model.stop() }
+        // The page has its own large title.
+        .toolbar(removing: .title)
         .navigationTitle(library.name(of: browser.item))
-        .navigationSubtitle(summary)
         .accessibilityIdentifier("SidebarIndex")
     }
 
@@ -111,25 +112,13 @@ struct SidebarIndex: View {
         let place: IndexPlace
         let library: ObjectIdentifier
     }
-
-    /// How many places the page lists, and for sources how many items they hold between them.
-    private var summary: String {
-        let rows = model.rows(for: place)
-        guard !rows.isEmpty else { return "" }
-        switch place {
-        case .sources:
-            let items = rows.reduce(0) { $0 + $1.count }
-            return String(localized: "\(rows.count) sources") + ", " + String(localized: "\(items) items")
-        default:
-            return String(localized: "\(rows.count) collections")
-        }
-    }
 }
 
 /// The rows of one index page under their tabs, searched.
 private struct IndexContent: View {
     @CurrentLibrary private var library
     let place: IndexPlace
+    let title: String
     let rows: [IndexRow]
     let isBuilt: Bool
     let browser: Browser
@@ -146,10 +135,13 @@ private struct IndexContent: View {
         } else if rows.isEmpty {
             empty
         } else {
-            let searched = browser.isSearching ? rows.filter(matches) : rows
+            let narrowed = place == .collections && !browser.collectionSourceFilter.isEmpty
+                ? rows.filter { browser.collectionSourceFilter.contains($0.sourceName) } : rows
+            let searched = browser.isSearching ? narrowed.filter(matches) : narrowed
             let shown = tab.rows(in: searched)
             IndexPage(
-                place: place, rows: shown, tabs: place.tabs.map { (tab: $0, count: $0.rows(in: searched).count) }, tab: $tab,
+                place: place, title: title, browser: browser,
+                sources: Set(rows.map(\.sourceName)).filter { !$0.isEmpty }.sorted(), rows: shown, tabs: place.tabs.map { (tab: $0, count: $0.rows(in: searched).count) }, tab: $tab,
                 choice: choice, open: open, edit: edit, delete: delete, newCollection: newCollection, emptyTab: emptyTab)
         }
     }

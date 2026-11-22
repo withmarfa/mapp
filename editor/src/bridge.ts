@@ -96,7 +96,24 @@ export type EditorMessage =
   /** A row of the property block was dragged: the whole order the page shows after the move, folded rows included. */
   | { type: 'moveRow'; item: string; row: string; order: string[] }
   | ({ type: 'openItemLink'; item: string } & LinkRef)
+  /** The person asked for the menu of a link in the text, which Inkkit has selected. `point` is where the pointer was in
+   *  the page's window, whose height is `viewportHeight`. The app builds the menu and carries each choice out through the
+   *  page's commands, under `generation`. */
+  | {
+      type: 'linkMenu'
+      item: string
+      generation: number
+      link: MenuLink
+      point: [number, number]
+      viewportHeight: number
+    }
   | ({ type: 'find' } & FindState)
+
+/** The link a `linkMenu` is for. `openable` is Inkkit's answer and `canOpenLink`'s, so the app opens an address only
+ *  where both allow it. A wiki link carries what `openItemLink` does. */
+export type MenuLink =
+  | { kind: 'web'; text: string; href: string; openable: boolean }
+  | ({ kind: 'wiki'; text: string } & LinkRef)
 
 /** The authored spelling identifies the binding; decoded parts serve navigation and display. Forward `raw` unchanged
  *  through opening, resolution and cache identity: Marfa binds each spelling separately, including an alias that

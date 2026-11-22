@@ -1,6 +1,7 @@
 import {
   InkKitEditor,
   InkKitError,
+  canOpenLink,
   type CaretState as InkCaret,
   type EditorLabels,
   type FileReference,
@@ -79,6 +80,7 @@ export function splitLabels(all: AppLabels): {
     quickLookNamed,
     loadAction,
     loadingNamed,
+    picture,
     picturesOff,
     loadOnePicture,
     loadPictures,
@@ -100,6 +102,7 @@ export function splitLabels(all: AppLabels): {
       quickLookNamed,
       loadAction,
       loadingNamed,
+      picture,
       picturesOff,
       loadOnePicture,
       loadPictures,
@@ -302,6 +305,26 @@ export class ItemEditor {
           host.invalidateFindGeometry()
         },
         openLink: events.openLink,
+        // Inkkit has selected the link and cancelled the web view's menu; the app draws its own at the pointer.
+        linkMenu(link, point) {
+          const shown =
+            link.kind === 'web'
+              ? {
+                  kind: 'web' as const,
+                  text: link.text,
+                  href: link.href,
+                  openable: link.openable && canOpenLink(link.href),
+                }
+              : { kind: 'wiki' as const, text: link.text, ...linkRef(link.reference) }
+          postToHost({
+            type: 'linkMenu',
+            item: host.item,
+            generation: host.generation,
+            link: shown,
+            point: [point.clientX, point.clientY],
+            viewportHeight: window.innerHeight,
+          })
+        },
         copy: events.copy,
         error(error) {
           postToHost(hostMessage(error))
@@ -440,6 +463,10 @@ export class ItemEditor {
     }
     this.item = id
     this.pictures.setItem(id)
+  }
+  /** The title the header shows, which a waiting picture's line does not repeat as its name. */
+  setTitle(title: string) {
+    this.pictures.setTitle(title)
   }
   /** The app's Remote Pictures setting changed: pictures that waited, or were turned off, are asked about again. */
   picturesChanged() {
@@ -700,8 +727,13 @@ export class ItemEditor {
       expected,
     )
   }
-  /** The `openLink` binding (Command-Shift-O) is Inkkit's own: it opens a Markdown link or a selected wiki link
-   *  through the `openLink` event. */
+  /** Takes a wiki link off by writing `text` where it stands: Inkkit has selected the link its menu was asked for, and
+   *  the text is what the link showed. Returns whether the item changed. */
+  unlinkSelected(text: string, expected = this.generation) {
+    return this.engine.pasteAsPlainText(text, expected)
+  }
+  /** The `openLink` binding is Inkkit's own: it opens a Markdown link or a selected wiki link through the `openLink`
+   *  event. */
   setKeymap(bindings: Keymap) {
     const keys: Partial<Record<ShortcutName, string[]>> = {}
     for (const [key, [command, arg]] of Object.entries(bindings)) {

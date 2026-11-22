@@ -6,15 +6,14 @@ extension Browser {
     /// answer for the page and for the modal's arrows, so they never disagree.
     func itemIndexRows(in library: any ItemLibrary) -> [ItemIndexRow] {
         let tab = IndexPreferences.tab(for: .items, in: defaults)
-        guard isSearching else { return itemIndex.tabs?.rows(for: tab) ?? [] }
-        return searchedItemTabs(in: library).rows(for: tab)
+        return itemIndexTabs(in: library)?.rows(for: tab) ?? []
     }
 
     /// The items an item's full page opened from Items follows, as they change: the tab's rows in the table's order, then
     /// the rest, so an item that moves to the other tier is still the one shown.
     func itemIndexIDs(in library: any ItemLibrary) -> [ItemID] {
         let tab = IndexPreferences.tab(for: .items, in: defaults)
-        let tabs = isSearching ? searchedItemTabs(in: library) : (itemIndex.tabs ?? .empty)
+        let tabs = itemIndexTabs(in: library) ?? .empty
         let shown = tabs.rows(for: tab).map(\.id)
         guard tab != .all else { return shown }
         let isShown = Set(shown)

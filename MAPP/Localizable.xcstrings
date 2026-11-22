@@ -1,6 +1,30 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Choose a collection to see what’s in it." : {
+
+    },
+    "⌘-click to open" : {
+
+    },
+    "Choose a source to see what it sends." : {
+
+    },
+    "Choose an event to see its details." : {
+
+    },
+    "Choose an item to see its details." : {
+
+    },
+    "Reading Item" : {
+
+    },
+    "Tag Not Added" : {
+
+    },
+    "The tag could not be added." : {
+
+    },
     "%@ on its disk" : {
 
     },
@@ -43,6 +67,24 @@
     "1 setting is set on the machine %@ runs on." : {
 
     },
+    "12 Nov" : {
+
+    },
+    "2 Nov" : {
+
+    },
+    "3 Nov" : {
+
+    },
+    "4 Nov" : {
+
+    },
+    "9 Nov" : {
+
+    },
+    "A control turned off is in the page’s More menu, and the View menu keeps every command." : {
+
+    },
     "A folder that already exists on the machine %@ runs on." : {
 
     },
@@ -50,6 +92,9 @@
 
     },
     "A webhook sends events to an address you choose, as they happen." : {
+
+    },
+    "Aa, which opens the formats bar." : {
 
     },
     "Address: %@" : {
@@ -74,6 +119,15 @@
 
     },
     "Backups Are Incomplete" : {
+
+    },
+    "Bookmark" : {
+
+    },
+    "Books to start this year." : {
+
+    },
+    "Budget" : {
 
     },
     "Can’t Extend This Key" : {
@@ -101,6 +155,9 @@
 
     },
     "Check Automatically is off, so %@ isn’t looking for updates." : {
+
+    },
+    "Close Formats" : {
 
     },
     "Copies" : {
@@ -140,6 +197,9 @@
 
     },
     "Deliveries waiting to be sent are dropped, and nothing more is sent until you turn it on." : {
+
+    },
+    "Dinner with Sam" : {
 
     },
     "Event" : {
@@ -194,6 +254,9 @@
     "%@ lists its jobs once it has started them." : {
 
     },
+    "Flights and the hotel." : {
+
+    },
     "Extend" : {
 
     },
@@ -207,6 +270,9 @@
 
     },
     "Heartbeat Address" : {
+
+    },
+    "Hides the title and properties." : {
 
     },
     "It never ends." : {
@@ -240,6 +306,9 @@
 
     },
     "Marfa %@ is ready." : {
+
+    },
+    "Mon" : {
 
     },
     "Named by the sign-in that keeps each one." : {
@@ -537,6 +606,9 @@
 
     },
     "On the server’s own page, in a sheet." : {
+
+    },
+    "Page Corner" : {
 
     },
     "Only %@ can change it. You can end it." : {
@@ -837,6 +909,9 @@
     "Read a file’s text" : {
 
     },
+    "Reading List" : {
+
+    },
     "Refused a reused token" : {
 
     },
@@ -892,6 +967,9 @@
 
     },
     "Removed old revoked keys" : {
+
+    },
+    "Renew passport" : {
 
     },
     "Replaced an item’s tags" : {
@@ -1107,6 +1185,9 @@
     "Telemetry Headers" : {
 
     },
+    "Text Style" : {
+
+    },
     "the %@" : {
 
     },
@@ -1171,6 +1252,9 @@
 
     },
     "Show Spelling and Grammar" : {
+
+    },
+    "The page’s text size and width." : {
 
     },
     "The server can’t read this secret, so it can’t use it until it is set again." : {
@@ -1488,6 +1572,9 @@
     "Thinned old versions" : {
 
     },
+    "Three things for next week." : {
+
+    },
     "this sign-in" : {
 
     },
@@ -1794,6 +1881,9 @@
     "Tries" : {
 
     },
+    "Trip to Lisbon" : {
+
+    },
     "Type both the host and the project token." : {
 
     },
@@ -1911,6 +2001,9 @@
     "Week Starts On" : {
 
     },
+    "Weekly Review" : {
+
+    },
     "What" : {
 
     },
@@ -1942,6 +2035,9 @@
 
     },
     "Where the database is." : {
+
+    },
+    "Where the month went." : {
 
     },
     "Who" : {
@@ -3793,6 +3889,9 @@
     "Command Palette" : {
 
     },
+    "Palette Actions" : {
+
+    },
     "Commands" : {
 
     },
@@ -4076,6 +4175,9 @@
       "generatesSymbol" : false
     },
     "Edit Link" : {
+
+    },
+    "Edit Link…" : {
 
     },
     "Edit Property" : {
@@ -5135,6 +5237,9 @@
 
     },
     "Open Item" : {
+
+    },
+    "Open Link" : {
 
     },
     "Open Original" : {
@@ -7900,7 +8005,7 @@
     "Up to %lld Lines" : {
 
     },
-    "View > Show Original switches it." : {
+    "The View menu switches it." : {
 
     },
     "Website" : {
@@ -8811,6 +8916,15 @@
 
     },
     "MAPP isn’t allowed to see or change how the server is monitored." : {
+
+    },
+    "Remove %@ From New" : {
+
+    },
+    "Edit the New row" : {
+
+    },
+    "Edit New Row…" : {
 
     }
   },

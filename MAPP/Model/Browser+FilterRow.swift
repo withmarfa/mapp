@@ -8,6 +8,7 @@ extension Browser {
     var showsFilterRow: Bool {
         if let choice = filterRowChoice[item] { return choice }
         if case .view = item { return false }
+        if item == .collections { return !collectionSourceFilter.isEmpty }
         return tableOptions[item]?.isFiltering == true
     }
 

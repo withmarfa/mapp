@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 /// ⌘K: one field that reaches the window's commands, the places in the sidebar and the items by title. ⇧⌘P: the
 /// same field searching the text of every item, each found item shown with the words around what was found. Both
-/// list in sections, and what a row can do is in Actions (⌘K again). Arrow keys choose, Return runs, and Escape or
+/// list in sections, and what a row can do is in Actions (⌘J). Arrow keys choose, Return runs, and Escape or
 /// a click outside puts it away. The commands are only what could be done now, so what it lists is what the menus
 /// have enabled.
 struct CommandPalette: View {
@@ -303,9 +303,9 @@ struct CommandPalette: View {
                     if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
                         PaletteFooter(
                             openTitle: openTitle(for: row), onOpen: { run(rows, at: chosen) },
-                            onActions: { toggleActions(rows, chosen: chosen) })
+                            actionsKeys: keys(.paletteActions), onActions: { toggleActions(rows, chosen: chosen) })
                     } else {
-                        PaletteFooter(openTitle: String(localized: "New Item"), onOpen: newItem, onActions: nil)
+                        PaletteFooter(openTitle: String(localized: "New Item"), onOpen: newItem, actionsKeys: nil, onActions: nil)
                     }
                 }
                 .opacity(target == nil ? 1 : 0)

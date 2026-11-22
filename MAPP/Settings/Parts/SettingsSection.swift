@@ -1,8 +1,8 @@
 import SwiftUI
 
 extension ContainerValues {
-    /// How much more room the page's column leaves above this part when it is the first on the page: a section with a name,
-    /// or a name and a line, sits lower than a head card (`SettingsTokens.Metric.firstHeaderInset`).
+    /// How much more room the page's column leaves above this part when it is the first on the page: a section with a name
+    /// and a line sits lower than one with a name alone (`SettingsTokens.Metric.firstHeaderWithLineInset`).
     @Entry var settingsFirstInset: CGFloat = 0
 
     /// Where the rule above the next row starts: at the row's text, which sits after its lead, if it has one.
@@ -32,10 +32,10 @@ struct SettingsSection<Content: View, Accessory: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: SettingsTokens.Metric.sectionGap) {
             if name != nil || line != nil {
                 HStack(alignment: .bottom, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 1) {
                         if let name {
                             name.settingsFont(.sectionName).accessibilityAddTraits(.isHeader)
                         }
@@ -46,8 +46,8 @@ struct SettingsSection<Content: View, Accessory: View>: View {
                     Spacer(minLength: 0)
                     accessory
                 }
+                .frame(minHeight: SettingsTokens.Metric.sectionHeader, alignment: .bottom)
                 .padding(.horizontal, inset)
-                .padding(.bottom, 2)
             }
             SettingsCard(content: { content })
             if let footer {
@@ -56,19 +56,12 @@ struct SettingsSection<Content: View, Accessory: View>: View {
                     .foregroundStyle(SettingsTokens.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, inset)
-                    .padding(.top, 2)
             }
         }
         .containerValue(\.settingsFirstInset, firstInset)
     }
 
-    private var firstInset: CGFloat {
-        switch (name != nil, line != nil) {
-        case (_, true): SettingsTokens.Metric.firstHeaderWithLineInset
-        case (true, false): SettingsTokens.Metric.firstHeaderInset
-        case (false, false): 0
-        }
-    }
+    private var firstInset: CGFloat { line != nil ? SettingsTokens.Metric.firstHeaderWithLineInset : 0 }
 }
 
 extension SettingsSection where Accessory == EmptyView {

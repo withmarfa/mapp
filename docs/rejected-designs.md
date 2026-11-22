@@ -54,7 +54,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **A board without its columns.**
 - **An agenda narrowed to a column.** The timeline uses the window's width.
 - **A thumbnail column of a new kind beside a document.**
-- **A flat, squared or hand-drawn segmented control.** MAPP uses the system's. See [Views and lists](views-and-lists.md).
+- **A flat, squared or hand-drawn segmented control.** MAPP uses the system's, and the corner's choices (Week or Month, Reader or Original) are the same shape in Liquid Glass. See [Views and lists](views-and-lists.md).
 - **A separate filter button in the list toolbar.** Filters live in the row above the list. An index page is the exception: Filter at its tabs' end shows or hides that row.
 - **Items grouped by date by default, or as sections that open, shelves, a card for each section, a digest for each period, or grouped by type.** Items is a table, for now.
 - **Filled cards for an index page's groups.**
@@ -67,7 +67,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 ## Buttons and messages
 
 - **Capsule buttons, black buttons and the Mac's push buttons.** Every button MAPP draws is a rounded rectangle; see [Components](components.md).
-- **A large 36-point button size.** There are two sizes, 22 and 28 points. Settings uses one, 28 points, except inside a table.
+- **A large 36-point button size.** There are two sizes, 22 and 28 points. Settings uses the system's regular size, and small inside a table.
 - **Buttons in a section's header in Settings.** Adding is the card's last row; other actions are regular buttons in a row.
 - **Run Now or Restore on one table row only, the row under the pointer.** One button on one row reads as special. A row action shows on every row.
 - **Sheets and alerts placed under the toolbar**, AppKit's default sheet position (August, 20 November 2026). They sit in the middle of the window.

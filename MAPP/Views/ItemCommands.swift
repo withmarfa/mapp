@@ -21,9 +21,9 @@ struct ItemCommandContext {
     let browser: Browser?
     /// The Reader and Original switch of the page in front, when it has an article.
     let pageLook: PageLookSwitch?
-    /// Whether an item's page is what the window shows, which Focus and the formats card belong to.
+    /// Whether an item's page is what the window shows, which Focus and the formats bar belong to.
     let showsPage: Bool
-    /// The window's presentation, which holds Focus and the formats card.
+    /// The window's presentation, which holds Focus and the formats bar.
     let details: DetailsPresentation?
 
     init(
@@ -80,6 +80,9 @@ struct ItemCommandContext {
 
     /// The one item whose page the window shows, which Focus is on: any kind of item, a file included.
     var focusItem: Item? { showsPage ? item : nil }
+
+    /// Whether the page is in a modal, which has no corner, so no Focus and no formats.
+    var hidesCorner: Bool { browser?.isModalPresented == true }
 
     var originalAddress: URL? { item.flatMap { library?.originalAddress(of: $0) } }
 
@@ -172,8 +175,8 @@ enum ItemCommand: CaseIterable {
         case .addAttachment: context.editableItem != nil
         case .toggleSource, .print, .exportPDF: context.visibleItem != nil
         case .toggleReader: context.pageLook != nil
-        case .toggleFormats: context.visibleItem != nil && context.details != nil
-        case .toggleFocus: context.focusItem != nil && context.details?.isCustomizingLayout == false
+        case .toggleFormats: context.editableItem != nil && context.details != nil && !context.hidesCorner
+        case .toggleFocus: context.focusItem != nil && context.details?.isCustomizingLayout == false && !context.hidesCorner
         }
     }
 

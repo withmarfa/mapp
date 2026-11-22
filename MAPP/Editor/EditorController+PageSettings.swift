@@ -83,6 +83,7 @@ extension EditorController {
             "footnote": String(localized: "Footnote"),
             "loadAction": String(localized: "Load"),
             "loadingNamed": String(localized: "Loading %@…"),
+            "picture": String(localized: "Picture"),
             "picturesOff": String(localized: "Remote Pictures Are Off"),
             "loadOnePicture": String(localized: "Load Picture"),
             "loadPictures": String(localized: "Load Pictures"),
@@ -97,6 +98,8 @@ extension EditorController {
             "imageResize": String(localized: "Resize Image"),
             "taskCheckbox": String(localized: "Task"),
             "wikiMissing": String(localized: "Link unavailable"),
+            // The hint under a link the pointer rests on, since a plain click places the caret.
+            "linkOpenHint": String(localized: "⌘-click to open"),
             "formattedEditor": String(localized: "Text"),
             "sourceEditor": String(localized: "Markdown Source"),
             "copyCode": String(localized: "Copy"),
@@ -165,7 +168,9 @@ extension EditorController {
     }
 
     func applyKeymap() {
-        var keymap: [String: [String]] = ["Mod-O": ["openLink"]]
+        // Open Link takes Command-Shift-O: Command-O is Open in New Window, which the page would otherwise answer first.
+        // Inkkit reads a capital letter as Shift, so the Shift is named and the letter is lowercase.
+        var keymap: [String: [String]] = ["Shift-Mod-o": ["openLink"]]
         for format in Format.allCases {
             guard let key = format.pageKey(for: formatShortcuts[format] ?? ShortcutCommand.format(format).defaultShortcut) else { continue }
             let (name, argument) = format.command
