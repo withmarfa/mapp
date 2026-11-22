@@ -81,7 +81,7 @@ private struct SortRow: View {
         .draggable(LayoutRowDrag(id: dragID(key.column.id)))
         .dropDestination(for: LayoutRowDrag.self) { drops, _ in
             guard let drop = drops.first, let moved = column(in: drop.id), moved != key.column.id else { return false }
-            write(Reordering.moving(moved, before: key.column.id, in: sort.map(\.column.id)).compactMap { id in
+            write(Reordering.moving(moved, onto: key.column.id, in: sort.map(\.column.id)).compactMap { id in
                 sort.first { $0.column.id == id }
             })
             return true

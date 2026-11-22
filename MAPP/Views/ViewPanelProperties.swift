@@ -113,7 +113,10 @@ private struct PropertyRowView: View {
         guard dragged.hasPrefix(Self.prefix) else { return false }
         let moved = String(dragged.dropFirst(Self.prefix.count))
         guard moved != column.id else { return false }
-        browser.changeProperties { $0.move(moved, before: column.id, in: columns) }
+        browser.changeProperties { properties in
+            let order = properties.arranged(columns).map(\.id)
+            properties.move(moved, before: Reordering.anchor(dropping: moved, onto: column.id, in: order), in: columns)
+        }
         return true
     }
 }

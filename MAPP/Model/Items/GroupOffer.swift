@@ -25,6 +25,14 @@ nonisolated struct GroupOffer: Hashable, Sendable {
         var id: String
         var label: String
         var choices: [Choice]
+
+        /// The choices in runs, a new one at each choice that starts a section: a picker draws a divider between runs,
+        /// never inside the element a choice is tagged in, where the divider would take the choice's tag.
+        var runs: [[Choice]] {
+            choices.reduce(into: []) { runs, choice in
+                if choice.startsSection || runs.isEmpty { runs.append([choice]) } else { runs[runs.count - 1].append(choice) }
+            }
+        }
     }
 
     var offersNone: Bool
