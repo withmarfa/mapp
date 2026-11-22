@@ -86,7 +86,14 @@ nonisolated enum MarfaMapping {
                 states: query.states.map { Set($0.map(state)) },
                 filter: query.filter, beneath: query.beneath.map { ItemID($0) }),
             sort: settings.sort.map { LibraryViewSort(field: $0.by, ascending: $0.direction == .ascending) },
-            group: settings.group.map { LibraryViewGroup(field: $0.by, bucket: $0.bucket.map(bucket), order: $0.order, hidden: $0.hidden) })
+            group: settings.group.map(libraryGroup))
+    }
+
+    private static func libraryGroup(_ group: ViewGrouping) -> LibraryViewGroup {
+        let known = group.bucket.flatMap { LibraryViewGroup.Bucket(rawValue: $0.rawValue) }
+        return LibraryViewGroup(
+            field: group.by, bucket: known, order: group.order, hidden: group.hidden,
+            otherBucket: known == nil ? group.bucket?.rawValue : nil)
     }
 
     /// Nil where a view lists both tiers.
@@ -98,22 +105,8 @@ nonisolated enum MarfaMapping {
         }
     }
 
-    private static func bucket(_ bucket: ViewGrouping.Bucket) -> LibraryViewGroup.Bucket {
-        switch bucket {
-        case .day: .day
-        case .week: .week
-        case .month: .month
-        case .year: .year
-        }
-    }
-
-    private static func marfaBucket(_ bucket: LibraryViewGroup.Bucket) -> ViewGrouping.Bucket {
-        switch bucket {
-        case .day: .day
-        case .week: .week
-        case .month: .month
-        case .year: .year
-        }
+    private static func marfaBucket(_ group: LibraryViewGroup) -> ViewGrouping.Bucket? {
+        (group.bucket?.rawValue ?? group.otherBucket).map(ViewGrouping.Bucket.init(rawValue:))
     }
 
     static func viewSettings(_ settings: LibraryViewSettings) -> ViewSettings {
@@ -157,7 +150,7 @@ nonisolated enum MarfaMapping {
     }
 
     private static func viewGrouping(_ group: LibraryViewGroup) -> ViewGrouping {
-        ViewGrouping(by: group.field, bucket: group.bucket.map(marfaBucket), order: group.order, hidden: group.hidden)
+        ViewGrouping(by: group.field, bucket: marfaBucket(group), order: group.order, hidden: group.hidden)
     }
 
     /// The server's refusal of a view write, in words for the person. A view is written at once, so a server that
