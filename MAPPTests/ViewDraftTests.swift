@@ -163,20 +163,21 @@ struct ViewDraftTests {
 
         let byEdit = try draft(.list(ItemOrder(sort: .dateEdited, groupsByDate: true)))
         #expect(byEdit.sort == [LibraryViewSort(field: "updated_at", ascending: false)])
-        // The list's sections by date are told as not kept, and no month grouping is written for them.
-        #expect(byEdit.group == nil)
-        #expect(byEdit.unkept == [.dateSections])
+        // The list's sections by date are that date by day, which the view keeps.
+        #expect(byEdit.group == LibraryViewGroup(field: "updated_at", bucket: .day))
+        #expect(byEdit.unkept.isEmpty)
         let byCreated = try draft(.list(ItemOrder(sort: .dateCreated, groupsByDate: true)))
-        #expect(byCreated.group == nil)
-        #expect(byCreated.unkept == [.dateSections])
+        #expect(byCreated.group == LibraryViewGroup(field: "created_at", bucket: .day))
+        #expect(byCreated.unkept.isEmpty)
         #expect(try draft(.list(ItemOrder(sort: .dateCreated, groupsByDate: false))).sort
             == [LibraryViewSort(field: "created_at", ascending: false)])
 
         // The board's cards follow the sort the window shows them in, and its lanes keep MAPP's order of the words.
-        let board = try draft(.board(key: "status", label: "Status"))
+        let board = try draft(.board)
         #expect(board.group == LibraryViewGroup(field: "properties.status", order: ViewDraft.declaredOrder(of: Self.statusColumn)))
         #expect(board.sort == [LibraryViewSort(field: "properties.status", ascending: true)])
-        #expect(try draft(.board(key: "due-date", label: "Due")).unkept == [.group(column: "Due")])
+        let odd = try #require(Self.draft(Self.window(.allItems, grouping: Self.dueColumn, layout: .board)))
+        #expect(odd.unkept == [.group(column: "Due")])
 
         let timeline = try draft(.timeline(key: "due_at", label: "Due"))
         #expect(timeline.group == LibraryViewGroup(field: "properties.due_at", bucket: .day))
@@ -303,7 +304,7 @@ struct ViewDraftTests {
         let result = ViewDraft.change(
             window, options: ungrouped, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(result.change.group == .clear)
-        #expect(result.unkept == [.dateSections])
+        #expect(result.unkept.isEmpty)
     }
 
     @Test func anUpdateNamesOnlyWhatTheWindowChanged() {

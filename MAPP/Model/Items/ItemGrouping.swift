@@ -3,13 +3,69 @@ import Marfa
 
 /// How a column groups a place's items, beside which column (`ItemTableOptions.Grouping`).
 nonisolated enum GroupMode: Hashable, Sendable {
-    /// One group per value: a choice's options, a parent, a type.
+    /// One group per value: a choice's options, a status's words, a parent, a type.
     case value
     /// A date's day, week, month or year, as a view's `group.bucket` names it.
     case bucket(LibraryViewGroup.Bucket)
+    /// Whether the field holds a value: Not Set where it is missing or null, as Marfa's `not_exists` selects, and Set
+    /// otherwise, an empty text or list included. Keyed `false` and `true`.
+    case presence
+    /// Marfa's four status groups, then No Status, each item by its own type's status field.
+    case statusGroups
 
     var bucket: LibraryViewGroup.Bucket? {
         if case .bucket(let bucket) = self { bucket } else { nil }
+    }
+
+    /// Whether a saved view can hold the grouping. Marfa's group has no presence span and no status groups yet, so
+    /// those stay in a place's default view and are named as not kept on Save as View (`ViewDraft.Unkept.groupMode`).
+    var isKeptByView: Bool {
+        switch self {
+        case .value, .bucket: true
+        case .presence, .statusGroups: false
+        }
+    }
+
+    /// The choice's name under its field: Words, Groups, Day and the rest, Set or Not Set.
+    var title: String {
+        switch self {
+        case .value: String(localized: "Words")
+        case .bucket(let bucket): bucket.title
+        case .presence: String(localized: "Set or Not Set")
+        case .statusGroups: String(localized: "Groups")
+        }
+    }
+}
+
+/// The keys of the groups every grouping may make beside its values.
+nonisolated enum GroupKey {
+    /// The items with no value, which Marfa keys `null`.
+    static let none = ""
+    /// The items whose type does not declare the field grouped by, last of all.
+    static let notApplicable = "\u{1}notApplicable"
+    /// Set or Not Set's groups, as Marfa keys them.
+    static let notSet = "false"
+    static let set = "true"
+
+    /// A group's key as a view's `group.order` and `group.hidden` hold it: the null group is `null`, a yes-or-no's a
+    /// bool, any other a string. Not Applicable is MAPP's own and is never written.
+    static func json(_ key: String, booleans: Bool) -> JSONValue? {
+        if key == none { return .null }
+        if key == notApplicable { return nil }
+        if booleans, key == "true" || key == "false" { return .bool(key == "true") }
+        return .string(key)
+    }
+
+    /// A key a view's lists name, as the window keys its groups.
+    static func key(of value: JSONValue) -> String? {
+        switch value {
+        case .null: none
+        case .bool(let flag): flag ? "true" : "false"
+        case .string(let text): text
+        case .integer(let number): "\(number)"
+        case .number(let number): "\(number)"
+        default: nil
+        }
     }
 }
 
@@ -89,6 +145,39 @@ nonisolated enum DateGroups {
 }
 
 nonisolated extension ItemTableColumn {
+    /// Whether the column can group as `mode` says: each value of a column with a few to pick from, a date's span,
+    /// whether a field or Happened is set, or a status by its groups.
+    func groups(by mode: GroupMode) -> Bool {
+        switch mode {
+        case .value: isCategorical
+        case .bucket: isDated
+        case .presence: field != nil || content == .occurred
+        case .statusGroups: style == .status
+        }
+    }
+
+    /// Whether a row holds a value in the column, as Marfa's `exists` tests it: a missing or null value is not set, and
+    /// anything else is, an empty text or list included.
+    func isSet(in row: ItemTableRow) -> Bool {
+        switch content {
+        case .field(let field):
+            guard let value = row.item.value(of: field.key) else { return false }
+            return value != .null
+        case .occurred: return row.item.occurred != nil
+        default: return true
+        }
+    }
+
+    /// The values a grouping by each value lists before any row holds them: a choice's options, a status's words, Yes
+    /// and No.
+    var declaredValues: Set<String> {
+        switch style {
+        case .status, .priority, .choice: Set((field?.options ?? []).filter { !$0.isEmpty })
+        case .boolean: ["true", "false"]
+        default: []
+        }
+    }
+
     /// Whether the column holds a date, which groups by day, week, month or year.
     var isDated: Bool {
         switch content {

@@ -26,7 +26,9 @@ struct ViewOptionCommandTests {
         let browser = Self.browser(.board, in: library)
         let titles = Self.titles(browser, library)
         #expect(titles.contains("Group by Priority"))
+        #expect(titles.contains("Group by Created: Week"))
         #expect(!titles.contains("Group by Status"), "the grouping already chosen is not offered again")
+        #expect(!titles.contains("Ungroup"), "a board always has lanes")
         #expect(titles.contains("Compact Cards"))
 
         let compact = try #require(
@@ -54,12 +56,18 @@ struct ViewOptionCommandTests {
 
     @Test func theGalleryOffersTheOtherCardSizes() {
         let library = FakeItemLibrary(items: [Self.task("A", status: "todo")])
-        #expect(Self.titles(Self.browser(.gallery, in: library), library) == ["Small Cards", "Large Cards"])
+        #expect(Self.titles(Self.browser(.gallery, in: library), library).prefix(2) == ["Small Cards", "Large Cards"])
     }
 
-    @Test func theListOffersNoViewOptionCommands() {
+    /// The list sorts and groups as every other layout, from the starting order Settings gives.
+    @Test func theListOffersThePlacesOwnSortAndGroup() {
         let library = FakeItemLibrary(items: [Self.task("A", status: "todo")])
-        #expect(Self.titles(Self.browser(.list, in: library), library).isEmpty)
+        let titles = Self.titles(Self.browser(.list, in: library), library)
+        #expect(titles.contains("Sort by Name"))
+        #expect(titles.contains("Group by Status"))
+        #expect(titles.contains("Group by Assignee: Set or Not Set"))
+        #expect(titles.contains("Ungroup"))
+        #expect(!titles.contains("Group by Edited: Day"), "the starting order's sections are already its edited date by day")
     }
 
     @Test func anItemPageOpenedFromATableTheBoardOrTheTimelineOffersNone() {

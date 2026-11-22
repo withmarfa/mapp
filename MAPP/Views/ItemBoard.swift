@@ -20,23 +20,24 @@ struct ItemBoard: View {
     var body: some View {
         let _ = daysSeen
         let items = browser.filteredItems(in: library)
-        let fields = browser.boardFieldChoices(in: library)
-        // Lanes follow a value grouping by a field. A date span does not set them.
-        let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: browser.item), available: fields)
+        // The lanes are the place's group (`Browser.boardGrouping`), so a saved view's group is its lanes.
+        let lanes = browser.boardLanes(in: library)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         VStack(spacing: 0) {
-            if let field {
-                let lanes = ItemBoardLayout.lanes(
-                    items: items, key: field.key, catalogue: library.catalogue, order: browser.boardCardOrder(in: library))
-                // Decided from the items, not the lanes shown: Hide Empty Groups may have removed every group lane.
-                let grouped = ItemBoardLayout.groupsByStatus(items: items, key: field.key, catalogue: library.catalogue)
+            if let lanes {
+                let shown = browser.shownBoardLanes(lanes)
+                let grouped = lanes.byStatusGroups
                 // A card leaves off what its lane already says: the field the board is grouped by.
                 let list = RowList(
                     mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat,
                     day: Calendar.current.startOfDay(for: library.now()))
                 let contents = cardContents.contents(
-                    of: items, in: library, looks: browser.looks(in: library), list: list, shape: CardShape(leaving: field.key, groupsByStatus: grouped))
-                board(browser.hidesEmptyGroups ? lanes.filter { !$0.items.isEmpty } : lanes, key: field.key, grouped: grouped, contents: contents)
+                    of: items, in: library, looks: browser.looks(in: library), list: list, shape: CardShape(leaving: lanes.key, groupsByStatus: grouped))
+                if shown.isEmpty, !items.isEmpty, lanes.all.contains(where: { !$0.items.isEmpty }) {
+                    HiddenGroupsEmptyState()
+                } else {
+                    board(shown, key: lanes.key, grouped: grouped, contents: contents)
+                }
             } else if items.isEmpty {
                 if browser.isSearching { SearchEmptyState(browser: browser) }
                 else { PlaceEmptyState(browser: browser) }
@@ -204,7 +205,7 @@ struct ItemBoard: View {
 
     private func isDestination(_ lane: ItemBoardLane) -> Bool {
         guard lane.takesItems else { return false }
-        return switch lane.id { case .option, .group, .missing: true; case .invalid, .notApplicable: false }
+        return switch lane.id { case .option, .group, .missing: true; case .invalid, .notApplicable, .key: false }
     }
 
     private func move(_ ids: [ItemID], to lane: ItemBoardLane.ID, key: String) {

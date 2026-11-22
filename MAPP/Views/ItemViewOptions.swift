@@ -132,9 +132,9 @@ struct DefaultViewOptions: View {
     }
 }
 
-/// What can be set about the view a window shows: the order of the list and the gallery, the table's sort,
-/// grouping and columns, the board's lanes and cards, and the timeline's dates. Each choice belongs to the place
-/// and is kept in its default view on this Mac, except the list's order, which is the app's.
+/// What can be set about the view a window shows: the sort and grouping of the list, the gallery, the table and the
+/// board, the table's columns, the board's cards, and the timeline's dates. Each choice belongs to the place, kept in its
+/// default view on this Mac or written to its saved view.
 struct CurrentViewOptions: View {
     /// Nil while no window is in front, when the list's order is still the app's to change.
     let browser: Browser?
@@ -151,19 +151,15 @@ struct CurrentViewOptions: View {
                 Divider()
                 IncludeSubtypesOption(browser: browser)
             }
-        // A collection keeps the order Marfa gives its members, so the app's order does not apply there.
+        // A collection keeps the order Marfa gives its members, so its Sort by is off (`keepsPlaceOrder`).
         case .list, .gallery, nil:
             if let browser, browser.viewMode == .gallery {
                 GalleryCardSizeOptions(browser: browser)
                 Divider()
             }
-            // A saved view has its own sort and group, which the list and the gallery take as the table does.
-            if let browser, browser.isViewPlace {
-                ItemTableViewOptions(browser: browser, columns: false)
-            } else {
-                OrderOptions(browser: browser).disabled(browser?.keepsPlaceOrder == true)
-            }
+            // Every place's list and gallery take the place's own sort and group, as the table does.
             if let browser {
+                ItemTableViewOptions(browser: browser, columns: false)
                 Divider()
                 IncludeSubtypesOption(browser: browser)
             }
@@ -177,16 +173,7 @@ struct ItemBoardOptions: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        let fields = browser.boardFieldChoices(in: library)
-        let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: browser.item), available: fields)
-        Picker("Group by", systemImage: "rectangle.split.3x1", selection: Binding { field?.key ?? "" } set: {
-            browser.setBoardField($0, in: browser.item)
-        }) {
-            ForEach(fields) { Text(verbatim: $0.label).tag($0.key) }
-        }
-        .pickerStyle(.menu)
-        .disabled(fields.isEmpty)
-        .accessibilityIdentifier("BoardGroupBy")
+        GroupByMenu(browser: browser)
         Picker("Card Density", systemImage: "rectangle.compress.vertical", selection: Binding {
             browser.compactBoards[browser.item, default: false]
         } set: { browser.setCompactBoard($0, in: browser.item) }) {

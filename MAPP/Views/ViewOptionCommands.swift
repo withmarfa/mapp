@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The View Options of the table, the board, the timeline and the index pages as the command palette lists them: each
-/// choice not already made. The list's and the gallery's order are the palette's own Sort and Group entries.
+/// The View Options of every layout and the index pages as the command palette lists them: each choice not already made.
 struct ViewOptionCommand {
     let title: String
     let systemImage: String
@@ -20,9 +19,37 @@ struct ViewOptionCommand {
         case .board: return board(browser, library)
         case .timeline: return timeline(browser, library)
         case .calendar: return calendar(browser, library)
-        case .gallery: return gallery(browser)
-        case .list: return []
+        case .gallery: return gallery(browser) + sorting(browser, library) + grouping(browser, library)
+        case .list: return sorting(browser, library) + grouping(browser, library)
         }
+    }
+
+    /// The list's and the gallery's Sort by, as the place's own: each field it can sort by, then the other direction.
+    private static func sorting(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
+        guard !browser.keepsPlaceOrder else { return [] }
+        let content = browser.tableContent(in: library)
+        let shown = SavedViews.arrangement(browser, content: content, order: browser.storedOrder).sort
+        let first = browser.ordersByRelevance ? nil : shown.first
+        var commands: [ViewOptionCommand] = []
+        if browser.isSearching, !browser.ordersByRelevance {
+            commands.append(.init(title: String(localized: "Sort by Relevance"), systemImage: "arrow.up.arrow.down", group: .sortAndGroup) {
+                browser.orderSearch(byRelevance: true)
+            })
+        }
+        for column in content.sortChoices where column.id != first?.column.id {
+            commands.append(.init(title: String(localized: "Sort by \(column.label)"), systemImage: "arrow.up.arrow.down", group: .sortAndGroup) {
+                browser.orderSearch(byRelevance: false)
+                browser.chooseSort([ItemTableComparator(column: column, order: column.firstOrder)])
+            })
+        }
+        if let first {
+            let reversed: SortOrder = first.order == .forward ? .reverse : .forward
+            let title = reversed == .forward ? first.column.ascendingTitle : first.column.descendingTitle
+            commands.append(.init(title: String(localized: "Sort \(title)"), systemImage: "arrow.up.arrow.down", group: .sortAndGroup) {
+                browser.chooseSort([ItemTableComparator(column: first.column, order: reversed)] + shown.dropFirst())
+            })
+        }
+        return commands
     }
 
     private static func table(_ browser: Browser, _ library: any ItemLibrary, _ storedColumns: Binding<Data>) -> [ViewOptionCommand] {
@@ -49,18 +76,7 @@ struct ViewOptionCommand {
                     + content.sort.dropFirst()
             })
         }
-        for column in content.categoricalColumns where column.id != content.grouping?.id {
-            commands.append(.init(title: String(localized: "Group by \(column.label)"), systemImage: "rectangle.grid.1x2", group: .sortAndGroup) {
-                browser.tableOptions[place, default: .init()].grouping = .column(column.id)
-                browser.tableOptions[place, default: .init()].collapsed = nil
-            })
-        }
-        if content.grouping != nil {
-            commands.append(.init(title: String(localized: "Ungroup"), systemImage: "rectangle.grid.1x2", group: .sortAndGroup) {
-                browser.tableOptions[place, default: .init()].grouping = .none
-                browser.tableOptions[place, default: .init()].collapsed = nil
-            })
-        }
+        commands += grouping(browser, library)
         for column in content.columns where column.content != .title {
             let shown = browser.showsColumn(column, stored: storedColumns.wrappedValue)
             commands.append(.init(
@@ -99,13 +115,7 @@ struct ViewOptionCommand {
 
     private static func board(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
         let place = browser.item
-        let fields = browser.boardFieldChoices(in: library)
-        let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: place), available: fields)
-        var commands = fields.filter { $0.key != field?.key }.map { field in
-            ViewOptionCommand(title: String(localized: "Group by \(field.label)"), systemImage: "rectangle.split.3x1", group: .sortAndGroup) {
-                browser.setBoardField(field.key, in: place)
-            }
-        }
+        var commands = grouping(browser, library)
         let compact = browser.compactBoards[place, default: false]
         commands.append(.init(
             title: compact ? String(localized: "Comfortable Cards") : String(localized: "Compact Cards"),

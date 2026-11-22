@@ -6,8 +6,8 @@ struct ViewChoices: Equatable {
     var options: ItemTableOptions
     var timelineDate: String?
 
-    /// The settings a view write names one by one, which the server merges or refuses one by one. The grouping holds the
-    /// timeline's date, which in a view is a grouping by that date's day.
+    /// The settings a view write names one by one, which the server merges or refuses one by one. The grouping holds its
+    /// group order and hidden groups, and the timeline's date, which in a view is a grouping by that date's day.
     enum Part: CaseIterable {
         case sort, grouping, filters
     }
@@ -18,12 +18,14 @@ struct ViewChoices: Equatable {
 
     /// The settings in which these choices would be written otherwise than `other`, a list in its own order showing
     /// `dated` where nothing sorts it.
-    func parts(differingFrom other: ViewChoices, dated: [ItemTableComparator]? = nil) -> Set<Part> {
+    func parts(differingFrom other: ViewChoices, dated: ViewDraft.Dated? = nil) -> Set<Part> {
         let mine = ViewDraft.shown(options, dated: dated)
         let theirs = ViewDraft.shown(other.options, dated: dated)
         var parts = Set<Part>()
         if ViewDraft.sortKeys(mine.sort) != ViewDraft.sortKeys(theirs.sort) { parts.insert(.sort) }
-        if mine.grouping != theirs.grouping || timelineDate != other.timelineDate { parts.insert(.grouping) }
+        if mine.grouping != theirs.grouping || ViewDraft.reorders(mine, from: theirs) || timelineDate != other.timelineDate {
+            parts.insert(.grouping)
+        }
         if mine.filterChoices != theirs.filterChoices { parts.insert(.filters) }
         return parts
     }
@@ -33,6 +35,8 @@ struct ViewChoices: Equatable {
         if parts.contains(.sort) { options.sort = other.options.sort }
         if parts.contains(.grouping) {
             options.grouping = other.options.grouping
+            options.groupOrder = other.options.groupOrder
+            options.hiddenGroups = other.options.hiddenGroups
             timelineDate = other.timelineDate
         }
         if parts.contains(.filters) {
@@ -98,7 +102,10 @@ extension Browser {
     @discardableResult
     func choicesChanged() -> Task<Void, Never>? {
         let place = item
-        if case .view = place, let before = observedChoices[place] { followDayGrouping(in: place, from: before) }
+        if let before = observedChoices[place] {
+            startGroupsAfresh(in: place, from: before)
+            if case .view = place { followDayGrouping(in: place, from: before) }
+        }
         let current = liveChoices
         guard let before = observedChoices[place] else {
             observedChoices[place] = current
@@ -110,6 +117,16 @@ extension Browser {
         keepPlaceChoices(of: place)
         guard case .view(let id) = place, viewPanel?.isNew != true else { return nil }
         return scheduleWrite(of: id)
+    }
+
+    /// A new grouping orders and hides no group until the person does: the keys of the old one name other groups.
+    func startGroupsAfresh(in place: SidebarItem, from before: ViewChoices) {
+        guard var options = tableOptions[place], options.grouping != before.options.grouping,
+              options.groupOrder != nil || options.hiddenGroups != nil,
+              options.groupOrder == before.options.groupOrder, options.hiddenGroups == before.options.hiddenGroups else { return }
+        options.groupOrder = nil
+        options.hiddenGroups = nil
+        tableOptions[place] = options
     }
 
     /// A view groups by one thing, so its timeline's date and a grouping by that date's day are one setting: a change
@@ -154,6 +171,8 @@ extension Browser {
         var options = tableOptions[place] ?? ItemTableOptions()
         if options.grouping != current.options.grouping { options.collapsed = nil }
         options.grouping = current.options.grouping
+        options.groupOrder = current.options.groupOrder
+        options.hiddenGroups = current.options.hiddenGroups
         options.sort = current.options.sort
         options.filters = current.options.filters
         options.negated = current.options.negated
@@ -246,10 +265,25 @@ extension Browser {
         switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
         case .success(let view):
             if update.change.group != nil, let replaced = update.view.group { replacedGroups[id, default: [:]][replaced.field] = replaced }
-            if choices(in: place) != sent { rewritingViews.insert(id) }
+            let changedSince = choices(in: place).parts(differingFrom: sent)
+            if !changedSince.isEmpty { rewritingViews.insert(id) }
             // The window takes each setting this write did not send and the person has not changed, so another
             // app's merge is shown and the next write does not send the older value back.
             seed(view, catalogue: library.catalogue, keepingWindow: true, sent: update.change)
+            if !changedSince.contains(.grouping), let held = viewSeeds[id]?.options, var options = tableOptions[place],
+               options.grouping == held.grouping,
+               options.groupOrder != held.groupOrder || options.hiddenGroups != held.hiddenGroups {
+                // A grouping this write sent by the same field comes back with the groups the view already ordered and
+                // hid (`ViewDraft.kept`); the window shows them, as no change of the person's.
+                options.groupOrder = held.groupOrder
+                options.hiddenGroups = held.hiddenGroups
+                tableOptions[place] = options
+                if var observed = observedChoices[place] {
+                    observed.options.groupOrder = held.groupOrder
+                    observed.options.hiddenGroups = held.hiddenGroups
+                    observedChoices[place] = observed
+                }
+            }
             tellUnkept(update.unkept, of: id, in: library)
         case .failure(let failure):
             // The library has told the person why. A view changed elsewhere shows as it is now; any other refusal

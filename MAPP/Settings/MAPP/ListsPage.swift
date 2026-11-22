@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The Lists page: how much each row says and the order every list takes until a view or a place chooses its own. What a
+/// The Lists page: how much each row says, and the starting order of a place's list: the sort and the sections by date a
+/// place shows until its own Sort by or Group by is chosen in View Options. What a
 /// list leaves out belongs to Search, never here.
 struct ListsPage: View {
     @AppStorage(ListKey.density) private var density = Density.standard
@@ -18,8 +19,8 @@ struct ListsPage: View {
                     selection: $density)
                     .accessibilityIdentifier("ListsDensity")
             }
-            SettingsSection("Order") {
-                SettingsRow("Sort By", line: "A view or a place can set its own.") {
+            SettingsSection("Order", line: "The order a place starts in until you change its Sort by or Group by in View Options.") {
+                SettingsRow("Sort By") {
                     SettingsPopUp(title: "Sort By", selection: $sort) {
                         ForEach(ItemSort.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
@@ -51,8 +52,8 @@ private struct DensityPicture: View {
 
     private static let note = "lucide:sticky-note"
     private static let task = "lucide:square-check-big"
-    private static let bookmark = "lucide:bookmark"
     private static let event = "lucide:calendar"
+    private static let bookmark = "lucide:bookmark"
 
     private var samples: [RowContent] {
         [
@@ -60,10 +61,10 @@ private struct DensityPicture: View {
             row(
                 Self.task, String(localized: "Task"), String(localized: "Weekly Review"), String(localized: "Three things for next week."), String(localized: "Mon"),
                 status: String(localized: "In Progress")),
-            row(Self.bookmark, String(localized: "Bookmark"), String(localized: "Reading List"), String(localized: "Books to start this year."), String(localized: "9 Nov")),
             row(Self.note, String(localized: "Note"), String(localized: "Budget"), String(localized: "Where the month went."), String(localized: "4 Nov")),
             row(Self.event, String(localized: "Event"), String(localized: "Dinner with Sam"), nil, String(localized: "3 Nov")),
             row(Self.task, String(localized: "Task"), String(localized: "Renew passport"), nil, String(localized: "2 Nov")),
+            row(Self.bookmark, String(localized: "Bookmark"), String(localized: "Oiling an oak worktop"), nil, String(localized: "1 Nov")),
         ]
     }
 
@@ -77,7 +78,7 @@ private struct DensityPicture: View {
     var body: some View {
         let isCompact = density == .compact
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(samples.prefix(isCompact ? 6 : 3).enumerated()), id: \.offset) { index, content in
+            ForEach(Array(samples.prefix(isCompact ? 6 : 2).enumerated()), id: \.offset) { index, content in
                 ItemRow(content: content, density: density, showsSample: !isCompact && index == 0)
                     .overlay(alignment: .top) {
                         if index > 0 {

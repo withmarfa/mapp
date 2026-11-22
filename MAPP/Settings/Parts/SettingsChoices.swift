@@ -21,9 +21,12 @@ struct ChoiceTiles<Value: Hashable>: View {
             ForEach(choices) { choice in
                 Button { selection = choice.value } label: {
                     VStack(spacing: 6) {
-                        choice.picture
-                            .frame(maxWidth: .infinity)
+                        // The tile's shape alone sets its size, so every tile in a row is the same height whatever its
+                        // picture holds.
+                        Color.clear
                             .aspectRatio(SettingsTokens.Metric.choiceAspect, contentMode: .fit)
+                            .frame(maxWidth: .infinity)
+                            .overlay(alignment: .topLeading) { choice.picture }
                             .clipShape(.rect(cornerRadius: 8, style: .continuous))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)

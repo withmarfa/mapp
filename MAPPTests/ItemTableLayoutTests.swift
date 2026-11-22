@@ -158,7 +158,7 @@ struct ItemTableLayoutTests {
             Self.row("G", status: "blocked"),
         ]
         let status = try #require(Self.columns(rows).first { $0.id == "field.status" })
-        let groups = ItemTableLayout.groups(of: rows, by: status)
+        let groups = ItemTableLayout.groups(of: rows, by: status, mode: .statusGroups)
         #expect(groups.map(\.id) == ["not_started", "in_progress", "completed", "canceled", ""])
         #expect(groups.map(\.title) == ["Not Started", "In Progress", "Completed", "Canceled", "No Status"])
         #expect(groups.first?.rows.map(\.item.title) == ["B", "E"])
@@ -168,7 +168,7 @@ struct ItemTableLayoutTests {
     @Test func aWordTheTypeDoesNotDeclareFallsInOtherAfterTheGroups() throws {
         let rows = [Self.row("A", status: "mystery"), Self.row("B", status: "completed"), Self.row("C", status: "pending")]
         let status = try #require(Self.columns(rows).first { $0.id == "field.status" })
-        let groups = ItemTableLayout.groups(of: rows, by: status)
+        let groups = ItemTableLayout.groups(of: rows, by: status, mode: .statusGroups)
         #expect(groups.map(\.id) == ["not_started", "completed", "other"])
         #expect(groups.last?.title == "Other")
         #expect(groups.last?.rows.map(\.item.title) == ["A"])
@@ -194,7 +194,7 @@ struct ItemTableLayoutTests {
         let row = ItemTableRow(item: item, typeLabel: "Event", typeIcon: nil, parent: nil)
         let columns = ItemTableLayout.columns(for: [row], catalogue: catalogue, hidden: [], looks: [:])
         let status = try #require(columns.first { $0.id == "field.status" })
-        #expect(ItemTableLayout.collapsed(ItemTableOptions(), groups: ItemTableLayout.groups(of: [row], by: status), by: status).isEmpty)
+        #expect(ItemTableLayout.collapsed(ItemTableOptions(), groups: ItemTableLayout.groups(of: [row], by: status, mode: .value), by: status).isEmpty)
     }
 
     @Test func aFieldNamedStatusThatIsNotOfTheStatusKindIsNotOne() {

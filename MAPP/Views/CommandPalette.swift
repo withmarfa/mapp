@@ -19,8 +19,6 @@ struct CommandPalette: View {
     @StoredOrder private var order
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
-    @AppStorage(OrderKey.sort) private var sort = ItemOrder().sort
-    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = ItemOrder().groupsByDate
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @AppStorage(SearchOptions.includesArchivedKey) private var includesArchived = SearchOptions.includesArchivedStandard
@@ -696,22 +694,6 @@ struct CommandPalette: View {
                 let isOn = browser.stacksSubtypes(in: library)
                 add(isOn ? String(localized: "Show This Type Only") : String(localized: "Include Subtypes"), IncludeSubtypes.symbol, in: .view) {
                     browser.setStacksSubtypes(!isOn, in: library)
-                }
-            }
-            // An index orders by its own columns (`ViewOptionCommand.indexCommands`), not by the list's sort.
-            let ordersList = !browser.showsSidebarIndex && (browser.viewMode == .list || browser.viewMode == .gallery)
-            if ordersList && browser.isSearching && !browser.ordersByRelevance {
-                add(String(localized: "Sort by Relevance"), "arrow.up.arrow.down", in: .sortAndGroup) { browser.orderSearch(byRelevance: true) }
-            }
-            for choice in ItemSort.allCases where (choice != sort || browser.ordersByRelevance) && ordersList {
-                add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down", in: .sortAndGroup) {
-                    sort = choice
-                    browser.orderSearch(byRelevance: false)
-                }
-            }
-            if sort != .title && !browser.ordersByRelevance && ordersList {
-                add(groupsByDate ? String(localized: "Ungroup by Date") : String(localized: "Group by Date"), "calendar", in: .sortAndGroup) {
-                    groupsByDate.toggle()
                 }
             }
             if browser.isCollectionItemPresented {

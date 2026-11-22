@@ -19,15 +19,15 @@ What is not built yet. The built part is in [Value components](value-components.
 
 Agreed with August on 21 November 2026, drawn as the Next boards of MAPP Pages. The rules are in [Views and lists](views-and-lists.md#grouping-properties-and-filters); this is the list of what is not built.
 
-- **Set or Not Set grouping** for a date field and any other optional field, on every layout, with Day, Week, Month and Year for a date and Words or Groups for a status.
+- **Grouping by Collection and Tags** in a list and a table, an item in each of its groups.
+- **A bucket's groups following the sort** where the view sorts by that date.
 - **A saved view keeps Set or Not Set and the status groups** once Marfa can hold them. Until then Save as View names them under Not Saved in the View.
-- **One Sort by and Group by for a place**, kept in its default view, with Settings > Lists as the starting order. It replaces an agreed rule ([Rejected designs](rejected-designs.md#reversed)).
 - **One Properties list for a view**, shared by every layout, replacing the table's Columns and falling back to each type's look.
 - **Edit Layouts…** in the window, opening Settings > Layouts at the type.
 - **Relative dates in filters**, kept only on this Mac.
 - **All or Any** in the filter row.
-- **Group order and hidden groups** in Edit View, saved to Marfa. Dragging a board's lanes waits.
-- **Filters for every field kind**, and Hide Empty Groups in every place.
+- **Dragging a board's lanes** to reorder them, which would write the group order Edit View writes.
+- **Filters for every field kind.**
 - **Fixes:** the timeline's row is drawn as agreed. MAPP keeping another app's group order and hidden groups, a board's cards following the sort, and no Sort on the timeline or the calendar are built, not yet released.
 
 ## Pages

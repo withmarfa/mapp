@@ -65,7 +65,7 @@ extension Browser {
     /// send the window's older value back over it. A setting the person changed stays as they chose it, and is written.
     private func follow(_ returned: ViewChoices, in place: SidebarItem, over earlier: ViewSeed, sent: LibraryViewChange) {
         let held = ViewChoices(options: earlier.options, timelineDate: earlier.timelineDate)
-        let dated = item == place ? datedList?.sort : nil
+        let dated = item == place ? datedList : nil
         var parts = Set(ViewChoices.Part.allCases).subtracting(choices(in: place).parts(differingFrom: held, dated: dated))
         if sent.sort != nil { parts.remove(.sort) }
         if sent.group != nil { parts.remove(.grouping) }
@@ -84,7 +84,7 @@ extension Browser {
         let place = SidebarItem.view(id)
         return ViewDraft.differs(
             tableOptions[place], timelineDate: timelineFields[place], from: seed.options, seedTimelineDate: seed.timelineDate,
-            dated: datedList?.sort)
+            dated: datedList)
     }
 
     /// Shows the layout without taking it for a change of the person's, which only the person's own choice is.
@@ -127,7 +127,7 @@ extension Browser {
     var datedList: ViewDraft.Dated? {
         guard !SavedViews.isArranged(self) else { return nil }
         let arrangement = SavedViews.datedArrangement(storedOrder)
-        return ViewDraft.Dated(sort: arrangement.sort, hasSections: arrangement.grouping == .date)
+        return ViewDraft.Dated(sort: arrangement.sort, hasSections: arrangement.hasDateSections)
     }
 
     // MARK: This Mac's settings for a view
@@ -137,10 +137,29 @@ extension Browser {
         viewSeeds[id]?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
     }
 
-    /// Whether the board leaves out a lane with no items: a saved view's choice.
+    /// Whether the open place leaves out the groups with no items, in every layout that groups: a saved view's choice
+    /// on this Mac, else the place's default view's.
     var hidesEmptyGroups: Bool {
-        guard case .view(let id) = item else { return false }
+        guard case .view(let id) = item else { return placeHidesEmptyGroups[item] ?? false }
         return macSettings(for: id).hidesEmptyGroups
+    }
+
+    /// Changes Hide Empty Groups. A saved view keeps it on this Mac as it is made, and a place in its default view. Undo
+    /// takes either back.
+    func setHidesEmptyGroups(_ hides: Bool) {
+        if case .view(let id) = item {
+            changeViewSettings(id) { $0.hidesEmptyGroups = hides }
+            return
+        }
+        let place = item
+        let before = hidesEmptyGroups
+        guard hides != before else { return }
+        placeHidesEmptyGroups[place] = hides ? true : nil
+        updatePlaceDefault(place) { $0.hidesEmptyGroups = hides }
+        registerUndo(String(localized: "Change View")) { browser in
+            guard browser.item == place else { return }
+            browser.setHidesEmptyGroups(before)
+        }
     }
 
     /// What the gallery draws on each card in the open place: a saved view's choice, else the place's default view's.

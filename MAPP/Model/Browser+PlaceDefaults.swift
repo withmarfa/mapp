@@ -36,6 +36,23 @@ extension Browser {
         }
     }
 
+    /// The types a place lists, whose fields a grouping may name though no item fills them: a type with its subtypes where
+    /// they show, and the types a saved view lists, with their subtypes. Empty for any other place, whose items' types are
+    /// the ones it lists.
+    func listedTypes(in library: any ItemLibrary) -> Set<TypeID> {
+        let catalogue = library.catalogue
+        switch item {
+        case .itemType(let raw):
+            let type = TypeID(raw)
+            return stacksSubtypes(in: library) ? catalogue.descendants(of: type).union([type]) : [type]
+        case .view(let id):
+            let types = library.views.first { $0.id == id }?.query.types ?? []
+            return Set(types).union(types.flatMap { catalogue.descendants(of: $0) })
+        default:
+            return []
+        }
+    }
+
     /// Keeps the open place's filters, sort, grouping and timeline date, which the window's funnel (`choicesChanged`) notes.
     func keepPlaceChoices(of place: SidebarItem) {
         let options = tableOptions[place]
@@ -91,6 +108,8 @@ extension Browser {
         let cards: ViewCards? = stored.cards == ViewCards() ? nil : stored.cards
         if placeCards[place] != cards { placeCards[place] = cards }
         if placeCalendarScales[place] != stored.calendarScale { placeCalendarScales[place] = stored.calendarScale }
+        let hides: Bool? = stored.hidesEmptyGroups ? true : nil
+        if placeHidesEmptyGroups[place] != hides { placeHidesEmptyGroups[place] = hides }
         observedChoices[place] = ViewChoices(options: options, timelineDate: stored.timelineField)
         apply(layout: stored.layout, in: library)
     }
@@ -134,6 +153,7 @@ extension Browser {
         compactBoards[place] = nil
         placeCards[place] = nil
         placeCalendarScales[place] = nil
+        placeHidesEmptyGroups[place] = nil
         observedChoices[place] = ViewChoices(options: ItemTableOptions(), timelineDate: nil)
         // The row of a place with no filter left is not kept open, which only a filter the person put in would have done.
         filterRowChoice[place] = nil
@@ -156,5 +176,6 @@ extension Browser {
         PlaceDefaults.update(in: defaults) { $0.set(stored, for: place) }
         compactBoards[place] = stored.compactBoard ? true : nil
         placeCalendarScales[place] = stored.calendarScale
+        placeHidesEmptyGroups[place] = stored.hidesEmptyGroups ? true : nil
     }
 }

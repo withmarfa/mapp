@@ -384,8 +384,10 @@ struct ViewPanelTests {
         browser.tableOptions[browser.item]?.sort = nil
         let content = browser.tableContent(in: library)
         let shown = SavedViews.arrangement(browser, content: content, order: ItemOrder())
-        #expect(shown.grouping == .date)
+        #expect(shown.hasDateSections)
         #expect(shown.isDated)
+        // Group by ticks the list's date by day, whose sections it shows.
+        #expect(browser.shownGrouping(in: library) == .column(ItemTableColumn.edited.id, by: .bucket(.day)))
     }
 
     @Test func aTableShowsItsOwnGroupingNotTheListsDates() {
@@ -393,7 +395,8 @@ struct ViewPanelTests {
         browser.viewMode = .table
         let content = browser.tableContent(in: library)
         let shown = SavedViews.arrangement(browser, content: content, order: ItemOrder())
-        #expect(shown.grouping != .date)
+        #expect(!shown.hasDateSections)
+        #expect(browser.shownGrouping(in: library) != .column(ItemTableColumn.edited.id, by: .bucket(.day)))
     }
 
     // MARK: Faults the review found
@@ -405,7 +408,8 @@ struct ViewPanelTests {
             browser.tableOptions[browser.item, default: .init()].grouping = .automatic
             browser.tableOptions[browser.item, default: .init()].sort = nil
         }
-        #expect(Self.held(library)?.group == nil)
+        // The list's sections by date are its edited date by day, which the view keeps.
+        #expect(Self.held(library)?.group == LibraryViewGroup(field: "updated_at", bucket: .day))
         #expect(Self.held(library)?.sort == Self.view().sort)
         #expect(Self.held(library)?.version == 2)
         #expect(!browser.hasViewChanges)

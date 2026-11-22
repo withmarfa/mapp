@@ -25,7 +25,8 @@ struct ItemList: View, Equatable {
         let _ = daysSeen
         let now = library.now()
         let sections = browser.sections(in: library, order: order, now: now)
-        let items: [Item] = sections.flatMap(\.items)
+        // A folded section lists its heading alone.
+        let items: [Item] = sections.flatMap { $0.isCollapsed ? [] : $0.items }
         let ids: [ItemID] = items.map(\.id)
         // Each row's content is worked out once for the item as it is and held by the browser, so a change of selection or
         // of one item makes the content of that row alone, and a row's body looks nothing up.
@@ -88,7 +89,8 @@ struct ItemList: View, Equatable {
             browser.open(ids)
         }
         .navigationTitle(title)
-        .navigationSubtitle(subtitle(count: ids.count))
+        // Hidden and folded groups leave the list, not the place, so their items still count.
+        .navigationSubtitle(subtitle(count: browser.listedCount(in: library) ?? sections.reduce(0) { $0 + $1.items.count }))
         // The search field takes the title's place while it is out.
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
     }
@@ -103,7 +105,9 @@ struct ItemList: View, Equatable {
             // it updates, as it does on every change of selection, out of sight too. Set here, they come from the
             // line alone; set inside `ListLineRow`, they would have SwiftUI run every row's body to find them.
             ForEach(lines) { line in
-                let row = ListLineRow(line: line, content: contents[line.id], density: density, excerpt: excerpts[line.id])
+                let row = ListLineRow(
+                    line: line, content: contents[line.id], density: density, excerpt: excerpts[line.id],
+                    fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil)
                 .selectionDisabled(line.isHeading)
                 .listRowSeparator(line.isHeading ? .hidden : .automatic, edges: .top)
                 .listRowSeparator(line.endsSection ? .hidden : .automatic, edges: .bottom)
@@ -159,15 +163,32 @@ private struct ListLineRow: View {
     let content: RowContent?
     let density: Density
     let excerpt: SearchExcerpt?
+    /// Folds or opens a section by its key, where the list's groups fold.
+    var fold: ((String) -> Void)?
 
     var body: some View {
         switch line {
-        case .heading(let group, let isFirst):
-            Text(group.title())
-                .interfaceFont(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.top, isFirst ? 0 : 10)
-                .accessibilityAddTraits(.isHeader)
+        case .heading(let group, let isFirst, let isCollapsed):
+            HStack(spacing: 4) {
+                Text(group.title())
+                    .interfaceFont(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityAddTraits(.isHeader)
+                if let fold {
+                    Button {
+                        fold(group.key)
+                    } label: {
+                        Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                            .imageScale(.small)
+                            .foregroundStyle(.tertiary)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .help(isCollapsed ? "Expand Group" : "Collapse Group")
+                    .accessibilityLabel(isCollapsed ? "Expand Group" : "Collapse Group")
+                }
+            }
+            .padding(.top, isFirst ? 0 : 10)
         case .item:
             if let content {
                 ItemRow(content: content, density: density, excerpt: excerpt)
@@ -179,14 +200,14 @@ private struct ListLineRow: View {
 
 /// A line of the list: a section's heading, or an item, with where it falls in its section.
 private enum ListLine: Identifiable {
-    case heading(ItemGroup, isFirst: Bool)
+    case heading(ItemGroup, isFirst: Bool, isCollapsed: Bool)
     case item(Item, group: ItemGroup?, endsSection: Bool)
 
     /// An item's line is known by the item, so the list's selection is its items; a heading takes an identifier
     /// of its own, never selected.
     var id: ItemID {
         switch self {
-        case .heading(let group, _): ItemID("heading:\(group)")
+        case .heading(let group, _, _): ItemID("heading:\(group)")
         case .item(let item, _, _): item.id
         }
     }
@@ -214,8 +235,8 @@ private enum ListLine: Identifiable {
     static func lines(of sections: [ItemSection]) -> [ListLine] {
         var lines: [ListLine] = []
         for section in sections {
-            if let group = section.group { lines.append(.heading(group, isFirst: lines.isEmpty)) }
-            for item in section.items {
+            if let group = section.group { lines.append(.heading(group, isFirst: lines.isEmpty, isCollapsed: section.isCollapsed)) }
+            for item in section.isCollapsed ? [] : section.items {
                 lines.append(.item(item, group: section.group, endsSection: item.id == section.items.last?.id))
             }
         }

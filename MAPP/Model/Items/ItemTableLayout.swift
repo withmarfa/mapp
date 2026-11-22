@@ -354,6 +354,11 @@ nonisolated struct ItemTableOptions: Hashable, Sendable {
     }
 
     var grouping = Grouping.automatic
+    /// The groups that come first, in this order, by key (`GroupKey`); the rest follow in the grouping's own order.
+    /// A saved view's `group.order`, or a place's own. Nil or empty orders nothing.
+    var groupOrder: [String]?
+    /// The groups left out, whose items still count in the place. A saved view's `group.hidden`, or a place's own.
+    var hiddenGroups: Set<String>?
     var sort: [ItemTableComparator]?
     /// For each column filtered, the categories it keeps; the empty string keeps empty cells. A column in `negated`
     /// keeps the rows outside those categories instead (Is Not).
@@ -385,7 +390,18 @@ nonisolated struct ItemTableOptions: Hashable, Sendable {
         var options = self
         options.pageSize = .standard
         options.negated = negated.filter(isNegated)
+        if options.groupOrder?.isEmpty == true { options.groupOrder = nil }
+        if options.hiddenGroups?.isEmpty == true { options.hiddenGroups = nil }
         return options
+    }
+
+    /// Groups by `grouping`, which orders and hides no group until the person does.
+    mutating func group(by grouping: Grouping) {
+        guard grouping != self.grouping else { return }
+        self.grouping = grouping
+        groupOrder = nil
+        hiddenGroups = nil
+        collapsed = nil
     }
 
     /// Whether any column is filtered.
@@ -444,14 +460,16 @@ nonisolated enum ItemTableLayout {
 
     /// The table's columns for these rows: the name, then the type where the rows mix types, then what the types' looks
     /// show (`TypeLook`): the status of each type that has one, then the facts in the order the looks give them, then
-    /// their dates. The columns of several types are the union of their looks. Every other column starts hidden and the
+    /// their dates. The columns of several types are the union of their looks. The fields of `listed` types no row holds
+    /// come too, hidden, so a grouping or a sort can name a field no item has yet. Every other column starts hidden and the
     /// person can show any of them. A look's column that no row fills starts hidden too, as an empty column says nothing.
     static func columns(
-        for rows: [ItemTableRow], catalogue: Catalogue, hidden: Set<String>, looks: [TypeID: TypeLook]
+        for rows: [ItemTableRow], types listed: Set<TypeID> = [], catalogue: Catalogue, hidden: Set<String>, looks: [TypeID: TypeLook]
     ) -> [ItemTableColumn] {
-        let types = Set(rows.map(\.item.type)).sorted { $0.rawValue < $1.rawValue }
+        let held = Set(rows.map(\.item.type))
+        let types = held.union(listed).sorted { $0.rawValue < $1.rawValue }
         var columns: [ItemTableColumn] = [.title]
-        if types.count > 1 { columns.append(.type) }
+        if held.count > 1 { columns.append(.type) }
 
         var fields: [String: ItemTypeInfo.Field] = [:]
         var styles: [String: ItemTableColumn.Style] = [:]
@@ -623,8 +641,7 @@ nonisolated enum ItemTableLayout {
     static func grouping(_ options: ItemTableOptions, columns: [ItemTableColumn]) -> ItemTableColumn? {
         switch options.grouping {
         case .none: return nil
-        case .column(let id, .value): return columns.first { $0.id == id && $0.isCategorical }
-        case .column(let id, .bucket): return columns.first { $0.id == id && $0.isDated }
+        case .column(let id, let mode): return columns.first { $0.id == id && $0.groups(by: mode) }
         // Only where items fill their status: a place of events, whose type has one nobody sets, is not grouped.
         case .automatic: return columns.first { $0.style == .status && $0.isShownByDefault }
         }
@@ -693,22 +710,56 @@ nonisolated enum ItemTableLayout {
         return order.map { rows[$0] }
     }
 
-    /// The rows in groups by `column`: a date's by the span `mode` names, oldest first and then the rows with none; a
-    /// status column's by the group each word is in, the four in their order and then the words no group claims; any
-    /// other column's as `categories` gives them.
+    /// The rows in groups by `column` as `mode` says, in the grouping's own order, with the rows that hold no value
+    /// last and, where a type does not declare the field, Not Applicable after them (`GroupKey`):
+    /// - each value: a choice's options and a status's words as declared, Yes before No, any other value A to Z;
+    /// - a date's span: keyed as Marfa keys it (`DateGroups.key`), earliest first;
+    /// - Set or Not Set: Not Set, then Set;
+    /// - status groups: Marfa's four in their order, then No Status, each row by its own type's status field.
+    /// `catalogue` tells which types declare the field and their status words; without it every row is applicable.
+    /// With `declared`, a grouping whose groups are known before the rows are (a choice, a status, yes or no, Set or
+    /// Not Set, status groups) lists the empty ones too, for Hide Empty Groups to leave out.
     static func groups(
-        of rows: [ItemTableRow], by column: ItemTableColumn, mode: GroupMode = .value, calendar: Calendar = .current, now: Date = .now
+        of rows: [ItemTableRow], by column: ItemTableColumn, mode: GroupMode, catalogue: Catalogue? = nil, declared: Bool = false,
+        calendar: Calendar = .current, now: Date = .now
     ) -> [ItemTableGroup] {
-        if let bucket = mode.bucket { return dated(rows, by: column, bucket: bucket, calendar: calendar, now: now) }
-        guard column.style == .status else { return categories(of: rows, by: column) }
-        var buckets: [StatusBucket: [ItemTableRow]] = [:]
-        var empty: [ItemTableRow] = []
-        for row in rows {
-            if let word = column.category(of: row) { buckets[column.statusBucket(of: word), default: []].append(row) } else { empty.append(row) }
+        var applicable = rows
+        var notApplicable: [ItemTableRow] = []
+        if let catalogue, mode != .statusGroups, let key = column.field?.key {
+            applicable = []
+            for row in rows {
+                if catalogue.itemTypes[row.item.type]?.fields.contains(where: { $0.key == key }) == false {
+                    notApplicable.append(row)
+                } else {
+                    applicable.append(row)
+                }
+            }
         }
-        var groups = buckets.keys.sorted { $0.rank < $1.rank }.map { ItemTableGroup(id: $0.id, title: $0.title, rows: buckets[$0]!) }
-        if !empty.isEmpty { groups.append(ItemTableGroup(id: "", title: String(localized: "No \(column.label)"), rows: empty)) }
+        var groups: [ItemTableGroup]
+        switch mode {
+        case .bucket(let bucket): groups = dated(applicable, by: column, bucket: bucket, calendar: calendar, now: now)
+        case .presence: groups = presence(applicable, by: column, declared: declared)
+        case .statusGroups: groups = statusGroups(applicable, by: column, catalogue: catalogue, declared: declared)
+        case .value: groups = categories(of: applicable, by: column, including: declared ? column.declaredValues : [], byLabel: true)
+        }
+        if !notApplicable.isEmpty {
+            groups.append(ItemTableGroup(id: GroupKey.notApplicable, title: String(localized: "Not Applicable"), rows: notApplicable))
+        }
         return groups
+    }
+
+    /// The groups in the order a view or a place gives (`group.order`): those it names first, in its order, then the
+    /// rest as they came, Not Applicable last.
+    static func ordered(_ groups: [ItemTableGroup], by order: [String]?) -> [ItemTableGroup] {
+        guard let order, !order.isEmpty else { return groups }
+        let byKey = Dictionary(groups.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<String>()
+        let named = order.compactMap { key -> ItemTableGroup? in
+            guard key != GroupKey.notApplicable, seen.insert(key).inserted else { return nil }
+            return byKey[key]
+        }
+        let rest = groups.filter { !seen.contains($0.id) }
+        return named + rest.filter { $0.id != GroupKey.notApplicable } + rest.filter { $0.id == GroupKey.notApplicable }
     }
 
     /// The rows in groups by the day, week, month or year of `column`'s date, keyed as Marfa keys them
@@ -728,10 +779,44 @@ nonisolated enum ItemTableLayout {
         return groups
     }
 
+    /// Not Set, then Set.
+    private static func presence(_ rows: [ItemTableRow], by column: ItemTableColumn, declared: Bool) -> [ItemTableGroup] {
+        let set = rows.filter(column.isSet(in:))
+        let unset = rows.filter { !column.isSet(in: $0) }
+        return [
+            ItemTableGroup(id: GroupKey.notSet, title: String(localized: "Not Set"), rows: unset),
+            ItemTableGroup(id: GroupKey.set, title: String(localized: "Set"), rows: set),
+        ].filter { declared || !$0.rows.isEmpty }
+    }
+
+    /// Marfa's four status groups in their order, then the words no group claims, then No Status. Each row goes by its
+    /// own type's status field where the catalogue is given, so types that keep their status under different names
+    /// share the groups; a type with no status field, or a row with no word, is No Status.
+    private static func statusGroups(
+        _ rows: [ItemTableRow], by column: ItemTableColumn, catalogue: Catalogue?, declared: Bool
+    ) -> [ItemTableGroup] {
+        var buckets: [StatusBucket: [ItemTableRow]] = [:]
+        var empty: [ItemTableRow] = []
+        for row in rows {
+            let field = catalogue.map { $0.itemTypes[row.item.type]?.statusField } ?? column.field
+            guard let field, let word = ItemTableValue.string(row, key: field.key) else {
+                empty.append(row)
+                continue
+            }
+            buckets[field.statusBucket(of: word), default: []].append(row)
+        }
+        if declared { for group in StatusGroup.allCases where buckets[.group(group)] == nil { buckets[.group(group)] = [] } }
+        var groups = buckets.keys.sorted { $0.rank < $1.rank }.map { ItemTableGroup(id: $0.id, title: $0.title, rows: buckets[$0]!) }
+        if !empty.isEmpty || declared { groups.append(ItemTableGroup(id: "", title: String(localized: "No Status"), rows: empty)) }
+        return groups
+    }
+
     /// The rows in groups by each value of `column`: a picked value's in the order its values are given, any other
-    /// column's largest first, and the rows with no value last. A filter offers these, so a status column's are its
+    /// column's largest first (A to Z `byLabel`), and the rows with no value last. A filter offers these, so a status column's are its
     /// words, ordered by their groups.
-    static func categories(of rows: [ItemTableRow], by column: ItemTableColumn, including extra: Set<String> = []) -> [ItemTableGroup] {
+    static func categories(
+        of rows: [ItemTableRow], by column: ItemTableColumn, including extra: Set<String> = [], byLabel: Bool = false
+    ) -> [ItemTableGroup] {
         var buckets: [String: [ItemTableRow]] = [:]
         for row in rows { buckets[column.category(of: row) ?? "", default: []].append(row) }
         for value in extra where buckets[value] == nil { buckets[value] = [] }
@@ -743,6 +828,7 @@ nonisolated enum ItemTableLayout {
             case .boolean:
                 return a == "true"
             default:
+                if byLabel { return column.label(ofCategory: a, in: rows).localizedStandardCompare(column.label(ofCategory: b, in: rows)) == .orderedAscending }
                 let (x, y) = (buckets[a]!.count, buckets[b]!.count)
                 return x == y ? column.label(ofCategory: a, in: rows).localizedStandardCompare(column.label(ofCategory: b, in: rows)) == .orderedAscending : x > y
             }
@@ -771,9 +857,15 @@ nonisolated enum ItemTableLayout {
     }
 
     /// The groups folded when the person has not chosen: finished work, so what is still to do leads.
-    static func collapsed(_ options: ItemTableOptions, groups: [ItemTableGroup], by column: ItemTableColumn) -> Set<String> {
+    static func collapsed(
+        _ options: ItemTableOptions, groups: [ItemTableGroup], by column: ItemTableColumn, mode: GroupMode = .statusGroups
+    ) -> Set<String> {
         if let collapsed = options.collapsed { return collapsed }
-        guard column.style == .status, options.grouping.mode == .value else { return [] }
-        return Set(groups.compactMap { $0.value.flatMap { StatusBucket(id: $0)?.isFinished == true ? $0 : nil } })
+        guard column.style == .status else { return [] }
+        switch mode {
+        case .statusGroups: return Set(groups.compactMap { $0.value.flatMap { StatusBucket(id: $0)?.isFinished == true ? $0 : nil } })
+        case .value: return Set(groups.compactMap { $0.value.flatMap { column.statusBucket(of: $0).isFinished ? $0 : nil } })
+        case .bucket, .presence: return []
+        }
     }
 }

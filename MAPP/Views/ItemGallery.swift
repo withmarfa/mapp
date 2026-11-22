@@ -41,6 +41,7 @@ struct ItemGallery: View {
         let _ = daysSeen
         let sections = browser.sections(in: library, order: order, now: library.now())
         let ids = Cost.measure(.galleryBody) { sections.flatMap { $0.items.map(\.id) } }
+        let count = browser.listedCount(in: library) ?? ids.count
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         // The picture's opening lines are drawn on the card when the preview allows them, so the line under the title
         // does not say them again.
@@ -60,7 +61,9 @@ struct ItemGallery: View {
         }
         .overlay {
             if ids.isEmpty {
-                if browser.isSearching {
+                if browser.listHidesEveryGroup(in: library) {
+                    HiddenGroupsEmptyState()
+                } else if browser.isSearching {
                     SearchEmptyState(browser: browser)
                         .accessibilityIdentifier("GalleryEmptySearch")
                 } else { PlaceEmptyState(browser: browser) }
@@ -68,8 +71,9 @@ struct ItemGallery: View {
         }
         .filteredEmptyState(browser)
         .navigationTitle(title)
+        // Hidden and folded groups leave the gallery, not the place, so their items still count.
         .navigationSubtitle(
-            (browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
+            (browser.isSearching ? Text("^[\(count) result](inflect: true)") : Text("^[\(count) item](inflect: true)"))
                 .editedSubtitle(browser.hasViewChanges))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .task {

@@ -170,7 +170,8 @@ struct ViewGroupKeptTests {
         window.place = .itemType(Self.task.rawValue)
         let draft = try #require(ViewDraft.draft(window, catalogue: Self.catalogue, views: []))
         #expect(draft.group?.order == [.string("todo"), .string("doing"), .string("done")])
-        window.layout = .board(key: "priority", label: "Priority")
+        window.layout = .board
+        window.grouping = Self.priorityColumn
         window.sort = [ItemTableComparator(column: Self.dueColumn, order: .forward)]
         let board = try #require(ViewDraft.draft(window, catalogue: Self.catalogue, views: []))
         #expect(board.group == LibraryViewGroup(field: "properties.priority", order: [.string("low"), .string("high")]))
@@ -318,6 +319,57 @@ struct ViewGroupKeptTests {
         #expect(library.views.first?.version == version + 1)
         #expect(library.views.first?.sort == [LibraryViewSort(field: "title", ascending: true)])
         #expect(library.views.first?.group?.field == "properties.priority")
+    }
+
+    /// Group order and hidden groups are part of the grouping: another app's, merged into a write of the sort, show in
+    /// the window and are never written back over.
+    @Test func groupOrderAndHiddenGroupsAnotherAppSetDuringASortAreShownAndKept() async throws {
+        let (browser, library) = Self.opened(Self.view(LibraryViewGroup(field: "properties.status")))
+        library.changedElsewhere = { $0.group = Self.statusElsewhere }
+        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        await browser.choicesChanged()?.value
+        #expect(library.views.first?.group == Self.statusElsewhere)
+        #expect(browser.tableOptions[browser.item]?.groupOrder == ["doing"])
+        #expect(browser.tableOptions[browser.item]?.hiddenGroups == ["done"])
+        #expect(!browser.hasViewChanges)
+
+        browser.setFilter("field.priority", values: ["high"])
+        await browser.choicesChanged()?.value
+        #expect(library.views.first?.group == Self.statusElsewhere)
+    }
+
+    @Test func groupOrderAndHiddenGroupsAnotherAppSetDuringARenameAreShownAndKept() async throws {
+        let (browser, library) = Self.opened(Self.view(LibraryViewGroup(field: "properties.status")))
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "Renamed"
+        library.changedElsewhere = { $0.group = Self.statusElsewhere }
+        await browser.commitViewName(in: library)
+        #expect(library.views.first?.title == "Renamed")
+        #expect(browser.tableOptions[browser.item]?.groupOrder == ["doing"])
+        #expect(browser.tableOptions[browser.item]?.hiddenGroups == ["done"])
+        #expect(!browser.hasViewChanges)
+
+        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        await browser.choicesChanged()?.value
+        #expect(library.views.first?.group == Self.statusElsewhere)
+    }
+
+    /// A new span for the same date keeps the view's group order and hidden groups, and the window shows them as kept.
+    @Test func aNewSpanKeepsTheGroupOrderAndTheWindowShowsIt() async throws {
+        let week = LibraryViewGroup(field: "properties.due_at", bucket: .week, order: [.string("2026-11-23")], hidden: [.null])
+        let (browser, library) = Self.opened(Self.view(week))
+        #expect(browser.tableOptions[browser.item]?.groupOrder == ["2026-11-23"])
+        browser.tableOptions[browser.item]?.grouping = .column("field.due_at", by: .bucket(.month))
+        await browser.choicesChanged()?.value
+        let month = LibraryViewGroup(field: "properties.due_at", bucket: .month, order: [.string("2026-11-23")], hidden: [.null])
+        #expect(library.views.first?.group == month)
+        #expect(browser.tableOptions[browser.item]?.groupOrder == ["2026-11-23"])
+        #expect(browser.tableOptions[browser.item]?.hiddenGroups == [GroupKey.none])
+        #expect(!browser.hasViewChanges)
+
+        browser.setFilter("field.priority", values: ["high"])
+        await browser.choicesChanged()?.value
+        #expect(library.views.first?.group == month)
     }
 
     /// What the person changes while a write is under way stays theirs and is written next, though another app changed

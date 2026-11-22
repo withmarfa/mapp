@@ -4,6 +4,9 @@
     "Choose a collection to see what’s in it." : {
 
     },
+    "Oiling an oak worktop" : {
+
+    },
     "⌘-click to open" : {
 
     },
@@ -76,6 +79,9 @@
     "12 Nov" : {
 
     },
+    "1 Nov" : {
+
+    },
     "2 Nov" : {
 
     },
@@ -83,9 +89,6 @@
 
     },
     "4 Nov" : {
-
-    },
-    "9 Nov" : {
 
     },
     "A control turned off is in the page’s More menu, and the View menu keeps every command." : {
@@ -128,9 +131,6 @@
 
     },
     "Bookmark" : {
-
-    },
-    "Books to start this year." : {
 
     },
     "Budget" : {
@@ -913,9 +913,6 @@
 
     },
     "Read a file’s text" : {
-
-    },
-    "Reading List" : {
 
     },
     "Refused a reused token" : {
@@ -4429,9 +4426,6 @@
     "Group by %@" : {
 
     },
-    "Group by Date" : {
-
-    },
     "Grouping by %@" : {
       "extractionState" : "manual"
     },
@@ -5185,9 +5179,6 @@
     },
     "One version a week kept for" : {
       "extractionState" : "manual"
-    },
-    "Only a board has empty groups." : {
-
     },
     "Only a card with a picture can fit it." : {
       "extractionState" : "manual"
@@ -6049,9 +6040,6 @@
     "The list could not be saved." : {
       "extractionState" : "manual"
     },
-    "The list’s sections by date" : {
-      "extractionState" : "manual"
-    },
     "The Marfa server can’t be reached. The items are still in Recently Deleted." : {
       "extractionState" : "manual"
     },
@@ -6549,9 +6537,6 @@
 
     },
     "Ungroup" : {
-
-    },
-    "Ungroup by Date" : {
 
     },
     "Unpin" : {
@@ -8940,6 +8925,86 @@
 
     },
     "Week of %@" : {
+
+    },
+    "Words" : {
+
+    },
+    "Groups" : {
+
+    },
+    "Set or Not Set" : {
+
+    },
+    "Each Option" : {
+
+    },
+    "Yes or No" : {
+
+    },
+    "More Fields" : {
+
+    },
+    "Collapse All Groups" : {
+
+    },
+    "Expand All Groups" : {
+
+    },
+    "A saved view can’t keep this grouping yet." : {
+
+    },
+    "Group by %@: %@" : {
+
+    },
+    "Groups Hidden" : {
+
+    },
+    "Every group with items is hidden. Show a group in Edit View to see its items." : {
+
+    },
+    "Not Saved in the View" : {
+
+    },
+    "Hide Group" : {
+
+    },
+    "Show Group" : {
+
+    },
+    "Expand Group" : {
+
+    },
+    "Collapse Group" : {
+
+    },
+    "%lld items need a value there, so it can’t be cleared." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item needs a value there, so it can’t be cleared."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items need a value there, so it can’t be cleared."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "The order a place starts in until you change its Sort by or Group by in View Options." : {
+
+    },
+    "%@ (Not Kept)" : {
 
     }
   },
