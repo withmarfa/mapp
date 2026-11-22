@@ -38,13 +38,16 @@ extension EditorController {
     /// since moved on is ignored, as the menu would act on text the person no longer sees.
     func showLinkMenu(for target: LinkMenuTarget, in item: ItemID, generation: Int, at point: CGPoint, viewportHeight: Double) {
         guard item == pageItemID, generation == self.generation, isReady else { return }
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        let handler = LinkMenuHandler { [weak self] choice in
+        let entries = Self.linkMenuEntries(for: target, isEditable: isEditable)
+        let choose: (LinkChoice) -> Void = { [weak self] choice in
             self?.perform(choice, on: target, in: item, generation: generation)
         }
+        if let onLinkMenu { return onLinkMenu(entries, choose) }
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let handler = LinkMenuHandler(chosen: choose)
         var separated = false
-        for entry in Self.linkMenuEntries(for: target, isEditable: isEditable) {
+        for entry in entries {
             // What changes the text is set apart from what only opens or copies.
             if !separated, entry.choice == .edit || entry.choice == .remove {
                 separated = true

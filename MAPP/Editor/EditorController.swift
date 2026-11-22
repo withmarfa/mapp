@@ -71,6 +71,9 @@ final class EditorController: NSObject {
     /// A link in the item's text names this item. A window that opens items as Settings > General > Open Items says
     /// sets this; without it the link opens as any other (`onOpenItem`).
     @ObservationIgnored var onFollowItemLink: ((ItemID) -> Void)?
+    /// Shows a link's menu in place of the native one, given what it offers and the way to carry out a choice. Nothing is
+    /// shown or done until the handler chooses. A native menu holds the main actor while it is open, so a test sets this.
+    @ObservationIgnored var onLinkMenu: (([LinkMenuEntry], @escaping (LinkChoice) -> Void) -> Void)?
     /// A link in the page names no item the window can open, which is told only by a beep: nothing is made.
     @ObservationIgnored var onUnopenableLink: () -> Void = { NSSound.beep() }
     /// Asks the person which of several items an ambiguous link means, in place of the menu at the pointer. The
