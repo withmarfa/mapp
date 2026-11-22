@@ -8,18 +8,22 @@ extension View {
     /// of selection, however it is made. The selection is read by the marks alone, so a change of selection does not
     /// run the body of the view that holds the list, which would have the list look at every row again. With
     /// `hovers`, the row under the pointer gets a fainter mark of its own, drawn and followed by the same layer view
-    /// from the table's mouse events, so that mark runs no row's body.
-    func softSelection(rows: some Hashable, hovers: Bool = false, selection: @escaping () -> some Hashable) -> some View {
-        background(SoftSelectionReader(rows: rows.hashValue, hovers: hovers, selection: selection))
+    /// from the table's mouse events, so that mark runs no row's body. `inert` names the rows, by their place in the
+    /// table, that the pointer passes over without a mark: a heading, which a click does nothing to.
+    func softSelection(
+        rows: some Hashable, hovers: Bool = false, inert: Set<Int> = [], selection: @escaping () -> some Hashable
+    ) -> some View {
+        background(SoftSelectionReader(rows: rows.hashValue, hovers: hovers, inert: inert, selection: selection))
     }
 }
 
 private struct SoftSelectionReader<Selection: Hashable>: View {
     let rows: Int
     let hovers: Bool
+    let inert: Set<Int>
     let selection: () -> Selection
 
-    var body: some View { SoftSelection(rows: rows, hovers: hovers, selection: selection().hashValue) }
+    var body: some View { SoftSelection(rows: rows, hovers: hovers, inert: inert, selection: selection().hashValue) }
 }
 
 /// SwiftUI cannot style a list's selection, which the `NSTableView` behind it draws. This finds that table, turns
@@ -27,15 +31,18 @@ private struct SoftSelectionReader<Selection: Hashable>: View {
 struct SoftSelection: NSViewRepresentable {
     let rows: Int
     let hovers: Bool
+    let inert: Set<Int>
     let selection: Int
 
     func makeNSView(context: Context) -> Probe {
         let probe = Probe()
         probe.hovers = hovers
+        probe.inert = inert
         return probe
     }
     func updateNSView(_ probe: Probe, context: Context) {
         probe.hovers = hovers
+        probe.inert = inert
         probe.refresh(rows: rows, selection: selection)
     }
     static func dismantleNSView(_ probe: Probe, coordinator: ()) { probe.dismantle() }
@@ -46,6 +53,10 @@ struct SoftSelection: NSViewRepresentable {
         private var originalHighlightStyle: NSTableView.SelectionHighlightStyle?
         private var isDismantled = false
         var hovers = false
+        /// The rows the pointer leaves unmarked, set on the marks as they come and whenever it changes.
+        var inert: Set<Int> = [] {
+            didSet { marks?.inert = inert }
+        }
         /// The rows and selection the marks were last asked to follow, so an update SwiftUI makes for any other
         /// reason leaves them alone.
         private var seen: Followed?
@@ -97,6 +108,7 @@ struct SoftSelection: NSViewRepresentable {
             originalHighlightStyle = table.selectionHighlightStyle
             table.selectionHighlightStyle = .none
             let marks = Marks(table: table, hovers: hovers)
+            marks.inert = inert
             table.addSubview(marks, positioned: .below, relativeTo: nil)
             self.marks = marks
         }
@@ -132,6 +144,11 @@ struct SoftSelection: NSViewRepresentable {
         private let hoverMark: CALayer?
         private var pointerIsOver = false
         private var placedHover: (frame: NSRect?, color: CGColor)?
+        /// The rows the pointer gets no mark on. SwiftUI's table answers nothing to `shouldSelectRow` for a row it will
+        /// not select, so the lists name their headings themselves.
+        var inert: Set<Int> = [] {
+            didSet { if inert != oldValue { updateHover(forced: true) } }
+        }
         /// The row the pointer was last over and the appearance the mark was colored for, so a move inside one row
         /// asks nothing further.
         private var lastHover: (row: Int, appearance: NSAppearance.Name)?
@@ -243,7 +260,7 @@ struct SoftSelection: NSViewRepresentable {
         }
 
         /// Puts the faint mark on the row under the pointer: not on a row that is chosen, which has its own, nor on
-        /// one the table would not select, such as a heading. Nothing is asked or placed while the pointer stays on the
+        /// one that is `inert`, such as a heading. Nothing is asked or placed while the pointer stays on the
         /// same row, since a move inside a row is most of the events; a change of selection asks again, with `forced`.
         /// The pointer counts only where the table is what shows there: an overlay above it, such as the command
         /// palette, leaves the table's rows unhovered.
@@ -257,7 +274,7 @@ struct SoftSelection: NSViewRepresentable {
             if !forced, let lastHover, lastHover.row == row, lastHover.appearance == appearance { return }
             lastHover = (row, appearance)
             if row >= 0, table.isRowSelected(row) || table.rowView(atRow: row, makeIfNecessary: false)?.isSelected == true { row = -1 }
-            if row >= 0, table.delegate?.tableView?(table, shouldSelectRow: row) == false { row = -1 }
+            if inert.contains(row) { row = -1 }
             let frame = row >= 0 ? Self.rect(ofRow: row, in: table) : nil
             var color = CGColor.clear
             effectiveAppearance.performAsCurrentDrawingAppearance {
