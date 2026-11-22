@@ -11,7 +11,11 @@ final class ItemTableContent {
     let columns: [ItemTableColumn]
     let sort: [ItemTableComparator]
     let grouping: ItemTableColumn?
+    /// How `grouping` groups: by each value, or by a date's span.
+    let groupMode: GroupMode
     private let options: ItemTableOptions
+    /// The calendar dates are grouped on: a saved view's weeks start on Monday, a place's where Settings says.
+    private let calendar: Calendar
     private let catalogue: Catalogue
 
     /// The rows the filters keep, in the order the items came in: what a layout that sorts and groups the items
@@ -23,7 +27,7 @@ final class ItemTableContent {
     lazy var rows: [ItemTableRow] = Cost.measure(.tableRows) {
         ItemTableLayout.sorted(kept, by: sort)
     }
-    lazy var groups: [ItemTableGroup] = Cost.measure(.tableGroups) { grouping.map { ItemTableLayout.groups(of: rows, by: $0) } ?? [] }
+    lazy var groups: [ItemTableGroup] = Cost.measure(.tableGroups) { grouping.map { ItemTableLayout.groups(of: rows, by: $0, mode: groupMode, calendar: calendar) } ?? [] }
     lazy var collapsed: Set<String> = grouping.map { ItemTableLayout.collapsed(options, groups: groups, by: $0) } ?? []
 
     /// Works the table out for `items`, which are what `browser` shows in `library`. Nothing is kept: ask the
@@ -43,6 +47,8 @@ final class ItemTableContent {
         // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
         sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
         grouping = ItemTableLayout.grouping(options, columns: columns)
+        groupMode = options.grouping.mode
+        calendar = browser.isViewPlace ? DateGroups.viewCalendar() : WeekStart.calendar(.current, in: browser.defaults)
     }
 
     /// The columns Add Sort offers: those of the types the view shows after its filters, in a sensible order.

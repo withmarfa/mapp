@@ -12,7 +12,7 @@ extension Browser {
     ) -> RowList {
         let arranged = listShape?.arranged == true && !ordersByRelevance
         var groupedByType = false
-        if arranged, case .column(let id) = tableOptions[item]?.grouping { groupedByType = id == ItemTableColumn.type.id }
+        if arranged, let id = tableOptions[item]?.grouping.columnID { groupedByType = id == ItemTableColumn.type.id }
         return RowList(
             mixesTypes: !groupedByType && Set(items.lazy.map(\.type)).count > 1,
             date: RowDateSource.of(

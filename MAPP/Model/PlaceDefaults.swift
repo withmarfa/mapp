@@ -12,10 +12,11 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         var reversed: Bool
     }
 
-    /// Where the table groups: by a column, or not at all. Nil is the place's own grouping.
+    /// Where the table groups: by a column, each value or a date's span, or not at all. Nil is the place's own grouping.
+    /// Stored as `none`, `column:<id>` for each value, or `<bucket>:<id>` (`week:field.due_at`) for a date's span.
     enum Grouping: Encodable, Equatable, Sendable {
         case none
-        case column(String)
+        case column(String, by: GroupMode = .value)
 
         private static let columnPrefix = "column:"
 
@@ -23,19 +24,32 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         init?(word: String) {
             if word == "none" {
                 self = .none
-            } else if word.hasPrefix(Self.columnPrefix) {
-                self = .column(String(word.dropFirst(Self.columnPrefix.count)))
+                return
+            }
+            guard let colon = word.firstIndex(of: ":") else { return nil }
+            let id = String(word[word.index(after: colon)...])
+            let head = String(word[..<colon])
+            guard !id.isEmpty else { return nil }
+            if head == "column" {
+                self = .column(id)
+            } else if let bucket = LibraryViewGroup.Bucket(rawValue: head) {
+                self = .column(id, by: .bucket(bucket))
             } else {
                 return nil
             }
         }
 
+        var word: String {
+            switch self {
+            case .none: "none"
+            case .column(let id, .value): Self.columnPrefix + id
+            case .column(let id, .bucket(let bucket)): bucket.rawValue + ":" + id
+            }
+        }
+
         func encode(to encoder: any Encoder) throws {
             var container = encoder.singleValueContainer()
-            switch self {
-            case .none: try container.encode("none")
-            case .column(let id): try container.encode(Self.columnPrefix + id)
-            }
+            try container.encode(word)
         }
     }
 
@@ -88,7 +102,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         let held: Grouping? = switch options.grouping {
         case .automatic: nil
         case .none: Grouping.none
-        case .column(let id): Grouping.column(id)
+        case .column(let id, let mode): Grouping.column(id, by: mode)
         }
         grouping = held
         let kept = options.filters.filter { !$0.value.isEmpty }
@@ -111,7 +125,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         let grouping: ItemTableOptions.Grouping = switch self.grouping {
         case nil: .automatic
         case .none?: .none
-        case .column(let id)?: isKept(id) ? .column(id) : .automatic
+        case .column(let id, let mode)?: isKept(id) ? .column(id, by: mode) : .automatic
         }
         if options.grouping != grouping { options.collapsed = nil }
         options.grouping = grouping

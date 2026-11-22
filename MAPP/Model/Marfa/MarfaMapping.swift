@@ -86,7 +86,7 @@ nonisolated enum MarfaMapping {
                 states: query.states.map { Set($0.map(state)) },
                 filter: query.filter, beneath: query.beneath.map { ItemID($0) }),
             sort: settings.sort.map { LibraryViewSort(field: $0.by, ascending: $0.direction == .ascending) },
-            group: settings.group.map { LibraryViewGroup(field: $0.by, bucket: $0.bucket.map(bucket)) })
+            group: settings.group.map { LibraryViewGroup(field: $0.by, bucket: $0.bucket.map(bucket), order: $0.order, hidden: $0.hidden) })
     }
 
     /// Nil where a view lists both tiers.
@@ -157,7 +157,7 @@ nonisolated enum MarfaMapping {
     }
 
     private static func viewGrouping(_ group: LibraryViewGroup) -> ViewGrouping {
-        ViewGrouping(by: group.field, bucket: group.bucket.map(marfaBucket))
+        ViewGrouping(by: group.field, bucket: group.bucket.map(marfaBucket), order: group.order, hidden: group.hidden)
     }
 
     /// The server's refusal of a view write, in words for the person. A view is written at once, so a server that

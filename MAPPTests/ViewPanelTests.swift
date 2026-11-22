@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Testing
 @testable import MAPP
 
@@ -102,6 +103,27 @@ struct ViewPanelTests {
         #expect(Self.held(library)?.group == nil)
         await Self.undo(undo, library) { $0?.group != nil }
         #expect(Self.held(library)?.group == LibraryViewGroup(field: "properties.status"))
+    }
+
+    /// Another app's sort, merged into the write of a grouping, is not the person's change, so an Undo of the grouping
+    /// gives back the earlier group exactly and leaves that sort as it is.
+    @Test func undoOfAGroupingAfterAMergedSortGivesBackTheEarlierGroupExactly() async throws {
+        let (browser, library, undo) = Self.opened()
+        let earlier = LibraryViewGroup(field: "properties.status", order: [.string("done")], hidden: [.null])
+        var ordered = try #require(Self.held(library))
+        ordered.version += 1
+        ordered.group = earlier
+        library.views = [ordered]
+        browser.followView(in: library)
+        let sort = [LibraryViewSort(field: "title", ascending: true)]
+        library.changedElsewhere = { $0.sort = sort }
+        await Self.change(browser) { browser.tableOptions[browser.item, default: .init()].grouping = .none }
+        #expect(Self.held(library)?.group == nil)
+        #expect(Self.held(library)?.sort == sort)
+        await Self.undo(undo, library) { $0?.group != nil }
+        #expect(Self.held(library)?.group == earlier)
+        #expect(Self.held(library)?.sort == sort)
+        #expect(!library.notices.waiting.contains { $0.title == "Can’t Undo" })
     }
 
     @Test func undoOfASortWritesTheEarlierOrderBack() async {

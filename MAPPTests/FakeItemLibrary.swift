@@ -72,6 +72,12 @@ final class FakeItemLibrary: ItemLibrary {
     var inViewWrite: (() async -> Void)?
     /// Awaited when a view's change arrives, before it is applied, so a test can act while a write is under way.
     var inViewChange: (() async -> Void)?
+    /// Another app's change to a view, taken by the server just before the next view change arrives, which then names
+    /// a version the view no longer holds. As `views/change-stale` and `views/change-conflict` say, the server merges
+    /// it where it changes only settings the other app left alone, and refuses it otherwise. Stricter than the server in
+    /// two cases: naming a setting the other app changed is a conflict even when the value sent equals the new one, and
+    /// clearing a group the named version never held is a conflict where the server leaves it (`views/group-clear`).
+    var changedElsewhere: ((inout LibraryView) -> Void)?
 
     init(items: [Item] = [], bodies: [ItemID: String] = [:], now: Date = .now) {
         self.items = items
@@ -634,7 +640,19 @@ final class FakeItemLibrary: ItemLibrary {
     func changeView(_ id: ItemID, _ change: LibraryViewChange, baseVersion: Int64) async -> Result<LibraryView, ViewWriteFailure> {
         await inViewChange?()
         guard var view = views.first(where: { $0.id == id }) else { return .failure(ViewWriteFailure(kind: .gone, message: "Gone")) }
-        let failure = viewFailure ?? (view.version == baseVersion ? nil : ViewWriteFailure(kind: .conflict, message: "Changed elsewhere"))
+        var merges = false
+        if let elsewhere = changedElsewhere {
+            changedElsewhere = nil
+            let before = view
+            elsewhere(&view)
+            view.version += 1
+            views = LibraryView.ordered(views.filter { $0.id != id } + [view])
+            let clashes = (change.title != nil && view.title != before.title) || (change.query != nil && view.query != before.query)
+                || (change.sort != nil && view.sort != before.sort) || (change.group != nil && view.group != before.group)
+            merges = baseVersion == before.version && !clashes
+        }
+        let current = view.version == baseVersion || merges
+        let failure = viewFailure ?? (current ? nil : ViewWriteFailure(kind: .conflict, message: "Changed elsewhere"))
         if let failure {
             notices.tell("Can’t Update View", failure.message)
             return .failure(failure)

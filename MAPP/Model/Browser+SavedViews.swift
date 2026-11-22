@@ -34,23 +34,50 @@ extension Browser {
         self.seed(view, catalogue: library.catalogue)
     }
 
-    /// Takes the view as the library holds it for the window's choices, or, with `keepingWindow`, only for the
-    /// version and options the next write is compared with.
-    func seed(_ view: LibraryView, catalogue: Catalogue, keepingWindow: Bool = false) {
+    /// Takes the view as the library holds it for the window's choices, or, with `keepingWindow`, as a write `sent`
+    /// returned it: the window then keeps each setting the person changed, and the next write is compared with the view.
+    func seed(
+        _ view: LibraryView, catalogue: Catalogue, keepingWindow: Bool = false, sent: LibraryViewChange = LibraryViewChange()
+    ) {
         let place = SidebarItem.view(view.id)
         var options = ViewDraft.options(for: view, catalogue: catalogue)
         let timelineDate = ViewDraft.timelineDate(of: view)
         let collapsed = tableOptions[place]?.collapsed
-        let mac = viewSeeds[view.id]?.mac ?? ViewLayouts.stored(in: defaults).settings(for: view.id) ?? ViewMacSettings()
+        let earlier = viewSeeds[view.id]
+        let mac = earlier?.mac ?? ViewLayouts.stored(in: defaults).settings(for: view.id) ?? ViewMacSettings()
         let types = ViewDraft.seededTypes(of: view.query, catalogue: catalogue)
         viewSeeds[view.id] = ViewSeed(
             version: view.version, options: options, timelineDate: timelineDate, types: types,
             preview: ViewDraft.previewQuery(of: view.query, seededTypes: types, catalogue: catalogue), mac: mac)
-        guard !keepingWindow else { return }
+        guard !keepingWindow else {
+            if let earlier { follow(ViewChoices(options: options, timelineDate: timelineDate), in: place, over: earlier, sent: sent) }
+            return
+        }
         options.collapsed = collapsed
         tableOptions[place] = options
         timelineFields[place] = timelineDate
         observedChoices[place] = ViewChoices(options: options, timelineDate: timelineDate)
+    }
+
+    /// Shows the settings of a view a write returned that the person has not changed since `earlier`, the seed the
+    /// write was compared with, and that the write did not send. The server may have merged another app's change to one
+    /// (`views/change-stale`); left out of the window, it would read as the person's own change, and the next write would
+    /// send the window's older value back over it. A setting the person changed stays as they chose it, and is written.
+    private func follow(_ returned: ViewChoices, in place: SidebarItem, over earlier: ViewSeed, sent: LibraryViewChange) {
+        let held = ViewChoices(options: earlier.options, timelineDate: earlier.timelineDate)
+        let dated = item == place ? datedList?.sort : nil
+        var parts = Set(ViewChoices.Part.allCases).subtracting(choices(in: place).parts(differingFrom: held, dated: dated))
+        if sent.sort != nil { parts.remove(.sort) }
+        if sent.group != nil { parts.remove(.grouping) }
+        if sent.query != nil { parts.remove(.filters) }
+        parts = parts.intersection(choices(in: place).parts(differingFrom: returned, dated: dated))
+        guard !parts.isEmpty else { return }
+        put(returned, in: place, only: parts)
+        // Not the person's change: no step of Undo, and nothing to write.
+        if var observed = observedChoices[place] {
+            observed.take(parts, from: returned)
+            observedChoices[place] = observed
+        }
     }
 
     private func differs(_ id: ItemID, from seed: ViewSeed) -> Bool {
@@ -307,7 +334,7 @@ extension Browser {
         }
         let update = ViewDraft.change(
             window, options: tableOptions[item], seed: seed.options, seedTimelineDate: seed.timelineDate, seededTypes: seed.types,
-            view: view, catalogue: library.catalogue)
+            view: view, catalogue: library.catalogue, replaced: replacedGroups[id] ?? [:])
         return ViewUpdate(view: view, change: update.change, baseVersion: seed.version, unkept: update.unkept)
     }
 

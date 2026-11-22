@@ -32,11 +32,15 @@ enum SavedViews {
         // The order and grouping come from what the layout shows (`arrangement`), which is what the panel shows too.
         let layoutShows = arrangement(browser, content: content, order: browser.storedOrder)
         var grouping: ItemTableColumn?
-        if case .column(let id) = layoutShows.grouping, content.grouping?.id == id { grouping = content.grouping }
+        var groupMode = GroupMode.value
+        if case .column(let id, let mode) = layoutShows.grouping, content.grouping?.id == id {
+            grouping = content.grouping
+            groupMode = mode
+        }
         var seededTypes: [String]?
         if case .view(let id) = browser.item { seededTypes = browser.viewSeeds[id]?.types }
         return ViewDraft.Window(
-            place: browser.item, columns: content.columns, sort: layoutShows.sort, grouping: grouping,
+            place: browser.item, columns: content.columns, sort: layoutShows.sort, grouping: grouping, groupMode: groupMode,
             filters: options.filters, negated: options.negated, search: search.isEmpty ? nil : search,
             layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.item],
             seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.grouping == .date) : nil,
@@ -107,7 +111,7 @@ enum SavedViews {
     enum ShownGrouping: Hashable {
         case none
         case date
-        case column(String)
+        case column(String, by: GroupMode = .value)
     }
 
     /// The order and grouping the layout beside the panel really uses, which the panel shows and the window's
@@ -129,10 +133,14 @@ enum SavedViews {
 
     static func arrangement(_ browser: Browser, content: ItemTableContent, order: ItemOrder) -> Arrangement {
         guard !isArranged(browser) else {
-            var grouping: ShownGrouping = content.grouping.map { .column($0.id) } ?? .none
+            var grouping: ShownGrouping = content.grouping.map { .column($0.id, by: content.groupMode) } ?? .none
             // The table groups by status on its own; an arranged list or gallery groups only by a column asked for.
             if browser.viewMode == .list || browser.viewMode == .gallery {
-                if case .column(let id) = browser.tableOptions[browser.item]?.grouping { grouping = .column(id) } else { grouping = .none }
+                if case .column(let id, let mode)? = browser.tableOptions[browser.item]?.grouping { grouping = .column(id, by: mode) } else { grouping = .none }
+            }
+            // The board sorts its cards by title where nothing sorts them, which is what it then shows and keeps.
+            if browser.viewMode == .board, browser.tableOptions[browser.item]?.sort?.isEmpty != false {
+                return Arrangement(sort: [ItemTableComparator(column: .title)], grouping: grouping, isDated: false)
             }
             return Arrangement(sort: content.sort, grouping: grouping, isDated: false)
         }
