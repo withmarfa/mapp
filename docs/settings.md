@@ -46,7 +46,7 @@ Every Editor setting reaches a page that is already open. The ones that are Inkk
 
 ## Lists
 
-Density (Standard or Compact, chosen from two previews side by side, each half the card wide and made of sample rows of several types drawn by the real list row: the type's mark in its color, a title, the line under it and the date, with a sample picture on the first Standard row; the chosen one has a ring) is what every list takes until a saved view or a place chooses its own. Sort By and Group By are the order every list takes until a view or a place chooses its own; Group By is dimmed while the sort is by title. Lists has no setting to leave types or sources out: that belongs to Search. Open Items and Today and Yesterday are in General.
+Density (Standard or Compact, chosen from two previews side by side, each half the card wide and made of sample rows of several types drawn by the real list row: the type's mark in its color, a title, the line under it and the date, with a sample picture on the first Standard row; the chosen one has a ring) is what every list takes until a saved view or a place chooses its own. Sort By and Group By are the order every list takes until a view or a place chooses its own; Group By is dimmed while the sort is by title. Agreed, not built: they become the starting order for a place nobody has changed, and the list in a place keeps its own Sort by and Group by in its default view ([One Sort by and Group by for a place](views-and-lists.md#one-sort-by-and-group-by-for-a-place)). Lists has no setting to leave types or sources out: that belongs to Search. Open Items and Today and Yesterday are in General.
 
 ## Layouts
 
@@ -60,9 +60,11 @@ A type's page is pushed on the list and Back returns to it. It has:
 - **Page.** What the item's page pins under its title (at most four), in order, the same choice as Customize Layout on an item of the type (`PagePlacements`). The last row pins another property.
 - **Restore Defaults** takes back that type's choices, for its look and for its page, and no other type's.
 
+Agreed, not built: Edit Layouts… in the window (View Options > Properties, Edit View's Properties section and the row menu) opens this page at a type.
+
 Every change is written to the store that already holds it (`TypeLooks` for the row, `PagePlacements` for the page), so a list, a card, a table and an item's page see it at once. Only what differs from what the type's preset gives is kept, as an import keeps it, so a better preset still reaches every place nobody chose. Nothing is written to Marfa.
 
-Not built: the board's Color row (a type's color comes from its icon, which the server holds), its Card section (Picture and Facts on Cards are a gallery's own settings, kept for each view and place, and a card's words come from the type's look) and Show in Types (waits for the Types page).
+Not built: the board's Color row (a type's color comes from its icon, which the server holds), its Card section (a card's facts come from the view's Properties list, which falls back to this page's Facts; see [Properties](views-and-lists.md#properties)) and Show in Types (waits for the Types page).
 
 ## Search
 

@@ -1,6 +1,6 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's star as described below, are built, not yet released, as are Items, Collections and Sources as index pages with tabs and a table, the sidebar customized in place, opening an item as a modal, a full page or a window with one row menu for every layout, making an item with quick add and the empty states, and the default view of every place that is not a saved view, with Save as View… and Reset View in View Options. See [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's star as described below, are built, not yet released, as are Items, Collections and Sources as index pages with tabs and a table, the sidebar customized in place, opening an item as a modal, a full page or a window with one row menu for every layout, making an item with quick add and the empty states, and the default view of every place that is not a saved view, with Save as View… and Reset View in View Options. See [Looks](looks.md). Grouping, Properties and filters for every layout are agreed, not built: see [Grouping, Properties and filters](#grouping-properties-and-filters).
 
 Where it lives: `Browser`, `ItemViewMode`, `ItemOpening`, `QuickAdd`, `PlaceEmpty`, `ListNeighbors`, `RowMenuEntry`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences`, `IndexChoice`, `ItemIndexModel`, `SearchLeaveOuts` and `SearchLeftOutLine` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `ItemIndexRow`, `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan`, `CalendarLayout`, `CalendarCorner` and `SearchNarrowing` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemRowMenu`, `ItemModal`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `SidebarIndex`, `SidebarPlaceMenu`, `SidebarColorPicker`, `IndexPage`, `ItemsIndex`, `IndexInspector`, `IndexViewOptions`, `WindowCorner`, `ViewCorner`, `CalendarCornerView`, `CalendarMonthCard`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
@@ -12,15 +12,15 @@ An item list takes one of six layouts (`ItemViewMode`): list, gallery, table, bo
 
 - The list takes the rows described in [Looks](looks.md).
 - The gallery's card shows the item's picture, or its opening lines when it has none, then its title on up to two lines (two lines of room on every card) and the one line of context its type's look gives it. An item with neither a picture nor text shows its type's mark. A favorite's star sits on the picture and nothing else does. The panel chooses the preview, fit, shape and size; the look chooses what the card says.
-- The board shows its columns, which are the groups of its grouping field. Each lane's header is its status mark (a status field's words, and the four status groups, take the mark of their group), its title and its count, on a quiet rounded lane. The lanes share the window's width, each between 236 and 340 points (200 and 260 in a compact board), so a board of a few lanes stays at the left and one of many scrolls sideways to its last lane. A board of one type groups by that type's own words: a status field's words by their group (Not Started, In Progress, Completed, Canceled) and then as the type declares them, any other field's as declared. A board of a mixed list groups by Marfa's four status groups, which every type shares: Not Started, In Progress, Completed and Canceled, then No Status, which holds the items with no status and the types that have none. A person can hide the groups that have no items. A card is the title, the look's Secondary line and the bottom line (the type only where the board mixes types, the status, two facts and "+N"), without the field the board is grouped by: a board grouped by status leaves the status off every card, and one grouped by priority leaves the priority off. A compact board shows the title alone, with the type's mark where the board mixes types.
+- The board shows its columns, which are the groups of its grouping field. Each lane's header is its status mark (a status field's words, and the four status groups, take the mark of their group), its title and its count, on a quiet rounded lane. The lanes share the window's width, each between 236 and 340 points (200 and 260 in a compact board), so a board of a few lanes stays at the left and one of many scrolls sideways to its last lane. A board of one type groups by that type's own words: a status field's words by their group (Not Started, In Progress, Completed, Canceled) and then as the type declares them, any other field's as declared. A board of a mixed list groups by Marfa's four status groups, which every type shares: Not Started, In Progress, Completed and Canceled, then No Status, which holds the items with no status and the types that have none. Only a saved view's Edit View can hide the groups that have no items. A card is the title, the look's Secondary line and the bottom line (the type only where the board mixes types, the status, two facts and "+N"), without the field the board is grouped by: a board grouped by status leaves the status off every card, and one grouped by priority leaves the priority off. A compact board shows the title alone, with the type's mark where the board mixes types.
 - The table's column headings have no dividers between them. A column still resizes by dragging its edge, where the resize cursor shows, and reorders by dragging its heading; the heading keeps its bottom line and the sort mark, which follows the heading's text in every table, whichever side the column aligns it to, and a right-aligned heading keeps the room after it that its numbers do. The line under the headings runs as far as the rows' separators, which is past a last column that has reached its widest. Every heading, in every table including Settings', is in the New row's label font (callout, medium) in the secondary color.
 - The table's column headings are drawn by one header view (`QuietHeaderView`) that keeps a heading cell for every column and refreshes it as it draws, so a column SwiftUI adds or replaces after the first layout still shows its heading. Once rows scroll up under the toolbar, a type's or a saved view's table draws the same `ToolbarBand` as every other scrolled view, reported from the table's own scroll (`quietTableHeader(isUnderToolbar:)`), with the headings staying pinned and opaque.
 - A table fits the width of its page and follows it as the page changes, such as when the right sidebar opens or closes: its columns shrink toward their minimum widths and grow toward their maximum, and the table scrolls sideways only where even the minimums do not fit. A widths change the person makes by dragging an edge is left as it is until the page's width changes again.
 - The table's rows are 36 points high and it has one left edge, shared by the title, chips, headers, group names and rows. A group's chevron hangs in the margin before it, inside the pane with room at its left.
 - A table cell whose value is picked from a menu (a status, a priority or a choice), and an empty cell that takes a value, fills with a tint across the whole cell under the pointer, and the chip in it does not move. An empty cell of a date, words, text, number or people value reads "Empty" under the pointer and opens that value's panel on a click, as the item page's row does, where the item's type declares the property and the item can be edited. An empty status, priority or choice changes in place.
-- After the name the table shows the look's status and facts as columns drawn with the same chips as a row (a status, an option, a person's initials and name, the type as a chip, a plain value with no label), then the look's date. A status and a priority stay chips in a table, not the plainer marks a board card uses. Every other property sits behind View Options and starts hidden. A table of several types shows the union of their looks, the status first. A column no row has a value in starts hidden. Columns a saved view chose win over the look, and the person can show, order and size any of them.
+- After the name the table shows the look's status and facts as columns drawn with the same chips as a row (a status, an option, a person's initials and name, the type as a chip, a plain value with no label), then the look's date. A status and a priority stay chips in a table, not the plainer marks a board card uses. Every other property sits behind View Options and starts hidden. A table of several types shows the union of their looks, the status first. A column no row has a value in starts hidden. Columns a saved view chose win over the look, and the person can show, order and size any of them. Agreed, not built: the columns become the view's Properties list ([Properties](#properties)).
 - A list of several types draws each item from its own type's look in every layout.
-- The timeline groups items by day, from today on, then an Earlier header, then the days before it, the latest first. Each item sits on the date its type's look names (`ItemPlacement`): an event by its start, a task by its due date, any other type by its look's date; only an item with no such date goes under No Date. A picker pointed at one field places every item by that field. An event's span (zone, all-day, end) is read in one place, `EventSpan`, for its page header and for placement. A row is the shared row (title, Secondary line, chips) beside a time column, with no second date; only an item placed by its start with no time says "All day", and a Secondary-line time is left out only where it is the field the timeline places by.
+- The timeline groups items by day, from today on, then an Earlier header, then the days before it, the latest first. Each item sits on the date its type's look names (`ItemPlacement`): an event by its start, a task by its due date, any other type by its look's date; only an item with no such date goes under No Date. A picker pointed at one field places every item by that field. An event's span (zone, all-day, end) is read in one place, `EventSpan`, for its page header and for placement. A row is the shared row (title, Secondary line, chips) beside a time column, with no second date; only an item placed by its start with no time says "All day", and a Secondary-line time is left out only where it is the field the timeline places by. The timeline starts from today's agenda and uses the window's width, and choosing a row opens the right sidebar. Agreed, not built: the row is drawn as [The timeline's row](#the-timelines-row) says.
 - The calendar (`ItemCalendar`, laid out by `CalendarLayout`) shows a week or a month, and is offered wherever the timeline is: where a type has a date field. Items sit as on the timeline (`ItemPlacement`, `EventSpan`). A week has a column for each day, seven in view, the hour rows opening at the working day, a red line for now, and the weekend tinted. It is one strip of days that scrolls both ways, as Calendar's does: a two-finger swipe along it moves the days continuously, past the edge of a week, and lets go on a day's edge, so the week shown can begin on any day, while a swipe down moves the hours. Only the columns in and beside view are built, so a calendar of thousands of items stays light. The title, the month, and the corner's Today, back and forward follow the days shown; back and forward move seven days, and Today and the first view start on the first weekday of the week that holds today. A pinch on the trackpad changes the height of an hour, from 24 to 160 points, keeping the hour under the pointer where it is; the height is a MAPP setting (`calendarHourHeight`), synced with the rest. The All Day row sits above the hours only while a shown day holds an all-day or multi-day item, so a calendar of timed items starts its hours at the top. A timed event is a block over each day it covers, side by side with those it overlaps, and a timed event with no end lasts one hour. A block shows its title on up to two lines and its time, drops the time first when the block is too short for both or too narrow, and uses a taller block's room for more lines of its title. A month is a grid of whole weeks with the days of the next and previous months muted, each day listing its items by title up to what fits and then "+N"; a multi-day item is on each of its days. An item with no date is not shown. The title is the month and the subtitle the week number, or the count of items in the month. Today, back, forward, Week or Month and the month are in the window's corner ([The bottom-right corner](#the-bottom-right-corner)), not the toolbar. The layout and the Week or Month choice are MAPP settings, kept with the view's other choices and synced through the settings item ([Settings storage](settings-storage.md)); a window shows the days or month it was moved to, which is not kept. Choosing an event opens the right sidebar. The arrow keys move the chosen event: left and right to the nearest day beside it that has events, up and down through a day's events in time order (`CalendarNavigation`), crossing into the next or previous week or month at the edge; Return opens it, Escape clears it, and a week scrolls to it. Today, back and forward count from the library's clock (`ItemLibrary.now`). Dragging, drawing a new event and a day view are not built.
 - A gallery, table or board has no row of new-item chips above it.
 
@@ -40,10 +40,6 @@ The window's bottom-right corner (`WindowCorner`) holds how a person views the s
 - **Timeline:** Today scrolls to today's agenda, which is the top of the timeline. The View menu has Today (⌘T).
 - **Gallery:** the card size by name (Small, Medium or Large) as one button with a menu. It is the size Edit View's Cards section holds, so either changes the other. The View menu has Small Cards, Medium Cards and Large Cards.
 - **An item's page:** Focus, Aa on a page that can be written, the text size and a web page's Reader or Original ([Item page](item-page.md#the-pages-corner)). The image and PDF controls use this component and are not built yet ([Agreed designs](agreed-designs.md)).
-
-Agreed, not built:
-
-- The timeline starts from today's agenda and uses the window's width, and choosing a row, card or event opens the right sidebar.
 
 ## Opening an item
 
@@ -110,7 +106,7 @@ Every place opens in a default view. A person can change the default view, but c
 - **Two windows on one place.** Both write the one entry, so the last change wins. A window keeps what it shows until it opens the place again, and then shows the other window's change.
 - **What has gone stale.** An entry for a type, collection or favorite that no longer exists is forgotten, but only once the server's copy has been read whole and is current, so a copy that is still filling or another server's never forgets one. A condition, sort or grouping on a field that no type of the place declares any more is dropped and the rest is kept. A layout the place no longer offers is not taken, and the place opens in its own.
 - **Save as View…** is the last item of View Options and a View menu command, and it is no longer in the toolbar. It shows only when there is something to keep, and opens New View's panel filled in with what the window shows. While that panel is open the default view keeps nothing, and Escape puts the place back as it was.
-- **Reset View** sits above Save as View… once a default view is changed, by a filter, a table's sort or grouping, the layout's own choices or the columns, and is not offered while New View's panel is open. It is also a View menu command and a palette command. It puts back the place's own layout, columns, density and cards, closes a filter row that was left open with nothing in it, and one Undo brings the choices back. A saved view keeps Revert View. The list's own Sort by and Group by are one setting for every place (Settings > Lists), not part of a place's default view, so changing them never offers Reset View.
+- **Reset View** sits above Save as View… once a default view is changed, by a filter, a table's sort or grouping, the layout's own choices or the columns, and is not offered while New View's panel is open. It is also a View menu command and a palette command. It puts back the place's own layout, columns, density and cards, closes a filter row that was left open with nothing in it, and one Undo brings the choices back. A saved view keeps Revert View. Today the list's own Sort by and Group by are one setting for every place (Settings > Lists), not part of a place's default view, so changing them never offers Reset View. That is agreed to change: see [One Sort by and Group by for a place](#one-sort-by-and-group-by-for-a-place).
 
 ## Edit View
 
@@ -122,6 +118,7 @@ Edit View opens in the right sidebar, and New View uses the same panel. It holds
 - Density holds a pop-up of As in Settings, Standard and Compact.
 - Sort holds a handle, the fixed property, a direction pop-up and an x in a circle, with a gray Add Sort. Add Sort lists the fields of the types the view shows after its filters, and the columns every item has: the name and the type first, then the status and the other fields in the order the looks give them, then the parent and the dates.
 - Group holds Group by and a Hide Empty Groups switch.
+- Agreed, not built: Group and Columns change as [Edit View's Group section](#edit-views-group-section) and [Properties](#properties) say.
 - Columns (a table) or Cards (a gallery) comes last. Cards has Preview, Size and Shape pop-ups and a Fit Picture switch; Shape is off when the preview is None, Fit Picture is off unless the preview can show a picture, and a gallery has no Density; what a card says comes from its type's look, not from the view.
 
 ## How an edit is saved
@@ -132,9 +129,128 @@ The funnel that writes each part where it belongs, and what it does when a write
 
 Filters live in one row above the list (`FilterRow` and `FilterChipsBar`) as squared 26-point chips: the field in gray, is or is not, the values and an x, then a square plus of the same height. A chip opens its value panel, with no counts, and the plus opens Filter By under it. A saved view opens with its row hidden.
 
+Agreed, not built: every field kind has operators, the row can join its filters by All or Any, and more of what a person means can be saved: see [Filters for every field](#filters-for-every-field) and [The filter row](#the-filter-row).
+
 There is no filter button in the list's toolbar, which holds Search and View Options. View Options opens with Show Filters or Hide Filters, then Sort by, Group by and Edit View. When filters apply, its button shows the count and is tinted while the window is active; in an inactive window it dims with the other toolbar buttons. The View menu has Show or Hide Filters, Add Filter and Clear Filters.
 
 View Options also holds Include Subtypes, which lets a type's list show the items of its subtypes. The choice is stored for each type as `includedSubtypes`.
+
+## Grouping, Properties and filters
+
+Status: Agreed, not built. Drawn on MAPP Pages' Views tab. Where this section differs from [Edit View](#edit-view), [Filters](#filters) or the table's columns above, this is the agreed rule; each part moves up to those sections as it is built. The list is in [Agreed designs](agreed-designs.md#grouping-properties-and-filters).
+
+### Which fields a place offers
+
+One rule serves Group by, Properties and Filter By. The fields come from the types the place lists, never only from the items on screen, so a field no item has filled yet can still be chosen and a filter can never hide a choice.
+
+- A type's place lists that type, and with Include Subtypes on its subtypes. A saved view lists its types and their subtypes, and a view of every type lists the types of the items it shows. Inbox, Recents, Favorites, a collection and a source list the types of the items they show.
+- A menu offers only what a field's kind supports, in this order: Status, then the fields the types' looks show, then the item's own parts (Type, Parent, Collection, Tags, Created, Edited and Happened), then More Fields for the rest. A field no item in the place fills goes under More Fields.
+- A field is listed once, by its key, under the label of the first type that declares it. Where two types give one key different kinds, the most specific kind wins: status, then priority, then the rest.
+
+### View Options
+
+One shape for every layout, which leaves out what does not apply:
+
+- Show Filters (Hide Filters), then Sort by, Group by and Properties.
+- The layout's own items: a board's Compact Cards, a gallery's card size, a timeline's Date Field and Today, a table's Rows at a Time.
+- Include Subtypes.
+- Edit View, Reset View and Save as View…
+
+### Group by
+
+The same menu serves every layout and every place. The timeline keeps Date Field as its only grouping, since its groups are days, and the calendar has none.
+
+- **None** comes first, and a board has none: a board always has lanes.
+- **Status** is one item where the grouping has one way to go, and opens Words and Groups where it has two. Words groups by the type's own words in the type's order; MAPP writes that order to Marfa, so another app does not list them A to Z. Groups uses Marfa's four groups (Not Started, In Progress, Completed, Canceled) and then No Status. Words is offered only where every type in the place has the same words. A status that is a plain choice, with no groups, is one item.
+- **Each choice field and each yes or no field** is one item: a choice groups by its options in declared order, a yes or no by Yes, No and No Value.
+- **Each date field** opens Day, Week, Month, Year, then **Set or Not Set**. A week begins on Monday, as Marfa fixes it for a saved view, whatever Settings > General > Week Starts On says. Created, Edited and Happened open Day, Week, Month and Year only, since every item has them. A bucket's groups follow the sort where the view sorts by that date and run newest first otherwise, and an item with no date sits in No Value, last.
+- **Set or Not Set** makes two groups, Not Set first and then Set. It is offered for a date field and for any other optional field, on every layout, so a type whose start stays empty until it happens can be grouped as not started and started.
+- **Type** is offered wherever the place shows more than one type. **Parent** groups by the parent item. **Collection** and **Tags** are offered in a list and a table only, and an item sits in each of its collections or tags. A grouping by collection needs the copy to hold that edge whole, and is refused, and said, when it does not.
+- **More Fields** holds every other field the types declare. Each opens Set or Not Set, and a field of a kind with more ways to group (a choice, a yes or no, a date) keeps them there.
+- A number, free text, a list of people and a list of words are not offered by value: one group for each value is noise, and Marfa cannot group by the members of a list.
+- A field only some types declare gives those types' items their groups and every other item one Not Applicable group.
+- After a divider: **Hide Empty Groups** (a tick), and, on a list and a table only, **Collapse All Groups** and **Expand All Groups**.
+
+**Hide Empty Groups** is offered in every place and layout, and is kept on this Mac, in a saved view's Mac part and in a place's default view. **Collapsed groups** are the window's own choice, kept for each place, and reach the list as well as the table.
+
+**A board's lanes.** A Not Set lane takes a card dropped on it and clears the field, where the type does not require the field. A Set lane and a lane of a date bucket (Day, Week, Month, Year) take no drop, since MAPP would have to invent a value ([Making an item](#making-an-item)).
+
+**What a saved view keeps.** A saved view's grouping is only what Marfa holds, so every app shows the view grouped the same way. Marfa holds a field's value, a date's Day, Week, Month or Year, a type, tags, a parent and a collection. It does not yet hold Set or Not Set or the status groups: a Marfa change to let a view keep them is agreed and not built. Until it is, a place's default view keeps them on this Mac and Save as View names them as not kept ([Save as View](#save-as-view)).
+
+### Edit View's Group section
+
+Edit View's sections run Name, Layout, Density (a list), Sort (not on a timeline or a calendar), **Group**, **Properties** and Cards (a gallery). Group holds:
+
+- **Group by**, a pop-up with the same menu as View Options.
+- **By**, a second pop-up, shown only for a date field (Day, Week, Month, Year or Set or Not Set) or for a status that offers Words and Groups.
+- **The groups**, one row for each in order, with a handle to drag the order and an eye to show or hide it. In a saved view they are Marfa's `group.order` and `group.hidden`, so they sync and other apps honor them. Dragging a board's lanes by their headers to reorder them, which would write the same order, is not built and waits.
+- **Hide Empty Groups**, a switch, with "This Mac" in the section's note style.
+
+MAPP reads and writes all four parts of a view's group (the field, the bucket, the order and the hidden groups) and drops none it did not change, including a field or bucket it cannot read. Choosing another field drops the old field's order and hidden groups, and writes the new field's declared order where it has one (a status's words, a choice's options).
+
+### One Sort by and Group by for a place
+
+- A place has one Sort by and one Group by, the same in View Options and Edit View, and the list in a place takes them as every other layout does. They are kept in the place's default view, so changing them offers Reset View.
+- Settings > Lists' Sort By and Group By are the starting order for a place nobody has changed ([Settings pages](settings.md#lists)). This replaces the rule that the list's own Sort by and Group by were one setting for every place ([Rejected designs](rejected-designs.md#reversed)).
+- Sort by lists the fields, then the two directions in the column's own words (Newest First). It is left out on the timeline and the calendar, whose order is time, in View Options and in Edit View. A board's cards follow the sort, which then syncs; today they sort by title whatever the sort says.
+
+### Properties
+
+One Properties list serves every layout of a view or a place, and replaces the table's Columns. It names what shows after the title: Status, Type and any field, tag, relation or count the place's types offer.
+
+- **How a layout draws it.** A table shows the shown properties as columns in the list's order, with Name first and locked. A list row, a board card, a gallery card and a timeline row show the first two after the status as chips and count the rest in "+N", as a look's facts are shown. Switching layout keeps the same choice. A board grouped by a field never shows that field on its cards, and a timeline never repeats the time it places by.
+- **It falls back to each type's look.** Until the list is changed, Edit View's Properties section is marked "As in Layouts" and every item shows its own type's look, as a view does today. Once it is changed the section is marked "This Mac", the view holds its own list for all its types, and a property a type does not declare is skipped for that type's items. **Use Layouts** at the section's foot, shown once the list is changed, puts the fallback back.
+- **The look stays the default.** The Secondary line and the date stay the type's: each is one line, the look already chooses them, and a view that chose them too would give the same choice a second place.
+- **Edit Layout of Events…** (for a place of one type, naming it) or **Edit Layouts…** (for several, asking which type from the place's types) opens Settings > Layouts at that type ([Settings pages](settings.md#layouts)). It is at the foot of Edit View's Properties section and of View Options > Properties, and the row menu has it beside Customize Layout.
+- **View Options > Properties** has a tick for each property the layout can show, then Edit Layouts….
+- **Edit View's Properties section** has a row for each property with its icon, its name, a handle and an eye, and Show More for the ones not shown.
+- **Where it is kept.** On this Mac only, in a saved view's Mac part and in a place's default view, never in Marfa: a view holds no layout. Reset View puts it back.
+- **Table column widths** stay the table's own ([How an edit is saved](#how-an-edit-is-saved)).
+
+### The timeline's row
+
+The timeline's row is as drawn on the timeline boards (V5 and V6). Every row is two lines and one height.
+
+- The title is regular weight, on one line, with the row's chips at the trailing edge of the same line and a person's initials last.
+- The second line is caption size, light gray. Where the list mixes types it starts with the type's name in plain gray text, and then comes the look's Secondary line. A source's name is not shown: a look cannot say one.
+- The day rail, the time column, the red Now line, the rule between days and Today in the corner are unchanged.
+
+### Filters for every field
+
+Filter By lists every field a place offers in two sections: the fields of the place's types under their names (such as Tasks and Projects), Status first and then in the looks' order, and **Every Item** (Type, Tags, Collection, Parent, Source, Created, Edited and Happened). Its search field stays. A field already filtered can take a second condition.
+
+Each chip's panel takes its field's operators, with the value control the kind needs: a value list, a date panel with its quick days (Today, Tomorrow, Next Week, In Two Weeks) and a month, a number field or a text field, or nothing for is set and is empty. A chip reads as a sentence: "Starts is set", "Due is before 30 Nov 2026", "Assignees include Rui Alves", "Status is not Completed, Canceled".
+
+| Kind | Operators | Notes |
+| --- | --- | --- |
+| Status | is, is not (a word or a group); is set, is empty | The value list shows the words under their four group headings, and choosing a heading means the whole group. In a place of several types the four groups show first, which work across every type's words. |
+| Choice, priority | is, is not; is set, is empty | |
+| Yes or no | is Yes, is No, is empty | |
+| Date field | is on, is before, is after, is between, is set, is empty | Then the relative operators below. |
+| Created, Edited, Happened | is on, is before, is after, is between | No is set or is empty: every item has them. Then the relative operators below. |
+| Number | =, ≠, <, ≤, >, ≥; is set, is empty | |
+| Text, URL, email | contains, starts with, is, is not; is set, is empty | |
+| People | include (by name or email); is set, is empty | No "does not include": Marfa cannot say it. |
+| Tags | include, has any tag, has no tags | No "does not include": Marfa cannot say it. |
+| Parent | is, is not, has one, has none | |
+| Collection | in, not in, in any, in none | |
+| Type | is, is not | The type exactly, not its subtypes. |
+| Source | is, is not | |
+
+A list of words has no filter, since Marfa's grammar does not say one.
+
+### The filter row
+
+- **All or Any.** Once the row holds two or more filters, a pop-up at its leading edge reads All or Any, and its menu is titled "All of these". With All, every chip applies together. With Any, every condition joins by OR, and a chip of several "is" values already joins its values by OR, so it stays savable.
+- **What a view cannot hold.** Marfa joins a view's conditions all by AND or all by OR, never both (`filter-mixed-logic`). A row that needs both is named at once, under the row, in the filter row's note: "This view can save only filters that all apply, or all of which any one may apply". It is not left for Save as View to find. Under Any, a chip of several "is not" values beside other chips is such a row, since its values join by AND.
+- **The "is not" rewrite.** Where a chip of a closed field (a status, a choice or a yes or no) holds several "is" values beside other chips, MAPP saves it as "is not" the other values, which Marfa joins with AND. The two select the same items, except an item that holds a word its type does not declare, which "is not" keeps. A row this rewrite cannot save is named under the row at once.
+- **Relative dates.** A date operator under "Relative to Today" is worked out on the Mac each day: is before today, is after today, is in the last… and is in the next…. Marfa's filter has no relative date, and a fixed date would go stale, so a saved view cannot keep one: the row's note at its trailing end says so ("A saved view can’t keep “in the last 7 days”"), and Save as View names it as not kept. A relative date works in the window and in a place's default view, which stays on this Mac.
+- **The limit of 10.** A view keeps up to 10 conditions; each value of each chip and each bound of "between" counts. The plus stays enabled in the window, and Filter By's foot says how many the row holds ("A view keeps up to 10 conditions; this one has 9") as the row nears the limit.
+- **Unchanged.** The row above the list, its squared 26-point chips and square plus, no filter button in the toolbar, a saved view opening with its row hidden, and a saved view's own condition the row cannot show as a locked chip.
+
+### Save as View
+
+New View's panel has a section, **Not Saved in the View**, with a count and a row for each choice the view will not keep: a grouping Marfa cannot hold yet ("Group by Starts: Set or Not Set"), a relative date ("Edited in the last 30 days") and a list's sections by date. The section is not shown when nothing is left out.
 
 ## Index pages
 

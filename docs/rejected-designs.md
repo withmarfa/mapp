@@ -155,12 +155,13 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 
 ## Reversed
 
-Turned down once, then chosen by August on 21 November 2026. They are agreed now; see [Agreed designs](agreed-designs.md).
+Turned down or agreed once, then changed by August on 21 November 2026. What replaces each is agreed now; see [Agreed designs](agreed-designs.md).
 
 - **A Filter button beside an index page's tabs**, which shows or hides the filter row.
 - **New (+) in the toolbar**, on an index page that has scrolled.
 - **Search beside an index page's tabs**, as a symbol that opens into a field.
 - **A note's formats as a bar along the page's foot**, opened from Aa.
+- **The list's own Sort by and Group by as one setting for every place** (Settings > Lists). Replaced by one Sort by and Group by for each place, kept in its default view, with Settings > Lists as the starting order for a place nobody changed: a place's two Group by menus gave two answers.
 
 ## Related pages
 
