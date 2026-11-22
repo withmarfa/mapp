@@ -218,3 +218,23 @@ import Testing
         #expect(await one.updates.isEmpty)
     }
 }
+
+@MainActor @Suite(.hangLimit) struct PreferencesWiringTests {
+    /// The library's copy is followed as it opens and let go as it closes; a copy whose slice lacks the type, as the
+    /// sample's does, changes nothing on this Mac.
+    @Test func theSettingsFollowTheOpenLibrary() async throws {
+        let bench = try HostBench()
+        let host = bench.host(opener: { connection, _, _ in SampleLibrary.open(connection) })
+        let libraries = Libraries(host: host, defaults: bench.defaults, syncsPreferences: true)
+        bench.defaults.set("dark", forKey: AppearanceKey.theme)
+        #expect(libraries.preferences.standing == .off(.noMarfa))
+        try await host.connect(address: SampleLibrary.connection.address.absoluteString, key: "sample")
+        #expect(await eventually { libraries.preferences.standing != .off(.noMarfa) })
+        await libraries.preferences.flush()
+        #expect(libraries.preferences.standing != .syncing)
+        #expect(bench.defaults.string(forKey: AppearanceKey.theme) == "dark")
+        #expect(bench.defaults.object(forKey: PreferencesSync.beforeSyncKey) == nil)
+        try await host.disconnect()
+        #expect(libraries.preferences.standing == .off(.noMarfa))
+    }
+}

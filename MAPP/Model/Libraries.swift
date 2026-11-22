@@ -110,12 +110,14 @@ import os
 
     /// Has MAPP's settings follow the library's copy, where it has one of a Marfa server.
     private func follow(_ library: MarfaLibrary?) {
-        guard let source = library?.source as? MarfaSource, let connection = host.configuredConnection else {
+        guard let source = library?.source as? MarfaSource else {
             preferences.detach()
             return
         }
+        // The copy's own server, since a switch opens the new copy before the host keeps its address.
+        let connection = source.connection
         preferences.attach(
-            WorkingCopyPreferences(copy: source.copy), library: libraryKey,
+            WorkingCopyPreferences(copy: source.copy), library: Self.libraryKey(for: connection.address),
             name: { [host] in host.instanceName(for: connection) })
     }
 
@@ -152,7 +154,11 @@ import os
 
     /// Names the library the windows read by its server's address, so its sidebar layout and its type looks are its own.
     var libraryKey: String {
-        "marfa:" + (host.configuredConnection?.address.absoluteString ?? "")
+        Self.libraryKey(for: host.configuredConnection?.address)
+    }
+
+    nonisolated static func libraryKey(for address: URL?) -> String {
+        "marfa:" + (address?.absoluteString ?? "")
     }
 
     var sidebarLayout: SidebarLayout { sidebarLayouts.layout(for: libraryKey) }
