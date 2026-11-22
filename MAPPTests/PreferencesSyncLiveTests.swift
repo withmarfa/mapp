@@ -175,6 +175,31 @@ extension LiveMarfaTests {
             }
         }
 
+        /// A removal the person asked for with changes waiting is not made while they are discarded, since sending it sends
+        /// them; made where they may be sent, the server has taken it and the settings are in the bin.
+        @Test(.timeLimit(.minutes(3)))
+        func aRemovalNeverSendsWhatWasDiscarded() async throws {
+            try await run {
+                let one = try await mac()
+                try await start(one)
+                await one.send()
+                let queued = try await one.source.copy.items.create(
+                    Draft(type: "core.note", properties: JSONObject([("title", .string("MAPP live removal test"))])))
+                let note = try #require(queued.itemId)
+                binned.append(ItemID(note))
+
+                await #expect(throws: PreferencesSync.RemovalError.otherChangesWait) {
+                    try await one.sync.remove(confirmed: true, sendsOtherChanges: false)
+                }
+                #expect(await Self.settingsItems().count == 1, "the settings are still in the Marfa")
+                #expect(try await one.source.copy.queue.all().contains { $0.id == queued.id && $0.verdict == nil }, "the change was not sent")
+
+                try await one.sync.remove(confirmed: true, sendsOtherChanges: true)
+                #expect(await Self.settingsItems().isEmpty, "the server has taken the removal")
+                #expect(one.sync.standing == .off(.removed))
+            }
+        }
+
         /// Makes a settings item over HTTP and moves it to the bin.
         private static func binnedSettingsItem() async -> ItemID? {
             guard let address = try? LiveMarfa.address(), let key = try? LiveMarfa.key(), let base = URL(string: address) else { return nil }

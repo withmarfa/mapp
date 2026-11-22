@@ -69,4 +69,25 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
 
     /// The checkbox on Disconnect's alert.
     var disconnectChoice: String { String(localized: "Also remove MAPP’s settings from \(name)") }
+
+    /// Under the checkbox on the question about changes that wait: removing the settings sends the queue, so it can't go
+    /// with discarding what is in it.
+    var sendsWaitingChanges: String {
+        String(localized: "Removing them also sends the changes above, so it can’t be combined with discarding them.")
+    }
+
+    /// Where one of the changes that wait is the removal itself, which has no text to show.
+    var removalWaiting: String {
+        String(localized: "One of them removes MAPP’s settings from \(name). Discard the copy and the settings stay there.")
+    }
+
+    /// Why Disconnect stopped, where the removal could not be made without sending what the person chose to discard.
+    var discardedChangesWait: String {
+        String(localized: "Removing them also sends the changes you chose to discard. Keep the copy to send them, or disconnect anyway and the settings stay in \(name).")
+    }
+
+    /// Why Disconnect stopped, where the server did not take the removal.
+    var removalNotTaken: String {
+        String(localized: "MAPP couldn’t finish removing them from \(name), so you’re still connected. Disconnect anyway and they may stay there.")
+    }
 }

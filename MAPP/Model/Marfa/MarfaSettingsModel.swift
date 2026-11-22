@@ -71,6 +71,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         var unsent: UnsentChanges?
         /// More changes arrived after the person was shown the others, so they are asked again.
         var isAskedAgain = false
+        /// One of the changes is the removal of MAPP's settings from the Marfa, which has no text to show.
+        var holdsSettingsRemoval = false
     }
 
     nonisolated enum Choice: Hashable, Sendable {
@@ -99,8 +101,20 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     struct SettingsKept {
         /// Whether the settings are kept in the connected Marfa now, which decides whether Disconnect offers to remove them.
         var isKept: @MainActor () -> Bool
-        /// Moves them to the bin and returns once the server has taken that; throws where it could not.
-        var remove: @MainActor () async throws -> Void
+        /// Moves them to the bin and returns once the server has taken that; throws a `PreferencesSync.RemovalError`
+        /// where it could not. With `sendsOtherChanges` false, a copy that holds other changes is left as it was, since
+        /// sending the removal sends them.
+        var remove: @MainActor (_ sendsOtherChanges: Bool) async throws -> Void
+        /// Whether one of the writes a copy has not sent, by id, is the removal of the settings.
+        var isRemovalWaiting: @MainActor (Set<String>) async -> Bool = { _ in false }
+
+        /// The settings kept by `sync`.
+        static func over(_ sync: PreferencesSync) -> SettingsKept {
+            SettingsKept(
+                isKept: { sync.syncs },
+                remove: { try await sync.remove(confirmed: true, sendsOtherChanges: $0) },
+                isRemovalWaiting: { await sync.isRemovalWaiting(among: $0) })
+        }
     }
 
     /// Set where the settings sync is known (`Libraries`); a model without it never offers the choice.
@@ -113,6 +127,14 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     private(set) var settingsRemovalFailure: SettingsRemovalFailure?
 
     struct SettingsRemovalFailure: Equatable {
+        enum Reason: Equatable {
+            /// The server did not take it.
+            case notDone
+            /// It would have sent the changes the person chose to discard.
+            case discardedChangesWait
+        }
+
+        var reason = Reason.notDone
         /// What they chose about the copy where changes waited, to carry on with if they disconnect anyway.
         var choice: Choice?
     }
@@ -198,7 +220,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         await run(.reaching(target)) { () async throws(MarfaHost.Problem) in
             try await host.changeAddress(to: target, via: method, choice: hostChoice)
         } onWaiting: { [self] unsent in
-            ask(.switchServer(usingCode: usingCode), unsent, askedAgain: choice != nil)
+            await ask(.switchServer(usingCode: usingCode), unsent, askedAgain: choice != nil)
         }
         // A switch that finished but for removing the old server's leftovers has still switched.
         if isConnected(to: target) { otherAddress = "" }
@@ -233,7 +255,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             try await host.disconnect(hostChoice(choice))
             departure = nil
         } onWaiting: { [self] unsent in
-            ask(.disconnect, unsent, askedAgain: choice != nil)
+            await ask(.disconnect, unsent, askedAgain: choice != nil)
         }
     }
 
@@ -245,9 +267,14 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         defer { isWorking = false }
         notice = nil
         do {
-            try await settingsKept.remove()
+            // Sending the removal sends the whole queue, so it is never made while the person is discarding what waits in it.
+            try await settingsKept.remove(choice != .discardCopy)
         } catch {
-            settingsRemovalFailure = SettingsRemovalFailure(choice: choice)
+            let blocked = (error as? PreferencesSync.RemovalError) == .otherChangesWait
+            settingsRemovalFailure = SettingsRemovalFailure(reason: blocked ? .discardedChangesWait : .notDone, choice: choice)
+            // A removal that was queued and not taken is no longer something to offer; one that never started still is.
+            offersSettingsRemoval = settingsKept.isKept()
+            alsoRemovesSettings = false
             return false
         }
         alsoRemovesSettings = false
@@ -492,14 +519,16 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
     }
 
-    private func ask(_ kind: Departure.Kind, _ unsent: UnsentChanges?, askedAgain: Bool) {
-        departure = Departure(kind: kind, unsent: unsent, isAskedAgain: askedAgain)
+    private func ask(_ kind: Departure.Kind, _ unsent: UnsentChanges?, askedAgain: Bool) async {
+        var departure = Departure(kind: kind, unsent: unsent, isAskedAgain: askedAgain)
+        if let unsent, let settingsKept { departure.holdsSettingsRemoval = await settingsKept.isRemovalWaiting(unsent.ids) }
+        self.departure = departure
     }
 
     private func run(
         _ step: Step,
         _ work: () async throws(MarfaHost.Problem) -> Void,
-        onWaiting: ((UnsentChanges?) -> Void)? = nil
+        onWaiting: ((UnsentChanges?) async -> Void)? = nil
     ) async {
         guard !isWorking else { return }
         isWorking = true
@@ -515,7 +544,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         } catch {
             if case .signIn(.canceled) = error { lastEnding = .canceled } else { lastEnding = .failed }
             if case .changesWaiting(let unsent) = error, let onWaiting {
-                onWaiting(unsent)
+                await onWaiting(unsent)
             } else {
                 // A failure after the question was put to the person ends it, so it is not asked again.
                 departure = nil

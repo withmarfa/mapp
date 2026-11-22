@@ -87,9 +87,7 @@ import os
                 anyAppShortcuts.reload()
             })
         marfaSettings = MarfaSettingsModel(host: host)
-        marfaSettings.settingsKept = MarfaSettingsModel.SettingsKept(
-            isKept: { [preferences] in preferences.syncs },
-            remove: { [preferences] in try await preferences.remove(confirmed: true) })
+        marfaSettings.settingsKept = .over(preferences)
         self.instanceSettings = instanceSettings ?? InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
         self.instanceSettings.onSaved = { [host] answer, settings, address in host.instanceSaved(answer, changing: settings, of: address) }
         isLaunching = host.configuredConnection != nil

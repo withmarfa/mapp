@@ -53,7 +53,8 @@ struct ConnectionPage: View {
             Button("Stay Connected", role: .cancel) {}
             Button("Disconnect Anyway", role: .destructive) { Task { await model.disconnectAnyway() } }
         } message: {
-            Text("MAPP couldn’t finish removing them from \(LibraryDescription.name(libraries)), so you’re still connected. Disconnect anyway and they may stay there.")
+            Text(verbatim: model.settingsRemovalFailure?.reason == .discardedChangesWait
+                ? mappSettingsWords.discardedChangesWait : mappSettingsWords.removalNotTaken)
         }
         .task(id: NameRequest(connection: host.configuredConnection, isOnline: host.state == .online, readsProfile: host.readsProfile)) {
             if accountNameServer != host.configuredConnection {
