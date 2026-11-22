@@ -178,7 +178,7 @@ final class Browser {
     var timelineFields: [SidebarItem: String] = [:]
     /// Opens the Settings window at a page, or where it was left when none is given. Settings is a window of its own, so
     /// the browser keeps nothing of it; the window's views set this to the app's launcher.
-    @ObservationIgnored var openSettings: (SettingsPage?) -> Void = { _ in }
+    @ObservationIgnored var openSettings: (SettingsPage?, SettingsSubpage?) -> Void = { _, _ in }
     var searchText = "" {
         didSet { if !isSearching { relevanceChoice = nil } }
     }
@@ -253,8 +253,8 @@ final class Browser {
     var showsPage: Bool { isModalPresented || (!showsCollection && !showsSidebarIndex) }
 
     /// Shows Settings, at `page` when one is given and where it was left otherwise.
-    func showSettings(_ page: SettingsPage? = nil) {
-        openSettings(page)
+    func showSettings(_ page: SettingsPage? = nil, subpage: SettingsSubpage? = nil) {
+        openSettings(page, subpage)
     }
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -755,6 +755,7 @@ final class Browser {
         pendingViewWrites = []
         placeCards = [:]
         placeHidesEmptyGroups = [:]
+        placeProperties = [:]
         placeCalendarScales = [:]
         calendarDay = nil
         showsCalendarMonth = false
@@ -926,6 +927,8 @@ final class Browser {
     var placeCalendarScales: [SidebarItem: CalendarScale] = [:]
     /// The places whose default view leaves out the groups with no items.
     var placeHidesEmptyGroups: [SidebarItem: Bool] = [:]
+    /// The Properties list of each place that is not a saved view, as its default view keeps it (`properties`).
+    var placeProperties: [SidebarItem: ViewProperties] = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.
     var calendarDay: Date?
     /// Counts the moves of the calendar by its buttons, menu or keys, so the month card can follow one that leaves the day as it was.

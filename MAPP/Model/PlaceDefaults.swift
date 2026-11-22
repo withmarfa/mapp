@@ -1,8 +1,9 @@
 import Foundation
 
 /// What a person changed in a place's default view: the filters, sort and grouping, the layout, the timeline's date, the
-/// board's card density, the gallery's cards and the calendar's scale. A place that is not a saved view opens as they
-/// left it. The columns and the density a place keeps are kept apart (`ItemTableColumnLayouts`, `PlaceDensities`).
+/// board's card density, the gallery's cards, the calendar's scale and its Properties list. A place that is not a saved
+/// view opens as they left it. The table's column widths and the density a place keeps are kept apart
+/// (`ItemTableColumnLayouts`, `PlaceDensities`).
 ///
 /// Every field is optional or empty by default, and an entry with nothing in it is not kept, so a place nobody changed
 /// has no entry.
@@ -76,6 +77,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     var compactBoard = false
     var cards = ViewCards()
     var calendarScale: CalendarScale?
+    /// What shows after the title in every layout; empty is the types' looks.
+    var properties = ViewProperties()
 
     init() {}
 
@@ -96,6 +99,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         compactBoard = try container.decodeIfPresent(Bool.self, forKey: .compactBoard) ?? false
         cards = try container.decodeIfPresent(ViewCards.self, forKey: .cards) ?? ViewCards()
         calendarScale = try container.decodeIfPresent(CalendarScale.self, forKey: .calendarScale)
+        properties = try container.decodeIfPresent(ViewProperties.self, forKey: .properties) ?? ViewProperties()
     }
 
     var isEmpty: Bool { self == PlaceDefault() }

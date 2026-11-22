@@ -32,7 +32,7 @@ struct ItemBoard: View {
                     mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat,
                     day: Calendar.current.startOfDay(for: library.now()))
                 let contents = cardContents.contents(
-                    of: items, in: library, looks: browser.looks(in: library), list: list, shape: CardShape(leaving: lanes.key, groupsByStatus: grouped))
+                    of: items, in: library, looks: browser.propertyLooks(in: library), list: list, shape: CardShape(leaving: lanes.key, groupsByStatus: grouped))
                 if shown.isEmpty, !items.isEmpty, lanes.all.contains(where: { !$0.items.isEmpty }) {
                     HiddenGroupsEmptyState()
                 } else {

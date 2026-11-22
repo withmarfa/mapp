@@ -21,7 +21,7 @@ struct ItemTableColumnsTests {
 
     @Test func theTableIsGivenOnlyTheColumnsThatAreShownByDefault() {
         let columns = Self.columns
-        let shown = ItemTableColumnLayouts.shown(columns, in: .init())
+        let shown = ViewProperties().shownColumns(columns)
         #expect(Self.ids(shown) == Self.ids(columns.filter(\.isShownByDefault)))
         #expect(columns.contains { !$0.isShownByDefault })
         #expect(!Self.ids(shown).contains("created"))
@@ -30,44 +30,43 @@ struct ItemTableColumnsTests {
 
     @Test func aHiddenColumnComesBackWhenShownAndLeavesAgainWhenHidden() {
         let columns = Self.columns
-        var layout = TableColumnCustomization<ItemTableRow>()
-        layout[visibility: "created"] = .visible
-        #expect(Self.ids(ItemTableColumnLayouts.shown(columns, in: layout)).contains("created"))
-        layout[visibility: "created"] = .hidden
-        #expect(!Self.ids(ItemTableColumnLayouts.shown(columns, in: layout)).contains("created"))
+        var properties = ViewProperties()
+        properties.setShown(.created, true)
+        #expect(Self.ids(properties.shownColumns(columns)).contains("created"))
+        properties.setShown(.created, false)
+        #expect(!Self.ids(properties.shownColumns(columns)).contains("created"))
     }
 
     @Test func aColumnShownByDefaultLeavesWhenHiddenAndKeepsItsPlaceInTheOrder() throws {
         let columns = Self.columns
         let victim = try #require(columns.first { $0.isShownByDefault && $0.content != .title })
-        var layout = TableColumnCustomization<ItemTableRow>()
-        layout[visibility: victim.id] = .hidden
-        let shown = ItemTableColumnLayouts.shown(columns, in: layout)
+        var properties = ViewProperties()
+        properties.setShown(victim, false)
+        let shown = properties.shownColumns(columns)
         #expect(!Self.ids(shown).contains(victim.id))
         #expect(Self.ids(shown) == Self.ids(columns.filter { $0.id != victim.id && $0.isShownByDefault }))
     }
 
     @Test func resetReturnsEveryColumnToItsDefault() {
         let columns = Self.columns
-        var layout = TableColumnCustomization<ItemTableRow>()
-        layout[visibility: "created"] = .visible
-        layout[visibility: "edited"] = .hidden
-        layout = TableColumnCustomization()
-        #expect(Self.ids(ItemTableColumnLayouts.shown(columns, in: layout)) == Self.ids(columns.filter(\.isShownByDefault)))
+        var properties = ViewProperties()
+        properties.setShown(.created, true)
+        properties.setShown(.edited, false)
+        properties.reset()
+        #expect(Self.ids(properties.shownColumns(columns)) == Self.ids(columns.filter(\.isShownByDefault)))
     }
 
-    @Test func theNameStaysEvenIfTheStoredLayoutHidesIt() {
-        var layout = TableColumnCustomization<ItemTableRow>()
-        layout[visibility: "title"] = .hidden
-        #expect(Self.ids(ItemTableColumnLayouts.shown(Self.columns, in: layout)).first == "title")
+    @Test func theNameStaysEvenIfTheStoredPropertiesHideIt() {
+        let properties = ViewProperties(shown: ["title": false])
+        #expect(Self.ids(properties.shownColumns(Self.columns)).first == "title")
     }
 
     @Test func aStoredLayoutSurvivesTheRoundTripPerPlace() {
         var layout = TableColumnCustomization<ItemTableRow>()
-        layout[visibility: "created"] = .visible
+        layout[visibility: "created"] = .hidden
         let stored = ItemTableColumnLayouts.storing(layout, for: .allItems, in: Data())
-        #expect(ItemTableColumnLayouts.layout(for: .allItems, in: stored)[visibility: "created"] == .visible)
-        #expect(ItemTableColumnLayouts.layout(for: .itemType("aic.decision"), in: stored)[visibility: "created"] == .automatic)
+        #expect(ItemTableColumnLayouts.layout(for: .allItems, in: stored) == layout)
+        #expect(ItemTableColumnLayouts.layout(for: .itemType("aic.decision"), in: stored) == .init())
     }
 
     // MARK: In a window
@@ -125,20 +124,15 @@ struct ItemTableColumnsTests {
                   states.indices.contains(index + 1) else { return nil }
             return states[index + 1]["currentWidth"] as? Double
         }
-        func store(_ change: (inout TableColumnCustomization<ItemTableRow>) -> Void) {
-            var next = layout()
-            change(&next)
-            defaults.set(ItemTableColumnLayouts.storing(next, for: .allItems, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()), forKey: ItemTableColumnLayouts.key)
-        }
 
         let first = try await table()
-        let expected = ItemTableColumnLayouts.shown(browser.tableContent(in: library).columns, in: .init()).map(\.id)
+        let expected = browser.shownColumns(browser.tableContent(in: library).columns).map(\.id)
         let initial = first.tableColumns.map(\.identifier)
         // SwiftUI names the table's columns itself, so a column is told by its place: the name first, Created last.
         #expect(initial.count == expected.count)
         let titleColumn = try #require(first.tableColumns.first)
 
-        store { $0[visibility: "created"] = .visible }
+        browser.setColumn(.created, shown: true)
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })
         let created = try #require(first.tableColumns.last)
         #expect(!initial.contains(created.identifier))
@@ -146,14 +140,14 @@ struct ItemTableColumnsTests {
         created.width = 160
         try #require(await eventually { storedWidth(of: "created") == 160 })
 
-        store { $0[visibility: "created"] = .hidden }
+        browser.setColumn(.created, shown: false)
         try #require(await eventually { first.tableColumns.count == expected.count })
         titleColumn.width += 40
         // Nothing to wait for: this gives the table's write-back time to have happened, if it is going to.
         try await Task.sleep(for: .milliseconds(300))
         #expect(storedWidth(of: "created") == 160)
 
-        store { $0[visibility: "created"] = .visible }
+        browser.setColumn(.created, shown: true)
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })
         let back = try #require(first.tableColumns.last)
         #expect(back.width == 160)
@@ -175,7 +169,7 @@ struct ItemTableColumnsTests {
         window.contentView = NSHostingView(rootView: Host(browser: browser).environment(\.library, library).defaultAppStorage(defaults))
         window.makeKeyAndOrderFront(nil)
         defer { window.performClose(nil); window.contentView = nil }
-        let expected = ItemTableColumnLayouts.shown(browser.tableContent(in: library).columns, in: .init()).map(\.id)
+        let expected = browser.shownColumns(browser.tableContent(in: library).columns).map(\.id)
         try #require(await eventually { window.contentView.flatMap { Self.tableView(in: $0) }.map { !$0.tableColumns.isEmpty } ?? false })
         // Nothing to wait for: this gives the table time to add or hide columns after its first layout, if it is going to.
         try await Task.sleep(for: .milliseconds(500))

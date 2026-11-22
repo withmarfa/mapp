@@ -11,7 +11,7 @@ struct ItemTable: View {
     @Bindable var browser: Browser
     let order: ItemOrder
     var pane: FocusState<Browser.Pane?>.Binding
-    /// Each place's columns as the person arranged them: shown or hidden, in their order, at their widths.
+    /// Each place's column widths, as the person dragged them. The columns shown and their order are the Properties list's.
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     /// What this Mac keeps for each saved view, whose column widths the table records (`Browser.keepWidths`).
     @AppStorage(ViewLayouts.key) private var viewLayouts = ViewLayouts()
@@ -75,19 +75,18 @@ struct ItemTable: View {
     /// before needs its rows made again, once.
     private func tableContent() -> ItemTableContent {
         let content = browser.tableContent(in: library)
-        guard browser.showRelations(of: browser.shownColumns(content.columns, stored: storedColumns)) else { return content }
+        guard browser.showRelations(of: browser.shownColumns(content.columns)) else { return content }
         return browser.tableContent(in: library)
     }
 
     private func table(
         columns: [ItemTableColumn], pages: Pages, grouping: ItemTableColumn?, collapsed: Set<String>
     ) -> some View {
-        let isView = viewID != nil
-        return Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: customization(columns)) {
+        Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: customization(columns)) {
             // Only the columns showing. SwiftUI adds and hides every column it is given on live rows when the place
             // changes, which for the many columns of a mixed place costs far more than the few it shows.
-            TableColumnForEach(browser.shownColumns(columns, stored: storedColumns)) { column in
-                tableColumn(column, isView: isView)
+            TableColumnForEach(browser.shownColumns(columns)) { column in
+                tableColumn(column)
             }
         } rows: {
             if let grouping {
@@ -132,15 +131,15 @@ struct ItemTable: View {
 
     /// A count has no sort control: it is asked for only the rows on screen (`ItemTableColumn.isSortable`).
     @TableColumnBuilder<ItemTableRow, ItemTableComparator>
-    private func tableColumn(_ column: ItemTableColumn, isView: Bool) -> some TableColumnContent<ItemTableRow, ItemTableComparator> {
+    private func tableColumn(_ column: ItemTableColumn) -> some TableColumnContent<ItemTableRow, ItemTableComparator> {
         if column.isSortable {
             TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
                 cell(of: row, in: column)
             }
             .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
             .customizationID(column.id)
-            // A view's order is the panel's to change, since the header cannot hold an arrangement Save waits for.
-            .disabledCustomizationBehavior(Self.disabledCustomization(of: column, inView: isView))
+            // The order is the Properties list's to change, which the header cannot hold.
+            .disabledCustomizationBehavior(Self.disabledCustomization(of: column))
         }
         if !column.isSortable {
             TableColumn(Text(verbatim: column.label)) { row in
@@ -148,7 +147,7 @@ struct ItemTable: View {
             }
             .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
             .customizationID(column.id)
-            .disabledCustomizationBehavior(Self.disabledCustomization(of: column, inView: isView))
+            .disabledCustomizationBehavior(Self.disabledCustomization(of: column))
         }
     }
 
@@ -187,13 +186,11 @@ struct ItemTable: View {
         browser.tableOptions[browser.item, default: .init()].collapsed = next
     }
 
-    /// What the header may not do with a column: the name always shows, and a view's order is the panel's to change,
-    /// since the header cannot hold an arrangement Save waits for. One call sets the whole set, as a second would
-    /// replace the first.
-    static func disabledCustomization(of column: ItemTableColumn, inView isView: Bool) -> TableColumnCustomizationBehavior {
-        var disabled: TableColumnCustomizationBehavior = []
+    /// What the header may not do with a column: the name always shows, and the order is the Properties list's, which
+    /// the header cannot hold. One call sets the whole set, as a second would replace the first.
+    static func disabledCustomization(of column: ItemTableColumn) -> TableColumnCustomizationBehavior {
+        var disabled: TableColumnCustomizationBehavior = [.reorder]
         if column.content == .title { disabled.insert(.visibility) }
-        if isView { disabled.insert(.reorder) }
         return disabled
     }
 
@@ -221,28 +218,40 @@ struct ItemTable: View {
     }
 
     /// The table's column widths, which a place keeps for itself and a saved view keeps on its own. The table reads and
-    /// writes it directly, so a change of place never shows the previous place's columns. A saved view's shown
-    /// columns and their order are the window's (`ViewColumns`), so a header that hides one is routed there, and what is
+    /// writes it directly, so a change of place never shows the previous place's columns. The shown columns and their
+    /// order are the Properties list's (`ViewProperties`), so a header that hides one is routed there, and what is
     /// left for the table to keep is the widths alone.
     private func customization(_ columns: [ItemTableColumn]) -> Binding<TableColumnCustomization<ItemTableRow>> {
         Binding {
-            guard let id = viewID else { return ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns) }
-            return viewLayouts.settings(for: id)?.widths.flatMap { try? JSONDecoder().decode(TableColumnCustomization<ItemTableRow>.self, from: $0) }
-                ?? .init()
+            var widths: TableColumnCustomization<ItemTableRow>
+            if let id = viewID {
+                widths = viewLayouts.settings(for: id)?.widths.flatMap { try? JSONDecoder().decode(TableColumnCustomization<ItemTableRow>.self, from: $0) }
+                    ?? .init()
+            } else {
+                widths = ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
+            }
+            return Self.widthsOnly(widths, columns)
         } set: { next in
+            for column in columns where column.content != .title && next[visibility: column.id] == .hidden {
+                browser.setColumn(column, shown: false)
+            }
+            let widths = Self.widthsOnly(next, columns)
             guard let id = viewID else {
-                storedColumns = ItemTableColumnLayouts.storing(
-                    next, for: browser.item, in: storedColumns, setAsideIn: browser.defaults)
+                storedColumns = ItemTableColumnLayouts.storing(widths, for: browser.item, in: storedColumns, setAsideIn: browser.defaults)
                 return
             }
-            var widths = next
-            for column in columns where column.content != .title && widths[visibility: column.id] == .hidden {
-                browser.changeViewSettings(id) { $0.columns.setShown(column, false) }
-                widths[visibility: column.id] = .automatic
-            }
-            widths.resetOrder()
             browser.keepWidths(try? JSONEncoder().encode(widths), of: id)
         }
+    }
+
+    /// The customization without what the Properties list owns: every column's visibility and the order.
+    private static func widthsOnly(
+        _ layout: TableColumnCustomization<ItemTableRow>, _ columns: [ItemTableColumn]
+    ) -> TableColumnCustomization<ItemTableRow> {
+        var widths = layout
+        for column in columns where column.content != .title { widths[visibility: column.id] = .automatic }
+        widths.resetOrder()
+        return widths
     }
 }
 
@@ -276,8 +285,7 @@ private final class TablePlaceTrace {
     }
 }
 
-/// Each place's columns as the person arranged them (shown or hidden, in their order, at their widths), kept
-/// together in the defaults under one key.
+/// Each place's column widths as the person dragged them, kept together in the defaults under one key.
 ///
 /// Stored data that cannot be read is never written over: a change that would replace it moves it aside under a key of its
 /// own first (`setAsideKey`), and a Reset View leaves it as it is.
@@ -318,12 +326,6 @@ enum ItemTableColumnLayouts {
         }
         layouts?[key(for: place)] = layout
         return (try? JSONEncoder().encode(layouts)) ?? stored
-    }
-
-    /// The columns the table is given: those the layout shows, and always the name. A hidden column stays out of the
-    /// table, so its width and place in the order wait in the layout and come back when the Columns menu shows it.
-    static func shown(_ columns: [ItemTableColumn], in layout: TableColumnCustomization<ItemTableRow>) -> [ItemTableColumn] {
-        columns.filter { $0.content == .title || layout.shows($0) }
     }
 
     /// The stored layouts: none where nothing is stored, and nil where what is stored cannot be read.

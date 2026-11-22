@@ -17,12 +17,12 @@ struct ItemRowMenu<LayoutActions: View>: View {
             let items = ids.compactMap { library.item($0) }
             let inBin = !items.isEmpty && items.allSatisfy { $0.state == .trashed }
             ForEach(Array(RowMenuEntry.entries(opening: opening, inBin: inBin).enumerated()), id: \.offset) { _, entry in
-                view(of: entry, single: items.count == 1 ? items.first : nil)
+                view(of: entry, single: items.count == 1 ? items.first : nil, items: items)
             }
         }
     }
 
-    @ViewBuilder private func view(of entry: RowMenuEntry, single: Item?) -> some View {
+    @ViewBuilder private func view(of entry: RowMenuEntry, single: Item?, items: [Item]) -> some View {
         switch entry {
         case .open:
             Button("Open", systemImage: "arrow.up.right") { browser.open(ids, as: opening) }
@@ -45,12 +45,22 @@ struct ItemRowMenu<LayoutActions: View>: View {
         case .customizeLayout:
             // A right click on a card with no page open has nothing to arrange.
             if details?.showsPage != false { CustomizeLayoutButton(ids: ids, details: details) }
+        case .editLayouts:
+            EditLayoutsCommand(types: Self.types(of: items, in: library)) { browser.showLayouts(of: $0) }
         case .versionHistory: VersionHistoryButton(ids: ids, details: details)
         case .recover:
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
         case .delete: ItemRemoveActions(ids: ids, undoManager: undoManager)
         case .divider: Divider()
         }
+    }
+}
+
+extension ItemRowMenu {
+    /// The types of the items the menu is for, by name: the pages Edit Layouts… can lead to.
+    static func types(of items: [Item], in library: any ItemLibrary) -> [ItemTypeInfo] {
+        Set(items.map(\.type)).compactMap { library.catalogue.itemTypes[$0] }
+            .sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
     }
 }
 

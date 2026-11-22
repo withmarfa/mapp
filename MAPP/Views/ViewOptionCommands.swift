@@ -10,17 +10,16 @@ struct ViewOptionCommand {
     var key: ShortcutCommand?
     let action: () -> Void
 
-    /// - Parameter storedColumns: Each place's table columns as kept (`ItemTableColumnLayouts`).
-    static func commands(for browser: Browser, in library: any ItemLibrary, storedColumns: Binding<Data>) -> [ViewOptionCommand] {
+    static func commands(for browser: Browser, in library: any ItemLibrary) -> [ViewOptionCommand] {
         if let place = browser.indexPlace { return indexCommands(for: place, browser: browser) }
         guard browser.offersViewOptions else { return [] }
         switch browser.viewMode {
-        case .table: return table(browser, library, storedColumns)
-        case .board: return board(browser, library)
-        case .timeline: return timeline(browser, library)
+        case .table: return table(browser, library)
+        case .board: return board(browser, library) + properties(browser, library)
+        case .timeline: return timeline(browser, library) + properties(browser, library)
         case .calendar: return calendar(browser, library)
-        case .gallery: return gallery(browser) + sorting(browser, library) + grouping(browser, library)
-        case .list: return sorting(browser, library) + grouping(browser, library)
+        case .gallery: return gallery(browser) + sorting(browser, library) + grouping(browser, library) + properties(browser, library)
+        case .list: return sorting(browser, library) + grouping(browser, library) + properties(browser, library)
         }
     }
 
@@ -52,7 +51,7 @@ struct ViewOptionCommand {
         return commands
     }
 
-    private static func table(_ browser: Browser, _ library: any ItemLibrary, _ storedColumns: Binding<Data>) -> [ViewOptionCommand] {
+    private static func table(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
         let place = browser.item
         let content = browser.tableContent(in: library)
         let first = content.sort.first
@@ -62,7 +61,7 @@ struct ViewOptionCommand {
                 browser.orderSearch(byRelevance: true)
             })
         }
-        for column in content.columns where browser.showsColumn(column, stored: storedColumns.wrappedValue) && column.id != first?.column.id {
+        for column in content.columns where browser.showsColumn(column) && column.id != first?.column.id {
             commands.append(.init(title: String(localized: "Sort by \(column.label)"), systemImage: "arrow.up.arrow.down", group: .sortAndGroup) {
                 browser.orderSearch(byRelevance: false)
                 browser.tableOptions[place, default: .init()].sort = [ItemTableComparator(column: column, order: column.firstOrder)]
@@ -77,15 +76,7 @@ struct ViewOptionCommand {
             })
         }
         commands += grouping(browser, library)
-        for column in content.columns where column.content != .title {
-            let shown = browser.showsColumn(column, stored: storedColumns.wrappedValue)
-            commands.append(.init(
-                title: shown ? String(localized: "Hide \(column.label) Column") : String(localized: "Show \(column.label) Column"),
-                systemImage: "tablecells"
-            ) {
-                browser.setColumn(column, shown: !shown, stored: storedColumns)
-            })
-        }
+        commands += properties(browser, library)
         if browser.tableRowsNotLoaded(in: content) > 0 {
             commands.append(.init(title: String(localized: "Load More Rows"), systemImage: "arrow.down.to.line") {
                 browser.loadMoreTableRows(in: content)
@@ -109,6 +100,23 @@ struct ViewOptionCommand {
             commands.append(.init(title: String(localized: "Clear Filters"), systemImage: "line.3.horizontal.decrease") {
                 browser.clearFilters()
             })
+        }
+        return commands
+    }
+
+    /// Show or hide each property the layout lists, and Use Layouts once the list is changed.
+    private static func properties(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
+        var commands = browser.offeredProperties(in: library).filter { $0.content != .title }.map { column in
+            let shown = browser.showsColumn(column)
+            return ViewOptionCommand(
+                title: shown ? String(localized: "Hide \(column.label) Property") : String(localized: "Show \(column.label) Property"),
+                systemImage: "list.bullet.rectangle"
+            ) {
+                browser.setColumn(column, shown: !shown)
+            }
+        }
+        if browser.properties.isChanged {
+            commands.append(.init(title: String(localized: "Use Layouts"), systemImage: "arrow.uturn.backward") { browser.useLayouts() })
         }
         return commands
     }

@@ -20,9 +20,9 @@ import SwiftUI
     var title: String { current.subpage?.title ?? current.page.title }
 
     /// Shows `page`. A page already shown stays as it is; any other is a new place, and what Forward held is dropped.
-    func show(_ page: SettingsPage) {
-        guard current != Place(page: page) else { return }
-        push(Place(page: page))
+    func show(_ page: SettingsPage, subpage: SettingsSubpage? = nil) {
+        guard current != Place(page: page, subpage: subpage) else { return }
+        push(Place(page: page, subpage: subpage))
     }
 
     /// Opens `subpage` on the page shown.
@@ -55,8 +55,8 @@ import SwiftUI
     /// Opens the window, or brings it forward. The scene's own action, handed over by whichever view has it first.
     @ObservationIgnored var open: () -> Void = {}
 
-    func show(_ page: SettingsPage? = nil) {
-        if let page { navigation.show(page) }
+    func show(_ page: SettingsPage? = nil, subpage: SettingsSubpage? = nil) {
+        if let page { navigation.show(page, subpage: subpage) }
         open()
     }
 }

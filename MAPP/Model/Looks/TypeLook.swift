@@ -52,6 +52,10 @@ nonisolated struct TypeLook: Hashable, Sendable {
     var secondary: [LookPart]
     /// The facts in the order they show; a view shows as many as it has room for.
     var facts: [LookFact]
+    /// Whether a row says the item's status, and the type where the list mixes types. Both stay on unless a view's
+    /// Properties list turns them off (`ViewProperties.looks`); a stored look never holds them.
+    var showsStatus = true
+    var showsType = true
 
     static let maxSecondary = 2
 

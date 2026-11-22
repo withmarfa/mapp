@@ -168,11 +168,11 @@ struct ViewPanelTests {
     @Test func columnsAreStoredAsTheyAreChangedAndUndoPutsThemBack() {
         let (browser, _, undo) = Self.opened()
         undo.beginUndoGrouping()
-        browser.changeViewSettings(Self.id) { $0.columns.setShown(.created, true) }
+        browser.changeViewSettings(Self.id) { $0.properties.setShown(.created, true) }
         Self.close(undo)
-        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.columns.isShown(.created) == true)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.properties.isShown(.created) == true)
         undo.undo()
-        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.columns.isShown(.created) != true)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.properties.isShown(.created) != true)
     }
 
     @Test func densityIsStoredAsItIsChangedAndUndoPutsItBack() {

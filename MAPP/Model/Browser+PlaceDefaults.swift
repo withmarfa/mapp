@@ -110,6 +110,8 @@ extension Browser {
         if placeCalendarScales[place] != stored.calendarScale { placeCalendarScales[place] = stored.calendarScale }
         let hides: Bool? = stored.hidesEmptyGroups ? true : nil
         if placeHidesEmptyGroups[place] != hides { placeHidesEmptyGroups[place] = hides }
+        let properties: ViewProperties? = stored.properties.isChanged ? stored.properties : nil
+        if placeProperties[place] != properties { placeProperties[place] = properties }
         observedChoices[place] = ViewChoices(options: options, timelineDate: stored.timelineField)
         apply(layout: stored.layout, in: library)
     }
@@ -138,7 +140,7 @@ extension Browser {
     var offersResetView: Bool { viewPanel?.isNew != true && isDefaultViewChanged }
 
     /// Puts the open place back to what it shows by itself: no filters, sort or grouping of the person's, its own
-    /// layout, columns, density and cards. One step of Undo brings the person's choices back.
+    /// layout, properties, column widths, density and cards. One step of Undo brings the person's choices back.
     func resetView(in library: any ItemLibrary) {
         guard hasDefaultView, viewPanel?.isNew != true else { return }
         let place = item
@@ -154,6 +156,7 @@ extension Browser {
         placeCards[place] = nil
         placeCalendarScales[place] = nil
         placeHidesEmptyGroups[place] = nil
+        placeProperties[place] = nil
         observedChoices[place] = ViewChoices(options: ItemTableOptions(), timelineDate: nil)
         // The row of a place with no filter left is not kept open, which only a filter the person put in would have done.
         filterRowChoice[place] = nil
@@ -177,5 +180,6 @@ extension Browser {
         compactBoards[place] = stored.compactBoard ? true : nil
         placeCalendarScales[place] = stored.calendarScale
         placeHidesEmptyGroups[place] = stored.hidesEmptyGroups ? true : nil
+        placeProperties[place] = stored.properties.isChanged ? stored.properties : nil
     }
 }

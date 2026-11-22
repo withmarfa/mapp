@@ -20,14 +20,14 @@ struct ViewLayoutsTests {
 
     @Test func settingsComeBackAsTheyWereKept() {
         let defaults = Self.defaults()
-        var columns = ViewColumns()
+        var columns = ViewProperties()
         columns.setShown(.created, true)
         ViewLayouts.update(in: defaults) {
-            $0.set(ViewMacSettings(layout: .board, columns: columns, hidesEmptyGroups: true, widths: Data([1, 2])), for: Self.view)
+            $0.set(ViewMacSettings(layout: .board, properties: columns, hidesEmptyGroups: true, widths: Data([1, 2])), for: Self.view)
         }
         let settings = ViewLayouts.stored(in: defaults).settings(for: Self.view)
         #expect(settings?.layout == .board)
-        #expect(settings?.columns == columns)
+        #expect(settings?.properties == columns)
         #expect(settings?.hidesEmptyGroups == true)
         #expect(settings?.widths == Data([1, 2]))
         #expect(ViewLayouts.stored(in: defaults).settings(for: ItemID("view-other")) == nil)
@@ -55,7 +55,7 @@ struct ViewLayoutsTests {
         #expect(layouts.settings(for: ItemID("view-a"))?.hidesEmptyGroups == true)
         // A layout this version lacks reads as the list, as everywhere else.
         #expect(layouts.settings(for: ItemID("view-b"))?.layout == .list)
-        #expect(layouts.settings(for: ItemID("view-c"))?.columns == ViewColumns())
+        #expect(layouts.settings(for: ItemID("view-c"))?.properties == ViewProperties())
     }
 
     @Test func aDeletedViewIsForgotten() {
@@ -80,23 +80,23 @@ struct ViewLayoutsTests {
     // MARK: Columns
 
     @Test func theColumnsStartAsTheTableLaysThemOut() {
-        let columns = ViewColumns()
+        let columns = ViewProperties()
         #expect(Self.ids(columns.arranged(Self.columns)) == ["title", "type", "edited", "created"])
         #expect(Self.ids(columns.shownColumns(Self.columns)) == ["title", "type", "edited"])
     }
 
     @Test func aColumnIsShownOrHiddenAndTheSameArrangementIsTheSameValue() {
-        var columns = ViewColumns()
+        var columns = ViewProperties()
         columns.setShown(.created, true)
         #expect(Self.ids(columns.shownColumns(Self.columns)).contains("created"))
         columns.setShown(.created, false)
-        #expect(columns == ViewColumns())
+        #expect(columns == ViewProperties())
         columns.setShown(.type, false)
         #expect(!Self.ids(columns.shownColumns(Self.columns)).contains("type"))
     }
 
     @Test func theNameIsAlwaysShownAndFirst() {
-        var columns = ViewColumns()
+        var columns = ViewProperties()
         columns.setShown(.title, false)
         columns.move("edited", before: "title", in: Self.columns)
         #expect(Self.ids(columns.shownColumns(Self.columns)).first == "title")
@@ -104,23 +104,23 @@ struct ViewLayoutsTests {
     }
 
     @Test func aColumnMovesBeforeAnotherOrToTheEnd() {
-        var columns = ViewColumns()
+        var columns = ViewProperties()
         columns.move("edited", before: "type", in: Self.columns)
         #expect(Self.ids(columns.arranged(Self.columns)) == ["title", "edited", "type", "created"])
         columns.move("edited", before: nil, in: Self.columns)
         #expect(Self.ids(columns.arranged(Self.columns)) == ["title", "type", "created", "edited"])
         // Back in the table's own order it is the same value as never having moved.
         columns.move("edited", before: "created", in: Self.columns)
-        #expect(columns == ViewColumns())
+        #expect(columns == ViewProperties())
     }
 
     @Test func movingAColumnKeepsTheSavedPlaceOfOneTheTableLacks() {
         // "gone" was arranged in a table that had it: before "edited" here, and before "type" there.
-        var before = ViewColumns(order: ["gone", "edited", "type"])
+        var before = ViewProperties(order: ["gone", "edited", "type"])
         before.move("created", before: "edited", in: Self.columns)
         #expect(before.order == ["gone", "created", "edited", "type"])
 
-        var between = ViewColumns(order: ["edited", "gone", "type"])
+        var between = ViewProperties(order: ["edited", "gone", "type"])
         between.move("created", before: "edited", in: Self.columns)
         #expect(between.order == ["created", "edited", "gone", "type"])
 
@@ -130,7 +130,7 @@ struct ViewLayoutsTests {
     }
 
     @Test func aColumnTheTableLacksKeepsTheOrderFromBeingForgotten() {
-        var columns = ViewColumns(order: ["gone", "type", "edited", "created"])
+        var columns = ViewProperties(order: ["gone", "type", "edited", "created"])
         columns.move("created", before: "edited", in: Self.columns)
         #expect(columns.order == ["gone", "type", "created", "edited"])
         // Back in the table's own order, with the absent column still named, the order is kept.
@@ -139,13 +139,13 @@ struct ViewLayoutsTests {
     }
 
     @Test func aSavedColumnThatNoLongerExistsIsIgnored() {
-        let columns = ViewColumns(order: ["gone", "edited", "type"], shown: ["gone": true, "created": true])
+        let columns = ViewProperties(order: ["gone", "edited", "type"], shown: ["gone": true, "created": true])
         #expect(Self.ids(columns.arranged(Self.columns)) == ["title", "edited", "type", "created"])
         #expect(Self.ids(columns.shownColumns(Self.columns)) == ["title", "edited", "type", "created"])
     }
 
     @Test func aColumnTheOrderNamesTwiceIsShownOnce() {
-        let columns = ViewColumns(order: ["edited", "edited"])
+        let columns = ViewProperties(order: ["edited", "edited"])
         #expect(Self.ids(columns.arranged(Self.columns)) == ["title", "edited", "type", "created"])
     }
 }

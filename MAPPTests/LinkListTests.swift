@@ -120,7 +120,7 @@ import Testing
         let library = FakeItemLibrary(items: [live, binned])
         let browser = Browser()
         var opened: [SettingsPage?] = []
-        browser.openSettings = { opened.append($0) }
+        browser.openSettings = { page, _ in opened.append(page) }
         browser.reveal(binned, in: library, order: ItemOrder())
         #expect(opened == [.recentlyDeleted])
     }

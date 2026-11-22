@@ -43,7 +43,7 @@ Every Mac is another OAuth client to the server, and only the client that regist
 
 ## What stays on this Mac
 
-Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `inspector*Open` keys, `inspectorAppOpen.*`, window scene storage), a table's columns (`itemTableColumns`) and widths, `startLastPlace`, `quickAddLastType`, `sendErrorReports`, `NSQuitAlwaysKeepsWindows`, everything on On This Mac, the `Marfa*` connection keys and the sync's own keys: `preferencesBeforeSync` and `preferencesSync`.
+Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `inspector*Open` keys, `inspectorAppOpen.*`, window scene storage), a table's column widths (`itemTableColumns`), `startLastPlace`, `quickAddLastType`, `sendErrorReports`, `NSQuitAlwaysKeepsWindows`, everything on On This Mac, the `Marfa*` connection keys and the sync's own keys: `preferencesBeforeSync` and `preferencesSync`.
 
 ## The first launch
 

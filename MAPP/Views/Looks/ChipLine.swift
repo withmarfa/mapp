@@ -12,6 +12,11 @@ struct ChipLine: View {
         more = content.more
     }
 
+    init(chips: [RowContent.Chip], more: Int) {
+        self.chips = chips
+        self.more = more
+    }
+
     var body: some View {
         let size = ChipLooks.current.rowTextSize * CGFloat(textSize) / 13
         HStack(spacing: 6) {

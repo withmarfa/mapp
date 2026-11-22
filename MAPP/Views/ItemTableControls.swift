@@ -17,29 +17,26 @@ struct FilterCommands: View {
     }
 }
 
-/// The table's part of View Options (`CurrentViewOptions`): Sort, Group and the columns shown. Sort and Group are the
-/// place's, kept in its default view or written to its saved view; the columns shown are kept for the place
-/// (`ItemTableColumnLayouts`), or stored for a saved view (`Browser.setColumn`). The list and the gallery of every place
-/// take the same Sort and Group, without the table's rows at a time and columns (`columns` false), and show the starting
-/// order Settings > Lists gives until the place has its own.
+/// The table's part of View Options (`CurrentViewOptions`): Sort, Group and Properties. Sort and Group are the place's, kept
+/// in its default view or written to its saved view; Properties are kept on this Mac (`Browser.changeProperties`). The list
+/// and the gallery of every place take the same Sort, Group and Properties, without the table's rows at a time (`table`
+/// false), and show the starting order Settings > Lists gives until the place has its own.
 struct ItemTableViewOptions: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
-    var columns = true
-    @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
+    var table = true
 
     var body: some View {
         let content = browser.tableContent(in: library)
-        let controls = Controls(browser: browser, content: content, stored: $storedColumns, choosesFromFields: !columns)
+        let controls = Controls(browser: browser, content: content, choosesFromFields: !table)
         controls.sortPicker
             .disabled(browser.keepsPlaceOrder)
         Divider()
         GroupByMenu(browser: browser)
-        if columns {
+        PropertiesMenu(browser: browser)
+        if table {
             Divider()
             controls.pageSizePicker
-            Divider()
-            controls.columnsMenu
         }
     }
 }
@@ -49,18 +46,16 @@ private struct Controls {
     let columns: [ItemTableColumn]
     let sort: [ItemTableComparator]
     let browser: Browser
-    @Binding var stored: Data
     /// The columns Sort by offers: those the table shows, or for a list or gallery every field its types can sort by.
     private let choices: [ItemTableColumn]
 
-    init(browser: Browser, content: ItemTableContent, stored: Binding<Data>, choosesFromFields: Bool) {
+    init(browser: Browser, content: ItemTableContent, choosesFromFields: Bool) {
         self.browser = browser
         _options = Binding { browser.tableOptions[browser.item] ?? ItemTableOptions() } set: { browser.tableOptions[browser.item] = $0 }
         columns = content.columns
         sort = SavedViews.arrangement(browser, content: content, order: browser.storedOrder).sort
         relevance = browser.isSearching ? Binding { browser.ordersByRelevance } set: { browser.orderSearch(byRelevance: $0) } : nil
-        _stored = stored
-        choices = choosesFromFields ? content.sortChoices : browser.shownColumns(content.columns, stored: stored.wrappedValue)
+        choices = choosesFromFields ? content.sortChoices : browser.shownColumns(content.columns)
     }
 
     /// Whether the rows are in search order, where the window searches; nil where it does not.
@@ -108,33 +103,6 @@ private struct Controls {
         }
         .pickerStyle(.menu)
         .accessibilityIdentifier("ItemTablePageSize")
-    }
-
-    // MARK: Columns
-
-
-    var columnsMenu: some View {
-        Menu("Columns", systemImage: "tablecells") {
-            ForEach(columns.filter { $0.content != .title }) { column in
-                Toggle(column.label, isOn: Binding { browser.showsColumn(column, stored: stored) } set: {
-                    browser.setColumn(column, shown: $0, stored: $stored)
-                })
-            }
-            Divider()
-            Button("Reset Columns") { browser.resetColumns(stored: $stored) }
-        }
-        .accessibilityIdentifier("ItemTableColumns")
-    }
-}
-
-extension TableColumnCustomization<ItemTableRow> {
-    /// Whether the table shows a column: as the person set it, or as the column is by default.
-    func shows(_ column: ItemTableColumn) -> Bool {
-        switch self[visibility: column.id] {
-        case .visible: true
-        case .hidden: false
-        default: column.isShownByDefault
-        }
     }
 }
 

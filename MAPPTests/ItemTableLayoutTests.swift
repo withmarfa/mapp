@@ -57,14 +57,10 @@ struct ItemTableLayoutTests {
     // MARK: What the header may change
 
     @MainActor
-    @Test func theNameCanNeverBeHiddenAndAViewsOrderIsNotTheHeadersToChange() {
-        let name = ItemTableColumn.title
-        let other = ItemTableColumn.edited
-        #expect(ItemTable.disabledCustomization(of: name, inView: false) == .visibility)
-        #expect(ItemTable.disabledCustomization(of: other, inView: false) == [])
-        #expect(ItemTable.disabledCustomization(of: other, inView: true) == .reorder)
-        // In a view the name keeps both, since one call sets the whole set.
-        #expect(ItemTable.disabledCustomization(of: name, inView: true) == [.visibility, .reorder])
+    @Test func theNameCanNeverBeHiddenAndTheOrderIsThePropertiesListsToChange() {
+        #expect(ItemTable.disabledCustomization(of: .edited) == .reorder)
+        // The name keeps both, since one call sets the whole set.
+        #expect(ItemTable.disabledCustomization(of: .title) == [.visibility, .reorder])
     }
 
     // MARK: Statuses
