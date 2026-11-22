@@ -2,7 +2,7 @@
 
 Status: Built in v0.0.43. The store of type looks and the list density are built in v0.0.44. See [Looks](looks.md).
 
-Where it lives: `ListKey`, `PageKey`, `OrderKey`, `InterfaceKey` and `AppearanceKey` under `MAPP/Views/`, and `MacSettings`, `StartWith`, `ReopenWindows`, `NewItemType`, `WeekStart`, `CalendarHourHeight`, `PagePlacements`, `ViewLayouts`, `PlaceDefaults`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `SearchLeaveOuts`, `SearchOptions`, `DateFormat` and `RemotePictureSetting` under `MAPP/Model/`, and `ShortcutBindings` and `AnyAppShortcuts` under `MAPP/Model/Shortcuts/`.
+Where it lives: `ListKey`, `PageKey`, `OrderKey`, `InterfaceKey` and `AppearanceKey` under `MAPP/Views/`, and `MacSettings`, `StartWith`, `ReopenWindows`, `NewItemType`, `NewRowTypes`, `WeekStart`, `CalendarHourHeight`, `PagePlacements`, `ViewLayouts`, `PlaceDefaults`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `SearchLeaveOuts`, `SearchOptions`, `DateFormat` and `RemotePictureSetting` under `MAPP/Model/`, and `ShortcutBindings` and `AnyAppShortcuts` under `MAPP/Model/Shortcuts/`.
 
 MAPP keeps its own settings in the app's defaults on this Mac today. It is agreed that they move into one hidden item in the Marfa, `app.mapp.preferences`, with window sizes, column widths and On This Mac staying on the Mac ([Agreed designs](agreed-designs.md#settings)). Until that is built, the scopes below stand. This page lists where each kind of setting lives, so you know which scope a new setting belongs to.
 
