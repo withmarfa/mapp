@@ -1,7 +1,7 @@
 import Foundation
 
-/// How tall one hour is in the calendar's week, which a pinch on the trackpad changes. A Mac setting, never written to
-/// Marfa ([Settings storage](../../../docs/settings-storage.md)).
+/// How tall one hour is in the calendar's week, which a pinch on the trackpad changes. One value in the defaults, synced
+/// through the Marfa (`PreferencesMap`).
 nonisolated enum CalendarHourHeight {
     static let key = "calendarHourHeight"
     /// The least and the most an hour may be, in points.

@@ -5,10 +5,10 @@ nonisolated enum LinkedFromPlace: String, Codable, Sendable {
     case page, inspector
 }
 
-/// Where an item's properties show, for each type: MAPP's own setting, kept as one value in the defaults and never
-/// sent to Marfa. The inspector always lists every property of an item. This says which of them the page shows too,
-/// which are pinned under its title (at most four, in order), and where Linked From goes. A type the person has never
-/// customized has no entry and follows the defaults in `PagePlacement`.
+/// Where an item's properties show, for each type: MAPP's own setting, kept as one value in the defaults and synced
+/// through the Marfa (`PreferencesMap`). The inspector always lists every property of an item. This says which of them
+/// the page shows too, which are pinned under its title (at most four, in order), and where Linked From goes. A type the
+/// person has never customized has no entry and follows the defaults in `PagePlacement`.
 nonisolated struct PagePlacements: Equatable, Sendable {
     static let key = "pagePlacements"
     /// Each entry is stored text that could not be read, in the order it was found.
