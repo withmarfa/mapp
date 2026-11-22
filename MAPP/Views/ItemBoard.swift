@@ -26,7 +26,8 @@ struct ItemBoard: View {
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         VStack(spacing: 0) {
             if let field {
-                let lanes = ItemBoardLayout.lanes(items: items, key: field.key, catalogue: library.catalogue)
+                let lanes = ItemBoardLayout.lanes(
+                    items: items, key: field.key, catalogue: library.catalogue, order: browser.boardCardOrder(in: library))
                 // Decided from the items, not the lanes shown: Hide Empty Groups may have removed every group lane.
                 let grouped = ItemBoardLayout.groupsByStatus(items: items, key: field.key, catalogue: library.catalogue)
                 // A card leaves off what its lane already says: the field the board is grouped by.

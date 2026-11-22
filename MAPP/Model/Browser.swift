@@ -110,8 +110,16 @@ final class Browser {
     /// The field a place's board makes its lanes of: the place's group, where it groups by a field. A board's lanes are
     /// the group, so a saved view's group and the lanes agree, and the table groups by the same field.
     func boardFieldKey(in place: SidebarItem) -> String? {
-        guard case .column(let id) = tableOptions[place]?.grouping, id.hasPrefix(Self.fieldColumnPrefix) else { return nil }
+        guard case .column(let id, .value)? = tableOptions[place]?.grouping, id.hasPrefix(Self.fieldColumnPrefix) else { return nil }
         return String(id.dropFirst(Self.fieldColumnPrefix.count))
+    }
+
+    /// Where each item stands in the sort the board's cards follow: the place's sort where the person or the view set
+    /// one, else nil, which keeps the cards by title.
+    func boardCardOrder(in library: any ItemLibrary) -> [ItemID: Int]? {
+        guard tableOptions[item]?.sort?.isEmpty == false else { return nil }
+        let rows = tableContent(in: library).rows
+        return Dictionary(rows.enumerated().map { ($0.element.item.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Makes `key`'s field the place's board lanes (and its group).
@@ -485,7 +493,7 @@ final class Browser {
     var listShape: ListShape? {
         guard let options = tableOptions[item] else { return nil }
         var grouped = false
-        if case .column = options.grouping { grouped = true }
+        if options.grouping.columnID != nil { grouped = true }
         let arranged = options.sort != nil || grouped
         guard arranged || options.isFiltering else { return nil }
         var shape = options.settled
@@ -505,7 +513,7 @@ final class Browser {
             return sectionsUnmeasured(of: content.kept.map(\.item), order: order, now: now)
         }
         // The table groups a place by status on its own; the list does only what a view or the person asked for.
-        guard case .column = shape.options.grouping, content.grouping != nil else {
+        guard shape.options.grouping.columnID != nil, content.grouping != nil else {
             return content.rows.isEmpty ? [] : [ItemSection(group: nil, items: content.rows.map(\.item))]
         }
         return content.groups.map { ItemSection(group: .custom(id: $0.id, title: $0.title), items: $0.rows.map(\.item)) }
@@ -734,6 +742,7 @@ final class Browser {
         observedChoices = [:]
         filterRowChoice = [:]
         toldUnkept = [:]
+        replacedGroups = [:]
         writingViews = []
         pendingViewWrites = []
         placeCards = [:]
@@ -880,6 +889,9 @@ final class Browser {
     @ObservationIgnored var pendingViewWrites: Set<ItemID> = []
     @ObservationIgnored var toldOffline: Set<ItemID> = []
     @ObservationIgnored var toldUnkept: [ItemID: Set<ViewDraft.Unkept>] = [:]
+    /// Each view's groups this window replaced, by field, so grouping by that field again (an Undo, or a choice made
+    /// back) gives back the groups another app ordered and hid there.
+    @ObservationIgnored var replacedGroups: [ItemID: [String: LibraryViewGroup]] = [:]
 
     /// Whether the row of filters above the list shows in a place the person chose, which is window state and never
     /// saved (`Browser+FilterRow`). A place the person did not choose for shows it by what it holds.

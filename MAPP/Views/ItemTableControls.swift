@@ -47,6 +47,7 @@ private struct Controls {
     let columns: [ItemTableColumn]
     let sort: [ItemTableComparator]
     let grouping: ItemTableColumn?
+    let groupMode: GroupMode
     let browser: Browser
     @Binding var stored: Data
 
@@ -56,6 +57,7 @@ private struct Controls {
         columns = content.columns
         sort = content.sort
         grouping = content.grouping
+        groupMode = content.groupMode
         categorical = content.categoricalColumns
         relevance = browser.isSearching ? Binding { browser.ordersByRelevance } set: { browser.orderSearch(byRelevance: $0) } : nil
         _stored = stored
@@ -103,11 +105,16 @@ private struct Controls {
 
     var groupPicker: some View {
         Picker("Group by", systemImage: "rectangle.grid.1x2", selection: Binding { grouping?.id ?? "" } set: { id in
+            guard id != grouping?.id else { return }
             options.grouping = id.isEmpty ? .none : .column(id)
             options.collapsed = nil
         }) {
             Text("None").tag("")
             Divider()
+            // A date grouped by its span, as a view may be, shows as it is.
+            if let grouping, let bucket = groupMode.bucket {
+                Text(verbatim: "\(grouping.label): \(bucket.title)").tag(grouping.id)
+            }
             ForEach(categorical) { Text($0.label).tag($0.id) }
         }
         .pickerStyle(.menu)

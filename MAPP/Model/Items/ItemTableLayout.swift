@@ -340,7 +340,17 @@ nonisolated struct ItemTableComparator: SortComparator, Hashable, Sendable {
 nonisolated struct ItemTableOptions: Hashable, Sendable {
     enum Grouping: Hashable, Sendable {
         case automatic, none
-        case column(String)
+        /// By a column, as `mode` says: each value, or a date's day, week, month or year.
+        case column(String, by: GroupMode = .value)
+
+        /// The column it names, where it names one.
+        var columnID: String? {
+            if case .column(let id, _) = self { id } else { nil }
+        }
+
+        var mode: GroupMode {
+            if case .column(_, let mode) = self { mode } else { .value }
+        }
     }
 
     var grouping = Grouping.automatic
@@ -426,7 +436,7 @@ nonisolated enum ItemTableLayout {
         for type in types { wanted.formUnion((looks[type] ?? .empty).relations) }
         // A column the options group, filter or sort by is read too, shown or not.
         var named = Set(options.filters.keys)
-        if case .column(let id) = options.grouping { named.insert(id) }
+        if let id = options.grouping.columnID { named.insert(id) }
         for comparator in options.sort ?? [] { named.insert(comparator.column.id) }
         for id in named { if let relation = Relation(rawValue: id) { wanted.insert(relation) } }
         return wanted
@@ -613,7 +623,8 @@ nonisolated enum ItemTableLayout {
     static func grouping(_ options: ItemTableOptions, columns: [ItemTableColumn]) -> ItemTableColumn? {
         switch options.grouping {
         case .none: return nil
-        case .column(let id): return columns.first { $0.id == id && $0.isCategorical }
+        case .column(let id, .value): return columns.first { $0.id == id && $0.isCategorical }
+        case .column(let id, .bucket): return columns.first { $0.id == id && $0.isDated }
         // Only where items fill their status: a place of events, whose type has one nobody sets, is not grouped.
         case .automatic: return columns.first { $0.style == .status && $0.isShownByDefault }
         }
@@ -682,9 +693,13 @@ nonisolated enum ItemTableLayout {
         return order.map { rows[$0] }
     }
 
-    /// The rows in groups by `column`: a status column's by the group each word is in, the four in their order and
-    /// then the words no group claims; any other column's as `categories` gives them.
-    static func groups(of rows: [ItemTableRow], by column: ItemTableColumn) -> [ItemTableGroup] {
+    /// The rows in groups by `column`: a date's by the span `mode` names, oldest first and then the rows with none; a
+    /// status column's by the group each word is in, the four in their order and then the words no group claims; any
+    /// other column's as `categories` gives them.
+    static func groups(
+        of rows: [ItemTableRow], by column: ItemTableColumn, mode: GroupMode = .value, calendar: Calendar = .current, now: Date = .now
+    ) -> [ItemTableGroup] {
+        if let bucket = mode.bucket { return dated(rows, by: column, bucket: bucket, calendar: calendar, now: now) }
         guard column.style == .status else { return categories(of: rows, by: column) }
         var buckets: [StatusBucket: [ItemTableRow]] = [:]
         var empty: [ItemTableRow] = []
@@ -693,6 +708,23 @@ nonisolated enum ItemTableLayout {
         }
         var groups = buckets.keys.sorted { $0.rank < $1.rank }.map { ItemTableGroup(id: $0.id, title: $0.title, rows: buckets[$0]!) }
         if !empty.isEmpty { groups.append(ItemTableGroup(id: "", title: String(localized: "No \(column.label)"), rows: empty)) }
+        return groups
+    }
+
+    /// The rows in groups by the day, week, month or year of `column`'s date, keyed as Marfa keys them
+    /// (`DateGroups.key`), in ascending order, then the rows with no date.
+    private static func dated(
+        _ rows: [ItemTableRow], by column: ItemTableColumn, bucket: LibraryViewGroup.Bucket, calendar: Calendar, now: Date
+    ) -> [ItemTableGroup] {
+        var buckets: [String: [ItemTableRow]] = [:]
+        for row in rows {
+            let key = column.date(of: row, calendar: calendar).map { DateGroups.key(of: $0, bucket: bucket, calendar: calendar) } ?? ""
+            buckets[key, default: []].append(row)
+        }
+        var groups = buckets.keys.filter { !$0.isEmpty }.sorted().map { key in
+            ItemTableGroup(id: key, title: DateGroups.title(ofKey: key, bucket: bucket, now: now, calendar: calendar), rows: buckets[key]!)
+        }
+        if let empty = buckets[""] { groups.append(ItemTableGroup(id: "", title: String(localized: "No \(column.label)"), rows: empty)) }
         return groups
     }
 
@@ -741,7 +773,7 @@ nonisolated enum ItemTableLayout {
     /// The groups folded when the person has not chosen: finished work, so what is still to do leads.
     static func collapsed(_ options: ItemTableOptions, groups: [ItemTableGroup], by column: ItemTableColumn) -> Set<String> {
         if let collapsed = options.collapsed { return collapsed }
-        guard column.style == .status else { return [] }
+        guard column.style == .status, options.grouping.mode == .value else { return [] }
         return Set(groups.compactMap { $0.value.flatMap { StatusBucket(id: $0)?.isFinished == true ? $0 : nil } })
     }
 }

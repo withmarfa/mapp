@@ -32,7 +32,10 @@ struct ViewEditPanel: View {
                 if browser.viewMode == .list {
                     ViewPanelDensity(browser: browser, panel: panel)
                 }
-                ViewPanelSort(browser: browser, content: content, sort: arrangement.sort)
+                // The timeline and the calendar place items by time, so a sort would change nothing there.
+                if browser.viewMode != .timeline && browser.viewMode != .calendar {
+                    ViewPanelSort(browser: browser, content: content, sort: arrangement.sort)
+                }
                 ViewPanelGroup(browser: browser, content: content, arrangement: arrangement)
                 if browser.viewMode == .table {
                     ViewPanelColumns(browser: browser, panel: panel, content: content)
@@ -184,6 +187,10 @@ private struct ViewPanelGroup: View {
                     Text("Date").tag(Self.dateTag)
                 }
                 Divider()
+                // A date grouped by its span, as a view may be, shows as it is.
+                if case .column(let id, .bucket(let bucket)) = arrangement.grouping, let column = content.grouping, column.id == id {
+                    Text(verbatim: "\(column.label): \(bucket.title)").tag(Self.tag(of: arrangement.grouping))
+                }
                 ForEach(content.categoricalColumns) { Text($0.label).tag($0.id) }
             }
             .labelsHidden()
@@ -197,7 +204,8 @@ private struct ViewPanelGroup: View {
         switch grouping {
         case .none: ""
         case .date: dateTag
-        case .column(let id): id
+        case .column(let id, .value): id
+        case .column(let id, .bucket(let bucket)): id + "\u{1}" + bucket.rawValue
         }
     }
 
@@ -212,7 +220,7 @@ private struct ViewPanelGroup: View {
         } else if tag.isEmpty {
             options.grouping = .none
             if arrangement.isDated { options.sort = arrangement.sort }
-        } else {
+        } else if tag != Self.tag(of: arrangement.grouping) {
             options.grouping = .column(tag)
         }
         options.collapsed = nil

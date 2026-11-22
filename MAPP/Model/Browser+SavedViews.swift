@@ -307,7 +307,7 @@ extension Browser {
         }
         let update = ViewDraft.change(
             window, options: tableOptions[item], seed: seed.options, seedTimelineDate: seed.timelineDate, seededTypes: seed.types,
-            view: view, catalogue: library.catalogue)
+            view: view, catalogue: library.catalogue, replaced: replacedGroups[id] ?? [:])
         return ViewUpdate(view: view, change: update.change, baseVersion: seed.version, unkept: update.unkept)
     }
 

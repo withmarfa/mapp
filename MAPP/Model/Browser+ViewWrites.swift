@@ -63,6 +63,7 @@ extension Browser {
     @discardableResult
     func choicesChanged() -> Task<Void, Never>? {
         let place = item
+        if case .view = place, let before = observedChoices[place] { followDayGrouping(in: place, from: before) }
         let current = liveChoices
         guard let before = observedChoices[place] else {
             observedChoices[place] = current
@@ -74,6 +75,26 @@ extension Browser {
         keepPlaceChoices(of: place)
         guard case .view(let id) = place, viewPanel?.isNew != true else { return nil }
         return scheduleWrite(of: id)
+    }
+
+    /// A view groups by one thing, so its timeline's date and a grouping by that date's day are one setting: a change
+    /// of either moves the other with it. A grouping by anything else leaves the timeline on each type's own date.
+    func followDayGrouping(in place: SidebarItem, from before: ViewChoices) {
+        var options = tableOptions[place] ?? ItemTableOptions()
+        let date = timelineFields[place]
+        if date != before.timelineDate {
+            let grouping: ItemTableOptions.Grouping = date.map { .column(Self.fieldColumnPrefix + $0, by: .bucket(.day)) } ?? .none
+            guard options.grouping != grouping else { return }
+            options.grouping = grouping
+            options.collapsed = nil
+            tableOptions[place] = options
+        } else if options.grouping != before.options.grouping {
+            if case .column(let id, .bucket(.day)) = options.grouping, id.hasPrefix(Self.fieldColumnPrefix) {
+                timelineFields[place] = String(id.dropFirst(Self.fieldColumnPrefix.count))
+            } else if date != nil {
+                timelineFields[place] = nil
+            }
+        }
     }
 
     private func registerChoiceUndo(in place: SidebarItem, from before: ViewChoices, to after: ViewChoices) {
@@ -185,6 +206,7 @@ extension Browser {
         let sent = choices(in: place)
         switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
         case .success(let view):
+            if update.change.group != nil, let replaced = update.view.group { replacedGroups[id, default: [:]][replaced.field] = replaced }
             // The window keeps what it shows: the view is the window's only where the view can hold it all.
             seed(view, catalogue: library.catalogue, keepingWindow: true)
             if choices(in: place) != sent { rewritingViews.insert(id) }

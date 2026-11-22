@@ -11,6 +11,8 @@ nonisolated enum ViewDraft {
         var columns: [ItemTableColumn]
         var sort: [ItemTableComparator]
         var grouping: ItemTableColumn?
+        /// How `grouping` groups: each value, or a date's span.
+        var groupMode: GroupMode = .value
         /// The filters the window applies, in every layout.
         var filters: [String: Set<String>] = [:]
         /// The columns whose filter is Is Not.
@@ -131,7 +133,7 @@ nonisolated enum ViewDraft {
         switch window.layout {
         case .table:
             let sort = sort(window.sort)
-            let group = group(window.grouping)
+            let group = group(window.grouping, mode: window.groupMode)
             return (sort.sort, group.group, sort.unkept + group.unkept)
         case .list(let order):
             let field = switch order.sort {
@@ -143,10 +145,13 @@ nonisolated enum ViewDraft {
             // Today, Yesterday and the rest are the list's own sections, which no bucket of a view's grouping matches.
             return ([sort], nil, order.groupsByDate && order.sort != .title ? [.dateSections] : [])
         case .board(let key, let label):
-            let byTitle = [LibraryViewSort(field: "title", ascending: true)]
-            guard let key else { return (byTitle, nil, []) }
-            guard isPropertyName(key) else { return (byTitle, nil, [.group(column: label)]) }
-            return (byTitle, LibraryViewGroup(field: "properties." + key), [])
+            // The cards follow the sort the window shows them in, which is by title where nothing sorts them.
+            let sort = sort(window.sort)
+            guard let key else { return (sort.sort, nil, sort.unkept) }
+            guard isPropertyName(key) else { return (sort.sort, nil, sort.unkept + [.group(column: label)]) }
+            let column = window.columns.first { $0.id == Browser.fieldColumnPrefix + key }
+            let group = LibraryViewGroup(field: "properties." + key, order: column.map(declaredOrder(of:)) ?? [])
+            return (sort.sort, group, sort.unkept)
         case .calendar:
             return ([], nil, [])
         case .timeline(let key, let label):
@@ -166,8 +171,9 @@ nonisolated enum ViewDraft {
         case .type: "type"
         case .created: "created_at"
         case .edited: "updated_at"
+        case .occurred: "occurred_at"
         case .field(let field): isPropertyName(field.key) ? "properties." + field.key : nil
-        case .parent, .children, .collections, .count, .duration, .occurred, .tags: nil
+        case .parent, .children, .collections, .count, .duration, .tags: nil
         }
     }
 
@@ -178,6 +184,7 @@ nonisolated enum ViewDraft {
         case "type": return "type"
         case "created_at": return "created"
         case "updated_at": return "edited"
+        case "occurred_at": return ItemTableColumn.occurred.id
         case "backref[\(MarfaMapping.parentEdge)]": return ItemTableColumn.parent.id
         default:
             guard field.hasPrefix("properties.") else { return nil }
@@ -202,11 +209,42 @@ nonisolated enum ViewDraft {
         return (sort, unkept)
     }
 
-    static func group(_ column: ItemTableColumn?) -> (group: LibraryViewGroup?, unkept: [Unkept]) {
+    /// The group a view holds for the window's grouping by `column`. A value grouping names the order MAPP lists the
+    /// values in where the column has one (`declaredOrder(of:)`), so other apps list them alike.
+    static func group(_ column: ItemTableColumn?, mode: GroupMode = .value) -> (group: LibraryViewGroup?, unkept: [Unkept]) {
         guard let column else { return (nil, []) }
         if column.content == .parent { return (LibraryViewGroup(field: parentField), []) }
         guard let field = field(of: column) else { return (nil, [.group(column: label(of: column))]) }
-        return (LibraryViewGroup(field: field), [])
+        switch mode {
+        case .value: return (LibraryViewGroup(field: field, order: declaredOrder(of: column)), [])
+        case .bucket(let bucket): return (LibraryViewGroup(field: field, bucket: bucket), [])
+        }
+    }
+
+    /// The order MAPP lists a column's values in, as a view's `group.order`: a status's words by their groups and
+    /// then as declared, a choice's options as declared. Empty for any other column, whose groups follow Marfa's order.
+    static func declaredOrder(of column: ItemTableColumn) -> [JSONValue] {
+        guard let field = column.field else { return [] }
+        let words = field.options.filter { !$0.isEmpty }
+        switch column.style {
+        case .status:
+            return words.enumerated().sorted { (column.rank(of: $0.element), $0.offset) < (column.rank(of: $1.element), $1.offset) }
+                .map { .string($0.element) }
+        case .priority, .choice: return words.map { .string($0) }
+        default: return []
+        }
+    }
+
+    /// The group a write sends in place of `held`, the view's own. Grouping by the same field keeps the groups `held`
+    /// orders and hides, which another app may have set: they name that field's values, whatever the span. Grouping by
+    /// another field drops them, since they name the old field's values, and orders the groups as MAPP lists them.
+    static func kept(_ group: LibraryViewGroup?, from held: LibraryViewGroup?) -> LibraryViewGroup? {
+        guard var group else { return nil }
+        if let held, held.field == group.field {
+            group.order = held.order
+            group.hidden = held.hidden
+        }
+        return group
     }
 
     private static func label(of column: ItemTableColumn) -> String {
@@ -393,16 +431,18 @@ nonisolated enum ViewDraft {
     // MARK: Opening a view
 
     /// The table options a view opens with: its order and grouping, where the table has a column for them.
-    /// A view with no grouping opens ungrouped, and one grouped by what the table cannot show, such as a date by
-    /// month, opens ungrouped too. A view that lists several types opens with a Type filter keeping them.
+    /// A date grouped by day, week, month or year opens grouped so. A view with no grouping opens ungrouped, and one
+    /// grouped by what MAPP cannot show (a link it has no column for, a span of something that is no date) opens
+    /// ungrouped too; its group stays in the view as it is, since a write names it only when the person changes it.
+    /// A view that lists several types opens with a Type filter keeping them.
     static func options(for view: LibraryView, catalogue: Catalogue) -> ItemTableOptions {
         var options = ItemTableOptions()
         let sort = view.sort.compactMap { key in
             columnID(of: key.field).map { ItemTableComparator(column: placeholder($0), order: key.ascending ? .forward : .reverse) }
         }
         options.sort = sort.isEmpty ? nil : sort
-        if let group = view.group, group.bucket == nil, let id = columnID(of: group.field) {
-            options.grouping = .column(id)
+        if let group = view.group, let id = columnID(of: group.field), let mode = mode(of: group, column: id, catalogue: catalogue) {
+            options.grouping = .column(id, by: mode)
         } else {
             options.grouping = .none
         }
@@ -414,6 +454,20 @@ nonisolated enum ViewDraft {
         options.filters = choices.mapValues(\.values)
         options.negated = Set(choices.filter(\.value.isNegated).keys)
         return options
+    }
+
+    /// How the window groups by a view's group, or nil where it cannot: a span needs a date, which an item's own dates
+    /// are and a field is where a type declares it one.
+    private static func mode(of group: LibraryViewGroup, column id: String, catalogue: Catalogue) -> GroupMode? {
+        guard let bucket = group.bucket else { return .value }
+        if [ItemTableColumn.created.id, ItemTableColumn.edited.id, ItemTableColumn.occurred.id].contains(id) { return .bucket(bucket) }
+        guard id.hasPrefix(Browser.fieldColumnPrefix) else { return nil }
+        let key = String(id.dropFirst(Browser.fieldColumnPrefix.count))
+        let isDate = catalogue.itemTypes.values.contains { type in type.fields.contains { field in
+            guard field.key == key, case .date = field.kind else { return false }
+            return true
+        } }
+        return isDate ? .bucket(bucket) : nil
     }
 
     /// The conditions of a view's filter the window has no filter for, as Marfa writes them. Saving a change of filters
@@ -455,7 +509,7 @@ nonisolated enum ViewDraft {
     /// by that order and has no grouping of a view's kind, however the options spell it.
     static func shown(_ options: ItemTableOptions, dated: [ItemTableComparator]?) -> ItemTableOptions {
         guard let dated, options.sort == nil else { return options }
-        if case .column = options.grouping { return options }
+        if options.grouping.columnID != nil { return options }
         var shown = options
         shown.sort = dated
         shown.grouping = .none
@@ -467,14 +521,15 @@ nonisolated enum ViewDraft {
     }
 
     /// The change that saves the window's choices to the view it shows, naming only the settings that differ from
-    /// those it opened with, so a setting the window left alone is never sent. The window's filters take the place
+    /// those it opened with, so a setting the window left alone is never sent. `replaced` holds the view's earlier
+    /// groups by field, whose order and hidden groups come back when the window groups by that field again. The window's filters take the place
     /// of the conditions they showed, so a filter removed in the window is removed from the view; the conditions the
     /// window cannot show stay as they are. A view groups
     /// by one thing, so where the timeline's date and the table's grouping both changed, the layout shown decides
     /// which is kept.
     static func change(
         _ window: Window, options: ItemTableOptions?, seed: ItemTableOptions, seedTimelineDate: String?,
-        seededTypes: [String]?, view: LibraryView, catalogue: Catalogue
+        seededTypes: [String]?, view: LibraryView, catalogue: Catalogue, replaced: [String: LibraryViewGroup] = [:]
     ) -> (change: LibraryViewChange, unkept: [Unkept]) {
         let options = shown(options ?? ItemTableOptions(), dated: window.dated?.sort)
         let seed = shown(seed, dated: window.dated?.sort)
@@ -488,31 +543,42 @@ nonisolated enum ViewDraft {
         }
         let regrouped = options.grouping != seed.grouping
         let redated = window.timelineDate != seedTimelineDate
-        var showsTimeline = false
-        if case .timeline = window.layout { showsTimeline = true }
-        if redated && (showsTimeline || !regrouped) {
-            if let key = window.timelineDate {
-                if isPropertyName(key) {
-                    change.group = .set(LibraryViewGroup(field: "properties." + key, bucket: .day))
+        if regrouped || redated {
+            var showsTimeline = false
+            if case .timeline = window.layout { showsTimeline = true }
+            // In a view the timeline's date and a grouping by its day are one setting (`Browser.followDayGrouping`).
+            let agrees = window.timelineDate.map { options.grouping == .column(Browser.fieldColumnPrefix + $0, by: .bucket(.day)) }
+                ?? (options.grouping.columnID == nil)
+            var target: LibraryViewGroup??
+            if redated && (showsTimeline || !regrouped || agrees) {
+                if let key = window.timelineDate {
+                    if isPropertyName(key) {
+                        target = .some(LibraryViewGroup(field: "properties." + key, bucket: .day))
+                    } else {
+                        unkept.append(.group(column: key))
+                    }
                 } else {
-                    unkept.append(.group(column: key))
+                    target = .some(nil)
+                }
+                if regrouped && !agrees {
+                    unkept.append(.group(column: window.grouping.map(label(of:)) ?? String(localized: "Group")))
+                } else if case .some(let days) = target, let group = view.group, group.bucket != .day, group.field != days?.field {
+                    // The days replace a grouping the view had, which the window did not ask for.
+                    let shown = columnID(of: group.field).flatMap { id in window.columns.first { $0.id == id } }
+                    unkept.append(.group(column: shown.map(label(of:)) ?? String(localized: "Group")))
                 }
             } else {
-                change.group = .clear
+                let group = group(window.grouping, mode: window.groupMode)
+                // A grouping the view cannot hold leaves the view's own as it is.
+                if group.unkept.isEmpty { target = .some(group.group) }
+                unkept += group.unkept
+                if window.dated?.hasSections == true { unkept.append(.dateSections) }
+                if redated { unkept.append(.group(column: String(localized: "Timeline date"))) }
             }
-            if regrouped {
-                unkept.append(.group(column: window.grouping.map(label(of:)) ?? String(localized: "Group")))
-            } else if let group = view.group, group.bucket != .day {
-                // The days replace a grouping the view had, which the window did not change but would lose.
-                let shown = columnID(of: group.field).flatMap { id in window.columns.first { $0.id == id } }
-                unkept.append(.group(column: shown.map(label(of:)) ?? String(localized: "Group")))
+            if let target {
+                let held = view.group.flatMap { $0.field == target?.field ? $0 : nil } ?? target.flatMap { replaced[$0.field] }
+                change.group = kept(target, from: held).map { .set($0) } ?? .clear
             }
-        } else if regrouped {
-            let group = group(window.grouping)
-            change.group = group.group.map { .set($0) } ?? .clear
-            unkept += group.unkept
-            if window.dated?.hasSections == true { unkept.append(.dateSections) }
-            if redated { unkept.append(.group(column: String(localized: "Timeline date"))) }
         }
         if options.filterChoices != seed.filterChoices {
             let filter = replacing(

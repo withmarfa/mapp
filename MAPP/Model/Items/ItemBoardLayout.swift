@@ -106,9 +106,10 @@ nonisolated enum ItemBoardLayout {
     /// The lanes of a board by `key`: the words the items' types declare, a status field's by their group (as the
     /// table lists them) and then in declared order, then No Value, and Invalid Value and Not Applicable where an
     /// item needs them. A board's fields are closed, so a word no type declares is an invalid value. Where the types
-    /// keep their status in different fields (`groupsByStatus`), the lanes are Marfa's status groups instead.
-    static func lanes(items: [Item], key: String, catalogue: Catalogue) -> [ItemBoardLane] {
-        if groupsByStatus(items: items, key: key, catalogue: catalogue) { return groupLanes(items: items, catalogue: catalogue) }
+    /// keep their status in different fields (`groupsByStatus`), the lanes are Marfa's status groups instead. Within a
+    /// lane the cards follow `order`, each item's place in the sort the window shows, or the title where nothing sorts them.
+    static func lanes(items: [Item], key: String, catalogue: Catalogue, order: [ItemID: Int]? = nil) -> [ItemBoardLane] {
+        if groupsByStatus(items: items, key: key, catalogue: catalogue) { return groupLanes(items: items, catalogue: catalogue, order: order) }
         var values: [(word: String, bucket: StatusBucket)] = []
         var isStatus = false
         var seen: Set<String> = []
@@ -137,14 +138,14 @@ nonisolated enum ItemBoardLayout {
         }
         return lanes.map { lane in
             var lane = lane
-            lane.items = sorted(groups[lane.id] ?? [])
+            lane.items = sorted(groups[lane.id] ?? [], by: order)
             return lane
         }
     }
 
     /// The lanes of a board whose types keep their status in different fields: Marfa's four status groups, which
     /// every type shares, then No Status (which holds a type with no status too), and Invalid Value where an item needs it.
-    private static func groupLanes(items: [Item], catalogue: Catalogue) -> [ItemBoardLane] {
+    private static func groupLanes(items: [Item], catalogue: Catalogue, order: [ItemID: Int]?) -> [ItemBoardLane] {
         let groups = Dictionary(grouping: items) { groupedLane(for: $0, catalogue: catalogue) }
         let types = Set(items.map(\.type))
         let fields = types.compactMap { type in eligibleFields(of: type, catalogue: catalogue).first(where: \.isStatus) }
@@ -158,7 +159,7 @@ nonisolated enum ItemBoardLayout {
         }
         return lanes.map { lane in
             var lane = lane
-            lane.items = sorted(groups[lane.id] ?? [])
+            lane.items = sorted(groups[lane.id] ?? [], by: order)
             return lane
         }
     }
@@ -172,8 +173,11 @@ nonisolated enum ItemBoardLayout {
         field.options.first { !$0.isEmpty && field.statusGroup(of: $0) == group }
     }
 
-    private static func sorted(_ items: [Item]) -> [Item] {
-        items.sorted {
+    private static func sorted(_ items: [Item], by order: [ItemID: Int]?) -> [Item] {
+        if let order {
+            return items.sorted { (order[$0.id] ?? .max, $0.id.rawValue) < (order[$1.id] ?? .max, $1.id.rawValue) }
+        }
+        return items.sorted {
             let order = $0.displayTitle.localizedStandardCompare($1.displayTitle)
             return order == .orderedSame ? $0.id.rawValue < $1.id.rawValue : order == .orderedAscending
         }

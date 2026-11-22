@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// A view saved on the server (Marfa's `system.view`): a named list of items that every app shows, with the order and
 /// grouping it suggests. Which layout shows it is each app's own, so a view holds none.
@@ -48,14 +49,20 @@ nonisolated struct LibraryViewSort: Hashable, Sendable {
 }
 
 /// What a view's items are grouped by: a field as a sort names it, or a link as `edge[<type>]` or
-/// `backref[<type>]`. A date field may be grouped by day, week, month or year.
+/// `backref[<type>]`. A date field may be grouped by day, week, month or year. `order` and `hidden` name groups by
+/// their keys as Marfa writes them (a value, a bucket's first day as `YYYY-MM-DD`, or `null`); another app may have
+/// set them, so a write keeps them unless the grouping's field changes (`ViewDraft.kept(_:from:declaredOrder:)`).
 nonisolated struct LibraryViewGroup: Hashable, Sendable {
-    nonisolated enum Bucket: Hashable, Sendable {
+    nonisolated enum Bucket: String, Hashable, Sendable, CaseIterable {
         case day, week, month, year
     }
 
     var field: String
     var bucket: Bucket?
+    /// The groups that come first, in this order.
+    var order: [JSONValue] = []
+    /// The groups the view leaves out, whose items it still lists.
+    var hidden: [JSONValue] = []
 }
 
 /// Everything a new view is saved with.

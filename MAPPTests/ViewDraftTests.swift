@@ -97,7 +97,7 @@ struct ViewDraftTests {
             LibraryViewSort(field: "properties.status", ascending: true),
             LibraryViewSort(field: "updated_at", ascending: false),
         ])
-        #expect(draft.group == LibraryViewGroup(field: "properties.status"))
+        #expect(draft.group == LibraryViewGroup(field: "properties.status", order: ViewDraft.declaredOrder(of: Self.statusColumn)))
         #expect(draft.unkept == [.search("plans"), .sort(column: "Due")])
     }
 
@@ -124,9 +124,8 @@ struct ViewDraftTests {
             ],
             group: LibraryViewGroup(field: "type"))
         let options = ViewDraft.options(for: view, catalogue: Self.catalogue)
-        // A field the table has no column for, here `occurred_at`, is left out of the order.
-        #expect(options.sort?.map(\.column.id) == ["field.status", "edited"])
-        #expect(options.sort?.map(\.order) == [.forward, .reverse])
+        #expect(options.sort?.map(\.column.id) == ["field.status", "occurred", "edited"])
+        #expect(options.sort?.map(\.order) == [.forward, .forward, .reverse])
         #expect(options.grouping == .column("type"))
         #expect(options.filters.isEmpty)
     }
@@ -135,9 +134,9 @@ struct ViewDraftTests {
         let plain = ViewDraft.options(for: LibraryView(id: ItemID("v"), title: "V"), catalogue: Self.catalogue)
         #expect(plain.grouping == .none)
         #expect(plain.sort == nil)
-        // The table groups no dates by month, so a bucketed grouping opens ungrouped.
+        // A date grouped by month opens grouped so.
         let monthly = LibraryView(id: ItemID("v"), title: "V", group: LibraryViewGroup(field: "created_at", bucket: .month))
-        #expect(ViewDraft.options(for: monthly, catalogue: Self.catalogue).grouping == .none)
+        #expect(ViewDraft.options(for: monthly, catalogue: Self.catalogue).grouping == .column("created", by: .bucket(.month)))
     }
 
     @Test func fieldsAndColumnsMapBothWays() {
@@ -173,9 +172,10 @@ struct ViewDraftTests {
         #expect(try draft(.list(ItemOrder(sort: .dateCreated, groupsByDate: false))).sort
             == [LibraryViewSort(field: "created_at", ascending: false)])
 
+        // The board's cards follow the sort the window shows them in, and its lanes keep MAPP's order of the words.
         let board = try draft(.board(key: "status", label: "Status"))
-        #expect(board.group == LibraryViewGroup(field: "properties.status"))
-        #expect(board.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(board.group == LibraryViewGroup(field: "properties.status", order: ViewDraft.declaredOrder(of: Self.statusColumn)))
+        #expect(board.sort == [LibraryViewSort(field: "properties.status", ascending: true)])
         #expect(try draft(.board(key: "due-date", label: "Due")).unkept == [.group(column: "Due")])
 
         let timeline = try draft(.timeline(key: "due_at", label: "Due"))
@@ -426,7 +426,7 @@ struct ViewDraftTests {
         #expect(beside.unkept.isEmpty)
         // With the list grouped by a column too, both are kept.
         let grouped = try #require(Self.draft(Self.window(.allItems, grouping: Self.statusColumn, filters: ["type": ["aic.ticket"]])))
-        #expect(grouped.group == LibraryViewGroup(field: "properties.status"))
+        #expect(grouped.group == LibraryViewGroup(field: "properties.status", order: ViewDraft.declaredOrder(of: Self.statusColumn)))
         #expect(grouped.query.filter == #"type eq "aic.ticket""#)
         // Is Not is a condition.
         let not = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task"]], negated: ["type"])))
