@@ -60,10 +60,14 @@ nonisolated protocol PreferencesCopy: Sendable {
 nonisolated struct WorkingCopyPreferences: PreferencesCopy {
     let copy: WorkingCopy
     let answerFeed: PreferenceAnswers
+    /// Asks the library's sync to send what the copy has queued, which a write does not by itself: the sync sends when the
+    /// copy reconnects and after a write of the library's own.
+    let sendSoon: @Sendable () async -> Void
 
-    init(copy: WorkingCopy, answers: PreferenceAnswers) {
+    init(copy: WorkingCopy, answers: PreferenceAnswers, sendSoon: @escaping @Sendable () async -> Void = {}) {
         self.copy = copy
         answerFeed = answers
+        self.sendSoon = sendSoon
     }
 
     var run: String { answerFeed.run }
@@ -148,12 +152,15 @@ nonisolated struct WorkingCopyPreferences: PreferencesCopy {
         let properties = JSONObject(PreferencesField.allCases.compactMap { field in fields[field].map { (field.rawValue, .object($0)) } })
         let queued = try await MarfaEngine.asking { try await copy.items.create(Draft(type: PreferencesType.id, properties: properties)) }
         guard let id = queued.itemId else { throw MarfaError.invalid(message: "the create named no item") }
+        await sendSoon()
         return id
     }
 
     func update(_ item: String, fields: [PreferencesField: JSONObject], readAt version: Int64) async throws -> String {
         let properties = JSONObject(PreferencesField.allCases.compactMap { field in fields[field].map { (field.rawValue, .object($0)) } })
-        return try await MarfaEngine.asking { try await copy.items.updateAsRead(item, Edit(properties: properties, baseVersion: version)) }.id
+        let queued = try await MarfaEngine.asking { try await copy.items.updateAsRead(item, Edit(properties: properties, baseVersion: version)) }
+        await sendSoon()
+        return queued.id
     }
 
     func queued() async throws -> Set<String> {
@@ -169,10 +176,12 @@ nonisolated struct WorkingCopyPreferences: PreferencesCopy {
             rest = rest.dropFirst(Self.batchLimit)
             _ = try await MarfaEngine.asking { try await copy.tables.write(batch, to: table.rawValue, of: item) }
         }
+        await sendSoon()
     }
 
     func remove(_ item: String) async throws {
         _ = try await MarfaEngine.asking { try await copy.items.delete(item) }
+        await sendSoon()
     }
 
     func send() async throws {

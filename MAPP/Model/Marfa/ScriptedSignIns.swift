@@ -64,13 +64,14 @@ nonisolated final class ScriptedSignIns: SignIns {
 
     /// Keeps what the key held for `connection` really holds, as the server it is held for says (`GET /keys/current`), in
     /// place of the permissions a sign-in asks for. A test server's key then shows a page its permission lacks as
-    /// Needs a Permission, as the shipping app does. A server that does not answer leaves what was held.
-    func adoptScopes(for connection: MarfaConnection) async {
+    /// Needs a Permission, as the shipping app does. A server that does not answer leaves what was held. A key states no
+    /// OAuth scopes, so `scopes` are kept beside them for what the person running the test knows it may do.
+    func adoptScopes(for connection: MarfaConnection, adding scopes: [String] = []) async {
         guard let server = try? held(connection.address), let token = try? key(for: connection.address) else { return }
         guard let key = try? await Client(server).getCurrentKey().ok.body.json else { return }
         save(
             token, for: connection.address, permissions: Set(key.permissions.compactMap { InstancePermission(rawValue: $0.rawValue) }),
-            profile: (try? readsProfile(for: connection)) ?? false)
+            profile: (try? readsProfile(for: connection)) ?? false, scopes: scopes)
     }
 
     /// The permissions each browser or code sign-in asked for, in order.

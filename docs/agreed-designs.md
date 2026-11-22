@@ -49,17 +49,7 @@ Only the agreed changes are listed. A change marked "needs a server change" wait
 
 ### Settings sync through Marfa
 
-Agreed, not built. It needs Marfa to keep `app.*` items hidden and to that app first.
-
-- **One hidden item per Marfa.** MAPP's own settings move into `app.mapp.preferences`, which only MAPP and the owner read. Marfa stores and syncs it and never interprets it.
-- **Its shape.** Fields hold settings that come once (Appearance, General, Editor, Lists, Search). Table rows hold those per command (shortcuts), per type (Layouts), per saved view, per place and per sidebar entry.
-- **What stays on each Mac.** Window sizes and positions, column widths and On This Mac.
-- **A second Mac** that connects to the same Marfa picks the settings up.
-- **Two Macs changing one setting.** The later write wins, row by row, and can be undone from the table's log.
-- **Connection** gets a section "MAPP's Settings" ("Kept in <Marfa>. Every Mac that connects to it uses them.") with Remove…, and a footer naming what stays on each Mac. The Disconnect alert has a checkbox, "Also remove MAPP's settings from <Marfa>", off by default.
-- **Export and Import** may stay, to copy settings between two Marfas.
-- **The owner** can see and remove the settings in Settings and from the command line, and backups include them.
-- Until this is built, the scopes in [Settings storage](settings-storage.md) stand.
+Built: MAPP's settings are kept in one hidden item per Marfa, shown and removed in Connection's MAPP's Settings section, and removed with the Disconnect alert's checkbox. [Settings storage](settings-storage.md) says what is true. Export and Import of settings between two Marfas are not built.
 
 ## Still open
 
