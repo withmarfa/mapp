@@ -36,6 +36,14 @@ nonisolated struct SyncedSetting: Sendable {
     let key: String
     let place: Place
 
+    /// Where the setting's store sets aside a value it cannot read, where it has such a place.
+    var setAsideKind: SetAside? {
+        switch place {
+        case .serverMember(_, let kind), .rows(_, _, _, _, _, let kind), .serverRows(_, _, let kind), .sidebar(let kind): kind
+        case .member, .set, .placeRows: nil
+        }
+    }
+
     /// The defaults keys this setting reads and writes.
     var defaultsKeys: [String] {
         if case .placeRows(_, _, let places) = place { return places.map { "\(key).\($0)" } }

@@ -64,8 +64,9 @@ nonisolated enum PreferencesMerge {
     }
 
     /// The base to reconcile against when the server kept another Mac's value of a field and wrote this Mac's to a
-    /// conflicted copy: each member this Mac wrote there and still holds counts as changed again, so it is written
-    /// over the other's, while the members the other Mac changed come here. Only the same member's later write wins.
+    /// conflicted copy: each member this Mac sent (`conflicted` holds only those) and still holds counts as changed
+    /// again, so it is written over the other's, while the members the other Mac changed come here. Only the same
+    /// member's later write wins.
     static func base(_ base: PreferenceUnits, reclaiming conflicted: PreferenceUnits, local: PreferenceUnits,
                      remote: PreferenceUnits) -> PreferenceUnits
     {
