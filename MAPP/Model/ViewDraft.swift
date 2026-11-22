@@ -11,8 +11,11 @@ nonisolated enum ViewDraft {
         var columns: [ItemTableColumn]
         var sort: [ItemTableComparator]
         var grouping: ItemTableColumn?
-        /// How `grouping` groups: each value, or a date's span.
+        /// How `grouping` groups: each value, a date's span, Set or Not Set, or status groups.
         var groupMode: GroupMode = .value
+        /// The groups the window puts first and leaves out, by key (`GroupKey`).
+        var groupOrder: [String]?
+        var hiddenGroups: Set<String>?
         /// The filters the window applies, in every layout.
         var filters: [String: Set<String>] = [:]
         /// The columns whose filter is Is Not.
@@ -46,8 +49,8 @@ nonisolated enum ViewDraft {
         case table
         /// The list or the gallery, in the list's own order.
         case list(ItemOrder)
-        /// Lanes by a choice field, or none where the board has no field.
-        case board(key: String?, label: String)
+        /// Lanes by the board's grouping, which the window names as the table's (`grouping`, `groupMode`).
+        case board
         /// Days by a date field, or none where the timeline has no field.
         case timeline(key: String?, label: String)
         /// Items placed by their own dates, in no order and no groups of a view's.
@@ -67,8 +70,8 @@ nonisolated enum ViewDraft {
         case refused(String)
         case sort(column: String)
         case group(column: String)
-        /// The list's sections by date, which a view's grouping cannot hold.
-        case dateSections
+        /// A way of grouping a view's group cannot hold yet, such as Set or Not Set, named by its field and its way.
+        case groupMode(column: String, mode: String)
     }
 
     /// The settings a view saves, apart from its title, and what of the window it leaves out.
@@ -133,7 +136,12 @@ nonisolated enum ViewDraft {
         switch window.layout {
         case .table:
             let sort = sort(window.sort)
-            let group = group(window.grouping, mode: window.groupMode)
+            var group = group(window.grouping, mode: window.groupMode)
+            if var held = group.group, let column = window.grouping {
+                if let order = window.groupOrder, !order.isEmpty { held.order = json(order, of: column) }
+                if let hidden = window.hiddenGroups, !hidden.isEmpty { held.hidden = json(hidden.sorted(), of: column) }
+                group.group = held
+            }
             return (sort.sort, group.group, sort.unkept + group.unkept)
         case .list(let order):
             let field = switch order.sort {
@@ -142,16 +150,15 @@ nonisolated enum ViewDraft {
             case .dateCreated: "created_at"
             }
             let sort = LibraryViewSort(field: field, ascending: order.sort == .title)
-            // Today, Yesterday and the rest are the list's own sections, which no bucket of a view's grouping matches.
-            return ([sort], nil, order.groupsByDate && order.sort != .title ? [.dateSections] : [])
-        case .board(let key, let label):
-            // The cards follow the sort the window shows them in, which is by title where nothing sorts them.
-            let sort = sort(window.sort)
-            guard let key else { return (sort.sort, nil, sort.unkept) }
-            guard isPropertyName(key) else { return (sort.sort, nil, sort.unkept + [.group(column: label)]) }
-            let column = window.columns.first { $0.id == Browser.fieldColumnPrefix + key }
-            let group = LibraryViewGroup(field: "properties." + key, order: column.map(declaredOrder(of:)) ?? [])
-            return (sort.sort, group, sort.unkept)
+            // The list's sections by date are that date by day, which a list reads as Today, Yesterday and the rest.
+            let days = order.groupsByDate && order.sort != .title ? LibraryViewGroup(field: field, bucket: .day) : nil
+            return ([sort], days, [])
+        case .board:
+            // The cards follow the sort the window shows them in, which is by title where nothing sorts them, and the lanes
+            // are the board's grouping, kept as the table's is.
+            return arrangement(of: Window(
+                place: window.place, columns: window.columns, sort: window.sort, grouping: window.grouping, groupMode: window.groupMode,
+                groupOrder: window.groupOrder, hiddenGroups: window.hiddenGroups, layout: .table))
         case .calendar:
             return ([], nil, [])
         case .timeline(let key, let label):
@@ -218,7 +225,13 @@ nonisolated enum ViewDraft {
         switch mode {
         case .value: return (LibraryViewGroup(field: field, order: declaredOrder(of: column)), [])
         case .bucket(let bucket): return (LibraryViewGroup(field: field, bucket: bucket), [])
+        case .presence, .statusGroups: return (nil, [.groupMode(column: label(of: column), mode: mode.title)])
         }
+    }
+
+    /// Group keys as a view's lists hold them (`GroupKey.json`): a yes-or-no column's as bools.
+    static func json(_ keys: [String], of column: ItemTableColumn) -> [JSONValue] {
+        keys.compactMap { GroupKey.json($0, booleans: column.style == .boolean) }
     }
 
     /// The order MAPP lists a column's values in, as a view's `group.order`: a status's words by their groups and
@@ -443,6 +456,10 @@ nonisolated enum ViewDraft {
         options.sort = sort.isEmpty ? nil : sort
         if let group = view.group, let id = columnID(of: group.field), let mode = mode(of: group, column: id, catalogue: catalogue) {
             options.grouping = .column(id, by: mode)
+            let order = group.order.compactMap(GroupKey.key(of:))
+            let hidden = Set(group.hidden.compactMap(GroupKey.key(of:)))
+            options.groupOrder = order.isEmpty ? nil : order
+            options.hiddenGroups = hidden.isEmpty ? nil : hidden
         } else {
             options.grouping = .none
         }
@@ -497,23 +514,29 @@ nonisolated enum ViewDraft {
     /// date its timeline shows.
     static func differs(
         _ options: ItemTableOptions?, timelineDate: String?, from seed: ItemTableOptions, seedTimelineDate: String?,
-        dated: [ItemTableComparator]? = nil
+        dated: Dated? = nil
     ) -> Bool {
         let options = shown(options ?? ItemTableOptions(), dated: dated)
         let seed = shown(seed, dated: dated)
-        return options.filterChoices != seed.filterChoices || options.grouping != seed.grouping
+        return options.filterChoices != seed.filterChoices || options.grouping != seed.grouping || reorders(options, from: seed)
             || sortKeys(options.sort) != sortKeys(seed.sort) || timelineDate != seedTimelineDate
     }
 
-    /// The options as a list that shows its own order shows them: with no sort and no column to group by it is ordered
-    /// by that order and has no grouping of a view's kind, however the options spell it.
-    static func shown(_ options: ItemTableOptions, dated: [ItemTableComparator]?) -> ItemTableOptions {
+    /// The options as a list that shows its starting order shows them: with no sort and no column to group by it is
+    /// ordered by that order and grouped by its date by day where it shows sections, however the options spell it.
+    static func shown(_ options: ItemTableOptions, dated: Dated?) -> ItemTableOptions {
         guard let dated, options.sort == nil else { return options }
         if options.grouping.columnID != nil { return options }
         var shown = options
-        shown.sort = dated
-        shown.grouping = .none
+        shown.sort = dated.sort
+        shown.grouping = dated.hasSections ? dated.sort.first.map { .column($0.column.id, by: .bucket(.day)) } ?? .none : .none
         return shown
+    }
+
+    /// Whether the groups put first or left out differ, which a grouping that changed starts afresh.
+    static func reorders(_ options: ItemTableOptions, from seed: ItemTableOptions) -> Bool {
+        options.grouping == seed.grouping
+            && ((options.groupOrder ?? []) != (seed.groupOrder ?? []) || (options.hiddenGroups ?? []) != (seed.hiddenGroups ?? []))
     }
 
     static func sortKeys(_ sort: [ItemTableComparator]?) -> [String]? {
@@ -531,8 +554,8 @@ nonisolated enum ViewDraft {
         _ window: Window, options: ItemTableOptions?, seed: ItemTableOptions, seedTimelineDate: String?,
         seededTypes: [String]?, view: LibraryView, catalogue: Catalogue, replaced: [String: LibraryViewGroup] = [:]
     ) -> (change: LibraryViewChange, unkept: [Unkept]) {
-        let options = shown(options ?? ItemTableOptions(), dated: window.dated?.sort)
-        let seed = shown(seed, dated: window.dated?.sort)
+        let options = shown(options ?? ItemTableOptions(), dated: window.dated)
+        let seed = shown(seed, dated: window.dated)
         var change = LibraryViewChange()
         var unkept: [Unkept] = []
         if let search = window.search { unkept.append(.search(search)) }
@@ -572,13 +595,17 @@ nonisolated enum ViewDraft {
                 // A grouping the view cannot hold leaves the view's own as it is.
                 if group.unkept.isEmpty { target = .some(group.group) }
                 unkept += group.unkept
-                if window.dated?.hasSections == true { unkept.append(.dateSections) }
                 if redated { unkept.append(.group(column: String(localized: "Timeline date"))) }
             }
             if let target {
                 let held = view.group.flatMap { $0.field == target?.field ? $0 : nil } ?? target.flatMap { replaced[$0.field] }
                 change.group = kept(target, from: held).map { .set($0) } ?? .clear
             }
+        } else if reorders(options, from: seed), var group = view.group, let column = window.grouping {
+            // The same grouping with other groups first or left out: Marfa's `group.order` and `group.hidden`.
+            group.order = json(options.groupOrder ?? [], of: column)
+            group.hidden = json((options.hiddenGroups ?? []).sorted(), of: column)
+            change.group = .set(group)
         }
         if options.filterChoices != seed.filterChoices {
             let filter = replacing(

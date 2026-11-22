@@ -31,19 +31,21 @@ enum SavedViews {
         let search = browser.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         // The order and grouping come from what the layout shows (`arrangement`), which is what the panel shows too.
         let layoutShows = arrangement(browser, content: content, order: browser.storedOrder)
+        // The grouping the layout shows: a board's lanes, the place's grouping, or the starting order's dates by day.
         var grouping: ItemTableColumn?
         var groupMode = GroupMode.value
-        if case .column(let id, let mode) = layoutShows.grouping, content.grouping?.id == id {
-            grouping = content.grouping
+        if case .column(let id, let mode) = browser.shownGrouping(in: library), let column = content.columns.first(where: { $0.id == id }) {
+            grouping = column
             groupMode = mode
         }
         var seededTypes: [String]?
         if case .view(let id) = browser.item { seededTypes = browser.viewSeeds[id]?.types }
         return ViewDraft.Window(
             place: browser.item, columns: content.columns, sort: layoutShows.sort, grouping: grouping, groupMode: groupMode,
+            groupOrder: options.groupOrder, hiddenGroups: options.hiddenGroups,
             filters: options.filters, negated: options.negated, search: search.isEmpty ? nil : search,
             layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.item],
-            seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.grouping == .date) : nil,
+            seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.hasDateSections) : nil,
             includesSubtypes: browser.stacksSubtypes(in: library))
     }
 
@@ -66,9 +68,7 @@ enum SavedViews {
             guard let order, browser.listShape?.arranged != true else { return .table }
             return .list(order)
         case .board:
-            let fields = browser.boardFieldChoices(in: library)
-            let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: browser.item), available: fields)
-            return .board(key: field?.key, label: field?.label ?? "")
+            return .board
         case .calendar:
             return .calendar
         case .timeline:
@@ -84,10 +84,10 @@ enum SavedViews {
         settings.cards = browser.cards
         settings.density = browser.density
         if browser.viewMode == .calendar { settings.calendarScale = browser.calendarScale }
+        settings.hidesEmptyGroups = browser.hidesEmptyGroups
         if case .view(let id) = browser.item {
             let held = browser.macSettings(for: id)
             settings.columns = held.columns
-            settings.hidesEmptyGroups = held.hidesEmptyGroups
             settings.calendarScale = held.calendarScale
         } else {
             let stored = browser.defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()
@@ -107,19 +107,14 @@ enum SavedViews {
 
     // MARK: What the layout uses
 
-    /// How the layout beside the panel groups: by a column, by date, or not at all.
-    enum ShownGrouping: Hashable {
-        case none
-        case date
-        case column(String, by: GroupMode = .value)
-    }
-
-    /// The order and grouping the layout beside the panel really uses, which the panel shows and the window's
-    /// choices become a view's from. The list and the gallery order and group by date (`ItemOrder`) unless the
-    /// person or the view arranged them; the table, the board and the timeline use the table's own sort and grouping.
+    /// The order the layout beside the panel really uses, which the panel shows and the window's choices become a
+    /// view's from. The list and the gallery take the starting order Settings > Lists gives (`ItemOrder`) unless the
+    /// person or the view arranged them; the table, the board and the timeline use the place's own sort. How each
+    /// groups is `Browser.shownGrouping`.
     struct Arrangement {
         var sort: [ItemTableComparator]
-        var grouping: ShownGrouping
+        /// Whether the starting order shows its sections by date.
+        var hasDateSections = false
         /// Whether the list's own date order applies, so a choice made here arranges the list.
         var isDated: Bool
     }
@@ -133,16 +128,11 @@ enum SavedViews {
 
     static func arrangement(_ browser: Browser, content: ItemTableContent, order: ItemOrder) -> Arrangement {
         guard !isArranged(browser) else {
-            var grouping: ShownGrouping = content.grouping.map { .column($0.id, by: content.groupMode) } ?? .none
-            // The table groups by status on its own; an arranged list or gallery groups only by a column asked for.
-            if browser.viewMode == .list || browser.viewMode == .gallery {
-                if case .column(let id, let mode)? = browser.tableOptions[browser.item]?.grouping { grouping = .column(id, by: mode) } else { grouping = .none }
-            }
             // The board sorts its cards by title where nothing sorts them, which is what it then shows and keeps.
             if browser.viewMode == .board, browser.tableOptions[browser.item]?.sort?.isEmpty != false {
-                return Arrangement(sort: [ItemTableComparator(column: .title)], grouping: grouping, isDated: false)
+                return Arrangement(sort: [ItemTableComparator(column: .title)], isDated: false)
             }
-            return Arrangement(sort: content.sort, grouping: grouping, isDated: false)
+            return Arrangement(sort: content.sort, isDated: false)
         }
         return datedArrangement(order)
     }
@@ -155,7 +145,7 @@ enum SavedViews {
         case .title: .title
         }
         let sort = ItemTableComparator(column: column, order: order.sort == .title ? .forward : .reverse)
-        return Arrangement(sort: [sort], grouping: order.groupsByDate && order.sort != .title ? .date : .none, isDated: true)
+        return Arrangement(sort: [sort], hasDateSections: order.groupsByDate && order.sort != .title, isDated: true)
     }
 
     static func describe(_ unkept: ViewDraft.Unkept) -> String {
@@ -167,7 +157,7 @@ enum SavedViews {
         case .refused(let message): String(localized: "A filter Marfa refuses: \(message)")
         case .sort(let column): String(localized: "Sorting by \(column)")
         case .group(let column): String(localized: "Grouping by \(column)")
-        case .dateSections: String(localized: "The list’s sections by date")
+        case .groupMode(let column, let mode): String(localized: "Group by \(column): \(mode)")
         }
     }
 }

@@ -13,7 +13,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     }
 
     /// Where the table groups: by a column, each value or a date's span, or not at all. Nil is the place's own grouping.
-    /// Stored as `none`, `column:<id>` for each value, or `<bucket>:<id>` (`week:field.due_at`) for a date's span.
+    /// Stored as `none`, `column:<id>` for each value, `<bucket>:<id>` (`week:field.due_at`) for a date's span,
+    /// `presence:<id>` for Set or Not Set, or `groups:<id>` for a status's groups.
     enum Grouping: Encodable, Equatable, Sendable {
         case none
         case column(String, by: GroupMode = .value)
@@ -32,6 +33,10 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
             guard !id.isEmpty else { return nil }
             if head == "column" {
                 self = .column(id)
+            } else if head == "presence" {
+                self = .column(id, by: .presence)
+            } else if head == "groups" {
+                self = .column(id, by: .statusGroups)
             } else if let bucket = LibraryViewGroup.Bucket(rawValue: head) {
                 self = .column(id, by: .bucket(bucket))
             } else {
@@ -44,6 +49,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
             case .none: "none"
             case .column(let id, .value): Self.columnPrefix + id
             case .column(let id, .bucket(let bucket)): bucket.rawValue + ":" + id
+            case .column(let id, .presence): "presence:" + id
+            case .column(let id, .statusGroups): "groups:" + id
             }
         }
 
@@ -57,6 +64,11 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     var layout: ItemViewMode?
     var sort: [SortKey] = []
     var grouping: Grouping?
+    /// The groups put first, in order, and those left out, by key (`GroupKey`).
+    var groupOrder: [String] = []
+    var hiddenGroups: [String] = []
+    /// Whether a group with no items is left out.
+    var hidesEmptyGroups = false
     var filters: [String: [String]] = [:]
     var negated: [String] = []
     /// The date field the timeline places its items on.
@@ -75,6 +87,9 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         layout = try container.decodeIfPresent(ItemViewMode.self, forKey: .layout)
         sort = try container.decodeIfPresent([SortKey].self, forKey: .sort) ?? []
         grouping = try container.decodeIfPresent(String.self, forKey: .grouping).flatMap(Grouping.init(word:))
+        groupOrder = try container.decodeIfPresent([String].self, forKey: .groupOrder) ?? []
+        hiddenGroups = try container.decodeIfPresent([String].self, forKey: .hiddenGroups) ?? []
+        hidesEmptyGroups = try container.decodeIfPresent(Bool.self, forKey: .hidesEmptyGroups) ?? false
         filters = try container.decodeIfPresent([String: [String]].self, forKey: .filters) ?? [:]
         negated = try container.decodeIfPresent([String].self, forKey: .negated) ?? []
         timelineField = try container.decodeIfPresent(String.self, forKey: .timelineField)
@@ -105,6 +120,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         case .column(let id, let mode): Grouping.column(id, by: mode)
         }
         grouping = held
+        groupOrder = options.groupOrder ?? []
+        hiddenGroups = (options.hiddenGroups ?? []).sorted()
         let kept = options.filters.filter { !$0.value.isEmpty }
         filters = kept.mapValues { $0.sorted() }
         negated = options.negated.filter { kept[$0] != nil }.sorted()
@@ -129,6 +146,9 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         }
         if options.grouping != grouping { options.collapsed = nil }
         options.grouping = grouping
+        let keepsGroups = grouping != .automatic
+        options.groupOrder = keepsGroups && !groupOrder.isEmpty ? groupOrder : nil
+        options.hiddenGroups = keepsGroups && !hiddenGroups.isEmpty ? Set(hiddenGroups) : nil
         let filters = filters.filter { isKept($0.key) && !$0.value.isEmpty }
         options.filters = filters.mapValues(Set.init)
         options.negated = Set(negated.filter { filters[$0] != nil })

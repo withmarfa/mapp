@@ -194,7 +194,10 @@ struct NavigationCostTests {
                 line(name, "sort[\(column.id)]", median { _ = ItemTableLayout.sorted(content.allRows, by: [comparator]) })
             }
             let items = browser.items(in: library)
-            line(name, "boardFields", median { _ = ItemBoardLayout.availableFields(items: items, catalogue: library.catalogue) })
+            line(name, "groupOffer", median {
+                browser.groupOfferMemo = nil
+                _ = browser.groupOffer(in: library)
+            })
             line(name, "timelineFields", median { _ = ItemTimelineLayout.fields(for: items, catalogue: library.catalogue) })
         }
     }

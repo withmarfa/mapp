@@ -20,7 +20,8 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     case galleryCard
     /// One placing of the soft selection's marks on a list or table.
     case softSelection
-    case boardFields
+    /// One working out of what Group by offers (`GroupOffer.make`).
+    case groupOffer
     case timelineFields
     /// One build of the item page's header, from the library and the window's drafts.
     case pageHeader

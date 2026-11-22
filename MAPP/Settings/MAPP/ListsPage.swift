@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The Lists page: how much each row says and the order every list takes until a view or a place chooses its own. What a
+/// The Lists page: how much each row says, and the starting order of a place's list: the sort and the sections by date a
+/// place shows until its own Sort by or Group by is chosen in View Options. What a
 /// list leaves out belongs to Search, never here.
 struct ListsPage: View {
     @AppStorage(ListKey.density) private var density = Density.standard
@@ -18,8 +19,8 @@ struct ListsPage: View {
                     selection: $density)
                     .accessibilityIdentifier("ListsDensity")
             }
-            SettingsSection("Order") {
-                SettingsRow("Sort By", line: "A view or a place can set its own.") {
+            SettingsSection("Order", line: "The order a place starts in until you change its Sort by or Group by in View Options.") {
+                SettingsRow("Sort By") {
                     SettingsPopUp(title: "Sort By", selection: $sort) {
                         ForEach(ItemSort.allCases, id: \.self) { Text($0.title).tag($0) }
                     }

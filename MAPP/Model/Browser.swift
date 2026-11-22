@@ -96,24 +96,6 @@ final class Browser {
         let viewItems: [ItemID]?
     }
 
-    /// The lanes a board of the place's items can group by, kept like the layouts above: the fields come from the
-    /// types the items have, which change only with the library's membership or catalogue, so an edit asks nothing
-    /// of the items. The View menu, the palette and a saved view's draft all ask here.
-    func boardFieldChoices(in library: any ItemLibrary) -> [ItemBoardField] {
-        let derived = fieldsKey(in: library)
-        if let held = fieldsMemo, held.key == derived.key, let fields = held.board { return fields }
-        let fields = ItemBoardLayout.availableFields(items: derived.items ?? items(in: library), catalogue: library.catalogue)
-        fieldsMemo = FieldsMemo(key: derived.key, board: fields, timeline: fieldsMemo?.key == derived.key ? fieldsMemo?.timeline : nil)
-        return fields
-    }
-
-    /// The field a place's board makes its lanes of, where the place groups by that field's value. A date span does not
-    /// set the lanes.
-    func boardFieldKey(in place: SidebarItem) -> String? {
-        guard case .column(let id, .value)? = tableOptions[place]?.grouping, id.hasPrefix(Self.fieldColumnPrefix) else { return nil }
-        return String(id.dropFirst(Self.fieldColumnPrefix.count))
-    }
-
     /// Where each item stands in the sort the board's cards follow: the place's sort where the person or the view set
     /// one, else nil, which keeps the cards by title.
     func boardCardOrder(in library: any ItemLibrary) -> [ItemID: Int]? {
@@ -122,21 +104,16 @@ final class Browser {
         return Dictionary(rows.enumerated().map { ($0.element.item.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
     }
 
-    /// Makes `key`'s field the place's board lanes (and its group).
-    func setBoardField(_ key: String, in place: SidebarItem) {
-        tableOptions[place, default: .init()].grouping = .column(Self.fieldColumnPrefix + key)
-        tableOptions[place, default: .init()].collapsed = nil
-    }
-
     /// How a field's column is named among the table's columns (`ItemTableLayout.columns`).
     nonisolated static let fieldColumnPrefix = "field."
 
-    /// The date fields a timeline of the place's items can place them on, kept as `boardFieldChoices` is.
+    /// The date fields a timeline of the place's items can place them on: the fields come from the types the items have,
+    /// which change only with the library's membership or catalogue, so an edit asks nothing of the items.
     func timelineFieldChoices(in library: any ItemLibrary) -> [ItemTypeInfo.Field] {
         let derived = fieldsKey(in: library)
         if let held = fieldsMemo, held.key == derived.key, let fields = held.timeline { return fields }
         let fields = ItemTimelineLayout.fields(for: derived.items ?? items(in: library), catalogue: library.catalogue)
-        fieldsMemo = FieldsMemo(key: derived.key, board: fieldsMemo?.key == derived.key ? fieldsMemo?.board : nil, timeline: fields)
+        fieldsMemo = FieldsMemo(key: derived.key, timeline: fields)
         return fields
     }
 
@@ -164,7 +141,6 @@ final class Browser {
 
     private struct FieldsMemo {
         let key: FieldsKey
-        var board: [ItemBoardField]?
         var timeline: [ItemTypeInfo.Field]?
     }
 
@@ -184,6 +160,8 @@ final class Browser {
     @ObservationIgnored private var sectionsMemo: (key: SectionsKey, sections: [ItemSection])?
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
+    /// The last Group by offer, while the table's content and the layout it was made for stand (`Browser+Grouping`).
+    @ObservationIgnored var groupOfferMemo: GroupOfferMemo?
     /// The content of the list's rows, held between passes (`Browser+Rows`).
     @ObservationIgnored let rowContents = RowContents()
     /// The person's chosen looks for this library's types, which the window's root seeds and keeps current (`RootView`).
@@ -497,8 +475,8 @@ final class Browser {
         let arranged = options.sort != nil || grouped
         guard arranged || options.isFiltering else { return nil }
         var shape = options.settled
-        shape.collapsed = nil
         if !arranged {
+            shape.collapsed = nil
             shape.sort = nil
             shape.grouping = .automatic
         }
@@ -513,10 +491,31 @@ final class Browser {
             return sectionsUnmeasured(of: content.kept.map(\.item), order: order, now: now)
         }
         // The table groups a place by status on its own; the list does only what a view or the person asked for.
-        guard shape.options.grouping.columnID != nil, content.grouping != nil else {
+        guard shape.options.grouping.columnID != nil, let column = content.grouping else {
             return content.rows.isEmpty ? [] : [ItemSection(group: nil, items: content.rows.map(\.item))]
         }
-        return content.groups.map { ItemSection(group: .custom(id: $0.id, title: $0.title), items: $0.rows.map(\.item)) }
+        let collapsed = content.collapsed
+        // An item's own date by day reads in a list as the list's sections always have: Today, Yesterday, Previous 7
+        // Days, Previous 30 Days, then months and years.
+        if content.groupMode == .bucket(.day), [ItemTableColumn.created.id, ItemTableColumn.edited.id, ItemTableColumn.occurred.id].contains(column.id) {
+            var sections: [ItemSection] = []
+            for row in content.groups.flatMap(\.rows) {
+                let group = column.date(of: row, calendar: .current).map { ItemGroup.group(for: $0, now: now) }
+                if let last = sections.last, last.group == group {
+                    sections[sections.count - 1].items.append(row.item)
+                } else {
+                    sections.append(ItemSection(group: group, items: [row.item]))
+                }
+            }
+            return sections.map { section in
+                var section = section
+                section.isCollapsed = section.group.map { collapsed.contains($0.key) } ?? false
+                return section
+            }
+        }
+        return content.groups.map {
+            ItemSection(group: .custom(id: $0.id, title: $0.title), items: $0.rows.map(\.item), isCollapsed: collapsed.contains($0.id))
+        }
     }
 
     /// The items the open place shows in the layouts that arrange them themselves (the board, the timeline): the
@@ -544,7 +543,8 @@ final class Browser {
         let keyed = (tableOptions[item] ?? ItemTableOptions()).settled
         let derived = derivedKey(in: library)
         let key = TableKey(
-            derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, counts: library.counts.revision)
+            derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, counts: library.counts.revision,
+            hidesEmpty: hidesEmptyGroups)
         if let held = tableMemo, held.key == key { return held.content }
         let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
         tableMemo = (key, content)
@@ -601,6 +601,7 @@ final class Browser {
         let shownRelations: Set<Relation>
         /// A changed or evicted answer invalidates the cached table rows.
         let counts: Int
+        let hidesEmpty: Bool
     }
 
     /// The links the table's shown columns hold, which its rows read besides those the looks and the options name.
@@ -746,6 +747,7 @@ final class Browser {
         writingViews = []
         pendingViewWrites = []
         placeCards = [:]
+        placeHidesEmptyGroups = [:]
         placeCalendarScales = [:]
         calendarDay = nil
         showsCalendarMonth = false
@@ -915,6 +917,8 @@ final class Browser {
     var placeCards: [SidebarItem: ViewCards] = [:]
     /// The scale of each place's calendar that is not a saved view, as its default view keeps it (`calendarScale`).
     var placeCalendarScales: [SidebarItem: CalendarScale] = [:]
+    /// The places whose default view leaves out the groups with no items.
+    var placeHidesEmptyGroups: [SidebarItem: Bool] = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.
     var calendarDay: Date?
     /// Counts the moves of the calendar by its buttons, menu or keys, so the month card can follow one that leaves the day as it was.

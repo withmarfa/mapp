@@ -21,6 +21,8 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case cantJoinCollection
         case fullOfTags
         case cantMoveToLane
+        /// Its type requires the field a Not Set lane would clear.
+        case needsValue
         /// A file, which has no lane to move to.
         case fileHasNoLane
         /// Selected, but not on the board now, as when a search or filter has hidden it since.
@@ -54,6 +56,7 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case .cantJoinCollection: String(localized: "\(count) items can’t be filed in a collection.")
         case .fullOfTags: String(localized: "\(count) items already have the most tags an item can have.")
         case .cantMoveToLane: String(localized: "\(count) items can’t go in this lane.")
+        case .needsValue: String(localized: "\(count) items need a value there, so it can’t be cleared.")
         case .fileHasNoLane: String(localized: "\(count) items are files, which can’t be moved between lanes.")
         case .notShown: String(localized: "\(count) items aren’t on this board.")
         }

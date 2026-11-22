@@ -1,26 +1,34 @@
 import Foundation
 
-nonisolated struct ItemBoardField: Identifiable, Hashable, Sendable {
-    let key: String
-    let label: String
-    /// Whether the field is a status field, which a board offers first.
-    var isStatus = false
-    var id: String { key }
-}
-
 nonisolated struct ItemBoardLane: Identifiable, Hashable, Sendable {
     enum ID: Hashable, Sendable {
         case option(String), group(StatusGroup), missing, invalid, notApplicable
+        /// A group of any other grouping, by its key (`GroupKey`): a date's span, Set, a type, a parent.
+        case key(String)
     }
 
     let id: ID
     let title: String
+    /// The lane's key as a view's `group.order` and `group.hidden` name it (`GroupKey`).
+    var groupKey: String {
+        switch id {
+        case .option(let word): word
+        case .group(let group): group.rawValue
+        case .missing: isNotSet ? GroupKey.notSet : GroupKey.none
+        case .invalid: "\u{1}invalid"
+        case .notApplicable: GroupKey.notApplicable
+        case .key(let key): key
+        }
+    }
+
     /// The status mark its header carries, on a board of a status field or of status groups.
     var symbol: StatusSymbol?
     var items: [Item]
     /// Whether a card can be dropped here. A lane of a board that mixes status fields takes a card only where every
     /// type has a word in the group, and never the lane of items with no status.
     var takesItems = true
+    /// Whether it is Set or Not Set's Not Set, which a card dropped in clears its field for.
+    var isNotSet = false
 }
 
 /// A board is a projection of the current library, never a second store of its items.
@@ -41,26 +49,6 @@ nonisolated enum ItemBoardLayout {
         }
     }
 
-    static func availableFields(items: [Item], catalogue: Catalogue) -> [ItemBoardField] {
-        Cost.measure(.boardFields) { availableFieldsUnmeasured(items: items, catalogue: catalogue) }
-    }
-
-    private static func availableFieldsUnmeasured(items: [Item], catalogue: Catalogue) -> [ItemBoardField] {
-        var seen: Set<String> = []
-        var result: [ItemBoardField] = []
-        for type in Set(items.map(\.type)).sorted(by: { $0.rawValue < $1.rawValue }) {
-            for field in eligibleFields(of: type, catalogue: catalogue) {
-                guard seen.insert(field.key).inserted else { continue }
-                result.append(ItemBoardField(key: field.key, label: field.label, isStatus: field.isStatus))
-            }
-        }
-        return result.filter(\.isStatus) + result.filter { !$0.isStatus }
-    }
-
-    static func selectedField(_ preferred: String?, available: [ItemBoardField]) -> ItemBoardField? {
-        available.first { $0.key == preferred } ?? available.first
-    }
-
     static func field(_ key: String, of item: Item, catalogue: Catalogue) -> ItemTypeInfo.Field? {
         eligibleFields(of: item.type, catalogue: catalogue).first { $0.key == key }
     }
@@ -68,14 +56,6 @@ nonisolated enum ItemBoardLayout {
     /// The first status field of an item's type: the one a board of mixed status fields sorts the item by.
     static func statusField(of item: Item, catalogue: Catalogue) -> ItemTypeInfo.Field? {
         eligibleFields(of: item.type, catalogue: catalogue).first(where: \.isStatus)
-    }
-
-    /// Whether the board of `items` sorts by Marfa's status groups: it mixes types and groups by a status field, so no
-    /// one type's words can be every card's lane. A board of one type keeps that type's own words.
-    static func groupsByStatus(items: [Item], key: String, catalogue: Catalogue) -> Bool {
-        let types = Set(items.map(\.type))
-        guard types.count > 1 else { return false }
-        return types.contains { eligibleFields(of: $0, catalogue: catalogue).first(where: \.isStatus)?.key == key }
     }
 
     /// The key whose value puts an item in the Invalid Value lane: its own status field where the board sorts by
@@ -106,10 +86,13 @@ nonisolated enum ItemBoardLayout {
     /// The lanes of a board by `key`: the words the items' types declare, a status field's by their group (as the
     /// table lists them) and then in declared order, then No Value, and Invalid Value and Not Applicable where an
     /// item needs them. A board's fields are closed, so a word no type declares is an invalid value. Where the types
-    /// keep their status in different fields (`groupsByStatus`), the lanes are Marfa's status groups instead. Within a
-    /// lane the cards follow `order`, each item's place in the sort the window shows, or the title where nothing sorts them.
-    static func lanes(items: [Item], key: String, catalogue: Catalogue, order: [ItemID: Int]? = nil) -> [ItemBoardLane] {
-        if groupsByStatus(items: items, key: key, catalogue: catalogue) { return groupLanes(items: items, catalogue: catalogue, order: order) }
+    /// keep their status in different fields, or the person groups by them (`statusGroups`), the lanes are Marfa's
+    /// status groups instead. Within a lane the cards follow `order`, each item's place in the sort the window shows, or
+    /// the title where nothing sorts them.
+    static func lanes(
+        items: [Item], key: String, catalogue: Catalogue, order: [ItemID: Int]? = nil, statusGroups: Bool = false
+    ) -> [ItemBoardLane] {
+        if statusGroups { return groupLanes(items: items, catalogue: catalogue, order: order) }
         var values: [(word: String, bucket: StatusBucket)] = []
         var isStatus = false
         var seen: Set<String> = []
@@ -183,13 +166,49 @@ nonisolated enum ItemBoardLayout {
         }
     }
 
+    /// The lanes of any other grouping, from its groups (`ItemTableLayout.groups`): only Not Set takes a card, which
+    /// clears the field; a date's span, Set and the rest take none, since MAPP would have to invent a value.
+    static func lanes(of groups: [ItemTableGroup], mode: GroupMode, order: [ItemID: Int]? = nil) -> [ItemBoardLane] {
+        groups.map { group in
+            let items = sorted(group.rows.map(\.item), by: order)
+            switch group.id {
+            case GroupKey.notApplicable:
+                return ItemBoardLane(id: .notApplicable, title: group.title, items: items, takesItems: false)
+            case GroupKey.notSet where mode == .presence:
+                return ItemBoardLane(id: .missing, title: group.title, items: items, isNotSet: true)
+            default:
+                return ItemBoardLane(id: .key(group.id), title: group.title, items: items, takesItems: false)
+            }
+        }
+    }
+
+    /// The lanes in a view's or a place's order, less the hidden ones and, where Hide Empty Groups is on, the empty ones.
+    static func arranged(_ lanes: [ItemBoardLane], order: [String]?, hidden: Set<String>?, hidesEmpty: Bool) -> [ItemBoardLane] {
+        var arranged = lanes
+        if let order, !order.isEmpty {
+            let named = order.compactMap { key in lanes.first { $0.groupKey == key } }
+            let keys = Set(named.map(\.groupKey))
+            arranged = named + lanes.filter { !keys.contains($0.groupKey) }
+        }
+        let hidden = hidden ?? []
+        return arranged.filter { !hidden.contains($0.groupKey) && !(hidesEmpty && $0.items.isEmpty) }
+    }
+
     enum Move: Equatable, Sendable {
         case set(PropertyValue?), unchanged, refused
+        /// The field must hold a value, so it can't be cleared.
+        case needsValue
     }
 
     /// The destination belongs to the board, but permission and allowed choices belong to this item's type.
     static func move(_ item: Item, key: String, to destination: ItemBoardLane.ID, catalogue: Catalogue) -> Move {
         if case .group(let group) = destination { return move(item, toGroup: group, catalogue: catalogue).move }
+        // Clearing suits any field the type declares, as Set or Not Set's Not Set does.
+        if destination == .missing, item.isEditable, let info = catalogue.itemTypes[item.type],
+           key != "title", key != info.titleKey, key != info.bodyKey, let declared = info.fields.first(where: { $0.key == key }) {
+            guard !declared.required else { return .needsValue }
+            return item.value(of: key) == nil ? .unchanged : .set(nil)
+        }
         guard item.isEditable, let field = field(key, of: item, catalogue: catalogue) else { return .refused }
         let value: PropertyValue?
         switch destination {
@@ -197,10 +216,7 @@ nonisolated enum ItemBoardLayout {
             guard !option.isEmpty else { return .refused }
             if !field.options.contains(option) { return .refused }
             value = .string(option)
-        case .missing:
-            guard !field.required else { return .refused }
-            value = nil
-        case .group, .invalid, .notApplicable: return .refused
+        case .group, .invalid, .notApplicable, .key, .missing: return .refused
         }
         if item.value(of: key) == value { return .unchanged }
         return .set(value)
@@ -248,6 +264,7 @@ nonisolated enum ItemBoardLayout {
             case .set(let value): plan.changes.append((id, writeKey, value))
             case .unchanged: break
             case .refused: plan.skips.skip(item.writeObstacle ?? (item.isFile ? .fileHasNoLane : .cantMoveToLane))
+            case .needsValue: plan.skips.skip(item.writeObstacle ?? .needsValue)
             }
         }
         return plan

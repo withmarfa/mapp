@@ -170,7 +170,8 @@ struct ViewGroupKeptTests {
         window.place = .itemType(Self.task.rawValue)
         let draft = try #require(ViewDraft.draft(window, catalogue: Self.catalogue, views: []))
         #expect(draft.group?.order == [.string("todo"), .string("doing"), .string("done")])
-        window.layout = .board(key: "priority", label: "Priority")
+        window.layout = .board
+        window.grouping = Self.priorityColumn
         window.sort = [ItemTableComparator(column: Self.dueColumn, order: .forward)]
         let board = try #require(ViewDraft.draft(window, catalogue: Self.catalogue, views: []))
         #expect(board.group == LibraryViewGroup(field: "properties.priority", order: [.string("low"), .string("high")]))

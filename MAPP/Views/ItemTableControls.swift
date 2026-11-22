@@ -18,9 +18,10 @@ struct FilterCommands: View {
 }
 
 /// The table's part of View Options (`CurrentViewOptions`): Sort, Group and the columns shown. Sort and Group are the
-/// place's, for the window; the columns shown are kept for the place (`ItemTableColumnLayouts`), or stored for a saved
-/// view (`Browser.setColumn`). A saved view's list
-/// and gallery take its Sort and Group too, without the table's rows at a time and columns (`columns` false).
+/// place's, kept in its default view or written to its saved view; the columns shown are kept for the place
+/// (`ItemTableColumnLayouts`), or stored for a saved view (`Browser.setColumn`). The list and the gallery of every place
+/// take the same Sort and Group, without the table's rows at a time and columns (`columns` false), and show the starting
+/// order Settings > Lists gives until the place has its own.
 struct ItemTableViewOptions: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
@@ -29,10 +30,11 @@ struct ItemTableViewOptions: View {
 
     var body: some View {
         let content = browser.tableContent(in: library)
-        let controls = Controls(browser: browser, content: content, stored: $storedColumns)
+        let controls = Controls(browser: browser, content: content, stored: $storedColumns, choosesFromFields: !columns)
         controls.sortPicker
+            .disabled(browser.keepsPlaceOrder)
         Divider()
-        controls.groupPicker
+        GroupByMenu(browser: browser)
         if columns {
             Divider()
             controls.pageSizePicker
@@ -46,31 +48,28 @@ private struct Controls {
     @Binding var options: ItemTableOptions
     let columns: [ItemTableColumn]
     let sort: [ItemTableComparator]
-    let grouping: ItemTableColumn?
-    let groupMode: GroupMode
     let browser: Browser
     @Binding var stored: Data
+    /// The columns Sort by offers: those the table shows, or for a list or gallery every field its types can sort by.
+    private let choices: [ItemTableColumn]
 
-    init(browser: Browser, content: ItemTableContent, stored: Binding<Data>) {
+    init(browser: Browser, content: ItemTableContent, stored: Binding<Data>, choosesFromFields: Bool) {
         self.browser = browser
         _options = Binding { browser.tableOptions[browser.item] ?? ItemTableOptions() } set: { browser.tableOptions[browser.item] = $0 }
         columns = content.columns
-        sort = content.sort
-        grouping = content.grouping
-        groupMode = content.groupMode
-        categorical = content.categoricalColumns
+        sort = SavedViews.arrangement(browser, content: content, order: browser.storedOrder).sort
         relevance = browser.isSearching ? Binding { browser.ordersByRelevance } set: { browser.orderSearch(byRelevance: $0) } : nil
         _stored = stored
+        choices = choosesFromFields ? content.sortChoices : browser.shownColumns(content.columns, stored: stored.wrappedValue)
     }
 
-    private let categorical: [ItemTableColumn]
     /// Whether the rows are in search order, where the window searches; nil where it does not.
     private let relevance: Binding<Bool>?
 
     // MARK: Sort
 
     var sortPicker: some View {
-        let first = sort.first
+        let first = browser.ordersByRelevance ? nil : sort.first
         return Group {
             Picker("Sort by", systemImage: "arrow.up.arrow.down", selection: Binding { first?.column.id ?? "" } set: { id in
                 guard let column = columns.first(where: { $0.id == id }) else {
@@ -79,19 +78,19 @@ private struct Controls {
                     return
                 }
                 relevance?.wrappedValue = false
-                options.sort = [ItemTableComparator(column: column, order: column.firstOrder)]
+                browser.chooseSort([ItemTableComparator(column: column, order: column.firstOrder)])
             }) {
                 if relevance != nil {
                     Text("Relevance").tag("")
                     Divider()
                 }
-                ForEach(shownColumns) { Text($0.label).tag($0.id) }
+                ForEach(choices) { Text($0.label).tag($0.id) }
             }
             .pickerStyle(.menu)
             .accessibilityIdentifier("ItemTableSort")
             Picker("Order", selection: Binding { first?.order ?? .forward } set: { order in
                 guard let first else { return }
-                options.sort = [ItemTableComparator(column: first.column, order: order)] + sort.dropFirst()
+                browser.chooseSort([ItemTableComparator(column: first.column, order: order)] + sort.dropFirst())
             }) {
                 Text(first?.column.ascendingTitle ?? String(localized: "Ascending")).tag(SortOrder.forward)
                 Text(first?.column.descendingTitle ?? String(localized: "Descending")).tag(SortOrder.reverse)
@@ -99,26 +98,6 @@ private struct Controls {
             .pickerStyle(.inline)
             .disabled(first == nil)
         }
-    }
-
-    // MARK: Group
-
-    var groupPicker: some View {
-        Picker("Group by", systemImage: "rectangle.grid.1x2", selection: Binding { grouping?.id ?? "" } set: { id in
-            guard id != grouping?.id else { return }
-            options.grouping = id.isEmpty ? .none : .column(id)
-            options.collapsed = nil
-        }) {
-            Text("None").tag("")
-            Divider()
-            // A date grouped by its span, as a view may be, shows as it is.
-            if let grouping, let bucket = groupMode.bucket {
-                Text(verbatim: "\(grouping.label): \(bucket.title)").tag(grouping.id)
-            }
-            ForEach(categorical) { Text($0.label).tag($0.id) }
-        }
-        .pickerStyle(.menu)
-        .accessibilityIdentifier("ItemTableGroup")
     }
 
     // MARK: Page size
@@ -133,7 +112,6 @@ private struct Controls {
 
     // MARK: Columns
 
-    private var shownColumns: [ItemTableColumn] { browser.shownColumns(columns, stored: stored) }
 
     var columnsMenu: some View {
         Menu("Columns", systemImage: "tablecells") {

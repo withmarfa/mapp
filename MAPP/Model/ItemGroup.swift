@@ -12,6 +12,20 @@ nonisolated enum ItemGroup: Hashable {
     /// A group of a saved view or of the table's grouping, by a field's value; `id` is the value.
     case custom(id: String, title: String)
 
+    /// The section's key, as the list's folded groups name it (`ItemTableOptions.collapsed`).
+    var key: String {
+        switch self {
+        case .favorites: "\u{1}favorites"
+        case .today: "\u{1}today"
+        case .yesterday: "\u{1}yesterday"
+        case .previous7Days: "\u{1}previous7Days"
+        case .previous30Days: "\u{1}previous30Days"
+        case .month(let year, let month): "\u{1}month-\(year)-\(month)"
+        case .year(let year): "\u{1}year-\(year)"
+        case .custom(let id, _): id
+        }
+    }
+
     func title(calendar: Calendar = .current) -> String {
         switch self {
         case .favorites: String(localized: "Favorites")
@@ -83,6 +97,8 @@ nonisolated struct ItemSection: Identifiable, Hashable {
     /// No group means the items are listed without a heading.
     var group: ItemGroup?
     var items: [Item]
+    /// Whether the person folded the section, which then lists its heading alone.
+    var isCollapsed = false
 
     var id: ItemGroup? { group }
 }
