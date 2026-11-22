@@ -5,10 +5,15 @@ import SwiftUI
 /// discard it with them. The text of what would be lost is shown, since it is the only copy. It sits in the middle of the
 /// Settings window, as a sheet of the parts does.
 struct DepartureSheet: View {
+    @Environment(Libraries.self) private var libraries
     let model: MarfaSettingsModel
     let departure: MarfaSettingsModel.Departure
 
     private var isDisconnecting: Bool { departure.kind == .disconnect }
+
+    private var words: ConnectionSettings {
+        ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries))
+    }
 
     /// Whether the copy is one a different version of the app made. This version can't send what it holds, so keeping the
     /// copy does not send it on connecting again.
@@ -51,12 +56,29 @@ struct DepartureSheet: View {
                 .settingsFont(.small)
                 .foregroundStyle(SettingsTokens.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+                if departure.holdsSettingsRemoval {
+                    Text(verbatim: words.removalWaiting)
+                        .settingsFont(.small)
+                        .foregroundStyle(SettingsTokens.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("DepartureRemovalWaiting")
+                }
+                if isDisconnecting, model.offersSettingsRemoval {
+                    Toggle(words.disconnectChoice, isOn: Bindable(model).alsoRemovesSettings)
+                        .toggleStyle(.checkbox)
+                        .accessibilityIdentifier("DepartureRemoveSettings")
+                    Text(verbatim: words.sendsWaitingChanges)
+                        .settingsFont(.small)
+                        .foregroundStyle(SettingsTokens.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         } buttons: {
             if canDiscard {
                 SettingsButton(isDisconnecting ? "Discard Changes and Disconnect" : "Discard Changes and Switch", role: .destructive) {
                     Task { await model.answer(.discardCopy) }
                 }
+                .disabled(model.alsoRemovesSettings)
                 .accessibilityIdentifier("DepartureDiscard")
             }
             Spacer(minLength: 0)

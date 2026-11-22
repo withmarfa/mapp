@@ -48,8 +48,16 @@ nonisolated protocol PreferencesCopy: Sendable {
     func answers() async -> [String: PreferenceAnswer]
     /// Writes one batch of rows to a table, all of them or none.
     func write(_ operations: [RowOperation], to table: PreferencesTable, of item: String) async throws
-    /// Moves an item to the bin.
-    func remove(_ item: String) async throws
+    /// Moves an item to the bin, and answers the id of the queued write that does it.
+    func remove(_ item: String) async throws -> String
+    /// The queued writes that move a settings item to the bin and have no answer yet.
+    func pendingRemovals() async throws -> Set<String>
+    /// Whether the queue holds a write the server has not answered that is not one of these items' own, such as the
+    /// library's: sending the queue sends it too.
+    func holdsOtherChanges(besides items: Set<String>) async throws -> Bool
+    /// Sends the queue and returns once the server has taken every one of `writes`; throws where it did not. A drain
+    /// sends the whole queue, so what happens to any other write does not count.
+    func send(_ writes: Set<String>) async throws
     /// Each change the copy names: the item it changed, or nil for a refresh such as a fill of tables or an answer.
     func changes() -> AsyncStream<String?>
 }
@@ -58,10 +66,14 @@ nonisolated protocol PreferencesCopy: Sendable {
 nonisolated struct WorkingCopyPreferences: PreferencesCopy {
     let copy: WorkingCopy
     let answerFeed: PreferenceAnswers
+    /// Asks the library's sync to send what the copy has queued, which a write does not by itself: the sync sends when the
+    /// copy reconnects and after a write of the library's own.
+    let sendSoon: @Sendable () async -> Void
 
-    init(copy: WorkingCopy, answers: PreferenceAnswers) {
+    init(copy: WorkingCopy, answers: PreferenceAnswers, sendSoon: @escaping @Sendable () async -> Void = {}) {
         self.copy = copy
         answerFeed = answers
+        self.sendSoon = sendSoon
     }
 
     var run: String { answerFeed.run }
@@ -146,12 +158,15 @@ nonisolated struct WorkingCopyPreferences: PreferencesCopy {
         let properties = JSONObject(PreferencesField.allCases.compactMap { field in fields[field].map { (field.rawValue, .object($0)) } })
         let queued = try await MarfaEngine.asking { try await copy.items.create(Draft(type: PreferencesType.id, properties: properties)) }
         guard let id = queued.itemId else { throw MarfaError.invalid(message: "the create named no item") }
+        await sendSoon()
         return id
     }
 
     func update(_ item: String, fields: [PreferencesField: JSONObject], readAt version: Int64) async throws -> String {
         let properties = JSONObject(PreferencesField.allCases.compactMap { field in fields[field].map { (field.rawValue, .object($0)) } })
-        return try await MarfaEngine.asking { try await copy.items.updateAsRead(item, Edit(properties: properties, baseVersion: version)) }.id
+        let queued = try await MarfaEngine.asking { try await copy.items.updateAsRead(item, Edit(properties: properties, baseVersion: version)) }
+        await sendSoon()
+        return queued.id
     }
 
     func queued() async throws -> Set<String> {
@@ -167,10 +182,51 @@ nonisolated struct WorkingCopyPreferences: PreferencesCopy {
             rest = rest.dropFirst(Self.batchLimit)
             _ = try await MarfaEngine.asking { try await copy.tables.write(batch, to: table.rawValue, of: item) }
         }
+        await sendSoon()
     }
 
-    func remove(_ item: String) async throws {
-        _ = try await MarfaEngine.asking { try await copy.items.delete(item) }
+    func remove(_ item: String) async throws -> String {
+        let queued = try await MarfaEngine.asking { try await copy.items.delete(item) }
+        await sendSoon()
+        return queued.id
+    }
+
+    func pendingRemovals() async throws -> Set<String> {
+        let writes = try await MarfaEngine.asking { try await copy.queue.all() }.filter { $0.kind == .deleteItem && $0.verdict == nil }
+        let named = writes.compactMap(\.itemId)
+        guard !named.isEmpty else { return [] }
+        let rows = try await MarfaEngine.asking { try await copy.items.get(named, includingBin: true) }.rows
+        let ours = Set(rows.filter { $0.type == PreferencesType.id }.map(\.id))
+        return Set(writes.filter { $0.itemId.map(ours.contains) ?? false }.map(\.id))
+    }
+
+    func holdsOtherChanges(besides items: Set<String>) async throws -> Bool {
+        try await MarfaEngine.asking { try await copy.queue.all() }.contains { write in
+            write.verdict == nil && !write.waiting && !(write.itemId.map(items.contains) ?? false)
+        }
+    }
+
+    func send(_ writes: Set<String>) async throws {
+        let report = try await MarfaEngine.asking { try await copy.queue.drain() }
+        let held = try await MarfaEngine.asking { try await copy.queue.all() }
+        var answers: [String: Verdict?] = [:]
+        for write in held { answers.updateValue(write.verdict, forKey: write.id) }
+        for told in report.verdicts { answers.updateValue(told.verdict, forKey: told.id) }
+        guard Self.taken(writes, answers: answers) else {
+            throw MarfaError.invalid(message: "the server did not take every write asked for")
+        }
+    }
+
+    /// Whether every one of `writes` was answered as applied. `answers` holds the verdict of each write the queue still
+    /// holds or the drain reported; a write in neither was answered and cleared. Another write's refusal says nothing.
+    static func taken(_ writes: Set<String>, answers: [String: Verdict?]) -> Bool {
+        writes.allSatisfy { write in
+            guard let answer = answers[write] else { return true }
+            switch answer {
+            case .accepted, .merged, .conflicted: return true
+            default: return false
+            }
+        }
     }
 
     func changes() -> AsyncStream<String?> {

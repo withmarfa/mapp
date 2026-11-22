@@ -19,6 +19,20 @@ actor FakePreferencesCopy: PreferencesCopy {
     private(set) var updates: [[PreferencesField]] = []
     private(set) var batches: [PreferencesTable: Int] = [:]
     private(set) var removed: [String] = []
+    private(set) var sends = 0
+    /// Whether the server takes what is sent; false stands for a server that does not answer.
+    var delivers = true
+    /// Writes the library queued, which the settings do not own, until a send takes them.
+    private(set) var libraryWrites: Set<String> = []
+    /// The library's writes a send has taken.
+    private(set) var sentLibraryWrites: Set<String> = []
+    /// Removals queued and not yet taken, by write id.
+    private(set) var queuedRemovals: [String: String] = [:]
+    /// Writes made to an item already in the bin.
+    private(set) var writesToBinned = 0
+    private var pausedItems: CheckedContinuation<Void, Never>?
+    private var pausesNextItems = false
+    private var isPaused = false
     private var made = 0
     private nonisolated let stream = AsyncStream<String?>.makeStream()
     /// Runs once, the next time an item's settings are read, as a person's change made while a step reads.
@@ -58,6 +72,20 @@ actor FakePreferencesCopy: PreferencesCopy {
     func forget(_ id: String) { held[id] = nil }
 
     func set(_ readiness: PreferencesReadiness) { readinessValue = readiness }
+
+    /// A change the person made to the library, queued and not yet sent.
+    func queueLibraryWrite(_ id: String = "library-write") { libraryWrites.insert(id) }
+
+    /// The next read of the items waits until `resume()`, as a step does while the copy answers slowly.
+    func pauseNextItems() { pausesNextItems = true }
+
+    var isHoldingItems: Bool { isPaused }
+
+    func resume() {
+        isPaused = false
+        pausedItems?.resume()
+        pausedItems = nil
+    }
 
     /// An item another Mac made, with its settings.
     @discardableResult
@@ -110,7 +138,12 @@ actor FakePreferencesCopy: PreferencesCopy {
     func readiness() async throws -> PreferencesReadiness { readinessValue }
 
     func items() async throws -> [PreferencesItem] {
-        held.filter { !$0.value.trashed }
+        if pausesNextItems {
+            pausesNextItems = false
+            isPaused = true
+            await withCheckedContinuation { pausedItems = $0 }
+        }
+        return held.filter { !$0.value.trashed }
             .map { PreferencesItem(id: $0.key, version: $0.value.version, createdAt: $0.value.createdAt, isConflictedCopy: $0.value.conflicted) }
             .sorted { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
     }
@@ -148,6 +181,7 @@ actor FakePreferencesCopy: PreferencesCopy {
 
     func update(_ item: String, fields: [PreferencesField: JSONObject], readAt version: Int64) async throws -> String {
         updates.append(fields.keys.sorted { $0.rawValue < $1.rawValue })
+        if held[item]?.trashed == true { writesToBinned += 1 }
         let write = "write-\(writeIDs.count + 1)"
         writeIDs.append(write)
         for (field, object) in fields { held[item]?.fields[field] = Self.members(object) }
@@ -159,6 +193,7 @@ actor FakePreferencesCopy: PreferencesCopy {
 
     func write(_ operations: [RowOperation], to table: PreferencesTable, of item: String) async throws {
         batches[table, default: 0] += 1
+        if held[item]?.trashed == true { writesToBinned += 1 }
         for operation in operations {
             switch operation {
             case .put(let id?, let values):
@@ -169,10 +204,28 @@ actor FakePreferencesCopy: PreferencesCopy {
         }
     }
 
-    func remove(_ item: String) async throws {
+    func remove(_ item: String) async throws -> String {
         removed.append(item)
         held[item]?.trashed = true
+        let write = "removal-\(removed.count)"
+        queuedRemovals[write] = item
+        return write
     }
+
+    func pendingRemovals() async throws -> Set<String> { Set(queuedRemovals.keys) }
+
+    func holdsOtherChanges(besides items: Set<String>) async throws -> Bool { !libraryWrites.isEmpty }
+
+    /// A send takes the whole queue, as a drain does, when the server answers.
+    func send(_ writes: Set<String>) async throws {
+        sends += 1
+        guard delivers else { throw MarfaError.invalid(message: "the server did not answer") }
+        sentLibraryWrites.formUnion(libraryWrites)
+        libraryWrites = []
+        queuedRemovals = [:]
+    }
+
+    func setDelivers(_ delivers: Bool) { self.delivers = delivers }
 
     nonisolated func changes() -> AsyncStream<String?> { stream.stream }
 

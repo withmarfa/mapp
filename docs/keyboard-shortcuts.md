@@ -4,7 +4,7 @@ Status: Built, not yet released. The shortcuts that work in any app must be trie
 
 Where it lives: `Shortcut`, `ShortcutCommand`, `ShortcutBindings`, `ShortcutsFile`, `AnyAppShortcuts` and `SystemHotKeys` under `MAPP/Model/Shortcuts/`, `FrontBrowser` and the catalogue of commands (an extension of `ShortcutCommand`) under `MAPP/Views/`, and `KeyboardPage`, `KeyboardPageModel` and `KeyboardFiles` under `MAPP/Settings/MAPP/`.
 
-Settings > Keyboard gives every menu command MAPP adds a shortcut that its person can change. It replaces the old Keyboard Shortcuts window, and Help > Keyboard Shortcuts opens the page. The shortcuts stay on this Mac and are never written to Marfa ([Settings storage](settings-storage.md)).
+Settings > Keyboard gives every menu command MAPP adds a shortcut that its person can change. It replaces the old Keyboard Shortcuts window, and Help > Keyboard Shortcuts opens the page. The shortcuts are kept with MAPP's other settings, so every Mac that connects to the same Marfa uses them ([Settings storage](settings-storage.md)).
 
 ## Menu commands
 

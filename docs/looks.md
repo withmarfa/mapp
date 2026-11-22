@@ -14,9 +14,9 @@ A look says how one type is drawn. Every view of that type, whether a list, a ga
 - A child type takes its parent's look, place by place, along Marfa's `parent` chain, at most ten types up. It does so only through types whose fields suggest the same preset: a place under an entity gets Place, not the entity's Person, and a repository under an entity gets Note. A parent the server lacks ends the walk.
 - A person edits a type's look in Settings > Layouts ([Settings pages](settings.md#layouts)) or imports a file of them; until then the presets are the looks.
 - A view adds little: its layout, its density, and which date, picture and facts it shows. Everything else comes from the type.
-- Looks are kept on this Mac for each server, with an export (`TypeLooks`). The store holds only what was chosen, place by place; every other look is worked out each time, so a better preset improves every look nobody chose. A density is not part of a look: a saved view keeps its own and a place keeps its own on this Mac. See [Settings storage](settings-storage.md).
+- Looks are kept for each server, in the defaults and synced through the Marfa, with an export (`TypeLooks`). The store holds only what was chosen, place by place; every other look is worked out each time, so a better preset improves every look nobody chose. A density is not part of a look: a saved view keeps its own and a place keeps its own. See [Settings storage](settings-storage.md).
 - `TypeLooks.looks(in:library:)` is the one way to resolve looks: it works out every type's look once. A caller holds the result for a catalogue revision and a set of choices, and never resolves in a row's body. A type the catalogue lacks has no entry.
-- A look is never written to Marfa.
+- A look syncs with MAPP's other settings, as a row of the `types` table, never as an item's own data.
 
 ## What a look holds
 

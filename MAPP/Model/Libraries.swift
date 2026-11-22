@@ -87,6 +87,7 @@ import os
                 anyAppShortcuts.reload()
             })
         marfaSettings = MarfaSettingsModel(host: host)
+        marfaSettings.settingsKept = .over(preferences)
         self.instanceSettings = instanceSettings ?? InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
         self.instanceSettings.onSaved = { [host] answer, settings, address in host.instanceSaved(answer, changing: settings, of: address) }
         isLaunching = host.configuredConnection != nil
@@ -117,7 +118,9 @@ import os
         // The copy's own server, since a switch opens the new copy before the host keeps its address.
         let connection = source.connection
         preferences.attach(
-            WorkingCopyPreferences(copy: source.copy, answers: source.preferenceAnswers), library: Self.libraryKey(for: connection.address),
+            WorkingCopyPreferences(
+                copy: source.copy, answers: source.preferenceAnswers, sendSoon: { [engine = source.engine] in await engine.sync.drain() }),
+            library: Self.libraryKey(for: connection.address),
             name: { [host] in host.instanceName(for: connection) })
     }
 
@@ -290,10 +293,15 @@ import os
                 host.presetTestServer(connection)
                 // The key holds what the server says it holds, so a key without an owner's permissions shows Needs a Permission.
                 Task {
-                    await signIns.adoptScopes(for: connection)
+                    // The test key is MAPP's own, which may write the settings' type, as a sign-in asks (`SystemSignIns`).
+                    await signIns.adoptScopes(for: connection, adding: [PreferencesType.vendorScope])
                     await host.refreshGrants()
                 }
-                return Libraries(host: host, defaults: defaults)
+                // `-MAPPSyncSettings` keeps MAPP's settings in the test server's item, as a real sign-in does. The pages
+                // read the standard defaults, so the sync follows those, which this debug build starts empty.
+                guard ProcessInfo.processInfo.arguments.contains("-MAPPSyncSettings") else { return Libraries(host: host, defaults: defaults) }
+                UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier ?? "")
+                return Libraries(host: host, defaults: .standard, syncsPreferences: true)
             }
             let sample = SampleLibrary.connection
             let host = MarfaHost(

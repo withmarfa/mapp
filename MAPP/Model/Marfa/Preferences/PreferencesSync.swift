@@ -60,6 +60,8 @@ final class PreferencesSync {
     @ObservationIgnored private var listening: Task<Void, Never>?
     @ObservationIgnored private var pending: Task<Void, Never>?
     @ObservationIgnored private var running = false
+    /// Above zero while a removal is under way: no step runs.
+    @ObservationIgnored private var holding = 0
     @ObservationIgnored private var again = false
     @ObservationIgnored private var waiting: [CheckedContinuation<Void, Never>] = []
     @ObservationIgnored private var observer: (any NSObjectProtocol)?
@@ -133,11 +135,41 @@ final class PreferencesSync {
 
     // MARK: For Connection's section
 
+    /// Why a removal did not go ahead or did not finish.
+    nonisolated enum RemovalError: Error, Equatable {
+        /// The queue holds changes that are not the settings', which sending the removal would send too.
+        case otherChangesWait
+        /// The server did not take the removal; it stays queued and is sent when the copy next reaches the server.
+        case notTaken
+    }
+
     /// Moves every settings item of this Marfa to the bin. The settings on this Mac stay as they are, and nothing is
     /// written to the Marfa until `startAgain()`.
-    func remove() async throws {
+    ///
+    /// With `confirmed`, it returns only once the server has taken the removal, which a sign-out needs, and throws where
+    /// it could not. Sending is of the whole queue, so unless the caller says it may send the library's other changes
+    /// (`sendsOtherChanges`), a queue that holds any is left alone and the removal is not made: changes the person
+    /// chose to discard never reach the server this way.
+    func remove(confirmed: Bool = false, sendsOtherChanges: Bool = true) async throws {
         guard let copy else { return }
-        for held in try await copy.items() { try await copy.remove(held.id) }
+        let generation = generation
+        pending?.cancel()
+        pending = nil
+        // A step under way ends first, and none starts until the items are in the bin, so none writes to a binned item
+        // or sets the standing over `removed`.
+        holding += 1
+        defer {
+            holding -= 1
+            if holding == 0 { schedule(after: .milliseconds(300)) }
+        }
+        await run()
+        guard generation == self.generation else { return }
+        let held = try await copy.items()
+        if confirmed, !sendsOtherChanges, try await copy.holdsOtherChanges(besides: Set(held.map(\.id))) {
+            throw RemovalError.otherChangesWait
+        }
+        var writes: Set<String> = []
+        for settings in held { writes.insert(try await copy.remove(settings.id)) }
         item = nil
         standing = .off(.removed)
         if let instance = try await copy.readiness().instance {
@@ -145,6 +177,16 @@ final class PreferencesSync {
             record.marfas[instance]?.removed = true
             record.save(defaults)
         }
+        if confirmed {
+            do { try await copy.send(writes) } catch { throw RemovalError.notTaken }
+        }
+    }
+
+    /// Whether any of the writes named (the ones a copy has not sent, as the departure question lists them) is the removal
+    /// of the settings from the Marfa.
+    func isRemovalWaiting(among writes: Set<String>) async -> Bool {
+        guard let copy, !writes.isEmpty, let removals = try? await copy.pendingRemovals() else { return false }
+        return !removals.isDisjoint(with: writes)
     }
 
     /// Keeps this Mac's settings in the Marfa again after they were removed: the next item is made from them, even
@@ -201,7 +243,7 @@ final class PreferencesSync {
     private struct Moved: Error {}
 
     private func step() async {
-        guard let copy else { return }
+        guard let copy, holding == 0 else { return }
         let generation = generation
         do {
             let ready = try await copy.readiness()
@@ -398,7 +440,7 @@ final class PreferencesSync {
         if switched { outcome.toLocal.formUnion(Set(local.units.keys).union(outcome.merged.keys)) }
         try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: retrying, in: copy)
         // Every write is judged above, by its answer or its conflicted copy, so the copies have nothing left to give.
-        for sibling in siblings { try await copy.remove(sibling.id) }
+        for sibling in siblings { _ = try await copy.remove(sibling.id) }
         item = chosen
         return adopted
     }

@@ -4,7 +4,7 @@ Status: General, Appearance, Editor, Lists, Layouts, Search, On This Mac and Con
 
 Where it lives: `GeneralPage`, `AppearancePage`, `EditorPage`, `ListsPage`, `LayoutsPage`, `LayoutTypePage`, `LayoutChoices`, `EditorOptions`, `LineSpacing`, `ParagraphSpacing`, `IndentWith`, `PasteAs`, `EditingMode`, `StartWith`, `ReopenWindows`, `NewItemType`, `WeekStart`, `DateFormat`, `DateDisplay`, `MissingChoice`, `MacSettings`, `AppTheme`, `AccentChoice`, `HighlightChoice`, `FontChoice`, `MAPP/Settings/`, `MAPP/Model/`, `MAPP/Views/`, `SearchPage`, `SearchOptions`, `SearchLeaveOutList`, `OnThisMacPage`, `LibraryExport`, `StoreSize`, `ConnectionPage`, `ConnectionStanding` and `ConnectionAccount`.
 
-Every setting here is a Mac setting, kept in the defaults and never written to Marfa ([Settings storage](settings-storage.md)).
+Every setting here is kept in the defaults on this Mac, and synced through the connected Marfa except what stays on each Mac ([Settings storage](settings-storage.md)).
 
 ## General
 
@@ -18,7 +18,7 @@ Every setting here is a Mac setting, kept in the defaults and never written to M
   - Week Starts On is System Setting or a day. Every calendar and date panel MAPP draws starts its week there (`Calendar.mapp`).
   - Date Format is System Setting, Numeric (27/10/2026), Abbreviated (27 Oct 2026) or Long (27 October 2026), and Time Format is System Setting, 12-Hour or 24-Hour. They apply wherever MAPP writes a date or a time, as a person reads it: lists, tables, the inspector, the calendar's hour gutter and its blocks, the timeline's Now marker and day heading, the date panel's time field and quick dates, a collection's Created and Updated, and the dates the Settings pages show. A time typed in the date panel reads back in either clock. A calendar's month and day names are not dates in this sense and follow the language only. System Setting keeps each place's own way, in the Mac's formats. An event's header is laid out in the event's own zone and ignores them.
 - **Privacy.** Pictures from Websites (Ask, Always or Never) and Send Error Reports. The second shows only in a build that carries a place to send reports to.
-- **Reset.** Reset MAPP's Settings… asks first with an alert; Cancel changes nothing. It resets every setting MAPP keeps on this Mac and leaves the copy, the queue, the sign-in and the connection alone ([Reset](settings-storage.md#reset)).
+- **Reset.** Reset MAPP's Settings… asks first with an alert; Cancel changes nothing. It resets every setting MAPP keeps, in the Marfa too where they sync, and leaves the copy, the queue, the sign-in and the connection alone ([Reset](settings-storage.md#reset)).
 
 ## Appearance
 
@@ -84,7 +84,8 @@ Not built: the board's Color row (a type's color comes from its icon, which the 
 - **The head** names the server and how it stands: Connected with how long ago it was up to date, Not Answering with Try Again, or Sign In… and Use a Code Instead… once the server has ended the sign-in. A copy that stopped shows no download progress.
 - **Account.** Signed In As, always shown while the sign-in is held, also while the server does not answer. Its value is the owner's name, which the server tells only to a sign-in that holds the profile name read scope: MAPP asks for it at every sign-in, and a Mac signed in before that has an empty value whose line says "Allow More… lets MAPP read the owner's name." The row has no button; the one Allow More… on the page is Look After This Marfa's, which also gives the name. Look After This Marfa ("MAPP holds N of the owner's 14 permissions" with Allow More…, or All 14, counted as a key's and an app's pages count them) and Unsent Changes. Allow More… asks for every permission not held, `sign_ins.manage` included, which is never asked at sign-in. Problems, the changes that need the person, follow Account.
 - **Other Marfas** and **Disconnect** follow every rule of [Marfa library](../MAPP/Model/Marfa/AGENTS.md): the queue is read in the same step, and the Departure sheet asks about changes that wait. Disconnect asks first with an alert: "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." The server deletes the webhooks an app made when its sign-in ends (`events/webhook-grant-revoked`).
-- **Not built.** The section "MAPP's Settings" and the alert's "Also remove MAPP's settings" wait for settings to sync through Marfa ([Agreed designs](agreed-designs.md#settings-sync-through-marfa)). The state after the sign-in address changed (a head that says where the server moved to) is not built: MAPP cannot learn the new address.
+- **MAPP's Settings** follows Account, and Disconnect's alert has the checkbox "Also remove MAPP's settings from <Marfa>", off by default ([Settings storage](settings-storage.md#connections-mapps-settings-section)).
+- **Not built.** The state after the sign-in address changed (a head that says where the server moved to) is not built: MAPP cannot learn the new address.
 
 ## Related pages
 

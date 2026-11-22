@@ -71,6 +71,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         var unsent: UnsentChanges?
         /// More changes arrived after the person was shown the others, so they are asked again.
         var isAskedAgain = false
+        /// One of the changes is the removal of MAPP's settings from the Marfa, which has no text to show.
+        var holdsSettingsRemoval = false
     }
 
     nonisolated enum Choice: Hashable, Sendable {
@@ -94,6 +96,48 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     @ObservationIgnored private var signingIn: Task<Void, Never>?
     /// Whether the person is asked to confirm a disconnect that has nothing waiting.
     var isConfirmingDisconnect = false
+
+    /// MAPP's own settings in the Marfa, as a disconnect can remove them first.
+    struct SettingsKept {
+        /// Whether the settings are kept in the connected Marfa now, which decides whether Disconnect offers to remove them.
+        var isKept: @MainActor () -> Bool
+        /// Moves them to the bin and returns once the server has taken that; throws a `PreferencesSync.RemovalError`
+        /// where it could not. With `sendsOtherChanges` false, a copy that holds other changes is left as it was, since
+        /// sending the removal sends them.
+        var remove: @MainActor (_ sendsOtherChanges: Bool) async throws -> Void
+        /// Whether one of the writes a copy has not sent, by id, is the removal of the settings.
+        var isRemovalWaiting: @MainActor (Set<String>) async -> Bool = { _ in false }
+
+        /// The settings kept by `sync`.
+        static func over(_ sync: PreferencesSync) -> SettingsKept {
+            SettingsKept(
+                isKept: { sync.syncs },
+                remove: { try await sync.remove(confirmed: true, sendsOtherChanges: $0) },
+                isRemovalWaiting: { await sync.isRemovalWaiting(among: $0) })
+        }
+    }
+
+    /// Set where the settings sync is known (`Libraries`); a model without it never offers the choice.
+    @ObservationIgnored var settingsKept: SettingsKept?
+    /// Whether Disconnect offers to remove the settings, decided when the person asks to disconnect.
+    private(set) var offersSettingsRemoval = false
+    /// The person's choice to remove them with the disconnect; off each time they ask to disconnect.
+    var alsoRemovesSettings = false
+    /// A removal that did not finish, which the person decides what to do about: nothing was left.
+    private(set) var settingsRemovalFailure: SettingsRemovalFailure?
+
+    struct SettingsRemovalFailure: Equatable {
+        enum Reason: Equatable {
+            /// The server did not take it.
+            case notDone
+            /// It would have sent the changes the person chose to discard.
+            case discardedChangesWait
+        }
+
+        var reason = Reason.notDone
+        /// What they chose about the copy where changes waited, to carry on with if they disconnect anyway.
+        var choice: Choice?
+    }
 
     init(host: MarfaHost) {
         self.host = host
@@ -176,7 +220,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         await run(.reaching(target)) { () async throws(MarfaHost.Problem) in
             try await host.changeAddress(to: target, via: method, choice: hostChoice)
         } onWaiting: { [self] unsent in
-            ask(.switchServer(usingCode: usingCode), unsent, askedAgain: choice != nil)
+            await ask(.switchServer(usingCode: usingCode), unsent, askedAgain: choice != nil)
         }
         // A switch that finished but for removing the old server's leftovers has still switched.
         if isConnected(to: target) { otherAddress = "" }
@@ -190,6 +234,9 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     /// A disconnect with nothing waiting is confirmed once, since it ends the sign-in. With changes waiting, the
     /// question about them is the confirmation, so it is not asked twice.
     func requestDisconnect() {
+        offersSettingsRemoval = settingsKept?.isKept() ?? false
+        alsoRemovesSettings = false
+        settingsRemovalFailure = nil
         if host.waitingChanges == 0 {
             isConfirmingDisconnect = true
         } else {
@@ -199,12 +246,53 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
 
     func disconnect(_ choice: Choice? = nil) async {
         guard !isWorking else { return }
+        // The removal comes before the sign-out, since after it nothing can be removed. With changes still waiting and no
+        // answer yet the question comes first, so a person who cancels it has removed nothing.
+        if offersSettingsRemoval, alsoRemovesSettings, choice != nil || host.waitingChanges == 0 {
+            guard await removeSettingsBeforeLeaving(choice) else { return }
+        }
         await run(.leaving) { () async throws(MarfaHost.Problem) in
             try await host.disconnect(hostChoice(choice))
             departure = nil
         } onWaiting: { [self] unsent in
-            ask(.disconnect, unsent, askedAgain: choice != nil)
+            await ask(.disconnect, unsent, askedAgain: choice != nil)
         }
+    }
+
+    /// Removes the settings from the Marfa for a disconnect. False where it did not finish: the person is told, and
+    /// nothing is signed out unless they say so (`disconnectAnyway`).
+    private func removeSettingsBeforeLeaving(_ choice: Choice?) async -> Bool {
+        guard let settingsKept else { return true }
+        isWorking = true
+        defer { isWorking = false }
+        notice = nil
+        do {
+            // Sending the removal sends the whole queue, so it is never made while the person is discarding what waits in it.
+            try await settingsKept.remove(choice != .discardCopy)
+        } catch {
+            let blocked = (error as? PreferencesSync.RemovalError) == .otherChangesWait
+            settingsRemovalFailure = SettingsRemovalFailure(reason: blocked ? .discardedChangesWait : .notDone, choice: choice)
+            // A removal that was queued and not taken is no longer something to offer; one that never started still is.
+            offersSettingsRemoval = settingsKept.isKept()
+            alsoRemovesSettings = false
+            return false
+        }
+        alsoRemovesSettings = false
+        offersSettingsRemoval = false
+        return true
+    }
+
+    /// The person agrees to disconnect although the settings stay in the Marfa.
+    func disconnectAnyway() async {
+        guard let failure = settingsRemovalFailure else { return }
+        settingsRemovalFailure = nil
+        alsoRemovesSettings = false
+        await disconnect(failure.choice)
+    }
+
+    /// The person stays connected after a removal that did not finish. A question about changes that wait stays open.
+    func stayConnected() {
+        settingsRemovalFailure = nil
     }
 
     /// The person's answer to the question: the copy is kept, or discarded with the changes they were shown.
@@ -220,6 +308,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     func cancelDeparture() {
         guard let kind = departure?.kind else { return }
         departure = nil
+        alsoRemovesSettings = false
         if case .switchServer = kind { Task { [host] in await host.abandonPendingSignIn() } }
     }
 
@@ -430,14 +519,16 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
     }
 
-    private func ask(_ kind: Departure.Kind, _ unsent: UnsentChanges?, askedAgain: Bool) {
-        departure = Departure(kind: kind, unsent: unsent, isAskedAgain: askedAgain)
+    private func ask(_ kind: Departure.Kind, _ unsent: UnsentChanges?, askedAgain: Bool) async {
+        var departure = Departure(kind: kind, unsent: unsent, isAskedAgain: askedAgain)
+        if let unsent, let settingsKept { departure.holdsSettingsRemoval = await settingsKept.isRemovalWaiting(unsent.ids) }
+        self.departure = departure
     }
 
     private func run(
         _ step: Step,
         _ work: () async throws(MarfaHost.Problem) -> Void,
-        onWaiting: ((UnsentChanges?) -> Void)? = nil
+        onWaiting: ((UnsentChanges?) async -> Void)? = nil
     ) async {
         guard !isWorking else { return }
         isWorking = true
@@ -453,7 +544,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         } catch {
             if case .signIn(.canceled) = error { lastEnding = .canceled } else { lastEnding = .failed }
             if case .changesWaiting(let unsent) = error, let onWaiting {
-                onWaiting(unsent)
+                await onWaiting(unsent)
             } else {
                 // A failure after the question was put to the person ends it, so it is not asked again.
                 departure = nil

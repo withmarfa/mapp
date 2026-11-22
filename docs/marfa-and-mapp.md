@@ -29,7 +29,7 @@ Marfa stores no color per type, status or option, no per-field icon or order, an
 - **Defaults.** Which properties to pin, which to hide, and which look a type starts from.
 - **Everything drawn.** Chip colors, mark shapes, symbols and spacing. A tone comes from the type's icon id, and an option's dot color comes from its words, because Marfa holds neither.
 
-MAPP keeps all of this on the Mac and never writes it to Marfa. [Settings storage](settings-storage.md) says where each setting lives.
+MAPP keeps all of this as its own settings, in one hidden item in the Marfa so every Mac uses them, not in any item's data. [Settings storage](settings-storage.md) says where each setting lives.
 
 ## MAPP names no type
 
