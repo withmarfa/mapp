@@ -6,5 +6,7 @@ nonisolated enum ListKey {
     static let density = "listDensity"
     /// Where an item opens (`ItemOpening`), on this Mac, for every window and layout.
     static let openItemsIn = "openItemsIn"
-    static let all = [density, openItemsIn]
+    /// Whether the Items page shows its quick-add tiles (`NewTiles`). Off until turned on.
+    static let showsQuickAdd = "showsQuickAddOptions"
+    static let all = [density, openItemsIn, showsQuickAdd]
 }

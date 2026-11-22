@@ -139,29 +139,21 @@ private struct IndexNameCell: View {
     }
 }
 
-/// The types a source writes: each type's icon in the type's color, with no tile, and its name.
-/// A type with no icon takes the neutral color and mark. Three are named and the rest counted.
+/// The types a source writes, each as the type chip item pages and the Items table draw, at row size. A type with no
+/// icon takes the neutral color and mark. Three are shown and the rest counted.
 private struct IndexTypesCell: View {
-    @Environment(\.colorScheme) private var scheme
     let shares: [TypeShare]
     private static let shown = 3
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 6) {
             ForEach(shares.prefix(Self.shown)) { share in
-                HStack(spacing: 4) {
-                    TypeGlyph(id: share.icon)
-                        .font(.system(size: 12))
-                        .foregroundStyle(TypeTone(icon: share.icon).color(for: scheme))
-                        .accessibilityHidden(true)
-                    Text(verbatim: share.label).lineLimit(1)
-                }
+                PageChip(text: share.label, kind: .type(icon: share.icon), size: .row)
             }
             if shares.count > Self.shown {
                 Text("+\(shares.count - Self.shown)").foregroundStyle(.secondary)
             }
         }
-        .foregroundStyle(.secondary)
         .lineLimit(1)
     }
 }

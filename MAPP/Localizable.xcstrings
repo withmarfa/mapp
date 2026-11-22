@@ -16,7 +16,13 @@
     "Choose an item to see its details." : {
 
     },
+    "Items Page" : {
+
+    },
     "Reading Item" : {
+
+    },
+    "Show Quick Add Options" : {
 
     },
     "Tag Not Added" : {
@@ -1576,6 +1582,9 @@
 
     },
     "this sign-in" : {
+
+    },
+    "Tiles above the table for making a new item of a type." : {
 
     },
     "Time Allowed" : {

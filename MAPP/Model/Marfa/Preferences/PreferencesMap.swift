@@ -76,7 +76,7 @@ enum PreferencesMap {
             DateFormat.key, WeekStart.key, StartWith.key, NewItemType.key, ListKey.openItemsIn, RemotePictureSetting.key,
         ], in: .general)
         + members(PageKey.all + [SourceViewMode.key], in: .editor)
-        + members([ListKey.density, CalendarHourHeight.key, NewRowTypes.key] + OrderKey.all, in: .lists)
+        + members([ListKey.density, ListKey.showsQuickAdd, CalendarHourHeight.key, NewRowTypes.key] + OrderKey.all, in: .lists)
         + members(SearchOptions.keys, in: .search)
         + [SyncedSetting(key: SearchLeaveOuts.defaultsKey, place: .serverMember(.search, .data(SearchLeaveOuts.setAsideKey)))]
 
