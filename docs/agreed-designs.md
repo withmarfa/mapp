@@ -28,7 +28,7 @@ Agreed with August on 21 November 2026, drawn as the Next boards of MAPP Pages. 
 - **All or Any** in the filter row.
 - **Group order and hidden groups** in Edit View, saved to Marfa. Dragging a board's lanes waits.
 - **Filters for every field kind**, and Hide Empty Groups in every place.
-- **Fixes:** MAPP keeps another app's group order and hidden groups, a board's cards follow the sort, the timeline shows no Sort, and the timeline's row is drawn as agreed.
+- **Fixes:** the timeline's row is drawn as agreed. MAPP keeping another app's group order and hidden groups, a board's cards following the sort and the timeline showing no Sort are built, not yet released.
 
 ## Pages
 
