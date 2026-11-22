@@ -14,6 +14,12 @@ nonisolated struct FilterTarget: Hashable, Sendable, Identifiable {
     /// The property a field of a type is kept in.
     var key: String? { field?.key }
 
+    /// Whether the field is a date that names a day and never a moment. Marfa reads such a value as its midnight in UTC
+    /// (`search-and-filters/filter-property-instant`), so a filter on it counts days on the UTC clock, not the Mac's.
+    var isDateOnly: Bool {
+        if kind == .date, case .date(includesTime: false)? = field?.kind { true } else { false }
+    }
+
     /// The words a status or choice declares, in the order the types give them.
     var declared: [String] { field?.options ?? [] }
 

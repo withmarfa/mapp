@@ -41,7 +41,8 @@ nonisolated extension ViewDraft {
 
     /// The clause as conditions, or nil where the grammar cannot say it: a value it cannot write, a field no filter can be
     /// made on, or a date relative to the day.
-    static func piece(of clause: FilterClause, target: FilterTarget, calendar: Calendar) -> Piece? {
+    static func piece(of clause: FilterClause, target: FilterTarget, calendar person: Calendar) -> Piece? {
+        let calendar = FilterDays.calendar(for: target, person: person)
         guard let field = filterField(of: target), !clause.isRelative else { return nil }
         func one(_ op: FilterOperator, _ value: FilterValue? = nil) -> Piece {
             Piece(conditions: [FilterCondition(field: field, operator: op, value: value)])
@@ -106,8 +107,9 @@ nonisolated extension ViewDraft {
         return FilterCondition(field: field, operator: comparison, value: .text(value))
     }
 
-    /// A day, or a run of days, as bounds of the person's own clock: from the first moment of a day to the first moment of
-    /// the day after the last, each written with the clock's offset (`filter-property-instant`).
+    /// A day, or a run of days, as bounds of the clock `calendar` names: from the first moment of a day to the first moment of
+    /// the day after the last, each written with the clock's offset (`filter-property-instant`). That clock is the person's, or
+    /// UTC for a date-only field (`FilterDays.calendar(for:person:)`).
     private static func dateBounds(of clause: FilterClause, field: FilterField, calendar: Calendar) -> Piece? {
         func instant(_ date: Date?) -> FilterValue? { date.map { .text(FilterDays.instantText($0, calendar: calendar)) } }
         func condition(_ op: FilterOperator, _ date: Date?) -> FilterCondition? {
@@ -159,6 +161,11 @@ nonisolated extension ViewDraft {
         return FilterClause(field: clause.field, op: .isNot, values: rest)
     }
 
+    /// What a clause's field is called where its field is no longer offered: the property's key.
+    private static func fieldName(of id: String) -> String {
+        id.hasPrefix(Browser.fieldColumnPrefix) ? String(id.dropFirst(Browser.fieldColumnPrefix.count)) : id
+    }
+
     // MARK: Combining
 
     /// What the clauses become beside a view's own conditions: the filter text, what could not be held, and how many
@@ -180,7 +187,10 @@ nonisolated extension ViewDraft {
         var entries: [(clause: FilterClause, target: FilterTarget, piece: Piece)] = []
         let clauses = state.savable.clauses
         for clause in clauses {
-            guard let target = targets[clause.field] else { continue }
+            guard let target = targets[clause.field] else {
+                unkept.append(.filter(column: fieldName(of: clause.field)))
+                continue
+            }
             guard let piece = piece(of: clause, target: target, calendar: calendar) else {
                 unkept.append(.filter(column: target.label))
                 continue
@@ -312,8 +322,9 @@ nonisolated extension ViewDraft {
     }
 
     /// One condition as the clause that says it alone, or nil where the window has no way to show it.
-    private static func clause(of condition: FilterCondition, among types: Set<TypeID>, catalogue: Catalogue, calendar: Calendar) -> (target: FilterTarget, clause: FilterClause)? {
+    private static func clause(of condition: FilterCondition, among types: Set<TypeID>, catalogue: Catalogue, calendar person: Calendar) -> (target: FilterTarget, clause: FilterClause)? {
         guard let target = target(of: condition.field, among: types, catalogue: catalogue) else { return nil }
+        let calendar = FilterDays.calendar(for: target, person: person)
         func make(_ op: FilterOp, _ values: [String] = []) -> (FilterTarget, FilterClause) { (target, FilterClause(field: target.id, op: op, values: values)) }
         let kind = target.kind
         switch (condition.operator, condition.value) {
@@ -365,7 +376,7 @@ nonisolated extension ViewDraft {
             let text = number == number.rounded() && abs(number) < 1e15 ? String(Int64(number)) : String(number)
             return op.map { make($0, [text]) }
         case .date, .moment:
-            // A bound at the start of the person's day: "before D" is `lt` it, "after the day before D" is `gte` it.
+            // A bound at the start of the day on the field's clock: "before D" is `lt` it, "after the day before D" is `gte` it.
             guard case .text(let text)? = condition.value, let date = FilterDays.instant(text),
                   calendar.startOfDay(for: date) == date else { return nil }
             let day = FilterDays.text(of: date, calendar: calendar)

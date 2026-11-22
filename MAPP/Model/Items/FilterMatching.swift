@@ -3,8 +3,18 @@ import Marfa
 
 /// Days as a filter holds them: a calendar day, `YYYY-MM-DD`, which the person's calendar turns into the moment it
 /// starts. Counting days on the calendar, never in seconds, keeps a day that is 23 or 25 hours long (a change of clocks)
-/// whole.
+/// whole. A date-only field is counted on the UTC calendar instead (`calendar(for:person:)`).
 nonisolated enum FilterDays {
+    static let utc: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }()
+
+    /// The calendar a field's days are counted on: the person's own, except for a date-only field, which Marfa keeps as
+    /// midnight UTC (`FilterTarget.isDateOnly`).
+    static func calendar(for target: FilterTarget, person: Calendar) -> Calendar { target.isDateOnly ? utc : person }
+
     static func day(_ text: String) -> ItemDate.Day? {
         let parts = text.split(separator: "-", omittingEmptySubsequences: false).compactMap { Int($0) }
         guard parts.count == 3, (1...12).contains(parts[1]), (1...31).contains(parts[2]) else { return nil }
@@ -31,7 +41,8 @@ nonisolated enum FilterDays {
     static func text(of date: Date, calendar: Calendar) -> String { ItemDate.day(date, calendar: calendar) }
 
     /// A moment as the contract takes it for a bound: the instant with the calendar's own offset, `2026-11-30T00:00:00+01:00`
-    /// (`search-and-filters/filter-property-instant`), so a day the person picked means their day.
+    /// (`search-and-filters/filter-property-instant`), so a day the person picked means their day. On the UTC calendar that is
+    /// `2026-11-30T00:00:00Z`.
     static func instantText(_ date: Date, calendar: Calendar) -> String {
         let zone = calendar.timeZone
         var gregorian = Calendar(identifier: .gregorian)
@@ -96,7 +107,8 @@ nonisolated enum FilterMatching {
             return matchesWords(clause, target, row: row, catalogue: catalogue)
         case .collection:
             let ids = Set(row.collections.map(\.id.rawValue))
-            let hit = { (value: String) in ids.contains(value) }
+            // An empty value is "in no collection", as an empty word is for a parent, a status and a choice.
+            let hit = { (value: String) in value.isEmpty ? ids.isEmpty : ids.contains(value) }
             return clause.op == .isNot ? !clause.values.contains(where: hit) : clause.values.contains(where: hit)
         case .tags:
             return clause.values.contains { row.item.tags.contains($0) }
@@ -193,18 +205,21 @@ nonisolated enum FilterMatching {
         }
     }
 
-    static func date(of row: ItemTableRow, _ target: FilterTarget, calendar: Calendar) -> Date? {
+    /// The moment a date field holds, as Marfa compares it: a day alone is its midnight in UTC, in a datetime field too.
+    static func date(of row: ItemTableRow, _ target: FilterTarget) -> Date? {
         switch target.id {
         case ItemTableColumn.created.id: row.item.created
         case ItemTableColumn.edited.id: row.item.modified
         case ItemTableColumn.occurred.id: row.item.occurred
-        default: target.key.flatMap { row.item.value(of: $0)?.string }.flatMap { ItemDate.parse($0, calendar: calendar)?.date }
+        default: target.key.flatMap { row.item.value(of: $0)?.string }.flatMap { ItemDate.parse($0, calendar: FilterDays.utc)?.date }
         }
     }
 
     private static func matchesDate(_ clause: FilterClause, _ target: FilterTarget, row: ItemTableRow, clock: Clock) -> Bool {
-        guard let date = date(of: row, target, calendar: clock.calendar) else { return false }
-        let calendar = clock.calendar
+        guard let date = date(of: row, target) else { return false }
+        let calendar = FilterDays.calendar(for: target, person: clock.calendar)
+        // Today is the Mac's day; a date-only field counts it as the same day on the UTC clock.
+        let now = target.isDateOnly ? todayOnUTC(clock) : clock.now
         func start(_ index: Int) -> Date? { clause.values.indices.contains(index) ? FilterDays.start(of: clause.values[index], calendar: calendar) : nil }
         func next(_ index: Int) -> Date? { clause.values.indices.contains(index) ? FilterDays.startOfNext(clause.values[index], calendar: calendar) : nil }
         switch clause.op {
@@ -212,16 +227,21 @@ nonisolated enum FilterMatching {
         case .before: return start(0).map { date < $0 } ?? false
         case .after: return next(0).map { date >= $0 } ?? false
         case .between: guard let from = start(0), let to = next(1) else { return false }; return date >= from && date < to
-        case .beforeToday: return date < calendar.startOfDay(for: clock.now)
+        case .beforeToday: return date < calendar.startOfDay(for: now)
         case .afterToday:
-            guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: clock.now)) else { return false }
+            guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) else { return false }
             return date >= tomorrow
         case .inLast, .inNext:
             guard let count = clause.values.first.flatMap({ Int($0) }),
-                  let span = FilterDays.span(of: clause.op, count: count, now: clock.now, calendar: calendar) else { return false }
+                  let span = FilterDays.span(of: clause.op, count: count, now: now, calendar: calendar) else { return false }
             return date >= span.start && date < span.end
         default: return false
         }
+    }
+
+    /// A moment of the Mac's day today, placed on the same day of the UTC calendar.
+    private static func todayOnUTC(_ clock: Clock) -> Date {
+        FilterDays.start(of: FilterDays.text(of: clock.now, calendar: clock.calendar), calendar: FilterDays.utc) ?? clock.now
     }
 
     /// Lower-cases the letters A to Z and no other, as Marfa folds a text's case (`search-and-filters/filter-text-case`).
