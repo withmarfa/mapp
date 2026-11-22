@@ -77,7 +77,6 @@ private struct DensityPicture: View {
                             Rectangle()
                                 .fill(SettingsTokens.rule)
                                 .frame(height: 1)
-                                .padding(.horizontal, SettingsTokens.Metric.listRuleInset)
                         }
                     }
             }
