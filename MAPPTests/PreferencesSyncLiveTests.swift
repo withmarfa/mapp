@@ -1,0 +1,174 @@
+import Foundation
+import Marfa
+import Testing
+@testable import MAPP
+
+extension LiveMarfaTests {
+    /// MAPP's settings across two Macs on the test instance: two copies, each with a store and defaults of its own. The
+    /// key holds the test instance's MAPP key, which reaches `app.mapp.preferences` as its owner made it. Every settings
+    /// item is purged before and after each test.
+    @MainActor
+    @Suite(.serialized)
+    final class PreferencesSyncLiveTests {
+        /// One Mac: its copy, its defaults and its settings sync.
+        final class Mac {
+            let source: MarfaSource
+            let defaults: UserDefaults
+            let sync: PreferencesSync
+            let root: URL
+            let suite: String
+
+            init(source: MarfaSource, defaults: UserDefaults, suite: String, sync: PreferencesSync, root: URL) {
+                self.source = source
+                self.defaults = defaults
+                self.suite = suite
+                self.sync = sync
+                self.root = root
+            }
+
+            /// Writes what coalesces now and sends the queue.
+            func send() async {
+                await sync.flush()
+                await source.flush()
+            }
+        }
+
+        private var macs: [Mac] = []
+        private let placement = PagePlacements.key
+
+        private func mac() async throws -> Mac {
+            let root = URL.temporaryDirectory.appending(path: "PreferencesSyncLive-\(UUID().uuidString)", directoryHint: .isDirectory)
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
+            let signIns = ScriptedSignIns()
+            signIns.save(try LiveMarfa.key(), for: connection.address, scopes: [PreferencesType.vendorScope])
+            let source = try await MarfaSource.open(connection, signIns: signIns, location: MarfaStoreLocation(root: root))
+            let suite = "MAPPTests.PreferencesLive.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(100)) {}
+            let mac = Mac(source: source, defaults: defaults, suite: suite, sync: sync, root: root)
+            macs.append(mac)
+            return mac
+        }
+
+        private func start(_ mac: Mac) async throws {
+            mac.sync.attach(WorkingCopyPreferences(copy: mac.source.copy), library: "marfa:" + (try LiveMarfa.address()), name: { nil })
+            mac.source.refresh()
+            try #require(await LiveMarfa.until {
+                await mac.sync.flush()
+                return mac.sync.standing == .syncing
+            }, "the settings never synced: \(mac.sync.standing)")
+        }
+
+        private func end() async {
+            for mac in macs {
+                mac.sync.detach()
+                await mac.source.close()
+                UserDefaults().removePersistentDomain(forName: mac.suite)
+                try? FileManager.default.removeItem(at: mac.root)
+            }
+            macs = []
+            await Self.purgeSettings()
+        }
+
+        /// Every settings item the instance holds, by the server's own list.
+        private static func settingsItems() async -> [ItemID] {
+            guard let address = try? LiveMarfa.address(), let key = try? LiveMarfa.key(),
+                  var url = URLComponents(string: address + "/items")
+            else { return [] }
+            url.queryItems = [URLQueryItem(name: "type", value: PreferencesType.id), URLQueryItem(name: "limit", value: "100")]
+            var request = URLRequest(url: url.url!)
+            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+            guard let (data, _) = try? await URLSession.shared.data(for: request),
+                  let page = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let rows = page["data"] as? [[String: Any]]
+            else { return [] }
+            return rows.compactMap { ($0["id"] as? String).map { ItemID($0) } }
+        }
+
+        private static func purgeSettings() async { await LiveMarfa.purge(await settingsItems()) }
+
+        private func run(_ body: () async throws -> Void) async throws {
+            await Self.purgeSettings()
+            do { try await body() } catch {
+                await end()
+                throw error
+            }
+            await end()
+        }
+
+        @Test(.timeLimit(.minutes(3)))
+        func aChangeOnOneMacReachesTheOther() async throws {
+            try await run {
+                let one = try await mac()
+                one.defaults.set("dark", forKey: AppearanceKey.theme)
+                try await start(one)
+                await one.send()
+                #expect(await Self.settingsItems().count == 1)
+                let two = try await mac()
+                try await start(two)
+                #expect(two.defaults.string(forKey: AppearanceKey.theme) == "dark")
+                one.defaults.set("light", forKey: AppearanceKey.theme)
+                await one.send()
+                #expect(await LiveMarfa.until { two.defaults.string(forKey: AppearanceKey.theme) == "light" })
+                #expect(await Self.settingsItems().count == 1)
+            }
+        }
+
+        @Test(.timeLimit(.minutes(3)))
+        func theLaterRowWinsAndUndoingItPutsTheEarlierBack() async throws {
+            try await run {
+                let one = try await mac()
+                try await start(one)
+                await one.send()
+                let two = try await mac()
+                try await start(two)
+                let earlier = #"{"core.note":{"rows":{"due_at":true}}}"#
+                let later = #"{"core.note":{"rows":{"due_at":false}}}"#
+                one.defaults.set(earlier, forKey: placement)
+                await one.send()
+                #expect(await LiveMarfa.until { two.defaults.string(forKey: self.placement) == earlier })
+                two.defaults.set(later, forKey: placement)
+                await two.send()
+                #expect(await LiveMarfa.until { one.defaults.string(forKey: self.placement) == later })
+
+                // The table's change log holds the later write as its newest batch.
+                let item = try #require(await Self.settingsItems().first)
+                let batch = try #require(await Self.newestBatch(of: item, in: .types))
+                _ = try await two.source.copy.tables.undo(batch: batch, in: PreferencesTable.types.rawValue, of: item.rawValue)
+                await two.source.flush()
+                #expect(await LiveMarfa.until { two.defaults.string(forKey: self.placement) == earlier })
+                #expect(await LiveMarfa.until { one.defaults.string(forKey: self.placement) == earlier })
+            }
+        }
+
+        @Test(.timeLimit(.minutes(3)))
+        func adoptingFillsTheRowsTheItemLacks() async throws {
+            try await run {
+                let one = try await mac()
+                one.defaults.set(#"{"core.note":{"rows":{"due_at":true}}}"#, forKey: placement)
+                try await start(one)
+                await one.send()
+                let two = try await mac()
+                two.defaults.set(#"{"core.task":{"rows":{"priority":true}}}"#, forKey: placement)
+                try await start(two)
+                await two.send()
+                let both = #"{"core.note":{"rows":{"due_at":true}},"core.task":{"rows":{"priority":true}}}"#
+                #expect(two.defaults.string(forKey: placement) == both)
+                #expect(await LiveMarfa.until { one.defaults.string(forKey: self.placement) == both })
+            }
+        }
+
+        private static func newestBatch(of item: ItemID, in table: PreferencesTable) async -> String? {
+            guard let address = try? LiveMarfa.address(), let key = try? LiveMarfa.key(),
+                  let url = URL(string: address + "/items/\(item.rawValue)/tables/\(table.rawValue)/batches")
+            else { return nil }
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+            guard let (data, _) = try? await URLSession.shared.data(for: request),
+                  let page = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let batches = page["data"] as? [[String: Any]]
+            else { return nil }
+            return batches.first?["id"] as? String
+        }
+    }
+}

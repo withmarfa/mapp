@@ -52,10 +52,14 @@ nonisolated final class ScriptedSignIns: SignIns {
 
     /// Keeps `key` as a sign-in holding `permissions` and, with `profile`, the read of the owner's name; a sign-in made
     /// before MAPP asked for it is kept with `profile` false.
-    func save(_ key: String, for address: URL, permissions: Set<InstancePermission> = SystemSignIns.askedAtSignIn, profile: Bool = true) {
+    /// `scopes` are kept beside them, as a sign-in the owner approved for MAPP's own settings holds `app.mapp.*:write`.
+    func save(
+        _ key: String, for address: URL, permissions: Set<InstancePermission> = SystemSignIns.askedAtSignIn, profile: Bool = true,
+        scopes: [String] = []
+    ) {
         _ = try? keychain.signIn(
             to: address, service: Self.service, accessToken: key,
-            scopes: permissions.map(\.rawValue).sorted() + (profile ? SystemSignIns.profileScopes : []))
+            scopes: permissions.map(\.rawValue).sorted() + (profile ? SystemSignIns.profileScopes : []) + scopes)
     }
 
     /// Keeps what the key held for `connection` really holds, as the server it is held for says (`GET /keys/current`), in
