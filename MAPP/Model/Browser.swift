@@ -671,10 +671,17 @@ final class Browser {
         guard !showsSidebarIndex else { return [] }
         guard viewMode == .table else {
             let shown = sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
-            guard tableOptions[item]?.isFiltering == true else { return shown }
-            // The items the filters hide stay in the selection's reach, as the table's do.
+            // The items the filters and the hidden groups leave out stay in the selection's reach, as the table's do.
+            let rest: [ItemID]
+            if listShape?.arranged == true, !ordersByRelevance {
+                rest = tableContent(in: library).allRows.map(\.id)
+            } else if tableOptions[item]?.isFiltering == true {
+                rest = items(in: library).map(\.id)
+            } else {
+                return shown
+            }
             let isShown = Set(shown)
-            return shown + items(in: library).map(\.id).filter { !isShown.contains($0) }
+            return shown + rest.filter { !isShown.contains($0) }
         }
         let content = tableContent(in: library)
         // A grouped table shows its rows group by group, not in the sort's order across groups.

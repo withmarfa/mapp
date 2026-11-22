@@ -71,7 +71,7 @@ struct ListEmptyState: View {
     var body: some View {
         if browser.filtersHideEverything(in: library) {
             FilteredEmptyState(browser: browser)
-        } else if browser.listShape?.arranged == true, browser.tableContent(in: library).hidesEveryGroup {
+        } else if browser.listHidesEveryGroup(in: library) {
             HiddenGroupsEmptyState()
         } else if browser.isSearching {
             SearchEmptyState(browser: browser)

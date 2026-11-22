@@ -86,7 +86,8 @@ nonisolated struct GroupOffer: Hashable, Sendable {
         var picked: [Entry] = []
         var dates: [Entry] = []
         var more: [Entry] = []
-        var seen: Set<String> = statusFields.first.map { [$0.key] } ?? []
+        // The Status item stands for every type's status field, whatever its key, so none is offered again.
+        var seen: Set<String> = statusEntry == nil ? [] : Set(statusFields.map(\.key))
         for type in sortedTypes {
             guard let info = catalogue.itemTypes[type] else { continue }
             let page: Set<String> = [info.titleKey, info.bodyKey, "title", "body"].compactMap { $0 }.reduce(into: []) { $0.insert($1) }

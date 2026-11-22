@@ -93,6 +93,13 @@ extension Browser {
         return tableContent(in: library).rows.count
     }
 
+    /// Whether the arranged list is grouped and every group holding items is hidden, which says so rather than that
+    /// the place is empty.
+    func listHidesEveryGroup(in library: any ItemLibrary) -> Bool {
+        guard let shape = listShape, shape.arranged, !ordersByRelevance, shape.options.grouping.columnID != nil else { return false }
+        return tableContent(in: library).hidesEveryGroup
+    }
+
     func expandAllGroups() {
         tableOptions[item, default: .init()].collapsed = []
     }

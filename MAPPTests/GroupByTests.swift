@@ -109,6 +109,8 @@ struct GroupByTests {
             columns: ItemTableLayout.columns(for: rows, catalogue: mixed, hidden: [], looks: [:]), types: [Self.task, other.id], rows: rows,
             catalogue: mixed, layout: .table, isView: false)
         #expect(words.sections[0].first?.choices.map(\.grouping) == [.column("field.status", by: .statusGroups)])
+        // The Status item stands for every type's status field, so neither the task's nor the note's is a group of its own.
+        #expect(!offer.entries.contains { [Browser.fieldColumnPrefix + "status", Browser.fieldColumnPrefix + "progress"].contains($0.id) && $0.id != GroupOffer.statusID })
         #expect(Self.labels(offer.sections[1]).prefix(2) == ["Type", "Parent"])
     }
 
@@ -237,6 +239,24 @@ struct GroupByTests {
         browser.choicesChanged()
         #expect(browser.tableOptions[browser.item]?.groupOrder == nil)
         #expect(browser.tableOptions[browser.item]?.hiddenGroups == nil)
+    }
+
+    @Test func hiddenGroupsLeaveTheGalleryAndTheirItemsStillCountAndStayInTheSelectionsList() {
+        let items = [Self.item("a", Self.task, ["status": .string("todo")]), Self.item("b", Self.task, ["status": .string("done")])]
+        let library = Self.library(items)
+        let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .gallery)
+        browser.chooseGrouping(.column("field.status"))
+        browser.setGroup("done", hidden: true, in: library)
+        let drawn = browser.sections(in: library, order: ItemOrder(), now: library.now()).flatMap { $0.items.map(\.id.rawValue) }
+        #expect(drawn == ["a"], "a hidden group's cards are not drawn")
+        #expect(browser.listedCount(in: library) == 2, "but its items still count")
+        #expect(browser.collectionItemIDs(in: library, order: ItemOrder()).map(\.rawValue) == ["a", "b"], "and stay in the list the selection follows")
+        #expect(!browser.listHidesEveryGroup(in: library))
+        browser.setGroup("todo", hidden: true, in: library)
+        #expect(browser.sections(in: library, order: ItemOrder(), now: library.now()).flatMap(\.items).isEmpty)
+        #expect(browser.listHidesEveryGroup(in: library), "the gallery says its groups are hidden, not that the place is empty")
+        #expect(browser.listedCount(in: library) == 2)
+        #expect(Set(browser.collectionItemIDs(in: library, order: ItemOrder()).map(\.rawValue)) == ["a", "b"])
     }
 
     @Test func aPlacesListKeepsItsOwnSortAndGroupInItsDefaultView() {
