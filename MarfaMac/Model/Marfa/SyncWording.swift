@@ -285,7 +285,7 @@ nonisolated enum Words {
 
     /// The copy could not be opened or made, for a reason the package did not name.
     static var copyCouldNotBeOpened: String {
-        String(localized: "The app couldn’t make or open the copy of your library on this Mac. Check that app can change its own files, then try again.")
+        String(localized: "The app couldn’t make or open the copy of your library on this Mac. Check that the app can change its own files, then try again.")
     }
 
     /// The copy's file is damaged. It says where the copy is, what it holds that no server has taken (`unsent` is nil
@@ -469,7 +469,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
             case .ancestorUnavailable: String(localized: "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it.")
             case .conflictUnresolved: String(localized: "It can’t be applied until a conflict on the item is settled. Undoing it puts the item back as the server has it.")
             case .instanceChanged: String(localized: "This change was made for a library the server no longer holds as it was. Try again to send it to the library as it is now, or undo it to put the item back as the server has it.")
-            case .recordUnread: String(localized: "This change came from a copy that app could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it.")
+            case .recordUnread: String(localized: "This change came from a copy that the app could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it.")
             case .serverRestored: String(localized: "The server was restored to an earlier point, and this change would put back what the restore removed. Try again to send it anyway, or undo it to keep the item as the server has it.")
             case .failingAlone: String(localized: "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it.")
             }

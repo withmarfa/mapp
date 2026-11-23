@@ -201,7 +201,7 @@ struct ProblemWordingTests {
     @Test func aChangeFromACopyReadInPartIsHeldUntilThePersonSays() {
         let wording = wording(entry(.blocked(.recordUnread)))
         #expect(wording.headline == "A change to “Plan the launch” is on hold")
-        #expect(wording.explanation.hasPrefix("This change came from a copy that app could only partly read"))
+        #expect(wording.explanation.hasPrefix("This change came from a copy that the app could only partly read"))
         #expect(wording.actions.map(\.action) == [.tryAgain, .withdraw])
         #expect(wording.actions.map(\.title) == ["Try Again", "Undo Change"])
         #expect(wording.confirmation(for: .withdraw)?.copiesText == true)

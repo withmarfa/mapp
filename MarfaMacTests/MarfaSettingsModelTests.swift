@@ -239,7 +239,7 @@ import Testing
         _ = model.host.scripted("key-2")
         await model.signInAgain()
         #expect(model.notice?.title == "Can’t Open the Library")
-        #expect(model.notice?.message == "The app kept the new sign-in, but the copy of your library on this Mac can’t be opened. The app couldn’t make or open the copy of your library on this Mac. Check that app can change its own files, then try again.")
+        #expect(model.notice?.message == "The app kept the new sign-in, but the copy of your library on this Mac can’t be opened. The app couldn’t make or open the copy of your library on this Mac. Check that the app can change its own files, then try again.")
         #expect(try bench.signIns.key(for: first.address) == "key-2")
     }
 

@@ -371,7 +371,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             case .notOpened, .signedInAgain:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
-                    message: String(localized: "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that app can change its own files, then try again."))
+                    message: String(localized: "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that the app can change its own files, then try again."))
             }
         case .copyKept(let kept, let signIn, let approvalAt):
             keptNotice(kept, signIn: signIn, approvalAt: approvalAt, reached: reached)
@@ -424,7 +424,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .keychain:
             Notice(
                 title: String(localized: "Can’t Keep the Sign-In"),
-                message: String(localized: "The Keychain wouldn’t keep or give the sign-in. Check that app can use the Keychain, then try again."))
+                message: String(localized: "The Keychain wouldn’t keep or give the sign-in. Check that the app can use the Keychain, then try again."))
         case .noWindow:
             Notice(
                 title: String(localized: "No Window to Sign In From"),

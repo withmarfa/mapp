@@ -66,7 +66,7 @@ enum LooksFiles {
         case .notLoaded:
             notLoadedMessage
         case .notALooksFile, .unwritable:
-            String(localized: "“\(file)” is not a layouts file that app can read. No layouts were changed.")
+            String(localized: "“\(file)” is not a layouts file that the app can read. No layouts were changed.")
         }
     }
 }

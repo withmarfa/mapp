@@ -1788,7 +1788,7 @@
     "Run “marfa apps list” with the command line signed in to %@ as the owner. Use the approval date to identify the earlier “Marfa for Mac” approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
 
     },
-    "The app couldn’t make or open the copy of your library on this Mac. Check that app can change its own files, then try again." : {
+    "The app couldn’t make or open the copy of your library on this Mac. Check that the app can change its own files, then try again." : {
 
     },
     "Couldn’t Finish Signing In" : {
@@ -3428,7 +3428,7 @@
     "A collection can’t be in another collection." : {
       "extractionState" : "manual"
     },
-    "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that app can change its own files, then try again." : {
+    "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that the app can change its own files, then try again." : {
       "extractionState" : "manual"
     },
     "A deletion wasn’t sent" : {
@@ -6178,7 +6178,7 @@
     "The item's title and path cannot be represented as an unambiguous file link." : {
       "extractionState" : "manual"
     },
-    "The Keychain wouldn’t keep or give the sign-in. Check that app can use the Keychain, then try again." : {
+    "The Keychain wouldn’t keep or give the sign-in. Check that the app can use the Keychain, then try again." : {
       "extractionState" : "manual"
     },
     "The library is still being brought up to date, so the change wasn’t made." : {
@@ -6415,7 +6415,7 @@
     "This address now reaches a different Marfa server from the one this copy of your library was made for, so the app has stopped syncing it." : {
       "extractionState" : "manual"
     },
-    "This change came from a copy that app could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it." : {
+    "This change came from a copy that the app could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it." : {
       "extractionState" : "manual"
     },
     "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it." : {
@@ -7855,7 +7855,7 @@
     "“%@” could not be read. No shortcuts were changed." : {
 
     },
-    "“%@” is not a shortcuts file that app can read. No shortcuts were changed." : {
+    "“%@” is not a shortcuts file that the app can read. No shortcuts were changed." : {
 
     },
     "“%@” was made by a newer version of the app. Update the app to import it. No shortcuts were changed." : {
@@ -8170,7 +8170,7 @@
     "“%@” could not be read. No layouts were changed." : {
 
     },
-    "“%@” is not a layouts file that app can read. No layouts were changed." : {
+    "“%@” is not a layouts file that the app can read. No layouts were changed." : {
 
     },
     "“%@” was attached to “%@” but isn’t in its text. It was meant for a folded section or text not yet shown." : {

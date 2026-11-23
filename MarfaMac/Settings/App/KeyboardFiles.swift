@@ -53,7 +53,7 @@ enum KeyboardFiles {
             libraries.host.notices.tell(String(localized: "Imported Shortcuts"), summary(applied: applied, skipped: skipped))
         } catch {
             let message = switch error {
-            case .notOurs: String(localized: "“\(url.lastPathComponent)” is not a shortcuts file that app can read. No shortcuts were changed.")
+            case .notOurs: String(localized: "“\(url.lastPathComponent)” is not a shortcuts file that the app can read. No shortcuts were changed.")
             case .newerVersion: String(localized: "“\(url.lastPathComponent)” was made by a newer version of the app. Update the app to import it. No shortcuts were changed.")
             }
             libraries.host.notices.tell(title, message)
