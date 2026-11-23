@@ -113,7 +113,7 @@ final class Tuning {
 
     /// The text to paste into a chat: the build, then one `group.name = value` per line.
     func report(build: String) -> String {
-        (["The app build \(build)"] + knobs.map { "\($0.id) = \(self[$0].text)" }).joined(separator: "\n")
+        (["Marfa for Mac build \(build)"] + knobs.map { "\($0.id) = \(self[$0].text)" }).joined(separator: "\n")
     }
 
     private static func object(_ value: Knob.Value) -> Any {

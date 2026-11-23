@@ -51,7 +51,7 @@ import Testing
         let request = try #require(PictureStub.requests(to: address).first)
         #expect(request.httpMethod == "GET")
         #expect(request.httpBody == nil)
-        #expect(request.value(forHTTPHeaderField: "User-Agent") == "Marfa for Mac")
+        #expect(request.value(forHTTPHeaderField: "User-Agent") == "MarfaMac")
         #expect(request.value(forHTTPHeaderField: "Referer") == nil)
         #expect(request.value(forHTTPHeaderField: "Cookie") == nil)
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)

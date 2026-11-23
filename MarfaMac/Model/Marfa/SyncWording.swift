@@ -230,7 +230,7 @@ nonisolated enum Words {
     }
 
     static func replacedApproval(address: String) -> String {
-        String(localized: "The app couldn’t confirm that \(address) ended the app’s earlier approval.") + " " + String(localized: "Run “marfa apps list” with the command line signed in to \(address) as the owner. Use the approval date to identify the earlier “Marfa for Mac” approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID.")
+        String(localized: "The app couldn’t confirm that \(address) ended its earlier approval.") + " " + String(localized: "Run “marfa apps list” with the command line signed in to \(address) as the owner. Use the approval date to identify the earlier “Marfa for Mac” approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID.")
     }
 
     /// What the app is no longer allowed to do after a sign-in the owner approved with fewer permissions than it held.

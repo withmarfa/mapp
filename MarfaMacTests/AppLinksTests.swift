@@ -10,7 +10,7 @@ struct AppLinksTests {
         #expect(parts.path == "/withmarfa/marfa-mac/issues/new")
         #expect(parts.queryItems?.map(\.name) == ["body"])
         let body = try #require(parts.queryItems?.first?.value)
-        #expect(body.contains("The app 1.4.0 (212)"))
+        #expect(body.contains("Marfa for Mac 1.4.0 (212)"))
         #expect(body.contains("macOS 27.0.1"))
         #expect(!body.contains("http"))
         #expect(!body.contains("@"))

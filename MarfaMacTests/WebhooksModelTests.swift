@@ -64,7 +64,7 @@ import Testing
         #expect(model.seesEvery)
         #expect(model.groups.map(\.id) == ["own", "app:raycast-client", "key:k-live", "key:k-old", "key:k-gone"])
         #expect(model.groups.map { model.heading(of: $0) } == [
-            "Made by the app", "Made by Raycast", "Made by the key Lisbon zine importer", "Made by the key Backup script (expired)",
+            "Made by Marfa for Mac", "Made by Raycast", "Made by the key Lisbon zine importer", "Made by the key Backup script (expired)",
             "Made by a revoked key",
         ])
         #expect(model.groups.map(\.isOwn) == [true, false, false, false, false])

@@ -22,7 +22,7 @@ nonisolated enum AppLinks {
 
 
             ---
-            the app \(version) (\(build))
+            Marfa for Mac \(version) (\(build))
             macOS \(system)
             """)]
         return parts.url!

@@ -72,7 +72,7 @@ struct TuningTests {
         try tuning { tuning, _ in
             tuning[strength] = .number(0.35)
             #expect(tuning.report(build: "19") == """
-                the app build 19
+                Marfa for Mac build 19
                 band.strength = 0.35
                 band.enabled = true
                 shapes.shape = round
