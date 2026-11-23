@@ -2,7 +2,7 @@
 
 Status: Built in v0.0.43. Entries marked "agreed, not built" describe a design that a later release builds.
 
-Where it lives: `Catalogue`, `Item`, `SidebarItem`, `PropertyRow`, `PagePins` and `ItemViewMode`, under `MAPP/Model/`.
+Where it lives: `Catalogue`, `Item`, `SidebarItem`, `PropertyRow`, `PagePins` and `ItemViewMode`, under `MarfaMac/Model/`.
 
 What is agreed and not built yet is in [Agreed designs](agreed-designs.md). This page defines the words MAPP uses. Each entry names who owns the thing, Marfa or MAPP, and links to the page that explains it. [Marfa and MAPP](marfa-and-mapp.md) explains the split.
 

@@ -2,7 +2,7 @@
 
 Status: Built, not yet released, apart from the button shapes agreed on 22 November 2026. The one button style and the keycaps below are drawn by one type each in the sheets, quick add, the value panels, the banners and the palettes. The last Buttons line says what is built and what is not on the style yet. The toast is built for items moved to Recently Deleted; the Messages lines say what is left.
 
-Where it lives: `MappButtonStyle`, `MappButtonRole`, `MappButtonSize`, `FieldLabel`, `KeyCap` and `ShortcutKeys`, under `MAPP/Views/`; `ToastView` there and `ToastPresenter` and `StepUndo` under `MAPP/Model/`.
+Where it lives: `MappButtonStyle`, `MappButtonRole`, `MappButtonSize`, `FieldLabel`, `KeyCap` and `ShortcutKeys`, under `MarfaMac/Views/`; `ToastView` there and `ToastPresenter` and `StepUndo` under `MarfaMac/Model/`.
 
 The design system's Button and Toast components hold the exact fills and measures; `MappButtonStyle` and `ToastView` read them from there. What was turned down is in [Rejected designs](rejected-designs.md).
 

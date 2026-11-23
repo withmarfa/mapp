@@ -1,10 +1,10 @@
 # Editor page
 
-The item editor's page: TypeScript on Inkkit, built by Vite into one self-contained file, `MAPP/Editor/Page/editor.html`. The Swift host that loads it is in `MAPP/Editor/`; read `MAPP/Editor/AGENTS.md` before changing the bridge or anything the host serves. The modules named here say in their doc comments how they draw and what they ask; read them before changing their behavior.
+The item editor's page: TypeScript on Inkkit, built by Vite into one self-contained file, `MarfaMac/Editor/Page/editor.html`. The Swift host that loads it is in `MarfaMac/Editor/`; read `MarfaMac/Editor/AGENTS.md` before changing the bridge or anything the host serves. The modules named here say in their doc comments how they draw and what they ask; read them before changing their behavior.
 
 ## Build and dependencies
 
-- The built page and its license notices are committed so the app builds without Node. After any change in `editor/`, run `pnpm build` and commit `MAPP/Editor/Page/` with the change. A build of an unchanged checkout leaves those files byte-identical. The host-generated notice follows this app's lockfile; Inkkit's notices (`INKKIT-THIRD-PARTY-NOTICES.txt`) cover what it bundles, Pele among them.
+- The built page and its license notices are committed so the app builds without Node. After any change in `editor/`, run `pnpm build` and commit `MarfaMac/Editor/Page/` with the change. A build of an unchanged checkout leaves those files byte-identical. The host-generated notice follows this app's lockfile; Inkkit's notices (`INKKIT-THIRD-PARTY-NOTICES.txt`) cover what it bundles, Pele among them.
 - Import only Inkkit's public facade, `@aicayzer/inkkit`, and its stylesheet. Never import Inkkit's Milkdown or ProseMirror internals. If the page needs something the facade lacks, it belongs in a new Inkkit release (`aicayzer/inkkit`); say so rather than reach past the facade.
 - Inkkit rejects a label it does not know. `window.mappLabels` carries the app's own words beside Inkkit's, and `splitLabels` in `editor/src/editor.ts` hands Inkkit only its own.
 
@@ -39,7 +39,7 @@ The item editor's page: TypeScript on Inkkit, built by Vite into one self-contai
 
 ## Links
 
-- The page asks the app about items through the `items` message handler, which answers every request: `suggest` after `[[`, `pick` for Link to Item (answered when the person has chosen or declined), and `resolve`. A command that gets nothing back leaves the line as typed. Change these with `MAPP/Editor/ItemRequests.swift`.
+- The page asks the app about items through the `items` message handler, which answers every request: `suggest` after `[[`, `pick` for Link to Item (answered when the person has chosen or declined), and `resolve`. A command that gets nothing back leaves the line as typed. Change these with `MarfaMac/Editor/ItemRequests.swift`.
 - Opening a `[[link]]` posts `openItemLink` with its exact authored `raw` text. Forward `WikiLinkReference.raw` unchanged through opening, resolution and cache identity, since Marfa binds each spelling separately. The page never guesses which item a name means. A link to a heading of its own item is followed in the page (`ItemEditor.revealHeading`, by the heading's text). A row of the sidebar's Outline goes to a heading by its place in Inkkit's own heading list (`ItemEditor.revealHeadingAt`), so two headings that read the same each have their own. The app keeps no heading parser: the page reports its list (see Bridge).
 - An address leaves the page to be opened only through `openLink` in `src/bridge.ts`, which drops what Inkkit's `canOpenLink` refuses, and the app checks nothing more. Send `openLink` nowhere else. The one other way an address reaches the app is `linkMenu`, which carries `openable` (Inkkit's answer and `canOpenLink`'s together), and the app opens the address only where it is true.
 - Inkkit's `linkMenu` event posts `linkMenu` (the link, the pointer's place and the window's height, under the load's generation) when the person right-clicks a link; Inkkit has selected the link, and the app builds the menu. Edit Link and Remove Link then run through `format('link', address)`, `format('link')` and, for a link to an item, `unlinkSelected(text, generation)`, which writes the words the link showed where it stood. The page keeps no menu of its own. Open Link's key is Inkkit's `openLink` binding (`setKeymap`); Inkkit reads a capital letter in a key as Shift.
@@ -50,7 +50,7 @@ The item editor's page: TypeScript on Inkkit, built by Vite into one self-contai
 
 ## Bridge
 
-- The bridge has two sides: `editor/src/bridge.ts` and `MAPP/Editor/EditorMessages.swift`. Change both in the same commit.
+- The bridge has two sides: `editor/src/bridge.ts` and `MarfaMac/Editor/EditorMessages.swift`. Change both in the same commit.
 - After each `load` the page posts `painted` with its generation once the browser has drawn the document, and not if a later `load` or `reload` has given the page another generation by then. The app ends its `item.open` signpost there.
 - The page posts `headings` (Inkkit's `headings()` as `{level, text}` in document order, the ordinal being the index, a heading with no words included) with its generation after each `load` and `reload`, and after an edit only when the list differs from the last one posted for that generation. It is the only source of the sidebar's Outline.
 
@@ -61,13 +61,13 @@ The item editor's page: TypeScript on Inkkit, built by Vite into one self-contai
 
 ## Commands
 
-Run these in `editor/`: `pnpm install`, `pnpm test` (Vitest with jsdom), `pnpm typecheck`, `pnpm format:check` (`pnpm format` rewrites), and `pnpm build`, which writes `MAPP/Editor/Page/editor.html`.
+Run these in `editor/`: `pnpm install`, `pnpm test` (Vitest with jsdom), `pnpm typecheck`, `pnpm format:check` (`pnpm format` rewrites), and `pnpm build`, which writes `MarfaMac/Editor/Page/editor.html`.
 
-The `EditorTests` suite (`MAPPTests/EditorTests*.swift`) runs the built page in real WebKit through the app's bridge, so run the unit tests after `pnpm build`.
+The `EditorTests` suite (`MarfaMacTests/EditorTests*.swift`) runs the built page in real WebKit through the app's bridge, so run the unit tests after `pnpm build`.
 
 ## Code Review Rules
 
-- **Page out of date.** Flag a change under `editor/` whose commit does not include the rebuilt `MAPP/Editor/Page/editor.html`.
+- **Page out of date.** Flag a change under `editor/` whose commit does not include the rebuilt `MarfaMac/Editor/Page/editor.html`.
 - **Inkkit internals.** Flag any import from Inkkit other than `@aicayzer/inkkit` and its stylesheet.
 - **Network or navigation.** Flag a widened Content-Security-Policy, a fetch, or a navigation. Safe path: load embedded files and pictures through `mapp-embed:` only, and ask the app, through `pictures`, for a picture at a web address.
 - **Rewritten source.** Flag a change that alters bytes outside the edited block, or a fix for a rewritten form without a corpus fixture.

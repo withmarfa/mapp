@@ -1,0 +1,555 @@
+import AppKit
+import Foundation
+import SwiftUI
+import Testing
+import UniformTypeIdentifiers
+@testable import MarfaMac
+
+extension Tag {
+    /// Timing runs that print numbers rather than check behavior. The Measure test plan selects them and sets
+    /// `MARFA_MAC_MEASURE`, which they need to run; any other plan reports them skipped.
+    @Tag static var measure: Self
+}
+
+/// About 650 items shaped like a working Marfa record: several types with status, priority and date fields,
+/// a few epics and projects holding the rest through `child-of`, and some favorites. Made in code so that a run
+/// needs no server, no key and none of anyone's data.
+nonisolated enum BigLibrary {
+    static let session = TypeID("aic.session"), decision = TypeID("aic.decision"), epic = TypeID("aic.ticket.epic")
+    static let task = TypeID("aic.ticket.task"), feature = TypeID("aic.ticket.feature"), spike = TypeID("aic.ticket.spike")
+    static let log = TypeID("aic.log"), note = TypeID("core.note"), project = TypeID("aic.project")
+
+    private static func field(_ key: String, _ kind: ItemTypeInfo.Field.Kind, in type: TypeID) -> ItemTypeInfo.Field {
+        ItemTypeInfo.Field(key: key, label: key, kind: kind, declaredBy: type)
+    }
+
+    /// A status field whose words sit in the groups their names suggest, the first being not started.
+    private static func status(_ words: [(String, StatusGroup)], in type: TypeID) -> ItemTypeInfo.Field {
+        field("status", .status(words.map { StatusWord(value: $0.0, group: $0.1) }), in: type)
+    }
+
+    private static func info(_ id: TypeID, _ label: String, _ extra: [ItemTypeInfo.Field]) -> ItemTypeInfo {
+        ItemTypeInfo(
+            id: id, label: label, fields: [field("title", .text, in: id), field("body", .text, in: id)] + extra,
+            titleField: "title", bodyField: "body", parent: nil)
+    }
+
+    static let catalogue: Catalogue = {
+        let day = ItemTypeInfo.Field.Kind.date(includesTime: false), time = ItemTypeInfo.Field.Kind.date(includesTime: true)
+        func ticket(_ id: TypeID, _ label: String) -> ItemTypeInfo {
+            info(id, label, [
+                status([("backlog", .notStarted), ("todo", .notStarted), ("in_progress", .inProgress), ("in_review", .inProgress), ("done", .completed), ("canceled", .canceled)], in: id),
+                field("priority", .choice(["low", "medium", "high"]), in: id), field("due_at", day, in: id),
+                field("assignee", .text, in: id), field("estimate", .number, in: id), field("blocked", .boolean, in: id),
+            ])
+        }
+        let catalogue = Catalogue(itemTypes: [
+            info(session, "Session", [
+                status([("planned", .notStarted), ("running", .inProgress), ("closed", .completed)], in: session), field("starts_at", time, in: session),
+                field("ends_at", time, in: session), field("number", .number, in: session),
+            ]),
+            info(decision, "Decision", [
+                status([("proposed", .notStarted), ("accepted", .completed), ("superseded", .canceled)], in: decision), field("decided_at", day, in: decision),
+                field("area", .text, in: decision),
+            ]),
+            ticket(epic, "Epic"), ticket(task, "Task"), ticket(feature, "Feature"), ticket(spike, "Spike"),
+            info(log, "Log", [field("occurred_at", time, in: log)]),
+            info(note, "Note", []),
+            info(project, "Project", [status([("active", .inProgress), ("paused", .notStarted), ("done", .completed)], in: project), field("due_at", day, in: project)]),
+        ], edgeTypes: LibraryFixture.catalogue.edgeTypes.values.map { $0 })
+        return catalogue
+    }()
+
+    /// A fixed pseudo-random run, so every run times the same data.
+    private struct Rng: RandomNumberGenerator {
+        var state: UInt64
+        mutating func next() -> UInt64 {
+            state &+= 0x9E37_79B9_7F4A_7C15
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+            return z ^ (z >> 31)
+        }
+    }
+
+    static let counts: [(TypeID, Int)] = [
+        (session, 90), (decision, 175), (task, 180), (feature, 40), (spike, 20), (epic, 30), (log, 60), (note, 40), (project, 15),
+    ]
+
+    /// `scale` repeats the mix, for a test of what a library ten thousand items long costs.
+    static func items(scale: Int = 1) -> [Item] {
+        var rng = Rng(state: 137)
+        func pick<T>(_ values: [T]) -> T { values[Int(rng.next() % UInt64(values.count))] }
+        func day(_ offset: Int) -> String {
+            let date = Date(timeIntervalSince1970: 1_780_000_000 - Double(offset) * 86_400)
+            return date.formatted(.iso8601.year().month().day())
+        }
+        func time(_ offset: Int, hours: Int = 0) -> String {
+            Date(timeIntervalSince1970: 1_780_000_000 - Double(offset) * 86_400 + Double(hours) * 3600).formatted(.iso8601)
+        }
+        var made: [Item] = []
+        var parents: [ItemID] = []
+        for (type, count) in counts {
+            for index in 0..<(count * scale) {
+                let id = ItemID("\(type.rawValue)-\(index)")
+                var properties = [Property(key: "title", value: .string("\(pick(["Fix", "Plan", "Review", "Ship", "Decide", "Move", "Trim"])) \(pick(["sidebar", "table", "sync", "search", "layout", "keys", "docs"])) number \(index)"))]
+                func add(_ key: String, _ value: PropertyValue) { properties.append(Property(key: key, value: value)) }
+                let age = Int(rng.next() % 400)
+                switch type {
+                case session:
+                    add("status", .string(pick(["planned", "running", "closed", "closed", "closed"])))
+                    add("starts_at", .string(time(age))); add("ends_at", .string(time(age, hours: 1 + Int(rng.next() % 6))))
+                    add("number", .number(Decimal(index + 1)))
+                case decision:
+                    add("status", .string(pick(["accepted", "accepted", "proposed", "superseded"])))
+                    add("decided_at", .string(day(age))); add("area", .string(pick(["app", "contract", "docs", "release"])))
+                case log:
+                    add("occurred_at", .string(time(age)))
+                case note:
+                    break
+                case project:
+                    add("status", .string(pick(["active", "paused", "done"]))); add("due_at", .string(day(age - 60)))
+                default:
+                    add("status", .string(pick(["backlog", "todo", "in_progress", "in_review", "done", "done", "canceled"])))
+                    // A few tickets carry no priority, as in the record, so the sort meets an absent field.
+                    if rng.next() % 5 != 0 { add("priority", .string(pick(["low", "medium", "high"]))) }
+                    if rng.next() % 2 == 0 { add("due_at", .string(day(age - 30))) }
+                    if rng.next() % 3 == 0 { add("assignee", .string(pick(["august", "claude", "codex"]))) }
+                    if rng.next() % 4 == 0 { add("estimate", .number(Decimal(Int(rng.next() % 13)))) }
+                }
+                var item = LibraryFixture.item(
+                    id, type, properties[0].value.string ?? "", age: age * 3600, tags: rng.next() % 25 == 0 ? [ItemTag.favorite] : [],
+                    properties: properties)
+                if type == epic || type == project { parents.append(id) }
+                if [task, feature, spike, session, decision].contains(type), !parents.isEmpty, rng.next() % 4 != 0 {
+                    item.edgesOut = [LibraryFixture.child("\(id.rawValue)#child-of", id, of: pick(parents))]
+                }
+                made.append(item)
+            }
+        }
+        return made
+    }
+
+    @MainActor
+    static func loaded(scale: Int = 1) async throws -> (MarfaLibrary, FakeItemSource) {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: items(scale: scale), catalogue: catalogue)))
+        try #require(await eventually { library.isLoaded })
+        return (library, source)
+    }
+}
+
+/// What moving around the window costs, timed on 650 items (`BigLibrary`), and for Select All in the list and moving
+/// between the table's places on about ten thousand. It prints one line per action for each place,
+/// `COST|<place>|<action>|<milliseconds>|<runs>`, how often each kind of work ran as `COUNT|` lines, and what a
+/// hosted window did as `HOSTED|` lines. It checks only that the data is the size it claims. Run it with the Measure
+/// test plan, which sets `MARFA_MAC_MEASURE`; the other plans leave it out. The numbers are for a person to read, never a
+/// gate.
+@MainActor
+@Suite(.tags(.measure), .enabled(if: ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE"] != nil), .serialized)
+struct NavigationCostTests {
+    private let order = ItemOrder()
+
+    /// The median of a few runs, in milliseconds.
+    private func median(_ runs: Int = 7, _ work: () -> Void) -> Double {
+        var times: [Double] = []
+        for _ in 0..<runs {
+            let start = ContinuousClock.now
+            work()
+            let elapsed = ContinuousClock.now - start
+            times.append(Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15)
+        }
+        return times.sorted()[times.count / 2]
+    }
+
+    private func line(_ place: String, _ action: String, _ ms: Double, runs: Int = 1) {
+        print("COST|\(place)|\(action)|\(String(format: "%.2f", ms))|\(runs)")
+    }
+
+    @Test func sizesOfTheData() async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        #expect(library.items(in: .allItems).count == BigLibrary.counts.map(\.1).reduce(0, +))
+    }
+
+    @Test func eachActionInEachPlace() async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        let places: [(String, SidebarItem)] = [
+            ("all", .allItems), ("decisions", .itemType("aic.decision")), ("tasks", .itemType("aic.ticket.task")),
+            ("sessions", .itemType("aic.session")), ("recents", .recents), ("favorites", .favorites),
+        ]
+        for (name, place) in places {
+            let browser = Browser()
+            browser.sidebarItem = place
+            let count = browser.items(in: library).count
+            line(name, "items(\(count))", median { _ = browser.items(in: library) })
+            line(name, "sections", median { _ = browser.sections(in: library, order: order, now: .now) })
+            line(name, "viewModes", median { _ = browser.availableViewModes(in: library) })
+            line(name, "tableInit", median { _ = ItemTableContent(browser: browser, library: library, items: browser.items(in: library)) })
+            line(name, "tableRows", median { _ = ItemTableContent(browser: browser, library: library, items: browser.items(in: library)).rows })
+            line(name, "tableGroups", median { _ = ItemTableContent(browser: browser, library: library, items: browser.items(in: library)).groups })
+            let content = ItemTableContent(browser: browser, library: library, items: browser.items(in: library))
+            for column in content.columns where ["title", "field.status", "field.priority", "field.due_at", "edited"].contains(column.id) || column.id.hasSuffix("starts_at") {
+                let comparator = ItemTableComparator(column: column, order: column.firstOrder)
+                line(name, "sort[\(column.id)]", median { _ = ItemTableLayout.sorted(content.allRows, by: [comparator]) })
+            }
+            let items = browser.items(in: library)
+            line(name, "groupOffer", median {
+                browser.groupOfferMemo = nil
+                _ = browser.groupOffer(in: library)
+            })
+            line(name, "timelineFields", median { _ = ItemTimelineLayout.fields(for: items, catalogue: library.catalogue) })
+        }
+    }
+
+    /// How often each cost runs for one window render of each layout, as the views ask for them today.
+    @Test func countsForOneNavigation() async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        let browser = Browser()
+        browser.sidebarItem = .itemType("aic.decision")
+        #if DEBUG
+        Cost.resetTallies()
+        _ = ItemTableContent(browser: browser, library: library, items: browser.items(in: library)).rows
+        for (cost, tally) in Cost.tallies.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
+            print("COUNT|one table content|\(cost.rawValue)|\(tally.count)|\(String(format: "%.2f", tally.milliseconds))")
+        }
+        #endif
+    }
+
+    /// The real window, hosted in a window nobody sees: for each move a person makes, how many times each cost ran
+    /// before the window was still again, and how long the main actor spent on it all. The editor's web view is
+    /// part of the window, so the wall time here includes whatever the window does besides these costs.
+    @Test func aHostedWindowAcrossTheMovesAPersonMakes() async throws {
+        try await hosted { browser, library, _, step in
+            try await step("open decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("table") { browser.viewMode = .table }
+            try await step("select a row") { browser.selection = [library.items(in: .itemType("aic.decision"))[3].id] }
+            try await step("select another row") { browser.selection = [library.items(in: .itemType("aic.decision"))[4].id] }
+            try await step("tasks (table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("board") { browser.viewMode = .board }
+            try await step("timeline") { browser.viewMode = .timeline }
+            try await step("gallery") { browser.viewMode = .gallery }
+            try await step("list") { browser.viewMode = .list }
+            try await step("all items (list)") { browser.sidebarItem = .allItems }
+            try await step("table") { browser.viewMode = .table }
+        }
+    }
+
+    /// Moving between places while the list stays, which is what a person does most.
+    @Test func aHostedWindowMovingBetweenPlacesInTheList() async throws {
+        try await hosted { browser, _, _, step in
+            try await step("all items (list)") { browser.sidebarItem = .allItems }
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("tasks (list)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("sessions (list)") { browser.sidebarItem = .itemType("aic.session") }
+            try await step("all items (list) again") { browser.sidebarItem = .allItems }
+            try await step("decisions (list) again") { browser.sidebarItem = .itemType("aic.decision") }
+        }
+    }
+
+    /// Opening items one after another in the list, so each move builds a page's header and the inspector.
+    @Test func aHostedWindowMovingBetweenItemsInTheList() async throws {
+        try await hosted { browser, library, _, step in
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            for (index, id) in ids.enumerated() {
+                try await step("open item \(index + 1)") { browser.selection = [id] }
+            }
+        }
+    }
+
+    /// Select All on about ten thousand items in the list, sent as the Edit menu sends it, then the list scrolled and one
+    /// row chosen. Select All goes through the list's binding (`SelectAllRoute`), so no row's view is made for it; the
+    /// soft selection's marks should follow the rows in view, not all of those selected.
+    @Test func aHostedWindowSelectingEveryItemInTheList() async throws {
+        try await hosted(scale: 15) { browser, library, _, step in
+            try await step("all items (list)") { browser.sidebarItem = .allItems }
+            try await step("select every item") {
+                #expect(NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: Self.longestTable(), from: nil))
+            }
+            let table = try #require(Self.longestTable())
+            let items = browser.items(in: library)
+            #expect(browser.selection == Set(items.map(\.id)))
+            for index in 1...3 { try await step("scroll \(index)") { Self.scrollList(by: 1500) } }
+            let visible = table.rows(in: table.visibleRect)
+            let row = visible.location + visible.length / 2
+            // The table shows the selection on the rows it has made, here the ones scrolled to.
+            #expect(table.isRowSelected(row))
+            try await step("deselect one row") { table.deselectRow(row) }
+            #expect(browser.selection.count == items.count - 1)
+            try await step("extend by one row") { table.selectRowIndexes([row], byExtendingSelection: true) }
+            #expect(browser.selection.count == items.count)
+            try await step("choose one row") {
+                table.selectRowIndexes([row], byExtendingSelection: false)
+            }
+            #expect(browser.selection.count == 1)
+        }
+    }
+
+    /// The table of every item with no grouping, then the move between two places that stays on the table.
+    @Test func aHostedWindowOnAnUngroupedTable() async throws {
+        try await hosted { browser, _, _, step in
+            for place in [SidebarItem.allItems, .itemType("aic.decision"), .itemType("aic.ticket.task")] {
+                browser.tableOptions[place, default: .init()].grouping = .none
+            }
+            try await step("all items (list)") { browser.sidebarItem = .allItems }
+            try await step("all items (ungrouped table)") { browser.viewMode = .table }
+            try await step("decisions (ungrouped table)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("tasks (ungrouped table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("all items (ungrouped table) again") { browser.sidebarItem = .allItems }
+            try await step("list") { browser.viewMode = .list }
+        }
+    }
+
+    /// The gallery, then a selection that moves from card to card, which should make no card's derived values again.
+    @Test func aHostedWindowOnTheGallery() async throws {
+        try await hosted { browser, library, _, step in
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("gallery") { browser.viewMode = .gallery }
+            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            for (index, id) in ids.enumerated() {
+                try await step("select card \(index + 1)") { browser.selection = [id] }
+            }
+            try await step("tasks (gallery)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("all items (gallery)") { browser.sidebarItem = .allItems }
+        }
+    }
+
+    /// The gallery while a link changes: a file is attached to one item, then taken off, which should make that item's
+    /// card again and no other card.
+    @Test func aHostedWindowOnTheGalleryWhileALinkChanges() async throws {
+        try await hosted { browser, library, source, step in
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("gallery") { browser.viewMode = .gallery }
+            let host = try #require(library.items(in: .itemType("aic.decision")).first)
+            var file = LibraryFixture.item(
+                ItemID("attached-file"), BigLibrary.note, "Photo.png", age: 0, properties: [Property(key: "title", value: .string("Photo.png"))],
+                content: .file(.png, byteCount: 10))
+            file.edgesOut = [Edge(id: EdgeID("attached-file#attached-to"), type: MarfaMapping.attachmentEdge, from: file.id, to: .item(host.id), origin: .property("attached-to"))]
+            try await step("attach a file to one decision") { source.send(.upserted([file])) }
+            file.edgesOut = []
+            file.modified = Date(timeIntervalSince1970: 3_000_000)
+            try await step("take it off") { source.send(.upserted([file])) }
+        }
+    }
+
+    /// The table, then a selection that moves from row to row, and the move between places that stays on the table.
+    @Test func aHostedWindowOnTheTable() async throws {
+        try await hosted { browser, library, _, step in
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("table") { browser.viewMode = .table }
+            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            for (index, id) in ids.enumerated() {
+                try await step("select row \(index + 1)") { browser.selection = [id] }
+            }
+            try await step("tasks (table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("all items (table)") { browser.sidebarItem = .allItems }
+            try await step("decisions (table) again") { browser.sidebarItem = .itemType("aic.decision") }
+        }
+    }
+
+    /// The moves between places that stay on the table, on about ten thousand items, as a test instance holds.
+    @Test func aHostedWindowMovingBetweenTablePlacesOnALargeLibrary() async throws {
+        try await hosted(scale: 15) { browser, _, _, step in
+            try await step("all items (list)") { browser.sidebarItem = .allItems }
+            try await step("all items (table)") { browser.viewMode = .table }
+            for round in 1...3 {
+                try await step("decisions (table) \(round)") { browser.sidebarItem = .itemType("aic.decision") }
+                try await step("tasks (table) \(round)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+                try await step("all items (table) \(round)") { browser.sidebarItem = .allItems }
+            }
+        }
+    }
+
+    /// An editor whose page has loaded, showing the header of `id` as the item page does, and the drafts it reads.
+    private func openPage(_ id: ItemID, in library: MarfaLibrary) async throws -> (EditorController, DetailsPresentation) {
+        let editor = EditorController(library: library)
+        try #require(await eventually { editor.isReady })
+        let drafts = DetailsPresentation()
+        editor.showHeader { Cost.measure(.pageHeader) { ItemPageHeader.header(of: id, in: library, drafts: drafts) } }
+        return (editor, drafts)
+    }
+
+    /// Prints what ran since the last reset, for `what`, and how long the main actor was busy with it.
+    private func report(_ what: String, wallMilliseconds: Double) {
+        #if DEBUG
+        let counts = Cost.tallies.sorted { $0.key.rawValue < $1.key.rawValue }
+            .map { "\($0.key.rawValue)=\($0.value.count)x\(String(format: "%.2f", $0.value.milliseconds))ms" }.joined(separator: " ")
+        print("PAGE|\(what)|\(counts)|wall=\(String(format: "%.2f", wallMilliseconds))ms")
+        #endif
+    }
+
+    /// Runs `work`, then lets the editor's pending header readings run, and reports the cost.
+    private func measurePage(_ what: String, _ work: () -> Void) async throws {
+        #if DEBUG
+        // Lets earlier work finish, so it is not counted in the measure.
+        try await Task.sleep(for: .milliseconds(300))
+        Cost.resetTallies()
+        let start = ContinuousClock.now
+        work()
+        // The readings the work queues run in this time, and the measure subtracts it.
+        try await Task.sleep(for: .milliseconds(100))
+        let elapsed = ContinuousClock.now - start - .milliseconds(100)
+        report(what, wallMilliseconds: Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15)
+        #endif
+    }
+
+    /// Opening one item page: an epic, which holds the most links to read and list.
+    @Test func openingAnItemPage() async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        let epic = ItemID("\(BigLibrary.epic.rawValue)-0")
+        let editor = EditorController(library: library)
+        try #require(await eventually { editor.isReady })
+        let drafts = DetailsPresentation()
+        try await measurePage("open an epic") {
+            editor.showHeader { Cost.measure(.pageHeader) { ItemPageHeader.header(of: epic, in: library, drafts: drafts) } }
+        }
+        // A second window opens its own page for the same item.
+        let second = EditorController(library: library)
+        try #require(await eventually { second.isReady })
+        try await measurePage("open the same epic in a second window") {
+            second.showHeader { Cost.measure(.pageHeader) { ItemPageHeader.header(of: epic, in: library, drafts: drafts) } }
+        }
+    }
+
+    /// Moving from one item page to the next, twenty times, as arrowing down the list does.
+    @Test func movingBetweenTwentyItemPages() async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        let ids = library.items(in: .allItems).prefix(20).map(\.id)
+        let editor = EditorController(library: library)
+        try #require(await eventually { editor.isReady })
+        let drafts = DetailsPresentation()
+        try await measurePage("move between 20 items") {
+            for id in ids {
+                editor.showHeader { Cost.measure(.pageHeader) { ItemPageHeader.header(of: id, in: library, drafts: drafts) } }
+            }
+        }
+    }
+
+    /// Another item edited while a page stays open, as a connector or another window does all day.
+    @Test func anUnrelatedEditWhileAPageIsOpen() async throws {
+        let (library, source) = try await BigLibrary.loaded()
+        let epic = ItemID("\(BigLibrary.epic.rawValue)-0")
+        let (editor, _) = try await openPage(epic, in: library)
+        _ = editor
+        let unrelated = try #require(library.items(in: .itemType(BigLibrary.note.rawValue)).first)
+        try await measurePage("edit 10 unrelated items with an epic open") {
+            for index in 0..<10 {
+                var edited = unrelated
+                edited.title = "Edited \(index)"
+                edited.modified = Date(timeIntervalSince1970: 2_000_000 + Double(index))
+                source.send(.upserted([edited]))
+            }
+        }
+    }
+
+    /// Hosts the real window on 650 items (or `scale` times that) and hands `script` the browser, the library and `step`, which runs one move
+    /// and prints what it cost.
+    private func hosted(
+        scale: Int = 1,
+        _ script: (Browser, MarfaLibrary, FakeItemSource, (String, () -> Void) async throws -> Void) async throws -> Void
+    ) async throws {
+        #if DEBUG
+        let (library, source) = try await BigLibrary.loaded(scale: scale)
+        let browser = Browser()
+        let libraries = ItemPreviewFixtures.libraries(named: "MarfaMac.NavigationCost")
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 1280, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: MainView(browser: browser, details: DetailsPresentation(), restoresWindow: false)
+            .environment(\.library, library)
+            .environment(libraries))
+        window.makeKeyAndOrderFront(nil)
+        defer { window.performClose(nil); window.contentView = nil }
+
+        /// Runs `move`, waits until nothing more is made for a moment, and prints what ran.
+        func step(_ name: String, _ move: () -> Void) async throws {
+            // Lets earlier work finish, so it is not counted in the measure.
+            try await Task.sleep(for: .milliseconds(400))
+            Cost.resetTallies()
+            move()
+            var last = -1
+            var stall = 0.0
+            while true {
+                // A short sleep that wakes late says how long the main actor was held in between.
+                for _ in 0..<30 {
+                    let before = ContinuousClock.now
+                    try await Task.sleep(for: .milliseconds(5))
+                    let late = (ContinuousClock.now - before) - .milliseconds(5)
+                    stall = max(stall, Double(late.components.seconds) * 1000 + Double(late.components.attoseconds) / 1e15)
+                }
+                let now = Cost.tallies.values.map(\.count).reduce(0, +)
+                if now == last { break }
+                last = now
+            }
+            let rows = window.contentView.map { Self.tableRows(in: $0) } ?? []
+            let marks = window.contentView.map { Self.marks(in: $0) } ?? []
+            let counts = Cost.tallies.sorted { $0.key.rawValue < $1.key.rawValue }
+                .map { "\($0.key.rawValue)=\($0.value.count)x\(String(format: "%.1f", $0.value.milliseconds))ms" }.joined(separator: " ")
+            print("HOSTED|\(name)|\(counts)|longest main-actor stall=\(String(format: "%.1f", stall))ms|table rows=\(rows)|soft selection marks=\(marks)")
+        }
+
+        try await script(browser, library, source, step)
+        #endif
+    }
+
+    /// The sidebar while items change, as a connector or another window changes them all day: an edit that moves no
+    /// item between places, a new item, and a favorite. Each is its own move, so the counts are for one change.
+    @Test func aHostedWindowWhileItemsChange() async throws {
+        try await hosted { browser, library, source, step in
+            try await step("all items (list)") { browser.sidebarItem = .allItems }
+            let edited = try #require(library.items(in: .itemType(BigLibrary.note.rawValue)).first)
+            for index in 0..<3 {
+                try await step("edit an item's title \(index + 1)") {
+                    var item = edited
+                    item.title = "Edited \(index)"
+                    item.modified = Date(timeIntervalSince1970: 2_000_000 + Double(index))
+                    source.send(.upserted([item]))
+                }
+            }
+            try await step("a new item") {
+                let item = LibraryFixture.item(
+                    ItemID("added-item"), BigLibrary.note, "Added", age: 0, properties: [Property(key: "title", value: .string("Added"))])
+                source.send(.upserted([item]))
+            }
+            try await step("a favorite") {
+                var item = edited
+                item.tags.insert(ItemTag.favorite)
+                item.modified = Date(timeIntervalSince1970: 3_000_000)
+                source.send(.upserted([item]))
+            }
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("edit an item in the place") {
+                var item = library.items(in: .itemType("aic.decision"))[2]
+                item.title = "Edited here"
+                item.modified = Date(timeIntervalSince1970: 4_000_000)
+                source.send(.upserted([item]))
+            }
+        }
+    }
+
+    /// How many chosen-row marks each soft selection in the window holds, not counting the hover mark.
+    private static func marks(in view: NSView) -> [Int] {
+        (view as? SoftSelection.Marks).map { [$0.selectionLayers.count] } ?? view.subviews.flatMap { marks(in: $0) }
+    }
+
+    /// The window's longest table, which is the list.
+    private static func longestTable() -> NSTableView? {
+        func tables(in view: NSView) -> [NSTableView] {
+            (view as? NSTableView).map { [$0] } ?? view.subviews.flatMap { tables(in: $0) }
+        }
+        guard let content = NSApp.windows.first(where: { $0 is TestWindow })?.contentView else { return nil }
+        return tables(in: content).max(by: { $0.numberOfRows < $1.numberOfRows })
+    }
+
+    private static func scrollList(by points: CGFloat) {
+        guard let table = longestTable(), let scroll = table.enclosingScrollView else { return }
+        let clip = scroll.contentView
+        clip.scroll(to: NSPoint(x: 0, y: clip.bounds.origin.y + points))
+        scroll.reflectScrolledClipView(clip)
+    }
+
+    /// The row counts of every table the window holds, found in its view tree.
+    private static func tableRows(in view: NSView) -> [Int] {
+        (view as? NSTableView).map { [$0.numberOfRows] } ?? view.subviews.flatMap { tableRows(in: $0) }
+    }
+}

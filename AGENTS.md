@@ -6,10 +6,10 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 
 | If you change | Read first |
 | --- | --- |
-| `MAPP/Model/` | `MAPP/Model/AGENTS.md`; for `Marfa/` also `MAPP/Model/Marfa/AGENTS.md` |
-| `MAPP/Views/` or `MAPP/Settings/` | `AGENTS.md` there; for `Settings/Marfa/` also its own |
-| `MAPP/Editor/` or `editor/` | both `AGENTS.md` files, since the bridge spans them |
-| `MAPPTests/` | `MAPPTests/AGENTS.md` |
+| `MarfaMac/Model/` | `MarfaMac/Model/AGENTS.md`; for `Marfa/` also `MarfaMac/Model/Marfa/AGENTS.md` |
+| `MarfaMac/Views/` or `MarfaMac/Settings/` | `AGENTS.md` there; for `Settings/Marfa/` also its own |
+| `MarfaMac/Editor/` or `editor/` | both `AGENTS.md` files, since the bridge spans them |
+| `MarfaMacTests/` | `MarfaMacTests/AGENTS.md` |
 | How anything looks: a row, chip, card, page or panel | the matching page in `docs/`; `docs/glossary.md` lists the terms |
 | What Marfa holds and what stays on the Mac | `docs/marfa-and-mapp.md`, `docs/settings-storage.md` |
 
@@ -17,7 +17,7 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 
 - Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, which delivers it to Claude Code. Edit the file, never the link. Codex loads no nested file, so the table above is how it finds the rest.
 - Keep each file under 200 lines and each chain from this file to a nested one under 32,000 bytes (Codex stops at 32 KiB). Detail about one type belongs in its doc comment, a concept in `docs/`, stated once and linked.
-- List a new `AGENTS.md` under `MAPP/` and its link in the MAPP target's membership exceptions in `project.pbxproj`, or the build fails on duplicate resources.
+- List a new `AGENTS.md` under `MarfaMac/` and its link in the MAPP target's membership exceptions in `project.pbxproj`, or the build fails on duplicate resources.
 - Run `python3 Scripts/check-instructions.py` after changing an instruction file, a doc or a name a doc cites. It checks the limits, links, membership exceptions and that each name on a doc's "Where it lives" line exists. CI runs it as `Instructions`, on drafts too.
 
 ## Working here
@@ -33,7 +33,7 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 
 - Target macOS 27 and Xcode 27 only, with no `#available` checks. Swift 6 language mode, main-actor isolation by default. Unit tests use Swift Testing; UI tests use XCTest.
 - Use SwiftUI with native containers and controls, and AppKit only where SwiftUI cannot express something. Check API questions against Apple's documentation.
-- Every user-facing string goes through the String Catalog. Building in Xcode updates `MAPP/Localizable.xcstrings`; `xcodebuild` alone does not.
+- Every user-facing string goes through the String Catalog. Building in Xcode updates `MarfaMac/Localizable.xcstrings`; `xcodebuild` alone does not.
 - App Sandbox and the hardened runtime stay on. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting` and the plugins release reader (`PluginRelease`) may connect out. Neither the item page nor a sealed web page loads from the network itself.
 
 ## Data rules
@@ -45,17 +45,17 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 
 ## Project layout
 
-- `MAPP.xcodeproj` uses folder-synchronized groups for `MAPP/`, `MAPPTests/` (unit tests) and `MAPPUITests/` (UI tests). Add a source file by creating it on disk, not in `project.pbxproj`. Every file under `MAPP/` becomes an app resource unless the MAPP target's membership exceptions list it. `Design/` holds artwork that is not built into the app.
-- Debug is `com.withmarfa.mapp.debug` and never shares the installed app's data or sign-ins; `MAPP/Info.plist` claims it as the sign-in's URL scheme. Key anything that must differ on `Bundle.main.bundleIdentifier`, never a literal.
-- To compare design values, add a knob to the Debug-only `MAPP/Tuning/` panel, not variants, and remove it once settled.
+- `MarfaMac.xcodeproj` uses folder-synchronized groups for `MarfaMac/`, `MarfaMacTests/` (unit tests) and `MarfaMacUITests/` (UI tests). Add a source file by creating it on disk, not in `project.pbxproj`. Every file under `MarfaMac/` becomes an app resource unless the MAPP target's membership exceptions list it. `Design/` holds artwork that is not built into the app.
+- Debug is `com.withmarfa.mapp.debug` and never shares the installed app's data or sign-ins; `MarfaMac/Info.plist` claims it as the sign-in's URL scheme. Key anything that must differ on `Bundle.main.bundleIdentifier`, never a literal.
+- To compare design values, add a knob to the Debug-only `MarfaMac/Tuning/` panel, not variants, and remove it once settled.
 
 ## Commands
 
-The unit, UI and `Live` test commands, and measuring, are in `MAPPTests/AGENTS.md`; the editor page's commands are in `editor/AGENTS.md`.
+The unit, UI and `Live` test commands, and measuring, are in `MarfaMacTests/AGENTS.md`; the editor page's commands are in `editor/AGENTS.md`.
 
 ## Signing and releases
 
-- Never commit a team identifier, a report destination (`MAPP_POSTHOG_HOST`, `MAPP_POSTHOG_PROJECT_TOKEN`) or a version. They go in the ignored `Config/Local.xcconfig`; `MARKETING_VERSION` stays `0.0.0`.
+- Never commit a team identifier, a report destination (`MARFA_MAC_POSTHOG_HOST`, `MARFA_MAC_POSTHOG_PROJECT_TOKEN`) or a version. They go in the ignored `Config/Local.xcconfig`; `MARKETING_VERSION` stays `0.0.0`.
 - A version exists only as a git tag (`v0.0.x`, candidates `v0.0.x-rcN`), made soon after a merge to `main` that changes what a person sees or does; tests, CI and docs alone are not tagged. Before you sign, tag or check a release, read the README's Signing and Releasing sections.
 - TestFlight is for internal testers: tag freely. Try a choice in a local build first.
 

@@ -1,0 +1,263 @@
+import Foundation
+import Marfa
+import MarfaTesting
+import Synchronization
+import Testing
+@testable import MarfaMac
+
+/// A library that answers nothing of its own: the test sets its connection and report, and reads what it was
+/// asked to do.
+nonisolated final class FakeMarfaSource: MarfaMac.ItemSource {
+    let connection: MarfaConnection
+    let embeds: any EmbedResolver = FakeEmbeds()
+    let state = Latest(MarfaConnectionState.connecting)
+    let report = Latest(SyncReport(queueRead: true))
+    private let asked = Mutex<[String]>([])
+
+    init(connection: MarfaConnection) {
+        self.connection = connection
+    }
+
+    var calls: [String] { asked.withLock { $0 } }
+
+    private func record(_ call: String) {
+        asked.withLock { $0.append(call) }
+    }
+
+    /// How many times anything has subscribed to the connection states.
+    let stateSubscriptions = Mutex(0)
+
+    var connectionState: MarfaConnectionState { state.value }
+    func connectionStates() -> AsyncStream<MarfaConnectionState> {
+        stateSubscriptions.withLock { $0 += 1 }
+        return state.values()
+    }
+    func refresh() { record("refresh") }
+
+    /// The text of the first writes the report counts, as the copy reads it from its queue.
+    let unsentTexts = Mutex<[SyncContent]>([])
+    /// The copy's store, whose own writes the queue names first, so a discard of what it reports names the
+    /// store's writes and their removal is checked by id, as a real copy's is.
+    let store = Mutex<URL?>(nil)
+
+    /// The ids of the writes the store holds now.
+    var storeWrites: [String] {
+        get async throws {
+            guard let store = store.withLock({ $0 }), FileManager.default.fileExists(atPath: store.path) else { return [] }
+            return try await WorkingCopy.unsentWrites(in: store).writes.map(\.id)
+        }
+    }
+
+    /// One write for each the report counts: the store's own, then made-up ones.
+    func unsentWrites() async -> UnsentChanges? {
+        let report = report.value
+        guard report.queueRead, let stored = try? await storeWrites else { return nil }
+        let names = (0..<report.changesNotSent).map { $0 < stored.count ? stored[$0] : "w\($0)" }
+        var unsent = UnsentChanges(ids: Set(names))
+        unsent.texts = unsentTexts.withLock { $0 }.enumerated().filter { $0.offset < names.count }.map { index, content in
+            UnsentChanges.Text(id: names[index], change: .edit, content: content, date: Date(timeIntervalSinceReferenceDate: Double(index)))
+        }
+        return unsent
+    }
+
+    func close(agreeing agreed: UnsentChanges?) async -> CloseOutcome {
+        let unsent = await unsentWrites()
+        let covered = if let unsent { agreed.map { unsent.ids.isSubset(of: $0.ids) } ?? true } else { agreed == nil }
+        guard covered else { return .waiting(unsent) }
+        record("close")
+        await onClose.withLock { $0 }?()
+        return .closed
+    }
+
+    var syncReport: SyncReport { report.value }
+    func syncReports() -> AsyncStream<SyncReport> { report.values() }
+    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool { false }
+
+    func changes() -> AsyncStream<SourceChange> { AsyncStream { $0.finish() } }
+    func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool { true }
+    func body(of item: ItemID) async throws -> ItemBody { throw SourceFailure(kind: .missing, message: "") }
+    func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict { .taken }
+    func edgeVerdict(moving edge: EdgeID, end: EdgeTypeInfo.End, to: ItemID) async -> EdgeVerdict { .taken }
+    func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] { [] }
+    func fileURL(of item: ItemID) async throws -> URL { throw SourceFailure(kind: .missing, message: "") }
+    func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch { SourceSearch() }
+    func items(inView view: ItemID) async throws -> [ItemID] { [] }
+    func items(matching query: LibraryViewQuery) async throws -> [ItemID] { [] }
+
+    func createView(_ settings: LibraryViewSettings, idempotencyKey: String) async throws -> LibraryView {
+        throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")
+    }
+    func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64, idempotencyKey: String) async throws -> LibraryView {
+        throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")
+    }
+    func deleteView(_ view: ItemID, idempotencyKey: String) async throws {
+        throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")
+    }
+    /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
+    let queuing = Mutex(false)
+    let queued = Mutex(0)
+
+    func queueSubmitted() async {
+        while queuing.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(10)) }
+        queued.withLock { $0 += 1 }
+    }
+
+    /// While set, closing waits, as a copy finishing its last step does.
+    let closesSlowly = Mutex(false)
+    /// Run as a close begins, before it answers, to stand for a quit while the copy closes.
+    let onClose = Mutex<(@Sendable () async -> Void)?>(nil)
+
+    func close() async {
+        record("close")
+        await onClose.withLock { $0 }?()
+        while closesSlowly.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(10)) }
+    }
+
+    /// The tokens of the sign-ins the copy was given, in order. A sign-in given while it was not open is never here.
+    var given: [String] { gave.withLock { $0 } }
+    private let gave = Mutex<[String]>([])
+    /// What giving the copy a sign-in does: nothing, or throw, as the package's `use(_:)` does.
+    let useFailure = Mutex<(any Error)?>(nil)
+    /// Run as the copy is given a sign-in, to stand for the copy's calls waiting while it changes.
+    let onUse = Mutex<(@Sendable () async -> Void)?>(nil)
+
+    /// Whether a failure to give the sign-in closed the copy, as the package does where its store cannot open again.
+    let useCloses = Mutex(false)
+    /// The role the copy holds once given the sign-in.
+    let useRole = Mutex(SourceRole.writer)
+
+    func use(_ server: Server) async throws -> SourceRole {
+        record("use")
+        await onUse.withLock { $0 }?()
+        if let failure = useFailure.withLock({ $0 }) { throw SourceUseFailure(cause: failure, closed: useCloses.withLock { $0 }) }
+        gave.withLock { $0.append(server.key) }
+        return useRole.withLock { $0 }
+    }
+}
+
+nonisolated extension UnsentChanges {
+    static func fake(_ count: Int) -> UnsentChanges {
+        UnsentChanges(ids: Set((0..<count).map { "w\($0)" }))
+    }
+}
+
+/// Opens a fake library for each address, as `MarfaSource.open` would: refused without a key, and making the
+/// copy's directory.
+nonisolated final class FakeServers: Sendable {
+    let failure = Mutex<SourceFailure?>(nil)
+    /// While set, an open waits, as one behind a keychain prompt would.
+    let slow = Mutex(false)
+    let opening = Mutex(false)
+    private let made = Mutex<[FakeMarfaSource]>([])
+    /// The name each address gives itself; an address with none cannot be read.
+    let names = Mutex<[MarfaConnection: String]>([:])
+    let reads = Mutex(0)
+    /// How many writes a new copy's store holds, unsent, as a real one does after the person wrote.
+    let storedWrites = Mutex(0)
+
+    var describer: MarfaHost.Describer {
+        { connection in
+            self.reads.withLock { $0 += 1 }
+            guard let name = self.names.withLock({ $0[connection] }) else {
+                throw SourceFailure(kind: .missing, message: "The server did not answer.")
+            }
+            return name
+        }
+    }
+
+    var opened: [FakeMarfaSource] { made.withLock { $0 } }
+    var last: FakeMarfaSource? { opened.last }
+
+    var opener: MarfaHost.Opener {
+        { connection, signIns, location in
+            if let failure = self.failure.withLock({ $0 }) { throw failure }
+            self.opening.withLock { $0 = true }
+            while self.slow.withLock({ $0 }) { try await Task.sleep(for: .milliseconds(10)) }
+            guard try signIns.server(for: connection) != nil else {
+                throw SourceFailure(kind: .denied, message: "There’s no key for this Marfa server.")
+            }
+            try FileManager.default.createDirectory(at: location.directory(for: connection), withIntermediateDirectories: true)
+            let store = location.store(for: connection)
+            let stored = self.storedWrites.withLock { $0 }
+            if stored > 0, !FileManager.default.fileExists(atPath: store.path) {
+                let copy = try await WorkingCopy.open(store: store)
+                for index in 0..<stored {
+                    _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": .string("unsent \(index)")]))
+                }
+                await copy.close()
+            }
+            let source = FakeMarfaSource(connection: connection)
+            source.store.withLock { $0 = store }
+            self.made.withLock { $0.append(source) }
+            return source
+        }
+    }
+}
+
+nonisolated extension MarfaHost.DisconnectChoice {
+    /// A discard of a copy the person was shown nothing waiting in.
+    static var discardNothing: Self { .discardCopy(UnsentChanges(ids: [])) }
+}
+
+/// Leaves the library as a person does: asked what waits, they discard exactly that.
+@MainActor func discardEverything(_ host: MarfaHost) async throws {
+    do {
+        try await host.disconnect()
+    } catch {
+        guard case .changesWaiting(let shown?) = error else { throw error }
+        try await host.disconnect(.discardCopy(shown))
+    }
+}
+
+/// A host on its own defaults, key store and store directory, all removed when the test ends.
+@MainActor final class HostBench {
+    let root = URL.temporaryDirectory.appending(path: "MarfaHostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let suite = "MarfaHostTests-\(UUID().uuidString)"
+    let defaults: UserDefaults
+    let signIns = ScriptedSignIns()
+    let location: MarfaStoreLocation
+    let servers = FakeServers()
+
+    init() throws {
+        defaults = try #require(UserDefaults(suiteName: suite))
+        location = MarfaStoreLocation(root: root)
+    }
+
+    deinit {
+        UserDefaults().removePersistentDomain(forName: suite)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: root.path)
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    /// A host that removes nothing outside its own copy: `cleaner` stands for the kept files and cached pictures, which a test must not touch.
+    func host(
+        opener: MarfaHost.Opener? = nil, remover: MarfaHost.Remover? = nil, cleaner: MarfaHost.Cleaner? = nil
+    ) -> MarfaHost {
+        MarfaHost(
+            defaults: defaults, signIns: signIns, location: location, opener: opener ?? servers.opener, describer: servers.describer,
+            remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) }, cleaner: cleaner ?? {})
+    }
+
+    var savedAddress: String? { defaults.string(forKey: "MarfaAddress") }
+
+    func hasCopy(_ connection: MarfaConnection) -> Bool {
+        FileManager.default.fileExists(atPath: location.directory(for: connection).path)
+    }
+}
+
+@MainActor extension MarfaHost {
+    /// Signs in by the browser, which the test's `ScriptedSignIns` answers by holding `key` for the address.
+    func connect(address: String, key: String) async throws(Problem) {
+        try await connect(address: address, via: scripted(key))
+    }
+
+    func changeAddress(to address: String, key: String, choice: DisconnectChoice? = nil) async throws(Problem) {
+        try await changeAddress(to: address, via: scripted(key), choice: choice)
+    }
+
+    /// A browser sign-in that leaves `key` held.
+    func scripted(_ key: String) -> SignInMethod {
+        (signIns as? ScriptedSignIns)?.script(browser: [.success(key)])
+        return .browser
+    }
+}

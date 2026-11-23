@@ -2,7 +2,7 @@
 
 Location shipped in v0.0.45 and Relation in v0.0.47. Count is available in this branch.
 
-Where it lives: `PropertyRow` (with its `Value`) under `MAPP/Model/Items/`, and `MarfaMapping` under `MAPP/Model/Marfa/`. Location is `ItemLocation` and `LocationFrame` under `MAPP/Model/Items/`, and `LocationPanelContent` and `LocationPanelModel` under `MAPP/Views/ValueEditing/`. Relation is `Relation`, `RelatedItem` and `ItemRelations` under `MAPP/Model/Items/`. Composed properties are built in a type's look from these.
+Where it lives: `PropertyRow` (with its `Value`) under `MarfaMac/Model/Items/`, and `MarfaMapping` under `MarfaMac/Model/Marfa/`. Location is `ItemLocation` and `LocationFrame` under `MarfaMac/Model/Items/`, and `LocationPanelContent` and `LocationPanelModel` under `MarfaMac/Views/ValueEditing/`. Relation is `Relation`, `RelatedItem` and `ItemRelations` under `MarfaMac/Model/Items/`. Composed properties are built in a type's look from these.
 
 A composed property is a property that MAPP builds from a type's fields and links. Marfa holds no such property, so building one changes nothing in Marfa and stores nothing new there.
 

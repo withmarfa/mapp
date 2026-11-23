@@ -71,7 +71,7 @@ Customize Layout turns the right sidebar into the editor of the page's layout, f
 - The mode finishes from the system's blue Done button, which takes the Details button's place. Customize Layout is offered only while a page is showing.
 - Page and Sidebar is the system's segmented control, as wide as the boxes under it.
 - In Sidebar, a row has a handle, the section's name and count, and a minus in a circle. A dashed Add Section opens its list under it, and From Apps appears only where real linked data exists.
-- The page and the sidebar stay in view and follow each change at once. The choice is MAPP's own and changes no item, so a read-only item can be laid out too; the rule for code is in [`MAPP/Model/AGENTS.md`](../MAPP/Model/AGENTS.md).
+- The page and the sidebar stay in view and follow each change at once. The choice is MAPP's own and changes no item, so a read-only item can be laid out too; the rule for code is in [`MarfaMac/Model/AGENTS.md`](../MarfaMac/Model/AGENTS.md).
 
 The choices are stored as `pagePlacements`. See [Settings storage](settings-storage.md). Layout is per type with no inheritance today; the agreed look store changes that. See [Looks](looks.md).
 

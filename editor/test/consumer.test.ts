@@ -523,7 +523,7 @@ test('a loaded note reports its first frame once, and not when another load has 
 
 test("the words the app sends mount Inkkit, with the app's own kept out of its labels", async () => {
   const swift = readFileSync(
-    resolve(import.meta.dirname, '../../MAPP/Editor/EditorController+PageSettings.swift'),
+    resolve(import.meta.dirname, '../../MarfaMac/Editor/EditorController+PageSettings.swift'),
     'utf8',
   )
   const start = swift.indexOf('static var editorLabels')

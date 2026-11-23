@@ -2,7 +2,7 @@
 
 Status: Built. MAPP's settings are kept in the connected Marfa so every Mac that connects uses them; window sizes, column widths and On This Mac stay on each Mac. The store of type looks and the list density are built in v0.0.44. See [Looks](looks.md).
 
-Where it lives: `ListKey`, `PageKey`, `OrderKey`, `InterfaceKey` and `AppearanceKey` under `MAPP/Views/`, and `MacSettings`, `StartWith`, `ReopenWindows`, `NewItemType`, `NewRowTypes`, `WeekStart`, `CalendarHourHeight`, `PagePlacements`, `ViewLayouts`, `PlaceDefaults`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `SearchLeaveOuts`, `SearchOptions`, `DateFormat` and `RemotePictureSetting` under `MAPP/Model/`, `ShortcutBindings` and `AnyAppShortcuts` under `MAPP/Model/Shortcuts/`, and `PreferencesType`, `PreferencesMap`, `PreferencesMerge`, `PreferencesSync`, `PreferencesCopy` and `ConnectionSettings` under `MAPP/Model/Marfa/`.
+Where it lives: `ListKey`, `PageKey`, `OrderKey`, `InterfaceKey` and `AppearanceKey` under `MarfaMac/Views/`, and `MacSettings`, `StartWith`, `ReopenWindows`, `NewItemType`, `NewRowTypes`, `WeekStart`, `CalendarHourHeight`, `PagePlacements`, `ViewLayouts`, `PlaceDefaults`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `SearchLeaveOuts`, `SearchOptions`, `DateFormat` and `RemotePictureSetting` under `MarfaMac/Model/`, `ShortcutBindings` and `AnyAppShortcuts` under `MarfaMac/Model/Shortcuts/`, and `PreferencesType`, `PreferencesMap`, `PreferencesMerge`, `PreferencesSync`, `PreferencesCopy` and `ConnectionSettings` under `MarfaMac/Model/Marfa/`.
 
 MAPP's settings have three homes. A setting belongs in the narrowest one that matches what the person would expect.
 
@@ -96,14 +96,14 @@ Settings > General > Reset MAPP's Settings… clears every key in `MacSettings.k
 
 ## Rules
 
-The rules that apply to every setting are in the `AGENTS.md` files: [what syncs and what stays](../AGENTS.md), [how a saved view's Mac settings are kept and forgotten](../MAPP/Model/AGENTS.md), and [how a Debug build keeps its own values](../AGENTS.md).
+The rules that apply to every setting are in the `AGENTS.md` files: [what syncs and what stays](../AGENTS.md), [how a saved view's Mac settings are kept and forgotten](../MarfaMac/Model/AGENTS.md), and [how a Debug build keeps its own values](../AGENTS.md).
 
 - **A type's setting has little inheritance.** `pagePlacements` for a child type does not read its parent's. A look does: it follows the `parent` chain, place by place; see [Looks](looks.md).
 - **A setting has one place.** A key is in `PreferencesMap` as synced or as staying on this Mac, never both.
 
 ## The Settings window
 
-Where it lives: `SettingsWindowView`, `SettingsPage`, `SettingsNavigation`, `SettingsLauncher`, `SettingsSidebar`, `SettingsTokens` and `MarfaSettingsHost`, under `MAPP/Settings/`.
+Where it lives: `SettingsWindowView`, `SettingsPage`, `SettingsNavigation`, `SettingsLauncher`, `SettingsSidebar`, `SettingsTokens` and `MarfaSettingsHost`, under `MarfaMac/Settings/`.
 
 Settings is a window of its own, opened by MAPP > Settings… (⌘,), with one instance that comes forward if it is already open and keeps the size it was left at (1200 by 900 points at first). It is a `Window` scene, not the system's `Settings` scene, which is sized to its content for a few tabs and gives no toolbar of ours or remembered, resizable frame. Every route that opens Settings names a page in the same window: the command, the sidebar's Settings shortcut, the palette's Settings commands, the connect and sign-in buttons, and the notices that offer Settings (`SettingsLauncher`). The main window keeps no Settings place, and no Settings column or width.
 

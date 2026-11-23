@@ -2,7 +2,7 @@
 
 Status: Built in v0.0.44. Each kind of value below is drawn by one component wherever the app shows it, except where "Not yet built" says otherwise. A board card and a table cell reading the type's look draw its values through the same family, built in v0.0.45.
 
-Where it lives: `ValueEditKind`, `ValueEditModel`, `CommandValuePanels` and `FieldMenu` for editing, `PageChip`, `PagePerson`, `PersonCircle`, `StatusMark`, `ChipLine`, `ChipLooks`, `TypeMark`, `TypeTone` and `OptionTone` under `MAPP/Views/Looks/`, `StatusSymbol` under `MAPP/Model/Items/`, and `editor/src/header.ts` for the page's web header.
+Where it lives: `ValueEditKind`, `ValueEditModel`, `CommandValuePanels` and `FieldMenu` for editing, `PageChip`, `PagePerson`, `PersonCircle`, `StatusMark`, `ChipLine`, `ChipLooks`, `TypeMark`, `TypeTone` and `OptionTone` under `MarfaMac/Views/Looks/`, `StatusSymbol` under `MarfaMac/Model/Items/`, and `editor/src/header.ts` for the page's web header.
 
 A value component is one drawing for one kind of value. The same component appears on the page, in the right sidebar, in a row, a card and a table cell, and in the panel that edits the value, so a status looks like a status everywhere.
 

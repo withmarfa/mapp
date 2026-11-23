@@ -3,8 +3,8 @@
 DEVELOPMENT_TEAM =
 
 // Where a build reports its errors and timings. Empty here, so a build from this source sends nothing; a build
-// made by WithMarfa carries both in Config/Local.xcconfig. MAPP/Info.plist reads them under these names. In
+// made by WithMarfa carries both in Config/Local.xcconfig. MarfaMac/Info.plist reads them under these names. In
 // Local.xcconfig write the host's `://` as `:/$()/`, since an xcconfig reads `//` as a comment.
-MAPP_POSTHOG_HOST =
-MAPP_POSTHOG_PROJECT_TOKEN =
+MARFA_MAC_POSTHOG_HOST =
+MARFA_MAC_POSTHOG_PROJECT_TOKEN =
 #include? "Local.xcconfig"

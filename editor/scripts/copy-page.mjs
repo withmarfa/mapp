@@ -1,6 +1,6 @@
 import { copyFile, mkdir, readFile } from 'node:fs/promises'
 
-const destination = '../MAPP/Editor/Page'
+const destination = '../MarfaMac/Editor/Page'
 const packageDist = new URL('.', import.meta.resolve('@aicayzer/inkkit/core'))
 const hostNotices = await readFile('dist/EDITOR-THIRD-PARTY-NOTICES.md', 'utf8')
 if (!hostNotices.includes('@aicayzer/inkkit'))

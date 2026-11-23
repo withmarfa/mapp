@@ -2,7 +2,7 @@
 
 Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's star as described below, are built, not yet released, as are Items, Collections and Sources as index pages with tabs and a table, the sidebar customized in place, opening an item as a modal, a full page or a window with one row menu for every layout, making an item with quick add and the empty states, and the default view of every place that is not a saved view, with Save as View… and Reset View in View Options. A saved view's group kept whole, dates grouped by day, week, month or year, the board's cards following the sort and no Sort on the timeline or the calendar are built, not yet released. See [Looks](looks.md). One Group by for every layout and place, with Set or Not Set, status groups, group order and hidden groups, Hide Empty Groups in every place and one Sort by and Group by for a place's list, is built, not yet released. One Properties list for every layout, Edit Layouts… in the window and the timeline's row as agreed are built, not yet released. Filters for every field, the filter row's All or Any, relative dates and the "is not" rewrite are built, not yet released. See [Grouping, Properties and filters](#grouping-properties-and-filters).
 
-Where it lives: `Browser`, `ItemViewMode`, `ItemOpening`, `QuickAdd`, `PlaceEmpty`, `ListNeighbors`, `RowMenuEntry`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences`, `IndexChoice`, `ItemIndexModel`, `SearchLeaveOuts` and `SearchLeftOutLine` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `ItemIndexRow`, `CardContents`, `ItemTableLayout`, `GroupOffer`, `FilterOffer`, `FilterMatching`, `DateGroups`, `ItemTimelineLayout`, `TimelineRowFace`, `ViewProperties`, `ItemPlacement`, `EventSpan`, `CalendarLayout`, `CalendarCorner` and `SearchNarrowing` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemRowMenu`, `ItemModal`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `TimelineRowView`, `PropertiesMenu`, `ViewPanelProperties`, `ItemCalendar`, `SidebarIndex`, `SidebarPlaceMenu`, `SidebarColorPicker`, `IndexPage`, `ItemsIndex`, `IndexInspector`, `IndexViewOptions`, `WindowCorner`, `ViewCorner`, `CalendarCornerView`, `CalendarMonthCard`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `FilterClausePanelHost`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
+Where it lives: `Browser`, `ItemViewMode`, `ItemOpening`, `QuickAdd`, `PlaceEmpty`, `ListNeighbors`, `RowMenuEntry`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences`, `IndexChoice`, `ItemIndexModel`, `SearchLeaveOuts` and `SearchLeftOutLine` under `MarfaMac/Model/`, with `IndexRow`, `IndexRows`, `ItemIndexRow`, `CardContents`, `ItemTableLayout`, `GroupOffer`, `FilterOffer`, `FilterMatching`, `DateGroups`, `ItemTimelineLayout`, `TimelineRowFace`, `ViewProperties`, `ItemPlacement`, `EventSpan`, `CalendarLayout`, `CalendarCorner` and `SearchNarrowing` under `MarfaMac/Model/Items/`; `ItemList`, `ItemRow`, `ItemRowMenu`, `ItemModal`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `TimelineRowView`, `PropertiesMenu`, `ViewPanelProperties`, `ItemCalendar`, `SidebarIndex`, `SidebarPlaceMenu`, `SidebarColorPicker`, `IndexPage`, `ItemsIndex`, `IndexInspector`, `IndexViewOptions`, `WindowCorner`, `ViewCorner`, `CalendarCornerView`, `CalendarMonthCard`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `FilterClausePanelHost`, `ItemViewOptions` and `CommandPalette` under `MarfaMac/Views/`.
 
 A view shows a set of items in a layout. This page explains the layouts, what a saved view is, and the controls that change what a list shows.
 
@@ -85,7 +85,7 @@ Built, not yet released. Every layout draws an empty place from one rule (`Place
 
 ## Saved views
 
-A saved view splits between Marfa and the Mac. The rules for each side, and for deleting a view, are in [`MAPP/Model/AGENTS.md`](../MAPP/Model/AGENTS.md).
+A saved view splits between Marfa and the Mac. The rules for each side, and for deleting a view, are in [`MarfaMac/Model/AGENTS.md`](../MarfaMac/Model/AGENTS.md).
 
 - **Marfa holds** the view's title, query, sort and group. The group is a field, a span for a date (day, week, month or year) and the groups another app put first or hid (`group.order`, `group.hidden`).
 - **MAPP keeps the group whole.** A write names the group only when the person changed it. Grouping by the same field again (a new span, or the timeline's day of that date) keeps the order and hidden groups; grouping by another field drops them, since they name the old field's values, and writes MAPP's own order where it has one: a status's words by their groups, a choice's options as declared. Undo gives back the groups as they were. A view grouped by something MAPP cannot show, such as a link it has no column for, opens ungrouped, and its group stays as it is.
@@ -127,7 +127,7 @@ Edit View opens in the right sidebar, and New View uses the same panel. It holds
 
 ## How an edit is saved
 
-The funnel that writes each part where it belongs, and what it does when a write is refused, are in [`MAPP/Model/AGENTS.md`](../MAPP/Model/AGENTS.md). Column widths differ from the rest: they are kept only from a drag of a divider (`Browser.keepWidths`), because `TableColumnCustomization` cannot separate the column order and visibility from the widths, so the app owns those two.
+The funnel that writes each part where it belongs, and what it does when a write is refused, are in [`MarfaMac/Model/AGENTS.md`](../MarfaMac/Model/AGENTS.md). Column widths differ from the rest: they are kept only from a drag of a divider (`Browser.keepWidths`), because `TableColumnCustomization` cannot separate the column order and visibility from the widths, so the app owns those two.
 
 ## Filters
 
@@ -343,7 +343,7 @@ Command-K and Search Items share one 680-point panel (`CommandPalette`), which s
   - More than ten conditions or ten types in one search is refused and shown as Can't Search, which a person fixes by choosing or leaving out less. One type chosen without its subtypes is one condition however many subtypes it has. This is built and not yet released.
 - There is no preview pane beside the results. A row carries its own excerpt.
 
-The palette builds its own list of commands. The rule that every toolbar action is also a command is in [`MAPP/Views/AGENTS.md`](../MAPP/Views/AGENTS.md).
+The palette builds its own list of commands. The rule that every toolbar action is also a command is in [`MarfaMac/Views/AGENTS.md`](../MarfaMac/Views/AGENTS.md).
 
 ## Controls
 
@@ -354,7 +354,7 @@ The palette builds its own list of commands. The rule that every toolbar action 
 
 ## Large libraries
 
-The rule for large lists is in [`MAPP/Views/AGENTS.md`](../MAPP/Views/AGENTS.md).
+The rule for large lists is in [`MarfaMac/Views/AGENTS.md`](../MarfaMac/Views/AGENTS.md).
 
 ## Where things go
 
@@ -367,7 +367,7 @@ The window has three areas: the sidebar, the list pane and the page. What a pers
 
 Status: Built, not yet released. Settings is a window of its own, not a place in the main window; [Settings storage](settings-storage.md#the-settings-window) says what it holds and how it is opened.
 
-Where it lives: `SettingsWindowView`, `SettingsSidebar`, `SettingsNavigation`, `SettingsLauncher`, `SettingsTokens`, `SettingsSection`, `SettingsRow`, `SettingsButton`, `SettingsSearchField`, `SettingsHead`, `SettingsProblemRow`, `SettingsPageState`, `SettingsReadOnlyValue`, `SettingsSheet`, `ChoiceTiles`, `SettingsSectionTable` and `SettingsPageTable`, under `MAPP/Settings/`.
+Where it lives: `SettingsWindowView`, `SettingsSidebar`, `SettingsNavigation`, `SettingsLauncher`, `SettingsTokens`, `SettingsSection`, `SettingsRow`, `SettingsButton`, `SettingsSearchField`, `SettingsHead`, `SettingsProblemRow`, `SettingsPageState`, `SettingsReadOnlyValue`, `SettingsSheet`, `ChoiceTiles`, `SettingsSectionTable` and `SettingsPageTable`, under `MarfaMac/Settings/`.
 
 The rules every page follows, agreed with August on 19 and 20 November 2026. The button rule of 22 November 2026 changes the buttons, pop-ups, input widths and numbers below; [Agreed designs](agreed-designs.md#buttons) lists what is not built yet.
 

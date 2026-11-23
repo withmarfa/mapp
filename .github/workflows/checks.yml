@@ -49,21 +49,21 @@ jobs:
         run: |
           files=$(git diff --name-only HEAD^1 HEAD)
           echo "$files"
-          if echo "$files" | grep -qE '^(editor/|MAPP/Editor/Page/|\.github/workflows/checks\.yml$)'; then
+          if echo "$files" | grep -qE '^(editor/|MarfaMac/Editor/Page/|\.github/workflows/checks\.yml$)'; then
             echo "editor=true" >> "$GITHUB_OUTPUT"
           fi
-          app=$(echo "$files" | grep -vE '\.md$' | grep -E '^(MAPP/|MAPPTests/|MAPPUITests/|MAPP\.xcodeproj/|TestPlans/|Config/|\.github/workflows/checks\.yml$|\.github/scripts/)' || true)
+          app=$(echo "$files" | grep -vE '\.md$' | grep -E '^(MarfaMac/|MarfaMacTests/|MarfaMacUITests/|MarfaMac\.xcodeproj/|TestPlans/|Config/|\.github/workflows/checks\.yml$|\.github/scripts/)' || true)
           if [ -n "$app" ]; then
             echo "swift=true" >> "$GITHUB_OUTPUT"
           fi
           # Anything outside the String Catalog, assets and UI tests may change logic. Views count: several unit
           # tests host them.
-          logic=$(echo "$app" | grep -vE '^(MAPP/Localizable\.xcstrings$|MAPP/Assets\.xcassets/|MAPPUITests/)' || true)
+          logic=$(echo "$app" | grep -vE '^(MarfaMac/Localizable\.xcstrings$|MarfaMac/Assets\.xcassets/|MarfaMacUITests/)' || true)
           if [ -n "$logic" ]; then
             echo "logic=true" >> "$GITHUB_OUTPUT"
           fi
           # The release build compiles the app, not the tests, so tests, test plans and the test scripts do not need it.
-          release=$(echo "$app" | grep -E '^(MAPP/|MAPP\.xcodeproj/|Config/|\.github/workflows/checks\.yml$)' || true)
+          release=$(echo "$app" | grep -E '^(MarfaMac/|MarfaMac\.xcodeproj/|Config/|\.github/workflows/checks\.yml$)' || true)
           if [ -n "$release" ]; then
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
@@ -103,7 +103,7 @@ jobs:
       - name: Rebuild the page and compare
         run: |
           pnpm build
-          git diff --exit-code -- ../MAPP/Editor/Page/
+          git diff --exit-code -- ../MarfaMac/Editor/Page/
 
   actionlint:
     name: Workflow lint
@@ -152,7 +152,7 @@ jobs:
       # in minutes, with a sample of the blocked process, instead of at the job's limit.
       - name: Build the app and unit tests
         run: >
-          xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Unit -destination 'platform=macOS'
+          xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -testPlan Unit -destination 'platform=macOS'
           -derivedDataPath build build-for-testing
       - name: Run the unit tests
         if: needs.changes.outputs.logic == 'true'
@@ -167,7 +167,7 @@ jobs:
       # are only built, so a change that breaks them is seen.
       - name: Build the UI tests
         run: >
-          xcodebuild -project MAPP.xcodeproj -scheme 'MAPP UI Tests' -destination 'platform=macOS'
+          xcodebuild -project MarfaMac.xcodeproj -scheme 'MarfaMac UI Tests' -destination 'platform=macOS'
           -derivedDataPath build build-for-testing
       - name: Show failures
         if: failure() && hashFiles('TestResults.xcresult/**') != ''
@@ -201,7 +201,7 @@ jobs:
       # A tag build archives Release, which leaves out code that only Debug builds hold; see v0.0.21 to v0.0.24-rc1.
       - name: Build the release configuration
         run: >
-          xcodebuild -project MAPP.xcodeproj -scheme MAPP -configuration Release -destination 'generic/platform=macOS'
+          xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -configuration Release -destination 'generic/platform=macOS'
           -derivedDataPath build-release CODE_SIGNING_ALLOWED=NO build
 
   checks:

@@ -8,10 +8,10 @@
 # The run writes to the server, so it starts only when the instance_id the server reports at its root (`GET <address>/`)
 # is the one given: reading it from the server and passing it is the acknowledgement that this is a test instance.
 #
-# Further arguments go to xcodebuild, such as `-only-testing:MAPPUITests/SpeedMeasureTests/testLaunchWarm` or build
+# Further arguments go to xcodebuild, such as `-only-testing:MarfaMacUITests/SpeedMeasureTests/testLaunchWarm` or build
 # settings. Add `SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule` for numbers close to a release's.
 # The test takes over the screen and keyboard, so run it with no other UI test running, and against a test instance
-# only, never a server that holds a person's data. The Debug-only `-MAPPKeepTestStore` flag keeps the copy the last
+# only, never a server that holds a person's data. The Debug-only `-MarfaMacKeepTestStore` flag keeps the copy the last
 # launch left, which is how a warm launch is timed. UI testing's own queries of a library this size take seconds, so
 # the tests click by coordinate and use shortcuts, and the signposts are the finer number.
 set -u
@@ -49,7 +49,7 @@ stream=$!
 # The stream takes a moment to attach, and nothing has begun.
 sleep 2
 
-TEST_RUNNER_MAPP_MEASURE_UI=1 xcodebuild -project "$dir/../MAPP.xcodeproj" -scheme 'MAPP UI Tests' -testPlan 'Measure UI' \
+TEST_RUNNER_MARFA_MAC_MEASURE_UI=1 xcodebuild -project "$dir/../MarfaMac.xcodeproj" -scheme 'MarfaMac UI Tests' -testPlan 'Measure UI' \
   -destination 'platform=macOS' -derivedDataPath "$derived" "$@" test 2>&1 | tee "$out" | grep -E '^UI\||error:|measured \[|Test Case .* (passed|failed|skipped)|TEST (SUCCEEDED|FAILED)'
 result=${pipestatus[1]}
 

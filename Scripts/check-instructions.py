@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks that MAPP's agent instructions and concept docs have not drifted. Standard library only.
+"""Checks that MarfaMac's agent instructions and concept docs have not drifted. Standard library only.
 
     python3 Scripts/check-instructions.py [repository root]
 
@@ -10,8 +10,8 @@ Each failure prints `path:line: message` (and a GitHub annotation in Actions); t
    32,000 bytes. Codex stops reading at 32 KiB, and the root file states this limit.
 3. Each `AGENTS.md` has a `CLAUDE.md` beside it that is a symlink to it, and no `CLAUDE.md` stands without one.
 4. Each backticked name on a "Where it lives" line in `docs/*.md` exists in the source. The line is the paragraph that
-   starts `Where it lives:`, up to the next blank line. The source is `MAPP/`, `MAPPTests/`, `MAPPUITests/` and
-   `editor/src/` (`.swift`, `.ts`, `.tsx`, `.js`, `.css`), without `MAPP/Editor/Page/`, which is built output.
+   starts `Where it lives:`, up to the next blank line. The source is `MarfaMac/`, `MarfaMacTests/`, `MarfaMacUITests/` and
+   `editor/src/` (`.swift`, `.ts`, `.tsx`, `.js`, `.css`), without `MarfaMac/Editor/Page/`, which is built output.
    A name is checked as follows, and anything that fits none of these is skipped:
    - A path (it holds `/`, or ends in a file extension such as `.swift` or `.ts`) must exist from the repository root,
      or end a path in the source: `ValueEditing/` matches any folder of that name, `ListRows.swift` any file.
@@ -21,8 +21,8 @@ Each failure prints `path:line: message` (and a GitHub annotation in Actions); t
    - Skipped as unverifiable: names with no capital letter (plain words, SF Symbol names such as
      `circle.lefthalf.filled`, Marfa type ids such as `core.note`, snake_case keys), names in capitals only
      (environment variables), and anything with spaces, quotes, brackets or other punctuation.
-5. Each `AGENTS.md` under `MAPP/` and its `CLAUDE.md` are in the MAPP target's membership exceptions in
-   `MAPP.xcodeproj/project.pbxproj`, and no exception names an `AGENTS.md` or `CLAUDE.md` that is gone. The folder is
+5. Each `AGENTS.md` under `MarfaMac/` and its `CLAUDE.md` are in the MarfaMac target's membership exceptions in
+   `MarfaMac.xcodeproj/project.pbxproj`, and no exception names an `AGENTS.md` or `CLAUDE.md` that is gone. The folder is
    synchronized, so a file missing from the list becomes an app resource and the build fails on duplicates.
 
 `.claude/`, any folder starting with a dot, `node_modules/` and build output are never searched for instruction files.
@@ -35,9 +35,9 @@ import sys
 LINE_LIMIT = 200  # an instruction file must have fewer lines than this
 CHAIN_LIMIT = 32000  # bytes, for the root file plus every ancestor's plus the nested one
 PRUNED = {"node_modules", "build", "build-release", "DerivedData", "dist", "xcuserdata"}
-SOURCE_ROOTS = ("MAPP", "MAPPTests", "MAPPUITests", "editor/src")
+SOURCE_ROOTS = ("MarfaMac", "MarfaMacTests", "MarfaMacUITests", "editor/src")
 SOURCE_SUFFIXES = (".swift", ".ts", ".tsx", ".js", ".css")
-BUILT_OUTPUT = "MAPP/Editor/Page/"
+BUILT_OUTPUT = "MarfaMac/Editor/Page/"
 FILE_SUFFIXES = (
     ".swift", ".ts", ".tsx", ".js", ".css", ".html", ".json", ".md", ".py", ".sh", ".yml", ".yaml", ".plist",
     ".xcstrings", ".xcconfig", ".entitlements", ".xcodeproj", ".xcassets",
@@ -206,20 +206,20 @@ def check_docs(root, report):
 
 
 def check_project(root, agents, claudes, report):
-    project = "MAPP.xcodeproj/project.pbxproj"
+    project = "MarfaMac.xcodeproj/project.pbxproj"
     full = os.path.join(root, project)
-    nested = sorted(p[len("MAPP/"):] for p in agents + claudes if p.startswith("MAPP/"))
+    nested = sorted(p[len("MarfaMac/"):] for p in agents + claudes if p.startswith("MarfaMac/"))
     if not os.path.exists(full):
         if nested:
-            report.fail(project, 1, "is missing, so the instruction files under MAPP/ cannot be checked.")
+            report.fail(project, 1, "is missing, so the instruction files under MarfaMac/ cannot be checked.")
         return
     lines = read(full).splitlines()
-    marker = next((i for i, l in enumerate(lines) if 'Exceptions for "MAPP" folder in "MAPP" target' in l), None)
+    marker = next((i for i, l in enumerate(lines) if 'Exceptions for "MarfaMac" folder in "MarfaMac" target' in l), None)
     start = next((i for i in range(marker or 0, len(lines)) if "membershipExceptions = (" in lines[i]), None) \
         if marker is not None else None
     if start is None:
         if nested:
-            report.fail(project, 1, 'has no `Exceptions for "MAPP" folder in "MAPP" target` with membershipExceptions.')
+            report.fail(project, 1, 'has no `Exceptions for "MarfaMac" folder in "MarfaMac" target` with membershipExceptions.')
         return
     listed, index = {}, start + 1
     while index < len(lines) and lines[index].strip() != ");":
@@ -231,7 +231,7 @@ def check_project(root, agents, claudes, report):
                         "duplicate resources.")
     for entry, line in listed.items():
         if os.path.basename(entry) in ("AGENTS.md", "CLAUDE.md") and \
-                not os.path.lexists(os.path.join(root, "MAPP", entry)):
+                not os.path.lexists(os.path.join(root, "MarfaMac", entry)):
             report.fail(project, line, f"membershipExceptions lists `{entry}`, which no longer exists; remove it.")
 
 

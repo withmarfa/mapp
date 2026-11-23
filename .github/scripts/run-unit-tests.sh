@@ -12,7 +12,7 @@ mkdir -p "$diagnostics"
 
 # The tests run one at a time: about 300 wait-based tests that share the main thread and a three-core runner
 # otherwise run out of their waits, or never finish.
-xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Unit -destination 'platform=macOS' \
+xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -testPlan Unit -destination 'platform=macOS' \
   -derivedDataPath "${DERIVED_DATA:-build}" -resultBundlePath TestResults.xcresult \
   -parallel-testing-enabled NO test-without-building &
 build=$!
@@ -23,7 +23,7 @@ while kill -0 "$build" 2>/dev/null; do
   if ((SECONDS >= deadline)); then
     echo "::error::The unit tests did not finish within $limit seconds; sampling them before they are stopped."
     # Only this run's own test host: other processes on a shared Mac are none of its business.
-    hosts="$derived/Build/Products/.*/MAPP\.app/Contents/MacOS/MAPP"
+    hosts="$derived/Build/Products/.*/MarfaMac\.app/Contents/MacOS/MarfaMac"
     pids=$(pgrep -f "$hosts" || true)
     {
       date -u

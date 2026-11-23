@@ -1,0 +1,109 @@
+import Foundation
+import Testing
+@testable import MarfaMac
+
+struct ItemGroupTests {
+    let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_GB")
+        calendar.timeZone = TimeZone(identifier: "Europe/London")!
+        return calendar
+    }()
+
+    var now: Date { date(2026, 9, 25, hour: 18) }
+
+    func date(_ year: Int, _ month: Int, _ day: Int, hour: Int = 12) -> Date {
+        calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
+    }
+
+    func item(_ title: String, created: Date, modified: Date? = nil, isFavorite: Bool = false) -> Item {
+        Item(
+            id: .mint(), type: TypeID("core.note"), title: title, name: title, titleRule: .firstLine,
+            tags: isFavorite ? [ItemTag.favorite] : [], version: ItemVersion(1), created: created, modified: modified ?? created)
+    }
+
+    func group(_ date: Date) -> ItemGroup {
+        ItemGroup.group(for: date, now: now, calendar: calendar)
+    }
+
+    @Test func daysAreGroupedAsNotesGroupsThem() {
+        #expect(group(date(2026, 9, 25, hour: 0)) == .today)
+        #expect(group(date(2026, 9, 24, hour: 23)) == .yesterday)
+        #expect(group(date(2026, 9, 23)) == .previous7Days)
+        #expect(group(date(2026, 9, 18)) == .previous7Days)
+        #expect(group(date(2026, 9, 17)) == .previous30Days)
+        #expect(group(date(2026, 8, 26)) == .previous30Days)
+    }
+
+    @Test func olderItemsThisYearGroupByMonthAndEarlierYearsByYear() {
+        #expect(group(date(2026, 8, 25)) == .month(year: 2026, month: 8))
+        #expect(group(date(2026, 1, 3)) == .month(year: 2026, month: 1))
+        #expect(group(date(2025, 12, 31)) == .year(2025))
+    }
+
+    @Test func monthAndYearSectionsAreTitledByName() {
+        #expect(ItemGroup.month(year: 2026, month: 8).title(calendar: calendar).contains("August"))
+        #expect(ItemGroup.year(2025).title(calendar: calendar) == "2025")
+    }
+
+    @Test func daysAreCountedByTheCalendarAcrossAClockChange() {
+        let afterClocksGoBack = calendar.date(from: DateComponents(year: 2026, month: 10, day: 26, hour: 0, minute: 30))!
+        let beforeClocksGoBack = calendar.date(from: DateComponents(year: 2026, month: 10, day: 24, hour: 23, minute: 30))!
+        #expect(ItemGroup.group(for: beforeClocksGoBack, now: afterClocksGoBack, calendar: calendar) == .previous7Days)
+        let lateYesterday = calendar.date(from: DateComponents(year: 2026, month: 10, day: 25, hour: 23))!
+        #expect(ItemGroup.group(for: lateYesterday, now: afterClocksGoBack, calendar: calendar) == .yesterday)
+    }
+
+    @Test func sectionsSortTheirInputSoNoGroupRepeats() {
+        let today = item("Today", created: date(2026, 9, 25, hour: 9))
+        let yesterday = item("Yesterday", created: date(2026, 9, 24))
+        let alsoToday = item("Also today", created: date(2026, 9, 25, hour: 10))
+        let sections = ItemGroup.sections(
+            of: [today, yesterday, alsoToday], sort: .dateEdited, favoritesFirst: true, groupsByDate: true, now: now, calendar: calendar
+        )
+        #expect(sections.map(\.group) == [.today, .yesterday])
+        #expect(sections[0].items == [alsoToday, today])
+    }
+
+    @Test func sortingByDateCreatedGroupsByCreation() {
+        let note = item("Old", created: date(2026, 9, 1), modified: date(2026, 9, 25, hour: 9))
+        let byCreated = ItemGroup.sections(of: [note], sort: .dateCreated, favoritesFirst: true, groupsByDate: true, now: now, calendar: calendar)
+        let byEdited = ItemGroup.sections(of: [note], sort: .dateEdited, favoritesFirst: true, groupsByDate: true, now: now, calendar: calendar)
+        #expect(byCreated.map(\.group) == [.previous30Days])
+        #expect(byEdited.map(\.group) == [.today])
+    }
+
+    @Test func favoritesLeadAndTheRestFollowInDateSections() {
+        let favoriteOld = item("Favorite", created: date(2026, 3, 1), isFavorite: true)
+        let today = item("Today", created: date(2026, 9, 25, hour: 9))
+        let yesterday = item("Yesterday", created: date(2026, 9, 24))
+        let sections = ItemGroup.sections(
+            of: [today, yesterday, favoriteOld], sort: .dateEdited, favoritesFirst: true, groupsByDate: true, now: now, calendar: calendar
+        )
+        #expect(sections.map(\.group) == [.favorites, .today, .yesterday])
+        #expect(sections[0].items == [favoriteOld])
+    }
+
+    @Test func withoutFavoritesFirstFavoritesStayInTheirDateSection() {
+        let favorite = item("Favorite", created: date(2026, 9, 25, hour: 9), isFavorite: true)
+        let sections = ItemGroup.sections(of: [favorite], sort: .dateEdited, favoritesFirst: false, groupsByDate: true, now: now, calendar: calendar)
+        #expect(sections.map(\.group) == [.today])
+    }
+
+    @Test func sortingByTitleListsItemsWithoutDateSections() {
+        let a = item("Apples", created: date(2026, 9, 25))
+        let b = item("Bread", created: date(2025, 1, 1))
+        let sections = ItemGroup.sections(of: [a, b], sort: .title, favoritesFirst: true, groupsByDate: true, now: now, calendar: calendar)
+        #expect(sections.count == 1)
+        #expect(sections[0].group == nil)
+        #expect(sections[0].items == [a, b])
+    }
+
+    @Test func sortingOrdersByTheChosenDateOrByTitle() {
+        let older = item("Zebra", created: date(2026, 9, 1), modified: date(2026, 9, 25))
+        let newer = item("apple", created: date(2026, 9, 20), modified: date(2026, 9, 21))
+        #expect(ItemSort.dateEdited.sorted([newer, older]) == [older, newer])
+        #expect(ItemSort.dateCreated.sorted([older, newer]) == [newer, older])
+        #expect(ItemSort.title.sorted([older, newer]) == [newer, older])
+    }
+}
