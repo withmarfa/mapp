@@ -25,17 +25,35 @@ struct TypesPage: View {
         SettingsSubpage(id: "type:" + type.id, title: model.title(of: type))
     }
 
-    private var openID: String? {
-        guard let id = subpage?.id, id.hasPrefix("type:") else { return nil }
-        return String(id.dropFirst(5))
+    private func subpage(for field: TypeFieldRecord, of type: TypeRecord) -> SettingsSubpage {
+        SettingsSubpage(id: "field:\(type.id):\(field.key)", title: TypesModel.title(of: field))
     }
+
+    /// The type a sub-page is about, and the field it opens when it is a field's page.
+    private var place: (type: String, field: String?)? {
+        guard let id = subpage?.id else { return nil }
+        if id.hasPrefix("type:") { return (String(id.dropFirst(5)), nil) }
+        if id.hasPrefix("field:") {
+            let parts = id.dropFirst(6).split(separator: ":", maxSplits: 1).map(String.init)
+            if parts.count == 2 { return (parts[0], parts[1]) }
+        }
+        return nil
+    }
+
+    private var openID: String? { place?.type }
+    private var openFieldKey: String? { place?.field }
 
     var body: some View {
         content
             .task(id: host.serverAddress) { await model.load() }
             .onAppear { host.ownerDrafts.register(model) }
-            .onChange(of: openID, initial: true) { if let id = openID { model.open(id) } else { model.close() } }
-            .onChange(of: model.hasLoaded) { if let id = openID { model.open(id) } }
+            .onChange(of: subpage, initial: true) { openPlace() }
+            .onChange(of: model.hasLoaded) { openPlace() }
+            .onChange(of: model.deleted) {
+                guard model.deleted != nil else { return }
+                model.acknowledgeDeleted()
+                back()
+            }
             .onChange(of: model.made) {
                 guard let id = model.made, let type = model.record(id) else { return }
                 model.acknowledgeMade()
@@ -45,6 +63,14 @@ struct TypesPage: View {
             .accessibilityIdentifier("TypesPage")
     }
 
+    private func openPlace() {
+        guard let id = openID else { return model.close() }
+        if let key = openFieldKey { model.openField(key, of: id) } else {
+            model.open(id)
+            model.closeField()
+        }
+    }
+
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
             OwnerFailureState(page: .types, failure: failure, host: host) { Task { await model.load() } }
@@ -52,7 +78,17 @@ struct TypesPage: View {
             OwnerLoading()
         } else if let id = openID {
             if let type = model.record(id) {
-                TypeDetail(model: model, type: type, host: host)
+                if let key = openFieldKey {
+                    if let field = model.ownField(key, of: id) {
+                        FieldDetail(model: model, type: type, field: field, host: host)
+                    } else {
+                        SettingsPageState(
+                            symbol: "textformat", title: Text("This Field Is Gone"), line: Text("It was removed, here or somewhere else."),
+                            action: ("Back", back))
+                    }
+                } else {
+                    TypeDetail(model: model, type: type, host: host)
+                }
             } else {
                 SettingsPageState(
                     symbol: "shippingbox", title: Text("This Type Is Gone"), line: Text("It was deleted, here or somewhere else."),
@@ -99,6 +135,8 @@ private struct TypeDetail: View {
     let type: TypeRecord
     let host: any MarfaSettingsHost
 
+    @Environment(\.settingsPush) private var push
+
     private var isEditable: Bool { model.isEditable(type) }
 
     var body: some View {
@@ -111,6 +149,11 @@ private struct TypeDetail: View {
             guidanceSection
             if model.hasStatus(type.id) { statusSection }
             fieldsSection
+            if isEditable {
+                feedSection
+                historySection
+                deleteSection
+            }
         }
     }
 
@@ -246,14 +289,105 @@ private struct TypeDetail: View {
     // MARK: Fields
 
     @ViewBuilder private var fieldsSection: some View {
-        let fields = model.fields(of: type.id)
-        if !fields.isEmpty {
+        let inherited = model.inheritedFields(of: type.id)
+        let own = model.ownFields(of: type.id)
+        if !inherited.isEmpty || isEditable {
             SettingsSection("Fields") {
-                SettingsRow(
-                    verbatim: String(localized: "\(fields.count) Fields"), line: Self.summary(of: fields),
-                    lead: .none
-                ) { SettingsLockedValue(text: source) }
+                if !inherited.isEmpty {
+                    SettingsRow(
+                        verbatim: inherited.count == 1 ? String(localized: "1 Field") : String(localized: "\(inherited.count) Fields"),
+                        line: Self.summary(of: inherited), lead: .none
+                    ) { SettingsLockedValue(text: source) }
+                }
+                ForEach(own, id: \.key) { field in
+                    SettingsLinkRow(verbatim: TypesModel.title(of: field), line: model.line(of: field)) {
+                        push(SettingsSubpage(id: "field:\(type.id):\(field.key)", title: TypesModel.title(of: field)))
+                    }
+                }
+                if isEditable { SettingsAddRow("Add a Field…") { model.beginField() } }
             }
+        }
+    }
+
+    // MARK: Rules
+
+    private var parentTitle: String? { type.parent.flatMap { model.record($0) }.map { model.title(of: $0) } }
+
+    private var feedSection: some View {
+        SettingsSection("Feed") {
+            SettingsRow(
+                "Move Feed Items to Recently Deleted After", error: model.fieldErrors[.feed]
+            ) {
+                SettingsPopUp(
+                    title: "Move Feed Items to Recently Deleted After",
+                    selection: Binding<FeedWindow?> { model.feedSelection(of: type.id) } set: { window in
+                        Task { await model.setFeedWindow(window, of: type.id) }
+                    }, isError: model.fieldErrors[.feed] != nil
+                ) {
+                    if let parentTitle { Text("As \(parentTitle)").tag(FeedWindow?.none) }
+                    ForEach(model.feedWindows(for: type.id), id: \.self) { window in
+                        Text(verbatim: Self.title(of: window)).tag(Optional(window))
+                    }
+                }
+            }
+        }
+    }
+
+    private static func title(of window: FeedWindow) -> String {
+        switch window {
+        case .never: String(localized: "Never")
+        case .days(let days): String(localized: "\(days) Days")
+        }
+    }
+
+    private var historySection: some View {
+        SettingsSection("History") {
+            SettingsRow("When Two Edits Meet", error: model.fieldErrors[.merge]) {
+                SettingsPopUp(
+                    title: "When Two Edits Meet",
+                    selection: Binding<String?> { model.mergeSelection(of: type.id) } set: { name in
+                        Task { await model.setMergeStrategy(name, of: type.id) }
+                    }, isError: model.fieldErrors[.merge] != nil
+                ) {
+                    if let parentTitle { Text("As \(parentTitle)").tag(String?.none) }
+                    Text("Later Edit Wins").tag(Optional("last_writer_wins"))
+                    Text("Keep Both Copies").tag(Optional("keep_both_copies"))
+                }
+            }
+        }
+    }
+
+    // MARK: Delete
+
+    private var deleteLine: String {
+        let name = model.title(of: type)
+        let below = model.children(of: type.id)
+        if !below.isEmpty { return String(localized: "Types are based on \(name). Change or delete those first.") }
+        let items = model.ownItemCount(of: type.id)
+        if items > 0 { return String(localized: "It holds \(items) items. Move them to another type first.") }
+        return String(localized: "Nothing holds it, so it can go.")
+    }
+
+    private var deleteSection: some View {
+        SettingsSection("Delete") {
+            SettingsRow(
+                title: Text("Delete \(model.title(of: type))"), line: model.deleteFailure == nil ? Text(verbatim: deleteLine) : nil,
+                error: model.deleteFailure, lines: nil
+            ) {
+                SettingsButton("Delete Type…", role: .destructive) { askToDelete() }.disabled(model.isDeleting)
+            }
+        }
+    }
+
+    private func askToDelete() {
+        let name = model.title(of: type)
+        SettingsAlert.confirm(
+            title: String(localized: "Delete \(name)?"),
+            message: String(localized: "\(host.serverName) deletes a type only while no item holds it and no type is based on it. Deleting can’t be undone."),
+            confirm: String(localized: "Delete Type"), window: NSApp.keyWindow
+        ) { confirmed, _ in
+            guard confirmed else { return }
+            Task { await model.deleteType() }
         }
     }
 
@@ -274,6 +408,104 @@ private struct TypeDetail: View {
     }
 }
 
+/// One field's page: what it means, its kind, the rules an owner sets and removing it. A field a type above gives has no
+/// page of its own: it is that type's to change.
+private struct FieldDetail: View {
+    let model: TypesModel
+    let type: TypeRecord
+    let field: TypeFieldRecord
+    let host: any MarfaSettingsHost
+    @Environment(\.settingsBack) private var back
+
+    private var name: String { TypesModel.title(of: field) }
+    private var kind: FieldKind? { FieldKind(rawValue: field.kind) }
+
+    var body: some View {
+        @Bindable var model = model
+        SettingsPageColumn {
+            SettingsHead(
+                symbol: Self.symbol(of: field.kind), tone: .gray, title: Text(verbatim: name),
+                line: Text("A field of \(model.title(of: type)).")
+            ) {
+                SettingsButton("Rename…") { model.beginRename() }
+            }
+            if let failure = model.pageFailure { OwnerProblem(title: "Not Changed", failure: failure, page: .types, host: host) }
+            SettingsSection("Field") {
+                SettingsStackRow(
+                    title: Text("What It Means"),
+                    line: Text("\(TypesModel.length(of: model.fieldMeaning)) of \(TypesModel.fieldMeaningLimit) characters."),
+                    error: model.fieldErrors[.fieldMeaning]
+                ) {
+                    SettingsField(
+                        title: "What It Means", text: $model.fieldMeaning, isError: model.fieldErrors[.fieldMeaning] != nil, width: nil,
+                        onSubmit: { Task { await model.commitFieldMeaning() } }, onEndEditing: { Task { await model.commitFieldMeaning() } })
+                }
+                SettingsRow("Kind") { SettingsLockedValue(text: FieldKind.title(ofKind: field.kind)) }
+                if kind == .choice { choicesRow }
+            }
+            SettingsSection("Rules") {
+                SettingsRow(title: Text("Required"), line: Text("Every item must have one."), error: model.fieldErrors[.fieldRule]) {
+                    SettingsToggle(title: "Required", isOn: Binding { field.isRequired } set: { on in Task { await model.setRequired(on) } })
+                }
+                SettingsRow(title: Text("Searchable"), line: Text("Search finds items by it.")) {
+                    SettingsToggle(title: "Searchable", isOn: Binding { field.isSearchable } set: { on in Task { await model.setSearchable(on) } })
+                }
+                if kind == .text {
+                    SettingsRow("Longest", error: model.fieldErrors[.fieldLongest]) {
+                        SettingsNumberField(
+                            title: "Longest", text: $model.fieldLongest, unit: "characters", prompt: "No limit",
+                            isError: model.fieldErrors[.fieldLongest] != nil,
+                            onSubmit: { Task { await model.commitLongest() } }, onEndEditing: { Task { await model.commitLongest() } })
+                    }
+                }
+            }
+            SettingsSection("Remove") {
+                SettingsRow(title: Text("Remove \(name)"), line: Text("Each item keeps its value.")) {
+                    SettingsButton("Remove…", role: .destructive) { askToRemove() }
+                }
+            }
+        }
+    }
+
+    private var choicesRow: some View {
+        @Bindable var model = model
+        return SettingsRow("Choices", error: model.fieldErrors[.choice]) {
+            SettingsWordChips(
+                words: field.choices.map { SettingsWord(id: $0, title: $0, isLocked: false) }, addTitle: "Add a Choice",
+                isAdding: model.isAddingChoice, draft: $model.choiceDraft, isError: model.fieldErrors[.choice] != nil,
+                begin: { model.beginChoice() }, commit: { Task { await model.commitChoice() } }, cancel: { model.cancelChoice() },
+                menu: { word in AnyView(Button("Remove Choice") { Task { await model.removeChoice(word.id) } }) })
+        }
+    }
+
+    private func askToRemove() {
+        SettingsAlert.confirm(
+            title: String(localized: "Remove \(name)?"),
+            message: String(localized: "Each item keeps the value it holds, and \(model.title(of: type)) stops asking for it."),
+            confirm: String(localized: "Remove Field"), window: NSApp.keyWindow
+        ) { confirmed, _ in
+            guard confirmed else { return }
+            Task {
+                await model.removeField()
+                if model.openFieldKey == nil { back() }
+            }
+        }
+    }
+
+    private static func symbol(of kind: String) -> String {
+        switch kind {
+        case "number", "integer": "number"
+        case "boolean": "checkmark.circle"
+        case "date", "datetime": "calendar"
+        case "url": "link"
+        case "email": "envelope"
+        case "enum": "list.bullet"
+        case "status": "circle.lefthalf.filled"
+        default: "textformat"
+        }
+    }
+}
+
 /// The one sheet over a type's page: its icon, a new type, or what a word means.
 private struct TypeSheet: View {
     let model: TypesModel
@@ -284,8 +516,54 @@ private struct TypeSheet: View {
             iconSheet
         } else if model.isMakingChild {
             childSheet
+        } else if model.isAddingField {
+            fieldSheet
+        } else if model.isRenamingField {
+            renameSheet
         } else if model.meaningWord != nil {
             meaningSheet
+        }
+    }
+
+    private var fieldSheet: some View {
+        @Bindable var model = model
+        return SettingsSheet(title: Text("New Field"), line: Text("Every item of this type, and of any type based on it, can hold it.")) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
+                SettingsSheetField(label: "Name", error: model.fieldErrors[.newField]) {
+                    SettingsField(
+                        title: "Name", text: $model.newFieldName, isError: model.fieldErrors[.newField] != nil, width: nil,
+                        onSubmit: { Task { await model.makeField() } })
+                }
+                SettingsSheetField(label: "Kind") {
+                    SettingsPopUp(title: "Kind", selection: $model.newFieldKind) {
+                        ForEach(FieldKind.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
+                    }
+                }
+                if model.newFieldKind == .choice {
+                    SettingsSheetField(label: "Choices") {
+                        SettingsField(title: "Choices", text: $model.newFieldChoices, prompt: "Separated by commas", width: nil)
+                    }
+                }
+            }
+        } buttons: {
+            Spacer(minLength: 0)
+            SettingsButton("Cancel") { model.cancelField() }.disabled(model.isWorking)
+            SettingsButton("Add") { Task { await model.makeField() } }.disabled(!model.canMakeField)
+        }
+    }
+
+    private var renameSheet: some View {
+        @Bindable var model = model
+        return SettingsSheet(title: Text("Rename Field"), line: Text("The name people read. Items keep their values.")) {
+            SettingsSheetField(label: "Name", error: model.fieldErrors[.fieldName]) {
+                SettingsField(
+                    title: "Name", text: $model.fieldNameDraft, isError: model.fieldErrors[.fieldName] != nil, width: nil,
+                    onSubmit: { Task { await model.commitRename() } })
+            }
+        } buttons: {
+            Spacer(minLength: 0)
+            SettingsButton("Cancel") { model.cancelRename() }.disabled(model.isWorking)
+            SettingsButton("Save") { Task { await model.commitRename() } }.disabled(model.isWorking)
         }
     }
 

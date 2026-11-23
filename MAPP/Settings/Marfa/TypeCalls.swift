@@ -30,7 +30,30 @@ nonisolated struct TypeFieldRecord: Hashable, Sendable {
     var isRequired: Bool
     var isSearchable: Bool
     var longest: Int?
+    /// The words a choice field offers, in order.
+    var choices: [String] = []
     var statusWords: [StatusWordRecord]
+}
+
+/// What a type says about how long its feed items stay, which a type that says nothing takes from the one above.
+nonisolated enum FeedWindow: Hashable, Sendable {
+    case days(Int)
+    /// The type keeps its feed items although a type above expires them.
+    case never
+}
+
+/// The kinds of field an owner adds. Marfa has more (lists, status words, thumbnails); those come from a plugin or the
+/// command line.
+nonisolated enum FieldKind: String, CaseIterable, Hashable, Sendable {
+    case text = "string"
+    case number
+    case wholeNumber = "integer"
+    case yesOrNo = "boolean"
+    case date
+    case dateAndTime = "datetime"
+    case link = "url"
+    case email
+    case choice = "enum"
 }
 
 /// A type as the server lists it: what it declares itself.
@@ -46,6 +69,10 @@ nonisolated struct TypeRecord: Identifiable, Hashable, Sendable {
     /// The icon the type declares itself; a child with none shows its parent's.
     var icon: String?
     var fields: [String: TypeFieldRecord]
+    /// The feed window the type declares itself.
+    var feedWindow: FeedWindow?
+    /// The strategy the type declares for a field it names no strategy for: `last_writer_wins` or `keep_both_copies`.
+    var mergeStrategy: String?
 
     struct PluginOrigin: Hashable, Sendable {
         var name: String
@@ -84,6 +111,26 @@ nonisolated enum TypeEdit: Hashable, Sendable {
     case parent(String?)
     case addWord(group: String, value: String)
     case wordMeaning(value: String, text: String)
+    case addField(key: String, label: String, kind: FieldKind, choices: [String])
+    case field(key: String, TypeFieldChange)
+    case removeField(key: String)
+    /// Nil leaves the window to the type above.
+    case feedWindow(FeedWindow?)
+    /// Nil leaves the strategy to the type above.
+    case mergeStrategy(String?)
+}
+
+/// A change to one field a type declares itself.
+nonisolated enum TypeFieldChange: Hashable, Sendable {
+    case label(String)
+    /// An empty meaning leaves it out.
+    case meaning(String)
+    case required(Bool)
+    case searchable(Bool)
+    /// Nil takes the limit away.
+    case longest(Int?)
+    /// The whole list, in order. A word a field already offers goes back as it is.
+    case choices([String])
 }
 
 /// Why a call about a type did not do what was asked.
@@ -98,6 +145,10 @@ nonisolated enum TypeFailure: Error, Hashable, Sendable {
     /// The server refused because an app's sign-in would change the type's guidance, which only the owner writes
     /// (`types/guidance-app-made`).
     case guidanceByApp
+    /// Items, a folder, a view or a webhook still name the type (`types/delete-in-use`).
+    case inUse(items: Int?, settings: Int)
+    /// Types are based on it (`types/delete-subtypes`).
+    case hasSubtypes([String])
 }
 
 /// What the Types page asks of the server. Every call needs the server and is never queued.
@@ -110,4 +161,30 @@ nonisolated protocol TypeCalls: Sendable {
     func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure)
     /// Registers `id`, a `user.*` type, below `parent` (`POST /types`).
     func addChild(id: String, label: String, below parent: String) async throws(TypeFailure)
+    /// Deletes a type of the owner's that no item holds and no type is based on (`DELETE /types/{id}`, never forced).
+    func delete(_ type: String) async throws(TypeFailure)
+}
+
+nonisolated extension FieldKind {
+    /// A field's kind for people, from the server's name for it. Kinds the owner cannot add are named too.
+    static func title(ofKind raw: String) -> String {
+        switch raw {
+        case "string": String(localized: "Text")
+        case "number": String(localized: "Number")
+        case "integer": String(localized: "Whole Number")
+        case "boolean": String(localized: "Yes or No")
+        case "date": String(localized: "Date")
+        case "datetime": String(localized: "Date and Time")
+        case "url": String(localized: "Link")
+        case "email": String(localized: "Email")
+        case "enum": String(localized: "Choice")
+        case "array": String(localized: "List")
+        case "object": String(localized: "Group")
+        case "thumbnail": String(localized: "Thumbnail")
+        case "status": String(localized: "Status")
+        default: raw
+        }
+    }
+
+    var title: String { Self.title(ofKind: rawValue) }
 }
