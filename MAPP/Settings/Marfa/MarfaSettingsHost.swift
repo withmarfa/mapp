@@ -119,8 +119,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     var overview: OverviewModel { get }
     /// The one reader of the server's health, which Overview, Backups and Housekeeping all read.
     var health: ServerHealthModel { get }
-    /// Opens another of the Marfa's pages in this window.
-    func show(_ page: MarfaSettingsPage)
+    /// Opens another of the Marfa's pages in this window, at one of its own pages where `subpage` names it.
+    func show(_ page: MarfaSettingsPage, subpage: SettingsSubpage?)
 
     /// Sources, as the server last named and counted them (the last answer, while it cannot be reached).
     var sources: [MarfaSourceRow] { get }
@@ -161,6 +161,10 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// Asks to confirm, then permanently deletes.
     func deleteDeletedPermanently(_ ids: Set<String>)
     func emptyDeleted()
+}
+
+extension MarfaSettingsHost {
+    func show(_ page: MarfaSettingsPage) { show(page, subpage: nil) }
 }
 
 /// A page of the Marfa's half of Settings, with the owner permission it needs to open.

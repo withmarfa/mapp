@@ -21,18 +21,43 @@ nonisolated enum PluginWording {
         return String(localized: "Adds \(list(adds)). Nothing is removed.")
     }
 
-    /// What the server answered to a removal: the connector that stopped, and the types that stay with their items.
+    /// What the server answered to a removal: the connector that stopped with its settings, secrets and mapping, what its
+    /// source keeps, and the types that stay with their items.
     static func removed(_ answer: PluginRemoval, title: String) -> String {
         var parts = [String(localized: "Removed \(title) \(answer.version).")]
-        if answer.removedConnector { parts.append(String(localized: "Its connector stopped, and its settings and secrets are gone.")) }
+        if answer.removedConnector {
+            parts.append(
+                String(localized: "Its connector stopped, and its settings, secrets and saved mapping are gone, with any rewrite it asked for."))
+        }
+        if let kept = answer.keptConnector, let line = keptSource(kept) { parts.append(line) }
         let types = answer.keptTypes.count
-        switch (types, answer.keptEdgeTypes.count) {
+        let edges = answer.keptEdgeTypes.count
+        switch (types, edges) {
         case (0, 0): parts.append(String(localized: "Nothing it brought is left to keep."))
+        case (1, 0): parts.append(String(localized: "Its type and its items stay."))
         case (_, 0): parts.append(String(localized: "Its \(types) types and their items stay."))
-        case (0, let edges): parts.append(String(localized: "Its \(edges) edge types stay."))
-        case (_, let edges): parts.append(String(localized: "Its \(types) types, its \(edges) edge types and their items stay."))
+        case (0, 1): parts.append(String(localized: "Its edge type stays."))
+        case (0, _): parts.append(String(localized: "Its \(edges) edge types stay."))
+        default:
+            let first = types == 1 ? String(localized: "Its type") : String(localized: "Its \(types) types")
+            let second = edges == 1 ? String(localized: "its edge type") : String(localized: "its \(edges) edge types")
+            parts.append(String(localized: "\(first), \(second) and their items stay."))
         }
         return parts.joined(separator: " ")
+    }
+
+    /// What a removed connector's source keeps, or nil where it keeps neither a state nor an agreement.
+    static func keptSource(_ kept: PluginRemoval.KeptConnector) -> String? {
+        let source = kept.source
+        let agreements = kept.agreements
+        switch (kept.state, agreements) {
+        case (false, 0): return nil
+        case (true, 0): return String(localized: "Its source \(source) keeps its state.")
+        case (true, 1): return String(localized: "Its source \(source) keeps its state and 1 agreement.")
+        case (true, _): return String(localized: "Its source \(source) keeps its state and \(agreements) agreements.")
+        case (false, 1): return String(localized: "Its source \(source) keeps its 1 agreement.")
+        case (false, _): return String(localized: "Its source \(source) keeps its \(agreements) agreements.")
+        }
     }
 
     /// Why a call about a plugin was refused, in one place for the row that shows it.
@@ -48,6 +73,9 @@ nonisolated enum PluginWording {
             }
         case .carriesGuidance:
             String(localized: "Marfa installs a plugin that carries guidance only from the command line.")
+        case .releaseChanged:
+            String(localized: "The release changed since it was read, so MAPP used none of it. Try again to read it.")
+        case .canceled: ""
         }
     }
 

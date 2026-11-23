@@ -103,32 +103,34 @@ struct PluginsAccess {
     func load() async {
         guard !isLoading else { return }
         isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
+        defer { isLoading = false }
         do {
             installed = try await calls.installed()
             failure = nil
         } catch {
             failure = error
+            hasLoaded = true
             await context.learn(from: error)
             return
         }
         // What a type is called is a nicety: without it the plugin's own IDs show.
         typeInfo = (try? await calls.typeInfo()) ?? typeInfo
+        // The server's answers are all the page needs to show what is installed; the release is read after, in its own row.
+        hasLoaded = true
         await readRelease()
     }
 
-    /// Reads the release again, then each bundle of a newer version, which says what the update adds and whether it carries
-    /// guidance.
+    /// Reads the release again, with every bundle read before dropped, then each bundle of a newer version, which says what the
+    /// update adds and whether it carries guidance. A read that was cancelled leaves the release as it was, to be read by the
+    /// next load, and is no failure.
     func readRelease() async {
         release = .reading
+        bundles = [:]
         do {
             let entries = try await calls.release()
             release = .read(entries)
         } catch {
-            release = .unreadable(error)
+            if error != .canceled { release = .unreadable(error) }
             return
         }
         for update in updates { await readBundle(of: update.entry) }
@@ -140,7 +142,7 @@ struct PluginsAccess {
         do {
             bundles[entry.name] = .read(try await calls.bundle(of: entry))
         } catch {
-            bundles[entry.name] = .failed(error)
+            bundles[entry.name] = error == .canceled ? nil : .failed(error)
         }
     }
 
@@ -247,6 +249,7 @@ struct PluginsAccess {
         defer { isInstallingFile = false }
         problem = nil
         notice = nil
+        commands[""] = nil
         let title = String(localized: "Not Installed From a File")
         switch choice {
         case .unreadable(let name):
@@ -287,9 +290,13 @@ struct PluginsAccess {
     }
 
     private func reloadAfterInstall(_ answer: PluginInstallAnswer) async {
-        installed = (try? await calls.installed()) ?? installed
+        // Where the list cannot be read the bundle stays, since the page that is showing the plugin reads from it.
+        let reloaded = try? await calls.installed()
+        if let reloaded {
+            installed = reloaded
+            bundles[answer.name] = nil
+        }
         typeInfo = (try? await calls.typeInfo()) ?? typeInfo
-        bundles[answer.name] = nil
         let held = plugin(answer.name)
         let verb =
             switch answer.outcome {
@@ -301,6 +308,7 @@ struct PluginsAccess {
         if answer.outcome != .unchanged, let held, held.connector != nil, held.host == nil {
             line += " " + String(localized: "Its connector runs nowhere until you choose a machine for it.")
         }
+        if reloaded == nil { line += " " + String(localized: "The list of plugins couldn’t be read, so what is shown may be out of date.") }
         notice = Notice(title: String(localized: "Done"), line: line)
         // The updates left are read again, so each still says what it adds.
         for update in updates { await readBundle(of: update.entry) }

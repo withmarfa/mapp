@@ -17,8 +17,11 @@ struct ConnectorsPage: View {
         _model = State(initialValue: ConnectorsModel(context: OwnerContext(host: host)))
     }
 
-    static func subpage(for summary: PluginConnectorSummary) -> SettingsSubpage {
-        SettingsSubpage(id: "connector:" + summary.name, title: summary.title)
+    static func subpage(for summary: PluginConnectorSummary) -> SettingsSubpage { subpage(plugin: summary.name, title: summary.title) }
+
+    /// The page of the connector of the plugin `name`, for another page to open.
+    static func subpage(plugin name: String, title: String) -> SettingsSubpage {
+        SettingsSubpage(id: "connector:" + name, title: title)
     }
 
     private var openName: String? {
@@ -129,6 +132,7 @@ private struct ConnectorDetail: View {
             running
             settings
             brings
+            plugin
         }
     }
 
@@ -290,6 +294,18 @@ private struct ConnectorDetail: View {
     private func secretLine(_ setting: ConnectorSetting) -> String {
         if setting.unreadable { return String(localized: "Can’t be read. Set it again.") }
         return setting.isSet ? String(localized: "Set. Never shown.") : String(localized: "Not set.")
+    }
+
+    // MARK: The plugin
+
+    private var plugin: some View {
+        SettingsSection("Plugin") {
+            SettingsRow(
+                verbatim: String(localized: "From the \(summary.title) Plugin"), line: String(localized: "Removing the plugin removes the connector.")
+            ) {
+                SettingsButton("Show Plugin") { host.show(.plugins, subpage: PluginsPage.subpage(named: summary.name, title: summary.title)) }
+            }
+        }
     }
 
     // MARK: What it brings

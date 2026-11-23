@@ -38,6 +38,7 @@ import Testing
     var overview: OverviewModel
     var health: ServerHealthModel
     var shown: [MarfaSettingsPage] = []
+    var shownSubpages: [SettingsSubpage?] = []
     var sources: [MarfaSourceRow] = []
     var canChangeSources = true
     var sourceChanges: [(code: String, change: MarfaSourceChange)] = []
@@ -59,7 +60,10 @@ import Testing
         overview = OverviewModel(context: OwnerContext(host: self), health: health)
     }
 
-    func show(_ page: MarfaSettingsPage) { shown.append(page) }
+    func show(_ page: MarfaSettingsPage, subpage: SettingsSubpage?) {
+        shown.append(page)
+        shownSubpages.append(subpage)
+    }
     func refreshSources() async {}
 
     func changeSource(_ code: String, _ change: MarfaSourceChange) async -> OwnerFailure? {

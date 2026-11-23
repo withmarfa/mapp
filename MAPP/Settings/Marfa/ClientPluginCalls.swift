@@ -46,7 +46,8 @@ nonisolated struct ClientPluginCalls: PluginCalls {
             let answer = try await client.removePlugin(path: .init(name: name)).ok.body.json
             return PluginRemoval(
                 name: answer.removed.name, version: answer.removed.version, removedConnector: answer.removed.connector != nil,
-                keptTypes: answer.kept.types, keptEdgeTypes: answer.kept.edgeTypes)
+                keptTypes: answer.kept.types, keptEdgeTypes: answer.kept.edgeTypes,
+                keptConnector: answer.kept.connector.map { .init(source: $0.source, state: $0.state, agreements: $0.agreements) })
         }
     }
 
@@ -90,13 +91,24 @@ nonisolated struct ClientPluginCalls: PluginCalls {
     }
 
     func bundle(of plugin: ReleasePlugin) async throws(PluginFailure) -> ReleaseBundle {
+        let release: PluginRelease
+        let index: [PluginIndexEntry]
         do throws(PluginReleaseError) {
-            let release = try PluginRelease(address: releaseAddress)
-            guard let entry = try await release.index().first(where: { $0.name == plugin.name }) else {
-                throw PluginReleaseError.unreachable(address: release.address, reason: "the release no longer lists \(plugin.name)")
-            }
+            release = try PluginRelease(address: releaseAddress)
+            index = try await release.index()
+        } catch { throw Self.failure(error) }
+        try Self.confirm(plugin, in: index.map(Self.listed))
+        guard let entry = index.first(where: { $0.name == plugin.name }) else { throw .releaseChanged }
+        do throws(PluginReleaseError) {
             return Self.bundle(try await release.bundle(for: entry))
         } catch { throw Self.failure(error) }
+    }
+
+    /// What the page showed is what a fresh index lists, so a bundle is never read or sent for a version the owner did not see.
+    static func confirm(_ shown: ReleasePlugin, in listed: [ReleasePlugin]) throws(PluginFailure) {
+        guard let fresh = listed.first(where: { $0.name == shown.name }), fresh.version == shown.version,
+            fresh.sha256.lowercased() == shown.sha256.lowercased()
+        else { throw .releaseChanged }
     }
 
     private static func listed(_ entry: PluginIndexEntry) -> ReleasePlugin {
@@ -124,7 +136,8 @@ nonisolated struct ClientPluginCalls: PluginCalls {
     static func failure(_ error: PluginReleaseError) -> PluginFailure {
         switch error {
         case .digestMismatch(let file, _, _): .digestMismatch(file: file)
-        case .addressCarriesCredentials, .addressUnreadable, .unreachable, .canceled:
+        case .canceled: .canceled
+        case .addressCarriesCredentials, .addressUnreadable, .unreachable:
             .releaseUnreadable(String(localized: "MAPP couldn’t reach it, or it served something that isn’t a release. Installed plugins and Install From a File… still work."))
         }
     }

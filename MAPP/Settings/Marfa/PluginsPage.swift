@@ -297,25 +297,21 @@ private struct PluginDetail: View {
         return String(localized: "Based on \(model.typeTitle(parent)). ") + count
     }
 
-    @ViewBuilder private func connectorRow(_ connector: InstalledPlugin.Connector) -> some View {
-        let lead = SettingsLead.well(symbol: "arrow.triangle.2.circlepath")
+    /// The connector's row, which opens the connector's own page, where Allow More… is asked if that page needs it.
+    private func connectorRow(_ connector: InstalledPlugin.Connector) -> some View {
+        let line: String
         if plugin.host != nil, let name = model.hostName(of: plugin) {
-            SettingsRow(title: Text("Connector"), line: Text(verbatim: String(localized: "Connects \(connector.sourceName). Runs on \(name).")), lead: lead)
+            line = String(localized: "Connects \(connector.sourceName). Runs on \(name).")
         } else if plugin.host != nil {
-            if host.grants.contains(.connectorsManage) {
-                SettingsRow(title: Text("Connector"), line: Text(verbatim: String(localized: "Connects \(connector.sourceName). Runs on a machine you linked.")), lead: lead)
-            } else {
-                SettingsRow(
-                    title: Text("Connector"),
-                    line: Text(verbatim: String(localized: "Connects \(connector.sourceName). Seeing where it runs needs Manage Connectors.")),
-                    lead: lead
-                ) {
-                    SettingsButton(host.isAllowingMore ? "Waiting…" : "Allow More…") { host.askForMore(naming: InstancePermission.connectorsManage.rawValue) }
-                        .disabled(host.isAllowingMore)
-                }
-            }
+            line =
+                host.grants.contains(.connectorsManage)
+                ? String(localized: "Connects \(connector.sourceName). Runs on a machine you linked.")
+                : String(localized: "Connects \(connector.sourceName). Seeing where it runs needs Manage Connectors.")
         } else {
-            SettingsRow(title: Text("Connector"), line: Text(verbatim: String(localized: "Connects \(connector.sourceName). It runs on no machine yet.")), lead: lead)
+            line = String(localized: "Connects \(connector.sourceName). It runs on no machine yet.")
+        }
+        return SettingsLinkRow(verbatim: String(localized: "Connector"), line: line, lead: .well(symbol: "arrow.triangle.2.circlepath")) {
+            host.show(.connectors, subpage: ConnectorsPage.subpage(plugin: plugin.name, title: plugin.title))
         }
     }
 
@@ -426,7 +422,9 @@ private struct PluginRemovalSheet: View {
 
     private var stays: String {
         let items = removal.items == 1 ? String(localized: "1 item") : String(localized: "\(removal.items.formatted()) items")
-        return String(localized: "Their types and \(items). Delete them in Types if you want.")
+        return removal.types.count == 1
+            ? String(localized: "Its type and \(items). Delete them in Types if you want.")
+            : String(localized: "Their types and \(items). Delete them in Types if you want.")
     }
 
     var body: some View {
@@ -439,9 +437,11 @@ private struct PluginRemovalSheet: View {
             VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
                 if plugin.connector != nil {
                     SettingsSection("Removed") {
-                        SettingsRow(
-                            "The Connector", line: "It stops bringing in items.", lead: .symbol("arrow.triangle.2.circlepath"))
+                        SettingsRow("The Connector", line: "It stops running.", lead: .symbol("arrow.triangle.2.circlepath"))
                         SettingsRow("Its Settings and Secrets", line: "Set them again if you install it later.", lead: .symbol("key"))
+                        SettingsRow(
+                            "Its Mapping", line: "Where it put things, and any rewrite it asked for. Map it again if you install it later.",
+                            lead: .symbol("arrow.left.arrow.right"), lines: nil)
                     }
                 }
                 SettingsSection("Stays") {

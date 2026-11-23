@@ -120,6 +120,16 @@ nonisolated struct PluginRemoval: Hashable, Sendable {
     var removedConnector: Bool
     var keptTypes: [String]
     var keptEdgeTypes: [String]
+    /// What stays of the connector with its source, where the plugin had a connector.
+    var keptConnector: KeptConnector?
+
+    /// What a source keeps of a removed connector, for it to start again from.
+    struct KeptConnector: Hashable, Sendable {
+        var source: String
+        /// Whether the source keeps a state document.
+        var state: Bool
+        var agreements: Int
+    }
 }
 
 /// Why a call about a plugin did not do what was asked.
@@ -133,6 +143,10 @@ nonisolated enum PluginFailure: Error, Hashable, Sendable {
     case needsNewerServer(marfa: String, server: String)
     /// The plugin's types carry guidance, which only the owner installs.
     case carriesGuidance
+    /// The release lists another version or digest of the plugin than the page showed, or lists it no more.
+    case releaseChanged
+    /// The read was cancelled, which is no failure and is shown as nothing.
+    case canceled
 }
 
 /// What the Plugins page asks. A call that needs the server never queues.
@@ -152,6 +166,6 @@ nonisolated protocol PluginCalls: Sendable {
     func bundle(of plugin: ReleasePlugin) async throws(PluginFailure) -> ReleaseBundle
     /// Installs a bundle as its bytes, unchanged (`POST /plugins`).
     func install(_ bundle: Data) async throws(PluginFailure) -> PluginInstallAnswer
-    /// Removes a plugin, which keeps its types, edge types and items (`DELETE /plugins/{name}`).
+    /// Removes a plugin, which keeps its types, edge types and items and deletes its connector's mapping (`DELETE /plugins/{name}`).
     func remove(_ name: String) async throws(OwnerFailure) -> PluginRemoval
 }

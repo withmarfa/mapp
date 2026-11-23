@@ -6,6 +6,23 @@ import Testing
 @testable import MAPP
 
 /// A server and a release with every answer scripted.
+/// Holds a scripted answer until the test lets it go.
+actor Gate {
+    private var isOpen = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        for continuation in waiting { continuation.resume() }
+        waiting = []
+    }
+}
+
 final class FakePluginCalls: PluginCalls, @unchecked Sendable {
     struct State {
         var installed: [InstalledPlugin] = []
@@ -19,11 +36,18 @@ final class FakePluginCalls: PluginCalls, @unchecked Sendable {
         var removals: [String] = []
         var removalAnswer: PluginRemoval?
         var hostNames: [String: String] = [:]
+        var releaseGate: Gate?
+        var installedFailure: OwnerFailure?
+        /// Makes the next read of the installed plugins fail once an install has been taken.
+        var failReadAfterInstall = false
     }
 
     let state = Mutex(State())
 
-    func installed() async throws(OwnerFailure) -> [InstalledPlugin] { state.withLock { $0.installed } }
+    func installed() async throws(OwnerFailure) -> [InstalledPlugin] {
+        if let failure = state.withLock({ $0.installedFailure }) { throw failure }
+        return state.withLock { $0.installed }
+    }
 
     func plugin(_ name: String) async throws(OwnerFailure) -> InstalledPlugin {
         guard let plugin = state.withLock({ $0.installed.first { $0.name == name } }) else { throw .notFound }
@@ -38,6 +62,7 @@ final class FakePluginCalls: PluginCalls, @unchecked Sendable {
     }
 
     func release() async throws(PluginFailure) -> [ReleasePlugin] {
+        if let gate = state.withLock({ $0.releaseGate }) { await gate.wait() }
         if let failure = state.withLock({ $0.releaseFailure }) { throw failure }
         return state.withLock { $0.release }
     }
@@ -49,7 +74,10 @@ final class FakePluginCalls: PluginCalls, @unchecked Sendable {
 
     func install(_ bundle: Data) async throws(PluginFailure) -> PluginInstallAnswer {
         if let refusal = state.withLock({ $0.installRefusal }) { throw refusal }
-        state.withLock { $0.sent.append(bundle) }
+        state.withLock {
+            $0.sent.append(bundle)
+            if $0.failReadAfterInstall { $0.installedFailure = .unreachable }
+        }
         return PluginInstallAnswer(name: "tickets", version: "0.0.14", outcome: .updated, fingerprint: "ab")
     }
 
@@ -57,7 +85,7 @@ final class FakePluginCalls: PluginCalls, @unchecked Sendable {
         if let refusal = state.withLock({ $0.removeRefusal }) { throw refusal }
         state.withLock { $0.removals.append(name) }
         return state.withLock { $0.removalAnswer }
-            ?? PluginRemoval(name: name, version: "1", removedConnector: false, keptTypes: [], keptEdgeTypes: [])
+            ?? PluginRemoval(name: name, version: "1", removedConnector: false, keptTypes: [], keptEdgeTypes: [], keptConnector: nil)
     }
 }
 
@@ -224,7 +252,8 @@ private func bundle(
             $0.installed = [installed("github", "GitHub", version: "0.0.13", types: ["common.issue", "common.pull"], connector: true)]
             $0.typeInfo = ["common.issue": PluginTypeInfo(label: "Issue", plural: "Issues", parent: "core.task")]
             $0.removalAnswer = PluginRemoval(
-                name: "github", version: "0.0.13", removedConnector: true, keptTypes: ["common.issue", "common.pull"], keptEdgeTypes: [])
+                name: "github", version: "0.0.13", removedConnector: true, keptTypes: ["common.issue", "common.pull"], keptEdgeTypes: [],
+                keptConnector: .init(source: "github", state: true, agreements: 3))
         }
         let model = model(calls, items: ["common.issue": 1_840, "common.pull": 212])
         await model.load()
@@ -236,7 +265,7 @@ private func bundle(
         #expect(model.installed.isEmpty)
         #expect(
             model.notice?.line
-                == "Removed GitHub 0.0.13. Its connector stopped, and its settings and secrets are gone. Its 2 types and their items stay.")
+                == "Removed GitHub 0.0.13. Its connector stopped, and its settings, secrets and saved mapping are gone, with any rewrite it asked for. Its source github keeps its state and 3 agreements. Its 2 types and their items stay.")
     }
 
     @Test func aRemovalTheServerRefusesIsToldAndTheSheetIsGone() async {
@@ -272,7 +301,120 @@ private func bundle(
     }
 
     @Test func removingIsToldInTheServersWordsForAPluginWithNothingKept() {
-        let answer = PluginRemoval(name: "x", version: "1.0.0", removedConnector: false, keptTypes: [], keptEdgeTypes: [])
+        let answer = PluginRemoval(name: "x", version: "1.0.0", removedConnector: false, keptTypes: [], keptEdgeTypes: [], keptConnector: nil)
         #expect(PluginWording.removed(answer, title: "X") == "Removed X 1.0.0. Nothing it brought is left to keep.")
+    }
+
+    @Test func removingSaysOneTypeOrOneAgreementInTheSingular() {
+        let one = PluginRemoval(
+            name: "x", version: "1.0.0", removedConnector: true, keptTypes: ["common.x"], keptEdgeTypes: ["blocks"],
+            keptConnector: .init(source: "x", state: false, agreements: 1))
+        #expect(
+            PluginWording.removed(one, title: "X")
+                == "Removed X 1.0.0. Its connector stopped, and its settings, secrets and saved mapping are gone, with any rewrite it asked for. Its source x keeps its 1 agreement. Its type, its edge type and their items stay.")
+        let many = PluginRemoval(
+            name: "x", version: "1.0.0", removedConnector: false, keptTypes: ["a", "b"], keptEdgeTypes: ["c", "d"], keptConnector: nil)
+        #expect(PluginWording.removed(many, title: "X") == "Removed X 1.0.0. Its 2 types, its 2 edge types and their items stay.")
+        let edges = PluginRemoval(name: "x", version: "1.0.0", removedConnector: false, keptTypes: [], keptEdgeTypes: ["c"], keptConnector: nil)
+        #expect(PluginWording.removed(edges, title: "X") == "Removed X 1.0.0. Its edge type stays.")
+    }
+
+    @Test func theInstalledPluginsShowAtOnceWhileTheReleaseIsStillBeingRead() async {
+        let calls = FakePluginCalls()
+        let gate = Gate()
+        calls.state.withLock {
+            $0.installed = [installed("tickets", "Tickets", version: "0.0.13")]
+            $0.release = [listed("tickets", "Tickets", version: "0.0.13")]
+            $0.releaseGate = gate
+        }
+        let model = model(calls)
+        let loading = Task { await model.load() }
+        while !model.hasLoaded { await Task.yield() }
+        #expect(model.installed.map(\.name) == ["tickets"])
+        #expect(model.release == .reading, "the release is still being read, and the page already shows what is installed")
+        await gate.open()
+        await loading.value
+        #expect(model.entries.map(\.name) == ["tickets"])
+    }
+
+    @Test func aFailedFirstReadStillEndsTheLoading() async {
+        let calls = FakePluginCalls()
+        calls.state.withLock { $0.installedFailure = .unreachable }
+        let model = model(calls)
+        await model.load()
+        #expect(model.hasLoaded && model.failure == .unreachable)
+    }
+
+    @Test func readingTheReleaseAgainDropsEveryBundleReadBefore() async {
+        let calls = FakePluginCalls()
+        let first = listed("tickets", "Tickets", version: "0.0.14")
+        let second = listed("tickets", "Tickets", version: "0.0.15")
+        calls.state.withLock {
+            $0.installed = [installed("tickets", "Tickets", version: "0.0.13")]
+            $0.release = [first]
+            $0.bundles["tickets"] = bundle(first)
+        }
+        let model = model(calls)
+        await model.load()
+        #expect(model.bundle("tickets")?.plugin.version.description == "0.0.14")
+        calls.state.withLock {
+            $0.release = [second]
+            $0.bundles["tickets"] = bundle(second)
+        }
+        await model.readRelease()
+        #expect(model.bundle("tickets")?.plugin.version.description == "0.0.15", "Try Again never keeps an older version's bundle")
+    }
+
+    @Test func aBundleIsSentOnlyWhereTheFreshIndexListsTheVersionAndDigestShown() throws {
+        let shown = listed("tickets", "Tickets", version: "0.0.14")
+        #expect(throws: Never.self) { try ClientPluginCalls.confirm(shown, in: [shown]) }
+        let newer = listed("tickets", "Tickets", version: "0.0.15")
+        #expect(throws: PluginFailure.releaseChanged) { try ClientPluginCalls.confirm(shown, in: [newer]) }
+        var other = shown
+        other.sha256 = String(repeating: "b", count: 64)
+        #expect(throws: PluginFailure.releaseChanged) { try ClientPluginCalls.confirm(shown, in: [other]) }
+        #expect(throws: PluginFailure.releaseChanged, "a plugin the release stopped listing") { try ClientPluginCalls.confirm(shown, in: []) }
+    }
+
+    @Test func aReadThatWasCancelledIsNotShownAsAFailure() async {
+        let calls = FakePluginCalls()
+        let entry = listed("tickets", "Tickets", version: "0.0.14")
+        calls.state.withLock {
+            $0.installed = [installed("tickets", "Tickets", version: "0.0.13")]
+            $0.release = [entry]
+            $0.releaseFailure = .canceled
+        }
+        let model = model(calls)
+        await model.load()
+        #expect(model.release == .reading, "nothing is drawn for a read that stopped; the next load reads it again")
+        calls.state.withLock { $0.releaseFailure = nil }
+        await model.install(entry)
+        #expect(model.problem == nil)
+    }
+
+    @Test func aFileInstalledAfterAnotherThatNeededTheCommandLineDropsThatCommand() async {
+        let calls = FakePluginCalls()
+        let model = model(calls, file: .file(name: "a.json", path: "/tmp/a.json", data: Data("{}".utf8)))
+        calls.state.withLock { $0.installRefusal = .carriesGuidance }
+        await model.installFile()
+        #expect(model.commands[""] != nil)
+        calls.state.withLock { $0.installRefusal = nil }
+        await model.installFile()
+        #expect(model.commands[""] == nil, "the first file's command is not the second file's")
+    }
+
+    @Test func anInstallWhoseListCannotBeReadKeepsItsBundleAndSaysSo() async {
+        let calls = FakePluginCalls()
+        let entry = listed("tickets", "Tickets", version: "0.0.14")
+        calls.state.withLock {
+            $0.release = [entry]
+            $0.bundles["tickets"] = bundle(entry)
+            $0.failReadAfterInstall = true
+        }
+        let model = model(calls)
+        await model.load()
+        await model.install(entry)
+        #expect(model.bundle("tickets") != nil, "the page that shows it keeps what it reads from, so it does not wait for ever")
+        #expect(model.notice?.line.contains("The list of plugins couldn’t be read") == true)
     }
 }

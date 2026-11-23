@@ -50,7 +50,7 @@ enum LibraryDescription {
         return made
     }
 
-    func show(_ page: MarfaSettingsPage) { launcher.show(.marfa(page)) }
+    func show(_ page: MarfaSettingsPage, subpage: SettingsSubpage?) { launcher.show(.marfa(page), subpage: subpage) }
 
     // MARK: Sources
 
