@@ -283,7 +283,7 @@ extension ClientOwnerCalls {
 
     func assignConnector(_ plugin: String, toHost host: String) async throws(OwnerFailure) {
         try await run { client in
-            _ = try await client.replacePluginConnectorHost(path: .init(name: plugin), body: .json(.init(host: host))).ok
+            _ = try await client.replacePluginConnectorHost(path: .init(name: plugin), body: .json(.init(host: .value(host)))).ok
         }
     }
 
