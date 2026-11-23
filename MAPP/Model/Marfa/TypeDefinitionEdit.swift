@@ -109,6 +109,25 @@ nonisolated enum TypeDefinitionEdit {
         return update
     }
 
+    /// Whether `own`, as the server holds it now, already has what `change` would make. The server has no check for a stale
+    /// write and refuses a word it holds, so a change worked out before another one landed is sent only if it still differs.
+    static func holds(_ change: TypeChange, in own: Listed) -> Bool {
+        let type = own.value1
+        switch change {
+        case .label(let text): return type.label == text
+        case .plural(let text): return type.plural == (text.isEmpty ? nil : text)
+        case .description(let text): return type.description == (text.isEmpty ? nil : text)
+        case .parent(let id): return type.parent == id
+        case .addWord(let group, let value):
+            return type.fields.additionalProperties.values.contains { field in
+                field.statusValues?.contains { $0.value == value && $0.group.rawValue == group } == true
+            }
+        case .wordMeaning(let value, let text):
+            let words = type.fields.additionalProperties.values.flatMap { $0.statusValues ?? [] }
+            return words.contains { $0.value == value && $0.description == (text.isEmpty ? nil : text) }
+        }
+    }
+
     /// The name of the status field a type above `own` declares, which a child redeclares to add words.
     private static func statusField(above own: Components.Schemas.TypeDefinition, in all: [Listed]) -> String? {
         var seen: Set<String> = [own.id]
@@ -147,7 +166,7 @@ nonisolated enum TypeDefinitionEdit {
         try await replace(update(own, for: plan))
     }
 
-    /// Reads the types, checks that `id` is the owner's to change and replaces it with `change` made.
+    /// Reads the types, checks that `id` is the owner's to change and replaces it with `change` made, unless it already holds it.
     static func run(
         _ change: TypeChange, to id: String,
         read: () async throws -> [Listed],
@@ -156,6 +175,7 @@ nonisolated enum TypeDefinitionEdit {
         let listed = try await read()
         guard let own = listed.first(where: { $0.value1.id == id }) else { throw TypeSchemaFailure.changedOnServer }
         if own.value2.provenance.origin == .plugin { throw TypeSchemaFailure.pluginType }
+        if holds(change, in: own) { return }
         try await replace(update(own, applying: change, in: listed))
     }
 

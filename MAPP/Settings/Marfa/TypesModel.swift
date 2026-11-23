@@ -72,6 +72,11 @@ struct TypeAccess {
     private var pending = 0
     private var tail: Task<Void, Never>?
     var isWorking: Bool { pending > 0 }
+    /// The text last sent for the name, plural or description, so a field left again without a new edit sends nothing while
+    /// an edit back to what the server held before is still sent behind the one in flight.
+    private var queuedText: [Field: String] = [:]
+    /// Set when Settings closed while a change was queued, so the queue's end hands over what no change kept.
+    private var closedWhileWorking = false
     /// The type a child type was made as, so the page can open it.
     private(set) var made: String?
 
@@ -216,6 +221,7 @@ struct TypeAccess {
             addingGroup = nil
             wordDraft = ""
             meaningWord = nil
+            queuedText = [:]
             Task { await loadReading(of: id) }
         }
         if draftedID != id, let type = record(id) {
@@ -311,9 +317,9 @@ struct TypeAccess {
         guard let id = openID, let group = addingGroup else { return }
         let value = Self.value(ofTyped: wordDraft)
         guard !value.isEmpty else { return cancelWord() }
-        if await apply(.addWord(group: group, value: value), to: id, field: .word) {
-            addingGroup = nil
-            wordDraft = ""
+        await apply(.addWord(group: group, value: value), to: id, field: .word) {
+            self.addingGroup = nil
+            self.wordDraft = ""
         }
     }
 
@@ -333,61 +339,76 @@ struct TypeAccess {
         guard let id = openID, let word = meaningWord, !isSavingMeaning else { return }
         isSavingMeaning = true
         defer { isSavingMeaning = false }
-        if await apply(.wordMeaning(value: word, text: meaningDraft.trimmingCharacters(in: .whitespacesAndNewlines)), to: id, field: .meaning) {
-            meaningWord = nil
+        await apply(.wordMeaning(value: word, text: meaningDraft.trimmingCharacters(in: .whitespacesAndNewlines)), to: id, field: .meaning) {
+            self.meaningWord = nil
         }
     }
 
     // MARK: Changing the type
 
-    /// Sends the name, plural or description as typed, when it differs from what the server holds.
+    /// Sends the name, plural or description as typed, unless nothing was typed since it was last sent or read. The server
+    /// leaves out a change it already holds, so a change back to what the type held a moment ago is sent behind the one in flight.
     func commit(_ field: Field) async {
         guard let id = openID, let type = record(id), isEditable(type) else { return }
         let edit: TypeEdit
+        let text: String
         switch field {
         case .name:
-            let text = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard text != type.label else { return }
+            text = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard text != (queuedText[field] ?? type.label) else { return }
             guard !text.isEmpty else {
                 fieldErrors[.name] = String(localized: "A type needs a name.")
                 return
             }
             edit = .label(text)
         case .plural:
-            let text = plural.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard text != (type.plural ?? "") else { return }
+            text = plural.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard text != (queuedText[field] ?? type.plural ?? "") else { return }
             edit = .plural(text)
         case .description:
-            let text = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard text != (type.description ?? "") else { return }
+            text = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard text != (queuedText[field] ?? type.description ?? "") else { return }
             edit = .description(text)
         default:
             return
         }
-        await apply(edit, to: id, field: field)
+        queuedText[field] = text
+        if await !apply(edit, to: id, field: field) { queuedText[field] = nil }
     }
 
+    /// Sends the chosen parent. The choice is an act, so it is always queued; the server leaves out one the type holds.
     func setParent(_ parent: String?, of id: String) async {
-        guard let type = record(id), isEditable(type), type.parent != parent else { return }
+        guard let type = record(id), isEditable(type) else { return }
         await apply(.parent(parent), to: id, field: .basedOn)
     }
 
-    /// Makes `edit` on the server and reads the types again. Changes run one at a time, in the order they were made, so each
-    /// is built from the type as the one before it left it. Answers whether the server took it; on a refusal what was typed
-    /// stays and the field it is about says why.
+    /// Makes `edit` on the server and reads the types again. Answers whether the server took it; on a refusal what was typed
+    /// stays and the field it is about says why. `kept` runs once the change has landed, before the queue's end.
     @discardableResult
-    private func apply(_ edit: TypeEdit, to id: String, field: Field) async -> Bool {
-        pending += 1
+    private func apply(_ edit: TypeEdit, to id: String, field: Field, kept: @MainActor () -> Void = {}) async -> Bool {
         fieldErrors[field] = nil
         pageFailure = nil
+        return await enqueue(kept: kept) { await self.send(edit, to: id, field: field) }
+    }
+
+    /// Runs `work` after every change queued before it. Changes run one at a time, in the order they were made, so each is built
+    /// from the type as the one before it left it: a replacement carries no version, so two at once would send back each
+    /// other's old values, and an icon written between a type's read and its replacement would be written over.
+    private func enqueue(kept: @MainActor () -> Void = {}, _ work: @escaping @MainActor () async -> Bool) async -> Bool {
+        pending += 1
         let previous = tail
-        let work = Task { () -> Bool in
+        let task = Task { () -> Bool in
             await previous?.value
-            return await send(edit, to: id, field: field)
+            return await work()
         }
-        tail = Task { _ = await work.value }
-        let took = await work.value
+        tail = Task { _ = await task.value }
+        let took = await task.value
+        if took { kept() }
         pending -= 1
+        if pending == 0, closedWhileWorking {
+            closedWhileWorking = false
+            for draft in collectDrafts() { context.lateDraft(draft) }
+        }
         return took
     }
 
@@ -467,6 +488,7 @@ struct TypeAccess {
     /// Shows what the server holds in the field that was just sent, and leaves the others as typed.
     private func showSaved(_ field: Field, of id: String) {
         guard let type = record(id) else { return }
+        queuedText[field] = nil
         switch field {
         case .name: name = type.label
         case .plural: plural = type.plural ?? ""
@@ -500,18 +522,20 @@ struct TypeAccess {
         iconFailure = nil
     }
 
-    /// Sets the icon, or with nil takes the owner's icon away so the type shows its maker's.
+    /// Sets the icon, or with nil takes the owner's icon away so the type shows its maker's. It waits behind the changes queued
+    /// before it, which would otherwise read the type before it and write the old icon back.
     func chooseIcon(_ icon: String?) async {
         guard let id = iconTarget, !isChangingIcon else { return }
         isChangingIcon = true
         iconFailure = nil
         defer { isChangingIcon = false }
-        if let refused = await access.setIcon(icon, id) {
-            await context.learn(from: refused)
-            iconFailure = OwnerWording.line(refused, on: .types)
-        } else {
-            iconTarget = nil
+        let took = await enqueue {
+            guard let refused = await self.access.setIcon(icon, id) else { return true }
+            await self.context.learn(from: refused)
+            self.iconFailure = OwnerWording.line(refused, on: .types)
+            return false
         }
+        if took { iconTarget = nil }
     }
 
     // MARK: A child type
@@ -560,10 +584,12 @@ struct TypeAccess {
 
     func makeChild() async {
         guard canMakeChild, let parent = childParent else { return }
-        pending += 1
         fieldErrors[.newType] = nil
-        defer { pending -= 1 }
         let id = identifier(forNamed: trimmedChildName)
+        _ = await enqueue { await self.addChild(id: id, below: parent) }
+    }
+
+    private func addChild(id: String, below parent: String) async -> Bool {
         do {
             try await calls.addChild(id: id, label: trimmedChildName, below: parent)
         } catch {
@@ -573,20 +599,30 @@ struct TypeAccess {
             } else {
                 fieldErrors[.newType] = OwnerWording.line(Self.owner(error), on: .types)
             }
-            return
+            return false
         }
         isMakingChild = false
         childName = ""
         records = ((try? await calls.types().types) ?? records).filter { !Self.isHidden($0.id) }
         made = id
+        return true
     }
 
     func acknowledgeMade() { made = nil }
 
     // MARK: Drafts
 
-    /// A child type's name typed in the sheet and not kept goes back to the person when Settings closes.
+    /// What was typed and not kept goes back to the person when Settings closes. While a change is queued or in flight it is
+    /// not yet known what the server keeps, so what is left is handed over when the queue ends, as a key's is.
     func takeDrafts() -> [OwnerDraft] {
+        if isWorking {
+            closedWhileWorking = true
+            return []
+        }
+        return collectDrafts()
+    }
+
+    private func collectDrafts() -> [OwnerDraft] {
         var drafts: [OwnerDraft] = []
         if isMakingChild, !trimmedChildName.isEmpty {
             drafts.append(.typed(title: String(localized: "Type Name Not Kept"), text: trimmedChildName))
@@ -609,7 +645,7 @@ struct TypeAccess {
                 descriptionText = type.description ?? ""
             }
         }
-        if meaningWord != nil, !meaningDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isSavingMeaning {
+        if meaningWord != nil, !meaningDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             drafts.append(.typed(title: String(localized: "Word Meaning Not Kept"), text: meaningDraft.trimmingCharacters(in: .whitespacesAndNewlines)))
             meaningWord = nil
         }

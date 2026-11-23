@@ -22,6 +22,11 @@ actor TypeCallGate {
     }
 }
 
+/// The drafts a model hands over after Settings has closed.
+final class LateDrafts: Sendable {
+    let drafts = Mutex<[OwnerDraft]>([])
+}
+
 /// A server that lists types and takes a change, with every call scripted.
 final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
     struct State {
@@ -46,7 +51,33 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         state.withLock { $0.started.append(edit) }
         if let gate = state.withLock({ $0.gate }) { await gate.wait() }
         if let refusal = state.withLock({ $0.refusal }) { throw refusal }
-        state.withLock { $0.changes.append((type, edit)) }
+        // Like the server's replacement: a change the type already holds sends nothing, and the rest is made on the type as it is now.
+        state.withLock { state in
+            guard let index = state.types.firstIndex(where: { $0.id == type }) else { return }
+            var record = state.types[index]
+            switch edit {
+            case .label(let text):
+                guard record.label != text else { return }
+                record.label = text
+            case .plural(let text):
+                guard record.plural != (text.isEmpty ? nil : text) else { return }
+                record.plural = text.isEmpty ? nil : text
+            case .description(let text):
+                guard record.description != (text.isEmpty ? nil : text) else { return }
+                record.description = text.isEmpty ? nil : text
+            case .parent(let parent):
+                guard record.parent != parent else { return }
+                record.parent = parent
+            case .addWord(let group, let value):
+                let held = record.fields.values.flatMap(\.statusWords).contains { $0.value == value && $0.group == group }
+                guard !held, let key = record.fields.first(where: { $0.value.kind == "status" })?.key else { return }
+                record.fields[key]?.statusWords.append(StatusWordRecord(value: value, group: group))
+            case .wordMeaning:
+                break
+            }
+            state.types[index] = record
+            state.changes.append((type, edit))
+        }
     }
 
     func addChild(id: String, label: String, below parent: String) async throws(TypeFailure) {
@@ -76,11 +107,15 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 
 @MainActor
 @Suite(.hangLimit) struct TypesModelTests {
-    private func model(_ calls: FakeTypeCalls, counts: [String: Int] = [:]) -> TypesModel {
+    private func model(
+        _ calls: FakeTypeCalls, counts: [String: Int] = [:], late: LateDrafts = LateDrafts(),
+        setIcon: @escaping (String?, String) async -> OwnerFailure? = { _, _ in nil }
+    ) -> TypesModel {
         let access = TypeAccess(
-            ownItems: { counts[$0] ?? 0 }, currentIcon: { _ in nil }, setIcon: { _, _ in nil },
+            ownItems: { counts[$0] ?? 0 }, currentIcon: { _ in nil }, setIcon: setIcon,
             markSets: [MarfaMarkSet(id: "lucide", title: "Lucide")], marks: { _, _ in [] }, plural: { _ in nil })
-        return TypesModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.schemaWrite] }), calls: calls, access: access)
+        let context = OwnerContext(calls: FakeOwnerCalls(), grants: { [.schemaWrite] }, lateDraft: { draft in late.drafts.withLock { $0.append(draft) } })
+        return TypesModel(context: context, calls: calls, access: access)
     }
 
     private func listing() -> FakeTypeCalls {
@@ -305,6 +340,123 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.name == "Job" && model.plural == "Jobs" && model.meaningWord == nil)
     }
 
+    @Test func aWordCommittedByReturnAndAgainByLeavingTheFieldIsAddedOnceWithNoRefusal() async {
+        let calls = listing()
+        calls.state.withLock { $0.gate = TypeCallGate() }
+        let gate = calls.state.withLock { $0.gate! }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.beginWord(in: "in_progress")
+        model.wordDraft = "In Review"
+        let returned = Task { await model.commitWord() }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        let left = Task { await model.commitWord() }
+        await gate.open()
+        await returned.value
+        await left.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.addWord(group: "in_progress", value: "in_review")])
+        #expect(model.fieldErrors[.word] == nil)
+        #expect(model.addingGroup == nil && model.wordDraft.isEmpty)
+    }
+
+    @Test func aNameChangedAndChangedBackWhileTheFirstIsSavingIsSentBackToo() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.name = "Piece of Work"
+        let first = Task { await model.commit(.name) }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        model.name = "Job"
+        let back = Task { await model.commit(.name) }
+        await gate.open()
+        await first.value
+        await back.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.label("Piece of Work"), .label("Job")])
+        #expect(model.record("user.job")?.label == "Job")
+    }
+
+    @Test func aParentChosenAndChosenBackWhileTheFirstIsSavingIsSentBackToo() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        let first = Task { await model.setParent("common.ticket", of: "user.job") }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        let back = Task { await model.setParent("core.task", of: "user.job") }
+        await gate.open()
+        await first.value
+        await back.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.parent("common.ticket"), .parent("core.task")])
+        #expect(model.record("user.job")?.parent == "core.task")
+    }
+
+    @Test func anIconChosenWhileAChangeIsSavingWaitsForIt() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let order = Mutex<[String]>([])
+        let model = model(calls, setIcon: { _, _ in
+            order.withLock { $0.append("icon after \(calls.state.withLock { $0.changes.count }) changes") }
+            return nil
+        })
+        await model.load()
+        model.open("user.job")
+        model.descriptionText = "Kitchens"
+        let description = Task { await model.commit(.description) }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        model.beginIcon(of: "user.job")
+        let icon = Task { await model.chooseIcon("lucide:hammer") }
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(order.withLock { $0 }.isEmpty)
+        await gate.open()
+        await description.value
+        await icon.value
+        #expect(order.withLock { $0 } == ["icon after 1 changes"])
+        #expect(model.iconTarget == nil)
+    }
+
+    @Test func aChangeStillSavingWhenSettingsClosesIsNotHandedBackIfItLands() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let late = LateDrafts()
+        let model = model(calls, late: late)
+        await model.load()
+        model.open("user.job")
+        model.name = "Piece of Work"
+        let saving = Task { await model.commit(.name) }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        #expect(model.takeDrafts().isEmpty)
+        await gate.open()
+        await saving.value
+        #expect(late.drafts.withLock { $0 }.isEmpty)
+    }
+
+    @Test func aMeaningStillSavingWhenSettingsClosesIsHandedBackIfTheServerRefusesIt() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let late = LateDrafts()
+        let model = model(calls, late: late)
+        await model.load()
+        model.open("user.job")
+        model.beginMeaning(of: "waiting", in: "user.job")
+        model.meaningDraft = "Parts ordered."
+        let saving = Task { await model.saveMeaning() }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        #expect(model.takeDrafts().isEmpty)
+        calls.state.withLock { $0.refusal = .invalid(field: "fields.status.status_values.0.description", message: "Too long.") }
+        await gate.open()
+        await saving.value
+        #expect(late.drafts.withLock { $0 } == [.typed(title: "Word Meaning Not Kept", text: "Parts ordered.")])
+    }
+
     @Test func aRefusalShowsTheServersReasonUnlessItIsTheLengthRule() {
         #expect(TypesModel.isLengthRule("Expected a string of at most 100 characters."))
         #expect(!TypesModel.isLengthRule("Status word \"waiting\" is already used."))
@@ -408,6 +560,25 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(set.fields.additionalProperties["status"]?.statusValues?.first?.description == "Parts ordered.")
         let cleared = try TypeDefinitionEdit.update(job, applying: .wordMeaning(value: "waiting", text: ""), in: [job])
         #expect(cleared.fields.additionalProperties["status"]?.statusValues?.first?.description == nil)
+    }
+
+    @Test func aChangeTheTypeAlreadyHoldsIsNotSent() async throws {
+        let job = listed("user.job", fields: ["status": Definition(_type: .status, statusValues: [Word(value: "waiting", group: .notStarted, description: "Parts ordered.")])])
+        var replaced = 0
+        for change: TypeDefinitionEdit.TypeChange in [
+            .label("Job"), .plural("Jobs"), .description("Kitchens"), .addWord(group: "not_started", value: "waiting"),
+            .wordMeaning(value: "waiting", text: "Parts ordered."),
+        ] {
+            try await TypeDefinitionEdit.run(change, to: "user.job", read: { [job] }, replace: { _ in replaced += 1 })
+        }
+        #expect(replaced == 0)
+        for change: TypeDefinitionEdit.TypeChange in [
+            .label("Work"), .plural(""), .description(""), .parent("core.task"), .addWord(group: "in_progress", value: "waiting"),
+            .wordMeaning(value: "waiting", text: ""),
+        ] {
+            try await TypeDefinitionEdit.run(change, to: "user.job", read: { [job, task] }, replace: { _ in replaced += 1 })
+        }
+        #expect(replaced == 6)
     }
 
     @Test func aPluginsTypeIsNeverReplaced() async {
