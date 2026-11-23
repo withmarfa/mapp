@@ -125,12 +125,10 @@ private func listed(_ name: String, _ title: String, version: String) -> Release
         version: PluginVersion(version)!, sha256: String(repeating: "a", count: 64))
 }
 
-private func bundle(
-    _ plugin: ReleasePlugin, types: [(id: String, guidance: Bool)] = [], connector: Bool = false
-) -> ReleaseBundle {
+private func bundle(_ plugin: ReleasePlugin, types: [String] = [], connector: Bool = false) -> ReleaseBundle {
     ReleaseBundle(
         plugin: plugin, bytes: Data("{\"name\":\"\(plugin.name)\"}".utf8),
-        types: types.map { .init(id: $0.id, label: $0.id, description: nil, icon: nil, hasGuidance: $0.guidance) },
+        types: types.map { .init(id: $0, label: $0, description: nil, icon: nil) },
         edgeTypes: [],
         connector: connector ? .init(sourceName: plugin.title, kinds: []) : nil)
 }
@@ -150,7 +148,7 @@ private func bundle(
         calls.state.withLock {
             $0.installed = [installed("tickets", "Tickets", version: "0.0.13"), installed("rss", "RSS", version: "0.0.13")]
             $0.release = [tickets, listed("rss", "RSS", version: "0.0.13"), listed("github", "GitHub", version: "0.0.13")]
-            $0.bundles["tickets"] = bundle(tickets, types: [(id: "common.ticket", guidance: false)])
+            $0.bundles["tickets"] = bundle(tickets, types: ["common.ticket"])
         }
         let model = model(calls)
         await model.load()
@@ -178,7 +176,7 @@ private func bundle(
         calls.state.withLock {
             $0.installed = [installed("tickets", "Tickets", version: "0.0.13", types: ["common.ticket"])]
             $0.release = [spikes]
-            $0.bundles["tickets"] = bundle(spikes, types: [(id: "common.ticket", guidance: false), (id: "common.spike", guidance: false)])
+            $0.bundles["tickets"] = bundle(spikes, types: ["common.ticket", "common.spike"])
         }
         let model = model(calls)
         await model.load()
@@ -189,7 +187,7 @@ private func bundle(
     @Test func installingSendsTheBundleBytesUnchangedAndReadsThePluginsAgain() async {
         let calls = FakePluginCalls()
         let entry = listed("tickets", "Tickets", version: "0.0.14")
-        let released = bundle(entry, types: [(id: "common.ticket", guidance: false)])
+        let released = bundle(entry, types: ["common.ticket"])
         calls.state.withLock {
             $0.release = [entry]
             $0.bundles["tickets"] = released
@@ -202,27 +200,30 @@ private func bundle(
         #expect(model.problem == nil)
     }
 
-    @Test func aPluginWhoseTypesCarryGuidanceIsNotSentAndTheCommandIsGiven() async {
+    @Test func aPluginWhoseTypesCarryGuidanceIsSentLikeAnyOtherAndNoCommandIsGiven() async {
         let calls = FakePluginCalls()
         let entry = listed("tickets", "Tickets", version: "0.0.14")
+        let released = bundle(entry, types: ["common.ticket"])
         calls.state.withLock {
             $0.release = [entry]
-            $0.bundles["tickets"] = bundle(entry, types: [(id: "common.ticket", guidance: true)])
+            $0.bundles["tickets"] = released
         }
         let model = model(calls)
         await model.load()
         await model.readBundle(of: entry)
-        #expect(model.heldCommand("tickets") == "marfa plugins install tickets")
+        #expect(model.heldCommand("tickets") == nil, "the server's answer decides, so nothing is held before it answers")
         await model.install(entry)
-        #expect(calls.state.withLock { $0.sent }.isEmpty, "Marfa refuses an app installing guidance, so none is sent")
+        #expect(calls.state.withLock { $0.sent } == [released.bytes], "sent once, as the server asked for the owner's sign-in in place")
+        #expect(model.heldCommand("tickets") == nil)
+        #expect(model.problem == nil)
     }
 
-    @Test func aServerRefusalForGuidanceGivesTheSameCommand() async {
+    @Test func aServerRefusalForGuidanceGivesTheCommandAndNoFailure() async {
         let calls = FakePluginCalls()
         let entry = listed("tickets", "Tickets", version: "0.0.14")
         calls.state.withLock {
             $0.release = [entry]
-            $0.bundles["tickets"] = bundle(entry, types: [(id: "common.ticket", guidance: false)])
+            $0.bundles["tickets"] = bundle(entry, types: ["common.ticket"])
             $0.installRefusal = .carriesGuidance
         }
         let model = model(calls)
@@ -230,6 +231,44 @@ private func bundle(
         await model.install(entry)
         #expect(model.heldCommand("tickets") == "marfa plugins install tickets")
         #expect(model.problem == nil, "it is an answer, not a failure")
+        #expect(model.notice == nil)
+    }
+
+    @Test func aSignInSheetTheOwnerClosesChangesNothingAndSaysNothing() async {
+        let calls = FakePluginCalls()
+        let entry = listed("tickets", "Tickets", version: "0.0.14")
+        calls.state.withLock {
+            $0.release = [entry]
+            $0.bundles["tickets"] = bundle(entry, types: ["common.ticket"])
+            $0.installRefusal = .canceled
+        }
+        let model = model(calls)
+        await model.load()
+        await model.install(entry)
+        #expect(model.problem == nil && model.notice == nil && model.heldCommand("tickets") == nil)
+        #expect(calls.state.withLock { $0.sent }.isEmpty)
+        #expect(!model.isWorking("tickets"), "Install is offered again")
+    }
+
+    @Test func anOwnerWhoDeclinesTheSignInIsToldItWasNotInstalled() async {
+        let calls = FakePluginCalls()
+        let entry = listed("tickets", "Tickets", version: "0.0.14")
+        calls.state.withLock {
+            $0.release = [entry]
+            $0.bundles["tickets"] = bundle(entry, types: ["common.ticket"])
+            $0.installRefusal = .owner(.notConfirmed)
+        }
+        let model = model(calls)
+        await model.load()
+        await model.install(entry)
+        #expect(model.problem?.title == "Not Installed")
+        #expect(model.problem?.failure == .owner(.notConfirmed))
+    }
+
+    @Test func theClosedSheetAndTheDeclineAreToldApartWhereTheServerAnswers() {
+        #expect(ClientPluginCalls.refusal(.canceled(message: "closed")) == .canceled)
+        let declined = MarfaError.forbidden(code: "access_denied", message: "no", server: nil)
+        #expect(ClientPluginCalls.refusal(declined) == .owner(.notConfirmed))
     }
 
     @Test func aNewerMarfaIsToldWithBothReleases() async {

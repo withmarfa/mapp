@@ -81,6 +81,7 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         case .label(let text): .label(text)
         case .plural(let text): .plural(text)
         case .description(let text): .description(text)
+        case .guidance(let text): .guidance(text)
         case .parent(let id): .parent(id)
         case .addWord(let group, let value): .addWord(group: group, value: value)
         case .wordMeaning(let value, let text): .wordMeaning(value: value, text: text)
@@ -122,6 +123,7 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         }
         if let known = ClientOwnerCalls.marfaError(error) {
             switch known {
+            case .canceled: return .canceled
             case .validation(let code, let message, let details, let server) where code == "invalid_schema":
                 let first = (details ?? server?.details)?.object?["errors"]?.array?.first?.object
                 return .invalid(field: first?["field"]?.string, message: first?["message"]?.string ?? message)
@@ -131,8 +133,11 @@ nonisolated struct ServerTypeCalls: TypeCalls {
             case .server(let status, let code, _, let details, let server) where status == 409 && code == "type_has_subtypes":
                 return .hasSubtypes((details ?? server?.details)?.object?["subtype_ids"]?.array?.compactMap(\.string) ?? [])
             case .forbidden(_, _, let server):
-                let changes = server?.details?.object?["changes"]?.array?.compactMap(\.string) ?? []
-                if changes.contains("guidance") { return .guidanceByApp }
+                // A sign-in that lacks `schema.write` is told the permission it needs (`required_scope`); only a sign-in that
+                // holds it and is an app's is refused for the guidance alone.
+                let details = server?.details?.object
+                let changes = details?["changes"]?.array?.compactMap(\.string) ?? []
+                if changes.contains("guidance"), details?["required_scope"] == nil { return .guidanceByApp }
             default: break
             }
         }

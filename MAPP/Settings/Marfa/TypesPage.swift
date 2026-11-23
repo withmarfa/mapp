@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The Types page: the owner's own types, those plugins brought and those Marfa ships, each opening a page of its own. A type
 /// of the owner's changes in place (its name, plural, icon, base, description and status words); a plugin's or Marfa's takes
-/// only a child type and an icon. Guidance is shown, with the guidance of the types above, and never written here.
+/// only a child type and an icon. Guidance is edited on the owner's types and shown, with the guidance of the types above, on the rest.
 struct TypesPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
@@ -213,20 +213,34 @@ private struct TypeDetail: View {
     // MARK: Guidance
 
     private var guidanceSection: some View {
+        @Bindable var model = model
         let reading = model.reading(of: type.id)
         let own = (reading?.guidance ?? type.guidance) ?? ""
         let ancestors = reading?.ancestors ?? []
-        return SettingsSection(
-            "Guidance", line: "What an agent or an app builder reads to use the type. Change it with `marfa types replace` on the command line."
-        ) {
-            if own.isEmpty && ancestors.isEmpty {
-                SettingsRow("No Guidance", look: .off)
-            }
-            if !own.isEmpty {
+        return SettingsSection("Guidance", line: "What an agent or an app builder reads to use the type.") {
+            if isEditable {
                 SettingsStackRow(
-                    title: Text(type.origin == .plugin ? "From the Plugin" : "Guidance"),
-                    line: isEditable ? Text("\(TypesModel.length(of: own)) of \(TypesModel.guidanceLimit) characters.") : nil
-                ) { SettingsStackText(text: own, isLocked: true, isMarkdown: true) }
+                    title: Text("Guidance"),
+                    line: Text("\(TypesModel.length(of: model.guidanceText)) of \(TypesModel.guidanceLimit) characters. Markdown works."),
+                    error: model.guidanceNeedsCommand ? String(localized: "This Marfa takes guidance only from the command line for now. Your text is kept here.") : model.fieldErrors[.guidance]
+                ) {
+                    SettingsTextArea(
+                        title: "Guidance", text: $model.guidanceText,
+                        isError: model.guidanceNeedsCommand || model.fieldErrors[.guidance] != nil,
+                        onEndEditing: { Task { await model.commit(.guidance) } })
+                }
+                if model.guidanceNeedsCommand {
+                    let command = TypesModel.guidanceCommand(for: type.id)
+                    SettingsRow(verbatim: command, line: String(localized: "Save the text as \(type.id).md beside \(type.id).json."), lines: nil) {
+                        SettingsButton(model.copiedCommand == command ? "Copied" : "Copy") { model.copyGuidanceCommand(command) }
+                    }
+                }
+            } else if own.isEmpty && ancestors.isEmpty {
+                SettingsRow("No Guidance", look: .off)
+            } else if !own.isEmpty {
+                SettingsStackRow(title: Text(type.origin == .plugin ? "From the Plugin" : "Guidance")) {
+                    SettingsStackText(text: own, isLocked: true, isMarkdown: true)
+                }
             }
             ForEach(ancestors, id: \.type) { above in
                 SettingsStackRow(title: Text("From \(model.title(of: above.type))")) { SettingsStackText(text: above.guidance, isLocked: true, isMarkdown: true) }

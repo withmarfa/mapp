@@ -35,8 +35,8 @@ nonisolated enum TypeDefinitionEdit {
     }
 
     /// The replacement that sends `listed` back as the server gave it, with `fields` in place of its own. The type's
-    /// guidance goes back unchanged: a replacement that left it out would remove it, which a sign-in an app made is
-    /// refused (`types/guidance-app-made`) and any other sign-in would do without meaning to.
+    /// guidance goes back unchanged: a replacement that left it out would remove it, which the server refuses an app's
+    /// sign-in unless the owner has just signed in again, and any other sign-in would do without meaning to.
     private static func replacement(of listed: Listed, fields: Components.Schemas.TypeDefinition.FieldsPayload) -> Update {
         let own = listed.value1
         var update = Update(fields: .init(additionalProperties: fields.additionalProperties))
@@ -64,6 +64,8 @@ nonisolated enum TypeDefinitionEdit {
         case plural(String)
         /// An empty description leaves it out.
         case description(String)
+        /// An empty guidance leaves it out, which removes the type's guidance.
+        case guidance(String)
         case parent(String?)
         /// A new word for the type's status field, in one of its four groups.
         case addWord(group: String, value: String)
@@ -91,6 +93,8 @@ nonisolated enum TypeDefinitionEdit {
             update.plural = text.isEmpty ? nil : text
         case .description(let text):
             update.description = text.isEmpty ? nil : text
+        case .guidance(let text):
+            update.guidance = text.isEmpty ? nil : text
         case .parent(let id):
             update.parent = id
         case .addWord(let group, let value):
@@ -165,6 +169,7 @@ nonisolated enum TypeDefinitionEdit {
         case .label(let text): return type.label == text
         case .plural(let text): return type.plural == (text.isEmpty ? nil : text)
         case .description(let text): return type.description == (text.isEmpty ? nil : text)
+        case .guidance(let text): return type.guidance == (text.isEmpty ? nil : text)
         case .parent(let id): return type.parent == id
         case .addWord(let group, let value):
             return type.fields.additionalProperties.values.contains { field in

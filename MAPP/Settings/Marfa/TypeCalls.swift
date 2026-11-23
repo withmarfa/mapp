@@ -107,6 +107,8 @@ nonisolated enum TypeEdit: Hashable, Sendable {
     case label(String)
     case plural(String)
     case description(String)
+    /// An empty text removes the type's guidance.
+    case guidance(String)
     /// Nil takes the type out from under its parent.
     case parent(String?)
     case addWord(group: String, value: String)
@@ -144,9 +146,11 @@ nonisolated enum TypeFailure: Error, Hashable, Sendable {
     case pluginType
     /// The type is not as the page showed it.
     case changedOnServer
-    /// The server refused because an app's sign-in would change the type's guidance, which only the owner writes
-    /// (`types/guidance-app-made`).
+    /// The server refused because an app's sign-in would change the type's guidance, and this Marfa takes that only from
+    /// the command line (`types/guidance-app-made`).
     case guidanceByApp
+    /// The owner closed the sign-in the server asked for, so nothing was sent.
+    case canceled
     /// Items, a folder, a view or a webhook still name the type (`types/delete-in-use`).
     case inUse(items: Int?, settings: Int)
     /// Types are based on it (`types/delete-subtypes`).

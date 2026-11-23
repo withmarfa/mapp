@@ -72,7 +72,7 @@ nonisolated enum PluginWording {
                 String(localized: "This plugin needs Marfa \(marfa) or later. This server runs \(server).")
             }
         case .carriesGuidance:
-            String(localized: "Marfa installs a plugin that carries guidance only from the command line.")
+            String(localized: "This Marfa takes a plugin that carries guidance only from the command line for now.")
         case .releaseChanged:
             String(localized: "The release changed since it was read, so MAPP used none of it. Try again to read it.")
         case .canceled: ""

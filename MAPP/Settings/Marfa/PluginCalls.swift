@@ -59,8 +59,6 @@ nonisolated struct ReleaseBundle: Hashable, Sendable {
         var label: String?
         var description: String?
         var icon: String?
-        /// Whether the type carries guidance, which only the owner installs.
-        var hasGuidance: Bool
     }
 
     struct EdgeTypeDefinition: Hashable, Sendable {
@@ -88,8 +86,6 @@ nonisolated struct ReleaseBundle: Hashable, Sendable {
     var types: [TypeDefinition]
     var edgeTypes: [EdgeTypeDefinition]
     var connector: Connector?
-
-    var carriesGuidance: Bool { types.contains { $0.hasGuidance } }
 }
 
 /// How a type reads on the plugin's page: its name, and what it is based on.
@@ -141,11 +137,12 @@ nonisolated enum PluginFailure: Error, Hashable, Sendable {
     case digestMismatch(file: String)
     /// The plugin needs a later Marfa than the server runs.
     case needsNewerServer(marfa: String, server: String)
-    /// The plugin's types carry guidance, which only the owner installs.
+    /// The plugin's types carry guidance, and this Marfa takes that only from the command line: the server refused it from an app.
     case carriesGuidance
     /// The release lists another version or digest of the plugin than the page showed, or lists it no more.
     case releaseChanged
-    /// The read was cancelled, which is no failure. A bundle read is dropped. A release read puts back what it held.
+    /// A read was cancelled, or the owner closed the sign-in an install asked for. Neither is a failure and neither says anything.
+    /// A bundle read is dropped. A release read puts back what it held. An install sent nothing.
     case canceled
 }
 

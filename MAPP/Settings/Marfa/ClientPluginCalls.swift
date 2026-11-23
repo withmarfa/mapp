@@ -75,7 +75,8 @@ nonisolated struct ClientPluginCalls: PluginCalls {
 
     /// The two refusals that name a plugin are told apart; every other is told as an owner's call is.
     static func refusal(_ error: MarfaError) -> PluginFailure {
-        switch error.pluginInstallRefusal {
+        if case .canceled = error { return .canceled }
+        return switch error.pluginInstallRefusal {
         case .needsNewerServer(let marfa, let server)?: .needsNewerServer(marfa: marfa, server: server)
         case .carriesGuidance?: .carriesGuidance
         case nil: .owner(ClientOwnerCalls.failure(error))
@@ -122,7 +123,7 @@ nonisolated struct ClientPluginCalls: PluginCalls {
         return ReleaseBundle(
             plugin: listed(released.entry), bytes: released.bytes,
             types: contents.types.map {
-                .init(id: $0.id, label: $0.label, description: $0.description, icon: $0.icon, hasGuidance: !($0.guidance ?? "").isEmpty)
+                .init(id: $0.id, label: $0.label, description: $0.description, icon: $0.icon)
             },
             edgeTypes: contents.edgeTypes.map { .init(id: $0.id, label: $0.label, description: $0.description) },
             connector: contents.connector.map { connector in
