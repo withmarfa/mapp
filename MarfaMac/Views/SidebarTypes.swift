@@ -33,7 +33,7 @@ struct SidebarTypesSection: View, Equatable {
                 typeRows
             }
         } header: {
-            header.overlay(alignment: .topLeading) { LibraryFillMarker() }
+            header
         }
     }
 
@@ -167,21 +167,5 @@ struct SidebarFolding {
         case nil: return .ignored
         }
         return .handled
-    }
-}
-
-/// The foot is a bar on the list's edge, so it is not a row of the outline. The measure asks that outline, which stays
-/// small on a large library, whether the copy is still filling. This is that answer, and only while it is.
-private struct LibraryFillMarker: View {
-    @Environment(MarfaHost.self) private var host: MarfaHost?
-
-    var body: some View {
-        if let host, FillWording.shows(host.report.fill, in: host.state) {
-            Color.clear
-                .frame(width: 1, height: 1)
-                .allowsHitTesting(false)
-                .accessibilityElement()
-                .accessibilityIdentifier("LibraryFillProgress")
-        }
     }
 }
