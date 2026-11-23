@@ -64,6 +64,27 @@ import Testing
         #expect(flushed.count == 0, "nothing changed, so nothing was handed over")
     }
 
+    @Test(arguments: ["https://marfa.example/a", "https://marfa.example/?x=1", "https://marfa.example/#f"])
+    func anAddressWithMoreThanTheServerIsToldInWordsWhereverItIsTyped(text: String) async throws {
+        let bench = try HostBench()
+        let (model, flushed) = model(bench)
+        await connect(model, to: text, key: "k")
+        let notice = try #require(model.notice)
+        #expect(notice.title == "Check the Address")
+        #expect(notice.message == "Use only the server’s address, with nothing after it, such as https://marfa.example.")
+        #expect(model.address == text, "what was typed is kept for another try")
+        #expect(!model.isConnected)
+
+        await connect(model, to: "http://first.test:8210")
+        model.otherAddress = text
+        await model.switchServer()
+        #expect(model.notice?.message == notice.message)
+        #expect(model.host.connection == first)
+        #expect(model.otherAddress == text)
+        #expect(bench.servers.opened.count == 1, "only the first server was opened")
+        _ = flushed
+    }
+
     @Test func aFailureToOpenTheCopyIsToldWithoutRawErrorText() async throws {
         let bench = try HostBench()
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
@@ -81,7 +102,7 @@ import Testing
         MarfaHost.Problem.notSignedIn, .signIn(.denied), .signIn(.expired), .signIn(.refused), .signIn(.unreachable), .signIn(.couldNotFinish),
         .signIn(.notMarfa), .signIn(.notVerified), .signIn(.inUse), .signIn(.keychain), .signIn(.noWindow), .signIn(.failed),
         .notRevoked(address: "https://marfa.test"), .notRemoved(signIn: "errSecItemNotFound", copy: nil),
-        .notRemoved(signIn: nil, copy: "NSCocoaErrorDomain 513"), .notConnected, .busy, .notAServer,
+        .notRemoved(signIn: nil, copy: "NSCocoaErrorDomain 513"), .notConnected, .busy, .notAServer, .addressHasMore,
         .otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse,
         .copyKept(.changed(now: 2), signIn: nil), .copyKept(.unreadable(folder: "/Library/Marfa/ab12"), signIn: "errSecItemNotFound"),
         .copyKept(.notMadeByApp(folder: "/Library/Marfa/ab12"), signIn: nil), .cannotDiscard(folder: "/Library/Marfa/ab12")

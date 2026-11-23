@@ -40,6 +40,8 @@ import os
 
     nonisolated enum Problem: Error, Hashable, Sendable {
         case notAServer
+        /// The address names a server and more: a path, a query or a fragment.
+        case addressHasMore
         /// The app is not signed in to the address: it never was, or the sign-in ended.
         case notSignedIn
         /// Writes still wait in the copy being left, so the person chooses what becomes of them, and a choice
@@ -133,7 +135,12 @@ import os
     private let sourceNamer: SourceNamer
 
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a sign-in for it.
-    private(set) var connection: MarfaConnection?
+    private(set) var connection: MarfaConnection? {
+        didSet { if connection != nil { unusableAddress = nil } }
+    }
+    /// The saved address that no longer names a server the app accepts (it has a path), told until a connection is made.
+    /// Its copy stays on disk, untouched, and a new address starts a new copy.
+    private(set) var unusableAddress: String?
     /// The library to show, once its copy is open. It holds how its server stands and what its copy last
     /// reported, so the host keeps neither while a copy is open.
     private(set) var library: MarfaLibrary?
@@ -263,9 +270,11 @@ import os
                 await endSignIn(of: stale)
             }
         }
-        guard !isBusy, source == nil, let saved = defaults.string(forKey: Self.addressKey),
-            let connection = try? MarfaConnection(address: saved)
-        else { return }
+        guard !isBusy, source == nil, let saved = defaults.string(forKey: Self.addressKey) else { return }
+        guard let connection = try? MarfaConnection(address: saved) else {
+            unusableAddress = saved
+            return
+        }
         isBusy = true
         defer { isBusy = false }
         self.connection = connection
@@ -523,7 +532,7 @@ import os
         do {
             return try MarfaConnection(address: address)
         } catch {
-            throw .notAServer
+            throw error == .hasMore ? .addressHasMore : .notAServer
         }
     }
 
