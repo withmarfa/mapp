@@ -130,6 +130,6 @@ struct SidebarFootRow: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(line.text))
             .accessibilityHint(Text(line.help ?? ""))
-            .accessibilityIdentifier("SyncStatus")
+            .accessibilityIdentifier(line.showsFill ? "LibraryFillProgress" : "SyncStatus")
     }
 }

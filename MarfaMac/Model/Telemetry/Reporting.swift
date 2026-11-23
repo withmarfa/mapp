@@ -9,6 +9,9 @@ typealias SDKReporter = WithMarfaTelemetry.Telemetry
 typealias ReportLevel = WithMarfaTelemetry.Telemetry.LogLevel
 typealias ReportAttribute = WithMarfaTelemetry.Telemetry.LogAttribute
 
+/// A number attribute. The package's initializer is visible only in this folder, so a test builds one through here.
+func reportAttribute(_ value: Int) -> ReportAttribute { ReportAttribute(value) }
+
 /// What the app hands to the SDK. A test gives its own, so no test reaches the network.
 nonisolated protocol ReportSink: Sendable {
     func report(_ error: MarfaError, during operation: StaticString)

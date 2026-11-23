@@ -35,7 +35,6 @@ struct SidebarTypesSection: View, Equatable {
         } header: {
             header
         }
-        .accessibilityIdentifier("SidebarTypes")
     }
 
     @ViewBuilder private var typeRows: some View {

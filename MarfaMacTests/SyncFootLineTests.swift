@@ -9,10 +9,10 @@ struct SyncFootLineTests {
 
     private func line(
         _ state: MarfaConnectionState = .online, waiting: Int = 0, oldest: TimeInterval? = nil, phase: SyncReport.Phase = .current,
-        problems: [SyncProblemEntry] = [], synced: TimeInterval? = 120
+        problems: [SyncProblemEntry] = [], synced: TimeInterval? = 120, fill: LibraryFill? = nil
     ) -> SyncFootLine? {
         let report = SyncReport(
-            phase: phase, waiting: waiting, oldestWaiting: oldest.map { now - $0 }, problems: problems, queueRead: true)
+            phase: phase, fill: fill, waiting: waiting, oldestWaiting: oldest.map { now - $0 }, problems: problems, queueRead: true)
         return SyncFootLine(state: state, report: report, lastSynced: synced.map { now - $0 }, now: now, locale: english)
     }
 
@@ -68,7 +68,22 @@ struct SyncFootLineTests {
             #expect(line.kind == .syncing)
             #expect(line.text == "Syncing…")
             #expect(line.showsSpinner)
+            #expect(!line.showsFill)
         }
+    }
+
+    @Test func aCopyStillFillingIsMarkedAndALaterUpdateIsNot() throws {
+        let filling = LibraryFill(state: .filling, listed: 10, expected: 40)
+        let underway = try #require(line(phase: .catchingUp, fill: filling))
+        #expect(underway.showsFill)
+        #expect(underway.text == "Syncing…")
+
+        let updating = try #require(line(phase: .updating, fill: LibraryFill(state: .complete)))
+        #expect(!updating.showsFill)
+        #expect(updating.text == "Syncing…")
+
+        let offline = try #require(line(.offline(reason: nil), phase: .catchingUp, fill: filling))
+        #expect(!offline.showsFill)
     }
 
     @Test func aCopyNotYetHeardFromTheServerSaysSyncing() throws {

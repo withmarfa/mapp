@@ -31,6 +31,7 @@ final class SpeedMeasureTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
+    private var sidebarFoot: XCUIElement { window.groups["Sidebar"] }
     private var list: XCUIElement { window.outlines["ItemList"] }
     private var label = ""
     private var samples: [String: [Double]] = [:]
@@ -370,10 +371,13 @@ final class SpeedMeasureTests: XCTestCase {
         }
     }
 
-    /// The sidebar lists the library's types, which it can only do once the copy has loaded, and the fill is done.
+    /// The sidebar lists a type, which it can do only once the copy has loaded, and the copy is no longer filling. The
+    /// foot that says so is a bar beside the outline, in a group of a few elements, so it is asked first.
     private var showsLibrary: Bool {
-        let type = sidebar.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'SidebarType-'"))
-        return type.firstMatch.exists && !element("LibraryFillProgress").exists
+        if sidebarFoot.descendants(matching: .any)["LibraryFillProgress"].exists { return false }
+        return sidebar.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'SidebarType-'"))
+            .firstMatch.exists
     }
 
     private func signpost(_ name: String) -> XCTOSSignpostMetric {

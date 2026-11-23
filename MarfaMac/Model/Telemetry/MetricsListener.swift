@@ -27,8 +27,8 @@ nonisolated final class MetricsListener: Sendable {
 
     private static let logger = Telemetry.logger(.launch)
 
-    /// What a metric report says of launch and hangs, for the report sent to WithMarfa: samples and the slowest
-    /// bucket of each, never a signpost name or a call stack.
+    /// What a metric report says of launch, hangs and CPU time, for the report sent to WithMarfa: samples and the
+    /// slowest bucket of each, and the day's CPU time when the report carries one. Never a signpost name or a call stack.
     nonisolated struct Summary: Sendable, Equatable {
         nonisolated struct Metric: Sendable, Equatable {
             var samples = 0
@@ -39,20 +39,14 @@ nonisolated final class MetricsListener: Sendable {
         var hang = Metric()
         var firstDraw = Metric()
         var launch = Metric()
+        /// The full day's CPU time, in milliseconds. Nil when that day's interval carries none.
+        var cpuTimeMilliseconds: Int?
     }
 
     static func log(_ report: MetricReport) {
-        let entries = report.stateEntries.flatMap(\.values) + report.intervalEntries.flatMap(\.values)
-        var summarized = Summary(intervalSeconds: Int(report.timeRange.duration.rounded()))
-        for entry in entries {
-            switch entry {
-            case .hangTime(let metric): summarized.hang = bucketSummary(metric.histogram)
-            case .timeToFirstDraw(let metric): summarized.firstDraw = bucketSummary(metric.histogram)
-            case .extendedLaunch(let metric): summarized.launch = bucketSummary(metric.histogram)
-            default: break
-            }
-        }
+        let summarized = summary(of: report)
         Telemetry.metricsSummarized(summarized)
+        let entries = report.stateEntries.flatMap(\.values) + report.intervalEntries.flatMap(\.values)
         let lines = entries.compactMap(summary)
         logger.notice("""
             MetricKit report for \(report.timeRange.duration.rounded(), privacy: .public) s: \
@@ -84,6 +78,29 @@ nonisolated final class MetricsListener: Sendable {
         }
     }
 
+    /// Launch, hangs and the day's CPU time. CPU time is read from the full-day interval only: a shorter interval is
+    /// already inside it, and `fullDayEntry` traps when the report has no interval.
+    static func summary(of report: MetricReport) -> Summary {
+        let entries = report.stateEntries.flatMap(\.values) + report.intervalEntries.flatMap(\.values)
+        var summarized = Summary(intervalSeconds: Int(report.timeRange.duration.rounded()))
+        for entry in entries {
+            switch entry {
+            case .hangTime(let metric): summarized.hang = bucketSummary(metric.histogram)
+            case .timeToFirstDraw(let metric): summarized.firstDraw = bucketSummary(metric.histogram)
+            case .extendedLaunch(let metric): summarized.launch = bucketSummary(metric.histogram)
+            default: break
+            }
+        }
+        if !report.intervalEntries.isEmpty {
+            for entry in report.intervalEntries.fullDayEntry.values {
+                if case .cpuTime(let metric) = entry {
+                    summarized.cpuTimeMilliseconds = milliseconds(metric.value)
+                }
+            }
+        }
+        return summarized
+    }
+
     private static func summary(_ result: MetricResult) -> String? {
         switch result {
         case .hangTime(let metric): "hang time: \(summary(metric.histogram))"
@@ -93,6 +110,7 @@ nonisolated final class MetricsListener: Sendable {
         case .applicationResumeTime(let metric): "resume: \(summary(metric.histogram))"
         case .signpostInterval(let metric):
             "\(metric.signpostCategory)/\(metric.signpostName) x\(metric.totalCount): \(summary(metric.signpostDuration))"
+        case .cpuTime(let metric): "cpu time: \(milliseconds(metric.value)) ms"
         default: nil
         }
     }

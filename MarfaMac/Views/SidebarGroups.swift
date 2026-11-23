@@ -82,6 +82,7 @@ struct SidebarGroupHeader: View, Equatable {
         let group = section.plan.group
         if !customizing, group.kind == .views {
             ViewsHeading(title: group.name, browser: browser)
+                .accessibilityIdentifier(Self.headingIdentifier(group))
         } else {
             HStack(spacing: 8) {
                 Text(group.name)
@@ -98,7 +99,18 @@ struct SidebarGroupHeader: View, Equatable {
                 libraries.updateSidebarLayout { $0.moveGroup(drop.id, onto: group.id) }
                 return true
             }
-            .accessibilityIdentifier("SidebarSection-\(group.id)")
+            .accessibilityIdentifier(Self.headingIdentifier(group))
+        }
+    }
+
+    /// An identifier on the section is copied onto every row, so the section's name stays on the heading.
+    private static func headingIdentifier(_ group: SidebarGroup) -> String {
+        switch group.kind {
+        case .library: "SidebarLibraryGroup"
+        case .views: "SidebarViews"
+        case .types: "SidebarTypes"
+        case .custom: "SidebarGroup-\(group.id)"
+        case .shortcuts: "SidebarGroup-\(group.id)"
         }
     }
 
@@ -358,7 +370,6 @@ struct SidebarPlacesSection: View, Equatable {
         } header: {
             header
         }
-        .accessibilityIdentifier(group.kind == .views ? "SidebarViews" : group.kind == .library ? "SidebarLibraryGroup" : "SidebarGroup-\(group.id)")
     }
 }
 
