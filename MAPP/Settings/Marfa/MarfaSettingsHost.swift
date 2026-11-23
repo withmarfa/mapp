@@ -134,6 +134,17 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func typeMark(for pattern: String) -> AnyView
     func markTitle(_ id: String) -> String
 
+    /// What the Types page asks of the server.
+    var typeCalls: any TypeCalls { get }
+    /// The type's mark in its tone, at the size of a head card's tile.
+    func largeTypeMark(for id: String) -> AnyView
+    /// How many items the type holds itself, never those of its subtypes, as the library counts them.
+    func itemCount(ofType id: String) -> Int
+    /// The icon the type shows now, an icon ID, or nil where it has none.
+    func typeIcon(of id: String) -> String?
+    /// Sets the type's icon, or with nil takes the owner's away, for every app. Answers why the server refused, or nil once it took it.
+    func changeTypeIcon(_ icon: String?, ofType id: String) async -> OwnerFailure?
+
     /// Recently Deleted.
     var deletedItems: [MarfaDeletedItem] { get }
     var deletedCount: Int { get }
@@ -148,11 +159,11 @@ struct MarfaMarkSet: Identifiable, Hashable {
 
 /// A page of the Marfa's half of Settings, with the owner permission it needs to open.
 nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
-    case overview, account, apps, keys, addresses, sources, recentlyDeleted, history, fileStorage, connectors, webhooks, folders, backups, updates, housekeeping, activity, monitoring, limits, startUp
+    case overview, account, apps, keys, addresses, types, sources, recentlyDeleted, history, fileStorage, connectors, webhooks, folders, backups, updates, housekeeping, activity, monitoring, limits, startUp
 
     /// The pages in groups, as the sidebar shows them.
     static let groups: [[MarfaSettingsPage]] = [
-        [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage], [.connectors, .webhooks, .folders],
+        [.overview], [.account, .apps, .keys, .addresses], [.types, .sources], [.recentlyDeleted, .history, .fileStorage], [.connectors, .webhooks, .folders],
         [.backups, .updates, .housekeeping], [.activity, .monitoring], [.limits, .startUp],
     ]
 
@@ -163,6 +174,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .apps: String(localized: "Apps")
         case .keys: String(localized: "Keys")
         case .addresses: String(localized: "Addresses")
+        case .types: String(localized: "Types")
         case .sources: String(localized: "Sources")
         case .recentlyDeleted: String(localized: "Recently Deleted")
         case .history: String(localized: "History")
@@ -187,6 +199,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .apps: "macwindow"
         case .keys: "key.fill"
         case .addresses: "globe"
+        case .types: "shippingbox.fill"
         case .sources: "tray.and.arrow.down.fill"
         case .recentlyDeleted: "trash"
         case .history: "clock.arrow.circlepath"
@@ -211,6 +224,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .apps: .purple
         case .keys: .amber
         case .addresses: .teal
+        case .types: .orange
         case .sources: .green
         case .recentlyDeleted: .gray
         case .history: .indigo
@@ -238,6 +252,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .account: nil
         case .apps: .grantsManage
         case .keys, .sources: .keysManage
+        case .types: .schemaWrite
         case .recentlyDeleted: .itemsPurge
         case .connectors: .connectorsManage
         case .webhooks: .webhooksManage
@@ -255,6 +270,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .account: ""
         case .apps: String(localized: "MAPP isn’t allowed to list, narrow or disconnect apps.")
         case .keys: String(localized: "MAPP isn’t allowed to list, make, extend or revoke keys.")
+        case .types: String(localized: "MAPP isn’t allowed to change types, their icons, words or fields.")
         case .sources: String(localized: "MAPP isn’t allowed to rename, mark or limit sources.")
         case .addresses: String(localized: "MAPP isn’t allowed to see or change the server’s addresses.")
         case .recentlyDeleted: String(localized: "MAPP isn’t allowed to list or permanently delete deleted items.")
@@ -291,6 +307,12 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             [
                 String(localized: "Sign-In Address"), String(localized: "Other Addresses"), String(localized: "Websites"),
                 String(localized: "Add an Address"), String(localized: "Add a Website"),
+            ]
+        case .types:
+            [
+                String(localized: "Yours"), String(localized: "From Plugins"), String(localized: "Built In"), String(localized: "New Type"),
+                String(localized: "New Child Type"), String(localized: "Statuses"), String(localized: "Guidance"), String(localized: "Icon"),
+                String(localized: "Based On"), String(localized: "Plural"), String(localized: "Description"),
             ]
         case .sources:
             [String(localized: "Rename"), String(localized: "Change Mark"), String(localized: "Limit Sources"), String(localized: "Rules for Every App and Key")]
