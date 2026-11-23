@@ -80,11 +80,9 @@ struct ItemBoard: View {
         return ScrollViewReader { proxy in
             GeometryReader { geometry in
                 ScrollView(.horizontal) {
-                    // Only the lanes in view are built. Their order is the place's.
-                    LazyHStack(alignment: .top, spacing: Self.laneGap) {
+                    HStack(alignment: .top, spacing: Self.laneGap) {
                         ForEach(lanes) { lane in
                             laneView(lane, lanes: lanes, key: key, grouped: grouped, ids: ids, contents: contents)
-                                .id(lane.id)
                                 .frame(width: laneWidth(count: lanes.count, in: geometry.size.width))
                                 .onScrollVisibilityChange(threshold: 0.01) { visible in
                                     if visible { visibleLanes.insert(lane.id) } else { visibleLanes.remove(lane.id) }
@@ -94,8 +92,8 @@ struct ItemBoard: View {
                     .padding(.horizontal, Self.edge)
                     .padding(.bottom, Self.edge)
                     .padding(.top, 8)
-                    // The window's own width and height at least, so a few lanes stay at the left and fill the pane.
-                    .frame(minWidth: geometry.size.width, minHeight: geometry.size.height, alignment: .leading)
+                    // The window's own width at least, so a few lanes stay at the left.
+                    .frame(minWidth: geometry.size.width, alignment: .leading)
                 }
                 .bandsToolbar()
             }
@@ -116,14 +114,7 @@ struct ItemBoard: View {
                 browser.selection = Set(ids)
                 return .handled
             }
-            .onChange(of: cursor) {
-                guard let cursor else { return }
-                if let lane = lanes.first(where: { $0.items.contains { $0.id == cursor } }) {
-                    proxy.scrollTo(lane.id, anchor: .center)
-                }
-                // The lane is built when it is scrolled to, so the card is scrolled to once that has happened.
-                Task { @MainActor in proxy.scrollTo(cursor, anchor: .center) }
-            }
+            .onChange(of: cursor) { if let cursor { proxy.scrollTo(cursor) } }
         }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
