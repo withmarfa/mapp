@@ -52,6 +52,9 @@ import Observation
     private(set) var removing: Set<String> = []
     /// A removal that stopped with data left, by the app's id, until the data is read again and shows what is left.
     private(set) var unfinished: [String: AppDataRemoved] = [:]
+    /// An app whose data a finished removal deleted before its disconnect failed, by the app's id, with how many items went
+    /// and why the disconnect stopped.
+    private(set) var removedButConnected: [String: (items: Int, stoppedBy: OwnerFailure)] = [:]
     var question: Question?
     /// The app an Apps page was disconnected from, so the page it was shown on can go back.
     private(set) var disconnected: String?
@@ -161,13 +164,18 @@ import Observation
         case .disconnect(let id):
             guard let app = app(id) else { return }
             rowErrors[id] = nil
+            unfinished[id] = nil
+            removedButConnected[id] = nil
             let removingData = alsoRemovingData && asked.checkbox != nil
+            var removedItems = 0
             do {
                 if removingData, case .kept(let kept)? = data[id], kept.reduce(0, { $0 + $1.total }) > Self.disconnectRemovalLimit {
                     // The server refuses to disconnect with more than it deletes in one write, so the data goes first.
                     for vendor in removableVendors(of: app) {
-                        let removal = try await context.calls.removeAppData(vendor: vendor)
+                        var removal = try await context.calls.removeAppData(vendor: vendor)
+                        removedItems += removal.removedItems
                         guard removal.isComplete else {
+                            removal.removedItems = removedItems
                             unfinished[id] = removal
                             await readData(of: app)
                             return
@@ -179,7 +187,12 @@ import Observation
                 data[id] = nil
                 disconnected = id
             } catch {
-                await refused(error, appID: id)
+                guard removedItems > 0 else { return await refused(error, appID: id) }
+                // The data is gone and the app is connected: the row's "Not Changed" would be untrue, so the page says both.
+                removedButConnected[id] = (removedItems, error)
+                await context.learn(from: error)
+                if error == .conflict || error == .notFound { await load() }
+                if let app = self.app(id) { await readData(of: app) }
             }
         case .removeData(let id, let vendor):
             guard let app = app(id) else { return }
@@ -198,6 +211,26 @@ import Observation
     }
 
     // MARK: Data
+
+    /// What a removal that deleted items and then stopped says under the data: never that nothing changed, and told even where
+    /// the data could not be read again.
+    struct RemovalNote: Equatable {
+        let title: String
+        let line: String
+    }
+
+    func removalNote(for app: AppAccess) -> RemovalNote? {
+        if let gone = removedButConnected[app.id] {
+            return RemovalNote(
+                title: String(localized: "Data Removed, Still Connected"),
+                line: AppDataWording.removedButConnected(removed: gone.items, appName: Self.name(of: app), stoppedBy: gone.stoppedBy))
+        }
+        guard let left = unfinished[app.id] else { return nil }
+        var couldReadAgain = true
+        if case .failed? = data[app.id] { couldReadAgain = false }
+        return RemovalNote(
+            title: String(localized: "Some Data May Be Left"), line: AppDataWording.unfinished(left, couldReadAgain: couldReadAgain))
+    }
 
     /// Reads what `app` keeps under each namespace it holds. Without any, nothing is asked.
     func readData(of app: AppAccess) async {

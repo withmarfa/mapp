@@ -196,6 +196,7 @@ private struct AppDataSection: View {
                     OwnerProblemRow(title: "Couldn’t Read Its Data", failure: failure, page: .apps, host: host) {
                         Task { await model.readData(of: app) }
                     }
+                    removalNote
                 }
             case .kept(let kept)?:
                 SettingsSection(name: Text("Data \(name) Keeps")) {
@@ -203,14 +204,16 @@ private struct AppDataSection: View {
                         SettingsRow(verbatim: String(localized: "\(name) Keeps No Data"), look: .off)
                     }
                     ForEach(kept, id: \.vendor) { held in row(held, among: kept.count) }
-                    if let left = model.unfinished[app.id] {
-                        SettingsProblemRow(
-                            title: Text("Some Data Is Left"),
-                            line: Text(verbatim: AppDataWording.unfinished(left)),
-                            actions: [])
-                    }
+                    removalNote
                 }
             }
+        }
+    }
+
+    /// What a removal that deleted items and then stopped says, drawn whether or not the data could be read again.
+    @ViewBuilder private var removalNote: some View {
+        if let note = model.removalNote(for: app) {
+            SettingsProblemRow(title: Text(verbatim: note.title), line: Text(verbatim: note.line), actions: [])
         }
     }
 
