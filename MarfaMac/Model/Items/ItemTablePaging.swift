@@ -30,9 +30,10 @@ nonisolated struct TablePaging: Hashable, Sendable {
         return Slice(rows: Array(rows.prefix(shown)), remaining: rows.count - shown)
     }
 
-    /// One page of a grouped place. Groups stay in order. Only as many item rows as the page holds are drawn, and a
-    /// group that begins after the page is left out. A group the person folded away shows its heading and none of
-    /// its rows, and those rows are not part of the page.
+    /// One page of a grouped place. Groups stay in order. Only as many item rows as the page holds are drawn. A
+    /// group the person folded away shows its heading and none of its rows, wherever it falls, and those rows are
+    /// not part of the page. An open group whose first row is past the page is left out, and its rows count toward
+    /// what is left.
     func slice(groups: [ItemTableGroup], collapsed: Set<String>, size: TablePageSize) -> (groups: [GroupSlice], remaining: Int) {
         var budget = pages * size.rawValue
         var shown: [GroupSlice] = []
@@ -40,7 +41,7 @@ nonisolated struct TablePaging: Hashable, Sendable {
         var filling = true
         for group in groups {
             if collapsed.contains(group.id) {
-                if filling { shown.append(GroupSlice(group: group, rows: [])) }
+                shown.append(GroupSlice(group: group, rows: []))
                 continue
             }
             if !filling || budget == 0 {

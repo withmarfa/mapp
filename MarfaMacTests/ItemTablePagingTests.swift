@@ -43,6 +43,15 @@ struct ItemTablePagingTests {
         #expect(paging.slice(rows, size: .fifty) == .init(rows: rows, remaining: 0))
     }
 
+    @Test func aFoldedGroupAfterAFullPageShowsItsHeading() {
+        let paging = TablePaging()
+        let drawn = paging.slice(groups: [Self.group("a", 50), Self.group("b", 20)], collapsed: ["b"], size: .fifty)
+        #expect(drawn.groups.map(\.group.id) == ["a", "b"])
+        #expect(drawn.groups[0].rows.count == 50)
+        #expect(drawn.groups[1].rows.isEmpty)
+        #expect(drawn.remaining == 0)
+    }
+
     @Test func aGroupedPlaceShowsOnePageInGroupOrder() {
         var paging = TablePaging()
         let groups = [Self.group("a", 60), Self.group("b", 60), Self.group("c", 10)]
