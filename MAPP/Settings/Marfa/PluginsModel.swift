@@ -27,6 +27,8 @@ struct PluginsAccess {
         case reading
         case read([ReleasePlugin])
         case unreadable(PluginFailure)
+        /// A first read that was cancelled before any release was held. Not a failure: Available offers Try Again.
+        case notRead
     }
 
     /// A bundle of the release, read and checked.
@@ -91,6 +93,8 @@ struct PluginsAccess {
     var removal: Removal?
     /// The command last copied, for the button to say so.
     private(set) var copied: String?
+    /// Loads that arrived while one was running. Each is resumed when that one finishes, and then reads for itself.
+    private var loadsWaiting: [CheckedContinuation<Void, Never>] = []
 
     init(context: OwnerContext, calls: any PluginCalls, access: PluginsAccess) {
         self.context = context
@@ -101,9 +105,20 @@ struct PluginsAccess {
     // MARK: Reading
 
     func load() async {
-        guard !isLoading else { return }
+        // One already running may be cancelled and leave nothing read. This one waits, then reads.
+        if isLoading {
+            await withCheckedContinuation { loadsWaiting.append($0) }
+            guard !Task.isCancelled else { return }
+            await load()
+            return
+        }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            let waiting = loadsWaiting
+            loadsWaiting = []
+            waiting.forEach { $0.resume() }
+        }
         do {
             installed = try await calls.installed()
             failure = nil
@@ -120,20 +135,48 @@ struct PluginsAccess {
         await readRelease()
     }
 
-    /// Reads the release again, with every bundle read before dropped, then each bundle of a newer version, which says what the
-    /// update adds and whether it carries guidance. A read that was cancelled leaves the release as it was, to be read by the
-    /// next load, and is no failure.
+    /// Reads the release again. A release that cannot be read drops every bundle read before. A read that was cancelled puts
+    /// back the release and the bundles held before it, and is no failure. A first read that never finished is `notRead`, so
+    /// Available offers Try Again instead of staying on Reading. Each newer version's bundle is then read.
     func readRelease() async {
+        let heldRelease = release
+        let heldBundles = bundles
         release = .reading
         bundles = [:]
         do {
             let entries = try await calls.release()
             release = .read(entries)
         } catch {
-            if error != .canceled { release = .unreadable(error) }
+            if error == .canceled {
+                switch heldRelease {
+                case .reading:
+                    release = .notRead
+                    bundles = [:]
+                case .read, .unreadable, .notRead:
+                    release = heldRelease
+                    bundles = heldBundles
+                }
+            } else {
+                release = .unreadable(error)
+            }
             return
         }
         for update in updates { await readBundle(of: update.entry) }
+    }
+
+    /// Try Again for a bundle the page could not use. The release is read first, then the bundle of the entry that read lists.
+    /// Where the release no longer lists the plugin, nothing of it is read and the page says so.
+    func readAgain(_ name: String) async {
+        let title = plugin(name)?.title ?? entry(name)?.title ?? name
+        await readRelease()
+        guard case .read = release, let fresh = entry(name) else {
+            if case .read = release {
+                notice = Notice(
+                    title: String(localized: "Not in the Release"), line: String(localized: "The release no longer lists \(title)."))
+            }
+            return
+        }
+        await readBundle(of: fresh)
     }
 
     func readBundle(of entry: ReleasePlugin) async {

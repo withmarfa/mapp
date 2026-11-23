@@ -145,7 +145,7 @@ nonisolated enum PluginFailure: Error, Hashable, Sendable {
     case carriesGuidance
     /// The release lists another version or digest of the plugin than the page showed, or lists it no more.
     case releaseChanged
-    /// The read was cancelled, which is no failure and is shown as nothing.
+    /// The read was cancelled, which is no failure. A bundle read is dropped. A release read puts back what it held.
     case canceled
 }
 

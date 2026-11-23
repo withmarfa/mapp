@@ -38,6 +38,11 @@ final class FakePluginCalls: PluginCalls, @unchecked Sendable {
         var hostNames: [String: String] = [:]
         var releaseGate: ReleaseGate?
         var bundleFailure: PluginFailure?
+        /// When set, a bundle is refused unless the release lists this version and digest, as `ClientPluginCalls` does.
+        var checksListedRelease = false
+        var bundleAsks: [ReleasePlugin] = []
+        /// Clears `releaseFailure` after it is thrown once, so a later read can succeed.
+        var consumeReleaseFailure = false
         var installedFailure: OwnerFailure?
         /// Makes the next read of the installed plugins fail once an install has been taken.
         var failReadAfterInstall = false
@@ -64,13 +69,27 @@ final class FakePluginCalls: PluginCalls, @unchecked Sendable {
 
     func release() async throws(PluginFailure) -> [ReleasePlugin] {
         if let gate = state.withLock({ $0.releaseGate }) { await gate.wait() }
-        if let failure = state.withLock({ $0.releaseFailure }) { throw failure }
+        let failure = state.withLock { state -> PluginFailure? in
+            let failure = state.releaseFailure
+            if state.consumeReleaseFailure { state.releaseFailure = nil }
+            return failure
+        }
+        if let failure { throw failure }
         return state.withLock { $0.release }
     }
 
     func bundle(of plugin: ReleasePlugin) async throws(PluginFailure) -> ReleaseBundle {
-        if let failure = state.withLock({ $0.bundleFailure }) { throw failure }
-        guard let bundle = state.withLock({ $0.bundles[plugin.name] }) else { throw .releaseUnreadable("missing") }
+        let snapshot = state.withLock { state -> (PluginFailure?, Bool, [ReleasePlugin], ReleaseBundle?) in
+            state.bundleAsks.append(plugin)
+            return (state.bundleFailure, state.checksListedRelease, state.release, state.bundles[plugin.name])
+        }
+        if let failure = snapshot.0 { throw failure }
+        if snapshot.1 {
+            guard let fresh = snapshot.2.first(where: { $0.name == plugin.name }), fresh.version == plugin.version,
+                fresh.sha256.lowercased() == plugin.sha256.lowercased()
+            else { throw .releaseChanged }
+        }
+        guard let bundle = snapshot.3 else { throw .releaseUnreadable("missing") }
         return bundle
     }
 
@@ -388,7 +407,7 @@ private func bundle(
         }
         let model = model(calls)
         await model.load()
-        #expect(model.release == .reading, "nothing is drawn for a read that stopped; the next load reads it again")
+        #expect(model.release == .notRead, "a first read that was cancelled does not stay on Reading, and is not a failure")
         calls.state.withLock {
             $0.releaseFailure = nil
             $0.bundleFailure = .canceled
@@ -396,6 +415,94 @@ private func bundle(
         await model.install(entry)
         #expect(model.problem == nil, "a cancelled bundle read is no refusal")
         #expect(model.bundles["tickets"] == nil, "it is read again when asked, not kept as a failure")
+    }
+
+    @Test func tryAgainReadsTheBundleTheNewReleaseLists() async {
+        let calls = FakePluginCalls()
+        let shown = listed("hello", "Hello", version: "0.0.14")
+        let fresh = listed("hello", "Hello", version: "0.0.15")
+        calls.state.withLock { $0.release = [shown] }
+        let model = model(calls)
+        await model.load()
+        calls.state.withLock {
+            $0.release = [fresh]
+            $0.bundles["hello"] = bundle(fresh)
+            $0.checksListedRelease = true
+            $0.bundleAsks = []
+        }
+        await model.readBundle(of: shown)
+        #expect(model.bundles["hello"] == .failed(.releaseChanged), "the fresh index refuses the version the page still holds")
+        calls.state.withLock { $0.bundleAsks = [] }
+        await model.readAgain("hello")
+        #expect(model.bundle("hello")?.plugin.version.description == "0.0.15")
+        #expect(calls.state.withLock { $0.bundleAsks } == [fresh], "Try Again reads the entry the new release lists, not the one it refused")
+    }
+
+    @Test func tryAgainShowsAPluginTheReleaseNoLongerLists() async {
+        let calls = FakePluginCalls()
+        let shown = listed("hello", "Hello", version: "0.0.14")
+        calls.state.withLock {
+            $0.release = [shown]
+            $0.checksListedRelease = true
+        }
+        let model = model(calls)
+        await model.load()
+        calls.state.withLock {
+            $0.release = []
+            $0.bundleAsks = []
+        }
+        await model.readAgain("hello")
+        #expect(model.entry("hello") == nil)
+        #expect(model.notice?.line == "The release no longer lists Hello.")
+        #expect(calls.state.withLock { $0.bundleAsks }.isEmpty, "no bundle is read for a plugin the release dropped")
+    }
+
+    @Test func aCancelledReleaseReadPutsBackTheReleaseAndItsBundles() async {
+        let calls = FakePluginCalls()
+        let entry = listed("tickets", "Tickets", version: "0.0.14")
+        calls.state.withLock {
+            $0.installed = [installed("tickets", "Tickets", version: "0.0.13")]
+            $0.release = [entry]
+            $0.bundles["tickets"] = bundle(entry)
+        }
+        let model = model(calls)
+        await model.load()
+        #expect(model.bundle("tickets")?.plugin.version.description == "0.0.14")
+        calls.state.withLock { $0.releaseFailure = .canceled }
+        await model.readRelease()
+        #expect(model.entries.map(\.name) == ["tickets"])
+        #expect(model.bundle("tickets")?.plugin.version.description == "0.0.14", "a cancelled read puts back the bundles it held")
+        #expect(model.release != .reading)
+    }
+
+    @Test func aNewerLoadReadsAfterOneThatWasCancelled() async {
+        let calls = FakePluginCalls()
+        let gate = ReleaseGate()
+        let entry = listed("tickets", "Tickets", version: "0.0.14")
+        calls.state.withLock {
+            $0.installed = [installed("tickets", "Tickets", version: "0.0.13")]
+            $0.release = [entry]
+            $0.releaseGate = gate
+            $0.releaseFailure = .canceled
+            $0.consumeReleaseFailure = true
+        }
+        let model = model(calls)
+        let first = Task { await model.load() }
+        #expect(await eventually { model.isLoading })
+        let started = Mutex(false)
+        let finished = Mutex(false)
+        let second = Task {
+            started.withLock { $0 = true }
+            await model.load()
+            finished.withLock { $0 = true }
+        }
+        #expect(await eventually { started.withLock { $0 } })
+        let returnedEarly = finished.withLock { $0 }
+        await gate.open()
+        await first.value
+        await second.value
+        #expect(!returnedEarly, "a load that finds one running waits, then reads, rather than returning")
+        #expect(model.entries.map(\.name) == ["tickets"])
     }
 
     @Test func aFileInstalledAfterAnotherThatNeededTheCommandLineDropsThatCommand() async {

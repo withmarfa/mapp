@@ -50,6 +50,14 @@ struct PluginsPage: View {
                 ReleasedPluginDetail(model: model, entry: entry, host: host)
             } else if case .reading = model.release {
                 OwnerLoading()
+            } else if case .unreadable(let failure) = model.release {
+                SettingsPageState(
+                    symbol: "exclamationmark.triangle", title: Text("The Plugins Release Couldn’t Be Read"),
+                    line: Text(verbatim: PluginWording.line(failure)), action: ("Try Again", { Task { await model.readRelease() } }))
+            } else if case .notRead = model.release {
+                SettingsPageState(
+                    symbol: "puzzlepiece.extension", title: Text("The Plugins Release Wasn’t Read"),
+                    action: ("Try Again", { Task { await model.readRelease() } }))
             } else {
                 SettingsPageState(
                     symbol: "puzzlepiece.extension", title: model.notice.map { Text(verbatim: $0.title) } ?? Text("This Plugin Isn’t Here"),
@@ -103,6 +111,10 @@ struct PluginsPage: View {
             switch model.release {
             case .reading:
                 SettingsRow("Reading the Plugins Release…") { ProgressView().controlSize(.small) }
+            case .notRead:
+                SettingsRow("The Plugins Release Wasn’t Read") {
+                    SettingsButton("Try Again") { Task { await model.readRelease() } }
+                }
             case .unreadable(let failure):
                 SettingsProblemRow(
                     title: Text("The Plugins Release Couldn’t Be Read"), line: Text(verbatim: PluginWording.line(failure)),
@@ -212,7 +224,7 @@ private struct PluginUpdateRow: View {
             } else if let command = model.heldCommand(update.id) {
                 SettingsButton(model.copied == command ? "Copied" : "Copy Command") { model.copyCommand(command) }
             } else if case .failed? = model.bundles[update.id] {
-                SettingsButton("Try Again") { Task { await model.readBundle(of: update.entry) } }
+                SettingsButton("Try Again") { Task { await model.readAgain(update.id) } }
             } else {
                 SettingsButton("Update", role: .update) { Task { await model.install(update.entry, asUpdate: true) } }
             }
@@ -349,7 +361,7 @@ private struct ReleasedPluginDetail: View {
         case .failed(let failure)?:
             SettingsPageState(
                 symbol: "exclamationmark.triangle", title: Text("This Plugin Couldn’t Be Read"), line: Text(verbatim: PluginWording.line(failure)),
-                action: ("Try Again", { Task { await model.readBundle(of: entry) } }))
+                action: ("Try Again", { Task { await model.readAgain(entry.name) } }))
         case .reading?, nil:
             OwnerLoading()
         }
