@@ -169,7 +169,7 @@ extension ItemLibrary {
         let candidates = ids.filter(canChangeType)
         guard !candidates.isEmpty else { return [] }
         return creatableTypes.filter { option in
-            candidates.contains { id in item(id)?.type != option.id && typeChange(of: id, to: option.id) != nil }
+            candidates.contains { id in headerItem(id)?.type != option.id && typeChange(of: id, to: option.id) != nil }
         }
     }
 
@@ -178,7 +178,7 @@ extension ItemLibrary {
     func offersTypeChange(for ids: Set<ItemID>) -> Bool {
         let options = creatableTypes
         return ids.contains { id in
-            canChangeType(id) && options.contains { option in item(id)?.type != option.id && typeChange(of: id, to: option.id) != nil }
+            canChangeType(id) && options.contains { option in headerItem(id)?.type != option.id && typeChange(of: id, to: option.id) != nil }
         }
     }
 
