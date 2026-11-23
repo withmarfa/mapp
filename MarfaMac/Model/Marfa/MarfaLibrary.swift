@@ -677,7 +677,7 @@ import Observation
 
     private static func placesDiffer(_ old: Item, _ new: Item) -> Bool {
         old.state != new.state || old.tier != new.tier || old.tags != new.tags || old.type != new.type
-            || old.edgesOut != new.edgesOut
+            || old.source != new.source || old.edgesOut != new.edgesOut
     }
 
     private func answered(_ id: WriteID, _ outcome: WriteOutcome) {
