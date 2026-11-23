@@ -109,7 +109,7 @@ import Observation
     @ObservationIgnored private var textSaves: [WriteID: Telemetry.Interval] = [:]
     /// Text writes the copy has not yet taken and read back, by item, so what it bound in the text may be older.
     @ObservationIgnored private var unreadText: [ItemID: Set<WriteID>] = [:]
-    /// The version of the text the person's last save of each item was typed on. Only the first save typed on a
+    /// The version the person's last sent save of each item was typed on. Only the first save sent on a
     /// version is merged against it; the rest follow the person's own.
     @ObservationIgnored private var savedOn: [ItemID: ItemVersion] = [:]
     /// Text typed on the text the library holds and not yet sent, by item (`TextPause`). The library holds it at once,
@@ -875,6 +875,9 @@ import Observation
         records[id]?.body = ItemBody(id: id, text: text, version: readAt)
         if isNew { schedule(id, at: min(now + textPause.quiet, now + textPause.cap)) }
     }
+
+    /// Whether any typed text waits to be sent.
+    var hasWaitingText: Bool { !waitingText.isEmpty }
 
     /// Sends every text that waits, as every hand-over ends with, so nothing typed before it still waits after it.
     func sendWaitingText() {

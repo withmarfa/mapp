@@ -65,8 +65,11 @@ extension MarfaLibrary {
             }
             try? await Task.sleep(for: .milliseconds(10))
         }
-        sendWaitingText()
-        await source.queueSubmitted()
+        // A page can report again while the queue is waited on, so the wait ends only with nothing typed left waiting.
+        repeat {
+            sendWaitingText()
+            await source.queueSubmitted()
+        } while hasWaitingText
     }
 
     /// The longest `finish` waits for a relationship change to be checked.

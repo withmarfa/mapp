@@ -70,6 +70,18 @@ import Testing
         #expect(library.notices.waiting.isEmpty)
     }
 
+    @Test func textTypedWhileFinishingWaitsIsSentBeforeFinishingReturns() async throws {
+        let (library, source) = try await loaded()
+        library.updateBody(of: F.n1, to: "Before")
+        source.queuing.withLock { $0 = true }
+        let finishing = Task { await library.finish() }
+        #expect(await eventually { source.writes.count == 1 })
+        library.updateBody(of: F.n1, to: "Before and after")
+        source.queuing.withLock { $0 = false }
+        await finishing.value
+        #expect(source.writes.last == .editBody(F.n1, "Before and after", base: ItemVersion(1), merge: .following))
+    }
+
     @Test func aPageHandingOverSendsWhatWaitsOutsideTheUndoItWaitsFor() async throws {
         typealias T = TypeChangeFixture
         func note(_ id: ItemID, _ title: String, version: Int64 = 1, type: TypeID = T.note) -> MarfaMac.Item {
