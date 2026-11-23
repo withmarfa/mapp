@@ -13,7 +13,7 @@ nonisolated enum Telemetry {
     static let slow = Duration.milliseconds(250)
     static let stalled = Duration.seconds(2)
 
-    static let subsystem = Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp"
+    static let subsystem = AppPaths.bundleIdentifier
 
     private static let loggers = Dictionary(uniqueKeysWithValues: Category.allCases.map {
         ($0, Logger(subsystem: subsystem, category: $0.rawValue))

@@ -196,7 +196,7 @@ nonisolated struct SystemSignIns: SignIns {
     let anchor: @MainActor @Sendable () -> NSWindow?
 
     init(
-        bundleIdentifier: String = Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp",
+        bundleIdentifier: String = AppPaths.bundleIdentifier,
         anchor: @escaping @MainActor @Sendable () -> NSWindow? = {
             NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first { $0.isVisible }
         }

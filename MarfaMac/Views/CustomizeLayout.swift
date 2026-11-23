@@ -34,7 +34,7 @@ nonisolated struct LayoutRowDrag: Codable, Transferable {
 
 extension UTType {
     /// Named for the bundle identifier, as `MarfaMac/Info.plist` declares it, so a row never drags into the other build.
-    nonisolated static let marfaLayoutRow = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").layout-row")
+    nonisolated static let marfaLayoutRow = UTType(exportedAs: "\(AppPaths.bundleIdentifier).layout-row")
 }
 
 /// The right sidebar while Customize Layout is on. Page arranges the item's rows in three groups, Pinned (up to four), On

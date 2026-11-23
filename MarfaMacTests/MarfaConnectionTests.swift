@@ -69,12 +69,12 @@ struct MarfaConnectionTests {
     /// Building the real sign-in touches neither the Keychain nor a window; Debug and Release differ by their
     /// bundle identifier, so they never share a sign-in or a return address.
     @Test func theRealSignInKeepsItsOwnServiceAndReturnsToTheApp() throws {
-        let debug = SystemSignIns(bundleIdentifier: "com.withmarfa.mapp.debug", anchor: { nil })
-        let release = SystemSignIns(bundleIdentifier: "com.withmarfa.mapp", anchor: { nil })
-        #expect(debug.service == "com.withmarfa.mapp.debug.marfa-sign-in")
-        #expect(release.service == "com.withmarfa.mapp.marfa-sign-in")
+        let debug = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa.debug", anchor: { nil })
+        let release = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa", anchor: { nil })
+        #expect(debug.service == "com.withmarfa.marfa.debug.marfa-sign-in")
+        #expect(release.service == "com.withmarfa.marfa.marfa-sign-in")
         #expect(debug.service != release.service)
-        #expect(debug.scheme == "com.withmarfa.mapp.debug")
+        #expect(debug.scheme == "com.withmarfa.marfa.debug")
         #expect(SystemSignIns.scopes == ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write", "profile.name:read", "app.marfa-mac.*:write", "metadata.types:write"])
     }
 

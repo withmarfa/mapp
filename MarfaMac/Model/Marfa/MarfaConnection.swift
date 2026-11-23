@@ -51,7 +51,8 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
 
 /// Where a Marfa library's working copy lives: in the app's own storage, one directory for each server address.
 nonisolated struct MarfaStoreLocation: Hashable, Sendable {
-    static let applicationSupport = URL.applicationSupportDirectory.appending(path: "Marfa", directoryHint: .isDirectory)
+    /// This copy's working copies. Named for the bundle identifier, never `Marfa`, which is the command line's folder.
+    static let applicationSupport = AppPaths.applicationSupport
 
     let root: URL
 

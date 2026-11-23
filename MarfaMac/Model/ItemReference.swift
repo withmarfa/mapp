@@ -74,7 +74,7 @@ nonisolated struct ItemReference: Codable, Transferable, Identifiable {
 extension UTType {
     /// Named for the bundle identifier, as `MarfaMac/Info.plist` declares it, so the Debug build and the installed app
     /// each own their type and an item never drags from one into the other.
-    nonisolated static let marfaItem = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").item")
+    nonisolated static let marfaItem = UTType(exportedAs: "\(AppPaths.bundleIdentifier).item")
 }
 
 extension ItemLibrary {

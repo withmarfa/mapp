@@ -256,6 +256,13 @@ import os
         }
     }
 
+    #if DEBUG
+    /// The sample library's defaults, named for this copy so another bundle never shares them.
+    static var sampleDefaultsSuite: String { "\(AppPaths.bundleIdentifier).SampleMarfa" }
+    /// The sample library's copy, under this copy's temporary folder.
+    static var sampleStore: URL { AppPaths.temporary("Sample Marfa") }
+    #endif
+
     /// The app's own: the person's defaults and Keychain, and the copy in the app's own storage.
     static func standard() -> Libraries {
         #if DEBUG
@@ -266,9 +273,9 @@ import os
             || TestHost.isRequested
             || environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         {
-            let suite = "MarfaMac.SampleMarfa"
+            let suite = sampleDefaultsSuite
             let defaults = UserDefaults(suiteName: suite) ?? .standard
-            let root = URL.temporaryDirectory.appending(path: "Sample Marfa", directoryHint: .isDirectory)
+            let root = sampleStore
             // A run against a test server may ask to keep the copy the last run left (`-MarfaMacKeepTestStore`), so the
             // speed tests can time a launch on a copy that is already there.
             let keepsCopy = environment["MARFA_MAC_TEST_MARFA_URL"] != nil

@@ -64,7 +64,7 @@ import Testing
     }
 
     @Test func aMacWithNoWindowThrowsTheAppsOwnErrorNotText() async throws {
-        let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.mapp.tests", anchor: { nil })
+        let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa.tests", anchor: { nil })
         let connection = try MarfaConnection(address: "https://marfa.test")
         do {
             _ = try await signIns.signInWithBrowser(to: connection, asking: [])

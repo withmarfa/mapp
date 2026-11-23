@@ -13,7 +13,7 @@ actor PictureCache {
 
     nonisolated static var standardFolder: URL {
         URL.cachesDirectory
-            .appending(path: Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp", directoryHint: .isDirectory)
+            .appending(path: AppPaths.bundleIdentifier, directoryHint: .isDirectory)
             .appending(path: "Remote Pictures", directoryHint: .isDirectory)
     }
 

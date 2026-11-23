@@ -45,7 +45,7 @@ nonisolated struct SidebarSectionDrag: Codable, Transferable {
 
 extension UTType {
     /// Named for the bundle identifier, as `MarfaMac/Info.plist` declares it, so a section never drags into the other build.
-    nonisolated static let marfaSidebarSection = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").sidebar-section")
+    nonisolated static let marfaSidebarSection = UTType(exportedAs: "\(AppPaths.bundleIdentifier).sidebar-section")
 }
 
 /// The mark at the trailing edge of a row and a section while the sidebar is being customized: it says the row can be

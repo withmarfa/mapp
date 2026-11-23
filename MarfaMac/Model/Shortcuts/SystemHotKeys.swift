@@ -3,7 +3,7 @@ import Carbon.HIToolbox
 import KeyboardShortcuts
 
 /// Registers the any-app shortcuts with the system through the KeyboardShortcuts package, which wraps Carbon's
-/// `RegisterEventHotKey`: it needs no Accessibility permission and works in the sandbox. A hot key is registered only
+/// `RegisterEventHotKey`: it needs no Accessibility permission. A hot key is registered only
 /// while it is set (`AnyAppShortcuts`), so an off shortcut takes no key from any other app.
 struct SystemHotKeys: HotKeyRegistrar {
     private func name(of command: AnyAppCommand) -> KeyboardShortcuts.Name {

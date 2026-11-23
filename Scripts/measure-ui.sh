@@ -44,7 +44,7 @@ if command -v marfa > /dev/null && [[ -n ${TEST_RUNNER_MARFA_API_URL:-} && -n ${
 fi
 
 /usr/bin/log stream --signpost --level debug --style ndjson \
-  --predicate 'subsystem BEGINSWITH "com.withmarfa.mapp"' > "$log" 2>/dev/null &
+  --predicate 'subsystem BEGINSWITH "com.withmarfa.marfa"' > "$log" 2>/dev/null &
 stream=$!
 # The stream takes a moment to attach, and nothing has begun.
 sleep 2

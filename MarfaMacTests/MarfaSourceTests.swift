@@ -275,7 +275,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// Another copy of the app holding the copy as its writer may still write to it, so it is never replaced. The
-    /// lock is held by a different process, as another copy of the app sharing the container would hold it.
+    /// lock is held by a different process, as another copy of the app would hold it.
     @Test
     func aCopyADifferentVersionMadeThatAnotherProcessHoldsIsKept() async throws {
         let root = scratch()
@@ -288,13 +288,7 @@ struct MarfaSourceOfflineTests {
         try Self.makeItAnEarlierVersion(store)
         let before = try Self.inode(store)
 
-        let holder: OtherProcessLock
-        do {
-            holder = try await OtherProcessLock(store)
-        } catch OtherProcessLock.Failure.notStarted(let reason) {
-            Issue.record("The test sandbox forbids starting /usr/bin/sqlite3, so another process can't hold the lock here: \(reason)")
-            return
-        }
+        let holder = try await OtherProcessLock(store)
         defer { holder.release() }
         let failure = await #expect(throws: SourceFailure.self) {
             _ = try await MarfaSource.open(connection, signIns: keys, location: location)
