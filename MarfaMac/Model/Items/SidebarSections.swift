@@ -178,8 +178,10 @@ nonisolated struct SidebarExtras: Sendable {
         var extras = SidebarExtras()
         func wants(_ section: SidebarSection) -> Bool { sections?.contains(section) ?? true }
         if wants(.outline), !item.isFile { extras.outline = outline }
-        if wants(.attachments) { extras.attachments = library.attachments(of: item.id).compactMap { library.item($0) }.map(target) }
-        if wants(.collections) { extras.collections = library.collections(holding: [item.id]).map(target) }
+        if wants(.attachments) { extras.attachments = library.attachments(of: item.id).compactMap { library.headerItem($0) }.map(target) }
+        // The item's own collection edges, and each collection as its header shows it. Not `collections`, which follows
+        // every publish in the library.
+        if wants(.collections) { extras.collections = collections(holding: item, in: library) }
         if sections?.contains(where: \.isFromApp) ?? true { extras.apps = appSections(of: item, in: library, relationships: relationships) }
         return extras
     }
@@ -194,7 +196,7 @@ nonisolated struct SidebarExtras: Sendable {
         for relationship in relationships {
             for found in relationship.targets {
                 guard let id = found.itemID, found.isOpenable, id != item.id, seen.insert(id).inserted,
-                      let other = library.item(id), let source = other.source, !source.isEmpty,
+                      let other = library.headerItem(id), let source = other.source, !source.isEmpty,
                       library.catalogue.itemTypes[other.type]?.linkField != nil
                 else { continue }
                 groups[.app(type: other.type, source: source), default: []].append(found)
@@ -206,6 +208,19 @@ nonisolated struct SidebarExtras: Sendable {
                 section: section, title: section.title(in: library.catalogue, sources: library.sources),
                 icon: library.catalogue.icon(for: type), sourceName: library.sources.name(source), targets: targets)
         }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    /// Active collections `item` is filed in, by title. Each is the header's item, so a publish that changes neither
+    /// this item's edges nor a collection's header does not reach the section.
+    @MainActor
+    private static func collections(holding item: Item, in library: any ItemLibrary) -> [ItemRelationshipTarget] {
+        item.collectionIDs.compactMap { library.headerItem($0) }
+            .filter { $0.state == .active && library.catalogue.isCollection($0.type) }
+            .sorted { a, b in
+                let order = a.displayTitle.localizedStandardCompare(b.displayTitle)
+                return order == .orderedSame ? a.id.rawValue < b.id.rawValue : order == .orderedAscending
+            }
+            .map(target)
     }
 
     private static func target(_ item: Item) -> ItemRelationshipTarget {

@@ -2,15 +2,80 @@ import Foundation
 import Observation
 
 /// One item as the views read it, observed on its own, so a change to one item redraws only what shows it.
+///
+/// The item and its text are stored whole. A page header does not follow either: it follows `headerStamp` and
+/// `textIsEmpty`, which move only when something the header shows changes. A keystroke that leaves the text
+/// non-empty, or a publish that moves only the version, preview, sync or bound embeds, does not.
 @Observable final class ItemRecord {
-    var item: Item
+    var item: Item { didSet { noteShown(oldValue) } }
     /// Nil for an item with no text, and until its text is read.
-    var body: ItemBody?
+    var body: ItemBody? { didSet { noteText() } }
     /// False once the source no longer holds the item, which tells the views that read only this record.
     var isHeld = true
+    /// Changes only when the text becomes empty or not. Missing text counts as empty.
+    private(set) var textIsEmpty = true
+    /// Changes only when the text arrives or goes, which is not the same as becoming empty.
+    private(set) var hasBody = false
+    /// Changes when a field the page header shows changes, not when only the version, preview, sync or embeds move.
+    private(set) var headerStamp = 0
+    /// Changes only when `version` changes. The inspector's Version cell follows this, not the whole item.
+    private(set) var versionStamp = 0
+    /// Changes when an edge touching this item comes, goes or changes, including one another item holds.
+    private(set) var linkStamp = 0
+
+    /// An edge this item does not hold itself changed: the other end came, went or moved.
+    fileprivate func noteLink() { linkStamp &+= 1 }
+    /// Changes only when the copy's bound embeds of this item change.
+    private(set) var embedStamp = 0
+    /// The item as `headerStamp` last counted it. Not observed: a reader follows `headerStamp`.
+    @ObservationIgnored private(set) var headerSnapshot: Item
+    /// The version as `versionStamp` last counted it. Not observed: a reader follows `versionStamp`.
+    @ObservationIgnored private(set) var versionSnapshot: ItemVersion
+    /// The text as `textIsEmpty` last counted it. Not observed: a reader follows `textIsEmpty` and `hasBody`.
+    @ObservationIgnored private(set) var bodySnapshot: ItemBody?
+    /// The bound embeds as `embedStamp` last counted them. Not observed: a reader follows `embedStamp`.
+    @ObservationIgnored private(set) var embedSnapshot: [BoundEmbed]
 
     init(_ item: Item) {
         self.item = item
+        headerSnapshot = item
+        versionSnapshot = item.version
+        embedSnapshot = item.boundEmbeds
+    }
+
+    private func noteShown(_ old: Item) {
+        if item.edgesOut != old.edgesOut { linkStamp &+= 1 }
+        if item.boundEmbeds != old.boundEmbeds {
+            embedSnapshot = item.boundEmbeds
+            embedStamp &+= 1
+        }
+        if item.version != old.version {
+            versionSnapshot = item.version
+            versionStamp &+= 1
+        }
+        if Self.affectsHeader(old, item) {
+            headerSnapshot = item
+            headerStamp &+= 1
+        }
+    }
+
+    private func noteText() {
+        bodySnapshot = body
+        let present = body != nil
+        if present != hasBody { hasBody = present }
+        let empty = body?.text.isEmpty ?? true
+        if empty != textIsEmpty { textIsEmpty = empty }
+    }
+
+    /// Whether the page header can show a difference. The version, the preview, sync and the bound embeds are not
+    /// drawn there. `modified` is: Updated is a pin.
+    private static func affectsHeader(_ old: Item, _ new: Item) -> Bool {
+        old.type != new.type || old.title != new.title || old.name != new.name || old.titleRule != new.titleRule
+            || old.properties != new.properties || old.content != new.content || old.state != new.state
+            || old.tier != new.tier || old.tags != new.tags || old.created != new.created
+            || old.modified != new.modified || old.occurred != new.occurred || old.trashed != new.trashed
+            || old.edgesOut != new.edgesOut || old.problem != new.problem || old.readOnly != new.readOnly
+            || old.source != new.source
     }
 }
 
@@ -40,10 +105,9 @@ import Observation
     private(set) var contentRevision = 0
     /// Bumped only when an item comes, goes or changes which places hold it, or the catalogue changes, for the counts.
     private(set) var membershipRevision = 0
-    /// Bumped when an edge comes, goes or changes, and when the index is built again, which is all that changes what
-    /// points at an item. A read of
-    /// an item's relationships follows this and the records of the items it names, never `contentRevision`.
-    private(set) var linksRevision = 0
+    /// Bumped when an item's title or the name the core gives it changes. A link shows that name. A keystroke that
+    /// does not change either leaves this still, unlike `contentRevision`, which the copy's publish of the row moves.
+    private(set) var namesRevision = 0
     private var searchRevision = 0
     private var viewRevision = 0
 
@@ -600,18 +664,30 @@ import Observation
         catalogue = holdingChosenIcons(snapshot.catalogue)
         take(snapshot.views)
         let present = Set(snapshot.items.map(\.id))
+        var renamed = false
         for (id, record) in records where !present.contains(id) {
+            // The index is rebuilt below. The other ends are told now, so a link this item held is read again.
+            noteLinks(touching: record.item)
             record.isHeld = false
             records[id] = nil
         }
         for item in snapshot.items {
             if let record = records[item.id] {
-                if record.item != item { record.item = item }
+                let old = record.item
+                guard old != item else { continue }
+                if old.title != item.title || old.name != item.name { renamed = true }
+                record.item = item
+                if old.edgesOut != item.edgesOut {
+                    noteLinks(touching: old)
+                    noteLinks(touching: item)
+                }
             } else {
                 records[item.id] = ItemRecord(item)
+                if !item.edgesOut.isEmpty { noteLinks(touching: item) }
             }
         }
         hold(Array(snapshot.bodies.values))
+        if renamed { namesRevision += 1 }
         reindex()
         isLoaded = true
         LaunchTrace.shared.mark(.firstLoaded)
@@ -621,36 +697,53 @@ import Observation
     private func take(_ changes: ItemChanges) {
         var changed = false
         var moved = false
-        var relinked = false
+        var renamed = false
         for id in changes.removed {
             guard let record = records.removeValue(forKey: id) else { continue }
             index.remove(record.item)
             record.isHeld = false
+            noteLinks(touching: record.item)
             changed = true
             moved = true
-            if !record.item.edgesOut.isEmpty { relinked = true }
         }
         for item in changes.upserted {
             if let record = records[item.id] {
                 let old = record.item
                 guard old != item else { continue }
+                if old.title != item.title || old.name != item.name { renamed = true }
+                // The index is current before the stamps move, so a reader told by a stamp sees the new edges.
                 index.remove(old)
-                record.item = item
                 index.insert(item, catalogue: catalogue)
+                record.item = item
+                if old.edgesOut != item.edgesOut {
+                    noteLinks(touching: old)
+                    noteLinks(touching: item)
+                }
                 if Self.placesDiffer(old, item) { moved = true }
-                if old.edgesOut != item.edgesOut { relinked = true }
             } else {
                 records[item.id] = ItemRecord(item)
                 index.insert(item, catalogue: catalogue)
+                if !item.edgesOut.isEmpty { noteLinks(touching: item) }
                 moved = true
-                if !item.edgesOut.isEmpty { relinked = true }
             }
             changed = true
         }
         hold(changes.bodies)
         if changed { contentRevision += 1 }
         if moved { membershipRevision += 1 }
-        if relinked { linksRevision += 1 }
+        if renamed { namesRevision += 1 }
+    }
+
+    /// Tells every item an edge of `item` touches, this item included, that the edge came, went or changed.
+    /// The item's own record moves its stamp when its `edgesOut` changes; this also reaches the other ends, whose
+    /// own items did not.
+    private func noteLinks(touching item: Item) {
+        var ids: Set<ItemID> = [item.id]
+        for edge in item.edgesOut {
+            ids.insert(edge.from)
+            if case .item(let other) = edge.to { ids.insert(other) }
+        }
+        for id in ids { records[id]?.noteLink() }
     }
 
     /// Text read while the person's own text is still on its way, or waits to be sent, is older than what the library
@@ -695,7 +788,6 @@ import Observation
         for record in records.values { index.insert(record.item, catalogue: catalogue) }
         contentRevision += 1
         membershipRevision += 1
-        linksRevision += 1
     }
 
     private static func placesDiffer(_ old: Item, _ new: Item) -> Bool {
@@ -1027,6 +1119,66 @@ import Observation
             return nil
         }
         return record.isHeld ? record.item : nil
+    }
+
+    func headerItem(_ id: ItemID) -> Item? {
+        guard let record = records[id] else {
+            _ = membershipRevision
+            return nil
+        }
+        guard record.isHeld else { return nil }
+        _ = record.headerStamp
+        return record.headerSnapshot
+    }
+
+    func itemVersion(_ id: ItemID) -> ItemVersion? {
+        guard let record = records[id] else {
+            _ = membershipRevision
+            return nil
+        }
+        guard record.isHeld else { return nil }
+        _ = record.versionStamp
+        return record.versionSnapshot
+    }
+
+    func textIsEmpty(_ id: ItemID) -> Bool {
+        guard let record = records[id] else {
+            _ = membershipRevision
+            return true
+        }
+        guard record.isHeld else { return true }
+        return record.textIsEmpty
+    }
+
+    func bodyText(_ id: ItemID) -> String? {
+        guard let record = records[id] else {
+            _ = membershipRevision
+            return nil
+        }
+        guard record.isHeld else { return nil }
+        // Emptiness and presence, not the text. A keystroke that leaves text in the item changes neither.
+        _ = record.hasBody
+        _ = record.textIsEmpty
+        return record.bodySnapshot?.text
+    }
+
+    /// Follows edges that touch `id`, including ones another item holds. An item not held follows membership until it arrives.
+    func observeLinks(of id: ItemID) {
+        guard let record = records[id] else {
+            _ = membershipRevision
+            return
+        }
+        _ = record.linkStamp
+    }
+
+    func boundEmbeds(of id: ItemID) -> [BoundEmbed] {
+        guard let record = records[id] else {
+            _ = membershipRevision
+            return []
+        }
+        guard record.isHeld else { return [] }
+        _ = record.embedStamp
+        return record.embedSnapshot
     }
 
     /// A file's bytes are named by facts the server sets, which the inspector shows as its kind and size.
@@ -1458,9 +1610,9 @@ import Observation
     }
 
     func attachments(of id: ItemID) -> [ItemID] {
-        // The index is not observed. A file attached or taken off changes an edge; a change to the file itself is
-        // followed through its own record, which a reader of the list reads with `item(_:)`.
-        _ = linksRevision
+        // The index is not observed. A file attached or taken off changes an edge of this item or of the file.
+        // A change to the file itself is followed through its own record, which a reader of the list reads with `item(_:)`.
+        observeLinks(of: id)
         return index.links(to: id, type: MarfaMapping.attachmentEdge).map(\.from)
     }
 }

@@ -137,18 +137,20 @@ extension ItemLibrary {
     /// for an item whose type the app cannot change: a file, one in the bin or with a problem, or one whose text is
     /// not read yet.
     func typeChangeValues(of id: ItemID) -> [String: PropertyValue]? {
-        guard let item = item(id), item.isEditable else { return nil }
+        guard let item = headerItem(id), item.isEditable else { return nil }
         var values = Dictionary(item.properties.map { ($0.key, $0.value) }, uniquingKeysWith: { first, _ in first })
         if let bodyKey = catalogue.itemTypes[item.type]?.bodyKey {
-            guard let body = body(of: id) else { return nil }
-            values[bodyKey] = .string(body.text)
+            // `bodyText` follows emptiness, not each edit. The header asks this on every build, and the text of a
+            // note that stays non-empty does not change whether the item can become another type.
+            guard let text = bodyText(id) else { return nil }
+            values[bodyKey] = .string(text)
         }
         return values
     }
 
     /// The plan for one item, or nil where it cannot become `type`.
     func typeChange(of id: ItemID, to type: TypeID, filling: [String: PropertyValue] = [:]) -> TypeChange? {
-        guard let item = item(id), let new = catalogue.itemTypes[type], item.type != type,
+        guard let item = headerItem(id), let new = catalogue.itemTypes[type], item.type != type,
               !catalogue.isFileType(type), let values = typeChangeValues(of: id)
         else { return nil }
         return try? TypeChange.plan(values, from: catalogue.itemTypes[item.type], to: new, filling: filling).get()
@@ -156,8 +158,8 @@ extension ItemLibrary {
 
     /// Whether the item's type can be changed now: an item `typeChangeValues` reads.
     func canChangeType(_ id: ItemID) -> Bool {
-        guard let item = item(id), item.isEditable else { return false }
-        return catalogue.itemTypes[item.type]?.bodyKey == nil || body(of: id) != nil
+        guard let item = headerItem(id), item.isEditable else { return false }
+        return catalogue.itemTypes[item.type]?.bodyKey == nil || bodyText(id) != nil
     }
 
     /// The types at least one of `ids` can become, by label: those a new item can be, except the type the item
@@ -167,7 +169,7 @@ extension ItemLibrary {
         let candidates = ids.filter(canChangeType)
         guard !candidates.isEmpty else { return [] }
         return creatableTypes.filter { option in
-            candidates.contains { id in item(id)?.type != option.id && typeChange(of: id, to: option.id) != nil }
+            candidates.contains { id in headerItem(id)?.type != option.id && typeChange(of: id, to: option.id) != nil }
         }
     }
 
@@ -176,7 +178,7 @@ extension ItemLibrary {
     func offersTypeChange(for ids: Set<ItemID>) -> Bool {
         let options = creatableTypes
         return ids.contains { id in
-            canChangeType(id) && options.contains { option in item(id)?.type != option.id && typeChange(of: id, to: option.id) != nil }
+            canChangeType(id) && options.contains { option in headerItem(id)?.type != option.id && typeChange(of: id, to: option.id) != nil }
         }
     }
 

@@ -48,7 +48,7 @@ struct ItemPageHeader: ViewModifier {
         of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, placements: PagePlacements = .stored(),
         titleLines: Int = TitleLines.stored(), dateFormat: DateFormat = .stored(), showsCoordinates: Bool = ShowsCoordinates.stored()
     ) -> PageHeader? {
-        guard let item = library.item(id) else { return nil }
+        guard let item = library.headerItem(id) else { return nil }
         let draft = drafts.draft(for: item.id, key: "title")
         let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat, offersEmpty: true, showsCoordinates: showsCoordinates)
         let (type, placement, relationships, now, kind, lead, pins) =
@@ -61,17 +61,19 @@ struct ItemPageHeader: ViewModifier {
         let contents = isCollection
             ? LinkedItem.list(
                 pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, format: dateFormat, members: .only,
-                item: { library.item($0) })
+                item: { library.headerItem($0) })
             : []
         let allLinked = LinkedItem.list(
             pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, format: dateFormat,
-            members: isCollection ? .excluding : .all, item: { library.item($0) })
+            members: isCollection ? .excluding : .all, item: { library.headerItem($0) })
         // Where the person put Linked From: the page's foot, or only the inspector.
         let linked = placement.linkedFromPlace == .page ? allLinked : []
         let hasText = library.catalogue.itemTypes[item.type]?.bodyKey != nil
         // A collection with no text, as a folder a connector keeps has, is its members: an editor with nothing in it
         // would only invite typing that the connector puts back.
-        let showsText = hasText && !(isCollection && library.body(of: item.id)?.text.isEmpty != false)
+        // The body is read only for a collection, and only for whether its text is empty. A note's header does not
+        // follow the text. `textIsEmpty` changes when that emptiness does, not on an edit that leaves text in place.
+        let showsText = hasText && !(isCollection && library.textIsEmpty(item.id))
         return PageHeader(
             item: item.id.rawValue,
             hidden: item.state == .trashed,

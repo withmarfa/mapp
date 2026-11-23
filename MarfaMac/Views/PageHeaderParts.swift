@@ -40,10 +40,10 @@ struct PageHeaderParts {
 
     /// The icon of the type of the item `target` names.
     static func typeIcon(of target: ItemID, in library: any ItemLibrary) -> String? {
-        library.item(target).flatMap { library.catalogue.icon(for: $0.type) }
+        library.headerItem(target).flatMap { library.catalogue.icon(for: $0.type) }
     }
 
     private static func isPerson(_ target: ItemID, in library: any ItemLibrary) -> Bool {
-        library.item(target).map { PageHeaderKind.of($0.type, in: library.catalogue) == .person } ?? false
+        library.headerItem(target).map { PageHeaderKind.of($0.type, in: library.catalogue) == .person } ?? false
     }
 }

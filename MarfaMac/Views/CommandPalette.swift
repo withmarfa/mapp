@@ -665,7 +665,7 @@ struct CommandPalette: View {
 
     private var commands: [Entry] {
         // Writing and Version History act on notes; a file selected takes neither.
-        let everything = browser.selectedItems(in: library)
+        let everything = browser.selectedHeaderItems(in: library)
         let selected = everything.filter { !$0.isFile }
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
         let hasVisibleEditor = browser.showsPage && one?.id == editor.pageItemID && editor.hasItem
@@ -778,15 +778,20 @@ struct CommandPalette: View {
         // The same commands, titles and rules as the menu bar and the More menu (`ItemCommand`).
         let itemContext = ItemCommandContext(library: library, ids: browser.selection, browser: browser, editor: editor, details: details)
         for command in ItemCommand.allCases where command.isEnabled(in: itemContext) {
-            add(String(localized: command.title(in: itemContext)), command.systemImage, keys(command.shortcutCommand), in: command.paletteGroup) {
+            let sourceMode = command == .toggleSource ? editor.caret.sourceMode : nil
+            add(String(localized: command.title(in: itemContext, sourceMode: sourceMode)), command.systemImage, keys(command.shortcutCommand), in: command.paletteGroup) {
                 command.perform(in: itemContext, editor: editor) { openWindow(value: $0) }
             }
         }
-        let single = browser.selection.count == 1 ? browser.selectedItems(in: library).first?.id : nil
-        let share = ItemShare(item: one, fileURL: single.flatMap { browser.fileURL(of: $0) }, in: library)
-        if share.isAvailable {
+        let shareID = one?.id
+        let shareFile = shareID.flatMap { browser.fileURL(of: $0) }
+        // Presence only. The text is read when Share is chosen, so opening the palette does not follow a keystroke.
+        let canShare = shareFile != nil || (shareID.map { library.bodyText($0) != nil } ?? false)
+        if canShare {
             add(String(localized: "Share…"), "square.and.arrow.up", in: .file) {
-                share.present(near: hasVisibleEditor ? editor.webView : nil)
+                let item = shareID.flatMap { library.item($0) }
+                ItemShare(item: item, fileURL: shareFile ?? shareID.flatMap { browser.fileURL(of: $0) }, in: library)
+                    .present(near: hasVisibleEditor ? editor.webView : nil)
             }
         }
 

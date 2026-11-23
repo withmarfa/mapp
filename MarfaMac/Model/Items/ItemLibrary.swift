@@ -43,7 +43,15 @@ protocol ItemLibrary: AnyObject, Observable {
     /// changing its state, tier, tags, type or links. What a place holds, and so what its counts and layouts are, can
     /// change only when this does. Reading it is observed.
     var membershipRevision: Int { get }
+    /// Counts changes to an item's title or the name the core gives it. A link shows that name, so a page follows
+    /// this and `membershipRevision` rather than `contentRevision`, which a published keystroke moves. A library that
+    /// bumps `membershipRevision` for every item change may leave this as that.
+    var namesRevision: Int { get }
     func item(_ id: ItemID) -> Item?
+    /// The item as a page header shows it. A change to only its version, preview, sync or bound embeds is not one.
+    func headerItem(_ id: ItemID) -> Item?
+    /// The item's version alone. It changes only when the version does, not when the text, preview, sync or embeds do.
+    func itemVersion(_ id: ItemID) -> ItemVersion?
     func items(in place: SidebarItem) -> [Item]
     /// What Recently Deleted holds, newest first. It is a page of Settings, not a place, so no window lists it.
     var deletedItems: [Item] { get }
@@ -74,6 +82,14 @@ protocol ItemLibrary: AnyObject, Observable {
     func idsForWindows(_ ids: some Collection<ItemID>) -> [ItemID]
     /// Nil for an item with no text, such as a file.
     func body(of id: ItemID) -> ItemBody?
+    /// Whether the item has no text. It changes only when the text becomes empty or not, so an edit that leaves text
+    /// in the item does not count. Missing text counts as empty.
+    func textIsEmpty(_ id: ItemID) -> Bool
+    /// The item's text for a check that depends on what it says, such as whether the item can change type. It changes
+    /// when the text arrives, goes, or becomes empty or not, and not when text that stays non-empty is edited.
+    func bodyText(_ id: ItemID) -> String?
+    /// The copy's bound embeds of the item. It changes only when those do.
+    func boundEmbeds(of id: ItemID) -> [BoundEmbed]
     /// Whether text saved to the item has not yet been sent or read back from the library's copy, so what the copy
     /// bound in the text (`Item.boundEmbeds`) may not cover it yet.
     func hasUnreadSave(_ id: ItemID) -> Bool
@@ -261,6 +277,12 @@ protocol ItemLibrary: AnyObject, Observable {
 }
 
 extension ItemLibrary {
+    var namesRevision: Int { membershipRevision }
+    func headerItem(_ id: ItemID) -> Item? { item(id) }
+    func itemVersion(_ id: ItemID) -> ItemVersion? { item(id)?.version }
+    func textIsEmpty(_ id: ItemID) -> Bool { body(of: id)?.text.isEmpty ?? true }
+    func bodyText(_ id: ItemID) -> String? { body(of: id)?.text }
+    func boundEmbeds(of id: ItemID) -> [BoundEmbed] { item(id)?.boundEmbeds ?? [] }
     var downloadedFiles: (any DownloadedFiles)? { nil }
     func downloadEverythingAgain() {}
     func isWritingProperties(of id: ItemID) -> Bool { false }
