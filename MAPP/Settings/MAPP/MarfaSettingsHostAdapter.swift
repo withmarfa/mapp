@@ -196,6 +196,15 @@ enum LibraryDescription {
 
     var ownAppVendor: String? { PreferencesType.vendor }
 
+    var webSignInReturn: String { SystemSignIns().redirectAddress }
+
+    func showWebSignIn(at address: URL) async -> Bool {
+        guard let scheme = URL(string: webSignInReturn)?.scheme,
+            let window = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: \.isVisible)
+        else { return false }
+        return await WebSignInSheet.show(address, endingOn: scheme, over: window)
+    }
+
     // MARK: Recently Deleted
 
     var deletedItems: [MarfaDeletedItem] {

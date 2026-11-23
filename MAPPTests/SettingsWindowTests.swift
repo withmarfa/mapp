@@ -106,7 +106,7 @@ struct SettingsWindowTests {
         #expect(SettingsPage.mappGroups.flatMap { $0 } == [.general, .appearance, .keyboard, .editor, .lists, .layouts, .search, .onThisMac, .connection])
         #expect(
             SettingsPage.marfaGroups.flatMap { $0 } == [
-                .overview, .account, .apps, .keys, .addresses, .sources, .recentlyDeleted, .history, .fileStorage, .webhooks, .folders,
+                .overview, .account, .apps, .keys, .addresses, .sources, .recentlyDeleted, .history, .fileStorage, .connectors, .webhooks, .folders,
                 .backups, .updates, .housekeeping, .activity, .monitoring, .limits, .startUp,
             ])
     }

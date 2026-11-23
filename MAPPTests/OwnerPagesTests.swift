@@ -87,6 +87,23 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var clocksConfirmed = 0
         /// The time the server answers when the clock is confirmed; the date it was shown where nil.
         var clockConfirmedAt: Date?
+        var connectorPlugins: [PluginConnectorSummary] = []
+        var connectorControls: [String: ConnectorControl] = [:]
+        var connectorRegistrations: [String: ConnectorRegistration] = [:]
+        var connectorHosts: [ConnectorHostInfo] = []
+        var connectorSettings: [String: ConnectorSettingsReading] = [:]
+        /// Each settings write, as the plugin and the changes it sent.
+        var connectorSettingsSent: [(plugin: String, changes: [String: ConnectorSettingChange])] = []
+        /// The machine each assignment named.
+        var connectorAssigned: [(plugin: String, host: String)] = []
+        /// What the sign-in start answers, and the address the browser was asked to return to.
+        var signInStart = ConnectorSignInStart(id: "sign-in-1", address: URL(string: "https://accounts.example.com/sign-in")!, expires: .now.addingTimeInterval(600))
+        var signInReturnedTo: [String] = []
+        var signInStatus = ConnectorSignInStatus.signedIn
+        /// The ID the status read names, where it is not the start's: another sign-in replaced it.
+        var signInReadID: String?
+        /// What the server holds after a sign-in finishes: the setting the token goes in, which a finished sign-in sets.
+        var signInSetsToken: (plugin: String, setting: String)?
     }
 
     let state = Mutex(State())
@@ -515,6 +532,125 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return try state.withLock { state throws(OwnerFailure) in
             guard let report = state.reports[id] else { throw .notFound }
             return report
+        }
+    }
+
+    func connectorPlugins() async throws(OwnerFailure) -> [PluginConnectorSummary] {
+        try enter("connectorPlugins")
+        await held("connectorPlugins")
+        return state.withLock { $0.connectorPlugins }
+    }
+
+    func connectorControl(of plugin: String) async throws(OwnerFailure) -> ConnectorControl {
+        try enter("connectorControl")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let control = state.connectorControls[plugin] else { throw .notFound }
+            return control
+        }
+    }
+
+    func connectorRegistration(_ id: String) async throws(OwnerFailure) -> ConnectorRegistration {
+        try enter("connectorRegistration")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let registration = state.connectorRegistrations[id] else { throw .notFound }
+            return registration
+        }
+    }
+
+    func connectorHosts() async throws(OwnerFailure) -> [ConnectorHostInfo] {
+        try enter("connectorHosts")
+        return state.withLock { $0.connectorHosts }
+    }
+
+    func connectorSettings(of plugin: String) async throws(OwnerFailure) -> ConnectorSettingsReading {
+        try enter("connectorSettings")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let reading = state.connectorSettings[plugin] else { throw .notFound }
+            return reading
+        }
+    }
+
+    /// Applies each change as the server does: a value is set, `null` takes it away, and `missing` names each required
+    /// setting left with no value and no default.
+    func changeConnectorSettings(of plugin: String, _ changes: [String: ConnectorSettingChange]) async throws(OwnerFailure) -> ConnectorSettingsReading {
+        try enter("changeConnectorSettings")
+        await held("changeConnectorSettings")
+        return try state.withLock { state throws(OwnerFailure) in
+            state.connectorSettingsSent.append((plugin, changes))
+            guard var reading = state.connectorSettings[plugin] else { throw .notFound }
+            for (name, change) in changes {
+                guard let index = reading.settings.firstIndex(where: { $0.name == name }) else { throw .refused("No such setting.") }
+                switch change {
+                case .set(let value):
+                    reading.settings[index].isSet = true
+                    reading.settings[index].value = reading.settings[index].secret ? nil : value
+                case .clear:
+                    reading.settings[index].isSet = false
+                    reading.settings[index].value = reading.settings[index].defaultValue
+                }
+            }
+            reading.missing = reading.settings.filter { $0.required && !$0.isSet && $0.defaultValue == nil }.map(\.name)
+            state.connectorSettings[plugin] = reading
+            return reading
+        }
+    }
+
+    private func controlled(_ plugin: String, _ call: String, _ change: (inout ConnectorControl) throws(OwnerFailure) -> Void) async throws(OwnerFailure) -> ConnectorControl {
+        try enter(call)
+        return try state.withLock { state throws(OwnerFailure) in
+            guard var control = state.connectorControls[plugin] else { throw .notFound }
+            try change(&control)
+            state.connectorControls[plugin] = control
+            return control
+        }
+    }
+
+    func pauseConnector(_ plugin: String) async throws(OwnerFailure) -> ConnectorControl {
+        try await controlled(plugin, "pauseConnector") { control throws(OwnerFailure) in
+            control.paused = true
+            control.runRequested = nil
+        }
+    }
+
+    func resumeConnector(_ plugin: String) async throws(OwnerFailure) -> ConnectorControl {
+        try await controlled(plugin, "resumeConnector") { control throws(OwnerFailure) in control.paused = false }
+    }
+
+    func runConnector(_ plugin: String) async throws(OwnerFailure) -> ConnectorControl {
+        try await controlled(plugin, "runConnector") { control throws(OwnerFailure) in
+            if control.paused { throw .refused("The connector is paused. Resume it to run it.") }
+            control.runRequested = .now
+        }
+    }
+
+    func assignConnector(_ plugin: String, toHost host: String) async throws(OwnerFailure) {
+        try enter("assignConnector")
+        try state.withLock { state throws(OwnerFailure) in
+            guard var control = state.connectorControls[plugin] else { throw .notFound }
+            state.connectorAssigned.append((plugin, host))
+            control.host = host
+            state.connectorControls[plugin] = control
+        }
+    }
+
+    func startConnectorSignIn(of plugin: String, returningTo address: String) async throws(OwnerFailure) -> ConnectorSignInStart {
+        try enter("startConnectorSignIn")
+        return state.withLock { state in
+            state.signInReturnedTo.append(address)
+            return state.signInStart
+        }
+    }
+
+    func connectorSignInStatus(of plugin: String) async throws(OwnerFailure) -> ConnectorSignInReading {
+        try enter("connectorSignInStatus")
+        return state.withLock { state in
+            if state.signInStatus == .signedIn, let token = state.signInSetsToken, var reading = state.connectorSettings[token.plugin],
+                let index = reading.settings.firstIndex(where: { $0.name == token.setting })
+            {
+                reading.settings[index].isSet = true
+                state.connectorSettings[token.plugin] = reading
+            }
+            return ConnectorSignInReading(status: state.signInStatus, id: state.signInReadID ?? state.signInStart.id)
         }
     }
 }
@@ -2027,7 +2163,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     @Test func theNewPagesAreInTheSidebarInTheBoardsOrder() {
         #expect(
             MarfaSettingsPage.groups == [
-                [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage], [.webhooks, .folders],
+                [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage], [.connectors, .webhooks, .folders],
                 [.backups, .updates, .housekeeping], [.activity, .monitoring], [.limits, .startUp],
             ])
         for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {

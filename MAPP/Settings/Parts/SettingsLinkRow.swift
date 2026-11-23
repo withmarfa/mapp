@@ -8,20 +8,22 @@ struct SettingsLinkRow: View {
     private let lead: SettingsLead
     private let value: Text?
     private let dot: Color?
+    private let lines: Int?
     private let action: () -> Void
 
-    init(verbatim title: String, line: String? = nil, lead: SettingsLead = .none, value: String? = nil, dot: Color? = nil, action: @escaping () -> Void) {
+    init(verbatim title: String, line: String? = nil, lead: SettingsLead = .none, value: String? = nil, dot: Color? = nil, lines: Int? = 2, action: @escaping () -> Void) {
         self.title = Text(verbatim: title)
         self.line = line.map { Text(verbatim: $0) }
         self.lead = lead
         self.value = value.map { Text(verbatim: $0) }
         self.dot = dot
+        self.lines = lines
         self.action = action
     }
 
     var body: some View {
         Button(action: action) {
-            SettingsRow(title: title, line: line, lead: lead) {
+            SettingsRow(title: title, line: line, lead: lead, lines: lines) {
                 HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if let value {
                         HStack(spacing: SettingsTokens.Metric.dotGap) {
