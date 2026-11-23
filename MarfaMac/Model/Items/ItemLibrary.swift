@@ -74,8 +74,8 @@ protocol ItemLibrary: AnyObject, Observable {
     func idsForWindows(_ ids: some Collection<ItemID>) -> [ItemID]
     /// Nil for an item with no text, such as a file.
     func body(of id: ItemID) -> ItemBody?
-    /// Whether text saved to the item has not yet been read back from the library's copy, so what the copy bound
-    /// in the text (`Item.boundEmbeds`) may not cover it yet.
+    /// Whether text saved to the item has not yet been sent or read back from the library's copy, so what the copy
+    /// bound in the text (`Item.boundEmbeds`) may not cover it yet.
     func hasUnreadSave(_ id: ItemID) -> Bool
     /// The `[[link]]` that the text of `itemID` can hold and the core binds, from that item, to this item and no
     /// other, or nil when no spelling does.
@@ -157,6 +157,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Every item being written is left and every change handed over, as the app quits or the library changes:
     /// returns once each is kept on this Mac, never waiting on a server.
     func finish() async
+    /// Sends at once any typed text the library holds back to send fewer writes, as every hand-over of the pages
+    /// ends with, so nothing typed before a hand-over still waits after it.
+    func sendWaitingText()
     /// Whether the create of `id` was refused before the library held the item, so the window has no item to open and the
     /// library has told the person. A library that refuses a create at once answers nil from `createItem` instead.
     func wasRefused(creating id: ItemID) -> Bool
@@ -261,6 +264,7 @@ extension ItemLibrary {
     var downloadedFiles: (any DownloadedFiles)? { nil }
     func downloadEverythingAgain() {}
     func isWritingProperties(of id: ItemID) -> Bool { false }
+    func sendWaitingText() {}
     var lastPropertyWrite: Int? { nil }
     func tookPropertyWrite(_ mark: Int) -> Bool { false }
     var history: (any ItemHistorySource)? { nil }

@@ -112,6 +112,10 @@ import Observation
     /// The version of the text the person's last save of each item was typed on. Only the first save typed on a
     /// version is merged against it; the rest follow the person's own.
     @ObservationIgnored private var savedOn: [ItemID: ItemVersion] = [:]
+    /// Text typed on the text the library holds and not yet sent, by item (`TextPause`). The library holds it at once,
+    /// as it holds unsettled text; only the write waits.
+    @ObservationIgnored private var waitingText: [ItemID: WaitingText] = [:]
+    @ObservationIgnored let textPause: TextPause
     /// Links removed only once the source has taken the links added in their place, by the link writes awaited.
     @ObservationIgnored private var replacements: [UUID: Replacement] = [:]
     @ObservationIgnored private var replacing: [WriteID: UUID] = [:]
@@ -173,6 +177,30 @@ import Observation
         /// What the person typed, so text a closing source refuses can be given back to them. Only the item's last
         /// save keeps it, since that holds everything typed before it.
         var typed: String?
+    }
+
+    /// How long typed text waits before the library sends it. The page reports the item's whole text at every change,
+    /// so a write per report sends the whole text per key. The library sends the latest text once the person has
+    /// paused for `quiet` and no earlier text write of the item is still unanswered, and never holds text longer than
+    /// `cap`, so text typed offline, where nothing is answered, still reaches the copy's queue soon. A hand-over, or
+    /// any other write naming the item, sends it at once.
+    nonisolated struct TextPause: Sendable {
+        var quiet: Duration
+        var cap: Duration
+
+        static let typing = TextPause(quiet: .milliseconds(500), cap: .seconds(2))
+    }
+
+    /// The latest text typed on an item and not yet sent. Every report is the whole text, so it replaces the one before.
+    private nonisolated struct WaitingText {
+        var text: String
+        let readAt: ItemVersion
+        var title: String
+        var reports: Int
+        /// When the first report it holds came, which bounds how long it waits.
+        let since: ContinuousClock.Instant
+        var last: ContinuousClock.Instant
+        var timer: Task<Void, Never>?
     }
 
     private nonisolated struct Refusal {
@@ -242,8 +270,10 @@ import Observation
         typeIcons: (any TypeIconSource)? = nil, typeSchemas: (any TypeSchemaSource)? = nil, config: (any InstanceConfigSource)? = nil,
         sourceNames: (any SourceNameSource)? = nil,
         now: @escaping () -> Date = Date.init,
+        textPause: TextPause = .typing,
         cameOnline: @escaping () -> Void = {}) {
         self.source = source
+        self.textPause = textPause
         counts = ItemCounts { ids, query in try await source.counts(of: ids, query) }
         self.history = history
         self.typeIcons = typeIcons
@@ -263,6 +293,8 @@ import Observation
                     guard let self else { return }
                     await take(change)
                 }
+                // The source has closed, so text still waiting goes back to the person rather than to no queue.
+                self?.sendWaitingText()
                 // Nothing more will be taken or answered, so no change waits for it.
                 self?.endWaits()
             },
@@ -288,6 +320,7 @@ import Observation
 
     isolated deinit {
         for task in following { task.cancel() }
+        for waiting in waitingText.values { waiting.timer?.cancel() }
     }
 
     var reachesServer: Bool { connection == .online }
@@ -595,12 +628,12 @@ import Observation
         if relinked { linksRevision += 1 }
     }
 
-    /// Text read while the person's own text is still on its way is older than what the library holds. Text
-    /// taken in is a new read: the page follows `body(of:)` and shows it, so the next save starts from it, and
-    /// where the server kept its own text over the person's, the page shows the server's.
+    /// Text read while the person's own text is still on its way, or waits to be sent, is older than what the library
+    /// holds. Text taken in is a new read: the page follows `body(of:)` and shows it, so the next save starts from it,
+    /// and where the server kept its own text over the person's, the page shows the server's.
     private func hold(_ bodies: [ItemBody]) {
         for body in bodies {
-            guard unsettledText[body.id] == nil else {
+            guard unsettledText[body.id] == nil, waitingText[body.id] == nil else {
                 sourceText[body.id] = body
                 continue
             }
@@ -675,6 +708,8 @@ import Observation
         unsettledText[item]?.remove(id)
         guard unsettledText[item]?.isEmpty == true else { return }
         unsettledText[item] = nil
+        // Text still waiting was typed over what the copy holds, so that stays aside for it; it may go now.
+        if waitingText[item] != nil { return waitEnded(item) }
         // The server may have merged the text, or kept its own and put the person's on a copy: the source tells
         // what the copy holds in the change that follows the answer, and this is what it held before that.
         if let body = sourceText.removeValue(forKey: item) { hold([body]) }
@@ -730,6 +765,7 @@ import Observation
     /// a write made after the source closed, which nothing keeps.
     @discardableResult
     func submit(_ write: ItemWrite, failing title: String) -> WriteID {
+        sendWaitingText(before: write)
         let id = WriteID()
         let unqueued = Self.unqueuedText(write)
         let refusal = Refusal(title: title, text: unqueued ?? Self.createdText(write), unqueuedText: unqueued)
@@ -810,27 +846,116 @@ import Observation
         if refusals[write] != nil { creating[write] = id } else { refusedCreations.insert(id) }
     }
 
-    /// The person's text, typed on the text the library gave at `readAt`. The first save typed on a version is merged
-    /// against it where the copy has moved on; every later one follows the person's own, so their saves never come back
-    /// conflicted against each other. Text typed on the text the library holds is held at once until the source
-    /// answers. Text typed on older text, reported after the page took in newer text, is sent as made on what it was
-    /// typed on (`queue-and-verdicts/as-read-sent-on-read`), so the server keeps both rather than this text replacing
-    /// what the person never saw, and the library goes on holding the newer text.
-    func saveText(_ text: String, of id: ItemID, readAt: ItemVersion, failing title: String) {
-        let held = records[id]?.body?.version ?? records[id]?.item.version ?? ItemVersion(0)
+    /// Text the page typed on the text the library gave at `readAt`. Text typed on the text the library holds is held
+    /// at once and waits to be sent (`TextPause`), the latest report replacing the one before; text that comes back to
+    /// what the copy holds while nothing is on its way needs no write. Text typed on older text goes at once
+    /// (`saveText`), after any that waits.
+    func takeTyped(_ text: String, of id: ItemID, readAt typedOn: ItemVersion, failing title: String) {
+        let held = heldVersion(of: id)
+        let readAt = ItemVersion(MarfaEngine.version(read: typedOn.rawValue, holding: held.rawValue))
+        guard readAt == held else { return saveText(text, of: id, readAt: typedOn, failing: title) }
+        if let waiting = waitingText[id], waiting.readAt != readAt { sendWaitingText(of: id) }
+        if unsettledText[id] == nil, sourceText[id] == nil { sourceText[id] = records[id]?.body }
+        if unsettledText[id] == nil, let copy = sourceText[id], copy.text == text {
+            waitingText.removeValue(forKey: id)?.timer?.cancel()
+            sourceText[id] = nil
+            records[id]?.body = copy
+            return
+        }
+        let now = ContinuousClock.now
+        let isNew = waitingText[id] == nil
+        var waiting = waitingText[id] ?? WaitingText(text: text, readAt: readAt, title: title, reports: 0, since: now, last: now)
+        waiting.text = text
+        waiting.title = title
+        waiting.reports += 1
+        waiting.last = now
+        waitingText[id] = waiting
+        records[id]?.body = ItemBody(id: id, text: text, version: readAt)
+        if isNew { schedule(id, at: min(now + textPause.quiet, now + textPause.cap)) }
+    }
+
+    /// Sends every text that waits, as every hand-over ends with, so nothing typed before it still waits after it.
+    func sendWaitingText() {
+        for id in Array(waitingText.keys) { sendWaitingText(of: id) }
+    }
+
+    /// Sends the text waiting for the item now. It is no step of an undo or redo running, whichever write sends it. An
+    /// item gone, or no longer writable, since the text was typed gives the person the text back.
+    private func sendWaitingText(of id: ItemID) {
+        guard let waiting = waitingText.removeValue(forKey: id) else { return }
+        waiting.timer?.cancel()
+        guard let item = item(id), item.isWritable else {
+            if unsettledText[id] == nil, let copy = sourceText.removeValue(forKey: id) { records[id]?.body = copy }
+            return notices.notKept(waiting.title, text: waiting.text, reason: Self.cantChange)
+        }
+        within(nil) { saveText(waiting.text, of: id, readAt: waiting.readAt, failing: waiting.title, reports: waiting.reports) }
+    }
+
+    /// Any other write naming an item goes after the text typed on it, so the queue keeps the order the person made
+    /// them in. A link write names its items by edge, so every text that waits goes first.
+    private func sendWaitingText(before write: ItemWrite) {
+        guard !waitingText.isEmpty else { return }
+        switch write {
+        case .create, .editBody:
+            break
+        case .editProperties(let id, _, _, _), .retype(let id, _, _, _), .retier(let id, _, _), .transition(let id, _),
+            .purge(let id, _), .tag(let id, _, _):
+            sendWaitingText(of: id)
+        case .link, .unlink, .moveEdge:
+            sendWaitingText()
+        }
+    }
+
+    /// One wake per waiting text: typing again only moves `last`, which this reads when it wakes.
+    private func schedule(_ id: ItemID, at due: ContinuousClock.Instant) {
+        waitingText[id]?.timer?.cancel()
+        waitingText[id]?.timer = Task { [weak self] in
+            try? await Task.sleep(until: due)
+            guard !Task.isCancelled else { return }
+            self?.waitEnded(id)
+        }
+    }
+
+    /// Sends the waiting text once the cap has passed, or once the person has paused with no earlier text write of the
+    /// item unanswered; otherwise wakes again when the pause or the cap is due. The answer to the earlier write
+    /// comes here too (`answered`).
+    private func waitEnded(_ id: ItemID) {
+        guard let waiting = waitingText[id] else { return }
+        let now = ContinuousClock.now
+        let cap = waiting.since + textPause.cap
+        let paused = waiting.last + textPause.quiet
+        if now >= cap || (now >= paused && unsettledText[id] == nil) { return sendWaitingText(of: id) }
+        schedule(id, at: now >= paused ? cap : min(paused, cap))
+    }
+
+    private func heldVersion(of id: ItemID) -> ItemVersion {
+        records[id]?.body?.version ?? records[id]?.item.version ?? ItemVersion(0)
+    }
+
+    /// The person's text, typed on the text the library gave at `readAt`, sent now. The first save sent on a version is
+    /// merged against it where the copy has moved on; every later one follows the person's own, so their saves never
+    /// come back conflicted against each other. Which it is is decided here, when the write is sent, so text that
+    /// waited never follows a save that was not sent. Text typed on the text the library holds is held at once until
+    /// the source answers. Text typed on older text, reported after the page took in newer text, is sent as made on
+    /// what it was typed on (`queue-and-verdicts/as-read-sent-on-read`), so the server keeps both rather than this
+    /// text replacing what the person never saw, and the library goes on holding the newer text. `reports` counts the
+    /// page's reports the write carries.
+    func saveText(_ text: String, of id: ItemID, readAt: ItemVersion, failing title: String, reports: Int = 1) {
+        sendWaitingText(of: id)
+        let held = heldVersion(of: id)
         let readAt = ItemVersion(MarfaEngine.version(read: readAt.rawValue, holding: held.rawValue))
         // A save held on a local create's version 0 is on version 1 once the answer lands, as `readAt` now is.
         let saved = savedOn[id].map { ItemVersion(MarfaEngine.version(read: $0.rawValue, holding: held.rawValue)) }
         let merge: BodyMerge = saved == readAt ? .following : .asRead
-        let saving = Telemetry.begin(.library, "text.save")
+        let saving = Telemetry.begin(.library, "text.save", ("reports", reports))
         let write = submit(.editBody(id, text, base: readAt, merge: merge), failing: title)
         let shown = readAt == held ? ItemBody(id: id, text: text, version: readAt) : nil
         // Every write the engine takes ends in `.taken` or `.answered`; only one the source refuses to take, as it
         // has closed, gets neither, so nothing waits on it.
         if refusals[write] != nil {
             // Until a write is taken, the copy holds the text it held before, which a save refused before queueing
-            // leaves on the page.
-            if unsettledText[id] == nil { sourceText[id] = records[id]?.body }
+            // leaves on the page. Text that waited set it aside when it was typed.
+            if unsettledText[id] == nil, sourceText[id] == nil { sourceText[id] = records[id]?.body }
             for earlier in unsettledText[id] ?? [] { textWrites[earlier]?.typed = nil }
             unsettledText[id, default: []].insert(write)
             unreadText[id, default: []].insert(write)
@@ -838,6 +963,7 @@ import Observation
             textSaves[write] = saving
         } else {
             saving.end()
+            if unsettledText[id] == nil { sourceText[id] = nil }
         }
         guard let shown else { return }
         savedOn[id] = readAt
@@ -855,7 +981,7 @@ import Observation
     // MARK: Reading
 
     func hasUnreadSave(_ id: ItemID) -> Bool {
-        unreadText[id] != nil
+        unreadText[id] != nil || waitingText[id] != nil
     }
 
     /// A write answered before the copy took it, as one refused, is read too: nothing more will come of it.
