@@ -26,6 +26,7 @@ import Testing
     @Test func aSecondEditAfterTheCopyMovedIsBasedOnTheVersionTheCopyHolds() async throws {
         let (library, source) = try await loaded()
         library.updateBody(of: F.n1, to: "A")
+        library.sendWaitingText()
         // The copy took the first edit's answer and moved to version 2, which the library hears before the answer.
         var moved = try #require(library.item(F.n1))
         moved.version = ItemVersion(2)
@@ -33,6 +34,7 @@ import Testing
         source.send(.upserted([moved]))
         #expect(await eventually { library.item(F.n1)?.version == ItemVersion(2) })
         library.updateBody(of: F.n1, to: "AB")
+        library.sendWaitingText()
         let second = try #require(source.writes.last)
         guard case .editBody(_, _, let base, let merge) = second else { Issue.record("not a body edit"); return }
         #expect(
@@ -47,6 +49,7 @@ import Testing
     @Test func aConflictShowsTheServersTextAndTheNextSaveStartsFromIt() async throws {
         let (library, source) = try await loaded()
         library.updateBody(of: F.n1, to: "Mine")
+        library.sendWaitingText()
         let write = try #require(source.submitted.last?.id)
         // Another device's edit arrives first, at version 5.
         var theirs = try #require(library.item(F.n1))
@@ -67,6 +70,7 @@ import Testing
         #expect(await eventually { library.item(F.n1)?.sync == .conflicted(sibling: F.n2, fields: ["body"]) })
         // The page reloads to the server's text; the person's next save is based on it.
         library.updateBody(of: F.n1, to: "Theirs!")
+        library.sendWaitingText()
         #expect(source.writes.last == .editBody(F.n1, "Theirs!", base: ItemVersion(5), merge: .asRead))
     }
 
@@ -105,9 +109,11 @@ import Testing
         source.send(.upserted([theirs]))
         #expect(await eventually { library.body(of: F.n1)?.text == "Theirs" })
         library.updateBody(of: F.n1, to: "Note body, mine", readAt: ItemVersion(1))
+        library.sendWaitingText()
         #expect(source.writes.last == .editBody(F.n1, "Note body, mine", base: ItemVersion(1), merge: .asRead))
         #expect(library.body(of: F.n1) == ItemBody(id: F.n1, text: "Theirs", version: ItemVersion(2)))
         library.updateBody(of: F.n1, to: "Theirs, mine", readAt: ItemVersion(2))
+        library.sendWaitingText()
         #expect(source.writes.last == .editBody(F.n1, "Theirs, mine", base: ItemVersion(2), merge: .asRead))
     }
 
@@ -116,6 +122,7 @@ import Testing
     @Test func aLateEditContinuingThePersonsOwnSavesFollowsThem() async throws {
         let (library, source) = try await loaded()
         library.updateBody(of: F.n1, to: "Mine", readAt: ItemVersion(1))
+        library.sendWaitingText()
         let write = try #require(source.submitted.last?.id)
         var theirs = try #require(library.item(F.n1))
         theirs.version = ItemVersion(3)
@@ -124,6 +131,7 @@ import Testing
         source.send(.upserted([theirs]))
         #expect(await eventually { library.body(of: F.n1)?.text == "Theirs" })
         library.updateBody(of: F.n1, to: "Mine more", readAt: ItemVersion(1))
+        library.sendWaitingText()
         #expect(source.writes.last == .editBody(F.n1, "Mine more", base: ItemVersion(1), merge: .following))
         #expect(library.body(of: F.n1)?.text == "Theirs")
     }
@@ -144,6 +152,7 @@ import Testing
         #expect(await eventually { library.body(of: id)?.version == ItemVersion(0) })
 
         library.updateBody(of: id, to: "Leak T", readAt: ItemVersion(0))
+        library.sendWaitingText()
         #expect(source.writes.last == .editBody(id, "Leak T", base: ItemVersion(0), merge: .asRead))
         let edit = try #require(source.submitted.last?.id)
 
@@ -156,6 +165,7 @@ import Testing
         #expect(await eventually { library.body(of: id)?.version == ItemVersion(2) })
 
         library.updateBody(of: id, to: "Leak Tomorrow", readAt: ItemVersion(0))
+        library.sendWaitingText()
         #expect(source.writes.last == .editBody(id, "Leak Tomorrow", base: ItemVersion(1), merge: .following))
     }
 
@@ -299,6 +309,8 @@ extension LiveMarfaTests {
         private func conflictedCopy(
             _ library: MarfaLibrary, _ source: MarfaSource, _ token: String, holding text: String
         ) async throws -> [MarfaMac.Item] {
+            // The page hands over as it leaves the item, so nothing typed waits for the pause.
+            library.sendWaitingText()
             await source.flush()
             _ = await eventually {
                 library.items(in: .allItems).contains {
@@ -314,6 +326,8 @@ extension LiveMarfaTests {
         /// Sends what waits and waits until the copy holds `text` with nothing left to send. A drain's answers are
         /// taken before a flush returns, so a conflict would show by then.
         private func sent(_ library: MarfaLibrary, _ source: MarfaSource, _ id: ItemID, holding text: String) async throws {
+            // The page hands over as it leaves the item, so nothing typed waits for the pause.
+            library.sendWaitingText()
             await source.flush()
             let held = try await eventuallyAsking {
                 guard library.syncReport.waiting == 0 else { return false }
@@ -374,6 +388,8 @@ extension LiveMarfaTests {
                 let token = "zr" + UUID().uuidString.prefix(8).lowercased()
                 let id = try await make(library, source, made, token)
                 library.updateBody(of: id, to: "first edit")
+                // Two saves, as when the page hands over between them.
+                library.sendWaitingText()
                 busy(seconds: 3)
                 library.updateBody(of: id, to: "first edit, second edit")
                 try await sent(library, source, id, holding: "first edit, second edit")

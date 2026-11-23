@@ -359,6 +359,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         library.updateBody(of: F.n1, to: "Note body")
         #expect(source.writes.isEmpty)
         library.updateBody(of: F.n1, to: "Typed")
+        library.sendWaitingText()
         #expect(source.writes == [.editBody(F.n1, "Typed", base: ItemVersion(1), merge: .asRead)])
         #expect(library.body(of: F.n1)?.text == "Typed")
         #expect(library.hasUnreadSave(F.n1))
@@ -381,11 +382,13 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         // The next edit goes from the version of the text now held.
         library.updateBody(of: F.n1, to: "Again")
+        library.sendWaitingText()
         #expect(source.writes.last == .editBody(F.n1, "Again", base: ItemVersion(2), merge: .asRead))
 
         // An item in the bin, or a file, takes no text.
         library.updateBody(of: F.n3, to: "No")
         library.updateBody(of: F.f1, to: "No")
+        library.sendWaitingText()
         #expect(source.writes.count == 2)
     }
 
@@ -394,6 +397,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func aSaveWhoseReadBackFailedKeepsThePersonsTextOnceAnswered() async throws {
         let (library, source) = try await loaded()
         library.updateBody(of: F.n1, to: "Typed")
+        library.sendWaitingText()
         let write = try #require(source.submitted.first?.id)
         source.send(.unavailable(SourceFailure(kind: .failed, message: "The copy could not be read.")))
         source.send(.taken(write))
@@ -404,6 +408,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         // The next save is typed on the person's own text, so it follows the write the copy took.
         library.updateBody(of: F.n1, to: "Typed again")
+        library.sendWaitingText()
         #expect(source.writes.last == .editBody(F.n1, "Typed again", base: ItemVersion(1), merge: .following))
 
         // A read that lands tells the copy's text, which stands once the save is answered.
@@ -413,6 +418,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.answered(try #require(source.submitted.last?.id), .accepted))
         #expect(await eventually { library.body(of: F.n1)?.version == ItemVersion(3) })
         library.updateBody(of: F.n1, to: "Third")
+        library.sendWaitingText()
         #expect(source.writes.last == .editBody(F.n1, "Third", base: ItemVersion(3), merge: .asRead))
     }
 
@@ -421,6 +427,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func aSavesReadBackToldBeforeItIsTakenKeepsThePersonsText() async throws {
         let (library, source) = try await loaded()
         library.updateBody(of: F.n1, to: "Typed")
+        library.sendWaitingText()
         let write = try #require(source.submitted.first?.id)
         // A read that raced the write, then the read of the write itself.
         source.sendBody(of: F.n1)
@@ -436,6 +443,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         // The next save is typed on the person's own text, so it follows the write the copy took.
         library.updateBody(of: F.n1, to: "Typed again")
+        library.sendWaitingText()
         #expect(source.writes.last == .editBody(F.n1, "Typed again", base: ItemVersion(1), merge: .following))
     }
 
@@ -444,6 +452,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let before = try #require(library.body(of: F.n1))
         library.updateBody(of: F.n1, to: "Typed while the copy was brought up to date")
+        library.sendWaitingText()
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: "copy_expired", message: "Try again in a moment.", notQueued: true))))
         #expect(await eventually { library.body(of: F.n1) == before })
@@ -1229,7 +1238,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         await source.close()
         library.updateBody(of: LibraryFixture.n1, to: "Typed while the key changed")
-        #expect(library.notices.waiting.map(\.text) == ["Typed while the key changed"])
+        #expect(await eventually { library.notices.waiting.map(\.text) == ["Typed while the key changed"] })
     }
 
     /// The source answers nothing for a save it will not take, so no save of it is waited on to be read.
@@ -1237,13 +1246,14 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         await source.close()
         library.updateBody(of: LibraryFixture.n1, to: "Typed while the key changed")
-        #expect(!library.hasUnreadSave(LibraryFixture.n1), "nothing is on its way, so no embed waits for the copy to read it")
+        #expect(await eventually { !library.hasUnreadSave(LibraryFixture.n1) }, "nothing is on its way, so no embed waits for the copy to read it")
     }
 
     /// Text submitted just before the source closed is refused by it as it closes, and goes to the app too.
     @Test func textRefusedAsTheSourceClosesGoesToTheAppWithTheText() async throws {
         let (library, source) = try await loaded()
         library.updateBody(of: LibraryFixture.n1, to: "Typed as it closed")
+        library.sendWaitingText()
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: MarfaEngine.closedCode, message: MarfaEngine.notKept))))
         #expect(await eventually { !library.notices.waiting.isEmpty })
@@ -1307,6 +1317,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func textRefusedBeforeItWasQueuedIsGivenBackWithTheReason() async throws {
         let (library, source) = try await loaded()
         library.updateBody(of: LibraryFixture.n1, to: "Typed while the copy was brought up to date")
+        library.sendWaitingText()
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: "copy_expired", message: "Try again in a moment.", notQueued: true))))
         #expect(await eventually { !library.notices.waiting.isEmpty })
@@ -1352,6 +1363,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         if kind == "body" {
             library.updateBody(of: LibraryFixture.n1, to: "Typed as it was purged")
+            library.sendWaitingText()
         } else {
             #expect(library.setItemProperty(LibraryFixture.n1, key: "title", value: .string("Typed as it was purged"), undoManager: nil))
         }
@@ -1452,6 +1464,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func textTheServerRefusedIsGivenBackAndPointsToLibrarySettings() async throws {
         let (library, source) = try await loaded()
         library.updateBody(of: LibraryFixture.n1, to: "Refused later")
+        library.sendWaitingText()
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: "validation_error", message: "Too long."))))
         #expect(await eventually { !library.notices.waiting.isEmpty })

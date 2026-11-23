@@ -42,14 +42,15 @@ extension MarfaLibrary {
         guard let item = item(id) else { return notices.notKept(String(localized: "Couldn’t Save Item"), text: body, reason: Self.cantChange) }
         guard self.body(of: id)?.text != body else { return }
         let title = String(localized: "Couldn’t Save “\(item.displayTitle)”")
-        // A save that arrives after the row stopped being writable, such as a debounced edit over a row the copy
-        // could not read, is kept nowhere, so the person gets the text back.
+        // A save that arrives after the row stopped being writable, such as text typed as the copy found it could not
+        // read the row, is kept nowhere, so the person gets the text back. Text that waits is checked again as it goes.
         guard item.isWritable else { return notices.notKept(title, text: body, reason: Self.cantChange) }
-        saveText(body, of: id, readAt: readAt, failing: title)
+        takeTyped(body, of: id, readAt: readAt, failing: title)
     }
 
-    /// Waits only until the source holds every write in its queue on this Mac, never for the server, so quitting
-    /// or leaving the library offline keeps every write without waiting on the network.
+    /// Sends the text that waits (`TextPause`), then waits only until the source holds every write in its queue on
+    /// this Mac, never for the server, so quitting or leaving the library offline keeps every write without waiting
+    /// on the network.
     ///
     /// A relationship change whose check the core has not answered is waited for first, since the check is made on this
     /// Mac and answers at once; if it has not within `Self.relationshipWait`, the person is told it was not made.
@@ -64,7 +65,11 @@ extension MarfaLibrary {
             }
             try? await Task.sleep(for: .milliseconds(10))
         }
-        await source.queueSubmitted()
+        // A page can report again while the queue is waited on, so the wait ends only with nothing typed left waiting.
+        repeat {
+            sendWaitingText()
+            await source.queueSubmitted()
+        } while hasWaitingText
     }
 
     /// The longest `finish` waits for a relationship change to be checked.
@@ -224,6 +229,7 @@ extension MarfaLibrary {
         let run = undoRun
         handOverEdits { [weak self] kept in
             guard let self else { return }
+            sendWaitingText()
             guard kept else {
                 return notices.tell(title, String(localized: "Finish editing the current item, then try again."))
             }
@@ -439,6 +445,7 @@ extension MarfaLibrary {
     /// The files go to the source as files of their own, which this removes once it has taken them. Each is
     /// attached to the item by the package, which says what the page writes in the text to embed it.
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport {
+        sendWaitingText()
         let directory = URL.temporaryDirectory.appending(path: "marfa-mac-attach-\(UUID().uuidString)", directoryHint: .isDirectory)
         let staged = await Self.stage(files, in: directory)
         var report = AttachReport()
@@ -472,7 +479,8 @@ extension MarfaLibrary {
     }
 
     func attach(file: URL, to id: ItemID) async throws -> Embed {
-        try await source.embeds.attach(file, to: id)
+        sendWaitingText()
+        return try await source.embeds.attach(file, to: id)
     }
 
     func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID? {

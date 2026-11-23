@@ -207,6 +207,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Reports queued for this run go out within the SDK's short deadline, after the editors' flush and only
             // once the quit is going ahead.
             if told { await Reporting.shared.flush() }
+            // The pages are still up and may have reported while the reports went out: that text joins the queue too.
+            if told { await libraries.current?.finish() }
             NSApp.reply(toApplicationShouldTerminate: told)
         }
         return .terminateLater

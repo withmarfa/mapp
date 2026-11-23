@@ -30,6 +30,8 @@ extension EditorController {
             // An edit the page reported before the hand-over but that arrived during it was held, and the page's
             // answer leaves it out, since the page counts it as reported.
             releaseHeldEdit()
+            // What the page handed over goes to the library's queue now, not after the pause typing waits for.
+            library?.sendWaitingText()
             isFlushing = false
             let waiting = waitingFlushes
             waitingFlushes = []
