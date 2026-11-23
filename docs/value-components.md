@@ -63,7 +63,7 @@ A value is edited in a panel that opens under it, its leading edge on the value'
 - A date has its shortcuts, a calendar that MAPP draws with the day as a circle, a Time row that stays empty until set, and Not Set.
 - The panel is glass by default. A Solid choice in Appearance makes it the window's own color.
 - Change Type, Add Tag and Add to Collection are panels like these (`CommandValuePanels`). From the page they open under the value. From a command (the menu, the toolbar and the palette) there is no value on screen, so the panel opens centered near the top of the window and is for the whole selection. A collection's panel lists the collections the items are not all in, and the chips are the ones every item is in. A tag or collection chosen is filed for every item at once, and one Undo takes it back. Never a sheet.
-- Statuses end with Edit Statuses, and a field's menu has Edit the type in Settings. Both wait for Settings > Types. See [Agreed designs](agreed-designs.md).
+- A status panel ends with Edit Statuses…, which opens the type in Settings > Types. A field's menu has Edit the type in Settings, which waits. See [Agreed designs](agreed-designs.md).
 
 ## Built in v0.0.44
 

@@ -71,6 +71,15 @@ import Testing
     func markGlyph(_ id: String) -> AnyView { AnyView(Image(systemName: "tray")) }
     func markTitle(_ id: String) -> String { id }
     func typeMark(for pattern: String) -> AnyView { AnyView(TypeMark(icon: typeIcons[pattern], size: .side)) }
+    var typeCalls: any TypeCalls = FakeTypeCalls()
+    func largeTypeMark(for id: String) -> AnyView { AnyView(TypeMark(icon: typeIcons[id], size: .large)) }
+    func itemCount(ofType id: String) -> Int { 0 }
+    func typePlural(of id: String) -> String? { nil }
+    func typeIcon(of id: String) -> String? { typeIcons[id] }
+    func changeTypeIcon(_ icon: String?, ofType id: String) async -> OwnerFailure? {
+        typeIcons[id] = icon
+        return nil
+    }
 
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome {
         allowed.append(permissions)

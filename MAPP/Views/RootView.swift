@@ -15,6 +15,10 @@ struct RootView: View {
         self.settingsLauncher = settingsLauncher
         let browser = Browser()
         browser.openSettings = { [settingsLauncher] in settingsLauncher.show($0, subpage: $1) }
+        ValueEditPresenter.shared.editType = { [settingsLauncher, libraries] type in
+            let title = libraries.current?.catalogue.plural(for: type) ?? type.rawValue
+            settingsLauncher.show(.types, subpage: SettingsSubpage(id: "type:" + type.rawValue, title: title))
+        }
         browser.lookChoices = libraries.typeLooks.choices(for: libraries.libraryKey)
         _browser = State(initialValue: browser)
     }

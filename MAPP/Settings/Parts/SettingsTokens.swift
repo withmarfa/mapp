@@ -188,6 +188,18 @@ enum SettingsTokens {
         static let statusDot: CGFloat = 7
         static let dotGap: CGFloat = 6
         static let lockGlyph: CGFloat = 10
+        /// The mark before a status group.
+        static let statusMark: CGFloat = 14
+        /// A word chip (a status word): its height, corner, side padding, the space between chips and the small add button.
+        static let chipHeight: CGFloat = 22
+        static let chipRadius: CGFloat = 6
+        static let chipPadding: CGFloat = 7
+        static let chipGap: CGFloat = 6
+        /// The room a word being typed takes, and the widest a chip grows before its text is cut.
+        static let chipFieldWidth: CGFloat = 96
+        static let chipMaxWidth: CGFloat = 160
+        /// The least a row that holds a long text under its title is tall, and the room between the title and the text.
+        static let stackGap: CGFloat = 6
         /// A table's column widths, by what they hold, and its action and check columns.
         enum Column {
             static let state: CGFloat = 70

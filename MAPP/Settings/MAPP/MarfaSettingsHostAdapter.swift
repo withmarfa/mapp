@@ -105,6 +105,35 @@ enum LibraryDescription {
         AnyView(TypeMark(icon: libraries.current?.catalogue.itemTypes[TypeID(pattern)]?.icon, size: .side))
     }
 
+    // MARK: Types
+
+    var typeCalls: any TypeCalls { ServerTypeCalls(client: confirmingClient) }
+
+    func largeTypeMark(for id: String) -> AnyView {
+        AnyView(TypeMark(icon: typeIcon(of: id), size: .large))
+    }
+
+    func itemCount(ofType id: String) -> Int { libraries.current?.count(in: .itemType(id)) ?? 0 }
+
+    func typePlural(of id: String) -> String? {
+        guard let catalogue = libraries.current?.catalogue, catalogue.itemTypes[TypeID(id)] != nil else { return nil }
+        return catalogue.plural(for: TypeID(id))
+    }
+
+    func typeIcon(of id: String) -> String? { libraries.current?.catalogue.icon(for: TypeID(id)) }
+
+    func changeTypeIcon(_ icon: String?, ofType id: String) async -> OwnerFailure? {
+        guard let library = libraries.current else { return .failed(TypeIconFailure.unsupported.message) }
+        guard let failure = await library.setIcon(icon, ofType: TypeID(id)) else { return nil }
+        return switch failure {
+        case .unreachable: .unreachable
+        case .notPermitted: .notPermitted(InstancePermission.schemaWrite.rawValue)
+        case .keyRefused: .signedOut
+        case .refused(let reason): .refused(reason)
+        case .unsupported, .failed: .failed(failure.message)
+        }
+    }
+
     var serverName: String { LibraryDescription.name(libraries) }
     var serverAddress: String? { host.configuredConnection?.address.absoluteString }
 

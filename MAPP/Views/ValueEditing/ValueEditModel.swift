@@ -99,6 +99,18 @@ final class ValueEditModel {
     private static func text(of value: PropertyValue?) -> String { value.map(ItemValueText.editing) ?? "" }
 
     var kind: ValueEditKind { request.kind }
+
+    /// The type whose words a status panel edits: the item's own, since a status panel is for one item.
+    var typeToEditStatuses: TypeID? {
+        guard case .status = kind, let id = request.item else { return nil }
+        return library.item(id)?.type
+    }
+
+    /// Closes the panel and opens the type in Settings > Types.
+    func editStatuses(of type: TypeID) {
+        close()
+        ValueEditPresenter.shared.editType?(type)
+    }
     private var library: any ItemLibrary { request.library }
 
     // MARK: Item

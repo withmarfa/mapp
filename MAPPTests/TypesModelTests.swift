@@ -1,0 +1,617 @@
+import Foundation
+import Marfa
+import MarfaAPI
+import Synchronization
+import Testing
+@testable import MAPP
+
+/// Holds a call until the test lets it go.
+actor TypeCallGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var isOpen = false
+
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func open() {
+        isOpen = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+/// The drafts a model hands over after Settings has closed.
+final class LateDrafts: Sendable {
+    let drafts = Mutex<[OwnerDraft]>([])
+}
+
+/// A server that lists types and takes a change, with every call scripted.
+final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
+    struct State {
+        var types: [TypeRecord] = []
+        var readings: [String: TypeReading] = [:]
+        var changes: [(type: String, edit: TypeEdit)] = []
+        var children: [(id: String, label: String, parent: String)] = []
+        var started: [TypeEdit] = []
+        var refusal: TypeFailure?
+        var gate: TypeCallGate?
+    }
+
+    let state = Mutex(State())
+
+    func types() async throws(TypeFailure) -> TypeListing { TypeListing(types: state.withLock { $0.types }, pluginTitles: ["tickets": "Tickets"]) }
+
+    func reading(of type: String) async throws(TypeFailure) -> TypeReading {
+        state.withLock { $0.readings[type] } ?? TypeReading(guidance: nil, ancestors: [])
+    }
+
+    func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure) {
+        state.withLock { $0.started.append(edit) }
+        if let gate = state.withLock({ $0.gate }) { await gate.wait() }
+        if let refusal = state.withLock({ $0.refusal }) { throw refusal }
+        // Like the server's replacement: a change the type already holds sends nothing, and the rest is made on the type as it is now.
+        state.withLock { state in
+            guard let index = state.types.firstIndex(where: { $0.id == type }) else { return }
+            var record = state.types[index]
+            switch edit {
+            case .label(let text):
+                guard record.label != text else { return }
+                record.label = text
+            case .plural(let text):
+                guard record.plural != (text.isEmpty ? nil : text) else { return }
+                record.plural = text.isEmpty ? nil : text
+            case .description(let text):
+                guard record.description != (text.isEmpty ? nil : text) else { return }
+                record.description = text.isEmpty ? nil : text
+            case .parent(let parent):
+                guard record.parent != parent else { return }
+                record.parent = parent
+            case .addWord(let group, let value):
+                let held = record.fields.values.flatMap(\.statusWords).contains { $0.value == value && $0.group == group }
+                guard !held, let key = record.fields.first(where: { $0.value.kind == "status" })?.key else { return }
+                record.fields[key]?.statusWords.append(StatusWordRecord(value: value, group: group))
+            case .wordMeaning:
+                break
+            }
+            state.types[index] = record
+            state.changes.append((type, edit))
+        }
+    }
+
+    func addChild(id: String, label: String, below parent: String) async throws(TypeFailure) {
+        if let refusal = state.withLock({ $0.refusal }) { throw refusal }
+        state.withLock {
+            $0.children.append((id, label, parent))
+            $0.types.append(TypeRecord(id: id, label: label, parent: parent, origin: .registered, fields: [:]))
+        }
+    }
+}
+
+private func record(
+    _ id: String, _ label: String, parent: String? = nil, origin: TypeOrigin = .registered, plural: String? = nil,
+    words: [StatusWordRecord] = []
+) -> TypeRecord {
+    var fields: [String: TypeFieldRecord] = [:]
+    if !words.isEmpty {
+        fields["status"] = TypeFieldRecord(
+            key: "status", label: nil, kind: "status", meaning: nil, isRequired: false, isSearchable: true, longest: nil, statusWords: words)
+    }
+    return TypeRecord(
+        id: id, label: label, plural: plural, parent: parent, origin: origin,
+        plugin: origin == .plugin ? .init(name: "tickets", version: "1.0") : nil, fields: fields)
+}
+
+private func word(_ value: String, _ group: String) -> StatusWordRecord { StatusWordRecord(value: value, group: group) }
+
+@MainActor
+@Suite(.hangLimit) struct TypesModelTests {
+    private func model(
+        _ calls: FakeTypeCalls, counts: [String: Int] = [:], late: LateDrafts = LateDrafts(),
+        setIcon: @escaping (String?, String) async -> OwnerFailure? = { _, _ in nil }
+    ) -> TypesModel {
+        let access = TypeAccess(
+            ownItems: { counts[$0] ?? 0 }, currentIcon: { _ in nil }, setIcon: setIcon,
+            markSets: [MarfaMarkSet(id: "lucide", title: "Lucide")], marks: { _, _ in [] }, plural: { _ in nil })
+        let context = OwnerContext(calls: FakeOwnerCalls(), grants: { [.schemaWrite] }, lateDraft: { draft in late.drafts.withLock { $0.append(draft) } })
+        return TypesModel(context: context, calls: calls, access: access)
+    }
+
+    private func listing() -> FakeTypeCalls {
+        let calls = FakeTypeCalls()
+        calls.state.withLock {
+            $0.types = [
+                record("core.task", "Task", origin: .platform, plural: "Tasks", words: [word("not_started", "not_started"), word("completed", "completed")]),
+                record("common.ticket", "Ticket", parent: "core.task", origin: .plugin, words: [word("backlog", "not_started")]),
+                record("user.job", "Job", parent: "core.task", plural: "Jobs", words: [word("waiting", "not_started")]),
+                record("user.rework", "Rework", parent: "user.job"),
+                record("app.mapp.preferences", "MAPP Settings"),
+            ]
+        }
+        return calls
+    }
+
+    @Test func theListSplitsTheOwnersTypesFromPluginsAndMarfasAndLeavesOutHiddenOnes() async {
+        let model = model(listing())
+        await model.load()
+        #expect(model.yours.map(\.id) == ["user.job", "user.rework"])
+        #expect(model.fromPlugins.map(\.id) == ["common.ticket"])
+        #expect(model.builtIn.map(\.id) == ["core.task"])
+        #expect(model.record("app.mapp.preferences") == nil)
+    }
+
+    @Test func aTypesCountIsItsOwnItemsAndThoseBelowIt() async {
+        let model = model(listing(), counts: ["user.job": 18, "user.rework": 4, "core.task": 300])
+        await model.load()
+        #expect(model.count(of: "user.job") == 22)
+        #expect(model.count(of: "core.task") == 322)
+    }
+
+    @Test func aChildShowsWhatItIsBasedOnAndAParentWhatIsBasedOnIt() async {
+        let model = model(listing())
+        await model.load()
+        #expect(model.subtitle(of: model.record("user.job")!) == "Based on Tasks. With Rework.")
+        #expect(model.subtitle(of: model.record("common.ticket")!) == "From Tickets. Based on Tasks.")
+    }
+
+    @Test func onlyTheOwnersTypeIsEditable() async {
+        let model = model(listing())
+        await model.load()
+        #expect(model.isEditable(model.record("user.job")!))
+        #expect(!model.isEditable(model.record("common.ticket")!))
+        #expect(!model.isEditable(model.record("core.task")!))
+    }
+
+    @Test func theWordsAParentGivesAreLockedAndTheTypesOwnAreNot() async {
+        let model = model(listing())
+        await model.load()
+        let words = model.words(of: "user.job", in: "not_started")
+        #expect(words.map(\.id) == ["not_started", "waiting"])
+        #expect(words.map(\.isLocked) == [true, false])
+        #expect(model.words(of: "common.ticket", in: "not_started").allSatisfy { $0.isLocked })
+        #expect(model.words(of: "user.rework", in: "not_started").map(\.isLocked) == [true, true])
+    }
+
+    @Test func aTypedWordIsNamedInLowercaseWithUnderscores() {
+        #expect(TypesModel.value(ofTyped: "  On Hold ") == "on_hold")
+        #expect(TypesModel.value(ofTyped: "In-Review") == "in_review")
+        #expect(TypesModel.title(ofWord: "on_hold") == "On Hold")
+    }
+
+    @Test func anEmojiCountsOnceAgainstALimit() {
+        #expect(TypesModel.length(of: String(repeating: "😀", count: 200)) == 200)
+        #expect(TypesModel.length(of: "😀") == 1)
+    }
+
+    @Test func addingAWordSendsItWithItsGroupAndClosesTheField() async {
+        let calls = listing()
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.beginWord(in: "in_progress")
+        model.wordDraft = "In Review"
+        await model.commitWord()
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.addWord(group: "in_progress", value: "in_review")])
+        #expect(model.addingGroup == nil)
+    }
+
+    @Test func aRefusedWordStaysTypedAndIsToldOnTheWordField() async {
+        let calls = listing()
+        calls.state.withLock { $0.refusal = .invalid(field: "fields.status.status_values.1.value", message: "A status word starts with a letter.") }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.beginWord(in: "in_progress")
+        model.wordDraft = "2nd Fitting"
+        await model.commitWord()
+        #expect(model.wordDraft == "2nd Fitting")
+        #expect(model.addingGroup == "in_progress")
+        #expect(model.fieldErrors[.word] == "A status word starts with a letter.")
+    }
+
+    @Test func aRefusalNamesTheFieldItIsAbout() {
+        #expect(TypesModel.field(named: "description") == .description)
+        #expect(TypesModel.field(named: "label") == .name)
+        #expect(TypesModel.field(named: "fields.status.status_values.0.description") == .meaning)
+        #expect(TypesModel.field(named: "fields.status.status_values.0.value") == .word)
+        #expect(TypesModel.field(named: nil) == nil)
+    }
+
+    @Test func aDescriptionTheServerRefusesIsKeptAndToldOnItsOwnField() async {
+        let calls = listing()
+        calls.state.withLock { $0.refusal = .invalid(field: "description", message: "Expected a string of at most 200 characters.") }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.descriptionText = String(repeating: "x", count: 201)
+        await model.commit(.description)
+        #expect(model.descriptionText.count == 201)
+        #expect(model.fieldErrors[.description] == "A description can be 200 characters at most.")
+        #expect(model.fieldErrors[.name] == nil)
+    }
+
+    @Test func aTypeOpenedBeforeTheTypesAreReadShowsWhatTheServerHoldsOnceTheyAre() async {
+        let calls = listing()
+        calls.state.withLock { $0.types[2].description = "Kitchens and joinery for clients." }
+        let model = model(calls)
+        model.open("user.job")
+        #expect(model.name.isEmpty)
+        await model.load()
+        #expect(model.name == "Job")
+        #expect(model.plural == "Jobs")
+        #expect(model.descriptionText == "Kitchens and joinery for clients.")
+    }
+
+    @Test func aDescriptionLeftAloneSendsNothing() async {
+        let calls = listing()
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        await model.commit(.description)
+        await model.commit(.name)
+        #expect(calls.state.withLock { $0.changes.isEmpty })
+    }
+
+    @Test func aPluginsTypeTakesNoEdit() async {
+        let calls = listing()
+        let model = model(calls)
+        await model.load()
+        model.open("common.ticket")
+        model.descriptionText = "Changed"
+        await model.commit(.description)
+        #expect(calls.state.withLock { $0.changes.isEmpty })
+    }
+
+    @Test func aChildTypeGetsAUserIdentifierBelowItsParentThatNoTypeHolds() async {
+        let calls = listing()
+        let model = model(calls)
+        await model.load()
+        model.beginChild(of: "common.ticket")
+        model.childName = "Job"
+        #expect(model.identifier(forNamed: "Job") == "user.job_2")
+        model.childName = "Café Hours"
+        await model.makeChild()
+        #expect(calls.state.withLock { $0.children.map(\.id) } == ["user.cafe_hours"])
+        #expect(calls.state.withLock { $0.children.map(\.parent) } == ["common.ticket"])
+        #expect(model.made == "user.cafe_hours")
+        #expect(model.identifier(forNamed: "2nd Fitting") == "user.type_2nd_fitting")
+    }
+
+    @Test func aTypeCannotBeBasedOnItselfOrAnythingBelowIt() async {
+        let model = model(listing())
+        await model.load()
+        #expect(model.basedOnChoices(for: "user.job").map(\.id) == ["core.task", "common.ticket"])
+    }
+
+    @Test func changesRunOneAtATimeSoALaterOneIsBuiltFromTheTypeTheEarlierOneLeft() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.descriptionText = "Kitchens and joinery"
+        let description = Task { await model.commit(.description) }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        let parent = Task { await model.setParent("common.ticket", of: "user.job") }
+        model.plural = "Fittings"
+        let plural = Task { await model.commit(.plural) }
+        // The first call has not landed, so the others have not started.
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(calls.state.withLock { $0.started } == [.description("Kitchens and joinery")])
+        await gate.open()
+        await description.value
+        await parent.value
+        await plural.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.description("Kitchens and joinery"), .parent("common.ticket"), .plural("Fittings")])
+    }
+
+    @Test func aPluralCommittedDuringANameSaveIsStillSent() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.name = "Piece of Work"
+        let name = Task { await model.commit(.name) }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        model.plural = "Pieces of Work"
+        let plural = Task { await model.commit(.plural) }
+        await gate.open()
+        await name.value
+        await plural.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.label("Piece of Work"), .plural("Pieces of Work")])
+    }
+
+    @Test func aNameAPluralAndAMeaningTypedAndNotKeptAreHandedBackWhenSettingsCloses() async {
+        let model = model(listing())
+        await model.load()
+        model.open("user.job")
+        model.name = "Piece of Work"
+        model.plural = "Pieces of Work"
+        model.beginMeaning(of: "waiting", in: "user.job")
+        model.meaningDraft = "Parts ordered."
+        #expect(model.takeDrafts() == [
+            .typed(title: "Type Name Change Not Kept", text: "Piece of Work"), .typed(title: "Type Plural Not Kept", text: "Pieces of Work"),
+            .typed(title: "Word Meaning Not Kept", text: "Parts ordered."),
+        ])
+        #expect(model.name == "Job" && model.plural == "Jobs" && model.meaningWord == nil)
+    }
+
+    @Test func aWordCommittedByReturnAndAgainByLeavingTheFieldIsAddedOnceWithNoRefusal() async {
+        let calls = listing()
+        calls.state.withLock { $0.gate = TypeCallGate() }
+        let gate = calls.state.withLock { $0.gate! }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.beginWord(in: "in_progress")
+        model.wordDraft = "In Review"
+        let returned = Task { await model.commitWord() }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        let left = Task { await model.commitWord() }
+        await gate.open()
+        await returned.value
+        await left.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.addWord(group: "in_progress", value: "in_review")])
+        #expect(model.fieldErrors[.word] == nil)
+        #expect(model.addingGroup == nil && model.wordDraft.isEmpty)
+    }
+
+    @Test func aNameChangedAndChangedBackWhileTheFirstIsSavingIsSentBackToo() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.name = "Piece of Work"
+        let first = Task { await model.commit(.name) }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        model.name = "Job"
+        let back = Task { await model.commit(.name) }
+        await gate.open()
+        await first.value
+        await back.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.label("Piece of Work"), .label("Job")])
+        #expect(model.record("user.job")?.label == "Job")
+    }
+
+    @Test func aParentChosenAndChosenBackWhileTheFirstIsSavingIsSentBackToo() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        let first = Task { await model.setParent("common.ticket", of: "user.job") }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        let back = Task { await model.setParent("core.task", of: "user.job") }
+        await gate.open()
+        await first.value
+        await back.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.parent("common.ticket"), .parent("core.task")])
+        #expect(model.record("user.job")?.parent == "core.task")
+    }
+
+    @Test func anIconChosenWhileAChangeIsSavingWaitsForIt() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let order = Mutex<[String]>([])
+        let model = model(calls, setIcon: { _, _ in
+            order.withLock { $0.append("icon after \(calls.state.withLock { $0.changes.count }) changes") }
+            return nil
+        })
+        await model.load()
+        model.open("user.job")
+        model.descriptionText = "Kitchens"
+        let description = Task { await model.commit(.description) }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        model.beginIcon(of: "user.job")
+        let icon = Task { await model.chooseIcon("lucide:hammer") }
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(order.withLock { $0 }.isEmpty)
+        await gate.open()
+        await description.value
+        await icon.value
+        #expect(order.withLock { $0 } == ["icon after 1 changes"])
+        #expect(model.iconTarget == nil)
+    }
+
+    @Test func aChangeStillSavingWhenSettingsClosesIsNotHandedBackIfItLands() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let late = LateDrafts()
+        let model = model(calls, late: late)
+        await model.load()
+        model.open("user.job")
+        model.name = "Piece of Work"
+        let saving = Task { await model.commit(.name) }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        #expect(model.takeDrafts().isEmpty)
+        await gate.open()
+        await saving.value
+        #expect(late.drafts.withLock { $0 }.isEmpty)
+    }
+
+    @Test func aMeaningStillSavingWhenSettingsClosesIsHandedBackIfTheServerRefusesIt() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let late = LateDrafts()
+        let model = model(calls, late: late)
+        await model.load()
+        model.open("user.job")
+        model.beginMeaning(of: "waiting", in: "user.job")
+        model.meaningDraft = "Parts ordered."
+        let saving = Task { await model.saveMeaning() }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        #expect(model.takeDrafts().isEmpty)
+        calls.state.withLock { $0.refusal = .invalid(field: "fields.status.status_values.0.description", message: "Too long.") }
+        await gate.open()
+        await saving.value
+        #expect(late.drafts.withLock { $0 } == [.typed(title: "Word Meaning Not Kept", text: "Parts ordered.")])
+    }
+
+    @Test func aRefusalShowsTheServersReasonUnlessItIsTheLengthRule() {
+        #expect(TypesModel.isLengthRule("Expected a string of at most 100 characters."))
+        #expect(!TypesModel.isLengthRule("Status word \"waiting\" is already used."))
+    }
+
+    @Test func aRepeatedWordShowsTheServersReasonOnTheWordField() async {
+        let calls = listing()
+        calls.state.withLock { $0.refusal = .invalid(field: "fields.status.status_values.1.value", message: "The word waiting is already used.") }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.beginWord(in: "in_progress")
+        model.wordDraft = "Waiting"
+        await model.commitWord()
+        #expect(model.fieldErrors[.word] == "The word waiting is already used.")
+    }
+
+    @Test func aClearedPluralShowsTheOneTheServerNowReadsForTheType() async {
+        let calls = listing()
+        calls.state.withLock { $0.readings["user.job"] = TypeReading(guidance: nil, plural: "Jobs", ancestors: []) }
+        let model = model(calls)
+        await model.load()
+        calls.state.withLock { $0.types[2].plural = nil; $0.readings["user.job"] = TypeReading(guidance: nil, plural: "Jobs", ancestors: []) }
+        model.open("user.job")
+        model.plural = ""
+        await model.commit(.plural)
+        #expect(model.title(of: "user.job") == "Jobs")
+    }
+
+    @Test func aNameTypedInTheNewTypeSheetIsHandedBackWhenSettingsCloses() async {
+        let model = model(listing())
+        await model.load()
+        model.beginChild(of: "core.task")
+        model.childName = "Fittings"
+        #expect(model.takeDrafts() == [.typed(title: "Type Name Not Kept", text: "Fittings")])
+        #expect(!model.isMakingChild)
+    }
+}
+
+/// What a type's replacement sends: the type as the server holds it, with the one change made.
+@Suite struct TypeReplacementTests {
+    private typealias Definition = Components.Schemas.FieldDefinition
+    private typealias Word = Components.Schemas.StatusValue
+
+    private func listed(
+        _ id: String, parent: String? = nil, guidance: String? = nil, fields: [String: Definition] = [:], origin: Components.Schemas.TypeProvenance.OriginPayload = .registered
+    ) -> TypeDefinitionEdit.Listed {
+        let definition = Components.Schemas.TypeDefinition(
+            id: id, label: "Job", plural: "Jobs", description: "Kitchens", guidance: guidance, parent: parent,
+            fields: .init(additionalProperties: fields), tables: .init(additionalProperties: [:]), version: 3)
+        return .init(value1: definition, value2: .init(provenance: .init(origin: origin), ownRoles: []))
+    }
+
+    private let task = TypeDefinitionEdit.Listed(
+        value1: .init(
+            id: "core.task", label: "Task", fields: .init(additionalProperties: [
+                "status": Definition(_type: .status, statusValues: [Word(value: "not_started", group: .notStarted)])
+            ]), version: 0),
+        value2: .init(provenance: .init(origin: .platform), ownRoles: []))
+
+    @Test func aChangeSendsTheGuidanceBackAsItWas() throws {
+        let job = listed("user.job", parent: "core.task", guidance: "One job is one piece of paid work.")
+        let update = try TypeDefinitionEdit.update(job, applying: .description("Kitchens and joinery"), in: [job, task])
+        #expect(update.guidance == "One job is one piece of paid work.")
+        #expect(update.description == "Kitchens and joinery")
+        #expect(update.label == "Job" && update.plural == "Jobs" && update.parent == "core.task" && update.version == 3)
+    }
+
+    @Test func aFieldEditSendsTheGuidanceBackToo() throws {
+        let job = listed(
+            "user.job", guidance: "Keep it short.", fields: ["site": Definition(_type: .string, label: "Site")])
+        let shown = ItemTypeInfo.Field(key: "site", label: "Site", kind: .text, declaredBy: TypeID("user.job"))
+        let plan = FieldEditPlan(type: TypeID("user.job"), edit: .rename(key: "site", label: "Place"), shown: shown)
+        #expect(try TypeDefinitionEdit.update(job, for: plan).guidance == "Keep it short.")
+    }
+
+    @Test func aWordIsAddedToTheTypesOwnStatusField() throws {
+        let job = listed("user.job", parent: "core.task", fields: ["status": Definition(_type: .status, statusValues: [Word(value: "waiting", group: .notStarted)])])
+        let update = try TypeDefinitionEdit.update(job, applying: .addWord(group: "in_progress", value: "in_review"), in: [job, task])
+        #expect(update.fields.additionalProperties["status"]?.statusValues?.map(\.value) == ["waiting", "in_review"])
+        #expect(update.fields.additionalProperties["status"]?.statusValues?.last?.group == .inProgress)
+    }
+
+    @Test func aChildThatDeclaresNoStatusRedeclaresTheParentsWithOnlyTheNewWord() throws {
+        let job = listed("user.job", parent: "core.task")
+        let update = try TypeDefinitionEdit.update(job, applying: .addWord(group: "not_started", value: "on_hold"), in: [job, task])
+        #expect(update.fields.additionalProperties["status"]?._type == .status)
+        #expect(update.fields.additionalProperties["status"]?.statusValues?.map(\.value) == ["on_hold"])
+    }
+
+    @Test func aTypeWithNoStatusFieldAboveItCannotTakeAWord() {
+        let job = listed("user.job")
+        #expect(throws: TypeSchemaFailure.changedOnServer) {
+            try TypeDefinitionEdit.update(job, applying: .addWord(group: "not_started", value: "on_hold"), in: [job])
+        }
+    }
+
+    @Test func aWordsMeaningIsSetAndAnEmptyOneLeavesItOut() throws {
+        let job = listed("user.job", fields: ["status": Definition(_type: .status, statusValues: [Word(value: "waiting", group: .notStarted, description: "Old")])])
+        let set = try TypeDefinitionEdit.update(job, applying: .wordMeaning(value: "waiting", text: "Parts ordered."), in: [job])
+        #expect(set.fields.additionalProperties["status"]?.statusValues?.first?.description == "Parts ordered.")
+        let cleared = try TypeDefinitionEdit.update(job, applying: .wordMeaning(value: "waiting", text: ""), in: [job])
+        #expect(cleared.fields.additionalProperties["status"]?.statusValues?.first?.description == nil)
+    }
+
+    @Test func aChangeTheTypeAlreadyHoldsIsNotSent() async throws {
+        let job = listed("user.job", fields: ["status": Definition(_type: .status, statusValues: [Word(value: "waiting", group: .notStarted, description: "Parts ordered.")])])
+        var replaced = 0
+        for change: TypeDefinitionEdit.TypeChange in [
+            .label("Job"), .plural("Jobs"), .description("Kitchens"), .addWord(group: "not_started", value: "waiting"),
+            .wordMeaning(value: "waiting", text: "Parts ordered."),
+        ] {
+            try await TypeDefinitionEdit.run(change, to: "user.job", read: { [job] }, replace: { _ in replaced += 1 })
+        }
+        #expect(replaced == 0)
+        for change: TypeDefinitionEdit.TypeChange in [
+            .label("Work"), .plural(""), .description(""), .parent("core.task"), .addWord(group: "in_progress", value: "waiting"),
+            .wordMeaning(value: "waiting", text: ""),
+        ] {
+            try await TypeDefinitionEdit.run(change, to: "user.job", read: { [job, task] }, replace: { _ in replaced += 1 })
+        }
+        #expect(replaced == 6)
+    }
+
+    @Test func aPluginsTypeIsNeverReplaced() async {
+        var replaced = 0
+        let ticket = listed("common.ticket", origin: .plugin)
+        await #expect(throws: TypeSchemaFailure.pluginType) {
+            try await TypeDefinitionEdit.run(.description("x"), to: "common.ticket", read: { [ticket] }, replace: { _ in replaced += 1 })
+        }
+        #expect(replaced == 0)
+    }
+}
+
+/// How the server's refusals of a type's replacement are read.
+@Suite struct TypeRefusalTests {
+    private func answer(_ json: String, status: UInt16 = 400, code: String) throws -> ServerAnswer {
+        ServerAnswer(status: status, code: code, details: try JSONValue(json: json), requestId: nil)
+    }
+
+    @Test func aRefusalNamesItsFieldFromTheServersAnswerNotFromTheErrorsOwnDetails() throws {
+        let server = try answer(#"{"errors":[{"field":"fields.status.status_values.1.value","message":"Expected a word."}]}"#, code: "invalid_schema")
+        let error = MarfaError.validation(code: "invalid_schema", message: "Invalid type schema", details: nil, server: server)
+        #expect(ServerTypeCalls.failure(error) == .invalid(field: "fields.status.status_values.1.value", message: "Expected a word."))
+    }
+
+    @Test func aRefusalForGuidanceAnAppMadeIsToldApartFromOneForAMissingPermission() throws {
+        let server = try answer(#"{"changes":["guidance"],"required_scope":"schema.write"}"#, status: 403, code: "forbidden")
+        let error = MarfaError.forbidden(code: "forbidden", message: "Forbidden", server: server)
+        #expect(ServerTypeCalls.failure(error) == .guidanceByApp)
+    }
+
+    @Test func aRefusalForAMissingPermissionNamesIt() throws {
+        let server = try answer(#"{"required_scope":"schema.write"}"#, status: 403, code: "forbidden")
+        let error = MarfaError.forbidden(code: "forbidden", message: "Forbidden", server: server)
+        #expect(ServerTypeCalls.failure(error) == .owner(.notPermitted("schema.write")))
+    }
+}
