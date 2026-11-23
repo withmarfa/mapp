@@ -2,7 +2,7 @@
 
 Status: The presets and the two densities are built in v0.0.44. See [Looks](looks.md).
 
-Where it lives: `LookPreset` under `MAPP/Model/Looks/`, `Density` and `PlaceDensities` under `MAPP/Model/`, `ItemRow` under `MAPP/Views/`, and the two places that choose a density, `ListsPage` under `MAPP/Settings/MAPP/` and `ViewPanelDensity` under `MAPP/Views/`.
+Where it lives: `LookPreset` under `MarfaMac/Model/Looks/`, `Density` and `PlaceDensities` under `MarfaMac/Model/`, `ItemRow` under `MarfaMac/Views/`, and the two places that choose a density, `ListsPage` under `MarfaMac/Settings/App/` and `ViewPanelDensity` under `MarfaMac/Views/`.
 
 A preset is the starting look for a type. A density is how much room a row takes. Both are suggestions that a look builds on, not layouts a person has to choose between.
 
@@ -40,7 +40,7 @@ The first of these that fits wins, so the order is the rule. A preset names no t
 
 No type Marfa ships gets Record or Clip today; a type with a number and a currency code, or a `source_app`, does.
 
-The dates of a Quote ("captured"), a Clip ("copied"), a Record ("happened") and a Message ("sent") are all Marfa's own `occurred_at` (`LookDate.occurred`), or the created date for an item with none. MAPP's `Item` holds it as `occurred`. An Event's Secondary is its time of day (`LookPart.time`) and its place, since the Date top right already shows the day.
+The dates of a Quote ("captured"), a Clip ("copied"), a Record ("happened") and a Message ("sent") are all Marfa's own `occurred_at` (`LookDate.occurred`), or the created date for an item with none. The app's `Item` holds it as `occurred`. An Event's Secondary is its time of day (`LookPart.time`) and its place, since the Date top right already shows the day.
 
 The title is always the item's name. A clipboard item is titled "Clipboard Item", or a name its person gave it, and never its content.
 

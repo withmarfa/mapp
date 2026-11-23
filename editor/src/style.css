@@ -185,8 +185,8 @@ body {
 }
 
 /* The interface text size the pictures' measures follow, as the header's do: the app sets it on the root, and every
-   measure below is that size's share, so they scale with it. They are points at the default 13, and are MAPP's small
-   gray button (`MappButton`): 22 high with 7 point corners, 9 points of padding and 12 point medium text, on the
+   measure below is that size's share, so they scale with it. They are points at the default 13, and are the app's small
+   gray button (`AppButton`): 22 high with 7 point corners, 9 points of padding and 12 point medium text, on the
    label's own gray, darker under the pointer. 22 is off the 4 point grid by design. */
 :root {
   --interface-text-size: 13px;
@@ -273,7 +273,7 @@ body {
   background: var(--picture-button-fill-pressed);
 }
 
-/* The close button, MAPP's plain icon button: a circle as tall as the Load button with no fill until the pointer is
+/* The close button, the app's plain icon button: a circle as tall as the Load button with no fill until the pointer is
    over it, and a little closer to Load than the other parts are to each other. It only hides the banner. */
 #picture-bar .picture-close {
   width: var(--picture-button-height);
@@ -304,7 +304,7 @@ body {
 }
 
 /* A page with no text to write draws no editor, rather than an empty one that takes typing. An empty one would invite
-   typing that a connector holding the item puts back, and MAPP cannot tell a connector's item from the person's until
+   typing that a connector holding the item puts back, and the app cannot tell a connector's item from the person's until
    Marfa marks them read only (marfa issue 2415). */
 body[data-text='none'] #editor {
   display: none;

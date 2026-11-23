@@ -14,9 +14,9 @@
   "testTargets" : [
     {
       "target" : {
-        "containerPath" : "container:MAPP.xcodeproj",
+        "containerPath" : "container:MarfaMac.xcodeproj",
         "identifier" : "3303FE023066ED47005D07A2",
-        "name" : "MAPPTests"
+        "name" : "MarfaMacTests"
       },
       "selectedTags" : {
         "tags" : [

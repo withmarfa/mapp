@@ -1,0 +1,469 @@
+import AppKit
+import SwiftUI
+
+/// Mounts one split view at a time: the workspace identity changes to switch. The column count of a mounted split view is never changed. Browser, editor, undo, columns and sidebar scroll live above that boundary so they survive a switch.
+struct MainView: View {
+    @CurrentLibrary private var library
+    @Environment(Libraries.self) private var libraries
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
+    @State private var browser = Browser()
+    @State private var editorSlot = EditorSlot()
+    @State private var details = DetailsPresentation()
+    @SceneStorage("detailsPresented") private var storedDetailsPresented = false
+    @StoredOrder private var order
+    @AppStorage(IncludedSubtypes.key) private var includedSubtypes = IncludedSubtypes()
+    @SceneStorage("browser") private var storedBrowser: Data?
+    @FocusState private var pane: Browser.Pane?
+    /// Kept with the window for the next launch, as the selection and the details are.
+    @SceneStorage("sidebarHidden") private var isSidebarHidden = false
+    @State private var snapshotSaver = DelayedAction()
+    @State private var measuredWidths = ColumnWidthTracker()
+    @Environment(\.appearsActive) private var appearsActive
+    /// The shape kept while Customize Toolbar's tray is open: replacing a toolbar under its tray crashes, and menu
+    /// commands still reach the window. A change made meanwhile shows once the tray closes.
+    @State private var heldPresentation: WorkspacePresentation?
+    @State private var heldViewMode: ItemViewMode?
+    private let restoresWindow: Bool
+
+    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
+        _browser = State(initialValue: browser)
+        _details = State(initialValue: details)
+        self.restoresWindow = restoresWindow
+    }
+
+    /// The window's editor, holding the window's title drafts.
+    private var editor: EditorController {
+        editorSlot.editor {
+            let editor = EditorController(library: library)
+            editor.titleDrafts = details
+            return editor
+        }
+    }
+
+    var body: some View { lifecycleWindow }
+
+    /// The gallery and the table have no list column, so they mount the two-column split view, as does the list while
+    /// an item is open as a full page.
+    private var usesCollectionLayout: Bool { browser.usesCollection || browser.isCollectionItemPresented }
+
+    private var workspacePresentation: WorkspacePresentation {
+        if details.history != nil { return .history }
+        if browser.showsItemsIndex { return .items }
+        if browser.showsSidebarIndex { return .index }
+        return usesCollectionLayout ? .collection : .list
+    }
+
+    private var shownPresentation: WorkspacePresentation { heldPresentation ?? workspacePresentation }
+    private var shownViewMode: ItemViewMode { heldViewMode ?? browser.viewMode }
+
+    private var activeWindow: some View {
+        // Release the outgoing toolbar providers before changing the column count.
+        // Browser, editor, drafts, and column preferences remain above this presentation identity.
+        dialogsWindow.id(shownPresentation)
+        .modifier(ToolbarTrayWatch { isOpen in
+            heldPresentation = isOpen ? workspacePresentation : nil
+            heldViewMode = isOpen ? browser.viewMode : nil
+        })
+        .onChange(of: workspacePresentation) {
+            editor.flush()
+            // Version History takes the whole window, which the modal would otherwise stay over.
+            if workspacePresentation == .history { browser.closeModal(returningFocus: false) }
+        }
+        // What the modal held is saved as it opens and as it closes, and the page goes back to the layout.
+        .onChange(of: browser.isModalPresented) { _, isOpen in
+            if !isOpen { editor.releaseFocus() }
+            editor.flush()
+        }
+        .onChange(of: appearsActive, initial: true) {
+            ColumnWidthRegistry.shared.windowBecame(active: appearsActive, tracker: measuredWidths)
+            if appearsActive { FrontBrowser.shared.last = browser }
+        }
+        // Customizing happens in the sidebar, so a command that starts it brings the sidebar back.
+        .onChange(of: browser.customizesSidebar) {
+            if browser.customizesSidebar { isSidebarVisible = true }
+        }
+        .onChange(of: browser.showsCollection) {
+            if browser.showsCollection { editor.releaseFocus(); editor.flush() }
+        }
+        // Another place, or the index of one, is somewhere else to go: Version History is of the item it was opened for.
+        .onChange(of: browser.sidebarItem) { details.leaveHistory() }
+        .onChange(of: browser.showsSidebarIndex) { details.leaveHistory() }
+    }
+
+    private var isSidebarVisible: Bool {
+        get { !isSidebarHidden }
+        nonmutating set { isSidebarHidden = !newValue }
+    }
+
+    // Both native split shapes read the same sidebar preference before their first layout.
+    private var listColumnVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding { isSidebarVisible ? .all : .doubleColumn } set: { isSidebarVisible = $0 == .all }
+    }
+
+    private var galleryColumnVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding { isSidebarVisible ? .all : .detailOnly } set: { isSidebarVisible = $0 == .all }
+    }
+
+    private var splitView: some View {
+        // The gallery and the table replace this entire split view rather than changing the columns inside it.
+        NavigationSplitView(columnVisibility: listColumnVisibility) {
+            sidebarColumn
+        } content: {
+            ItemList(browser: browser, order: order, pane: $pane).equatable()
+                .filterChips(browser)
+                // The split view reads the ideal only as it is built, so it comes from the tracker as it stands then.
+                .navigationSplitViewColumnWidth(
+                    min: ColumnWidth.list.range.lowerBound, ideal: measuredWidths.width(of: .list),
+                    max: ColumnWidth.list.range.upperBound)
+        } detail: {
+            // The modal holds the window's one editor while it is open, so the page beside the list steps aside.
+            Group {
+                if browser.isModalPresented { Color.clear } else { itemPage }
+            }
+                .toastOverlay()
+                .modifier(itemInspector(WindowToolbarLayout.list))
+                .toolbar(id: WindowToolbarLayout.list) { windowToolbar(hasListColumn: true) }
+        }
+    }
+
+    private func windowToolbar(hasListColumn: Bool = false) -> WindowToolbar {
+        WindowToolbar(
+            browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
+            hasListColumn: hasListColumn)
+    }
+
+    /// Only the three-column split has a list column to measure.
+    private var hasListColumn: Bool { shownPresentation == .list }
+
+    private var sidebarColumn: some View {
+        VStack(spacing: 0) {
+            Sidebar(browser: browser, order: order)
+                // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
+                .focused($pane, equals: .sidebar)
+        }
+        .onSplitViewDividerDrag(placing: {
+            hasListColumn
+                ? [measuredWidths.width(of: .sidebar), measuredWidths.width(of: .list)]
+                : [measuredWidths.width(of: .sidebar)]
+        }) { widths in
+            if let sidebar = widths.first { measuredWidths.record(sidebar, for: .sidebar) }
+            if hasListColumn, widths.count > 1 { measuredWidths.record(widths[1], for: .list) }
+        }
+        .navigationSplitViewColumnWidth(
+            min: ColumnWidth.sidebar.range.lowerBound, ideal: measuredWidths.width(of: .sidebar), max: ColumnWidth.sidebar.range.upperBound)
+    }
+
+    private var itemPage: some View {
+        ItemDetail(browser: browser, editor: editor, details: details)
+    }
+
+    /// An item's page filling the content, where the list that held the keyboard has gone. The page takes the keyboard
+    /// itself, so Escape still reaches `escapesFromPage` before anything is clicked.
+    private var fullPage: some View {
+        itemPage
+            .focusable()
+            .focusEffectDisabled()
+            .focused($pane, equals: .page)
+            .onAppear { pane = .page }
+    }
+
+    private var workspace: some View {
+        Group {
+            if let history = details.history, shownPresentation == .history {
+                VersionHistoryWorkspace(mode: history, details: details)
+                    .toastOverlay()
+            } else if shownPresentation == .items {
+                NavigationSplitView(columnVisibility: galleryColumnVisibility) {
+                    sidebarColumn
+                } detail: {
+                    ItemsIndex(browser: browser, pane: $pane)
+                        .toastOverlay()
+                        .modifier(itemInspector(WindowToolbarLayout.items))
+                        .toolbar(id: WindowToolbarLayout.items) { windowToolbar() }
+                }
+            } else if shownPresentation == .index {
+                NavigationSplitView(columnVisibility: galleryColumnVisibility) {
+                    sidebarColumn
+                } detail: {
+                    SidebarIndex(browser: browser, details: details, order: order)
+                        .toastOverlay()
+                        .toolbar(id: WindowToolbarLayout.index) { windowToolbar() }
+                }
+            } else if shownPresentation == .collection {
+                NavigationSplitView(columnVisibility: galleryColumnVisibility) {
+                    sidebarColumn
+                } detail: {
+                    Group {
+                        if browser.showsCollection {
+                            Group {
+                                switch browser.viewMode {
+                                case .table:
+                                    ItemTable(browser: browser, order: order, pane: $pane)
+                                case .board:
+                                    ItemBoard(browser: browser, pane: $pane)
+                                case .timeline:
+                                    ItemTimeline(browser: browser, pane: $pane)
+                                case .calendar:
+                                    ItemCalendar(browser: browser, pane: $pane)
+                                case .list, .gallery:
+                                    ItemGallery(browser: browser, order: order, pane: $pane)
+                                }
+                            }
+                            .filterChips(browser)
+                            .viewCorner(browser)
+                        } else {
+                            // The page has no title of the window's own to show beside Back, which is the arrow alone.
+                            fullPage.toolbar(removing: .title)
+                        }
+                    }
+                    .toastOverlay()
+                    .modifier(itemInspector(WindowToolbarLayout.collection(shownViewMode)))
+                    .toolbar(id: WindowToolbarLayout.collection(shownViewMode)) { windowToolbar() }
+                }
+                // Each view has its own split view: swapped inside one, the next squeezes the right sidebar to its
+                // minimum. Only the split is remade, as the dialogs above it watch the view for a saved view's layout.
+                .id(shownViewMode)
+            } else {
+                splitView
+            }
+        }
+    }
+
+    private func itemInspector(_ toolbarLayout: String) -> ItemInspectorColumn {
+        ItemInspectorColumn(browser: browser, details: details, editor: editor, toolbarLayout: toolbarLayout)
+    }
+
+    private var presentedWindow: some View {
+        workspace
+        // The window's toolbar is part of what a modal covers: dimmed and silent, as behind a sheet.
+        .disabled(browser.isModalPresented)
+        .escapesFromPage(details)
+        .overlay {
+            ZStack {
+                if browser.isModalPresented {
+                    ItemModal(browser: browser, editor: editor, details: details)
+                        // Gone at once on close: a fading card would still host the editor the page beside the list takes.
+                        .transition(.asymmetric(insertion: .opacity, removal: .identity))
+                }
+            }
+            .animation(.easeOut(duration: 0.15), value: browser.isModalPresented)
+        }
+        .focusedSceneValue(\.detailsPresentation, details)
+        .modifier(CommandValuePanels(details: details))
+        .modifier(FieldEditSheets(details: details))
+        .sheet(item: Binding { details.typeValues } set: { details.typeValues = $0 }) { TypeValuesSheet(request: $0) }
+        .onChange(of: details.isPresentedByPerson) { if restoresWindow { storedDetailsPresented = details.isPresentedByPerson } }
+        // Closing the sidebar by hand finishes Customize Layout, which has nowhere else to show.
+        .onChange(of: details.isPresented) { if !details.isPresented { details.endLayout() } }
+        // Leaving the page finishes it too, as there is nothing left to arrange.
+        .onChange(of: browser.showsPage, initial: true) {
+            details.showsPage = browser.showsPage
+            if !browser.showsPage { details.endLayout() }
+        }
+        .overlay(alignment: .top) {
+            if let palette = browser.palette {
+                FloatingPanel {
+                    browser.palette = nil
+                    browser.focusRequest = .list
+                } content: {
+                    CommandPalette(browser: browser, editor: editor, mode: palette)
+                        // Each palette starts afresh, as ⌘K's Search Items moves from one to the other.
+                        .id(palette)
+                }
+            } else if browser.quickAdd.isPresented, browser.quickAdd.draft != nil {
+                FloatingPanel {
+                    browser.putAwayQuickAdd()
+                    if browser.focusRequest == nil { browser.focusRequest = .list }
+                } content: {
+                    QuickAddPanel(browser: browser, quickAdd: browser.quickAdd, editor: editor)
+                }
+            }
+        }
+        .focusedSceneValue(\.browser, browser)
+        .focusedSceneValue(\.editor, browser.showsPage ? editor : nil)
+        .focusedSceneValue(\.focusedItems, FocusedItems(ids: browser.selection, undoManager: undoManager))
+        // Last, so the toolbars, the context menus and the palette above the workspace all read it.
+        .environment(details)
+    }
+
+    private var lifecycleWindow: some View {
+        activeWindow
+        .watchesPlace(browser, order: order)
+        // The page grants its own requests, since it may not exist until the request's selection shows.
+        .onChange(of: browser.focusRequest, grantFocusRequest)
+        // A draft the inspector held back is given back when the selection moves off its item, shown or not. Folding
+        // a section or hiding the inspector keep it, and the item still shown keeps its own.
+        .onChange(of: browser.selection) {
+            // Selecting another item, or following a link, leaves the history of the one it was opened for.
+            if let history = details.history, browser.selection != [history.item] { details.leaveHistory() }
+            details.handOffProperties(except: browser.selection.count == 1 ? browser.selection.first : nil, in: library, undoManager: undoManager)
+        }
+        .onChange(of: browser.snapshotParts) {
+            if restoresWindow {
+                storedBrowser = try? JSONEncoder().encode(browser.snapshot())
+                StartWith.remember(browser.item)
+            }
+        }
+        // The window has gone, by closing or changing library, once its titles were saved or the person chose to
+        // go; its drafts take no part in what other windows do. The library is the one this view showed, so a
+        // window whose libraries now read another has changed library rather than closed.
+        .onDisappear { [library, libraries] in
+            editorSlot.made?.flush()
+            editorSlot.made?.windowWent()
+            let changed = libraries.current.map { ObjectIdentifier($0) != ObjectIdentifier(library) } ?? true
+            details.handOffProperties(in: library, undoManager: nil)
+            browser.quickAdd.handOff(to: library.notices, because: changed ? .libraryChanged : .closed, in: library)
+            browser.giveUpNewItem(because: .windowLeft)
+            browser.viewPanel?.handOff(because: changed ? .libraryChanged : .closed)
+        }
+        .onAppear {
+            if restoresWindow { details.isPresented = storedDetailsPresented }
+            let editor = editor
+            if restoresWindow {
+                // The position is saved once the person stops scrolling, not for every line of it.
+                let stored = $storedBrowser
+                browser.listMemory.scrolled = { [snapshotSaver, browser] in
+                    snapshotSaver.schedule { stored.wrappedValue = try? JSONEncoder().encode(browser.snapshot()) }
+                }
+            }
+            editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
+            editor.onEscape = { [browser, details, library] in
+                if details.isEditingView { browser.escapeViewPanel(in: library) }
+                else if details.isCustomizingLayout { details.endLayout() }
+                else if details.escapeFromPage() { return }
+                else if browser.isModalPresented { browser.closeModal() }
+                else { browser.focusRequest = .list }
+            }
+            browser.windowOpener = { [library, openWindow] ids in
+                ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
+            }
+            editor.onOpenItem = { [browser, library, order] id in
+                if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }
+            }
+            editor.onFollowItemLink = { [browser, library, order] id in
+                if let item = library.item(id) { browser.follow(link: item, in: library, order: order) }
+            }
+            editor.onShowRefusedTitle = { [browser, library, order] id in
+                if let item = library.item(id) { browser.reveal(item, in: library, order: order) }
+            }
+        }
+        .onChange(of: includedSubtypes.types, initial: true) { browser.stackedTypes = includedSubtypes.types }
+        // Another Mac's settings reached the defaults: a list reads its density again.
+        .onReceive(NotificationCenter.default.publisher(for: PreferencesSync.appliedNotification)) { _ in browser.densityRevision += 1 }
+        // A window restores what it showed once the library has been read, since before then nothing is there. A
+        // window carried to another library starts afresh with it.
+        .onChange(of: library.isLoaded, initial: true) {
+            browser.adopt(library, undoManager: undoManager)
+            guard library.isLoaded else { return }
+            // After this update, not in it: chosen while the window's customizable toolbars are first mounted, the page
+            // can miss the selection and stay on No Item Selected.
+            Task {
+                if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order, start: StartWith.stored().startingPlace()) }
+                #if DEBUG
+                if SampleLibrary.isRequested, SampleLibrary.withCollections {
+                    browser.sidebarItem = .itemType("core.task")
+                    browser.set(layout: .board)
+                }
+                if let place = SampleLibrary.launchPlace {
+                    // A type with no item yet has no place to stay on, so a server's copy still filling is waited for.
+                    for _ in 0..<60 where library.count(in: place) == 0 { try? await Task.sleep(for: .milliseconds(500)) }
+                    browser.sidebarItem = place
+                }
+                if let layout = SampleLibrary.launchLayout { browser.set(layout: layout) }
+                #endif
+            }
+        }
+        // A new item reaches a server's library when its source says so, which the window waits for to open it.
+        .onChange(of: newItemIsSettled) {
+            if newItemIsSettled { browser.finishNewItem(in: library) }
+        }
+        // The files quick add attached go at the end of the new item's text, once the page shows it.
+        .onChange(of: browser.newEmbeds) {
+            guard let attached = browser.newEmbeds else { return }
+            browser.newEmbeds = nil
+            editor.append(attached.embeds, to: attached.id)
+        }
+        #if DEBUG
+        // A sample launch can open an item without a click, as `-MarfaMacSelectItem <id>`, once the library holds it.
+        .onChange(of: launchSelection.map { library.item($0) != nil }, initial: true) {
+            if let id = launchSelection, library.item(id) != nil { browser.selection = [id] }
+        }
+        #endif
+    }
+
+    private var dialogsWindow: some View {
+        presentedWindow
+        .libraryDialogs()
+        .handlesFiles(in: browser, order: order)
+        .deleteConfirmation(for: details)
+        .savedViewDialogs(browser: browser, details: details)
+    }
+
+    private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }
+
+    #if DEBUG
+    private var launchSelection: ItemID? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard SampleLibrary.isRequested, let flag = arguments.firstIndex(of: "-MarfaMacSelectItem"),
+              arguments.indices.contains(flag + 1) else { return nil }
+        return ItemID(arguments[flag + 1])
+    }
+    #endif
+
+    /// The list's search comes out as a field, which takes the keyboard.
+    private func grantFocusRequest() {
+        switch browser.focusRequest {
+        case .search:
+            browser.showSearchField()
+        case .sidebar, .list:
+            editor.releaseFocus()
+            // Asked for as the place changes, the list that takes the keyboard is not yet in the window.
+            let request = browser.focusRequest
+            Task { pane = request }
+        case .page, .title:
+            // The modal's own page takes the request, and no full page is opened behind it.
+            if browser.showsCollection, !browser.isModalPresented { browser.isCollectionItemPresented = true }
+            return
+        case nil: return
+        }
+        browser.focusRequest = nil
+    }
+}
+
+private enum WorkspacePresentation: Hashable {
+    case list, collection, index, items, history
+}
+
+/// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every
+/// resize of the window lay out every column again, which made live resizing several times slower, and one applied
+/// after the column's toolbar raises an exception during layout when a new window opens.
+private struct ItemInspectorColumn: ViewModifier {
+    let browser: Browser
+    let details: DetailsPresentation
+    let editor: EditorController
+    let toolbarLayout: String
+    /// Read once, as the window remakes this column when its layout changes and the column's own width goes with it.
+    /// Kept out of the state as it changes, so a drag is not fed back into the column it is resizing.
+    @State private var width = UserDefaults.standard.object(forKey: InterfaceKey.inspectorWidth) as? Double ?? 310
+
+    /// Whether the person is dragging the sidebar's own edge, which is what chooses its width. Dragging another divider
+    /// or the window's edge can squeeze the sidebar too, and that is not a choice to keep.
+    private static func isDraggingEdge(ofSidebarWidth width: CGFloat) -> Bool {
+        guard let event = NSApp.currentEvent, event.type == .leftMouseDragged, let window = event.window else { return false }
+        return abs(window.frame.width - width - event.locationInWindow.x) < 8
+    }
+
+    func body(content: Content) -> some View {
+        // While the modal is open its own sidebar shows the details, so this one is out and only one is mounted.
+        content.inspector(isPresented: Binding { details.isPresented && !browser.isModalPresented } set: { details.isPresented = $0 }) {
+            ItemInspectorHost(browser: browser, details: details, editor: editor)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newWidth in
+                    guard details.isPresented, Self.isDraggingEdge(ofSidebarWidth: newWidth) else { return }
+                    UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)
+                }
+                .inspectorColumnWidth(min: 260, ideal: width, max: 440)
+                .toolbar(id: toolbarLayout) { InspectorToolbar(details: details, editor: editor, browser: browser) }
+        }
+    }
+}

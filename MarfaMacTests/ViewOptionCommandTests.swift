@@ -1,0 +1,86 @@
+import Foundation
+import SwiftUI
+import Testing
+@testable import MarfaMac
+
+struct ViewOptionCommandTests {
+    private static func task(_ id: String, status: String) -> Item {
+        Item(id: ItemID(id), type: TypeID("core.task"), title: id, titleRule: .property("title"),
+             properties: [Property(key: "status", value: .string(status))],
+             version: ItemVersion(1), created: .distantPast, modified: .distantPast)
+    }
+
+    private static func browser(_ mode: ItemViewMode, in library: FakeItemLibrary) -> Browser {
+        let browser = Browser()
+        browser.show(.itemType("core.task"), in: library, order: ItemOrder())
+        browser.viewMode = mode
+        return browser
+    }
+
+    private static func titles(_ browser: Browser, _ library: FakeItemLibrary) -> [String] {
+        ViewOptionCommand.commands(for: browser, in: library).map(\.title)
+    }
+
+    @Test func theBoardOffersTheOtherGroupingsAndTheOtherDensity() throws {
+        let library = FakeItemLibrary(items: [Self.task("A", status: "todo"), Self.task("B", status: "done")])
+        let browser = Self.browser(.board, in: library)
+        let titles = Self.titles(browser, library)
+        #expect(titles.contains("Group by Priority"))
+        #expect(titles.contains("Group by Created: Week"))
+        #expect(!titles.contains("Group by Status"), "the grouping already chosen is not offered again")
+        #expect(!titles.contains("Ungroup"), "a board always has lanes")
+        #expect(titles.contains("Compact Cards"))
+
+        let compact = try #require(
+            ViewOptionCommand.commands(for: browser, in: library)
+                .first { $0.title == "Compact Cards" })
+        compact.action()
+        #expect(browser.compactBoards[browser.item] == true)
+        #expect(Self.titles(browser, library).contains("Comfortable Cards"))
+    }
+
+    @Test func theCalendarsCommandsMoveFromTheWeekTheLibrarysClockShows() throws {
+        let clock = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let library = FakeItemLibrary(items: [Self.task("A", status: "todo")], now: clock)
+        let browser = Self.browser(.calendar, in: library)
+        let commands = ViewOptionCommand.commands(for: browser, in: library)
+        let next = try #require(commands.first { $0.title == "Next Week" })
+        next.action()
+        let thisWeek = CalendarLayout.firstDay(ofWeekHolding: clock, calendar: .chosenWeekStart)
+        let expected = try #require(Calendar.chosenWeekStart.date(byAdding: .day, value: 7, to: thisWeek))
+        #expect(browser.calendarDay == expected, "a week on from the clock's, not from the wall clock")
+        let today = try #require(ViewOptionCommand.commands(for: browser, in: library).first { $0.title == "Today" })
+        today.action()
+        #expect(browser.calendarDay == nil)
+    }
+
+    @Test func theGalleryOffersTheOtherCardSizes() {
+        let library = FakeItemLibrary(items: [Self.task("A", status: "todo")])
+        #expect(Self.titles(Self.browser(.gallery, in: library), library).prefix(2) == ["Small Cards", "Large Cards"])
+    }
+
+    /// The list sorts and groups as every other layout, from the starting order Settings gives.
+    @Test func theListOffersThePlacesOwnSortAndGroup() {
+        let library = FakeItemLibrary(items: [Self.task("A", status: "todo")])
+        let titles = Self.titles(Self.browser(.list, in: library), library)
+        #expect(titles.contains("Sort by Name"))
+        #expect(titles.contains("Group by Status"))
+        #expect(titles.contains("Group by Assignee: Set or Not Set"))
+        #expect(titles.contains("Ungroup"))
+        #expect(!titles.contains("Group by Edited: Day"), "the starting order's sections are already its edited date by day")
+    }
+
+    @Test func anItemPageOpenedFromATableTheBoardOrTheTimelineOffersNone() {
+        let library = FakeItemLibrary(items: [Self.task("A", status: "todo")])
+        for mode in [ItemViewMode.table, .board, .timeline] {
+            let browser = Self.browser(mode, in: library)
+            // The fixture has no date, so the timeline has nothing to offer even while it shows.
+            if mode != .timeline { #expect(!Self.titles(browser, library).isEmpty, "\(mode) while it shows") }
+            browser.selection = [ItemID("A")]
+            browser.open(browser.selection, as: .fullPage)
+            #expect(!browser.showsCollection)
+            #expect(Self.titles(browser, library).isEmpty, "\(mode) with an item page open")
+            #expect(!browser.offersViewOptions)
+        }
+    }
+}

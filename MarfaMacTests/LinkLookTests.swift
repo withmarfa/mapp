@@ -1,0 +1,83 @@
+@testable import MarfaMac
+import Foundation
+import Testing
+
+@Suite(.hangLimit)
+@MainActor struct LinkLookTests {
+    /// The names the page accepts from the app (`editor/src/link-style.ts`); it drops any other.
+    private let accepted = /^--(inkkit-link|inkkit-wiki-link|link)-[a-z-]+$/
+
+    @Test func everyVariableOfEveryLookIsOneThePageAccepts() {
+        for look in LinkLook.allCases {
+            for name in look.cssVariables().keys {
+                #expect(name.wholeMatch(of: accepted) != nil, "\(look): \(name)")
+            }
+        }
+    }
+
+    @Test func everyLookGivesEveryToneItsIconAndTintColors() {
+        for look in LinkLook.allCases {
+            let variables = look.cssVariables()
+            for tone in TypeTone.allCases {
+                #expect(variables["--link-icon-\(tone.rawValue)"] != nil, "\(look) icon \(tone)")
+                #expect(variables["--link-tint-\(tone.rawValue)"] != nil, "\(look) tint \(tone)")
+            }
+        }
+    }
+
+    @Test func onlyTheMarkAndTheTintedPillColorTheIcon() {
+        for look in LinkLook.allCases {
+            let color = look.cssVariables()["--link-icon-blue"]
+            #expect((color != "currentcolor") == (look == .mark || look == .tintedPill), "\(look)")
+        }
+    }
+
+    @Test func theIconShowsOnlyInTheLooksThatDrawOne() {
+        for look in LinkLook.allCases {
+            let hidden = look.cssVariables()["--inkkit-wiki-link-icon-display"] == "none"
+            #expect(hidden == !look.showsIcon, "\(look)")
+        }
+    }
+
+    @Test func everyPillHasTheNeutralFillForALinkWithNoKnownType() {
+        let neutral = LinkLook.pill.cssVariables()["--inkkit-wiki-link-background"]
+        #expect(neutral != nil)
+        #expect(LinkLook.tintedPill.cssVariables()["--inkkit-wiki-link-background"] == neutral)
+        #expect(LinkLook.tintedPill.cssVariables()["--inkkit-wiki-link-tint-strength"] == "100%")
+        for look in LinkLook.allCases where look != .pill && look != .tintedPill {
+            #expect(look.cssVariables()["--inkkit-wiki-link-background"] == nil, "\(look)")
+        }
+    }
+
+    @Test func aStoredLookThatIsNotOneOfTheSixIsTheMark() throws {
+        let defaults = try #require(UserDefaults(suiteName: "LinkLookTests-\(UUID().uuidString)"))
+        #expect(LinkLook.stored(in: defaults) == .mark)
+        defaults.set("neon", forKey: LinkLook.key)
+        #expect(LinkLook.stored(in: defaults) == .mark)
+        defaults.set("tintedPill", forKey: LinkLook.key)
+        #expect(LinkLook.stored(in: defaults) == .tintedPill)
+    }
+
+    @Test func everyLookShowsTheSameCueForALinkACommandClickOpens() {
+        let cue = LinkLook.mark.cssVariables().filter { $0.key.hasPrefix("--inkkit-link-") }
+        #expect(cue["--inkkit-link-hover-background"] != nil && cue["--inkkit-link-open-background"] != nil)
+        for look in LinkLook.allCases {
+            let variables = look.cssVariables()
+            #expect(variables.filter { $0.key.hasPrefix("--inkkit-link-") } == cue, "\(look)")
+            // A plain click places the caret, so no look says it opens: the pointer is Inkkit's, with Command held.
+            #expect(variables["--inkkit-wiki-link-cursor"] == nil, "\(look)")
+            #expect(variables["--inkkit-link-open-cursor"] == nil, "\(look)")
+        }
+    }
+
+    @Test func aMarkLinkHasADottedUnderlineAndAMissingOneALighterLine() {
+        let mark = LinkLook.mark.cssVariables()
+        #expect(mark["--inkkit-wiki-link-underline"] == "underline")
+        #expect(mark["--inkkit-wiki-link-underline-style"] == "dotted")
+        #expect(mark["--inkkit-wiki-link-missing-underline-style"] == "dotted")
+        #expect(mark["--inkkit-wiki-link-missing-underline-color"] != mark["--inkkit-wiki-link-underline-color"])
+        #expect(mark["--inkkit-wiki-link-hover-underline"] == nil, "Inkkit keeps the line under the pointer")
+        #expect(LinkLook.underline.cssVariables()["--inkkit-wiki-link-underline"] == "underline")
+        #expect(LinkLook.underline.cssVariables()["--inkkit-wiki-link-underline-style"] == nil)
+    }
+}

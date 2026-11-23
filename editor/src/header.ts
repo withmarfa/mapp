@@ -170,7 +170,7 @@ export interface HeaderModel {
   layoutOn?: boolean | null
   /** False where the page has no text to write, so the page draws no empty editor (`body[data-text='none']`): a
    *  collection with no text sends it. An empty editor only invites typing that a connector holding the item puts
-   *  back, and MAPP cannot tell a connector's item from the person's until Marfa marks them read only (marfa issue
+   *  back, and the app cannot tell a connector's item from the person's until Marfa marks them read only (marfa issue
    *  2415). */
   showsText: boolean
   /** "Show N More", worded by the app for the rows and for the items that are folded away. */
@@ -352,7 +352,7 @@ class LinkedSection {
 
 /** The item's title and pinned properties, drawn in the page above the item so they scroll with it as one
  *  surface. What they do is the app's: the title is saved as the item's property, and each pin opens a native
- *  menu. The header belongs to MAPP's page, not to Inkkit; do not move it back into a native overlay that follows
+ *  menu. The header belongs to the app's page, not to Inkkit; do not move it back into a native overlay that follows
  *  WebKit's scrolling.
  *
  *  Under the title the header draws the pins the app sends (`HeaderModel.pins`, at most four, each a key with its icon

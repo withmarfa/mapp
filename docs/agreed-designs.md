@@ -1,10 +1,10 @@
 # Agreed designs, not built yet
 
-Status: Agreed, not built. Each design is drawn on MAPP Pages, and the MAPP design system holds its components. When a design is built, move its section to the page for its area and delete it here.
+Status: Agreed, not built. Each design is drawn on Marfa for Mac Pages, and the Marfa for Mac design system holds its components. When a design is built, move its section to the page for its area and delete it here.
 
 Where it lives: not built yet.
 
-This page lists what has been agreed for MAPP and is not in the app yet, so the next build starts from one list. What was turned down is in [Rejected designs](rejected-designs.md).
+This page lists what has been agreed for the app and is not in the app yet, so the next build starts from one list. What was turned down is in [Rejected designs](rejected-designs.md).
 
 ## Editing in place
 
@@ -16,20 +16,20 @@ What is not built yet. The built part is in [Value components](value-components.
 
 ## Grouping, Properties and filters
 
-Agreed with August on 21 November 2026, drawn as the Next boards of MAPP Pages. The rules are in [Views and lists](views-and-lists.md#grouping-properties-and-filters); this is the list of what is not built. Filters for every field kind, relative dates, All or Any and the "is not" rewrite are built, not yet released.
+Agreed with August on 21 November 2026, drawn as the Next boards of Marfa for Mac Pages. The rules are in [Views and lists](views-and-lists.md#grouping-properties-and-filters); this is the list of what is not built. Filters for every field kind, relative dates, All or Any and the "is not" rewrite are built, not yet released.
 
 - **Grouping by Collection and Tags** in a list and a table, an item in each of its groups.
 - **A bucket's groups following the sort** where the view sorts by that date.
 - **A saved view keeps Set or Not Set and the status groups** once Marfa can hold them. Until then Save as View names them under Not Saved in the View.
 - **Dragging a board's lanes** to reorder them, which would write the group order Edit View writes.
 - **Built, not yet released:** one Properties list for a view or place, shared by every layout, replacing the table's Columns and falling back to each type's look; Edit Layouts… in the window, opening Settings > Layouts at the type; the timeline's row as agreed; filters for every field kind; All or Any in the filter row; and relative dates in filters, kept only on this Mac.
-- **Fixes:** MAPP keeping another app's group order and hidden groups, a board's cards following the sort, and no Sort on the timeline or the calendar are built, not yet released.
+- **Fixes:** the app keeping another app's group order and hidden groups, a board's cards following the sort, and no Sort on the timeline or the calendar are built, not yet released.
 
 ## Buttons
 
-Agreed with August on 22 November 2026 (MAPP Pages, Foundations F7 to F10; the design system's Button, PopUp and Settings components). The rule is in [Components](components.md#buttons); this is what the build changes.
+Agreed with August on 22 November 2026 (Marfa for Mac Pages, Foundations F7 to F10; the design system's Button, PopUp and Settings components). The rule is in [Components](components.md#buttons); this is what the build changes.
 
-- **`MappButtonStyle`:** the corner radius follows the size, a capsule at 28 points and 7-point corners at the small size, which grows from 22 to 24 points. Keyboard focus follows the shape.
+- **`AppButtonStyle`:** the corner radius follows the size, a capsule at 28 points and 7-point corners at the small size, which grows from 22 to 24 points. Keyboard focus follows the shape.
 - **Pop-up and menu buttons** are gray with no outline: two arrows for a value, one for a menu of commands.
 - **Symbols:** a gray circle on its own, such as More (…) and Add (+) at a row's end; plain on a header row and inside a banner, the toast or a chip. A symbol scales with its button's size and is never semibold, the menu chevron included.
 - **Search fields** are the system's: white, with a hairline edge, a capsule.
@@ -44,23 +44,23 @@ Agreed with August on 22 November 2026 (MAPP Pages, Foundations F7 to F10; the d
 
 ## Settings
 
-Agreed with August on 19 and 20 November 2026. The pages are drawn on the Settings tab of MAPP Pages, and the design system holds every part (`SettingsWindow` and the components it uses). This section lists the rules and what each page holds. In the copy below, `<Marfa>` stands for the Marfa's own name.
+Agreed with August on 19 and 20 November 2026. The pages are drawn on the Settings tab of Marfa for Mac Pages, and the design system holds every part (`SettingsWindow` and the components it uses). This section lists the rules and what each page holds. In the copy below, `<Marfa>` stands for the Marfa's own name.
 
 ### General rules
 
 The rules that are built (the window, the toolbar, rows, sections, changing things, numbers, problems and errors, buttons, tables, words and named values) are in [Views and lists](views-and-lists.md#settings). One is not built yet:
 
-- **A synced folder's page** shows what it holds as a tree of its folders, counted in files, which MAPP builds from the server's paths. Not built: the package's client offers no call for a folder's settings or paths (see [The Marfa's half of Settings](marfa-settings.md#left-out)).
-- **Not now:** custom CSS, plugins for MAPP itself, AI providers and Vim keys. Themes come later; every color and font is already a named value.
+- **A synced folder's page** shows what it holds as a tree of its folders, counted in files, which the app builds from the server's paths. Not built: the package's client offers no call for a folder's settings or paths (see [The Marfa's half of Settings](marfa-settings.md#left-out)).
+- **Not now:** custom CSS, plugins for the app itself, AI providers and Vim keys. Themes come later; every color and font is already a named value.
 
-### MAPP's pages
+### App pages
 
 Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Layouts and Search; On This Mac and Connection. There is no Advanced page, and Settings > Sidebar stays gone.
 
 - **General and Appearance** are built: see [Settings pages](settings.md).
 - **Keyboard** is built: see [Keyboard shortcuts](keyboard-shortcuts.md).
 - **Editor, Lists and Layouts** are built: see [Settings pages](settings.md).
-- **Search, On This Mac and Connection** are built: see [Settings pages](settings.md). Agreed but not built: On This Mac's **Export Automatically** ("To a folder you choose", with Never as the default), a row in the Export section under Export Everything. MAPP has no scheduler, and keeping a chosen folder across launches needs a saved folder permission that MAPP does not keep yet. Connection gets the "MAPP's Settings" section described under sync below once that is built.
+- **Search, On This Mac and Connection** are built: see [Settings pages](settings.md). Agreed but not built: On This Mac's **Export Automatically** ("To a folder you choose", with Never as the default), a row in the Export section under Export Everything. The app has no scheduler, and keeping a chosen folder across launches needs a saved folder permission that the app does not keep yet. Connection gets the "This app's Settings" section described under sync below once that is built.
 
 ### The Marfa's pages
 
@@ -72,7 +72,7 @@ Only the agreed changes are listed. A change marked "needs a server change" wait
 
 ### Settings sync through Marfa
 
-Built: MAPP's settings are kept in one hidden item per Marfa, shown and removed in Connection's MAPP's Settings section, and removed with the Disconnect alert's checkbox. [Settings storage](settings-storage.md) says what is true. Export and Import of settings between two Marfas are not built.
+Built: this app's settings are kept in one hidden item per Marfa, shown and removed in Connection's This App's Settings section, and removed with the Disconnect alert's checkbox. [Settings storage](settings-storage.md) says what is true. Export and Import of settings between two Marfas are not built.
 
 ## Still open
 

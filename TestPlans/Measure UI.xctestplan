@@ -17,9 +17,9 @@
         "SpeedMeasureTests"
       ],
       "target" : {
-        "containerPath" : "container:MAPP.xcodeproj",
+        "containerPath" : "container:MarfaMac.xcodeproj",
         "identifier" : "3303FE323066ED47005D07A2",
-        "name" : "MAPPUITests"
+        "name" : "MarfaMacUITests"
       }
     }
   ],

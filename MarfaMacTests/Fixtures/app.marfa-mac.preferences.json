@@ -1,0 +1,126 @@
+{
+  "id": "app.marfa-mac.preferences",
+  "version": 1,
+  "label": "Marfa for Mac Settings",
+  "plural": "Marfa for Mac Settings",
+  "description": "The app's own settings for this Marfa, which every Mac that connects to it uses.",
+  "fields": {
+    "appearance": {
+      "type": "object",
+      "description": "The app's Appearance settings, by the key the app keeps each under."
+    },
+    "general": {
+      "type": "object",
+      "description": "The app's General settings, by the key the app keeps each under."
+    },
+    "editor": {
+      "type": "object",
+      "description": "The app's Editor settings, by the key the app keeps each under."
+    },
+    "lists": {
+      "type": "object",
+      "description": "The app's Lists settings, by the key the app keeps each under."
+    },
+    "search": {
+      "type": "object",
+      "description": "The app's Search settings, by the key the app keeps each under."
+    }
+  },
+  "tables": {
+    "commands": {
+      "description": "A shortcut for each menu command, and the shortcuts that work in any app.",
+      "columns": {
+        "key": {
+          "type": "string",
+          "required": true,
+          "description": "What the row is for: a command, a type, a view, a place or a part of the sidebar."
+        },
+        "setting": {
+          "type": "string",
+          "required": true,
+          "description": "Which of this app's settings the row holds."
+        },
+        "value": {
+          "type": "string",
+          "description": "The setting's value, as the JSON text the app stores."
+        }
+      }
+    },
+    "types": {
+      "description": "What each type's page shows, its look and whether its list includes its subtypes.",
+      "columns": {
+        "key": {
+          "type": "string",
+          "required": true,
+          "description": "What the row is for: a command, a type, a view, a place or a part of the sidebar."
+        },
+        "setting": {
+          "type": "string",
+          "required": true,
+          "description": "Which of this app's settings the row holds."
+        },
+        "value": {
+          "type": "string",
+          "description": "The setting's value, as the JSON text the app stores."
+        }
+      }
+    },
+    "views": {
+      "description": "What the app shows of each saved view on every Mac.",
+      "columns": {
+        "key": {
+          "type": "string",
+          "required": true,
+          "description": "What the row is for: a command, a type, a view, a place or a part of the sidebar."
+        },
+        "setting": {
+          "type": "string",
+          "required": true,
+          "description": "Which of this app's settings the row holds."
+        },
+        "value": {
+          "type": "string",
+          "description": "The setting's value, as the JSON text the app stores."
+        }
+      }
+    },
+    "places": {
+      "description": "The default view, density, tab and order of each place.",
+      "columns": {
+        "key": {
+          "type": "string",
+          "required": true,
+          "description": "What the row is for: a command, a type, a view, a place or a part of the sidebar."
+        },
+        "setting": {
+          "type": "string",
+          "required": true,
+          "description": "Which of this app's settings the row holds."
+        },
+        "value": {
+          "type": "string",
+          "description": "The setting's value, as the JSON text the app stores."
+        }
+      }
+    },
+    "sidebar": {
+      "description": "The sidebar's tabs, sections, order, hidden places and colors.",
+      "columns": {
+        "key": {
+          "type": "string",
+          "required": true,
+          "description": "What the row is for: a command, a type, a view, a place or a part of the sidebar."
+        },
+        "setting": {
+          "type": "string",
+          "required": true,
+          "description": "Which of this app's settings the row holds."
+        },
+        "value": {
+          "type": "string",
+          "description": "The setting's value, as the JSON text the app stores."
+        }
+      }
+    }
+  }
+}

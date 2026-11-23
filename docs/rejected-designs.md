@@ -2,7 +2,7 @@
 
 Status: Reference. Each design below was drawn and turned down.
 
-Where it lives: this page records choices that have no code to show for them. The pages it links to describe what MAPP does instead.
+Where it lives: this page records choices that have no code to show for them. The pages it links to describe what the app does instead.
 
 Do not try one of these again in the same form. If a new case needs one, say what is different and ask first.
 
@@ -54,7 +54,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **A board without its columns.**
 - **An agenda narrowed to a column.** The timeline uses the window's width.
 - **A thumbnail column of a new kind beside a document.**
-- **A flat, squared or hand-drawn segmented control.** MAPP uses the system's, and the corner's choices (Week or Month, Reader or Original) are the same shape in Liquid Glass. See [Views and lists](views-and-lists.md).
+- **A flat, squared or hand-drawn segmented control.** the app uses the system's, and the corner's choices (Week or Month, Reader or Original) are the same shape in Liquid Glass. See [Views and lists](views-and-lists.md).
 - **A separate filter button in the list toolbar.** Filters live in the row above the list. An index page is the exception: Filter at its tabs' end shows or hides that row.
 - **Items grouped by date by default, or as sections that open, shelves, a card for each section, a digest for each period, or grouped by type.** Items is a table, for now.
 - **Filled cards for an index page's groups.**
@@ -72,7 +72,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **Sheets and alerts placed under the toolbar**, AppKit's default sheet position (August, 20 November 2026). They sit in the middle of the window.
 - **A blue focus ring.** Keyboard focus is a gray ring.
 - **A solid red destructive button.** It is a pale red fill with red text.
-- **MAPP's own alert.** MAPP uses Apple's.
+- **the app's own alert.** the app uses Apple's.
 - **A toast at the top of the page.** It rises at the bottom of the window.
 
 ## Selection
@@ -90,7 +90,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **Handles at the leading edge, beside the marks.** They sit at each row's trailing edge.
 - **A view's mark as a round tinted tile.** It is the view's symbol in its own color.
 - **Settings taking over the main window's sidebar**, with a way back and a search field, and a sidebar as wide as Codex's. Settings is a window of its own.
-- **A sidebar, search field or buttons that MAPP draws itself in Settings**, to match a board. Settings uses the system's own controls (August, 21 November 2026).
+- **A sidebar, search field or buttons that the app draws itself in Settings**, to match a board. Settings uses the system's own controls (August, 21 November 2026).
 - **Keyboard's search in the toolbar, or as a glass field.** It is a short field at the trailing end above the cards.
 - **Descriptions of three lines or more in Settings.** One line, two at most.
 - **Gray cards in Settings**, as System Settings draws them. Cards are white with a hairline.
@@ -119,7 +119,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **Small, Medium and Large as segments in the corner.** The size is one control, named, with a menu.
 - **Separate Zoom In, Zoom Out and Fit buttons.** Zoom is one control with a menu.
 - **"Page 3 of 12".** It reads "3 of 12".
-- **A Format panel copied from the iPhone's Notes.** MAPP's own formats, from its Format menu, in one bar opened from Aa.
+- **A Format panel copied from the iPhone's Notes.** the app's own formats, from its Format menu, in one bar opened from Aa.
 - **An item's page sliding in over the list from the right (a side peek).** An item opens in a modal, a full page or a window.
 - **A back button labeled with the place, such as "‹ Items", or a path such as Items › name**, for now. Back has no label.
 - **Focus that hides the sidebar and the list.** Focus hides only the title and the properties.

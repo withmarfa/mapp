@@ -100,7 +100,7 @@ if (
   !pictureIcon
 )
   throw new Error('editor root missing')
-const labels = splitLabels((window as unknown as { mappLabels?: AppLabels }).mappLabels ?? {})
+const labels = splitLabels((window as unknown as { marfaLabels?: AppLabels }).marfaLabels ?? {})
 
 const editor = await ItemEditor.mount(
   root,
