@@ -4,7 +4,7 @@
 
 ## Structure
 
-- `MarfaSource` is the `ItemSource` over the copy. Views draw from the copy offline; a row count it cannot answer needs the server. Writes go to the copy's queue at once. `MarfaLibrary` changes nothing itself; every write goes to the source.
+- `MarfaSource` is the `ItemSource` over the copy. Views draw from the copy offline; a row count it cannot answer needs the server. `MarfaLibrary` changes nothing itself; every write goes to the source.
 - Only `MarfaEngine` changes the source's contents. `MarfaSync` consumes `WorkingCopy.updates()`, waits for the engine's reads, sends queued writes and fetches kept files. The package owns retries, fill progress, connection state and the last sync time; a new one refreshes table row counts. Each transition to `.needsHydration`, including one from `.offline`, hydrates the copy. A fault stops hydration, offering Refresh.
 - The copy is the record. The engine holds the raw rows and edges, `MarfaHub` what readers were told, and `MarfaLibrary.records` the main actor's copy, the source of `MarfaItemIndex`.
 - Do not use the package's `LiveQuery`: the engine reads what the copy names as changed since its cursor (`readChanged`), on one ordered stream. An update says only what kind of read is wanted; the first of a stream is read from the cursor.
@@ -32,9 +32,9 @@
 
 ## Text and versions
 
-- Every save names the version of the text it was typed on. Only the first save typed on a version is merged against it (`BodyMerge.asRead`); later saves follow the person's own (`.following`), so saves never conflict with each other or overwrite text the person did not see. Do not replace this with last-writer-wins.
+- Every save names the version of the text it was typed on. Only the first save sent on a version is merged against it (`BodyMerge.asRead`); later ones follow the person's own (`.following`), so saves never conflict with each other or overwrite text the person never saw. Do not replace this with last-writer-wins.
 - Text read before the server answered this device's create is at version 0; an edit on it goes on version 1 (`MarfaEngine.version(read:holding:)`), never the copy's version.
-- `MarfaLibrary` holds the text the person typed until the source answers it, since a read that raced the write is older.
+- `MarfaLibrary` coalesces typing (`TextPause`): held at once and until answered, as a raced read is older; sent after a pause or at a hand-over, leaving none waiting.
 - An Undo or Redo the copy refuses while catching up is held (`MarfaEngine+Holding`) and made only if what it touches is as it was when it was pressed; otherwise none of the step is made and the person is told. A held write never overwrites newer text and never waits without end.
 - Where the server keeps its text over the person's, the page shows the server's and says the person's changes went to a copy.
 - A restore writes only the title and the text, through the ordinary edit path on the version the library holds.

@@ -116,6 +116,8 @@ import Observation
     /// as it holds unsettled text; only the write waits.
     @ObservationIgnored private var waitingText: [ItemID: WaitingText] = [:]
     @ObservationIgnored let textPause: TextPause
+    /// Whether the source has said its last, so nothing typed waits for a source that will take no write.
+    @ObservationIgnored private var sourceEnded = false
     /// Links removed only once the source has taken the links added in their place, by the link writes awaited.
     @ObservationIgnored private var replacements: [UUID: Replacement] = [:]
     @ObservationIgnored private var replacing: [WriteID: UUID] = [:]
@@ -293,7 +295,8 @@ import Observation
                     guard let self else { return }
                     await take(change)
                 }
-                // The source has closed, so text still waiting goes back to the person rather than to no queue.
+                // The source has closed, so text still waiting, and any typed after, goes back to the person at once.
+                self?.sourceEnded = true
                 self?.sendWaitingText()
                 // Nothing more will be taken or answered, so no change waits for it.
                 self?.endWaits()
@@ -320,7 +323,6 @@ import Observation
 
     isolated deinit {
         for task in following { task.cancel() }
-        for waiting in waitingText.values { waiting.timer?.cancel() }
     }
 
     var reachesServer: Bool { connection == .online }
@@ -853,7 +855,7 @@ import Observation
     func takeTyped(_ text: String, of id: ItemID, readAt typedOn: ItemVersion, failing title: String) {
         let held = heldVersion(of: id)
         let readAt = ItemVersion(MarfaEngine.version(read: typedOn.rawValue, holding: held.rawValue))
-        guard readAt == held else { return saveText(text, of: id, readAt: typedOn, failing: title) }
+        guard readAt == held, !sourceEnded else { return saveText(text, of: id, readAt: typedOn, failing: title) }
         if let waiting = waitingText[id], waiting.readAt != readAt { sendWaitingText(of: id) }
         if unsettledText[id] == nil, sourceText[id] == nil { sourceText[id] = records[id]?.body }
         if unsettledText[id] == nil, let copy = sourceText[id], copy.text == text {
@@ -906,13 +908,15 @@ import Observation
         }
     }
 
-    /// One wake per waiting text: typing again only moves `last`, which this reads when it wakes.
+    /// One wake per waiting text: typing again only moves `last`, which this reads when it wakes. The wake keeps the
+    /// library until the text is sent, so a library let go without `finish` still sends it; a closing source sends
+    /// every text that waits, which cancels the wakes.
     private func schedule(_ id: ItemID, at due: ContinuousClock.Instant) {
         waitingText[id]?.timer?.cancel()
-        waitingText[id]?.timer = Task { [weak self] in
+        waitingText[id]?.timer = Task {
             try? await Task.sleep(until: due)
             guard !Task.isCancelled else { return }
-            self?.waitEnded(id)
+            waitEnded(id)
         }
     }
 

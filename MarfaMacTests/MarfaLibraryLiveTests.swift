@@ -171,6 +171,7 @@ extension LiveMarfaTests {
 
                 // Text: held at once, and the copy's own once the server has answered.
                 library.updateBody(of: child, to: "Edited \(token) text.")
+                library.sendWaitingText()
                 #expect(library.body(of: child)?.text == "Edited \(token) text.")
                 await source.flush()
                 #expect(try await source.body(of: child).text == "Edited \(token) text.")
@@ -335,6 +336,7 @@ extension LiveMarfaTests {
 
                 // A link to the target, and to a name nothing answers to.
                 library.updateBody(of: host, to: "See [[\(targetTitle)]] and [[MARFAMACTEST nowhere \(token)]].")
+                library.sendWaitingText()
                 await source.flush()
                 try #require(await eventually {
                     library.relationships(for: target).first { $0.field == "inverse:references" }?.targets.map(\.itemID) == [host]
@@ -345,6 +347,7 @@ extension LiveMarfaTests {
 
                 // Taking the link out of the text takes the edge out.
                 library.updateBody(of: host, to: "Nothing again.")
+                library.sendWaitingText()
                 await source.flush()
                 try #require(await eventually {
                     library.relationships(for: target).first { $0.field == "inverse:references" }?.targets.isEmpty ?? true
@@ -357,6 +360,7 @@ extension LiveMarfaTests {
                 let embed = try #require(report.embeds.first, "\(report.failed)")
                 #expect(embed.name == "MARFAMACTEST attachment \(token).png")
                 library.updateBody(of: host, to: "A picture: ![\(embed.name)](\(embed.link))")
+                library.sendWaitingText()
                 await source.flush()
                 try #require(await eventually {
                     library.relationships(for: host).first { $0.field == "inverse:attached-to" }?.targets.count == 1
