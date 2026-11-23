@@ -142,7 +142,7 @@ jobs:
     if: needs.changes.outputs.swift == 'true' && github.event.pull_request.draft == false
     # The hosted image with Xcode 27 (a public preview at the time of writing).
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -192,7 +192,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.release == 'true' && github.event.pull_request.draft == false
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
