@@ -44,6 +44,10 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         }
     }
 
+    func delete(_ type: String) async throws(TypeFailure) {
+        try await run { client in try await client.delete(itemType: type) }
+    }
+
     // MARK: Reading
 
     static func record(_ listed: TypeDefinitionEdit.Listed) -> TypeRecord {
@@ -58,7 +62,7 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         let fields = own.fields.additionalProperties.map { key, field in
             TypeFieldRecord(
                 key: key, label: field.label, kind: field._type.rawValue, meaning: field.description, isRequired: field.required ?? false,
-                isSearchable: field.searchable ?? true, longest: field.maxLength,
+                isSearchable: field.searchable ?? true, longest: field.maxLength, choices: field.enumValues ?? [],
                 statusWords: (field.statusValues ?? []).map {
                     StatusWordRecord(value: $0.value, group: $0.group.rawValue, meaning: $0.description)
                 })
@@ -67,7 +71,9 @@ nonisolated struct ServerTypeCalls: TypeCalls {
             id: own.id, label: own.label ?? own.id, plural: own.plural, description: own.description, guidance: own.guidance,
             parent: own.parent, origin: origin,
             plugin: listed.value2.provenance.plugin.map { .init(name: $0.name, version: $0.version) },
-            icon: own.displayHints?.icon, fields: Dictionary(uniqueKeysWithValues: fields.map { ($0.key, $0) }))
+            icon: own.displayHints?.icon, fields: Dictionary(uniqueKeysWithValues: fields.map { ($0.key, $0) }),
+            feedWindow: own.retentionPolicy?.feedDays.map { $0.value.map { .days(Int($0)) } ?? .never },
+            mergeStrategy: own.mergePolicy?._default?.rawValue)
     }
 
     static func change(_ edit: TypeEdit) -> TypeDefinitionEdit.TypeChange {
@@ -78,6 +84,11 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         case .parent(let id): .parent(id)
         case .addWord(let group, let value): .addWord(group: group, value: value)
         case .wordMeaning(let value, let text): .wordMeaning(value: value, text: text)
+        case .addField(let key, let label, let kind, let choices): .addField(key: key, label: label, kind: kind, choices: choices)
+        case .field(let key, let change): .field(key: key, change)
+        case .removeField(let key): .removeField(key: key)
+        case .feedWindow(let window): .feedWindow(window)
+        case .mergeStrategy(let name): .mergeStrategy(name)
         }
     }
 
@@ -114,6 +125,11 @@ nonisolated struct ServerTypeCalls: TypeCalls {
             case .validation(let code, let message, let details, let server) where code == "invalid_schema":
                 let first = (details ?? server?.details)?.object?["errors"]?.array?.first?.object
                 return .invalid(field: first?["field"]?.string, message: first?["message"]?.string ?? message)
+            case .server(let status, let code, _, let details, let server) where status == 409 && code == "type_in_use":
+                let object = (details ?? server?.details)?.object
+                return .inUse(items: object?["item_count"]?.number.map { Int($0) }, settings: object?["settings"]?.array?.count ?? 0)
+            case .server(let status, let code, _, let details, let server) where status == 409 && code == "type_has_subtypes":
+                return .hasSubtypes((details ?? server?.details)?.object?["subtype_ids"]?.array?.compactMap(\.string) ?? [])
             case .forbidden(_, _, let server):
                 let changes = server?.details?.object?["changes"]?.array?.compactMap(\.string) ?? []
                 if changes.contains("guidance") { return .guidanceByApp }

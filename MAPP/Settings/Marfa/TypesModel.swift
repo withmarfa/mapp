@@ -23,6 +23,7 @@ struct TypeAccess {
     /// What a refusal can be about on a type's page.
     enum Field: Hashable {
         case name, plural, description, basedOn, word, meaning, newType
+        case fieldName, fieldMeaning, fieldLongest, fieldRule, fieldSearchable, fieldRemove, choice, newField, feed, merge
     }
 
     /// The four groups a status word sits in, in the order of a piece of work's life.
@@ -34,6 +35,7 @@ struct TypeAccess {
     static let descriptionLimit = 200
     static let guidanceLimit = 1000
     static let wordMeaningLimit = 120
+    static let fieldMeaningLimit = 300
 
     private let context: OwnerContext
     private let calls: any TypeCalls
@@ -62,6 +64,25 @@ struct TypeAccess {
     private(set) var meaningWord: String?
     var meaningDraft = ""
     private(set) var isSavingMeaning = false
+
+    // The open field's page and the sheets that make or rename a field.
+    private(set) var openFieldKey: String?
+    var fieldMeaning = ""
+    var fieldLongest = ""
+    private(set) var isAddingChoice = false
+    var choiceDraft = ""
+    private(set) var isAddingField = false
+    var newFieldName = ""
+    var newFieldKind = FieldKind.text
+    var newFieldChoices = ""
+    private(set) var isRenamingField = false
+    var fieldNameDraft = ""
+
+    // Deleting the open type.
+    private(set) var isDeleting = false
+    private(set) var deleteFailure: String?
+    /// The type that was deleted, so the page can leave it.
+    private(set) var deleted: String?
 
     // The sheet that makes a child type.
     private(set) var isMakingChild = false
@@ -121,6 +142,7 @@ struct TypeAccess {
         case .pluginType: .refused(String(localized: "This type belongs to a plugin, so it can only change with the plugin."))
         case .changedOnServer: .conflict
         case .guidanceByApp: .refused(String(localized: "Guidance is written by the owner, not by an app."))
+        case .inUse, .hasSubtypes: .conflict
         }
     }
 
@@ -196,7 +218,7 @@ struct TypeAccess {
     /// The line under a type's name on its own page.
     func headLine(of type: TypeRecord) -> String {
         let items = count(of: type.id)
-        let held = String(localized: "\(items) items.")
+        let held = String(AttributedString(localized: "^[\(items) item](inflect: true).").characters)
         switch type.origin {
         case .platform: return String(localized: "Built into Marfa. ") + held
         case .plugin:
@@ -222,6 +244,8 @@ struct TypeAccess {
             wordDraft = ""
             meaningWord = nil
             queuedText = [:]
+            openFieldKey = nil
+            deleteFailure = nil
             Task { await loadReading(of: id) }
         }
         if draftedID != id, let type = record(id) {
@@ -385,7 +409,7 @@ struct TypeAccess {
     /// Makes `edit` on the server and reads the types again. Answers whether the server took it; on a refusal what was typed
     /// stays and the field it is about says why. `kept` runs once the change has landed, before the queue's end.
     @discardableResult
-    private func apply(_ edit: TypeEdit, to id: String, field: Field, kept: @MainActor () -> Void = {}) async -> Bool {
+    func apply(_ edit: TypeEdit, to id: String, field: Field, kept: @MainActor () -> Void = {}) async -> Bool {
         fieldErrors[field] = nil
         pageFailure = nil
         return await enqueue(kept: kept) { await self.send(edit, to: id, field: field) }
@@ -431,7 +455,7 @@ struct TypeAccess {
     private func refused(_ error: TypeFailure, field: Field) async {
         switch error {
         case .invalid(let path, let message):
-            let named = Self.field(named: path)
+            let named = field == .newField ? nil : Self.field(named: path)
             let target = named ?? field
             fieldErrors[target] = Self.isLengthRule(message) ? Self.line(for: target) ?? message : message
         case .changedOnServer:
@@ -440,7 +464,7 @@ struct TypeAccess {
         case .owner(let failure):
             pageFailure = failure
             await context.learn(from: failure)
-        case .pluginType, .guidanceByApp:
+        case .pluginType, .guidanceByApp, .inUse, .hasSubtypes:
             pageFailure = Self.owner(error)
         }
     }
@@ -459,7 +483,10 @@ struct TypeAccess {
         case .description: String(localized: "A description can be \(descriptionLimit) characters at most.")
         case .meaning: String(localized: "What a word means can be \(wordMeaningLimit) characters at most.")
         case .word: String(localized: "A status word starts with a letter, then letters, numbers and spaces.")
-        case .basedOn, .newType: nil
+        case .fieldName: String(localized: "A field’s name can be 100 characters at most.")
+        case .fieldMeaning: String(localized: "What a field means can be \(fieldMeaningLimit) characters at most.")
+        case .fieldLongest: String(localized: "The longest a field can be is a whole number of at least 1.")
+        case .basedOn, .newType, .newField, .fieldRule, .fieldSearchable, .fieldRemove, .choice, .feed, .merge: nil
         }
     }
 
@@ -467,6 +494,14 @@ struct TypeAccess {
     static func field(named path: String?) -> Field? {
         guard let path else { return nil }
         if path.contains("status_values") { return path.hasSuffix("description") ? .meaning : .word }
+        if path.hasPrefix("fields.") {
+            if path.hasSuffix(".description") { return .fieldMeaning }
+            if path.hasSuffix(".label") { return .fieldName }
+            if path.hasSuffix(".max_length") { return .fieldLongest }
+            if path.hasSuffix(".enum_values") { return .choice }
+        }
+        if path.hasPrefix("retention_policy") { return .feed }
+        if path.hasPrefix("merge_policy") { return .merge }
         switch path {
         case "label": return .name
         case "plural": return .plural
@@ -493,9 +528,306 @@ struct TypeAccess {
         case .name: name = type.label
         case .plural: plural = type.plural ?? ""
         case .description: descriptionText = type.description ?? ""
+        case .fieldMeaning, .fieldLongest, .fieldName, .fieldRule, .fieldSearchable: syncFieldDrafts()
         default: break
         }
     }
+
+    // MARK: Fields
+
+    /// The fields the open type declares itself and the owner can change: those no type above declares. A field a child
+    /// redeclares to add words is the parent's.
+    func ownFields(of id: String) -> [TypeFieldRecord] {
+        guard let type = record(id), isEditable(type) else { return [] }
+        let above = Set(chain(of: id).dropLast().flatMap { $0.fields.keys })
+        return type.fields.values.filter { !above.contains($0.key) }.sorted(by: Self.byName)
+    }
+
+    /// The fields a type above gives, which the type's page shows locked.
+    func inheritedFields(of id: String) -> [TypeFieldRecord] {
+        let own = Set(ownFields(of: id).map(\.key))
+        return fields(of: id).filter { !own.contains($0.key) }
+    }
+
+    private static func byName(_ lhs: TypeFieldRecord, _ rhs: TypeFieldRecord) -> Bool {
+        (lhs.label ?? lhs.key).localizedStandardCompare(rhs.label ?? rhs.key) == .orderedAscending
+    }
+
+    func ownField(_ key: String, of id: String) -> TypeFieldRecord? { ownFields(of: id).first { $0.key == key } }
+
+    /// What a field is called for people: its label, else its name written for reading.
+    static func title(of field: TypeFieldRecord) -> String { field.label ?? title(ofWord: field.key) }
+
+    /// Opens a field's page, its drafts what the server holds.
+    func openField(_ key: String, of id: String) {
+        open(id)
+        guard openFieldKey != key else { return }
+        openFieldKey = key
+        isAddingChoice = false
+        choiceDraft = ""
+        fieldErrors[.fieldMeaning] = nil
+        fieldErrors[.fieldLongest] = nil
+        fieldErrors[.choice] = nil
+        syncFieldDrafts()
+    }
+
+    func closeField() {
+        openFieldKey = nil
+        isAddingChoice = false
+    }
+
+    private func syncFieldDrafts() {
+        guard let id = openID, let key = openFieldKey, let field = ownField(key, of: id) else { return }
+        fieldMeaning = field.meaning ?? ""
+        fieldLongest = field.longest.map(String.init) ?? ""
+    }
+
+    /// The line under a field in the list: its kind, and that it is required.
+    func line(of field: TypeFieldRecord) -> String {
+        let kind = FieldKind.title(ofKind: field.kind)
+        return field.isRequired ? String(localized: "\(kind), required.") : String(localized: "\(kind).")
+    }
+
+    func commitFieldMeaning() async {
+        guard let id = openID, let key = openFieldKey, let field = ownField(key, of: id) else { return }
+        let text = fieldMeaning.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text != (field.meaning ?? "") else { return }
+        await apply(.field(key: key, .meaning(text)), to: id, field: .fieldMeaning)
+    }
+
+    func setRequired(_ on: Bool) async {
+        guard let id = openID, let key = openFieldKey else { return }
+        await apply(.field(key: key, .required(on)), to: id, field: .fieldRule)
+    }
+
+    func setSearchable(_ on: Bool) async {
+        guard let id = openID, let key = openFieldKey else { return }
+        await apply(.field(key: key, .searchable(on)), to: id, field: .fieldSearchable)
+    }
+
+    /// Sets how long a text field can be, or with nothing typed takes the limit away.
+    func commitLongest() async {
+        guard let id = openID, let key = openFieldKey, let field = ownField(key, of: id) else { return }
+        let text = fieldLongest.trimmingCharacters(in: .whitespacesAndNewlines)
+        let limit: Int?
+        if text.isEmpty {
+            limit = nil
+        } else if let number = Int(text), number >= 1 {
+            limit = number
+        } else {
+            fieldErrors[.fieldLongest] = Self.line(for: .fieldLongest)
+            return
+        }
+        guard limit != field.longest else { return }
+        await apply(.field(key: key, .longest(limit)), to: id, field: .fieldLongest)
+    }
+
+    func beginChoice() {
+        fieldErrors[.choice] = nil
+        isAddingChoice = true
+        choiceDraft = ""
+    }
+
+    func cancelChoice() {
+        isAddingChoice = false
+        choiceDraft = ""
+        fieldErrors[.choice] = nil
+    }
+
+    /// Adds the typed choice after the ones the field offers. A choice is never renamed: an item keeps the word it holds.
+    func commitChoice() async {
+        guard let id = openID, let key = openFieldKey, let field = ownField(key, of: id) else { return }
+        let word = choiceDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !word.isEmpty else { return cancelChoice() }
+        guard !field.choices.contains(word) else {
+            fieldErrors[.choice] = String(localized: "“\(word)” is already a choice.")
+            return
+        }
+        if await apply(.field(key: key, .addChoice(word)), to: id, field: .choice) { cancelChoice() }
+    }
+
+    func removeChoice(_ word: String) async {
+        guard let id = openID, let key = openFieldKey, let field = ownField(key, of: id) else { return }
+        guard field.choices.count > 1 else {
+            fieldErrors[.choice] = String(localized: "A choice field needs at least one choice.")
+            return
+        }
+        await apply(.field(key: key, .removeChoice(word)), to: id, field: .choice)
+    }
+
+    // The sheet that renames a field.
+
+    func beginRename() {
+        guard let id = openID, let key = openFieldKey, let field = ownField(key, of: id) else { return }
+        fieldNameDraft = Self.title(of: field)
+        fieldErrors[.fieldName] = nil
+        isRenamingField = true
+    }
+
+    func cancelRename() {
+        guard !isWorking else { return }
+        isRenamingField = false
+        fieldErrors[.fieldName] = nil
+    }
+
+    /// Changes the name people read. The field's own name stays, since items hold their values under it.
+    func commitRename() async {
+        guard let id = openID, let key = openFieldKey else { return }
+        let text = fieldNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            fieldErrors[.fieldName] = String(localized: "A field needs a name.")
+            return
+        }
+        let clash = fields(of: id).contains { $0.key != key && Self.title(of: $0).compare(text, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }
+        guard !clash else {
+            fieldErrors[.fieldName] = String(localized: "This type already has a field named “\(text)”.")
+            return
+        }
+        if await apply(.field(key: key, .label(text)), to: id, field: .fieldName) { isRenamingField = false }
+    }
+
+    // The sheet that adds a field.
+
+    func beginField() {
+        newFieldName = ""
+        newFieldKind = .text
+        newFieldChoices = ""
+        fieldErrors[.newField] = nil
+        isAddingField = true
+    }
+
+    func cancelField() {
+        guard !isWorking else { return }
+        isAddingField = false
+        fieldErrors[.newField] = nil
+    }
+
+    var trimmedFieldName: String { newFieldName.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// The choices typed for a new choice field, one for each comma or line, without blanks or repeats.
+    var typedChoices: [String] {
+        var seen: Set<String> = []
+        return newFieldChoices.split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    var canMakeField: Bool { !trimmedFieldName.isEmpty && (newFieldKind != .choice || !typedChoices.isEmpty) }
+
+    /// The name a new field gets on the server, made from what was typed and different from every field the type holds.
+    func key(forNamed text: String, in id: String) -> String {
+        let slug = Self.slug(of: text, prefix: "field_")
+        let held = Set(fields(of: id).map(\.key))
+        var key = slug
+        var number = 2
+        while held.contains(key) {
+            key = "\(slug)_\(number)"
+            number += 1
+        }
+        return key
+    }
+
+    func makeField() async {
+        guard canMakeField, let id = openID else { return }
+        let name = trimmedFieldName
+        let clash = fields(of: id).contains { Self.title(of: $0).compare(name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }
+        guard !clash else {
+            fieldErrors[.newField] = String(localized: "This type already has a field named “\(name)”.")
+            return
+        }
+        let edit = TypeEdit.addField(key: key(forNamed: name, in: id), label: name, kind: newFieldKind, choices: typedChoices)
+        if await apply(edit, to: id, field: .newField) { isAddingField = false }
+    }
+
+    // MARK: Rules
+
+    /// What the type's page offers for how long feed items stay: the days offered, and the type's own window if it is another.
+    func feedWindows(for id: String) -> [FeedWindow] {
+        var windows: [FeedWindow] = [7, 30, 90, 365].map { .days($0) }
+        if case .days(let own)? = record(id)?.feedWindow, !windows.contains(.days(own)) {
+            windows.append(.days(own))
+            windows.sort { Self.rank($0) < Self.rank($1) }
+        }
+        return [.never] + windows
+    }
+
+    private static func rank(_ window: FeedWindow) -> Int {
+        if case .days(let days) = window { days } else { Int.max }
+    }
+
+    /// The window the type's page shows chosen: its own, else (where no type above gives one) that Marfa keeps feed items.
+    func feedSelection(of id: String) -> FeedWindow? {
+        guard let type = record(id) else { return nil }
+        if let own = type.feedWindow { return own }
+        return hasParent(type) ? nil : .never
+    }
+
+    func mergeSelection(of id: String) -> String? {
+        guard let type = record(id) else { return nil }
+        if let own = type.mergeStrategy { return own }
+        return hasParent(type) ? nil : "last_writer_wins"
+    }
+
+    func hasParent(_ type: TypeRecord) -> Bool { type.parent.flatMap(record) != nil }
+
+    func setFeedWindow(_ window: FeedWindow?, of id: String) async {
+        guard let type = record(id), isEditable(type), window != feedSelection(of: id) else { return }
+        await apply(.feedWindow(window), to: id, field: .feed)
+    }
+
+    func setMergeStrategy(_ name: String?, of id: String) async {
+        guard let type = record(id), isEditable(type), name != mergeSelection(of: id) else { return }
+        await apply(.mergeStrategy(name), to: id, field: .merge)
+    }
+
+    // MARK: Removing
+
+    /// Removes the open field. Each item keeps the value it holds under the field's name (`types/field-removed`).
+    func removeField() async {
+        guard let id = openID, let key = openFieldKey else { return }
+        if await apply(.removeField(key: key), to: id, field: .fieldRemove) { openFieldKey = nil }
+    }
+
+    /// Deletes the open type, which Marfa allows only while no item and no other type holds it. Its refusal is told in words.
+    func deleteType() async {
+        guard let id = openID, let type = record(id), isEditable(type), !isDeleting else { return }
+        isDeleting = true
+        deleteFailure = nil
+        defer { isDeleting = false }
+        do {
+            try await calls.delete(id)
+        } catch {
+            if case .owner(let failure) = error { await context.learn(from: failure) }
+            deleteFailure = deleteLine(for: error, type: id)
+            return
+        }
+        await reread()
+        deleted = id
+    }
+
+    func acknowledgeDeleted() { deleted = nil }
+
+    private func deleteLine(for failure: TypeFailure, type id: String) -> String {
+        let name = title(of: id)
+        switch failure {
+        case .inUse(let items, let settings):
+            if let items, items > 0 {
+                return String(AttributedString(localized: "\(name) still holds ^[\(items) item](inflect: true), in the bin too. Move them to another type first.").characters)
+            }
+            if settings > 0 { return String(localized: "A folder, view or webhook still uses \(name). Change it first.") }
+            return String(localized: "Something still uses \(name), so it was kept.")
+        case .hasSubtypes(let ids):
+            let names = ids.map { title(of: $0) }.formatted(.list(type: .and))
+            return ids.isEmpty
+                ? String(localized: "Types are based on \(name), so it was kept.")
+                : String(localized: "Types are based on \(name): \(names). Change or delete those first.")
+        case .changedOnServer: return OwnerWording.line(.conflict, on: .types)
+        default: return OwnerWording.line(Self.owner(failure), on: .types)
+        }
+    }
+
+    /// How many items the open type holds, as the delete's line says, without those of the types below it.
+    func ownItemCount(of id: String) -> Int { access.ownItems(id) }
 
     // MARK: The icon
 
@@ -558,20 +890,26 @@ struct TypeAccess {
     var canMakeChild: Bool { !isWorking && !trimmedChildName.isEmpty && childParent != nil }
 
     /// Whether a sheet is open: the icon's, a new type's or a word's meaning.
-    var hasSheet: Bool { iconTarget != nil || isMakingChild || meaningWord != nil }
+    var hasSheet: Bool { iconTarget != nil || isMakingChild || meaningWord != nil || isAddingField || isRenamingField }
 
     func closeSheet() {
-        if iconTarget != nil { closeIcon() } else if isMakingChild { cancelChild() } else { cancelMeaning() }
+        if iconTarget != nil {
+            closeIcon()
+        } else if isMakingChild {
+            cancelChild()
+        } else if isAddingField {
+            cancelField()
+        } else if isRenamingField {
+            cancelRename()
+        } else {
+            cancelMeaning()
+        }
     }
 
     /// The identifier a new type gets under `user.`: the name in lowercase letters, digits and underscores, made unique among
     /// the types listed. The server judges the rest.
     func identifier(forNamed text: String) -> String {
-        let folded = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).lowercased()
-        var slug = String(folded.map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "_" })
-        while slug.contains("__") { slug = slug.replacingOccurrences(of: "__", with: "_") }
-        slug = slug.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
-        if slug.isEmpty || !(slug.first?.isLetter ?? false) { slug = "type_" + slug }
+        let slug = Self.slug(of: text, prefix: "type_")
         let held = Set(records.map(\.id))
         var id = "user." + slug
         var number = 2
@@ -580,6 +918,16 @@ struct TypeAccess {
             number += 1
         }
         return id
+    }
+
+    /// Lowercase letters, digits and underscores from `text`, starting with a letter (after `prefix` where it does not).
+    static func slug(of text: String, prefix: String) -> String {
+        let folded = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).lowercased()
+        var slug = String(folded.map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "_" })
+        while slug.contains("__") { slug = slug.replacingOccurrences(of: "__", with: "_") }
+        slug = slug.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        if slug.isEmpty || !(slug.first?.isLetter ?? false) { slug = prefix + slug }
+        return slug
     }
 
     func makeChild() async {
@@ -649,6 +997,35 @@ struct TypeAccess {
             drafts.append(.typed(title: String(localized: "Word Meaning Not Kept"), text: meaningDraft.trimmingCharacters(in: .whitespacesAndNewlines)))
             meaningWord = nil
         }
+        if isAddingField {
+            if !newFieldName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                drafts.append(.typed(title: String(localized: "Field Name Not Kept"), text: newFieldName))
+            }
+            let choices = newFieldChoices.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !choices.isEmpty { drafts.append(.typed(title: String(localized: "New Field Choices Not Kept"), text: choices)) }
+            isAddingField = false
+        }
+        if let id = openID, let key = openFieldKey, let field = ownFields(of: id).first(where: { $0.key == key }) {
+            let meaning = fieldMeaning.trimmingCharacters(in: .whitespacesAndNewlines)
+            if meaning != (field.meaning ?? "") {
+                drafts.append(.typed(title: String(localized: "Field Meaning Not Kept"), text: meaning))
+                fieldMeaning = field.meaning ?? ""
+            }
+            let longest = fieldLongest.trimmingCharacters(in: .whitespacesAndNewlines)
+            if longest != (field.longest.map(String.init) ?? "") {
+                drafts.append(.typed(title: String(localized: "Field Longest Not Kept"), text: longest))
+                fieldLongest = field.longest.map(String.init) ?? ""
+            }
+            let renamed = fieldNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            if isRenamingField, !renamed.isEmpty, renamed != Self.title(of: field) {
+                drafts.append(.typed(title: String(localized: "Field Name Change Not Kept"), text: renamed))
+            }
+            let choice = choiceDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            if isAddingChoice, !choice.isEmpty { drafts.append(.typed(title: String(localized: "Choice Not Kept"), text: choice)) }
+        }
+        isRenamingField = false
+        isAddingChoice = false
+        choiceDraft = ""
         if !wordDraft.isEmpty {
             drafts.append(.typed(title: String(localized: "Status Word Not Kept"), text: wordDraft))
             wordDraft = ""

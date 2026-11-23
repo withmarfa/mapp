@@ -69,6 +69,14 @@ nonisolated enum TypeDefinitionEdit {
         case addWord(group: String, value: String)
         /// What an own word means; empty leaves it out.
         case wordMeaning(value: String, text: String)
+        /// A field the type declares. An enum field needs at least one choice, which the server judges.
+        case addField(key: String, label: String, kind: FieldKind, choices: [String])
+        case field(key: String, TypeFieldChange)
+        case removeField(key: String)
+        /// Nil leaves out the type's own window, so the type above decides.
+        case feedWindow(FeedWindow?)
+        /// Nil leaves out the type's own default strategy, so the type above decides.
+        case mergeStrategy(String?)
     }
 
     /// The replacement for `change` to `listed`. A word is added to the type's own status field, or to a redeclaration
@@ -105,6 +113,46 @@ nonisolated enum TypeDefinitionEdit {
                 changed.description = text.isEmpty ? nil : text
                 return changed
             }
+        case .addField(let key, let label, let kind, let choices):
+            guard own.fields.additionalProperties[key] == nil, !declaredAbove(key, from: listed, in: all) else {
+                throw .refused(String(localized: "This type already has a field named “\(label)”."))
+            }
+            guard let payload = Components.Schemas.FieldDefinition._TypePayload(rawValue: kind.rawValue) else { throw .changedOnServer }
+            update.fields.additionalProperties[key] = .init(
+                _type: payload, label: label, enumValues: kind == .choice ? choices : nil)
+        case .field(let key, let edit):
+            // A field a type above declares is that type's to change, whatever the page showed.
+            guard var field = own.fields.additionalProperties[key], !declaredAbove(key, from: listed, in: all) else { throw .changedOnServer }
+            switch edit {
+            case .label(let text): field.label = text
+            case .meaning(let text): field.description = text.isEmpty ? nil : text
+            case .required(let on): field.required = on ? true : nil
+            case .searchable(let on): field.searchable = on ? nil : false
+            case .longest(let limit): field.maxLength = limit
+            case .addChoice(let word):
+                let held = field.enumValues ?? []
+                if !held.contains(word) { field.enumValues = held + [word] }
+            case .removeChoice(let word):
+                let kept = (field.enumValues ?? []).filter { $0 != word }
+                guard !kept.isEmpty else { throw .refused(String(localized: "A choice field needs at least one choice.")) }
+                field.enumValues = kept
+            }
+            update.fields.additionalProperties[key] = field
+        case .removeField(let key):
+            guard own.fields.additionalProperties[key] != nil, !declaredAbove(key, from: listed, in: all) else { throw .changedOnServer }
+            update.fields.additionalProperties[key] = nil
+        case .feedWindow(let window):
+            var policy = own.retentionPolicy ?? .init()
+            switch window {
+            case nil: policy.feedDays = nil
+            case .never?: policy.feedDays = .null
+            case .days(let days)?: policy.feedDays = .value(Double(days))
+            }
+            update.retentionPolicy = policy.feedDays == nil && policy.additionalProperties.isEmpty ? nil : policy
+        case .mergeStrategy(let name):
+            var policy = own.mergePolicy ?? .init()
+            policy._default = name.flatMap(Components.Schemas.MergeStrategy.init(rawValue:))
+            update.mergePolicy = policy._default == nil && (policy.fields?.additionalProperties.isEmpty ?? true) && policy.additionalProperties.isEmpty ? nil : policy
         }
         return update
     }
@@ -125,6 +173,28 @@ nonisolated enum TypeDefinitionEdit {
         case .wordMeaning(let value, let text):
             let words = type.fields.additionalProperties.values.flatMap { $0.statusValues ?? [] }
             return words.contains { $0.value == value && $0.description == (text.isEmpty ? nil : text) }
+        case .addField: return false
+        case .removeField(let key): return type.fields.additionalProperties[key] == nil
+        case .field(let key, let edit):
+            guard let field = type.fields.additionalProperties[key] else { return false }
+            switch edit {
+            case .label(let text): return field.label == text
+            case .meaning(let text): return field.description == (text.isEmpty ? nil : text)
+            case .required(let on): return (field.required ?? false) == on
+            case .searchable(let on): return (field.searchable ?? true) == on
+            case .longest(let limit): return field.maxLength == limit
+            case .addChoice(let word): return field.enumValues?.contains(word) == true
+            case .removeChoice(let word): return field.enumValues?.contains(word) != true
+            }
+        case .feedWindow(let window):
+            let feed = type.retentionPolicy?.feedDays
+            switch window {
+            case nil: return feed == nil
+            case .never?: return feed.map { $0.value == nil } ?? false
+            case .days(let days)?: return feed?.value == Double(days)
+            }
+        case .mergeStrategy(let name):
+            return type.mergePolicy?._default?.rawValue == name
         }
     }
 

@@ -35,7 +35,9 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         var changes: [(type: String, edit: TypeEdit)] = []
         var children: [(id: String, label: String, parent: String)] = []
         var started: [TypeEdit] = []
+        var deleted: [String] = []
         var refusal: TypeFailure?
+        var deleteRefusal: TypeFailure?
         var gate: TypeCallGate?
     }
 
@@ -72,11 +74,27 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
                 let held = record.fields.values.flatMap(\.statusWords).contains { $0.value == value && $0.group == group }
                 guard !held, let key = record.fields.first(where: { $0.value.kind == "status" })?.key else { return }
                 record.fields[key]?.statusWords.append(StatusWordRecord(value: value, group: group))
-            case .wordMeaning:
+            case .field(let key, .addChoice(let word)):
+                guard var field = record.fields[key], !field.choices.contains(word) else { return }
+                field.choices.append(word)
+                record.fields[key] = field
+            case .field(let key, .removeChoice(let word)):
+                guard var field = record.fields[key], field.choices.contains(word), field.choices.count > 1 else { return }
+                field.choices.removeAll { $0 == word }
+                record.fields[key] = field
+            default:
                 break
             }
             state.types[index] = record
             state.changes.append((type, edit))
+        }
+    }
+
+    func delete(_ type: String) async throws(TypeFailure) {
+        if let refusal = state.withLock({ $0.deleteRefusal }) { throw refusal }
+        state.withLock {
+            $0.deleted.append(type)
+            $0.types.removeAll { $0.id == type }
         }
     }
 
@@ -486,6 +504,224 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.title(of: "user.job") == "Jobs")
     }
 
+    private func withFields() -> FakeTypeCalls {
+        let calls = listing()
+        calls.state.withLock {
+            $0.types[2].fields["client"] = TypeFieldRecord(
+                key: "client", label: "Client", kind: "string", meaning: "Who the job is for.", isRequired: false, isSearchable: true,
+                longest: 200, statusWords: [])
+            $0.types[2].fields["kind"] = TypeFieldRecord(
+                key: "kind", label: nil, kind: "enum", meaning: nil, isRequired: true, isSearchable: true, longest: nil,
+                choices: ["kitchen", "stairs"], statusWords: [])
+        }
+        return calls
+    }
+
+    @Test func aTypesOwnFieldsAreEditableAndWhatAParentGivesIsLocked() async {
+        let model = model(withFields())
+        await model.load()
+        #expect(model.ownFields(of: "user.job").map(\.key) == ["client", "kind"])
+        // The status field the job redeclares to add a word is the parent's, so it is not offered as the job's own.
+        #expect(model.inheritedFields(of: "user.job").map(\.key) == ["status"])
+        #expect(model.ownFields(of: "common.ticket").isEmpty)
+        #expect(model.ownFields(of: "core.task").isEmpty)
+    }
+
+    @Test func aFieldIsAddedWithANameMadeFromItsLabelThatNoFieldHolds() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.beginField()
+        model.newFieldName = "Client"
+        model.newFieldKind = .choice
+        model.newFieldChoices = " Gold, Silver ,, Gold"
+        #expect(model.typedChoices == ["Gold", "Silver"])
+        await model.makeField()
+        // A field of that label is there, so nothing is sent and the sheet says so.
+        #expect(calls.state.withLock { $0.changes.isEmpty })
+        #expect(model.fieldErrors[.newField] != nil)
+        model.newFieldName = "Site Address"
+        await model.makeField()
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.addField(key: "site_address", label: "Site Address", kind: .choice, choices: ["Gold", "Silver"])])
+        #expect(!model.isAddingField)
+    }
+
+    @Test func aChoiceFieldNeedsAChoiceBeforeItCanBeAdded() async {
+        let model = model(withFields())
+        await model.load()
+        model.open("user.job")
+        model.beginField()
+        model.newFieldName = "Tier"
+        model.newFieldKind = .choice
+        #expect(!model.canMakeField)
+        model.newFieldChoices = "Gold"
+        #expect(model.canMakeField)
+    }
+
+    @Test func aMeaningOverTheLimitIsKeptAndToldOnTheField() async {
+        let calls = withFields()
+        calls.state.withLock { $0.refusal = .invalid(field: "fields.client.description", message: "Expected at most 300.") }
+        let model = model(calls)
+        await model.load()
+        model.openField("client", of: "user.job")
+        #expect(model.fieldMeaning == "Who the job is for.")
+        model.fieldMeaning = String(repeating: "x", count: 301)
+        await model.commitFieldMeaning()
+        #expect(model.fieldMeaning.count == 301)
+        #expect(model.fieldErrors[.fieldMeaning] == "What a field means can be 300 characters at most.")
+        #expect(TypesModel.field(named: "fields.client.max_length") == .fieldLongest)
+    }
+
+    @Test func aFieldIsRenamedByLabelAndTheRuleSwitchesSendTheirOwnChange() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        model.openField("client", of: "user.job")
+        model.beginRename()
+        model.fieldNameDraft = "Customer"
+        await model.commitRename()
+        await model.setRequired(true)
+        await model.setSearchable(false)
+        model.fieldLongest = "80"
+        await model.commitLongest()
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [
+            .field(key: "client", .label("Customer")), .field(key: "client", .required(true)),
+            .field(key: "client", .searchable(false)), .field(key: "client", .longest(80)),
+        ])
+        #expect(!model.isRenamingField)
+    }
+
+    @Test func aLongestThatIsNotAWholeNumberIsRefusedBeforeItIsSent() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        model.openField("client", of: "user.job")
+        model.fieldLongest = "0"
+        await model.commitLongest()
+        #expect(model.fieldErrors[.fieldLongest] != nil)
+        #expect(calls.state.withLock { $0.changes.isEmpty })
+    }
+
+    @Test func aChoiceIsAddedAfterTheOthersAndTheLastCannotBeTakenOut() async {
+        let calls = withFields()
+        calls.state.withLock { $0.types[2].fields["kind"]?.choices = ["kitchen"] }
+        let model = model(calls)
+        await model.load()
+        model.openField("kind", of: "user.job")
+        await model.removeChoice("kitchen")
+        #expect(model.fieldErrors[.choice] == "A choice field needs at least one choice.")
+        #expect(calls.state.withLock { $0.changes.isEmpty })
+        model.beginChoice()
+        model.choiceDraft = "garden"
+        await model.commitChoice()
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.field(key: "kind", .addChoice("garden"))])
+        #expect(model.ownField("kind", of: "user.job")?.choices == ["kitchen", "garden"])
+    }
+
+    @Test func aChoiceAddedAndAnotherTakenOutWhileTheFirstIsSavingEachKeepTheOthersEdit() async {
+        let calls = withFields()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let model = model(calls)
+        await model.load()
+        model.openField("kind", of: "user.job")
+        model.beginChoice()
+        model.choiceDraft = "garden"
+        let added = Task { await model.commitChoice() }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        let removed = Task { await model.removeChoice("kitchen") }
+        await gate.open()
+        await added.value
+        await removed.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.field(key: "kind", .addChoice("garden")), .field(key: "kind", .removeChoice("kitchen"))])
+        #expect(calls.state.withLock { $0.types[2].fields["kind"]?.choices } == ["stairs", "garden"])
+    }
+
+    @Test func aRefusedSearchableAndARefusedRemoveAreToldOnTheirOwnRows() async {
+        let calls = withFields()
+        calls.state.withLock { $0.refusal = .invalid(field: nil, message: "Not now.") }
+        let model = model(calls)
+        await model.load()
+        model.openField("client", of: "user.job")
+        await model.setSearchable(false)
+        #expect(model.fieldErrors[.fieldSearchable] == "Not now." && model.fieldErrors[.fieldRule] == nil)
+        await model.removeField()
+        #expect(model.fieldErrors[.fieldRemove] == "Not now." && model.fieldErrors[.fieldRule] == nil)
+        #expect(model.openFieldKey == "client")
+    }
+
+    @Test func aRenameALongestAChoiceAndNewFieldChoicesTypedAndNotKeptAreHandedBackWhenSettingsCloses() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        model.openField("client", of: "user.job")
+        model.beginRename()
+        model.fieldNameDraft = "Customer"
+        model.fieldLongest = "80"
+        model.beginChoice()
+        model.choiceDraft = "garden"
+        model.beginField()
+        model.newFieldChoices = "red, green"
+        #expect(model.takeDrafts() == [
+            .typed(title: "New Field Choices Not Kept", text: "red, green"), .typed(title: "Field Longest Not Kept", text: "80"),
+            .typed(title: "Field Name Change Not Kept", text: "Customer"), .typed(title: "Choice Not Kept", text: "garden"),
+        ])
+        #expect(!model.isRenamingField && !model.isAddingField && !model.isAddingChoice && model.fieldLongest == "200")
+    }
+
+    @Test func aFieldIsOnlyOpenedOnATypeTheOwnerCanChange() async {
+        let model = model(listing())
+        await model.load()
+        model.openField("status", of: "common.ticket")
+        #expect(model.ownField("status", of: "common.ticket") == nil)
+    }
+
+    @Test func theFeedAndMergeRulesShowTheTypesOwnOrLeaveItToTheTypeAbove() async {
+        let calls = withFields()
+        calls.state.withLock { $0.types[2].feedWindow = .days(45) }
+        let model = model(calls)
+        await model.load()
+        #expect(model.feedSelection(of: "user.job") == .days(45))
+        #expect(model.feedWindows(for: "user.job") == [.never, .days(7), .days(30), .days(45), .days(90), .days(365)])
+        #expect(model.feedSelection(of: "user.rework") == nil)
+        #expect(model.mergeSelection(of: "user.rework") == nil)
+        await model.setFeedWindow(.never, of: "user.job")
+        await model.setMergeStrategy("keep_both_copies", of: "user.job")
+        await model.setFeedWindow(nil, of: "user.rework")
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.feedWindow(.never), .mergeStrategy("keep_both_copies")])
+    }
+
+    @Test func deletingATypeLeavesItsPageAndTellsAServerRefusalInWords() async {
+        let calls = withFields()
+        calls.state.withLock { $0.deleteRefusal = .inUse(items: 18, settings: 0) }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        await model.deleteType()
+        #expect(model.deleteFailure == "Jobs still holds 18 items, in the bin too. Move them to another type first.")
+        #expect(model.deleted == nil)
+        calls.state.withLock { $0.deleteRefusal = .hasSubtypes(["user.rework"]) }
+        await model.deleteType()
+        #expect(model.deleteFailure == "Types are based on Jobs: Rework. Change or delete those first.")
+        calls.state.withLock { $0.deleteRefusal = nil }
+        await model.deleteType()
+        #expect(model.deleted == "user.job")
+        #expect(model.record("user.job") == nil)
+        #expect(model.deleteFailure == nil)
+    }
+
+    @Test func aPluginsOrBuiltInTypeIsNeverDeleted() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        model.open("common.ticket")
+        await model.deleteType()
+        model.open("core.task")
+        await model.deleteType()
+        #expect(calls.state.withLock { $0.deleted.isEmpty })
+    }
+
     @Test func aNameTypedInTheNewTypeSheetIsHandedBackWhenSettingsCloses() async {
         let model = model(listing())
         await model.load()
@@ -581,6 +817,27 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(replaced == 6)
     }
 
+    @Test func aChoiceIsAddedToAndTakenOutOfTheChoicesTheFieldOffersNow() throws {
+        let job = listed("user.job", fields: ["kind": Definition(_type: .string, enumValues: ["kitchen", "stairs"])])
+        let added = try TypeDefinitionEdit.update(job, applying: .field(key: "kind", .addChoice("garden")), in: [job])
+        #expect(added.fields.additionalProperties["kind"]?.enumValues == ["kitchen", "stairs", "garden"])
+        let removed = try TypeDefinitionEdit.update(job, applying: .field(key: "kind", .removeChoice("kitchen")), in: [job])
+        #expect(removed.fields.additionalProperties["kind"]?.enumValues == ["stairs"])
+        let last = listed("user.job", fields: ["kind": Definition(_type: .string, enumValues: ["stairs"])])
+        #expect(throws: TypeSchemaFailure.refused("A choice field needs at least one choice.")) {
+            try TypeDefinitionEdit.update(last, applying: .field(key: "kind", .removeChoice("stairs")), in: [last])
+        }
+    }
+
+    @Test func aChoiceTheFieldAlreadyOffersOrLacksIsNotSent() async throws {
+        let job = listed("user.job", fields: ["kind": Definition(_type: .string, enumValues: ["kitchen", "stairs"])])
+        var replaced = 0
+        for change: TypeDefinitionEdit.TypeChange in [.field(key: "kind", .addChoice("stairs")), .field(key: "kind", .removeChoice("garden"))] {
+            try await TypeDefinitionEdit.run(change, to: "user.job", read: { [job] }, replace: { _ in replaced += 1 })
+        }
+        #expect(replaced == 0)
+    }
+
     @Test func aPluginsTypeIsNeverReplaced() async {
         var replaced = 0
         let ticket = listed("common.ticket", origin: .plugin)
@@ -588,6 +845,62 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
             try await TypeDefinitionEdit.run(.description("x"), to: "common.ticket", read: { [ticket] }, replace: { _ in replaced += 1 })
         }
         #expect(replaced == 0)
+    }
+
+    @Test func aFieldIsAddedAndAChoiceFieldCarriesItsChoices() throws {
+        let job = listed("user.job", parent: "core.task")
+        let text = try TypeDefinitionEdit.update(job, applying: .addField(key: "client", label: "Client", kind: .text, choices: []), in: [job, task])
+        #expect(text.fields.additionalProperties["client"]?._type == .string)
+        #expect(text.fields.additionalProperties["client"]?.label == "Client")
+        #expect(text.fields.additionalProperties["client"]?.enumValues == nil)
+        let choice = try TypeDefinitionEdit.update(job, applying: .addField(key: "tier", label: "Tier", kind: .choice, choices: ["gold"]), in: [job, task])
+        #expect(choice.fields.additionalProperties["tier"]?._type == ._enum)
+        #expect(choice.fields.additionalProperties["tier"]?.enumValues == ["gold"])
+    }
+
+    @Test func aFieldAParentDeclaresCannotBeAddedOrChangedHere() {
+        let job = listed("user.job", parent: "core.task")
+        #expect(throws: TypeSchemaFailure.self) {
+            try TypeDefinitionEdit.update(job, applying: .addField(key: "status", label: "Status", kind: .text, choices: []), in: [job, task])
+        }
+        #expect(throws: TypeSchemaFailure.changedOnServer) {
+            try TypeDefinitionEdit.update(job, applying: .field(key: "status", .required(true)), in: [job, task])
+        }
+        #expect(throws: TypeSchemaFailure.changedOnServer) {
+            try TypeDefinitionEdit.update(job, applying: .removeField(key: "status"), in: [job, task])
+        }
+    }
+
+    @Test func aFieldsRulesChangeOnlyThatFieldAndSendTheGuidanceBack() throws {
+        let job = listed(
+            "user.job", guidance: "Keep it short.", fields: [
+                "client": Definition(_type: .string, label: "Client", description: "Old", searchable: false),
+                "site": Definition(_type: .string, label: "Site"),
+            ])
+        let required = try TypeDefinitionEdit.update(job, applying: .field(key: "client", .required(true)), in: [job])
+        #expect(required.fields.additionalProperties["client"]?.required == true)
+        #expect(required.fields.additionalProperties["client"]?.searchable == false)
+        #expect(required.fields.additionalProperties["site"] == job.value1.fields.additionalProperties["site"])
+        #expect(required.guidance == "Keep it short.")
+        let searchable = try TypeDefinitionEdit.update(job, applying: .field(key: "client", .searchable(true)), in: [job])
+        #expect(searchable.fields.additionalProperties["client"]?.searchable == nil)
+        let meaning = try TypeDefinitionEdit.update(job, applying: .field(key: "client", .meaning("")), in: [job])
+        #expect(meaning.fields.additionalProperties["client"]?.description == nil)
+        let removed = try TypeDefinitionEdit.update(job, applying: .removeField(key: "client"), in: [job])
+        #expect(Set(removed.fields.additionalProperties.keys) == ["site"])
+    }
+
+    @Test func aFeedWindowAndAMergeStrategyAreSetNeverAndLeftToTheTypeAbove() throws {
+        let job = listed("user.job")
+        let days = try TypeDefinitionEdit.update(job, applying: .feedWindow(.days(30)), in: [job])
+        #expect(days.retentionPolicy?.feedDays == .value(30))
+        let never = try TypeDefinitionEdit.update(job, applying: .feedWindow(.never), in: [job])
+        #expect(never.retentionPolicy?.feedDays == .null)
+        let above = try TypeDefinitionEdit.update(job, applying: .feedWindow(nil), in: [job])
+        #expect(above.retentionPolicy == nil)
+        let merge = try TypeDefinitionEdit.update(job, applying: .mergeStrategy("keep_both_copies"), in: [job])
+        #expect(merge.mergePolicy?._default == .keepBothCopies)
+        #expect(try TypeDefinitionEdit.update(job, applying: .mergeStrategy(nil), in: [job]).mergePolicy == nil)
     }
 }
 
@@ -613,5 +926,14 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let server = try answer(#"{"required_scope":"schema.write"}"#, status: 403, code: "forbidden")
         let error = MarfaError.forbidden(code: "forbidden", message: "Forbidden", server: server)
         #expect(ServerTypeCalls.failure(error) == .owner(.notPermitted("schema.write")))
+    }
+
+    @Test func aTypeInUseAndATypeWithChildrenAreToldApart() throws {
+        let inUse = try answer(#"{"item_count":18,"settings":[{"kind":"folder"}]}"#, status: 409, code: "type_in_use")
+        let items = MarfaError.server(status: 409, code: "type_in_use", message: "In use", details: nil, server: inUse)
+        #expect(ServerTypeCalls.failure(items) == .inUse(items: 18, settings: 1))
+        let below = try answer(#"{"subtype_ids":["user.rework"]}"#, status: 409, code: "type_has_subtypes")
+        let children = MarfaError.server(status: 409, code: "type_has_subtypes", message: "Has subtypes", details: nil, server: below)
+        #expect(ServerTypeCalls.failure(children) == .hasSubtypes(["user.rework"]))
     }
 }
