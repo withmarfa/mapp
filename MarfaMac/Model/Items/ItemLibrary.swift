@@ -50,6 +50,8 @@ protocol ItemLibrary: AnyObject, Observable {
     func item(_ id: ItemID) -> Item?
     /// The item as a page header shows it. A change to only its version, preview, sync or bound embeds is not one.
     func headerItem(_ id: ItemID) -> Item?
+    /// The item's version alone. It changes only when the version does, not when the text, preview, sync or embeds do.
+    func itemVersion(_ id: ItemID) -> ItemVersion?
     func items(in place: SidebarItem) -> [Item]
     /// What Recently Deleted holds, newest first. It is a page of Settings, not a place, so no window lists it.
     var deletedItems: [Item] { get }
@@ -277,6 +279,7 @@ protocol ItemLibrary: AnyObject, Observable {
 extension ItemLibrary {
     var namesRevision: Int { membershipRevision }
     func headerItem(_ id: ItemID) -> Item? { item(id) }
+    func itemVersion(_ id: ItemID) -> ItemVersion? { item(id)?.version }
     func textIsEmpty(_ id: ItemID) -> Bool { body(of: id)?.text.isEmpty ?? true }
     func bodyText(_ id: ItemID) -> String? { body(of: id)?.text }
     func boundEmbeds(of id: ItemID) -> [BoundEmbed] { item(id)?.boundEmbeds ?? [] }

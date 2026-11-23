@@ -14,7 +14,8 @@ struct ItemShare {
 
     init(item: Item?, fileURL: URL?, in library: any ItemLibrary) {
         title = item?.displayTitle ?? ""
-        text = item.flatMap { library.body(of: $0.id)?.text }
+        // A file is shared as itself. Reading the text here would follow a keystroke in whichever view built this.
+        text = fileURL == nil ? item.flatMap { library.body(of: $0.id)?.text } : nil
         self.fileURL = fileURL
     }
 
@@ -34,12 +35,17 @@ struct ItemShare {
 }
 
 /// Shares an item's markdown as text, the form every destination can take, or a file as itself.
+/// The text is read in this view. A toolbar or menu that shows the control does not follow a keystroke.
 struct ItemShareLink: View {
-    let share: ItemShare
+    var item: Item?
+    var fileURL: URL?
+    /// Nil while no library is open, which leaves Share disabled.
+    var library: (any ItemLibrary)?
     /// The More menu shows titles alone, so its Share does too.
     var showsIcon = true
 
     var body: some View {
+        let share = library.map { ItemShare(item: item, fileURL: fileURL, in: $0) } ?? ItemShare()
         if let fileURL = share.fileURL {
             ShareLink(item: fileURL) { label }
         } else if let text = share.text {

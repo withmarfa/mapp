@@ -31,10 +31,10 @@ struct ItemInspectorHost: View {
             if let browser, details.isEditingView, let panel = browser.viewPanel {
                 ViewEditPanel(browser: browser, panel: panel)
                     .onExitCommand { browser.escapeViewPanel(in: library) }
-            } else if let id = selectedID, let item = library.item(id), details.isCustomizingLayout, PageCustomization.isAvailable(for: item) {
+            } else if let id = selectedID, let item = library.headerItem(id), details.isCustomizingLayout, PageCustomization.isAvailable(for: item) {
                 ItemLayoutPanel(item: item, outline: editor?.headings(of: id) ?? [])
                     .onExitCommand { details.endLayout() }
-            } else if let id = selectedID, let item = library.item(id) {
+            } else if let id = selectedID, let item = library.headerItem(id) {
                 let placement = placements.placement(of: item.type, in: library.catalogue)
                 let relationships = library.relationships(for: id)
                 let sections = placement.sidebarSections.compactMap(SidebarSection.init(id:))
@@ -62,7 +62,7 @@ struct ItemInspectorHost: View {
                     onPlace: PageCustomization.isAvailable(for: item) ? { row, shown in placements.set(shown, row: row, of: item.type, in: library.catalogue) } : nil,
                     drawnByPage: PageCustomization.drawnKeys(of: item, in: library.catalogue),
                     linked: placement.linkedFromPlace == .inspector ? linked(to: item, in: relationships) : [],
-                    typeIcon: { target in library.item(target).flatMap { library.catalogue.icon(for: $0.type) } },
+                    typeIcon: { target in library.headerItem(target).flatMap { library.catalogue.icon(for: $0.type) } },
                     sections: sections,
                     extras: SidebarExtras.of(item, in: library, relationships: relationships, sections: sections, outline: outline),
                     onHeading: { editor?.revealHeading(at: $0) }
@@ -100,7 +100,7 @@ struct ItemInspectorHost: View {
     static func linked(to item: Item, in relationships: [ItemRelationship], library: any ItemLibrary, format: DateFormat) -> [LinkedItem] {
         LinkedItem.list(
             pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: library.now(), format: format,
-            members: library.catalogue.isCollection(item.type) ? .excluding : .all, item: { library.item($0) })
+            members: library.catalogue.isCollection(item.type) ? .excluding : .all, item: { library.headerItem($0) })
     }
 
     private func open(_ id: ItemID) {
@@ -416,7 +416,8 @@ struct ItemInspector: View {
 
     @ViewBuilder private var details: some View {
         if let source { InspectorDetailCell(name: String(localized: "Source"), value: source.name, mark: source.mark) }
-        detail("Version", item.version.rawValue.formatted())
+        // Version is not a header field. This cell follows it on its own, so a new version does not rebuild the sidebar.
+        InspectorVersionCell(id: item.id, fallback: item.version)
         moment("Created", item.created)
         moment("Edited", item.modified)
         if let place { detail("Place", place) }
@@ -520,6 +521,19 @@ struct ItemInspector: View {
         var shown = InspectorFields.accountedFor(type: type, hidden: hiddenKeys)
         shown.formUnion(relationships.map(\.field))
         return item.properties.filter { !shown.contains($0.key) }
+    }
+}
+
+/// The Version cell. It follows the item's version alone, so a preview, a sync change or a keystroke does not redraw it.
+private struct InspectorVersionCell: View {
+    @Environment(\.library) private var library
+    let id: ItemID
+    /// Shown where no library is open, as in a preview of the inspector.
+    let fallback: ItemVersion
+
+    var body: some View {
+        let version = library?.itemVersion(id) ?? fallback
+        InspectorDetailCell(name: String(localized: "Version"), value: version.rawValue.formatted())
     }
 }
 

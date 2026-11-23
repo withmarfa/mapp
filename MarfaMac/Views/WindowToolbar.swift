@@ -270,7 +270,7 @@ struct InspectorToolbar: CustomizableToolbarContent {
             } else {
                 // The Items index shows the chosen item in this sidebar, so what acts on it sits above it, as Open comes first.
                 if let browser, browser.showsItemsIndex {
-                    let items = browser.selectedItems(in: library)
+                    let items = browser.selectedHeaderItems(in: library)
                     let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: nil, details: details)
                     ToolbarItem(id: "inspectorOpen") {
                         Button("Open") { browser.openSelection() }
@@ -425,7 +425,7 @@ struct ItemToolbarActions {
     var shareLink: some View {
         let hasSingleSelection = (browser?.selection.count ?? items.count) == 1
         let item = hasSingleSelection && pageItems.count == 1 ? pageItems.first : nil
-        return ItemShareLink(share: ItemShare(item: item, fileURL: selectedFileURL, in: library))
+        return ItemShareLink(item: item, fileURL: selectedFileURL, library: library)
             .help("Share…")
             .accessibilityIdentifier("ShareToolbar")
     }
@@ -518,7 +518,7 @@ private struct MoreMenu: View {
             command(.quickLook)
             command(.openOriginal)
             command(.openInBrowser)
-            ItemShareLink(share: ItemShare(item: item, fileURL: fileURL, in: library), showsIcon: false)
+            ItemShareLink(item: item, fileURL: fileURL, library: library, showsIcon: false)
             Divider()
             ItemOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)
             CollectionActions(selection: ids, details: details, undoManager: undoManager)
