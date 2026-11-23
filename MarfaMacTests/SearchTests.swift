@@ -228,6 +228,27 @@ import Testing
         #expect(library.search("body", in: .everywhere).items.map(\.id) == [F.n1])
     }
 
+    @Test func anOlderAnswerThatArrivesAfterANewerOneIsNotShown() async throws {
+        let (library, source) = try await loaded()
+        source.hits.withLock { $0["older"] = [F.n1] }
+        source.hits.withLock { $0["newer"] = [F.p1] }
+        source.holdSearches("older", "newer")
+        _ = library.search("older", in: .everywhere)
+        #expect(await eventually { source.searches.withLock { $0 } >= 1 })
+        _ = library.search("newer", in: .everywhere)
+        #expect(await eventually { source.searches.withLock { $0 } >= 2 })
+        source.releaseSearches("older")
+        #expect(await eventually { source.searchesFinished.withLock { $0 } >= 1 })
+        let waiting = library.search("newer", in: .everywhere)
+        #expect(waiting.isPending)
+        #expect(waiting.items.isEmpty)
+        source.releaseSearches("newer")
+        #expect(await eventually {
+            let found = library.search("newer", in: .everywhere)
+            return !found.isPending && found.items.map(\.id) == [F.p1]
+        })
+    }
+
     @Test func aPlaceIsSearchedByTheQueryItStandsFor() async throws {
         let (library, source) = try await loaded()
         _ = library.search("body", in: .place(.inbox))
