@@ -7,9 +7,9 @@ nonisolated enum TablePageSize: Int, CaseIterable, Hashable, Sendable {
     static let standard = TablePageSize.fifty
 }
 
-/// How many pages of rows the table has loaded, as the person asked for them: one for the whole table, or one for
-/// each group when it is grouped. Sorting, filtering and grouping have already used every row by the time a page
-/// is cut, so a page is only what the table draws.
+/// How many pages of rows the table has loaded, as the person asked for them. A page is of the whole place, grouped
+/// or not. Sorting, filtering and grouping have already used every row by the time a page is cut, so a page is only
+/// what the table draws.
 nonisolated struct TablePaging: Hashable, Sendable {
     /// What a table draws of some rows: the first of them, and how many are left.
     struct Slice: Equatable, Sendable {
@@ -17,22 +17,48 @@ nonisolated struct TablePaging: Hashable, Sendable {
         let remaining: Int
     }
 
-    private(set) var pages = 1
-    private(set) var groupPages: [String: Int] = [:]
-
-    func pages(of group: String?) -> Int {
-        group.map { groupPages[$0, default: 1] } ?? pages
+    /// One group's share of the place's page: its heading's group, and the rows of it that fit.
+    struct GroupSlice: Equatable, Sendable {
+        let group: ItemTableGroup
+        let rows: [ItemTableRow]
     }
 
-    func slice(_ rows: [ItemTableRow], size: TablePageSize, group: String? = nil) -> Slice {
-        let shown = min(rows.count, pages(of: group) * size.rawValue)
+    private(set) var pages = 1
+
+    func slice(_ rows: [ItemTableRow], size: TablePageSize) -> Slice {
+        let shown = min(rows.count, pages * size.rawValue)
         return Slice(rows: Array(rows.prefix(shown)), remaining: rows.count - shown)
     }
 
-    /// Adds a page to the whole table, or to one group.
-    mutating func loadMore(group: String? = nil) {
-        if let group { groupPages[group, default: 1] += 1 } else { pages += 1 }
+    /// One page of a grouped place. Groups stay in order. Only as many item rows as the page holds are drawn, and a
+    /// group that begins after the page is left out. A group the person folded away shows its heading and none of
+    /// its rows, and those rows are not part of the page.
+    func slice(groups: [ItemTableGroup], collapsed: Set<String>, size: TablePageSize) -> (groups: [GroupSlice], remaining: Int) {
+        var budget = pages * size.rawValue
+        var shown: [GroupSlice] = []
+        var remaining = 0
+        var filling = true
+        for group in groups {
+            if collapsed.contains(group.id) {
+                if filling { shown.append(GroupSlice(group: group, rows: [])) }
+                continue
+            }
+            if !filling || budget == 0 {
+                filling = false
+                remaining += group.rows.count
+                continue
+            }
+            let take = min(budget, group.rows.count)
+            shown.append(GroupSlice(group: group, rows: Array(group.rows.prefix(take))))
+            budget -= take
+            remaining += group.rows.count - take
+            if budget == 0 { filling = false }
+        }
+        return (shown, remaining)
     }
+
+    /// Adds a page to the place.
+    mutating func loadMore() { pages += 1 }
 
     /// Loads enough pages to show every one of `ids` that the table holds. A group the person folded away shows
     /// nothing, so it loads nothing. Nil `groups` is a table that is not grouped.
@@ -40,20 +66,12 @@ nonisolated struct TablePaging: Hashable, Sendable {
         _ ids: Set<ItemID>, rows: [ItemTableRow], groups: [ItemTableGroup]?, collapsed: Set<String>, size: TablePageSize
     ) {
         guard !ids.isEmpty else { return }
-        func pagesNeeded(_ rows: [ItemTableRow]) -> Int {
-            var needed = 1
-            for (index, row) in rows.enumerated() where ids.contains(row.id) {
-                needed = max(needed, index / size.rawValue + 1)
-            }
-            return needed
+        let flat = groups.map { listed in listed.filter { !collapsed.contains($0.id) }.flatMap(\.rows) } ?? rows
+        var needed = 1
+        for (index, row) in flat.enumerated() where ids.contains(row.id) {
+            needed = max(needed, index / size.rawValue + 1)
         }
-        guard let groups else {
-            pages = max(pages, pagesNeeded(rows))
-            return
-        }
-        for group in groups where !collapsed.contains(group.id) {
-            groupPages[group.id] = max(groupPages[group.id, default: 1], pagesNeeded(group.rows))
-        }
+        pages = max(pages, needed)
     }
 }
 

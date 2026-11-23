@@ -3,12 +3,13 @@ import SwiftUI
 
 /// A place's items as a table, in the manner of a database view: a row for each item, a column for each field its
 /// type has, and the place's own grouping, sort and filters from its toolbar (`ItemTableViewOptions`). Selecting a row shows it in Details, and
-/// opening one shows its page in the table's place, as the gallery does.
+/// opening one shows its page in the table's place, as the gallery does. Choosing a row runs the table that holds the
+/// selection, not this body, which pages the place.
 struct ItemTable: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
-    @Bindable var browser: Browser
+    let browser: Browser
     let order: ItemOrder
     var pane: FocusState<Browser.Pane?>.Binding
     /// Each place's column widths, as the person dragged them. The columns shown and their order are the Properties list's.
@@ -21,6 +22,8 @@ struct ItemTable: View {
     @State private var isUnderToolbar = false
     @State private var hover = ItemTableHover()
     @State private var placeTrace = TablePlaceTrace()
+    /// The column widths last decoded, so a click does not decode them again.
+    @State private var widthCache = ColumnWidthCache()
 
     /// The inset style's own margin before the first column.
     static let inset: CGFloat = 16
@@ -39,7 +42,9 @@ struct ItemTable: View {
         let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
-        table(columns: content.columns, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
+        ItemTableSelection(browser: browser, content: content) { selection in
+            table(selection: selection, columns: content.columns, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
+        }
             .padding(.horizontal, Self.margin)
             .searchStatus(browser)
             .overlay {
@@ -63,8 +68,6 @@ struct ItemTable: View {
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }
-            // A row the selection names that is not loaded yet, such as one reached by Back or a link, loads its page.
-            .onChange(of: browser.selection, initial: true) { browser.revealSelectionInTable(content) }
             .onChange(of: allRows.count) { browser.revealSelectionInTable(content) }
             .task {
                 for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
@@ -80,9 +83,9 @@ struct ItemTable: View {
     }
 
     private func table(
-        columns: [ItemTableColumn], pages: Pages, grouping: ItemTableColumn?, collapsed: Set<String>
+        selection: Binding<Set<ItemID>>, columns: [ItemTableColumn], pages: Pages, grouping: ItemTableColumn?, collapsed: Set<String>
     ) -> some View {
-        Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: customization(columns)) {
+        Table(of: ItemTableRow.self, selection: selection, sortOrder: sortBinding(columns), columnCustomization: customization(columns)) {
             // Only the columns showing. SwiftUI adds and hides every column it is given on live rows when the place
             // changes, which for the many columns of a mixed place costs far more than the few it shows.
             TableColumnForEach(browser.shownColumns(columns)) { column in
@@ -91,10 +94,13 @@ struct ItemTable: View {
         } rows: {
             if let grouping {
                 ForEach(pages.groups) { groupRows($0, grouping: grouping, collapsed: collapsed) }
+                if pages.remaining > 0 {
+                    loadMoreRow(remaining: pages.remaining)
+                }
             } else {
                 ForEach(pages.slice.rows) { TableRow($0) }
                 if pages.slice.remaining > 0 {
-                    loadMoreRow(remaining: pages.slice.remaining, group: nil)
+                    loadMoreRow(remaining: pages.slice.remaining)
                 }
             }
         }
@@ -161,22 +167,19 @@ struct ItemTable: View {
         let isCollapsed = collapsed.contains(id)
         Section {
             if !isCollapsed {
-                ForEach(page.slice.rows) { TableRow($0) }
+                ForEach(page.rows) { TableRow($0) }
             }
         } header: {
             ItemTableGroupHeader(group: page.group, column: grouping, isCollapsed: isCollapsed) { toggle(id, collapsed: collapsed) }
         }
-        if page.slice.remaining > 0, !isCollapsed {
-            loadMoreRow(remaining: page.slice.remaining, group: id)
-        }
     }
 
     @TableRowBuilder<ItemTableRow>
-    private func loadMoreRow(remaining: Int, group: String?) -> some TableRowContent<ItemTableRow> {
+    private func loadMoreRow(remaining: Int) -> some TableRowContent<ItemTableRow> {
         Section {
             ForEach([ItemTableRow]()) { TableRow($0) }
         } header: {
-            ItemTableLoadMore(remaining: remaining) { browser.loadMoreTableRows(group: group) }
+            ItemTableLoadMore(remaining: remaining) { browser.loadMoreTableRows() }
         }
     }
 
@@ -221,14 +224,7 @@ struct ItemTable: View {
     /// what is left for the table to keep is the widths alone.
     private func customization(_ columns: [ItemTableColumn]) -> Binding<TableColumnCustomization<ItemTableRow>> {
         Binding {
-            var widths: TableColumnCustomization<ItemTableRow>
-            if let id = viewID {
-                widths = viewLayouts.settings(for: id)?.widths.flatMap { try? JSONDecoder().decode(TableColumnCustomization<ItemTableRow>.self, from: $0) }
-                    ?? .init()
-            } else {
-                widths = ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
-            }
-            return Self.widthsOnly(widths, columns)
+            Self.widthsOnly(decodedWidths(), columns)
         } set: { next in
             if let data = try? JSONEncoder().encode(next), let header = Self.headerOrder(in: data) {
                 browser.changeProperties { $0.adoptHeaderOrder(header, in: columns) }
@@ -243,6 +239,28 @@ struct ItemTable: View {
             }
             browser.keepWidths(try? JSONEncoder().encode(widths), of: id)
         }
+    }
+
+    /// The stored widths for the place showing now. Decoded when the place or the stored data changes, and kept until
+    /// then, so reading the binding does not decode again.
+    private func decodedWidths() -> TableColumnCustomization<ItemTableRow> {
+        let data: Data
+        let place: String
+        if let id = viewID {
+            data = viewLayouts.settings(for: id)?.widths ?? Data()
+            place = id.rawValue
+        } else {
+            data = storedColumns
+            place = browser.item.storageKey
+        }
+        if widthCache.data != data || widthCache.place != place {
+            widthCache.decoded = viewID == nil
+                ? ItemTableColumnLayouts.layout(for: browser.item, in: data)
+                : (try? JSONDecoder().decode(TableColumnCustomization<ItemTableRow>.self, from: data)) ?? .init()
+            widthCache.data = data
+            widthCache.place = place
+        }
+        return widthCache.decoded
     }
 
     /// The customization without what the Properties list owns: every column's visibility and the order.
@@ -413,35 +431,60 @@ private struct ItemTableGroupHeader: View {
     }
 }
 
-/// The rows the table draws: a page of them, or a page of each group.
+/// The table, apart from the body that pages the place. A table reads its selection as it is made, so a change of
+/// selection runs this body rather than `ItemTable`'s, which would page the place again.
+private struct ItemTableSelection<Content: View>: View {
+    @Bindable var browser: Browser
+    let content: ItemTableContent
+    let table: (Binding<Set<ItemID>>) -> Content
+
+    var body: some View {
+        table($browser.selection)
+            .onChange(of: browser.selection, initial: true) { browser.revealSelectionInTable(content) }
+    }
+}
+
+/// Widths decoded for one place's stored columns. A class, so keeping the decoded value does not refresh the table.
+private final class ColumnWidthCache {
+    var data: Data?
+    var place: String?
+    var decoded = TableColumnCustomization<ItemTableRow>()
+}
+
+/// The rows the table draws: one page of the place. Groups stay in their order, and a group that begins after the
+/// page is left out.
 private struct Pages {
     struct GroupPage: Identifiable {
         let group: ItemTableGroup
-        let slice: TablePaging.Slice
+        let rows: [ItemTableRow]
         var id: String { group.id }
     }
 
     /// The page of an ungrouped table.
     let slice: TablePaging.Slice
     let groups: [GroupPage]
+    /// The item rows still to load, in the groups the person has not folded away.
+    let remaining: Int
 
     @MainActor
     init(content: ItemTableContent, paging: TablePaging, size: TablePageSize) {
         if content.grouping == nil {
             slice = paging.slice(content.rows, size: size)
             groups = []
+            remaining = slice.remaining
         } else {
+            let drawn = paging.slice(groups: content.groups, collapsed: content.collapsed, size: size)
             slice = TablePaging.Slice(rows: [], remaining: 0)
-            groups = content.groups.map { GroupPage(group: $0, slice: paging.slice($0.rows, size: size, group: $0.id)) }
+            groups = drawn.groups.map { GroupPage(group: $0.group, rows: $0.rows) }
+            remaining = drawn.remaining
         }
     }
 
     var shownIDs: [String] {
-        (slice.rows + groups.flatMap(\.slice.rows)).map(\.id.rawValue)
+        (slice.rows.map(\.id.rawValue) + groups.flatMap { $0.rows.map(\.id.rawValue) })
     }
 
-    /// Where the groups' header rows fall among the table's rows: each group's header, then its rows unless it is
-    /// folded, then its Load More row while it has more to show.
+    /// Where the groups' header rows fall among the table's rows: each group's header, then its rows unless it is folded.
     func headerPlaces(collapsed: Set<String>) -> Set<Int> {
         var places: Set<Int> = []
         var place = 0
@@ -449,7 +492,7 @@ private struct Pages {
             places.insert(place)
             place += 1
             if collapsed.contains(page.group.id) { continue }
-            place += page.slice.rows.count + (page.slice.remaining > 0 ? 1 : 0)
+            place += page.rows.count
         }
         return places
     }

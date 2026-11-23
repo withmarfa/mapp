@@ -15,10 +15,10 @@ extension Browser {
 
     var tablePageSize: TablePageSize { tableOptions[item]?.pageSize ?? .standard }
 
-    /// Adds a page to the whole table, or to one group of it.
-    func loadMoreTableRows(group: String? = nil) {
+    /// Adds a page to the place, grouped or not.
+    func loadMoreTableRows() {
         var paging = tablePaging
-        paging.loadMore(group: group)
+        paging.loadMore()
         pagingState = (pagingKey, paging)
     }
 
@@ -26,19 +26,13 @@ extension Browser {
     func tableRowsNotLoaded(in content: ItemTableContent) -> Int {
         let (paging, size) = (tablePaging, tablePageSize)
         guard content.grouping != nil else { return paging.slice(content.rows, size: size).remaining }
-        return content.groups.filter { !content.collapsed.contains($0.id) }
-            .reduce(0) { $0 + paging.slice($1.rows, size: size, group: $1.id).remaining }
+        return paging.slice(groups: content.groups, collapsed: content.collapsed, size: size).remaining
     }
 
-    /// Loads the next page of the whole table, or of every group that has rows left.
+    /// Loads the next page of the place.
     func loadMoreTableRows(in content: ItemTableContent) {
-        guard content.grouping != nil else { return loadMoreTableRows() }
-        var paging = tablePaging
-        for group in content.groups where !content.collapsed.contains(group.id)
-            && paging.slice(group.rows, size: tablePageSize, group: group.id).remaining > 0 {
-            paging.loadMore(group: group.id)
-        }
-        pagingState = (pagingKey, paging)
+        guard tableRowsNotLoaded(in: content) > 0 else { return }
+        loadMoreTableRows()
     }
 
     /// Loads enough pages to show the selected items the table holds, such as one reached by Back, a link or a new
