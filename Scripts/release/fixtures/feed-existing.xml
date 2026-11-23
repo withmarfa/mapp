@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Marfa for Mac</title>
+    <link>https://github.com/withmarfa/marfa-mac/releases</link>
+    <description>The versions of Marfa for Mac.</description>
+    <language>en</language>
+    <item>
+      <title>Marfa 0.0.58</title>
+      <pubDate>Mon, 16 Nov 2026 09:00:00 GMT</pubDate>
+      <sparkle:version>5899</sparkle:version>
+      <sparkle:shortVersionString>0.0.58</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>27.0.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/withmarfa/marfa-mac/releases</sparkle:fullReleaseNotesLink>
+      <description>&lt;p&gt;Older notes.&lt;/p&gt;</description>
+      <enclosure url="https://downloads.example.com/marfa-mac/Marfa-0.0.58.dmg" length="1000" type="application/octet-stream" sparkle:edSignature="OLD58=="/>
+    </item>
+    <item>
+      <title>Marfa 0.0.58-rc1</title>
+      <pubDate>Sun, 15 Nov 2026 09:00:00 GMT</pubDate>
+      <sparkle:version>5801</sparkle:version>
+      <sparkle:shortVersionString>0.0.58</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>27.0.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <sparkle:fullReleaseNotesLink>https://github.com/withmarfa/marfa-mac/releases</sparkle:fullReleaseNotesLink>
+      <description>&lt;p&gt;Candidate notes.&lt;/p&gt;</description>
+      <enclosure url="https://downloads.example.com/marfa-mac/Marfa-0.0.58-rc1.dmg" length="999" type="application/octet-stream" sparkle:edSignature="OLD58RC=="/>
+    </item>
+  </channel>
+</rss>

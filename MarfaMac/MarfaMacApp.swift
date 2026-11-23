@@ -78,7 +78,7 @@ struct MarfaMacApp: App {
             FormatCommands(shortcuts: libraries.shortcuts)
             ToolbarCommands()
             SettingsCommands(launcher: settingsLauncher, shortcuts: libraries.shortcuts)
-            AboutCommands()
+            AboutCommands(updater: delegate.updater)
             HelpCommands(launcher: settingsLauncher)
             #if DEBUG
             TuningCommands()
@@ -87,6 +87,7 @@ struct MarfaMacApp: App {
 
         Window("Settings", id: SettingsLauncher.windowID) {
             SettingsWindowView(launcher: settingsLauncher, libraries: libraries)
+                .environment(\.appUpdater, delegate.updater)
         }
         .defaultSize(width: SettingsTokens.Metric.windowWidth, height: SettingsTokens.Metric.windowHeight)
         .windowResizability(.contentMinSize)
@@ -131,6 +132,8 @@ struct MarfaMacApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let libraries = Libraries.standard()
+    /// Nil unless this build carries a feed and a key, so a build from the source never offers to replace itself.
+    let updater = AppUpdater.standard()
     private let separators = MenuSeparatorTidy()
     private var metrics: MetricsListener?
     private var themeObservation: (any NSObjectProtocol)?

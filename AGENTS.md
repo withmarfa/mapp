@@ -34,7 +34,7 @@ Marfa for Mac is a macOS app for a Marfa server's items, with a sidebar, a list 
 - Target macOS 27 and Xcode 27 only, with no `#available` checks. Swift 6 language mode, main-actor isolation by default. Unit tests use Swift Testing; UI tests use XCTest.
 - Use SwiftUI with native containers and controls, and AppKit only where SwiftUI cannot express something. Check API questions against Apple's documentation.
 - Every user-facing string goes through the String Catalog. Building in Xcode updates `MarfaMac/Localizable.xcstrings`; `xcodebuild` alone does not.
-- The app is not sandboxed and keeps the hardened runtime with no exceptions. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting` and the plugins release reader (`PluginRelease`) may connect out. Neither the item page nor a sealed web page loads from the network itself.
+- The app is not sandboxed and keeps the hardened runtime with no exceptions. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting`, the plugins release reader (`PluginRelease`) and Sparkle may connect out. Neither the item page nor a sealed web page loads from the network itself.
 
 ## Data rules
 
@@ -46,7 +46,7 @@ Marfa for Mac is a macOS app for a Marfa server's items, with a sidebar, a list 
 ## Project layout
 
 - `MarfaMac.xcodeproj` uses folder-synchronized groups for `MarfaMac/`, `MarfaMacTests/` and `MarfaMacUITests/`. Add a file on disk, not in `project.pbxproj`. A file under `MarfaMac/` is a resource unless the MarfaMac target's membership exceptions list it. `Design/` is not in the app.
-- Debug is `com.withmarfa.marfa.debug` and never shares the installed app's data or sign-ins. Its working copy is Application Support under that identifier, never Marfa's command-line folder. `MarfaMac/Info.plist` claims it as the sign-in URL scheme. Key on `Bundle.main.bundleIdentifier`, never a literal.
+- Debug is `com.withmarfa.marfa.debug` and never shares the installed app's data or sign-ins, nor Marfa's command-line folder. `MarfaMac/Info.plist` claims it as the sign-in URL scheme. Key paths and names on `AppPaths.bundleIdentifier`, never a literal.
 - To compare design values, add a knob to the Debug-only `MarfaMac/Tuning/` panel, not variants, and remove it once settled.
 
 ## Commands
@@ -55,9 +55,8 @@ The unit, UI and `Live` test commands, and measuring, are in `MarfaMacTests/AGEN
 
 ## Signing and releases
 
-- Never commit a team identifier, a report destination (`MARFA_MAC_POSTHOG_HOST`, `MARFA_MAC_POSTHOG_PROJECT_TOKEN`) or a version. They go in the ignored `Config/Local.xcconfig`; `MARKETING_VERSION` stays `0.0.0`.
-- A version exists only as a git tag (`v0.0.x`, candidates `v0.0.x-rcN`), made soon after a merge to `main` that changes what a person sees or does; tests, CI and docs alone are not tagged. Before you sign, tag or check a release, read the README's Signing and Releasing sections.
-- TestFlight is for internal testers: tag freely. Try a choice in a local build first.
+- Never commit a team identifier, a report destination, an update feed or key or a version. They go in the ignored `Config/Local.xcconfig`; `MARKETING_VERSION` stays `0.0.0`.
+- A version exists only as a git tag (`v0.0.x`, candidates `v0.0.x-rcN` for the beta channel), made soon after a merge to `main` that changes what a person sees or does; tests, CI and docs alone are not tagged. A tag starts `release.yml`, which publishes through Sparkle. Before you sign, tag or check a release, read the README's Signing and Releasing sections, and try a choice in a local build first.
 
 ## Code Review Rules
 
@@ -65,6 +64,6 @@ Report only a problem you can show: name the input, state or step, and what goes
 
 - **Person's text lost.** Flag any path where a write that fails, is refused or races another change is dropped or written over newer text. Safe path: a conflicted copy, the queue or the clipboard, and tell the person.
 - **Bytes rewritten.** Flag any change that rewrites an item's text the person did not edit, or blocks outside the edit. Safe path: edit in place and add a fixture to `editor/fixtures/corpus/` for any form found rewritten.
-- **Platform rules.** Flag `#available` checks, shims, hard-coded user-facing strings, a committed team identifier, report destination or version, and custom chrome where a system control exists.
+- **Platform rules.** Flag `#available` checks, shims, hard-coded user-facing strings, a committed team identifier, report destination, update setting or version, and custom chrome where a system control exists.
 - **Note for item.** Flag a name, string, comment or doc that says note where it means any item. Safe path: say item, or the type's own name from the catalogue.
 - **Stale instructions or docs.** Flag a change that leaves an `AGENTS.md`, a `docs/` page, the README or a comment untrue; fix it in the same pull request.

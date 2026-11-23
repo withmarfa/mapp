@@ -14,6 +14,7 @@
 		3310000D3066ED47005D07A2 /* WithMarfaTelemetry in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000E3066ED47005D07A2 /* WithMarfaTelemetry */; };
 		331000113066ED47005D07A2 /* MarfaBrandIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 331000103066ED47005D07A2 /* MarfaBrandIcons */; };
 		3310000B3066ED47005D07A2 /* MarfaIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000C3066ED47005D07A2 /* MarfaIcons */; };
+		3310002C3066ED47005D07A2 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 3310002B3066ED47005D07A2 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -88,6 +89,7 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				3310002A3066ED47005D07A2 /* KeyboardShortcuts in Frameworks */,
+				3310002C3066ED47005D07A2 /* Sparkle in Frameworks */,
 				331000123066ED47005D07A2 /* MarfaAPI in Frameworks */,
 				331000043066ED47005D07A2 /* Marfa in Frameworks */,
 				331000113066ED47005D07A2 /* MarfaBrandIcons in Frameworks */,
@@ -157,6 +159,7 @@
 			name = MarfaMac;
 			packageProductDependencies = (
 				331000293066ED47005D07A2 /* KeyboardShortcuts */,
+				3310002B3066ED47005D07A2 /* Sparkle */,
 				331000133066ED47005D07A2 /* MarfaAPI */,
 				331000053066ED47005D07A2 /* Marfa */,
 				331000103066ED47005D07A2 /* MarfaBrandIcons */,
@@ -248,6 +251,7 @@
 				331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */,
 				3310001B3066ED47005D07A2 /* XCRemoteSwiftPackageReference "app-telemetry" */,
 				331000283066ED47005D07A2 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+				3310002D3066ED47005D07A2 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3303FCFA3066ED46005D07A2 /* Products */;
@@ -742,6 +746,14 @@
 				version = 3.1.0;
 			};
 		};
+		3310002D3066ED47005D07A2 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -779,6 +791,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 331000283066ED47005D07A2 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
 			productName = KeyboardShortcuts;
+		};
+		3310002B3066ED47005D07A2 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3310002D3066ED47005D07A2 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

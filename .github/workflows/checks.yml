@@ -14,7 +14,8 @@ name: Checks
 # - The instruction check (`Scripts/check-instructions.py`) is cheap, so it runs on drafts too. It runs for any
 #   Markdown file, `project.pbxproj`, Swift or editor source (a renamed type can leave a doc stale), the script
 #   or this workflow.
-# - Xcode Cloud archives tagged releases only.
+# - The release scripts (`Scripts/release/`) have unit tests, run when they or this workflow change. `release.yml` publishes tagged
+#   releases and rehearses itself on a change to the release files; it is not part of `Checks`.
 # The final job, "Checks", always runs; make it the one required check.
 on:
   pull_request:
@@ -37,6 +38,7 @@ jobs:
       swift: ${{ steps.filter.outputs.swift }}
       logic: ${{ steps.filter.outputs.logic }}
       release: ${{ steps.filter.outputs.release }}
+      scripts: ${{ steps.filter.outputs.scripts }}
       workflows: ${{ steps.filter.outputs.workflows }}
       instructions: ${{ steps.filter.outputs.instructions }}
     steps:
@@ -66,6 +68,9 @@ jobs:
           release=$(echo "$app" | grep -E '^(MarfaMac/|MarfaMac\.xcodeproj/|Config/|\.github/workflows/checks\.yml$)' || true)
           if [ -n "$release" ]; then
             echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$files" | grep -qE '^(Scripts/release/|\.github/workflows/checks\.yml$)'; then
+            echo "scripts=true" >> "$GITHUB_OUTPUT"
           fi
           if echo "$files" | grep -qE '^\.github/(workflows/|actionlint\.ya?ml$)'; then
             echo "workflows=true" >> "$GITHUB_OUTPUT"
@@ -135,6 +140,18 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 Scripts/check-instructions.py
+
+  release-scripts:
+    name: Release scripts
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s Scripts/release -v
 
   swift:
     name: Unit tests
@@ -206,7 +223,7 @@ jobs:
 
   checks:
     name: Checks
-    needs: [changes, editor, actionlint, instructions, swift, release]
+    needs: [changes, editor, actionlint, instructions, release-scripts, swift, release]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

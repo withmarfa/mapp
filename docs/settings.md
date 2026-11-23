@@ -2,7 +2,7 @@
 
 Status: General, Appearance, Editor, Lists, Layouts, Search, On This Mac and Connection are built. The other pages are in [Agreed designs](agreed-designs.md#settings) until they are built.
 
-Where it lives: `GeneralPage`, `AppearancePage`, `EditorPage`, `ListsPage`, `LayoutsPage`, `LayoutTypePage`, `LayoutChoices`, `EditorOptions`, `LineSpacing`, `ParagraphSpacing`, `IndentWith`, `PasteAs`, `EditingMode`, `StartWith`, `ReopenWindows`, `NewItemType`, `WeekStart`, `DateFormat`, `DateDisplay`, `MissingChoice`, `MacSettings`, `AppTheme`, `AccentChoice`, `HighlightChoice`, `FontChoice`, `MarfaMac/Settings/`, `MarfaMac/Model/`, `MarfaMac/Views/`, `SearchPage`, `SearchOptions`, `SearchLeaveOutList`, `OnThisMacPage`, `LibraryExport`, `StoreSize`, `ConnectionPage`, `ConnectionStanding` and `ConnectionAccount`.
+Where it lives: `GeneralPage`, `AppearancePage`, `EditorPage`, `ListsPage`, `LayoutsPage`, `LayoutTypePage`, `LayoutChoices`, `EditorOptions`, `LineSpacing`, `ParagraphSpacing`, `IndentWith`, `PasteAs`, `EditingMode`, `StartWith`, `ReopenWindows`, `NewItemType`, `WeekStart`, `DateFormat`, `DateDisplay`, `MissingChoice`, `MacSettings`, `AppUpdater`, `UpdateSettings`, `AppTheme`, `AccentChoice`, `HighlightChoice`, `FontChoice`, `MarfaMac/Settings/`, `MarfaMac/Model/`, `MarfaMac/Views/`, `SearchPage`, `SearchOptions`, `SearchLeaveOutList`, `OnThisMacPage`, `LibraryExport`, `StoreSize`, `ConnectionPage`, `ConnectionStanding` and `ConnectionAccount`.
 
 Every setting here is kept in the defaults on this Mac, and synced through the connected Marfa except what stays on each Mac ([Settings storage](settings-storage.md)).
 
@@ -18,6 +18,7 @@ Every setting here is kept in the defaults on this Mac, and synced through the c
   - Week Starts On is System Setting or a day. Every calendar and date panel the app draws starts its week there (`Calendar.chosenWeekStart`).
   - Date Format is System Setting, Numeric (27/10/2026), Abbreviated (27 Oct 2026) or Long (27 October 2026), and Time Format is System Setting, 12-Hour or 24-Hour. They apply wherever the app writes a date or a time, as a person reads it: lists, tables, the inspector, the calendar's hour gutter and its blocks, the timeline's Now marker and day heading, the date panel's time field and quick dates, a collection's Created and Updated, and the dates the Settings pages show. A time typed in the date panel reads back in either clock. A calendar's month and day names are not dates in this sense and follow the language only. System Setting keeps each place's own way, in the Mac's formats. An event's header is laid out in the event's own zone and ignores them.
 - **Privacy.** Pictures from Websites (Ask, Always or Never) and Send Error Reports. The second shows only in a build that carries a place to send reports to.
+- **Updates.** Check Automatically (once a day) and Beta Versions, which also offers release candidates. The section shows only in a build that carries an update feed and key, which is a release build; it has the app menu's Check for Updates… beside it.
 - **Reset.** Reset This App's Settings… asks first with an alert; Cancel changes nothing. It resets every setting the app keeps, in the Marfa too where they sync, and leaves the copy, the queue, the sign-in and the connection alone ([Reset](settings-storage.md#reset)).
 
 ## Appearance

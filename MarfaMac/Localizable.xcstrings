@@ -4,6 +4,9 @@
     "As in Layouts" : {
 
     },
+    "Beta Versions" : {
+
+    },
     "Change Properties" : {
 
     },
@@ -35,6 +38,9 @@
 
     },
     "before today" : {
+
+    },
+    "Check for Updates…" : {
 
     },
     "Choose a collection to see what’s in it." : {
@@ -148,6 +154,9 @@
     "is set" : {
 
     },
+    "Look for a new version once a day." : {
+
+    },
     "No Matching Values" : {
 
     },
@@ -158,6 +167,9 @@
 
     },
     "Show Property" : {
+
+    },
+    "Try new versions before they’re released." : {
 
     },
     "Use Layouts" : {

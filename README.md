@@ -17,23 +17,65 @@ This builds the app and runs the unit tests. To run the app, open `MarfaMac.xcod
 
 ## Signing
 
-A checkout builds without a developer account and signs to run locally. `Config/Signing.xcconfig`, the project's base configuration, leaves the team empty and includes the ignored `Config/Local.xcconfig`.
+A checkout builds without a developer account and signs to run locally. `Config/Signing.xcconfig`, the project's base configuration, leaves each of the settings below empty and includes the ignored `Config/Local.xcconfig`.
 
 - To sign with a team, write `DEVELOPMENT_TEAM = <team ID>` into `Config/Local.xcconfig`. The repository holds no tool for keeping that line.
 - To send errors and timings (`MarfaMac/Model/Telemetry/Reporting.swift`), write `MARFA_MAC_POSTHOG_HOST` and `MARFA_MAC_POSTHOG_PROJECT_TOKEN` into `Config/Local.xcconfig` the same way. `Info.plist` carries them into the build; a build without both sends nothing.
-- Never commit a team identifier or either report setting.
+- To make a build that updates itself, write `MARFA_MAC_UPDATE_FEED_URL` (the address of the appcast) and `MARFA_MAC_UPDATE_PUBLIC_KEY` (the public half of the Sparkle signing key) the same way. A build without both has no updater, no **Check for Updates…** and no Updates section in Settings, so a local build never offers to replace itself. In an xcconfig file, write the `://` of an address as `:/$()/`, since `//` starts a comment.
+- Never commit a team identifier, a report setting or an update setting.
 
-In Xcode Cloud, `ci_scripts/ci_post_clone.sh` writes `Config/Local.xcconfig` from the workflow secrets `MARFA_MAC_DEVELOPMENT_TEAM`, `MARFA_MAC_POSTHOG_HOST` and `MARFA_MAC_POSTHOG_PROJECT_TOKEN`. Without a team, Xcode Cloud uses its own managed signing. The script stops the build when only one report setting is set, or when the host is not `https` or the token does not start with `phc_`.
+The release workflow writes `Config/Local.xcconfig` for a release build from the values of its environment.
 
 ## Releasing
 
-- A version exists only as a git tag: `v` followed by the version, such as `v0.0.5`. Every version is `0.0.x` until the first public release, and each release is the latest release tag plus `0.0.1`.
-- A release candidate is a tag with `-rc` and a number after the version it is a candidate for, such as `v0.0.25-rc1`, then `-rc2`. It builds as version 0.0.25 with the next build number, so TestFlight shows one version with several builds. A candidate is never counted as the latest release tag.
-- Tag soon after any merge to `main` that changes what a person sees or does. Take the next candidate of the next version by default. Cut the release itself (`v0.0.25`) when a candidate has been tried, when a logical set of work is complete, or when the brief says so. Merges that change only tests, CI, docs, or notes are not tagged. A tag build only archives, so don't hold work back to save version numbers. TestFlight is for active testing with internal testers, and no UI test run is needed before a tag.
-- Never write a version into a file. `MARKETING_VERSION` stays `0.0.0` in the repository.
-- To release or make a candidate, tag the merged commit on `main` and push the tag. A tag that begins with `v` starts the Xcode Cloud workflow, which archives the app and gives it to internal TestFlight testers. There is no other distribution, so there is no Sparkle and no notarization.
-- `ci_scripts/ci_post_clone.sh` sets `MARKETING_VERSION` from the tag, without the `-rc` suffix, and stops the build if the tag is not a version or the version wasn't written. Xcode Cloud numbers the builds.
-- Agents can't see Xcode Cloud. Check a release in App Store Connect: the build for the tag's version appears under TestFlight.
+A tag publishes a release. The workflow in `.github/workflows/release.yml` builds the app, signs it with a Developer ID, notarizes and staples it, packs it in a disk image that it signs, notarizes and staples too, and signs the image for Sparkle. It then creates the GitHub release, uploads the disk image and the appcast to `https://downloads.withmarfa.com/marfa-mac/`, and checks that each file is served as uploaded. The app updates itself from that appcast through [Sparkle](https://sparkle-project.org).
+
+### Versions and tags
+
+- A version exists only as a git tag: `v` followed by three numbers, such as `v0.0.59`. Every version is `0.0.x` until the first public release, and each release is the latest release tag plus `0.0.1`.
+- A release candidate is a tag with `-rc` and a number from 1 to 98 after the version it is a candidate for, such as `v0.0.59-rc1`, then `-rc2`. It builds as version 0.0.59.
+- A candidate goes to the beta channel: only people who turn on **Beta Versions** in **Settings > General > Updates** are offered it. A release goes to everyone, and to the website's download, `Marfa.dmg`. A candidate is never counted as the latest release tag.
+- The build number comes from the tag, so nothing is written into a file: `X*10000000 + Y*100000 + Z*100 + N` for the candidate `vX.Y.Z-rcN`, and the same with 99 for N for the release `vX.Y.Z`. `v0.0.59-rc1` builds as 5901 and `v0.0.59` as 5999. Sparkle compares build numbers, so a candidate is older than its release, and a rebuilt tag keeps its number. `MARKETING_VERSION` stays `0.0.0` in the repository.
+- The workflow refuses a tag that is not that shape, that would build version 0.0.0, or that is not on the history of `main`.
+- Tag soon after any merge to `main` that changes what a person sees or does. Take the next candidate of the next version by default. Cut the release itself (`v0.0.59`) when a candidate has been tried, when a logical set of work is complete, or when the brief says so. Merges that change only tests, CI, docs, or notes are not tagged. Try a choice in a local build first, because a release is installed on every Mac that checks for updates.
+
+### Make a release or a candidate
+
+1. Merge the work into `main`.
+2. Tag the merged commit and push the tag:
+
+   ```sh
+   git tag v0.0.59-rc1 <commit>
+   git push origin v0.0.59-rc1
+   ```
+
+3. Check the release, as described below.
+
+To rebuild a tag, re-run its workflow run. The run replaces the disk image on the GitHub release and the tag's item in the appcast.
+
+### Check a release
+
+1. In GitHub, open the **Actions** tab and check that the **Release** run for the tag has finished. Its `build` job signs and notarizes, and its `publish` job releases and uploads.
+2. Open the repository's **Releases** page. The release for the tag lists the disk image, and a candidate is marked as a pre-release.
+3. Fetch the appcast and look for the tag's item at the top. A candidate's item has `<sparkle:channel>beta</sparkle:channel>`; a release's item has no channel:
+
+   ```sh
+   curl -s https://downloads.withmarfa.com/marfa-mac/appcast.xml | head -40
+   ```
+
+4. To try the update, run an older build that carries a feed, choose **Marfa > Check for Updates…**, and install the new version.
+
+### Dry run
+
+A pull request that changes `.github/workflows/release.yml`, `Scripts/release/`, the project or `Config/`, and a manual run of the workflow, make a dry run. It archives with ad hoc signing, makes the disk image, signs it with a throwaway Sparkle key and builds an appcast from a fixture feed. It skips the export, notarizing and every upload, reads no secret, and keeps the disk image and the appcast as the `dry-run` artifact. A tag run stops if the environment lacks any value it needs.
+
+### Release scripts
+
+`Scripts/release/` holds the steps the workflow runs, each of which you can read on its own. The tag and the appcast are handled by Python 3 scripts with unit tests:
+
+```sh
+python3 -m unittest discover -s Scripts/release
+```
 
 ## Contributing
 

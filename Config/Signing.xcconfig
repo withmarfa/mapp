@@ -7,4 +7,10 @@ DEVELOPMENT_TEAM =
 // Local.xcconfig write the host's `://` as `:/$()/`, since an xcconfig reads `//` as a comment.
 MARFA_MAC_POSTHOG_HOST =
 MARFA_MAC_POSTHOG_PROJECT_TOKEN =
+// Where a build looks for a new version, and the key that checks what it finds. Empty here, so a build from this source
+// never updates itself, shows no Check for Updates… and offers no Updates in Settings; a release build carries both in
+// Config/Local.xcconfig. MarfaMac/Info.plist reads them under these names, and the feed's `://` is written `:/$()/` there
+// as well.
+MARFA_MAC_UPDATE_FEED_URL =
+MARFA_MAC_UPDATE_PUBLIC_KEY =
 #include? "Local.xcconfig"
