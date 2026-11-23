@@ -120,8 +120,10 @@ extension EditorController {
         guard !isWatchingLinks, let library else { return }
         isWatchingLinks = true
         withObservationTracking {
-            _ = library.items(in: .allItems)
-            // A type given another icon or tone changes the mark of every link to its items.
+            // `contentRevision` moves when the copy takes a keystroke (its version, its modified date, its preview).
+            // That must not redraw links. `namesRevision` moves when a title or a display name changes.
+            // `membershipRevision` moves when an item comes or goes, or the catalogue is read again (a type's icon).
+            _ = library.namesRevision
             _ = library.membershipRevision
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in

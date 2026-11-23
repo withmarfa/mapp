@@ -88,7 +88,7 @@ extension ItemLibrary {
     /// the binding the copy holds and the facts of the file it names that change what is shown. Observed as items are.
     func embedStates(of itemID: ItemID) -> [String: EmbedState] {
         var states: [String: EmbedState] = [:]
-        for embed in item(itemID)?.boundEmbeds ?? [] where states[embed.text] == nil {
+        for embed in boundEmbeds(of: itemID) where states[embed.text] == nil {
             states[embed.text] = embedState(of: embed)
         }
         return states
@@ -121,7 +121,7 @@ extension ItemLibrary {
     }
 
     private func binding(of reference: EmbedReference, in item: ItemID) -> ReferenceResolution? {
-        self.item(item)?.boundEmbeds.first { $0.text == reference.text }?.resolution
+        boundEmbeds(of: item).first { $0.text == reference.text }?.resolution
     }
 
     /// Whether the copy may not yet have read the text holding the embed: a save of the item is on its way, or the

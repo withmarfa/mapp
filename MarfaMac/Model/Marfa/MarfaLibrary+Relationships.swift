@@ -119,7 +119,7 @@ extension MarfaLibrary {
     /// A link keeps its item's ID whether or not the copy holds the item, so it can still be removed: one it does not
     /// hold is shown as not found, and one in the bin as deleted.
     private func target(_ id: ItemID) -> ItemRelationshipTarget {
-        guard let item = item(id) else { return ItemRelationshipTarget(title: "", itemID: id, resolution: .missing) }
+        guard let item = headerItem(id) else { return ItemRelationshipTarget(title: "", itemID: id, resolution: .missing) }
         return ItemRelationshipTarget(
             title: item.name ?? "", itemID: id, resolution: .resolved(id), isDeleted: item.state == .trashed)
     }
@@ -136,7 +136,7 @@ extension MarfaLibrary {
     }
 
     func childIDs(of id: ItemID) -> [ItemID] {
-        _ = linksRevision
+        observeLinks(of: id)
         return index.links(from: id, type: MarfaMapping.parentEdge).map(\.to)
     }
 
@@ -145,9 +145,10 @@ extension MarfaLibrary {
     }
 
     private func readRelationships(for id: ItemID) -> [ItemRelationship] {
-        guard let item = item(id) else { return [] }
-        // Another item's edge can point here; its title and state are followed through its own record.
-        _ = linksRevision
+        guard let item = headerItem(id) else { return [] }
+        // Another item's edge can point here without changing a field this header shows. `observeLinks` follows that
+        // edge. Each named item is read with `headerItem`, so a title there is followed and an unrelated item is not.
+        observeLinks(of: id)
         var fields = ownFields(of: item.type)
         for edge in item.edgesOut where edge.origin != .body && !fields.contains(where: { $0.name == edge.type }) {
             if let end = fieldEnd(edge.type) { fields.append((edge.type, end)) }
@@ -161,7 +162,7 @@ extension MarfaLibrary {
         for type in Set(pointing.map(\.type)) {
             guard let end = fieldEnd(Self.inversePrefix + type) else { continue }
             let holders = pointing.filter { $0.type == type }.map { $0.holder }
-            let targets = Self.ordered(holders.filter { self.item($0) != nil }.map(target))
+            let targets = Self.ordered(holders.filter { self.headerItem($0) != nil }.map(target))
             // A two-way relation reads the same from both items, so the links pointing here join the ones this item
             // holds in a single list.
             if end.info.isTwoWay, let own = fields.firstIndex(where: { !$0.end.isInverse && $0.end.info.id == type }) {
