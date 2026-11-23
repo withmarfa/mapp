@@ -45,6 +45,7 @@ jobs:
       build: ${{ steps.release.outputs.build }}
       candidate: ${{ steps.release.outputs.candidate }}
       file: ${{ steps.release.outputs.file }}
+      previous: ${{ steps.release.outputs.previous }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -63,6 +64,12 @@ jobs:
           if [ "$EVENT" = push ]; then tag="$REF_NAME"; else tag=v0.0.99-rc1; fi
           python3 Scripts/release/version.py "$tag" | tee -a "$GITHUB_OUTPUT"
           echo "file=Marfa-${tag#v}.dmg" >> "$GITHUB_OUTPUT"
+          # The release notes start at the tag before: for a candidate any tag, for a release the last release, so
+          # the first release's notes are not the whole history.
+          exclude=()
+          if [[ "$tag" != *-rc* ]]; then exclude=(--exclude '*-rc*'); fi
+          previous=$(git describe --tags --abbrev=0 --match 'v*' ${exclude[@]+"${exclude[@]}"} "HEAD^" 2>/dev/null || true)
+          echo "previous=$previous" | tee -a "$GITHUB_OUTPUT"
 
       - name: Refuse a tag that is not on main
         if: github.event_name == 'push'
@@ -224,6 +231,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: release
+    # Publishing reads the live appcast and writes it back, so two tags never publish at once.
+    concurrency:
+      group: release-publish
+      cancel-in-progress: false
     permissions:
       # Only the step that creates the GitHub release writes; nothing else here touches the repository.
       contents: write
@@ -233,6 +244,7 @@ jobs:
       BUILD: ${{ needs.build.outputs.build }}
       CANDIDATE: ${{ needs.build.outputs.candidate }}
       FILE: ${{ needs.build.outputs.file }}
+      PREVIOUS: ${{ needs.build.outputs.previous }}
       GH_REPO: ${{ github.repository }}
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -262,6 +274,7 @@ jobs:
           else
             flags=(--verify-tag --generate-notes)
             if [ "$CANDIDATE" = true ]; then flags+=(--prerelease); fi
+            if [ -n "$PREVIOUS" ]; then flags+=(--notes-start-tag "$PREVIOUS"); fi
             gh release create "$TAG" "$dmg" "${flags[@]}"
           fi
           gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/notes.md"
