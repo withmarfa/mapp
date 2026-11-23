@@ -17,6 +17,14 @@
 	<string>$(MARFA_MAC_POSTHOG_HOST)</string>
 	<key>MARFA_MAC_POSTHOG_PROJECT_TOKEN</key>
 	<string>$(MARFA_MAC_POSTHOG_PROJECT_TOKEN)</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>$(MARFA_MAC_UPDATE_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>$(MARFA_MAC_UPDATE_PUBLIC_KEY)</string>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

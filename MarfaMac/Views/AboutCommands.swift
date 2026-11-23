@@ -1,14 +1,30 @@
 import AppKit
 import SwiftUI
 
+/// Marfa > Check for Updates…, off while a check runs. A view of its own, so the menu follows `canCheckForUpdates`.
+private struct CheckForUpdatesButton: View {
+    let updater: AppUpdater
+
+    var body: some View {
+        Button("Check for Updates…") { updater.checkForUpdates() }
+            .disabled(!updater.canCheckForUpdates)
+    }
+}
+
 /// Marfa > About Marfa: the standard About panel, with what the About page of Settings used to say, as its credits: what
 /// the app is, and where to find the project, Marfa's documentation and the license.
 struct AboutCommands: Commands {
+    /// Nil in a build that does not update itself, which has no Check for Updates….
+    let updater: AppUpdater?
+
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About Marfa") {
                 NSApp.activate()
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
+            }
+            if let updater {
+                CheckForUpdatesButton(updater: updater)
             }
         }
     }

@@ -12,7 +12,9 @@ struct GeneralPage: View {
     @AppStorage(WeekStart.key) private var weekStart = 0
     @AppStorage(RemotePictureSetting.key) private var pictures = RemotePictureSetting.standard
     @AppStorage(Reporting.switchKey) private var sendsReports = true
+    @AppStorage(UpdateSettings.betaKey) private var betaVersions = false
     @Environment(\.library) private var library
+    @Environment(\.appUpdater) private var updater
     @State private var isConfirmingReset = false
 
     var body: some View {
@@ -21,6 +23,7 @@ struct GeneralPage: View {
             newItems
             dates
             privacy
+            updates
             reset
         }
         .accessibilityIdentifier("GeneralPage")
@@ -172,6 +175,26 @@ struct GeneralPage: View {
         .onChange(of: sendsReports) { _, isOn in Reporting.shared.switchChanged(to: isOn) }
     }
 
+    // MARK: Updates
+
+    /// Shown only in a build that updates itself.
+    @ViewBuilder private var updates: some View {
+        if let updater {
+            SettingsSection("Updates") {
+                SettingsRow("Check Automatically", line: "Look for a new version once a day.") {
+                    SettingsToggle(
+                        title: "Check Automatically",
+                        isOn: Binding { updater.checksAutomatically } set: { updater.checksAutomatically = $0 }
+                    )
+                    .accessibilityIdentifier("CheckAutomatically")
+                }
+                SettingsRow("Beta Versions", line: "Try new versions before they’re released.") {
+                    SettingsToggle(title: "Beta Versions", isOn: $betaVersions).accessibilityIdentifier("BetaVersions")
+                }
+            }
+        }
+    }
+
     // MARK: Reset
 
     private var reset: some View {
@@ -194,6 +217,12 @@ struct GeneralPage: View {
 
     private func resetSettings() {
         libraries.resetMacSettings()
+        updater?.resetChoices()
         Reporting.shared.switchChanged(to: true)
     }
+}
+
+extension EnvironmentValues {
+    /// The updater this page offers choices for, or nil where the build has none.
+    @Entry var appUpdater: AppUpdater?
 }

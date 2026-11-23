@@ -104,7 +104,8 @@ nonisolated enum SettingsPage: Hashable, Sendable {
                 String(localized: "Start With"), String(localized: "Reopen Windows"), String(localized: "Open Items"),
                 String(localized: "New Items Are"), String(localized: "Today and Yesterday"), String(localized: "Week Starts On"),
                 String(localized: "Date Format"), String(localized: "Time Format"), String(localized: "Pictures from Websites"),
-                String(localized: "Send Error Reports"), String(localized: "Reset This App’s Settings"),
+                String(localized: "Send Error Reports"), String(localized: "Check Automatically"), String(localized: "Beta Versions"),
+                String(localized: "Reset This App’s Settings"),
             ]
         case .appearance:
             [
