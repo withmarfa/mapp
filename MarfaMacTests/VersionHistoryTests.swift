@@ -202,7 +202,7 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         guard case .editBody(Self.launch, "Old agenda", let base, _)? = source.writes.first(where: { if case .editBody = $0 { true } else { false } })
         else { Issue.record("no text edit"); return }
         #expect(base == ItemVersion(1))
-        #expect(source.writes.contains(.editProperties(Self.launch, ["title": .string("Old launch")], base: ItemVersion(1), undoing: nil)))
+        #expect(source.writes.contains(.editProperties(Self.launch, ["title": .string("Old launch")], base: ItemVersion(1))))
     }
 
     @Test func undoPutsBackWhatWasReplacedOnlyWhileItIsUnchanged() async throws {

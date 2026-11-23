@@ -502,7 +502,7 @@ import Testing
     @Test func forgottenAnswersChangeSyncStatesWithoutAWholeReadAndARefusalStaysUntilDiscarded() async throws {
         let scene = try await Self.open(Self.fake([Self.row("kept", title: "Kept"), Self.row("refused", title: "Refused")]))
         for id in ["kept", "refused"] {
-            scene.source.submit(.editProperties(ItemID(id), ["title": .string("\(id) again")], base: ItemVersion(1), undoing: nil), as: WriteID())
+            scene.source.submit(.editProperties(ItemID(id), ["title": .string("\(id) again")], base: ItemVersion(1)), as: WriteID())
         }
         await scene.source.engineTook()
         #expect(scene.item("kept")?.sync == .waiting(writes: 1))

@@ -105,8 +105,8 @@ extension MarfaEngine {
     private func rebased(_ write: ItemWrite) -> ItemWrite {
         func current(_ id: ItemID, or base: ItemVersion) -> ItemVersion { rows[id.rawValue].map { ItemVersion($0.version) } ?? base }
         switch write {
-        case .editProperties(let id, let changes, let base, let undoing):
-            return .editProperties(id, changes, base: current(id, or: base), undoing: undoing)
+        case .editProperties(let id, let changes, let base, let assuming):
+            return .editProperties(id, changes, base: current(id, or: base), assuming: assuming)
         case .editBody(let id, let text, let base, let merge):
             return .editBody(id, text, base: current(id, or: base), merge: merge)
         case .retype(let id, let type, let changes, let base):

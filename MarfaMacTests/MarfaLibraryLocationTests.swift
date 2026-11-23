@@ -49,7 +49,7 @@ import UniformTypeIdentifiers
         var changes = both
         changes["place"] = .string("Brat")
         #expect(library.setItemProperties(Self.id, changes: changes, actionName: "Edit Location", undoManager: nil))
-        #expect(source.writes == [.editProperties(Self.id, changes, base: ItemVersion(1), undoing: nil)])
+        #expect(source.writes == [.editProperties(Self.id, changes, base: ItemVersion(1))])
     }
 
     @Test func oneUndoStepTakesBackBothNumbersAndRedoPutsThemBack() async throws {
@@ -61,10 +61,10 @@ import UniformTypeIdentifiers
         undo.endUndoGrouping()
         #expect(undo.undoActionName == "Edit Location")
         undo.undo()
-        #expect(source.writes.last == .editProperties(Self.id, ["latitude": nil, "longitude": nil], base: ItemVersion(1), undoing: nil))
+        #expect(source.writes.last == .editProperties(Self.id, ["latitude": nil, "longitude": nil], base: ItemVersion(1)))
         #expect(!undo.canUndo)
         undo.redo()
-        #expect(source.writes.last == .editProperties(Self.id, both, base: ItemVersion(1), undoing: nil))
+        #expect(source.writes.last == .editProperties(Self.id, both, base: ItemVersion(1)))
         #expect(undo.canUndo)
     }
 
@@ -110,7 +110,7 @@ import UniformTypeIdentifiers
         // The stored item has no numbers yet, so taking them away equals what it holds; the name does not.
         let back: [String: PropertyValue?] = ["latitude": nil, "longitude": nil, "place": .string("Brat")]
         #expect(library.setItemProperties(Self.id, changes: back, actionName: "Edit Location", undoManager: nil))
-        #expect(source.writes.last == .editProperties(Self.id, back, base: ItemVersion(1), undoing: nil))
+        #expect(source.writes.last == .editProperties(Self.id, back, base: ItemVersion(1)))
 
         var held = try #require(library.item(Self.id))
         held.properties = [Property(key: "place", value: .string("Brat"))]

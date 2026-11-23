@@ -66,8 +66,8 @@ extension MarfaLibrary {
         action()
     }
 
-    /// The engine did not make a held step's writes, because what they touch changed or the copy was not brought up to
-    /// date in time. An undo goes back on the undo stack, and registering outside an undo or redo empties the whole
+    /// The engine did not make a step's writes: what a held step touches changed or the copy was not brought up to date
+    /// in time, or an earlier edit an undo was built on was not made. An undo goes back on the undo stack, and registering outside an undo or redo empties the whole
     /// redo stack, the step it had registered included; a redo cannot go back, so the undo it registered does nothing
     /// and says so. A redo's write that carried the person's text is the only copy of it, so `text` is kept where they
     /// can get it back, as for a library that closed.

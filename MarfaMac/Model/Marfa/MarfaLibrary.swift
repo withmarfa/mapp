@@ -219,10 +219,10 @@ import Observation
     /// The item each property edit is for, until the copy takes or refuses it. Observed, so an editor holding a list it
     /// wrote can tell a write still on its way from one refused (`isWritingProperties(of:)`).
     private var propertyWrites: [WriteID: ItemID] = [:]
-    /// The mark of each property edit (`lastPropertyWrite`) until the copy takes or refuses it, and the marks of the
-    /// edits it took lately, so an editor can tell a write that landed and was changed again before it drew from one
-    /// refused (`tookPropertyWrite(_:)`).
-    @ObservationIgnored private var propertyMarks: [WriteID: Int] = [:]
+    /// Each property edit until the source answers it, which an undo is built on (`PropertiesBefore`), and the marks of
+    /// the edits the copy took lately, so an editor can tell a write that landed and was changed again before it drew
+    /// from one refused (`tookPropertyWrite(_:)`).
+    @ObservationIgnored private var propertyEdits: [WriteID: PropertyEdit] = [:]
     @ObservationIgnored private(set) var lastPropertyWrite: Int? = 0
     @ObservationIgnored private var takenMarks: Set<Int> = []
     /// Creates the source refused before it held the item, such as one made while the copy is brought up to date,
@@ -630,14 +630,17 @@ import Observation
         case .answered(let id, let outcome):
             textSaves.removeValue(forKey: id)?.end()
             propertyWrites[id] = nil
-            propertyMarks[id] = nil
+            propertyAnswered(id, outcome)
             read(id)
             answered(id, outcome)
             settle(id)
         case .taken(let id):
             textSaves.removeValue(forKey: id)?.end()
             propertyWrites[id] = nil
-            if let mark = propertyMarks.removeValue(forKey: id) { remember(taken: mark) }
+            if let edit = propertyEdits[id], edit.state == .onItsWay {
+                propertyMade(edit)
+                remember(taken: edit.mark)
+            }
             took(id)
             read(id)
             settle(id)
@@ -800,7 +803,7 @@ import Observation
         let textWrite = textWrites.removeValue(forKey: id)
         let typed = textWrite?.typed
         let run = undoRuns.removeValue(forKey: id)
-        if case .refused(let problem) = outcome, let run, MarfaEngine.isHeldRefusal(problem.code) {
+        if case .refused(let problem) = outcome, let run, MarfaEngine.isUndoNotMade(problem.code) {
             giveBack(run, problem, title: refusal?.title, text: typed ?? refusal?.text)
         } else if case .refused(let problem) = outcome, let refusal {
             let message = problem.message ?? String(localized: "The Marfa server refused this change.")
@@ -933,15 +936,50 @@ import Observation
         return ([draft.title, draft.body] + values).filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
 
-    /// A property edit is followed until the copy takes or refuses it.
-    func submitPropertyEdit(_ write: ItemWrite, of item: ItemID, failing title: String) {
+    /// A property edit is on its way until the copy takes or refuses it, and followed until the source answers it.
+    func submitPropertyEdit(
+        _ item: ItemID, _ changes: [String: PropertyValue?], base: ItemVersion, assuming: Set<WriteID> = [], failing title: String
+    ) {
         let mark = (lastPropertyWrite ?? 0) + 1
         lastPropertyWrite = mark
-        let id = submit(write, failing: title)
+        let id = submit(.editProperties(item, changes, base: base, assuming: assuming), failing: title)
         if refusals[id] != nil {
             propertyWrites[id] = item
-            propertyMarks[id] = mark
+            propertyEdits[id] = PropertyEdit(item: item, mark: mark, changes: changes)
         }
+    }
+
+    /// The copy shows the edit's values, so an older edit of the item still on its way, such as a held undo, no longer
+    /// decides the keys they share.
+    private func propertyMade(_ edit: PropertyEdit) {
+        edit.state = .made
+        for other in propertyEdits.values where other.item == edit.item && other.state == .onItsWay && other.mark < edit.mark {
+            other.laid.subtract(edit.changes.keys)
+        }
+    }
+
+    /// An edit the copy took and the server then refused is left out of an undo too, since the person was told it was
+    /// not saved. One answered before the copy took it queued nothing, as its values were already there.
+    private func propertyAnswered(_ id: WriteID, _ outcome: WriteOutcome) {
+        guard let edit = propertyEdits.removeValue(forKey: id) else { return }
+        switch outcome {
+        case .refused:
+            edit.state = .notMade
+        case .conflicted(_, let fields):
+            edit.laid.subtract(fields)
+        case .accepted, .merged, .blocked, .dead:
+            break
+        }
+        if edit.state == .onItsWay { propertyMade(edit) }
+    }
+
+    /// The values of `keys` as the person wrote them, read from the copy and the edits of the item still on their way.
+    func propertiesBefore(_ keys: some Collection<String>, of item: Item) -> PropertiesBefore {
+        let earlier = propertyEdits
+            .filter { $0.value.item == item.id && $0.value.state == .onItsWay && !$0.value.laid.isDisjoint(with: keys) }
+            .sorted { $0.value.mark < $1.value.mark }
+            .map { (id: $0.key, edit: $0.value) }
+        return PropertiesBefore(shown: Dictionary(uniqueKeysWithValues: keys.map { ($0, item.value(of: $0)) }), earlier: earlier)
     }
 
     func isWritingProperties(of id: ItemID) -> Bool { propertyWrites.values.contains(id) }

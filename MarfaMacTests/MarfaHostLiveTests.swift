@@ -26,9 +26,7 @@ extension LiveMarfaTests {
                     let typed = "MARFAMACTEST purged elsewhere, then everything typed after"
                     let log = ChangeLog(source)
                     // As a property editor still showing the item saves, by the library, which follows the answer.
-                    library.submitPropertyEdit(
-                        .editProperties(id, ["title": .string(typed)], base: version, undoing: nil), of: id,
-                        failing: "Can’t Edit This Property")
+                    library.submitPropertyEdit(id, ["title": .string(typed)], base: version, failing: "Can’t Edit This Property")
                     let answered = try #require(await log.wait { state in
                         state.changes.contains { if case .answered(_, .refused) = $0 { true } else { false } }
                     })
@@ -61,7 +59,7 @@ extension LiveMarfaTests {
                     #expect(state.painted?.items.contains { $0.id == id } == true)
                     let typed = "MARFAMACTEST purged elsewhere, then everything typed after"
                     let edit = WriteID(), behind = WriteID()
-                    source.submit(.editProperties(id, ["title": .string(typed)], base: version, undoing: nil), as: edit)
+                    source.submit(.editProperties(id, ["title": .string(typed)], base: version), as: edit)
                     source.submit(.tag(id, ItemTag.favorite, on: true), as: behind)
                     // Each write names an item the server no longer holds, so each is refused on its own.
                     #expect(await eventually { source.syncReport.problems.count { $0.itemID == id } == 2 }, "\(source.syncReport.problems)")

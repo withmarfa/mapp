@@ -127,7 +127,7 @@ import Testing
             let version = try #require(await copy.items.get(item.id.rawValue)?.version)
             let id = WriteID()
             source.submit(
-                .editProperties(item.id, ["title": .string(title)], base: ItemVersion(version), undoing: nil), as: id, undoing: group)
+                .editProperties(item.id, ["title": .string(title)], base: ItemVersion(version)), as: id, undoing: group)
             return id
         }
 
@@ -285,6 +285,50 @@ import Testing
         #expect(state.refusal(to: edit)?.code == MarfaEngine.heldChangedCode)
         #expect(try await scene.links() == 1, "the link is not removed either")
         #expect(try await scene.title() == "Elsewhere")
+        await finish(scene)
+    }
+
+    @Test func aHeldUndoNeverOverwritesANewerEditTakenAtOnce() async throws {
+        let scene = try await makeScene()
+        let group = UndoGroup()
+        scene.unlink(as: group)
+        let undo = try await scene.retitle(to: "First", as: group)
+        try #require(try await eventuallyAsking { await scene.held() == 2 })
+
+        // The person edits the item again; the copy holds its row, so the edit is taken at once.
+        let version = try #require(await scene.copy.items.get(scene.item.id.rawValue)?.version)
+        scene.source.submit(.editProperties(scene.item.id, ["title": .string("Newer")], base: ItemVersion(version)), as: WriteID())
+        try #require(try await eventuallyAsking { try await scene.title() == "Newer" })
+
+        await scene.becomeWhole()
+        let state = try #require(await scene.log.wait { $0.answer(to: undo) != nil })
+        #expect(state.refusal(to: undo)?.code == MarfaEngine.heldChangedCode)
+        #expect(try await scene.title() == "Newer")
+        await finish(scene)
+    }
+
+    @Test func anUndoBuiltOnAnEditThatWasNotMadeIsNotMade() async throws {
+        let scene = try await makeScene()
+        func edit(_ title: String, assuming: Set<WriteID> = [], as group: UndoGroup? = nil) async throws -> WriteID {
+            let version = try #require(await scene.copy.items.get(scene.item.id.rawValue)?.version)
+            let id = WriteID()
+            let write = ItemWrite.editProperties(scene.item.id, ["title": .string(title)], base: ItemVersion(version), assuming: assuming)
+            scene.source.submit(write, as: id, undoing: group)
+            return id
+        }
+
+        let made = try await edit("First")
+        let undo = try await edit("First", assuming: [made], as: UndoGroup())
+        try #require(await scene.log.wait { $0.changes.contains(.taken(undo)) } != nil)
+
+        // The next edit is refused before the copy queues it, after the person chose Undo on a later one.
+        scene.reads.missing.withLock { $0 = [scene.item.id.rawValue] }
+        let refused = try await edit("Second")
+        let built = try await edit("Second", assuming: [refused], as: UndoGroup())
+        let state = try #require(await scene.log.wait { $0.answer(to: built) != nil })
+        #expect(state.refusal(to: refused)?.notQueued == true)
+        #expect(state.refusal(to: built)?.code == MarfaEngine.earlierNotMadeCode)
+        #expect(try await scene.title() == "First")
         await finish(scene)
     }
 

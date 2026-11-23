@@ -64,7 +64,7 @@ extension LiveMarfaTests {
                 #expect(first == ["[[\(title)]]": .item(id: plan.rawValue)])
 
                 let version = try #require(log.current.snapshot?.items.first { $0.id == plan }?.version)
-                source.submit(.editProperties(plan, ["title": .string("\(title) v2")], base: version, undoing: nil), as: WriteID())
+                source.submit(.editProperties(plan, ["title": .string("\(title) v2")], base: version), as: WriteID())
                 source.submit(.create(id: reused, ItemDraft(type: Self.note, title: title, body: "New")), as: WriteID())
                 _ = try #require(await log.wait { state in
                     state.snapshot?.items.first { $0.id == plan }?.title == "\(title) v2" && state.snapshot?.items.contains { $0.id == reused } == true

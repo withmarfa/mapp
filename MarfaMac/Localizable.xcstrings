@@ -918,6 +918,9 @@
     "Always kept, so they open offline." : {
 
     },
+    "An earlier change to this item wasn’t saved, so the change wasn’t made." : {
+      "extractionState" : "manual"
+    },
     "An archive %@, or any Marfa, can restore." : {
 
     },

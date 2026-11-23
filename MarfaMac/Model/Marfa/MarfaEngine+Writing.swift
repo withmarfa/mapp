@@ -19,6 +19,9 @@ extension MarfaEngine {
             return true
         }
         do {
+            if case .editProperties(_, _, _, let assuming) = write, !assuming.allSatisfy(madeEdits.contains) {
+                throw Refused(problem: SyncProblem(code: Self.earlierNotMadeCode, message: Self.earlierNotMade))
+            }
             #if DEBUG
             if let error = hooks.refusing.current?(write) { throw error }
             #endif
@@ -45,6 +48,7 @@ extension MarfaEngine {
                 }
                 let queued = try await Self.asking { try await queue(write) }
                 record(id, queued)
+                if case .editProperties = write { made(id) }
                 if case .moveEdge = write { for written in queued { movedEnds[written.id] = ends } }
                 touched = ends.union(queued.flatMap { [$0.itemId, $0.toId].compactMap(\.self) })
             }
@@ -110,6 +114,11 @@ extension MarfaEngine {
         default:
             return nil
         }
+    }
+
+    private func made(_ edit: WriteID) {
+        madeEdits.append(edit)
+        if madeEdits.count > 256 { madeEdits.removeFirst() }
     }
 
     /// A write that needed nothing queued, such as a move to the end the edge already holds, is taken at once.

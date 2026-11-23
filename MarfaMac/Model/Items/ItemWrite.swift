@@ -34,8 +34,10 @@ nonisolated enum BodyMerge: Hashable, Sendable {
 nonisolated enum ItemWrite: Hashable, Sendable {
     /// The app mints the id, so it can name the item before the source answers.
     case create(id: ItemID, ItemDraft)
-    /// A nil value removes the property. `undoing` names the write whose side effects an undo puts back.
-    case editProperties(ItemID, [String: PropertyValue?], base: ItemVersion, undoing: WriteID?)
+    /// A nil value removes the property. An undo built on earlier edits still on their way names them in `assuming`,
+    /// and is refused if any of them was refused before the copy queued it, since it would put back a value that was
+    /// never saved.
+    case editProperties(ItemID, [String: PropertyValue?], base: ItemVersion, assuming: Set<WriteID> = [])
     case editBody(ItemID, String, base: ItemVersion, merge: BodyMerge)
     /// Moves the item to another type, with the property changes the move makes in the same edit (`TypeChange`). A
     /// nil value removes the property.

@@ -462,14 +462,14 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         #expect(library.setItemProperty(F.en1, key: "title", value: .string(" Ada L. "), undoManager: undo))
-        #expect(source.writes == [.editProperties(F.en1, ["name": .string("Ada L.")], base: ItemVersion(1), undoing: nil)])
+        #expect(source.writes == [.editProperties(F.en1, ["name": .string("Ada L.")], base: ItemVersion(1))])
 
         var moved = try #require(library.item(F.en1))
         moved.version = ItemVersion(7)
         source.send(.upserted([moved]))
         #expect(await eventually { library.item(F.en1)?.version == ItemVersion(7) })
         undo.undo()
-        #expect(source.writes.last == .editProperties(F.en1, ["name": .string("Ada")], base: ItemVersion(7), undoing: nil))
+        #expect(source.writes.last == .editProperties(F.en1, ["name": .string("Ada")], base: ItemVersion(7)))
 
         // A title that is the first line of the text is edited in the text.
         #expect(!library.setItemProperty(F.f1, key: "title", value: .string("X"), undoManager: nil))
@@ -495,11 +495,83 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.setItemProperty(F.t1, key: "due", value: .string("2026-10-06"), undoManager: undo))
         undo.endUndoGrouping()
         undo.undo()
-        #expect(source.writes.last == .editProperties(F.t1, ["due": nil], base: ItemVersion(1), undoing: nil))
+        #expect(source.writes.last == .editProperties(F.t1, ["due": nil], base: ItemVersion(1)))
         undo.undo()
-        #expect(source.writes.last == .editProperties(F.t1, ["status": nil], base: ItemVersion(1), undoing: nil))
+        #expect(source.writes.last == .editProperties(F.t1, ["status": nil], base: ItemVersion(1)))
         undo.redo()
-        #expect(source.writes.last == .editProperties(F.t1, ["status": .string("done")], base: ItemVersion(1), undoing: nil))
+        #expect(source.writes.last == .editProperties(F.t1, ["status": .string("done")], base: ItemVersion(1)))
+    }
+
+    /// Sets en1's name as an undo step of its own, and gives the edit's write.
+    private func rename(_ library: MarfaLibrary, _ source: FakeItemSource, to name: String, _ undo: UndoManager) throws -> WriteID {
+        undo.beginUndoGrouping()
+        defer { undo.endUndoGrouping() }
+        try #require(library.setItemProperty(F.en1, key: "name", value: .string(name), undoManager: undo))
+        return try #require(source.submitted.last?.id)
+    }
+
+    /// The copy shows en1 with `name` at `version`.
+    private func show(_ library: MarfaLibrary, _ source: FakeItemSource, name: String, version: Int64) async throws {
+        var item = try #require(library.item(F.en1))
+        item.properties = [Property(key: "name", value: .string(name))]
+        item.version = ItemVersion(version)
+        source.send(.upserted([item]))
+        try #require(await eventually { library.item(F.en1)?.version == ItemVersion(version) })
+    }
+
+    /// The copy does not show an edit until it takes it, so the Undo of a later one puts back what the earlier one wrote,
+    /// and is made only if that one is.
+    @Test func anUndoPutsBackAnEarlierEditStillOnItsWay() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let earlier = try rename(library, source, to: "Ada L", undo)
+        _ = try rename(library, source, to: "Ada K", undo)
+        undo.undo()
+        #expect(source.writes.last == .editProperties(F.en1, ["name": .string("Ada L")], base: ItemVersion(1), assuming: [earlier]))
+    }
+
+    /// The person was told the earlier edit was not saved, whether it was refused before or after the copy took it.
+    @Test(arguments: [false, true]) func anUndoDoesNotPutBackAnEarlierEditThatWasRefused(takenFirst: Bool) async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let earlier = try rename(library, source, to: "Ada L", undo)
+        _ = try rename(library, source, to: "Ada K", undo)
+        if takenFirst { source.send(.taken(earlier)) }
+        source.send(.answered(earlier, .refused(SyncProblem(code: "validation_error", message: "Not allowed.", notQueued: !takenFirst))))
+        try #require(await eventually { library.notices.waiting.last?.message.hasPrefix("Not allowed.") == true })
+        undo.undo()
+        #expect(source.writes.last == .editProperties(F.en1, ["name": .string("Ada")], base: ItemVersion(1)))
+    }
+
+    /// A held Undo still on its way stops standing for the item once a newer edit is taken over it.
+    @Test func anUndoPutsBackANewerEditTakenOverAHeldUndo() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        source.send(.taken(try rename(library, source, to: "Ada L", undo)))
+        try await show(library, source, name: "Ada L", version: 2)
+        undo.undo()
+        source.send(.taken(try rename(library, source, to: "Ada C", undo)))
+        try await show(library, source, name: "Ada C", version: 3)
+        _ = try rename(library, source, to: "Ada D", undo)
+        undo.undo()
+        #expect(source.writes.last == .editProperties(F.en1, ["name": .string("Ada C")], base: ItemVersion(3)))
+    }
+
+    /// Redo puts back the person's own value over a change made elsewhere since the Undo.
+    @Test func aRedoPutsBackThePersonsOwnValue() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        source.send(.taken(try rename(library, source, to: "Ada L", undo)))
+        try await show(library, source, name: "Ada L", version: 2)
+        undo.undo()
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try await show(library, source, name: "Ada E", version: 4)
+        undo.redo()
+        #expect(source.writes.last == .editProperties(F.en1, ["name": .string("Ada L")], base: ItemVersion(4)))
     }
 
     @Test func favoritesAreTheFavoriteTagAndUndo() async throws {
@@ -1036,7 +1108,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         model.activate(ValueEditOptions.optionID("done"))
         #expect(closed, "the panel does not wait for the server")
         #expect(model.notice == nil)
-        #expect(source.writes == [.editProperties(F.t1, ["status": .string("done")], base: ItemVersion(1), undoing: nil)])
+        #expect(source.writes == [.editProperties(F.t1, ["status": .string("done")], base: ItemVersion(1))])
         #expect(library.notices.waiting.isEmpty, "nothing is told as a fault while offline")
 
         // The copy applies the write at once and marks the item as waiting for the server.
