@@ -129,7 +129,13 @@ nonisolated enum TypeDefinitionEdit {
             case .required(let on): field.required = on ? true : nil
             case .searchable(let on): field.searchable = on ? nil : false
             case .longest(let limit): field.maxLength = limit
-            case .choices(let words): field.enumValues = words
+            case .addChoice(let word):
+                let held = field.enumValues ?? []
+                if !held.contains(word) { field.enumValues = held + [word] }
+            case .removeChoice(let word):
+                let kept = (field.enumValues ?? []).filter { $0 != word }
+                guard !kept.isEmpty else { throw .refused(String(localized: "A choice field needs at least one choice.")) }
+                field.enumValues = kept
             }
             update.fields.additionalProperties[key] = field
         case .removeField(let key):
@@ -167,6 +173,28 @@ nonisolated enum TypeDefinitionEdit {
         case .wordMeaning(let value, let text):
             let words = type.fields.additionalProperties.values.flatMap { $0.statusValues ?? [] }
             return words.contains { $0.value == value && $0.description == (text.isEmpty ? nil : text) }
+        case .addField: return false
+        case .removeField(let key): return type.fields.additionalProperties[key] == nil
+        case .field(let key, let edit):
+            guard let field = type.fields.additionalProperties[key] else { return false }
+            switch edit {
+            case .label(let text): return field.label == text
+            case .meaning(let text): return field.description == (text.isEmpty ? nil : text)
+            case .required(let on): return (field.required ?? false) == on
+            case .searchable(let on): return (field.searchable ?? true) == on
+            case .longest(let limit): return field.maxLength == limit
+            case .addChoice(let word): return field.enumValues?.contains(word) == true
+            case .removeChoice(let word): return field.enumValues?.contains(word) != true
+            }
+        case .feedWindow(let window):
+            let feed = type.retentionPolicy?.feedDays
+            switch window {
+            case nil: return feed == nil
+            case .never?: return feed.map { $0.value == nil } ?? false
+            case .days(let days)?: return feed?.value == Double(days)
+            }
+        case .mergeStrategy(let name):
+            return type.mergePolicy?._default?.rawValue == name
         }
     }
 

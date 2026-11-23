@@ -23,7 +23,7 @@ struct TypeAccess {
     /// What a refusal can be about on a type's page.
     enum Field: Hashable {
         case name, plural, description, basedOn, word, meaning, newType
-        case fieldName, fieldMeaning, fieldLongest, fieldRule, choice, newField, feed, merge
+        case fieldName, fieldMeaning, fieldLongest, fieldRule, fieldSearchable, fieldRemove, choice, newField, feed, merge
     }
 
     /// The four groups a status word sits in, in the order of a piece of work's life.
@@ -218,7 +218,7 @@ struct TypeAccess {
     /// The line under a type's name on its own page.
     func headLine(of type: TypeRecord) -> String {
         let items = count(of: type.id)
-        let held = String(localized: "\(items) items.")
+        let held = String(AttributedString(localized: "^[\(items) item](inflect: true).").characters)
         switch type.origin {
         case .platform: return String(localized: "Built into Marfa. ") + held
         case .plugin:
@@ -486,7 +486,7 @@ struct TypeAccess {
         case .fieldName: String(localized: "A field’s name can be 100 characters at most.")
         case .fieldMeaning: String(localized: "What a field means can be \(fieldMeaningLimit) characters at most.")
         case .fieldLongest: String(localized: "The longest a field can be is a whole number of at least 1.")
-        case .basedOn, .newType, .newField, .fieldRule, .choice, .feed, .merge: nil
+        case .basedOn, .newType, .newField, .fieldRule, .fieldSearchable, .fieldRemove, .choice, .feed, .merge: nil
         }
     }
 
@@ -528,7 +528,7 @@ struct TypeAccess {
         case .name: name = type.label
         case .plural: plural = type.plural ?? ""
         case .description: descriptionText = type.description ?? ""
-        case .fieldMeaning, .fieldLongest, .fieldName, .fieldRule: syncFieldDrafts()
+        case .fieldMeaning, .fieldLongest, .fieldName, .fieldRule, .fieldSearchable: syncFieldDrafts()
         default: break
         }
     }
@@ -602,7 +602,7 @@ struct TypeAccess {
 
     func setSearchable(_ on: Bool) async {
         guard let id = openID, let key = openFieldKey else { return }
-        await apply(.field(key: key, .searchable(on)), to: id, field: .fieldRule)
+        await apply(.field(key: key, .searchable(on)), to: id, field: .fieldSearchable)
     }
 
     /// Sets how long a text field can be, or with nothing typed takes the limit away.
@@ -643,7 +643,7 @@ struct TypeAccess {
             fieldErrors[.choice] = String(localized: "“\(word)” is already a choice.")
             return
         }
-        if await apply(.field(key: key, .choices(field.choices + [word])), to: id, field: .choice) { cancelChoice() }
+        if await apply(.field(key: key, .addChoice(word)), to: id, field: .choice) { cancelChoice() }
     }
 
     func removeChoice(_ word: String) async {
@@ -652,7 +652,7 @@ struct TypeAccess {
             fieldErrors[.choice] = String(localized: "A choice field needs at least one choice.")
             return
         }
-        await apply(.field(key: key, .choices(field.choices.filter { $0 != word })), to: id, field: .choice)
+        await apply(.field(key: key, .removeChoice(word)), to: id, field: .choice)
     }
 
     // The sheet that renames a field.
@@ -785,7 +785,7 @@ struct TypeAccess {
     /// Removes the open field. Each item keeps the value it holds under the field's name (`types/field-removed`).
     func removeField() async {
         guard let id = openID, let key = openFieldKey else { return }
-        if await apply(.removeField(key: key), to: id, field: .fieldRule) { openFieldKey = nil }
+        if await apply(.removeField(key: key), to: id, field: .fieldRemove) { openFieldKey = nil }
     }
 
     /// Deletes the open type, which Marfa allows only while no item and no other type holds it. Its refusal is told in words.
@@ -811,7 +811,9 @@ struct TypeAccess {
         let name = title(of: id)
         switch failure {
         case .inUse(let items, let settings):
-            if let items, items > 0 { return String(localized: "\(name) still holds \(items) items, in the bin too. Move them to another type first.") }
+            if let items, items > 0 {
+                return String(AttributedString(localized: "\(name) still holds ^[\(items) item](inflect: true), in the bin too. Move them to another type first.").characters)
+            }
             if settings > 0 { return String(localized: "A folder, view or webhook still uses \(name). Change it first.") }
             return String(localized: "Something still uses \(name), so it was kept.")
         case .hasSubtypes(let ids):
@@ -995,8 +997,12 @@ struct TypeAccess {
             drafts.append(.typed(title: String(localized: "Word Meaning Not Kept"), text: meaningDraft.trimmingCharacters(in: .whitespacesAndNewlines)))
             meaningWord = nil
         }
-        if isAddingField, !newFieldName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            drafts.append(.typed(title: String(localized: "Field Name Not Kept"), text: newFieldName))
+        if isAddingField {
+            if !newFieldName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                drafts.append(.typed(title: String(localized: "Field Name Not Kept"), text: newFieldName))
+            }
+            let choices = newFieldChoices.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !choices.isEmpty { drafts.append(.typed(title: String(localized: "New Field Choices Not Kept"), text: choices)) }
             isAddingField = false
         }
         if let id = openID, let key = openFieldKey, let field = ownFields(of: id).first(where: { $0.key == key }) {
@@ -1005,7 +1011,21 @@ struct TypeAccess {
                 drafts.append(.typed(title: String(localized: "Field Meaning Not Kept"), text: meaning))
                 fieldMeaning = field.meaning ?? ""
             }
+            let longest = fieldLongest.trimmingCharacters(in: .whitespacesAndNewlines)
+            if longest != (field.longest.map(String.init) ?? "") {
+                drafts.append(.typed(title: String(localized: "Field Longest Not Kept"), text: longest))
+                fieldLongest = field.longest.map(String.init) ?? ""
+            }
+            let renamed = fieldNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            if isRenamingField, !renamed.isEmpty, renamed != Self.title(of: field) {
+                drafts.append(.typed(title: String(localized: "Field Name Change Not Kept"), text: renamed))
+            }
+            let choice = choiceDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            if isAddingChoice, !choice.isEmpty { drafts.append(.typed(title: String(localized: "Choice Not Kept"), text: choice)) }
         }
+        isRenamingField = false
+        isAddingChoice = false
+        choiceDraft = ""
         if !wordDraft.isEmpty {
             drafts.append(.typed(title: String(localized: "Status Word Not Kept"), text: wordDraft))
             wordDraft = ""

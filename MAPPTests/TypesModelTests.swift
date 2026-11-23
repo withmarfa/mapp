@@ -74,7 +74,15 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
                 let held = record.fields.values.flatMap(\.statusWords).contains { $0.value == value && $0.group == group }
                 guard !held, let key = record.fields.first(where: { $0.value.kind == "status" })?.key else { return }
                 record.fields[key]?.statusWords.append(StatusWordRecord(value: value, group: group))
-            case .wordMeaning:
+            case .field(let key, .addChoice(let word)):
+                guard var field = record.fields[key], !field.choices.contains(word) else { return }
+                field.choices.append(word)
+                record.fields[key] = field
+            case .field(let key, .removeChoice(let word)):
+                guard var field = record.fields[key], field.choices.contains(word), field.choices.count > 1 else { return }
+                field.choices.removeAll { $0 == word }
+                record.fields[key] = field
+            default:
                 break
             }
             state.types[index] = record
@@ -601,13 +609,65 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let model = model(calls)
         await model.load()
         model.openField("kind", of: "user.job")
+        await model.removeChoice("kitchen")
+        #expect(model.fieldErrors[.choice] == "A choice field needs at least one choice.")
+        #expect(calls.state.withLock { $0.changes.isEmpty })
         model.beginChoice()
         model.choiceDraft = "garden"
         await model.commitChoice()
-        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.field(key: "kind", .choices(["kitchen", "garden"]))])
-        await model.removeChoice("kitchen")
-        #expect(model.fieldErrors[.choice] == "A choice field needs at least one choice.")
-        #expect(calls.state.withLock { $0.changes.count } == 1)
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.field(key: "kind", .addChoice("garden"))])
+        #expect(model.ownField("kind", of: "user.job")?.choices == ["kitchen", "garden"])
+    }
+
+    @Test func aChoiceAddedAndAnotherTakenOutWhileTheFirstIsSavingEachKeepTheOthersEdit() async {
+        let calls = withFields()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let model = model(calls)
+        await model.load()
+        model.openField("kind", of: "user.job")
+        model.beginChoice()
+        model.choiceDraft = "garden"
+        let added = Task { await model.commitChoice() }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        let removed = Task { await model.removeChoice("kitchen") }
+        await gate.open()
+        await added.value
+        await removed.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.field(key: "kind", .addChoice("garden")), .field(key: "kind", .removeChoice("kitchen"))])
+        #expect(calls.state.withLock { $0.types[2].fields["kind"]?.choices } == ["stairs", "garden"])
+    }
+
+    @Test func aRefusedSearchableAndARefusedRemoveAreToldOnTheirOwnRows() async {
+        let calls = withFields()
+        calls.state.withLock { $0.refusal = .invalid(field: nil, message: "Not now.") }
+        let model = model(calls)
+        await model.load()
+        model.openField("client", of: "user.job")
+        await model.setSearchable(false)
+        #expect(model.fieldErrors[.fieldSearchable] == "Not now." && model.fieldErrors[.fieldRule] == nil)
+        await model.removeField()
+        #expect(model.fieldErrors[.fieldRemove] == "Not now." && model.fieldErrors[.fieldRule] == nil)
+        #expect(model.openFieldKey == "client")
+    }
+
+    @Test func aRenameALongestAChoiceAndNewFieldChoicesTypedAndNotKeptAreHandedBackWhenSettingsCloses() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        model.openField("client", of: "user.job")
+        model.beginRename()
+        model.fieldNameDraft = "Customer"
+        model.fieldLongest = "80"
+        model.beginChoice()
+        model.choiceDraft = "garden"
+        model.beginField()
+        model.newFieldChoices = "red, green"
+        #expect(model.takeDrafts() == [
+            .typed(title: "New Field Choices Not Kept", text: "red, green"), .typed(title: "Field Longest Not Kept", text: "80"),
+            .typed(title: "Field Name Change Not Kept", text: "Customer"), .typed(title: "Choice Not Kept", text: "garden"),
+        ])
+        #expect(!model.isRenamingField && !model.isAddingField && !model.isAddingChoice && model.fieldLongest == "200")
     }
 
     @Test func aFieldIsOnlyOpenedOnATypeTheOwnerCanChange() async {
@@ -755,6 +815,27 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
             try await TypeDefinitionEdit.run(change, to: "user.job", read: { [job, task] }, replace: { _ in replaced += 1 })
         }
         #expect(replaced == 6)
+    }
+
+    @Test func aChoiceIsAddedToAndTakenOutOfTheChoicesTheFieldOffersNow() throws {
+        let job = listed("user.job", fields: ["kind": Definition(_type: .string, enumValues: ["kitchen", "stairs"])])
+        let added = try TypeDefinitionEdit.update(job, applying: .field(key: "kind", .addChoice("garden")), in: [job])
+        #expect(added.fields.additionalProperties["kind"]?.enumValues == ["kitchen", "stairs", "garden"])
+        let removed = try TypeDefinitionEdit.update(job, applying: .field(key: "kind", .removeChoice("kitchen")), in: [job])
+        #expect(removed.fields.additionalProperties["kind"]?.enumValues == ["stairs"])
+        let last = listed("user.job", fields: ["kind": Definition(_type: .string, enumValues: ["stairs"])])
+        #expect(throws: TypeSchemaFailure.refused("A choice field needs at least one choice.")) {
+            try TypeDefinitionEdit.update(last, applying: .field(key: "kind", .removeChoice("stairs")), in: [last])
+        }
+    }
+
+    @Test func aChoiceTheFieldAlreadyOffersOrLacksIsNotSent() async throws {
+        let job = listed("user.job", fields: ["kind": Definition(_type: .string, enumValues: ["kitchen", "stairs"])])
+        var replaced = 0
+        for change: TypeDefinitionEdit.TypeChange in [.field(key: "kind", .addChoice("stairs")), .field(key: "kind", .removeChoice("garden"))] {
+            try await TypeDefinitionEdit.run(change, to: "user.job", read: { [job] }, replace: { _ in replaced += 1 })
+        }
+        #expect(replaced == 0)
     }
 
     @Test func aPluginsTypeIsNeverReplaced() async {

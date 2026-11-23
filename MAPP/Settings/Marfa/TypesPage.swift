@@ -295,7 +295,7 @@ private struct TypeDetail: View {
             SettingsSection("Fields") {
                 if !inherited.isEmpty {
                     SettingsRow(
-                        verbatim: inherited.count == 1 ? String(localized: "1 Field") : String(localized: "\(inherited.count) Fields"),
+                        verbatim: String(AttributedString(localized: "^[\(inherited.count) Field](inflect: true) From \(parentTitle ?? source)").characters),
                         line: Self.summary(of: inherited), lead: .none
                     ) { SettingsLockedValue(text: source) }
                 }
@@ -364,8 +364,8 @@ private struct TypeDetail: View {
         let below = model.children(of: type.id)
         if !below.isEmpty { return String(localized: "Types are based on \(name). Change or delete those first.") }
         let items = model.ownItemCount(of: type.id)
-        if items > 0 { return String(localized: "It holds \(items) items. Move them to another type first.") }
-        return String(localized: "Nothing holds it, so it can go.")
+        if items > 0 { return String(AttributedString(localized: "It holds ^[\(items) item](inflect: true). Move them to another type first.").characters) }
+        return String(localized: "No item in your library holds it.")
     }
 
     private var deleteSection: some View {
@@ -419,6 +419,9 @@ private struct FieldDetail: View {
 
     private var name: String { TypesModel.title(of: field) }
     private var kind: FieldKind? { FieldKind(rawValue: field.kind) }
+    /// What the type calls one of its items, and several, as the sentences under the rules say them.
+    private var singular: String { type.label.localizedLowercase }
+    private var plural: String { model.title(of: type).localizedLowercase }
 
     var body: some View {
         @Bindable var model = model
@@ -444,10 +447,10 @@ private struct FieldDetail: View {
                 if kind == .choice { choicesRow }
             }
             SettingsSection("Rules") {
-                SettingsRow(title: Text("Required"), line: Text("Every item must have one."), error: model.fieldErrors[.fieldRule]) {
+                SettingsRow(title: Text("Required"), line: Text("Every \(singular) must have one."), error: model.fieldErrors[.fieldRule]) {
                     SettingsToggle(title: "Required", isOn: Binding { field.isRequired } set: { on in Task { await model.setRequired(on) } })
                 }
-                SettingsRow(title: Text("Searchable"), line: Text("Search finds items by it.")) {
+                SettingsRow(title: Text("Searchable"), line: Text("Search finds \(plural) by it."), error: model.fieldErrors[.fieldSearchable]) {
                     SettingsToggle(title: "Searchable", isOn: Binding { field.isSearchable } set: { on in Task { await model.setSearchable(on) } })
                 }
                 if kind == .text {
@@ -460,7 +463,7 @@ private struct FieldDetail: View {
                 }
             }
             SettingsSection("Remove") {
-                SettingsRow(title: Text("Remove \(name)"), line: Text("Each item keeps its value.")) {
+                SettingsRow(title: Text("Remove \(name)"), line: Text("Each \(singular) keeps its value."), error: model.fieldErrors[.fieldRemove]) {
                     SettingsButton("Remove…", role: .destructive) { askToRemove() }
                 }
             }

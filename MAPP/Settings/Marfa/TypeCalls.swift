@@ -129,8 +129,10 @@ nonisolated enum TypeFieldChange: Hashable, Sendable {
     case searchable(Bool)
     /// Nil takes the limit away.
     case longest(Int?)
-    /// The whole list, in order. A word a field already offers goes back as it is.
-    case choices([String])
+    /// A choice after the ones the field offers now; one it already offers is left as it is.
+    case addChoice(String)
+    /// Takes one choice out of the ones the field offers now, which can't be the last.
+    case removeChoice(String)
 }
 
 /// Why a call about a type did not do what was asked.
