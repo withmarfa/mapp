@@ -1,9 +1,11 @@
 import SwiftUI
 
+/// A place's items by day. Choosing a row runs the list that holds the selection, not this body, which places every
+/// item, so a selection does not place them again.
 struct ItemTimeline: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
-    @Bindable var browser: Browser
+    let browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
@@ -94,7 +96,7 @@ struct ItemTimeline: View {
     }
 
     private func list(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> some View {
-        List(selection: $browser.selection) {
+        SelectableTimeline(browser: browser) {
             ForEach(groups) { group in
                 ForEach(lines(of: group, now: now)) { line in
                     switch line {
@@ -243,6 +245,17 @@ struct ItemTimeline: View {
         case .notApplicable:
             Text("Not Applicable").interfaceFont(.headline).foregroundStyle(.secondary)
         }
+    }
+}
+
+/// The list, apart from the timeline's body: a list reads its selection as it is made, so a change of selection runs
+/// this body rather than the timeline's, which places every item the place holds.
+private struct SelectableTimeline<Content: View>: View {
+    @Bindable var browser: Browser
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        List(selection: $browser.selection) { content }
     }
 }
 
