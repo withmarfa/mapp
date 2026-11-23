@@ -54,8 +54,38 @@ nonisolated struct AppAccess: Identifiable, Hashable, Sendable {
     var name: String?
     var origins: [String]
     var scopes: [String]
+    /// Each `app.<vendor>` namespace the app holds, where its own data is kept.
+    var vendors: [String] = []
     var granted: Date?
     var lastUsed: Date?
+}
+
+/// What an app keeps under one `app.<vendor>` namespace, as items counted by type and state. Marfa answers counts, never a size.
+nonisolated struct AppData: Hashable, Sendable {
+    struct Kind: Hashable, Sendable {
+        let type: String
+        var active: Int
+        var archived: Int
+        var trashed: Int
+    }
+
+    let vendor: String
+    var types: [Kind]
+
+    var active: Int { types.reduce(0) { $0 + $1.active } }
+    var archived: Int { types.reduce(0) { $0 + $1.archived } }
+    var trashed: Int { types.reduce(0) { $0 + $1.trashed } }
+    var total: Int { active + archived + trashed }
+}
+
+/// How removing a namespace's data ended: what the server deleted over every call it answered, and what it says is left.
+nonisolated struct AppDataRemoved: Hashable, Sendable {
+    var removedItems: Int
+    var remainingItems: Int
+    /// Why it stopped with items left, or nil where it did not stop early.
+    var stoppedBy: OwnerFailure?
+
+    var isComplete: Bool { stoppedBy == nil && remainingItems == 0 }
 }
 
 nonisolated enum KeyTier: String, CaseIterable, Hashable, Sendable {
@@ -183,7 +213,13 @@ nonisolated protocol OwnerCalls: Sendable {
     func apps() async throws(OwnerFailure) -> [AppAccess]
     /// Narrows an app to `scopes`, which were read as `expected`; a change since is a `conflict`.
     func narrow(_ app: AppAccess, to scopes: [String]) async throws(OwnerFailure)
-    func disconnect(_ app: AppAccess) async throws(OwnerFailure)
+    /// Disconnects `app`; `removingData` also deletes for good what it keeps, in the same write (`items.purge`).
+    func disconnect(_ app: AppAccess, removingData: Bool) async throws(OwnerFailure)
+    /// What an app keeps under `vendor`, an `app.<vendor>` namespace (`grants.manage`).
+    func appData(vendor: String) async throws(OwnerFailure) -> AppData
+    /// Deletes everything under `vendor` for good, calling again until none is left. Throws where the first call fails; a
+    /// later failure comes back as `stoppedBy`.
+    func removeAppData(vendor: String) async throws(OwnerFailure) -> AppDataRemoved
 
     func keys() async throws(OwnerFailure) -> [KeyInfo]
     func create(_ key: NewKey) async throws(OwnerFailure) -> CreatedKey
@@ -443,7 +479,8 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
                     }
                 return AppAccess(
                     id: grant.id, clientID: grant.clientId, kind: kind, name: grant.clientName, origins: grant.origins,
-                    scopes: grant.scopes, granted: Self.date(grant.grantedAt), lastUsed: Self.date(grant.lastUsedAt))
+                    scopes: grant.scopes, vendors: grant.vendors, granted: Self.date(grant.grantedAt),
+                    lastUsed: Self.date(grant.lastUsedAt))
             }
         }
     }
@@ -457,8 +494,30 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         }
     }
 
-    func disconnect(_ app: AppAccess) async throws(OwnerFailure) {
-        try await run { client in _ = try await client.revokeAppGrant(path: .init(id: app.id)).ok }
+    func disconnect(_ app: AppAccess, removingData: Bool) async throws(OwnerFailure) {
+        try await run { client in
+            try await client.disconnect(grant: app.id, data: removingData ? .remove(.ownerConfirmed) : .keep)
+        }
+    }
+
+    func appData(vendor: String) async throws(OwnerFailure) -> AppData {
+        try await run { client in
+            let page = try await client.appData(vendor: vendor)
+            return AppData(
+                vendor: page.vendor,
+                types: page.types.map {
+                    AppData.Kind(type: $0._type, active: $0.active, archived: $0.archived, trashed: $0.trashed)
+                })
+        }
+    }
+
+    func removeAppData(vendor: String) async throws(OwnerFailure) -> AppDataRemoved {
+        try await run { client in
+            let removal = try await client.removeAppData(vendor: vendor, .ownerConfirmed)
+            return AppDataRemoved(
+                removedItems: removal.removedItems, remainingItems: removal.remainingItems,
+                stoppedBy: removal.stoppedBy.map { Self.failure($0) })
+        }
     }
 
     // MARK: Keys

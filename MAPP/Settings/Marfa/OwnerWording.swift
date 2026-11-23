@@ -208,3 +208,26 @@ nonisolated enum AccessScopes {
         return parts.joined(separator: " ")
     }
 }
+
+/// The words for the data an app keeps, which Marfa answers as counts by state, never as a size.
+nonisolated enum AppDataWording {
+    /// How many items are held, by state, and who can read them. MAPP's own settings say where they are removed.
+    static func line(_ data: AppData, appName: String, keptByMAPP: Bool) -> String {
+        var parts: [String] = []
+        if data.active > 0 { parts.append(String(localized: "\(data.active) active")) }
+        if data.archived > 0 { parts.append(String(localized: "\(data.archived) archived")) }
+        if data.trashed > 0 { parts.append(String(localized: "\(data.trashed) in the trash")) }
+        let counts = parts.isEmpty ? String(localized: "No items.") : String(localized: "Items: \(parts.formatted(.list(type: .and))).")
+        let who = keptByMAPP
+            ? String(localized: "These are MAPP’s settings, which every Mac that connects uses. Remove them in Connection, where MAPP keeps them in step.")
+            : String(localized: "Only \(appName) and you can read it.")
+        return counts + " " + who
+    }
+
+    /// What a removal that stopped early left, which the page's counts then show.
+    static func unfinished(_ removal: AppDataRemoved) -> String {
+        let reason = removal.stoppedBy.map { OwnerWording.line($0) }
+        let left = String(localized: "Some of it is still there, as the counts show. Remove it again to finish.")
+        return [reason, left].compactMap { $0 }.joined(separator: " ")
+    }
+}
