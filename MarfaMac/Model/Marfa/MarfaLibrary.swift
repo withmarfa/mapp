@@ -197,6 +197,10 @@ import Observation
     /// (`MarfaLibrary+Undoing`).
     @ObservationIgnored var undoRun: UndoRun?
     @ObservationIgnored private var undoRuns: [WriteID: UndoRun] = [:]
+    /// Where this Mac's state change on its way leaves each item, until the copy shows it (`setStates`).
+    @ObservationIgnored var movingTo: [ItemID: StateMoving] = [:]
+    /// What follows the answer to each write of a state change, told whether the server took it (`setStates`).
+    @ObservationIgnored var stateAnswers: [WriteID: (WriteID, Bool) -> Void] = [:]
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
@@ -633,12 +637,14 @@ import Observation
             propertyMarks[id] = nil
             read(id)
             answered(id, outcome)
+            stateWriteAnswered(id, outcome)
             settle(id)
         case .taken(let id):
             textSaves.removeValue(forKey: id)?.end()
             propertyWrites[id] = nil
             if let mark = propertyMarks.removeValue(forKey: id) { remember(taken: mark) }
             took(id)
+            stateWriteTaken(id)
             read(id)
             settle(id)
         case .catalogue(let catalogue):

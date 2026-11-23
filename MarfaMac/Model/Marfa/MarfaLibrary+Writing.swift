@@ -410,20 +410,91 @@ extension MarfaLibrary {
         setStates(changes, name: String(localized: "Recover"), undoManager: undoManager)
     }
 
-    func setStates(_ changes: [ItemID: (from: ItemState, to: ItemState)], name: String, undoManager: UndoManager?) {
-        let changes = changes.filter { item($0.key) != nil }
-        guard !changes.isEmpty else { return }
-        for (id, change) in changes {
-            if change.from == .trashed {
-                submit(.transition(id, change.to), failing: String(localized: "Can’t Recover"))
-            } else {
-                submit(.transition(id, change.to), failing: String(localized: "Couldn’t Make This Change"))
+    /// An Undo or Redo moves only an item still in the state this Mac left it in (`stateLeft`). A state moves no
+    /// version, so the server would not catch a change another device made since; that item is left alone and the
+    /// person told. The step registered in return reverses only what the server took.
+    func setStates(_ changes: [ItemID: StateChange], name: String, undoManager: UndoManager?) {
+        var changes = changes.filter { item($0.key) != nil }
+        var changedSince = BatchSkips()
+        if undoRun != nil {
+            for (id, change) in changes where stateLeft(id) != change.from {
+                changes[id] = nil
+                changedSince.skip(.changedSince)
+            }
+            tellSkipped(changedSince, didChange: !changes.isEmpty, failing: name)
+            if changes.isEmpty, !changedSince.isEmpty { undoRun?.outcome.wasMade = false }
+        }
+        guard !changes.isEmpty || !changedSince.isEmpty else { return }
+        let made = StateMoves()
+        for (id, change) in changes { move(id, change, recordingIn: made, name: name) }
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            guard !made.moves.isEmpty else {
+                return library.notices.tell(name, String(localized: "That change wasn’t made, so there is nothing to undo here."))
+            }
+            library.setStates(made.moves.mapValues { (from: $0.to, to: $0.from) }, name: name, undoManager: undoManager)
+        }
+    }
+
+    /// The state an item is in as this Mac left it: where a state change on its way leaves it, or else what the copy shows.
+    func stateLeft(_ id: ItemID) -> ItemState? {
+        movingTo[id]?.to ?? item(id)?.state
+    }
+
+    /// The server takes an item out of the bin only to active (`items/transition`), so a move from the bin to the
+    /// archive restores it, then archives it once the server has accepted the restore. Queued together, the archive
+    /// would be sent after a refused restore (`queue-and-verdicts/answer-frees-follower`) and archive an item another
+    /// device had restored meanwhile.
+    private func move(_ id: ItemID, _ change: StateChange, recordingIn made: StateMoves, name: String) {
+        made.moves[id] = change
+        let throughActive = change.from == .trashed && change.to == .archived
+        let title = change.from == .trashed ? String(localized: "Can’t Recover") : String(localized: "Couldn’t Make This Change")
+        let run = undoRun
+        sendState(id, throughActive ? .active : change.to, leaving: change.to, failing: title) { [weak self] restore, accepted in
+            guard accepted else {
+                made.moves[id] = nil
+                return
+            }
+            // A later state change of this item, made before the answer, is the one that stands.
+            guard let self, throughActive, movingTo[id]?.write == restore else { return }
+            guard item(id)?.state == .active else {
+                movingTo[id] = nil
+                made.moves[id] = (from: change.from, to: .active)
+                return notices.tell(name, BatchSkips.sentence(.changedSince, count: 1))
+            }
+            within(run) {
+                sendState(id, .archived, leaving: .archived, failing: String(localized: "Couldn’t Make This Change")) { _, accepted in
+                    if !accepted { made.moves[id] = (from: change.from, to: .active) }
+                }
             }
         }
-        let reversed = changes.mapValues { (from: $0.to, to: $0.from) }
-        registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.setStates(reversed, name: name, undoManager: undoManager)
+    }
+
+    /// `answered` is told whether the server took the write, at once where the source would not take it.
+    private func sendState(
+        _ id: ItemID, _ state: ItemState, leaving final: ItemState, failing title: String,
+        answered: @escaping (WriteID, Bool) -> Void
+    ) {
+        let write = submit(.transition(id, state), failing: title)
+        guard isFollowed(write) else { return answered(write, false) }
+        movingTo[id] = StateMoving(write: write, sent: state, to: final)
+        stateAnswers[write] = answered
+    }
+
+    /// The copy shows the write, so the item stands where the copy says, unless a second write is still to follow.
+    func stateWriteTaken(_ write: WriteID) {
+        guard let (id, moving) = movingTo.first(where: { $0.value.write == write }), moving.sent == moving.to else { return }
+        movingTo[id] = nil
+    }
+
+    func stateWriteAnswered(_ write: WriteID, _ outcome: WriteOutcome) {
+        let accepted = switch outcome {
+        case .accepted, .merged: true
+        case .conflicted, .refused, .blocked, .dead: false
         }
+        if let (id, moving) = movingTo.first(where: { $0.value.write == write }), !accepted || moving.sent == moving.to {
+            movingTo[id] = nil
+        }
+        stateAnswers.removeValue(forKey: write)?(write, accepted)
     }
 
     /// Destroys items in the bin at the server, which only a server that can be reached does, so it is only where
@@ -496,6 +567,23 @@ extension MarfaLibrary {
         return nil
     }
 
+}
+
+/// An item's state before and after a state change.
+typealias StateChange = (from: ItemState, to: ItemState)
+
+/// A state change of this Mac's on its way: the write sent, the state it sends and the state the change leaves the
+/// item in, which differ while a second write is still to follow.
+struct StateMoving {
+    let write: WriteID
+    let sent: ItemState
+    let to: ItemState
+}
+
+/// The moves a state change made, kept as the server answers them, so the change registered in return reverses
+/// only what was made.
+final class StateMoves {
+    var moves: [ItemID: StateChange] = [:]
 }
 
 /// What a change of type wrote, filled in when its writes are made.

@@ -27,6 +27,8 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case fileHasNoLane
         /// Selected, but not on the board now, as when a search or filter has hidden it since.
         case notShown
+        /// No longer as this Mac left it, so an Undo or Redo would overwrite a change made since.
+        case changedSince
     }
 
     private(set) var counts: [Reason: Int] = [:]
@@ -59,6 +61,7 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case .needsValue: String(localized: "\(count) items need a value there, so it can’t be cleared.")
         case .fileHasNoLane: String(localized: "\(count) items are files, which can’t be moved between lanes.")
         case .notShown: String(localized: "\(count) items aren’t on this board.")
+        case .changedSince: String(localized: "\(count) items have changed since, so they were left as they are.")
         }
     }
 }

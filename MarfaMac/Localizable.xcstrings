@@ -3214,6 +3214,29 @@
         }
       }
     },
+    "%lld items have changed since, so they were left as they are." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item has changed since, so it was left as it is."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items have changed since, so they were left as they are."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld minutes" : {
 
     },
