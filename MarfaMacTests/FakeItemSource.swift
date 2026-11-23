@@ -65,6 +65,11 @@ nonisolated final class FakeItemSource: ItemSource {
     let searchIncomplete = Mutex(false)
     let searchCapped = Mutex(false)
     let targets = Mutex<[SearchTarget]>([])
+    /// Queries `search` does not answer until a test lets them go. A cancelled search still answers, so a late one
+    /// can be told from one that never returned.
+    let searchHolds = Mutex<Set<String>>([])
+    /// How many searches have answered, including one a cancellation let go.
+    let searchesFinished = Mutex(0)
     /// What `items(inView:)` answers for each view; any other lists nothing.
     let viewMembers = Mutex<[ItemID: [ItemID]]>([:])
     let viewReads = Mutex(0)
@@ -214,10 +219,28 @@ nonisolated final class FakeItemSource: ItemSource {
     func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch {
         searches.withLock { $0 += 1 }
         targets.withLock { $0.append(target) }
+        while searchHolds.withLock({ $0.contains(text) }), !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        searchesFinished.withLock { $0 += 1 }
         if searchFails.withLock({ $0 }) { throw SourceFailure(kind: .failed, message: "The search could not be read.") }
         return SourceSearch(
             hits: hits.withLock { $0[text] ?? [] }, excerpts: excerpts.withLock { $0[text] ?? [:] },
             isIncomplete: searchIncomplete.withLock { $0 }, isCapped: searchCapped.withLock { $0 })
+    }
+
+    /// Holds `search` on each query until `releaseSearches`.
+    func holdSearches(_ queries: String...) {
+        searchHolds.withLock { holds in
+            for query in queries { holds.insert(query) }
+        }
+    }
+
+    /// Lets the named queries answer. A query that is not named stays held.
+    func releaseSearches(_ queries: String...) {
+        searchHolds.withLock { holds in
+            for query in queries { holds.remove(query) }
+        }
     }
 
     /// The views the fake server holds. A change based on another version than the one held is refused as a
