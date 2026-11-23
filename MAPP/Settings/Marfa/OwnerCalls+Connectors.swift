@@ -169,7 +169,7 @@ extension ClientOwnerCalls {
         ConnectorControl(host: control.host, registration: control.registration, paused: control.paused, runRequested: control.runRequestedAt)
     }
 
-    private static func value(_ container: OpenAPIValueContainer) -> ConnectorSettingValue? {
+    static func value(_ container: OpenAPIValueContainer) -> ConnectorSettingValue? {
         switch container.value {
         case let flag as Bool: .flag(flag)
         case let number as Int: .number(Double(number))
@@ -197,7 +197,7 @@ extension ClientOwnerCalls {
             missing: answer.missing)
     }
 
-    private static func container(_ value: ConnectorSettingValue?) -> OpenAPIValueContainer {
+    static func container(_ value: ConnectorSettingValue?) -> OpenAPIValueContainer {
         switch value {
         case .text(let text)?: OpenAPIValueContainer(stringLiteral: text)
         case .number(let number)?: (try? OpenAPIValueContainer(unvalidatedValue: number)) ?? OpenAPIValueContainer(nilLiteral: ())

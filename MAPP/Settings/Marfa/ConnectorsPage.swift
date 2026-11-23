@@ -8,6 +8,7 @@ struct ConnectorsPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: ConnectorsModel
+    @State private var mappings = ConnectorMappingModels()
     @Environment(\.settingsPush) private var push
     @Environment(\.settingsBack) private var back
 
@@ -24,9 +25,20 @@ struct ConnectorsPage: View {
         SettingsSubpage(id: "connector:" + name, title: title)
     }
 
+    static func subpage(for kind: ConnectorKind, of summary: PluginConnectorSummary) -> SettingsSubpage {
+        SettingsSubpage(id: "mapping:\(summary.name)/\(kind.name)", title: ConnectorWording.kindTitle(kind.name))
+    }
+
     private var openName: String? {
         guard let id = subpage?.id, id.hasPrefix("connector:") else { return nil }
         return String(id.dropFirst(10))
+    }
+
+    /// The connector and kind a mapping page names.
+    private var openMapping: (plugin: String, kind: String)? {
+        guard let id = subpage?.id, id.hasPrefix("mapping:") else { return nil }
+        let parts = id.dropFirst(8).split(separator: "/", maxSplits: 1).map(String.init)
+        return parts.count == 2 ? (parts[0], parts[1]) : nil
     }
 
     var body: some View {
@@ -53,6 +65,16 @@ struct ConnectorsPage: View {
             OwnerFailureState(page: .connectors, failure: failure, host: host) { Task { await model.load() } }
         } else if !model.hasLoaded {
             OwnerLoading()
+        } else if let open = openMapping {
+            if let entry = model.entry(open.plugin), let kind = entry.summary.kinds.first(where: { $0.name == open.kind }) {
+                ConnectorMappingPage(
+                    model: mappings.model(for: entry.summary, context: OwnerContext(host: host)), kind: kind,
+                    previewBlock: Self.previewBlock(entry, title: entry.summary.title), host: host)
+            } else {
+                SettingsPageState(
+                    symbol: "arrow.triangle.2.circlepath", title: Text("This Connector Is Gone"),
+                    line: Text("Its plugin was removed, here or somewhere else."), action: ("Back", back))
+            }
         } else if let name = openName {
             if let entry = model.entry(name) {
                 ConnectorDetail(model: model, entry: entry, host: host)
@@ -97,6 +119,14 @@ struct ConnectorsPage: View {
         return String(localized: "\(entry.summary.description) Runs on \(name).")
     }
 
+    /// Why no preview can be asked for now, or nil where one can: a paused connector and one with no machine answer none.
+    static func previewBlock(_ entry: ConnectorsModel.Entry, title: String) -> String? {
+        guard let control = entry.control else { return nil }
+        if control.paused { return String(localized: "Resume \(title) to see one. A paused connector answers no preview.") }
+        if control.host == nil { return String(localized: "Choose the machine that runs \(title) to see one.") }
+        return nil
+    }
+
     static func dot(_ health: ConnectorHealth) -> Color {
         switch health {
         case .ran: SettingsTokens.ok
@@ -106,11 +136,24 @@ struct ConnectorsPage: View {
     }
 }
 
+/// The mapping models of the connectors whose mapping page was opened, so Back and Forward return to the same draft.
+@MainActor final class ConnectorMappingModels {
+    private var held: [String: ConnectorMappingModel] = [:]
+
+    func model(for summary: PluginConnectorSummary, context: OwnerContext) -> ConnectorMappingModel {
+        if let model = held[summary.name] { return model }
+        let model = ConnectorMappingModel(context: context, plugin: summary)
+        held[summary.name] = model
+        return model
+    }
+}
+
 /// One connector's page.
 private struct ConnectorDetail: View {
     let model: ConnectorsModel
     let entry: ConnectorsModel.Entry
     let host: any MarfaSettingsHost
+    @Environment(\.settingsPush) private var push
 
     private var summary: PluginConnectorSummary { entry.summary }
     private var health: ConnectorHealth { model.health(of: entry) }
@@ -314,9 +357,10 @@ private struct ConnectorDetail: View {
         if !summary.kinds.isEmpty {
             SettingsSection("What It Brings") {
                 ForEach(summary.kinds) { kind in
-                    SettingsRow(
+                    SettingsLinkRow(
                         verbatim: ConnectorWording.kindTitle(kind.name),
-                        line: ConnectorWording.kindLine(kind, typeName: model.typeName(kind.type)), size: .compact)
+                        line: ConnectorWording.kindLine(kind, typeName: model.typeName(kind.type)), lines: 1
+                    ) { push(ConnectorsPage.subpage(for: kind, of: summary)) }
                 }
             }
         }
