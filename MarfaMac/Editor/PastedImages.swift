@@ -31,7 +31,7 @@ enum PastedImages {
     }
 
     /// The images' names and bytes, read away from the main thread, since a file can be large, and the name of each
-    /// file that was too large or couldn't be read.
+    /// file that was too large or couldn't be read. A file chosen in an open panel is read under its security scope.
     @concurrent nonisolated static func read(_ sources: [Source]) async -> (images: [(name: String, data: Data)], skipped: [String]) {
         var images: [(name: String, data: Data)] = []
         var skipped: [String] = []
@@ -40,6 +40,8 @@ enum PastedImages {
             case .data(let name, let data):
                 images.append((name, data))
             case .file(let url):
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
                 if let data = readImage(url) { images.append((url.lastPathComponent, data)) } else { skipped.append(url.lastPathComponent) }
             }
         }

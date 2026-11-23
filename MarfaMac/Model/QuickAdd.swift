@@ -12,10 +12,12 @@ final class QuickAdd {
         let url: URL
         let byteCount: Int64?
         let contentType: UTType?
+        private let access: FileAccess
 
         /// Nil for a folder, a package or anything else that is not one file that can be read. A symbolic link is
         /// taken as the file it points to.
         init?(_ link: URL) {
+            access = FileAccess(link)
             let url = link.resolvingSymlinksInPath()
             guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentTypeKey]),
                   values.isRegularFile == true, FileManager.default.isReadableFile(atPath: url.path(percentEncoded: false))
@@ -56,6 +58,20 @@ final class QuickAdd {
                 ? String(localized: "\(names(files)) wasn’t added.")
                 : String(localized: "\(names(files)) weren’t added.")
         }
+    }
+
+    /// Holds the security scope of a file the person chose in a panel, which `fileImporter` gives sandboxed or not, so
+    /// the file can be read later, and gives it up once nothing holds the file.
+    nonisolated final class FileAccess: Sendable {
+        private let url: URL
+        private let scoped: Bool
+
+        init(_ url: URL) {
+            self.url = url
+            scoped = url.startAccessingSecurityScopedResource()
+        }
+
+        deinit { if scoped { url.stopAccessingSecurityScopedResource() } }
     }
 
     /// A detail of the item the panel shows as a chip under its text: its parent, or one of its kind's fields.
