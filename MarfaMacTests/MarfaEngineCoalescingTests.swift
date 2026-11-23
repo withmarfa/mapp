@@ -690,6 +690,47 @@ import Testing
         await scene.close()
     }
 
+    /// The person's first save is sent as read and accepted. Before the engine counts that answer, another device's
+    /// body reaches the copy. The person's next save follows the first, and must not be sent on the version that
+    /// holds the other device's body, where the server would lay it over that body.
+    @Test @MainActor func aSaveAfterAnAnswerCountedLateLeavesAnotherDevicesBody() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("note", title: "Note", body: "Base")]))
+        let library = MarfaLibrary(
+            source: scene.source, notices: Notices(), textPause: MarfaLibrary.TextPause(quiet: .seconds(600), cap: .seconds(600)))
+        try #require(await eventually { library.isLoaded })
+        let id = ItemID("note")
+        func otherDevice(_ properties: JSONObject, on version: Int64) async throws {
+            let write = try await scene.copy.items.update("note", Edit(properties: properties, baseVersion: version))
+            scene.fake.verdict = { _ in .accepted }
+            _ = try await scene.copy.queue.drain()
+            _ = try await scene.copy.queue.forgetAnswered(ids: [write.id])
+        }
+
+        // The copy is ahead of the page, so the first save goes as read on version 1.
+        try await otherDevice(["title": .string("Their title")], on: 1)
+        library.updateBody(of: id, to: "Mine", readAt: ItemVersion(1))
+        library.sendWaitingText()
+        await scene.source.queueSubmitted()
+        let first = try #require(try await scene.copy.queue.all().first { $0.itemId == "note" })
+        try #require(first.baseVersion == 1)
+        library.updateBody(of: id, to: "Mine, more", readAt: ItemVersion(1))
+
+        scene.fake.verdict = { _ in .accepted }
+        _ = try await scene.copy.queue.drain()
+        let answered = try #require(try await scene.copy.items.get("note")?.version)
+        try await otherDevice(["body": .string("Theirs")], on: answered)
+        let theirs = try #require(try await scene.copy.items.get("note"))
+        try #require(theirs.properties["body"] == .string("Theirs"))
+        await scene.source.tellAnswers()
+        library.sendWaitingText()
+        await scene.source.queueSubmitted()
+        let second = try #require(try await scene.copy.queue.all().first { $0.itemId == "note" && $0.verdict == nil })
+        #expect(
+            (second.baseVersion ?? theirs.version) < theirs.version,
+            "the save went on version \(String(describing: second.baseVersion)), which holds the other device's body")
+        await scene.close()
+    }
+
     /// Attaching a large file takes as long as the copy takes to read it. A save of the item's text made meanwhile
     /// is kept at once, and the attach's answer leaves it as it is.
     @Test @MainActor func aTextSaveIsKeptWhileALargeFileIsAttached() async throws {

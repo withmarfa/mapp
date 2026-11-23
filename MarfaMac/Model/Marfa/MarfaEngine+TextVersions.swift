@@ -67,10 +67,13 @@ extension MarfaEngine {
         return ownText[id]?.on ?? base.rawValue
     }
 
-    /// Moves the version the person's own writes account for past the answers the copy has taken. A create or update
-    /// the server took on the version it held moves the item one version on (`versions/create-version-one`,
-    /// `versions/update-step`); one merged, or sent as read on an older version, lands on whatever the server held,
-    /// which the copy now shows with every answer taken so far. Any other answer leaves the item where it was.
+    /// Moves the version the person's own writes account for past the answers the copy has taken. Each answer names
+    /// the version its write made, and the person's text accounts for that version alone: the copy can already hold a
+    /// later one, another device's change that arrived before the answer was counted, which a save following on the
+    /// copy's version would lay its text over. A create or update the server took on the version it held, with no
+    /// version in its answer, moves the item one version on (`versions/create-version-one`, `versions/update-step`).
+    /// One merged, or sent as read on an older version, with no version in its answer, leaves it where it was, so the
+    /// next save is merged rather than laid over a change. Any other answer leaves the item where it was.
     func count(answers queue: [Marfa.QueuedWrite], for id: ItemID) async throws {
         guard let own = ownText[id] else { return }
         var taken = counted
@@ -80,8 +83,10 @@ extension MarfaEngine {
         counted.formUnion(taken)
     }
 
-    /// `own` moved past the answers in `queue` not yet in `counted`. Each is put in `counted` only once its effect
-    /// is known, so an answer whose version cannot be read, as while the copy is hydrated again, is counted later.
+    /// `own` moved past the answers in `queue` not yet in `counted`. A version an answer names is held to the copy's
+    /// (`held`), since an edit on a version the copy does not hold yet is refused (`queue-and-verdicts/as-read-bounds`).
+    /// Each answer is put in `counted` only once its effect is known, so one whose effect needs the copy's version,
+    /// which cannot be read while the copy is hydrated again, is counted later.
     nonisolated static func counting(
         _ queue: [Marfa.QueuedWrite], for id: ItemID, own: OwnText, counted: inout Set<String>, sentAsRead: Set<String>,
         held: () async throws -> Int64
@@ -91,12 +96,19 @@ extension MarfaEngine {
                 && !counted.contains($0.id)
         }
         guard !answered.isEmpty else { return own }
-        let landedElsewhere = answered.contains { write in
-            if case .merged = write.verdict { return true }
-            return write.verdict == .accepted && sentAsRead.contains(write.id)
-        }
         var own = own
-        own.on = landedElsewhere ? try await held() : own.on + Int64(answered.count { $0.verdict == .accepted })
+        var named = false
+        for write in answered {
+            let landed = if case .merged = write.verdict { true } else { write.verdict == .accepted }
+            guard landed else { continue }
+            if let version = write.answer?.object?["item"]?.object?["version"]?.integer {
+                own.on = max(own.on, version)
+                named = true
+            } else if write.verdict == .accepted, !sentAsRead.contains(write.id) {
+                own.on += 1
+            }
+        }
+        if named { own.on = min(own.on, try await held()) }
         counted.formUnion(answered.map(\.id))
         return own
     }

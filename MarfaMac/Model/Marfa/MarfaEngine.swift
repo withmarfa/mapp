@@ -172,7 +172,8 @@ actor MarfaEngine {
         return .seconds(30)
     }
 
-    /// Edits queued as read on a version older than the copy held, whose answer lands on whatever the server held.
+    /// Edits queued as read on a version older than the copy held, whose answer lands on whatever the server held,
+    /// not one version on from the version sent (`counting`).
     var sentAsRead: Set<String> = []
     var painted = false
     /// Whether the package's first update, which always asks to read everything, has been taken.

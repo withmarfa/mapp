@@ -685,16 +685,23 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
-    /// An answer moves the person's text on only once its effect is known. One that landed elsewhere needs the
-    /// version the copy holds, which an expired copy cannot read, so it stays to be counted again.
+    /// An answer moves the person's text to the version the answer names, never past it to one the copy holds
+    /// since, and only once its effect is known: a named version is held to the copy's, which an expired copy
+    /// cannot read, so it stays to be counted again.
     @Test func anAnswerIsCountedOnlyOnceTheVersionItNeedsIsRead() async throws {
         struct Unreadable: Error {}
-        func write(_ id: String, _ verdict: Marfa.Verdict) -> Marfa.QueuedWrite {
+        func write(_ id: String, _ verdict: Marfa.Verdict, made version: Int64? = nil) -> Marfa.QueuedWrite {
             Marfa.QueuedWrite(
                 id: id, kind: .updateItem, itemId: "item", idempotencyKey: id, verdict: verdict,
+                answer: version.map { .object(["item": .object(["version": .integer($0)])]) },
                 queuedAt: "2026-10-06T00:00:00Z")
         }
-        let queue = [write("merged", .merged(fields: ["body"])), write("taken", .accepted)]
+        func count(_ queue: [Marfa.QueuedWrite], asRead: Set<String> = [], held: Int64) async -> Int64 {
+            var counted: Set<String> = []
+            let own = MarfaEngine.OwnText(text: "Mine", on: 3)
+            return await MarfaEngine.counting(queue, for: ItemID("item"), own: own, counted: &counted, sentAsRead: asRead) { held }.on
+        }
+        let queue = [write("merged", .merged(fields: ["body"]), made: 7), write("taken", .accepted)]
         let own = MarfaEngine.OwnText(text: "Mine", on: 3)
         var counted: Set<String> = []
         await #expect(throws: Unreadable.self) {
@@ -705,15 +712,20 @@ struct MarfaSourceOfflineTests {
         #expect(counted.isEmpty)
 
         let moved = await MarfaEngine.counting(queue, for: ItemID("item"), own: own, counted: &counted, sentAsRead: []) {
-            9
+            12
         }
-        #expect(moved.on == 9)
+        #expect(moved.on == 8)
         #expect(counted == ["merged", "taken"])
         // Counted once, the same answers move it no further.
         let again = await MarfaEngine.counting(queue, for: ItemID("item"), own: moved, counted: &counted, sentAsRead: []) {
             12
         }
         #expect(again == moved)
+        #expect(await count([write("read", .accepted, made: 5)], asRead: ["read"], held: 9) == 5)
+        #expect(await count([write("merged", .merged(fields: ["body"]), made: 7)], held: 6) == 6)
+        // With no version named, a save merged elsewhere leaves the text where it was, so the next one is merged too.
+        #expect(await count([write("merged", .merged(fields: ["body"]))], held: 9) == 3)
+        #expect(await count([write("read", .accepted)], asRead: ["read"], held: 9) == 3)
         // Accepted on the version it was sent on, an answer moves the text one version on without reading.
         var fresh: Set<String> = []
         let accepted = try await MarfaEngine.counting(
