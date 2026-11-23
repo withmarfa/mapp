@@ -46,16 +46,6 @@ enum MappingWording {
         return OwnerWording.line(failure)
     }
 
-    /// The pop-up's word for how a field is filled.
-    static func choice(_ choice: MappingChoice, in field: MappingTypeField?, titles: (String) -> String) -> String {
-        switch choice {
-        case .none: String(localized: "Not Filled")
-        case .field(let name): titles(name)
-        case .fixed: String(localized: "Fixed Value")
-        case .template: String(localized: "Template")
-        }
-    }
-
     /// A draft that was not saved, in words the owner can read and type again.
     static func summary(_ mapping: KindMapping) -> String {
         var lines = [
@@ -72,11 +62,6 @@ enum MappingWording {
         }
         for (word, target) in mapping.statusOverrides.sorted(by: { $0.key < $1.key }) { lines.append("\(word) → \(target)") }
         return lines.joined(separator: "\n")
-    }
-
-    /// The line under "Preview": what it is of.
-    static func previewLine(_ item: MappingPreviewItem, type: String) -> String {
-        String(localized: "As \(type), from a recent item.")
     }
 
     /// A rewrite's request, as a row's title and line.

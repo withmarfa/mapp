@@ -31,7 +31,7 @@ struct ConnectorMappingPage: View {
         }
         .task { await model.load() }
         .onAppear { host.ownerDrafts.register(model) }
-        .task(id: model.previewRuns[name]) {
+        .task(id: model.hasLoaded ? model.previewRuns[name] ?? 0 : -1) {
             guard previewBlock == nil, model.hasLoaded, model.kinds[name] != nil else { return }
             try? await Task.sleep(for: .seconds(1))
             if Task.isCancelled { return }
