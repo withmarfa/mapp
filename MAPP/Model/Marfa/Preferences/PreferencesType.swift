@@ -21,9 +21,11 @@ nonisolated enum PreferencesTable: String, CaseIterable, Codable, Hashable, Send
 /// `PreferencesTypeTests` holds the definition fixed.
 nonisolated enum PreferencesType {
     static let id = "app.mapp.preferences"
+    /// The namespace the type is under, which one app holds for every Mac that connects.
+    static let vendor = "app.mapp"
 
     /// The scope that reaches the item from a sign-in other than the one that registered the type.
-    static let vendorScope = "app.mapp.*:write"
+    static let vendorScope = "\(vendor).*:write"
     /// The scopes that reach the item whoever holds the vendor.
     static let reachingScopes: Set<String> = [vendorScope, "app.*:write"]
     /// What registering the type needs, as the first Mac's hydration does.

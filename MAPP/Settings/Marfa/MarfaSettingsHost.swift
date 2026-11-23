@@ -95,6 +95,9 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func client() throws -> Client
     /// What opens something in MAPP, such as Show in MAPP; nil where the app has no such place.
     var openInApp: ((String) -> Void)? { get }
+    /// The `app.<vendor>` namespace the app keeps its own synced settings in, which the Apps page never removes the data of;
+    /// nil where the app keeps none.
+    var ownAppVendor: String? { get }
 
     /// The server's own settings, drafted on This Marfa's fields.
     var instanceSettings: InstanceSettingsModel { get }

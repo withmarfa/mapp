@@ -37,6 +37,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var failures: [String: OwnerFailure] = [:]
         var calls: [String] = []
         var narrowed: [(app: AppAccess, scopes: [String])] = []
+        /// What each namespace holds, by vendor, and what removing it answers (the data goes where it is complete).
+        var appData: [String: AppData] = [:]
+        var removalAnswer: [String: AppDataRemoved] = [:]
+        var dataRemoved: [String] = []
+        var disconnects: [(id: String, removingData: Bool)] = []
         var created: [NewKey] = []
         var changes: [(id: String, change: KeyChange)] = []
         var applied: [AddressPlan] = []
@@ -188,9 +193,31 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         }
     }
 
-    func disconnect(_ app: AppAccess) async throws(OwnerFailure) {
+    func disconnect(_ app: AppAccess, removingData: Bool) async throws(OwnerFailure) {
         try enter("disconnect")
-        state.withLock { $0.apps.removeAll { $0.id == app.id } }
+        state.withLock { state in
+            state.disconnects.append((app.id, removingData))
+            state.apps.removeAll { $0.id == app.id }
+            if removingData { for vendor in app.vendors { state.appData[vendor] = nil } }
+        }
+    }
+
+    func appData(vendor: String) async throws(OwnerFailure) -> AppData {
+        try enter("appData")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let data = state.appData[vendor] else { throw .notFound }
+            return data
+        }
+    }
+
+    func removeAppData(vendor: String) async throws(OwnerFailure) -> AppDataRemoved {
+        try enter("removeAppData")
+        return state.withLock { state in
+            state.dataRemoved.append(vendor)
+            let answer = state.removalAnswer[vendor] ?? AppDataRemoved(removedItems: state.appData[vendor]?.total ?? 0, remainingItems: 0)
+            if answer.isComplete { state.appData[vendor] = nil }
+            return answer
+        }
     }
 
     func keys() async throws(OwnerFailure) -> [KeyInfo] {
@@ -827,6 +854,224 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await model.confirm(question)
         #expect(model.apps.isEmpty)
         #expect(model.disconnected == "g1")
+    }
+
+    private func kept(_ vendor: String = "app.raycast", active: Int = 10, archived: Int = 1, trashed: Int = 2) -> AppData {
+        AppData(vendor: vendor, types: [AppData.Kind(type: vendor + ".setting", active: active, archived: archived, trashed: trashed)])
+    }
+
+    private func bench(keeping vendors: [String: AppData]) -> OwnerBench {
+        var holder = app()
+        holder.vendors = vendors.keys.sorted()
+        let bench = bench(holder)
+        bench.calls.state.withLock { $0.appData = vendors }
+        return bench
+    }
+
+    @Test func whatAnAppKeepsIsCountedByStateAndNeverSized() async {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        await model.readData(of: model.apps[0])
+        guard case .kept(let held)? = model.data["g1"] else {
+            Issue.record("the data was not read")
+            return
+        }
+        #expect(held.first?.total == 13)
+        let line = AppDataWording.line(held[0], appName: "Raycast", keptByMAPP: false)
+        #expect(line.contains("10 active") && line.contains("1 archived") && line.contains("2 in the trash"))
+        #expect(line.hasSuffix("Only Raycast and you can read it."))
+        #expect(!line.contains("KB"), "Marfa answers counts, so no size is told")
+    }
+
+    @Test func anAppThatHoldsNoNamespaceIsNotAsked() async {
+        let bench = bench(app())
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        await model.readData(of: model.apps[0])
+        #expect(model.data["g1"] == .kept([]))
+        #expect(!bench.calls.calls.contains("appData"))
+    }
+
+    @Test func removingDataAsksFirstSaysItIsForGoodAndShowsNothingLeft() async throws {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        await model.readData(of: model.apps[0])
+        model.askToRemoveData(model.apps[0], vendor: "app.raycast")
+        let question = try #require(model.question)
+        #expect(question.message.contains("deletes it for good"))
+        #expect(question.message.contains("Only a backup brings it back."))
+        #expect(bench.calls.state.withLock { $0.dataRemoved.isEmpty }, "nothing is deleted before the owner agrees")
+        await model.confirm(question)
+        #expect(bench.calls.state.withLock { $0.dataRemoved } == ["app.raycast"])
+        #expect(model.unfinished["g1"] == nil)
+    }
+
+    @Test func aRemovalThatStopsPartWayShowsWhatIsLeftNeverDone() async throws {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        bench.calls.state.withLock {
+            $0.removalAnswer["app.raycast"] = AppDataRemoved(removedItems: 1000, remainingItems: 500, stoppedBy: .unreachable)
+        }
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        model.askToRemoveData(model.apps[0], vendor: "app.raycast")
+        await model.confirm(try #require(model.question))
+        #expect(model.unfinished["g1"]?.remainingItems == 500)
+        guard case .kept(let held)? = model.data["g1"] else {
+            Issue.record("the data was not read again")
+            return
+        }
+        #expect(held.first?.total == 13, "the counts shown are the server's, read again")
+    }
+
+    @Test func disconnectingKeepsTheDataUnlessTheBoxIsTicked() async throws {
+        for ticked in [false, true] {
+            let bench = bench(keeping: ["app.raycast": kept()])
+            let model = AppsModel(context: bench.context)
+            await model.load()
+            await model.readData(of: model.apps[0])
+            model.askToDisconnect(model.apps[0])
+            let question = try #require(model.question)
+            #expect(question.checkbox == "Also remove its data")
+            await model.confirm(question, alsoRemovingData: ticked)
+            #expect(bench.calls.state.withLock { $0.disconnects.first?.removingData } == ticked)
+            #expect(bench.calls.state.withLock { $0.appData["app.raycast"] != nil } == !ticked)
+        }
+    }
+
+    @Test func anAppWithNoDataIsNotOfferedTheBox() async {
+        let bench = bench(app())
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        model.askToDisconnect(model.apps[0])
+        #expect(model.question?.checkbox == nil)
+    }
+
+    @Test func moreDataThanOneWriteDeletesIsRemovedBeforeTheAppIsDisconnected() async throws {
+        let bench = bench(keeping: ["app.raycast": kept(active: 1500)])
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        await model.readData(of: model.apps[0])
+        model.askToDisconnect(model.apps[0])
+        await model.confirm(try #require(model.question), alsoRemovingData: true)
+        #expect(bench.calls.state.withLock { $0.dataRemoved } == ["app.raycast"])
+        #expect(bench.calls.state.withLock { $0.disconnects.count } == 1)
+    }
+
+    @Test func aDisconnectThatCannotFinishTheDataStaysConnected() async throws {
+        let bench = bench(keeping: ["app.raycast": kept(active: 1500)])
+        bench.calls.state.withLock {
+            $0.removalAnswer["app.raycast"] = AppDataRemoved(removedItems: 1000, remainingItems: 513, stoppedBy: .unreachable)
+        }
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        await model.readData(of: model.apps[0])
+        model.askToDisconnect(model.apps[0])
+        await model.confirm(try #require(model.question), alsoRemovingData: true)
+        #expect(bench.calls.state.withLock { $0.disconnects.isEmpty }, "an app is not disconnected from data it still has")
+        #expect(model.apps.count == 1)
+        #expect(model.unfinished["g1"]?.remainingItems == 513)
+    }
+
+    @Test func aRemovalThatStopsAndCannotReadAgainSaysItemsWereRemovedNeverNothingChanged() async throws {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        bench.calls.state.withLock {
+            $0.removalAnswer["app.raycast"] = AppDataRemoved(removedItems: 1000, remainingItems: 500, stoppedBy: .unreachable)
+        }
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        await model.readData(of: model.apps[0])
+        bench.calls.fail("appData", with: .unreachable)
+        model.askToRemoveData(model.apps[0], vendor: "app.raycast")
+        await model.confirm(try #require(model.question))
+        guard case .failed? = model.data["g1"] else {
+            Issue.record("the read should have failed")
+            return
+        }
+        let note = try #require(model.removalNote(for: model.apps[0]))
+        #expect(note.title == "Some Data May Be Left")
+        #expect(
+            note.line
+                == "1,000 items were removed. MAPP lost the server partway through. Some of it may still be there. MAPP couldn’t read what is left. Remove it again to finish.")
+        #expect(!note.line.contains("Nothing was changed"))
+    }
+
+    @Test func aRemovalThatStopsAndIsReadAgainDoesNotLeadWithNothingChanged() async throws {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        bench.calls.state.withLock {
+            $0.removalAnswer["app.raycast"] = AppDataRemoved(removedItems: 1000, remainingItems: 500, stoppedBy: .conflict)
+        }
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        model.askToRemoveData(model.apps[0], vendor: "app.raycast")
+        await model.confirm(try #require(model.question))
+        let note = try #require(model.removalNote(for: model.apps[0]))
+        #expect(
+            note.line
+                == "1,000 items were removed. It changed somewhere else partway through. Some of it may still be there. Remove it again to finish.")
+    }
+
+    @Test func aRemovalThatRemovedNothingStillSaysNothingWasChanged() async throws {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        bench.calls.state.withLock {
+            $0.removalAnswer["app.raycast"] = AppDataRemoved(removedItems: 0, remainingItems: 13, stoppedBy: .unreachable)
+        }
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        model.askToRemoveData(model.apps[0], vendor: "app.raycast")
+        await model.confirm(try #require(model.question))
+        let note = try #require(model.removalNote(for: model.apps[0]))
+        #expect(note.line == "MAPP can’t reach the server. Nothing was changed. Some of it is still there. Remove it again to finish.")
+    }
+
+    @Test func aDisconnectRefusedAfterTheDataWentSaysTheDataIsGoneAndTheAppIsStillConnected() async throws {
+        let bench = bench(keeping: ["app.raycast": kept(active: 1500)])
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        await model.readData(of: model.apps[0])
+        model.askToDisconnect(model.apps[0])
+        bench.calls.fail("disconnect", with: .unreachable)
+        await model.confirm(try #require(model.question), alsoRemovingData: true)
+        #expect(bench.calls.state.withLock { $0.dataRemoved } == ["app.raycast"])
+        #expect(model.apps.count == 1, "the app is still connected")
+        #expect(model.disconnected == nil)
+        #expect(model.rowErrors["g1"] == nil, "the row does not say Not Changed beside data that is gone")
+        let note = try #require(model.removalNote(for: model.apps[0]))
+        #expect(note.title == "Data Removed, Still Connected")
+        #expect(
+            note.line == "1,503 items were removed. Raycast is still connected. MAPP lost the server partway through. Disconnect it again to finish.")
+        #expect(bench.calls.calls.filter { $0 == "appData" }.count >= 2, "what is left is read again")
+    }
+
+    @Test func aNewRemovalClearsWhatTheLastOneSaid() async throws {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        bench.calls.state.withLock {
+            $0.removalAnswer["app.raycast"] = AppDataRemoved(removedItems: 1000, remainingItems: 500, stoppedBy: .unreachable)
+        }
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        model.askToRemoveData(model.apps[0], vendor: "app.raycast")
+        await model.confirm(try #require(model.question))
+        #expect(model.removalNote(for: model.apps[0]) != nil)
+        bench.calls.state.withLock { $0.removalAnswer["app.raycast"] = nil }
+        model.askToRemoveData(model.apps[0], vendor: "app.raycast")
+        await model.confirm(try #require(model.question))
+        #expect(model.removalNote(for: model.apps[0]) == nil)
+    }
+
+    @Test func mappsOwnSettingsAreNeverRemovedFromHere() async throws {
+        var mapp = app()
+        mapp.vendors = ["app.mapp"]
+        let bench = bench(mapp)
+        bench.calls.state.withLock { $0.appData["app.mapp"] = kept("app.mapp") }
+        let model = AppsModel(context: bench.context, ownVendor: "app.mapp")
+        await model.load()
+        model.askToRemoveData(model.apps[0], vendor: "app.mapp")
+        #expect(model.question == nil)
+        model.askToDisconnect(model.apps[0])
+        #expect(model.question?.checkbox == nil, "disconnecting never takes MAPP's settings with it")
+        #expect(AppDataWording.line(kept("app.mapp"), appName: "MAPP", keptByMAPP: true).contains("Remove them in Connection"))
     }
 
     @Test func aRefusalForWantOfAPermissionNamesItAndReadsTheGrantsAgain() async throws {

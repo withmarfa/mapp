@@ -1,7 +1,8 @@
+import AppKit
 import SwiftUI
 
 /// The Apps page: the apps the owner approved, each opening a page of its own with what it may reach, which can only be
-/// narrowed, the keys it made and Disconnect. Narrowing and disconnecting ask first.
+/// narrowed, the keys it made, the data it keeps and Disconnect. Narrowing, removing data and disconnecting ask first.
 struct AppsPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
@@ -12,7 +13,7 @@ struct AppsPage: View {
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
         self.subpage = subpage
-        _model = State(initialValue: AppsModel(context: OwnerContext(host: host)))
+        _model = State(initialValue: AppsModel(context: OwnerContext(host: host), ownVendor: host.ownAppVendor))
     }
 
     static func subpage(for app: AppAccess) -> SettingsSubpage {
@@ -29,14 +30,15 @@ struct AppsPage: View {
     var body: some View {
         content
             .task(id: host.serverAddress) { await model.load() }
-            .alert(
-                model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
-                presenting: model.question
-            ) { asked in
-                Button("Cancel", role: .cancel) {}
-                Button(asked.confirm, role: .destructive) { Task { await model.confirm(asked) } }
-            } message: { asked in
-                Text(verbatim: asked.message)
+            .onChange(of: model.question) { _, asked in
+                guard let asked else { return }
+                // SwiftUI's alert has no checkbox, which Disconnect's "Also remove its data" is.
+                SettingsAlert.confirm(
+                    title: asked.title, message: asked.message, confirm: asked.confirm, checkbox: asked.checkbox, window: NSApp.keyWindow
+                ) { confirmed, checked in
+                    guard confirmed else { return model.cancelQuestion() }
+                    Task { await model.confirm(asked, alsoRemovingData: checked) }
+                }
             }
             .onChange(of: model.disconnected) { if $1 != nil { back() } }
             .accessibilityIdentifier("AppsPage")
@@ -127,6 +129,12 @@ private struct AppDetail: View {
     }
 
     var body: some View {
+        content
+            // Here, not on the data section, which draws nothing until the first read ends.
+            .task(id: app.id) { await model.readData(of: app) }
+    }
+
+    private var content: some View {
         SettingsPageColumn {
             SettingsHead(
                 symbol: AppsPage.symbol(app.kind), tone: .purple, title: Text(verbatim: name), line: Text(verbatim: kindLine))
@@ -156,13 +164,67 @@ private struct AppDetail: View {
                     }
                 }
             }
+            AppDataSection(model: model, app: app, host: host)
             SettingsSection("Disconnect") {
                 SettingsRow(
                     verbatim: String(localized: "Disconnect \(name)"),
-                    line: String(localized: "Its webhooks are deleted, and its keys keep working.")
+                    line: String(localized: "Its webhooks are deleted, its keys keep working, and it asks about its data.")
                 ) {
                     SettingsButton("Disconnect…", role: .destructive) { model.askToDisconnect(app) }
                 }
+            }
+        }
+    }
+}
+
+/// What one app keeps under its own `app.<vendor>` namespaces, counted by state, with Remove…. Marfa answers counts, never a
+/// size. MAPP's own settings are shown and never removed here.
+private struct AppDataSection: View {
+    let model: AppsModel
+    let app: AppAccess
+    let host: any MarfaSettingsHost
+
+    private var name: String { AppsModel.name(of: app) }
+
+    var body: some View {
+        Group {
+            switch model.data[app.id] {
+            case nil, .reading?:
+                EmptyView()
+            case .failed(let failure)?:
+                SettingsSection(name: Text("Data \(name) Keeps")) {
+                    OwnerProblemRow(title: "Couldn’t Read Its Data", failure: failure, page: .apps, host: host) {
+                        Task { await model.readData(of: app) }
+                    }
+                    removalNote
+                }
+            case .kept(let kept)?:
+                SettingsSection(name: Text("Data \(name) Keeps")) {
+                    if kept.isEmpty {
+                        SettingsRow(verbatim: String(localized: "\(name) Keeps No Data"), look: .off)
+                    }
+                    ForEach(kept, id: \.vendor) { held in row(held, among: kept.count) }
+                    removalNote
+                }
+            }
+        }
+    }
+
+    /// What a removal that deleted items and then stopped says, drawn whether or not the data could be read again.
+    @ViewBuilder private var removalNote: some View {
+        if let note = model.removalNote(for: app) {
+            SettingsProblemRow(title: Text(verbatim: note.title), line: Text(verbatim: note.line), actions: [])
+        }
+    }
+
+    private func row(_ held: AppData, among count: Int) -> some View {
+        let title = count == 1 ? String(localized: "\(name)’s Own Data") : held.vendor
+        return SettingsRow(
+            verbatim: title, line: AppDataWording.line(held, appName: name, keptByMAPP: model.isOwn(held.vendor)), lines: nil
+        ) {
+            if !model.isOwn(held.vendor), !held.types.isEmpty {
+                SettingsButton("Remove…", role: .destructive) { model.askToRemoveData(app, vendor: held.vendor) }
+                    .disabled(model.removing.contains(app.id))
             }
         }
     }

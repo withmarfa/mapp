@@ -208,3 +208,60 @@ nonisolated enum AccessScopes {
         return parts.joined(separator: " ")
     }
 }
+
+/// The words for the data an app keeps, which Marfa answers as counts by state, never as a size.
+nonisolated enum AppDataWording {
+    /// How many items are held, by state, and who can read them. MAPP's own settings say where they are removed.
+    static func line(_ data: AppData, appName: String, keptByMAPP: Bool) -> String {
+        var parts: [String] = []
+        if data.active > 0 { parts.append(String(localized: "\(data.active) active")) }
+        if data.archived > 0 { parts.append(String(localized: "\(data.archived) archived")) }
+        if data.trashed > 0 { parts.append(String(localized: "\(data.trashed) in the trash")) }
+        let counts = parts.isEmpty ? String(localized: "No items.") : String(localized: "Items: \(parts.formatted(.list(type: .and))).")
+        let who = keptByMAPP
+            ? String(localized: "These are MAPP’s settings, which every Mac that connects uses. Remove them in Connection, where MAPP keeps them in step.")
+            : String(localized: "Only \(appName) and you can read it.")
+        return counts + " " + who
+    }
+
+    /// How many items a removal deleted.
+    static func removed(_ count: Int) -> String {
+        count == 1 ? String(localized: "1 item was removed.") : String(localized: "\(count) items were removed.")
+    }
+
+    /// Why a call stopped after the server had already deleted items: the refusals' own lines say "Nothing was changed",
+    /// which is no longer true.
+    static func stoppedAfterRemoving(_ failure: OwnerFailure) -> String {
+        switch failure {
+        case .unreachable: String(localized: "MAPP lost the server partway through.")
+        case .conflict: String(localized: "It changed somewhere else partway through.")
+        case .notConfirmed: String(localized: "The sign-in wasn’t confirmed partway through.")
+        default: OwnerWording.line(failure)
+        }
+    }
+
+    /// What a removal that stopped early left. `couldReadAgain` is false where the read after it failed, so no counts show
+    /// what is left.
+    static func unfinished(_ removal: AppDataRemoved, couldReadAgain: Bool = true) -> String {
+        guard removal.removedItems > 0 else {
+            let reason = removal.stoppedBy.map { OwnerWording.line($0) }
+            let left = String(localized: "Some of it is still there. Remove it again to finish.")
+            return [reason, left].compactMap { $0 }.joined(separator: " ")
+        }
+        return [
+            removed(removal.removedItems),
+            removal.stoppedBy.map { stoppedAfterRemoving($0) },
+            String(localized: "Some of it may still be there."),
+            couldReadAgain ? nil : String(localized: "MAPP couldn’t read what is left."),
+            String(localized: "Remove it again to finish."),
+        ].compactMap { $0 }.joined(separator: " ")
+    }
+
+    /// What a disconnect that failed after the data was removed leaves: the data gone, the app still connected.
+    static func removedButConnected(removed count: Int, appName: String, stoppedBy failure: OwnerFailure) -> String {
+        [
+            removed(count), String(localized: "\(appName) is still connected."), stoppedAfterRemoving(failure),
+            String(localized: "Disconnect it again to finish."),
+        ].joined(separator: " ")
+    }
+}

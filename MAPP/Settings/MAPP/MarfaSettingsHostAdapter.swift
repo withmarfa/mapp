@@ -194,6 +194,8 @@ enum LibraryDescription {
 
     var openInApp: ((String) -> Void)? { nil }
 
+    var ownAppVendor: String? { PreferencesType.vendor }
+
     // MARK: Recently Deleted
 
     var deletedItems: [MarfaDeletedItem] {

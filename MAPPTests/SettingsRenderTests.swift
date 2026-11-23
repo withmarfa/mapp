@@ -22,6 +22,7 @@ import Testing
     var deletedRetentionDays: Int? = 60
     var canDeletePermanently = true
     var openInApp: ((String) -> Void)? { nil }
+    var ownAppVendor: String? { "app.mapp" }
     var allowed: [Set<InstancePermission>] = []
     var ownerCalls: any OwnerCalls = FakeOwnerCalls()
     var instanceCalls: any InstanceCalls = FakeInstanceCalls()
