@@ -1,5 +1,5 @@
 {
-  "originHash" : "bd3290b67327971e2ac3ff21d8766538f495766a6849848c2b35650624b996f6",
+  "originHash" : "7f574dd86fea7a95a61ddd278809628d1db527a2a902da203945f577d8f138e5",
   "pins" : [
     {
       "identity" : "app-telemetry",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/withmarfa/marfa-swift",
       "state" : {
-        "revision" : "ba5096d78315e354c95af3c207d092a8df1c1c47",
-        "version" : "0.0.83"
+        "revision" : "f08a87f39bb0f3c7219aca5e1ae9f4a563c66903",
+        "version" : "0.0.87"
       }
     },
     {

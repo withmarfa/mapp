@@ -69,6 +69,7 @@ nonisolated enum TypeDefinitionEdit {
     ) async throws {
         let listed = try await read()
         guard let own = listed.first(where: { $0.value1.id == plan.type.rawValue }) else { throw TypeSchemaFailure.changedOnServer }
+        if own.value2.provenance.origin == .plugin { throw TypeSchemaFailure.pluginType }
         if declaredAbove(plan.edit.key, from: own, in: listed) { throw TypeSchemaFailure.changedOnServer }
         try await replace(update(own, for: plan))
     }

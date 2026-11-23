@@ -37,7 +37,7 @@ nonisolated struct FieldMenu: Equatable, Sendable {
                     let label = catalogue.itemTypes[source]?.label ?? source.rawValue
                     lockText = String(localized: "Inherited from \(label)")
                 case .shipped:
-                    lockText = String(localized: "Part of a type Marfa provides")
+                    lockText = String(localized: "Part of a type Marfa or a plugin provides")
                 }
             } else {
                 // A clash of names is for the sheet to say when it is submitted, not a reason to hide the way to fix one.

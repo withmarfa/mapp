@@ -6955,7 +6955,7 @@
     "Zoom Out" : {
 
     },
-    "Marfa’s own types can’t be changed. Add the field to a type of your own instead." : {
+    "Types that Marfa or a plugin provides can’t be changed. Add the field to a type of your own instead." : {
 
     },
     "This field belongs to a type above this one, so it can only be changed there." : {
@@ -6997,13 +6997,16 @@
     "This type has changed on the server since MAPP last read it, so nothing was changed. Look at the field again and try once more." : {
 
     },
+    "This type belongs to a plugin, so it can only change with the plugin." : {
+
+    },
     "This library doesn’t keep changes to types." : {
 
     },
     "Inherited from %@" : {
 
     },
-    "Part of a type Marfa provides" : {
+    "Part of a type Marfa or a plugin provides" : {
 
     },
     "Edit Value" : {
