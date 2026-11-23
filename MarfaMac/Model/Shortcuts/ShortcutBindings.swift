@@ -5,7 +5,7 @@ import Observation
 /// better default reaches every command nobody changed; a command the person cleared is stored as cleared. Shortcuts sync
 /// through the connected Marfa (`PreferencesMap`).
 ///
-/// A stored command that app no longer has is ignored and kept, in case it returns. Stored text that cannot be read is
+/// A stored command that the app no longer has is ignored and kept, in case it returns. Stored text that cannot be read is
 /// moved aside under a key of its own, kept and never removed, and the commands start from their defaults.
 @Observable @MainActor
 final class ShortcutBindings {

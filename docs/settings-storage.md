@@ -39,7 +39,7 @@ A mark's color and a place's section change one at a time, so each is its own ro
 
 ### The type's shape never changes
 
-Every Mac is another OAuth client to the server, and only the client that registered the first type under `app.marfa-mac` may replace it (withmarfa/marfa#3462). A later the app could not change the type, so a new setting is a new member inside a field or a new `setting` word in a table, never a new field, table or column. `PreferencesTypeTests` fails on any change to the definition.
+Every Mac is another OAuth client to the server, and only the client that registered the first type under `app.marfa-mac` may replace it (withmarfa/marfa#3462). A later copy of the app could not change the type, so a new setting is a new member inside a field or a new `setting` word in a table, never a new field, table or column. `PreferencesTypeTests` fails on any change to the definition.
 
 ## What stays on this Mac
 

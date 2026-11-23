@@ -4,8 +4,8 @@ import Testing
 @testable import MarfaMac
 
 extension LiveMarfaTests {
-    /// this app's settings across two Macs on the test instance: two copies, each with a store and defaults of its own. The
-    /// key holds the test instance's the app key, which reaches `app.marfa-mac.preferences` as its owner made it. Every settings
+    /// This app's settings across two Macs on the test instance: two copies, each with a store and defaults of its own. The
+    /// key holds the test instance's app key, which reaches `app.marfa-mac.preferences` as its owner made it. Every settings
     /// item is purged before and after each test.
     @MainActor
     @Suite(.serialized)

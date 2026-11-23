@@ -3,7 +3,7 @@ import MarfaTesting
 import Testing
 @testable import MarfaMac
 
-/// The unit tests run inside the app, so these check that app they run in stays out of the person's way and
+/// The unit tests run inside the app, so these check that the app they run in stays out of the person's way and
 /// away from their data.
 struct TestHostTests {
     @Test func hostShowsNoDockIconAndNoScene() {

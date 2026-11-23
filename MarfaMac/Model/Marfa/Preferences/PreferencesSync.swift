@@ -572,7 +572,7 @@ final class PreferencesSync {
             var writes = 0
             /// The settings a store dropped or changed when it read what was written (`apply`), and what it left.
             var frozen: [PreferenceUnit: Frozen] = [:]
-            /// the app that judged `frozen`; another tries those settings again.
+            /// The app that judged `frozen`; another tries those settings again.
             var frozenBuild: String?
             /// Set once this Mac removed the item or saw it in the bin, so an emptied bin does not bring it back.
             var removed: Bool?

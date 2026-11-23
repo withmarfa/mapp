@@ -33,7 +33,7 @@ nonisolated struct ShortcutCommand: Hashable, Identifiable, Sendable {
     }
 }
 
-/// The keys of the system's own commands that app does not add, which no command of the app's can take.
+/// The keys of the system's own commands that the app does not add, which no command of the app's can take.
 nonisolated enum SystemShortcuts {
     /// The command a shortcut belongs to in the system's menus, or nil if it is free.
     static func owner(of shortcut: Shortcut) -> String? { reserved[shortcut] }
