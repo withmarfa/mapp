@@ -260,8 +260,8 @@ import Observation
         }
     }
 
-    /// Searches that replace one another: the same place and the same narrowing, whether or not they ask for what
-    /// was left out.
+    /// Searches that replace one another: the same place, the same narrowing, and the same choice of whether they
+    /// ask for what was left out.
     private nonisolated struct SearchChannel: Hashable {
         var scope: SearchScope
         var narrowing: SearchNarrowing
@@ -1266,7 +1266,9 @@ import Observation
 
     /// A search that fails keeps the results already shown for the same words and place and says why, rather than
     /// showing that nothing was found, and shows nothing where it has none; it is not asked again until the items
-    /// change. A newer search of the same place cancels this one, and an answer from an earlier run is dropped.
+    /// change. A newer search with the same place, narrowing and leave-out choice cancels this one. The revision
+    /// and fill are stored with the answer, so a cancelled refresh stays as old as the answer it kept. An answer
+    /// from an earlier run is dropped.
     private func startSearch(_ key: SearchKey, at revision: Int, fill: LibraryFill?) {
         let turn = supersede(key)
         let channel = SearchChannel(key)
@@ -1290,8 +1292,6 @@ import Observation
         }
         if var run = searches[key] {
             run.running = true
-            run.revision = revision
-            run.fill = fill
             searches[key] = run
         } else {
             searches[key] = SearchRun(revision: revision, running: true, fill: fill)

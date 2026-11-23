@@ -228,6 +228,34 @@ import Testing
         #expect(library.search("body", in: .everywhere).items.map(\.id) == [F.n1])
     }
 
+    @Test func aCancelledRefreshOfAnAnsweredSearchIsAskedAgain() async throws {
+        let (library, source) = try await loaded()
+        source.hits.withLock { $0["first"] = [F.n1] }
+        #expect(await eventually { library.search("first", in: .everywhere).items.map(\.id) == [F.n1] })
+
+        var renamed = try #require(library.item(F.n2))
+        renamed.title = "Renamed"
+        source.send(.upserted([renamed]))
+        #expect(await eventually { library.item(F.n2)?.title == "Renamed" })
+
+        source.holdSearches("first")
+        _ = library.search("first", in: .everywhere)
+        #expect(await eventually { source.searches.withLock { $0 } >= 2 })
+
+        source.hits.withLock { $0["second"] = [F.p1] }
+        #expect(await eventually {
+            let found = library.search("second", in: .everywhere)
+            return !found.isPending && found.items.map(\.id) == [F.p1]
+        })
+
+        source.hits.withLock { $0["first"] = [F.n1, F.p1] }
+        let asked = source.searches.withLock { $0 }
+        _ = library.search("first", in: .everywhere)
+        #expect(await eventually { source.searches.withLock { $0 } > asked })
+        source.releaseSearches("first")
+        #expect(await eventually { library.search("first", in: .everywhere).items.map(\.id) == [F.n1, F.p1] })
+    }
+
     @Test func anOlderAnswerThatArrivesAfterANewerOneIsNotShown() async throws {
         let (library, source) = try await loaded()
         source.hits.withLock { $0["older"] = [F.n1] }
