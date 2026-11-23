@@ -19,4 +19,4 @@ trap 'rm -rf "$work"' EXIT
 signature=$("$sign_update" --ed-key-file "$work/key" -p "$file")
 "$sign_update" --verify --ed-key-file "$work/key" "$file" "$signature" >/dev/null
 echo "signature=$signature"
-echo "length=$(stat -f %z "$file" 2>/dev/null || stat -c %s "$file")"
+echo "length=$(wc -c <"$file" | tr -d ' ')"
