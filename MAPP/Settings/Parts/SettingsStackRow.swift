@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// A row that holds a long text under its title, as a description or a guidance does: the title, one line under it where
@@ -63,21 +64,80 @@ struct SettingsStackText: View {
     }
 }
 
-/// A text of several lines in the rounded field's look, with the count of characters against its limit under it.
+/// A text of several lines in the rounded field's look: Return starts a new line, and the text is kept when the field is left.
+/// It is plain text, so what is typed is never changed into curly quotes, dashes or other substitutes: a Markdown text is kept
+/// as written.
 struct SettingsTextArea: View {
-    let title: LocalizedStringKey
+    let title: String.LocalizationValue
     @Binding var text: String
     var isError = false
-    var lines = 4
+    var lines = 6
+    /// Run when the field loses focus, so a text typed and left is kept as one that was submitted.
+    var onEndEditing: (() -> Void)?
     @Environment(\.settingsTextScale) private var scale
 
     var body: some View {
-        TextField(title, text: $text, axis: .vertical)
-            .labelsHidden()
-            .textFieldStyle(.roundedBorder)
-            .controlSize(.large)
-            .lineLimit(lines...(lines * 3))
-            .font(SettingsTokens.font(.title, scale: scale))
+        SettingsPlainTextView(label: String(localized: title), text: $text, size: 13 * scale, onEndEditing: onEndEditing)
+            .frame(height: CGFloat(lines) * 17 * scale + 14)
+            .background(SettingsTokens.field, in: .rect(cornerRadius: SettingsTokens.Metric.controlRadius))
+            .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius).strokeBorder(SettingsTokens.hairline) }
             .settingsErrorRing(isError)
+    }
+}
+
+/// The system's text view in a scroll view, set to keep exactly what is typed.
+private struct SettingsPlainTextView: NSViewRepresentable {
+    let label: String
+    @Binding var text: String
+    let size: CGFloat
+    let onEndEditing: (() -> Void)?
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text, onEndEditing: onEndEditing) }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        scroll.drawsBackground = false
+        scroll.hasHorizontalScroller = false
+        guard let view = scroll.documentView as? NSTextView else { return scroll }
+        view.delegate = context.coordinator
+        view.isRichText = false
+        view.allowsUndo = true
+        view.drawsBackground = false
+        view.isAutomaticQuoteSubstitutionEnabled = false
+        view.isAutomaticDashSubstitutionEnabled = false
+        view.isAutomaticTextReplacementEnabled = false
+        view.isAutomaticSpellingCorrectionEnabled = false
+        view.isAutomaticLinkDetectionEnabled = false
+        view.textContainerInset = NSSize(width: 4, height: 6)
+        view.font = .systemFont(ofSize: size)
+        view.setAccessibilityLabel(label)
+        view.string = text
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        context.coordinator.text = $text
+        context.coordinator.onEndEditing = onEndEditing
+        guard let view = scroll.documentView as? NSTextView else { return }
+        if view.font?.pointSize != size { view.font = .systemFont(ofSize: size) }
+        // A change made by typing is already in the view, and setting it again would move the cursor.
+        if view.string != text { view.string = text }
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
+        var onEndEditing: (() -> Void)?
+
+        init(text: Binding<String>, onEndEditing: (() -> Void)?) {
+            self.text = text
+            self.onEndEditing = onEndEditing
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let view = notification.object as? NSTextView else { return }
+            text.wrappedValue = view.string
+        }
+
+        func textDidEndEditing(_ notification: Notification) { onEndEditing?() }
     }
 }

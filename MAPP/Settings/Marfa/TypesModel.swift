@@ -22,7 +22,7 @@ struct TypeAccess {
 @Observable @MainActor final class TypesModel: OwnerDraftHolding {
     /// What a refusal can be about on a type's page.
     enum Field: Hashable {
-        case name, plural, description, basedOn, word, meaning, newType
+        case name, plural, description, guidance, basedOn, word, meaning, newType
         case fieldName, fieldMeaning, fieldLongest, fieldRule, fieldSearchable, fieldRemove, choice, newField, feed, merge
     }
 
@@ -58,6 +58,10 @@ struct TypeAccess {
     var name = ""
     var plural = ""
     var descriptionText = ""
+    var guidanceText = ""
+    /// Whether the server refused the open type's guidance from an app, so the page gives the command that writes it.
+    private(set) var guidanceNeedsCommand = false
+    private(set) var copiedCommand: String?
     private(set) var addingGroup: String?
     var wordDraft = ""
     /// The word whose meaning is being written.
@@ -141,7 +145,8 @@ struct TypeAccess {
         case .invalid(_, let message): .refused(message)
         case .pluginType: .refused(String(localized: "This type belongs to a plugin, so it can only change with the plugin."))
         case .changedOnServer: .conflict
-        case .guidanceByApp: .refused(String(localized: "Guidance is written by the owner, not by an app."))
+        case .guidanceByApp: .refused(String(localized: "This Marfa takes guidance only from the command line for now."))
+        case .canceled: .notConfirmed
         case .inUse, .hasSubtypes: .conflict
         }
     }
@@ -240,6 +245,8 @@ struct TypeAccess {
             draftedID = nil
             fieldErrors = [:]
             pageFailure = nil
+            guidanceNeedsCommand = false
+            copiedCommand = nil
             addingGroup = nil
             wordDraft = ""
             meaningWord = nil
@@ -253,6 +260,7 @@ struct TypeAccess {
             name = type.label
             plural = type.plural ?? ""
             descriptionText = type.description ?? ""
+            guidanceText = type.guidance ?? ""
         }
     }
 
@@ -393,11 +401,22 @@ struct TypeAccess {
             text = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard text != (queuedText[field] ?? type.description ?? "") else { return }
             edit = .description(text)
+        case .guidance:
+            // Guidance is Markdown a plugin or the command line may have left with trailing lines, so what the type holds
+            // is compared as it reads here: a field opened and left again sends nothing.
+            text = guidanceText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard text != (queuedText[field] ?? (type.guidance ?? "").trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+            guard Self.length(of: text) <= Self.guidanceLimit else {
+                fieldErrors[.guidance] = Self.line(for: .guidance)
+                return
+            }
+            fieldErrors[.guidance] = nil
+            edit = .guidance(text)
         default:
             return
         }
         queuedText[field] = text
-        if await !apply(edit, to: id, field: field) { queuedText[field] = nil }
+        if await !apply(edit, to: id, field: field), !(field == .guidance && guidanceNeedsCommand) { queuedText[field] = nil }
     }
 
     /// Sends the chosen parent. The choice is an act, so it is always queued; the server leaves out one the type holds.
@@ -447,6 +466,10 @@ struct TypeAccess {
         guard await reread() else { return true }
         if case .parent = edit { await loadReading(of: id) }
         if case .plural = edit { await loadReading(of: id) }
+        if case .guidance = edit {
+            guidanceNeedsCommand = false
+            await loadReading(of: id)
+        }
         // Another change is waiting behind this one: the field may hold what was typed since.
         if pending == 1 { showSaved(field, of: id) }
         return true
@@ -464,9 +487,24 @@ struct TypeAccess {
         case .owner(let failure):
             pageFailure = failure
             await context.learn(from: failure)
-        case .pluginType, .guidanceByApp, .inUse, .hasSubtypes:
+        case .guidanceByApp:
+            // The typed text stays in its field, and the command that writes it is given beside it.
+            guidanceNeedsCommand = true
+        case .canceled:
+            // The owner closed the sign-in: nothing was sent and nothing is said.
+            break
+        case .pluginType, .inUse, .hasSubtypes:
             pageFailure = Self.owner(error)
         }
+    }
+
+    /// The command that writes a type's guidance from the command line: the type's definition in a file, with the guidance in
+    /// the file of the same name that ends in `.md` beside it.
+    static func guidanceCommand(for id: String) -> String { "marfa types replace \(id) --file \(id).json" }
+
+    func copyGuidanceCommand(_ command: String) {
+        OwnerClipboard.copyText(command)
+        copiedCommand = command
     }
 
     /// Whether the server's sentence is about a length limit, which the page words with the limit it counts in code points.
@@ -481,6 +519,7 @@ struct TypeAccess {
         case .name: String(localized: "A name can be 100 characters at most.")
         case .plural: String(localized: "A plural can be 100 characters at most.")
         case .description: String(localized: "A description can be \(descriptionLimit) characters at most.")
+        case .guidance: String(localized: "Guidance can be \(guidanceLimit) characters at most.")
         case .meaning: String(localized: "What a word means can be \(wordMeaningLimit) characters at most.")
         case .word: String(localized: "A status word starts with a letter, then letters, numbers and spaces.")
         case .fieldName: String(localized: "A field’s name can be 100 characters at most.")
@@ -506,6 +545,7 @@ struct TypeAccess {
         case "label": return .name
         case "plural": return .plural
         case "description": return .description
+        case "guidance": return .guidance
         case "parent": return .basedOn
         default: return nil
         }
@@ -528,6 +568,7 @@ struct TypeAccess {
         case .name: name = type.label
         case .plural: plural = type.plural ?? ""
         case .description: descriptionText = type.description ?? ""
+        case .guidance: guidanceText = type.guidance ?? ""
         case .fieldMeaning, .fieldLongest, .fieldName, .fieldRule, .fieldSearchable: syncFieldDrafts()
         default: break
         }
@@ -991,6 +1032,12 @@ struct TypeAccess {
             if description != (type.description ?? "") {
                 drafts.append(.typed(title: String(localized: "Type Description Not Kept"), text: description))
                 descriptionText = type.description ?? ""
+            }
+            let guidance = guidanceText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if guidance != (type.guidance ?? "").trimmingCharacters(in: .whitespacesAndNewlines) {
+                if !guidance.isEmpty { drafts.append(.typed(title: String(localized: "Type Guidance Not Kept"), text: guidance)) }
+                guidanceText = type.guidance ?? ""
+                guidanceNeedsCommand = false
             }
         }
         if meaningWord != nil, !meaningDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

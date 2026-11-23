@@ -19,8 +19,9 @@ struct PluginsAccess {
 
 /// The Plugins page: the plugins the server holds, the newer versions the plugins release lists, and the plugins it lists that
 /// are not installed. The release is read by the app itself and every bundle is checked against the digest the release lists
-/// before anything is shown of it or sent. A bundle is installed as its bytes, unchanged. Marfa refuses an app installing a
-/// plugin whose types carry guidance, so for one the page says it installs from the command line and gives the command.
+/// before anything is shown of it or sent. A bundle is installed as its bytes, unchanged. One whose types carry guidance is sent
+/// like any other, and the server's answer decides: it asks the owner to sign in again (the call shows that in place and sends
+/// again), or, while it takes guidance only from the command line, refuses, and the page then gives the command.
 @Observable @MainActor final class PluginsModel {
     /// The plugins release as the page reads it. A release that cannot be read leaves the rest of the page working.
     enum Release: Equatable {
@@ -238,12 +239,8 @@ struct PluginsAccess {
 
     func items(ofType id: String) -> Int { access.ownItems(id) }
 
-    /// The command the owner is given for `name`, once the server refused it or its bundle is known to carry guidance.
-    func heldCommand(_ name: String) -> String? {
-        if let command = commands[name] { return command }
-        guard bundle(name)?.carriesGuidance == true else { return nil }
-        return Self.command(for: name)
-    }
+    /// The command the owner is given for `name`, once the server refused it for its guidance.
+    func heldCommand(_ name: String) -> String? { commands[name] }
 
     /// The command that installs or updates `name` from the release.
     static func command(for name: String) -> String { "marfa plugins install \(name)" }
@@ -266,8 +263,7 @@ struct PluginsAccess {
 
     func isWorking(_ name: String) -> Bool { working.contains(name) }
 
-    /// Installs, or updates to, what the release lists for `entry`. The bundle is read and checked first, and one whose types
-    /// carry guidance is not sent: the owner is given the command instead.
+    /// Installs, or updates to, what the release lists for `entry`. The bundle is read and checked first.
     func install(_ entry: ReleasePlugin, asUpdate: Bool = false) async {
         let name = entry.name
         guard !working.contains(name) else { return }
@@ -281,7 +277,6 @@ struct PluginsAccess {
             if case .failed(let failure)? = bundles[name] { problem = Problem(plugin: name, title: title, failure: failure) }
             return
         }
-        if bundle.carriesGuidance { return }
         await send(bundle.bytes, plugin: name, title: title)
     }
 
@@ -312,12 +307,14 @@ struct PluginsAccess {
         } catch {
             switch error {
             case .carriesGuidance:
-                // The bundle parse cannot see guidance a file hides, so the server's refusal is the same answer.
                 if let plugin {
                     commands[plugin] = Self.command(for: plugin)
                 } else if let filePath {
                     commands[""] = Self.command(forFile: filePath)
                 }
+            case .canceled:
+                // The owner closed the sign-in the server asked for: nothing was sent and nothing is said.
+                break
             case .owner(let owner):
                 await context.learn(from: owner)
                 problem = Problem(plugin: plugin, title: title, failure: error)

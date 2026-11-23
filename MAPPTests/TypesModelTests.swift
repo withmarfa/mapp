@@ -67,6 +67,9 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
             case .description(let text):
                 guard record.description != (text.isEmpty ? nil : text) else { return }
                 record.description = text.isEmpty ? nil : text
+            case .guidance(let text):
+                guard record.guidance != (text.isEmpty ? nil : text) else { return }
+                record.guidance = text.isEmpty ? nil : text
             case .parent(let parent):
                 guard record.parent != parent else { return }
                 record.parent = parent
@@ -917,9 +920,17 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     }
 
     @Test func aRefusalForGuidanceAnAppMadeIsToldApartFromOneForAMissingPermission() throws {
-        let server = try answer(#"{"changes":["guidance"],"required_scope":"schema.write"}"#, status: 403, code: "forbidden")
-        let error = MarfaError.forbidden(code: "forbidden", message: "Forbidden", server: server)
-        #expect(ServerTypeCalls.failure(error) == .guidanceByApp)
+        let app = try answer(#"{"changes":["guidance"]}"#, status: 403, code: "forbidden")
+        #expect(ServerTypeCalls.failure(MarfaError.forbidden(code: "forbidden", message: "Forbidden", server: app)) == .guidanceByApp)
+        let missing = try answer(#"{"changes":["guidance"],"required_scope":"schema.write"}"#, status: 403, code: "forbidden")
+        #expect(
+            ServerTypeCalls.failure(MarfaError.forbidden(code: "forbidden", message: "Forbidden", server: missing))
+                == .owner(.notPermitted("schema.write")), "a missing permission shows Allow More…, not the command")
+    }
+
+    @Test func aSignInSheetTheOwnerClosedIsNotAFailure() {
+        #expect(ServerTypeCalls.failure(MarfaError.canceled(message: "closed")) == .canceled)
+        #expect(ServerTypeCalls.failure(MarfaError.forbidden(code: "access_denied", message: "no", server: nil)) == .owner(.notConfirmed))
     }
 
     @Test func aRefusalForAMissingPermissionNamesIt() throws {
@@ -935,5 +946,109 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let below = try answer(#"{"subtype_ids":["user.rework"]}"#, status: 409, code: "type_has_subtypes")
         let children = MarfaError.server(status: 409, code: "type_has_subtypes", message: "Has subtypes", details: nil, server: below)
         #expect(ServerTypeCalls.failure(children) == .hasSubtypes(["user.rework"]))
+    }
+}
+
+extension TypesModelTests {
+    private func guidanceOpen(_ calls: FakeTypeCalls) async -> TypesModel {
+        calls.state.withLock { $0.types[2].guidance = "One job is one piece of paid work." }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        return model
+    }
+
+    @Test func guidanceTypedAndLeftIsSentAsTheSameQueuedChangeAndShownAsTheServerHoldsIt() async {
+        let calls = listing()
+        let model = await guidanceOpen(calls)
+        #expect(model.guidanceText == "One job is one piece of paid work.")
+        model.guidanceText = "  One job is one piece of paid work.\n\nPut the client on it.\n"
+        await model.commit(.guidance)
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.guidance("One job is one piece of paid work.\n\nPut the client on it.")])
+        #expect(model.guidanceText == "One job is one piece of paid work.\n\nPut the client on it.")
+        #expect(!model.guidanceNeedsCommand && model.fieldErrors[.guidance] == nil)
+    }
+
+    @Test func guidanceLeftAloneSendsNothingEvenWhereTheTypeHoldsTrailingLines() async {
+        let calls = listing()
+        let model = await guidanceOpen(calls)
+        calls.state.withLock { $0.types[2].guidance = "One job.\n\n" }
+        await model.load()
+        model.guidanceText = "One job.\n\n"
+        await model.commit(.guidance)
+        #expect(calls.state.withLock { $0.started }.isEmpty)
+    }
+
+    @Test func guidanceIsCountedInCodePointsAndOneOverTheLimitIsNotSent() async {
+        let calls = listing()
+        let model = await guidanceOpen(calls)
+        model.guidanceText = String(repeating: "🛠", count: TypesModel.guidanceLimit)
+        await model.commit(.guidance)
+        #expect(calls.state.withLock { $0.started }.count == 1, "1,000 emoji are 1,000 characters")
+        model.guidanceText = String(repeating: "x", count: TypesModel.guidanceLimit + 1)
+        await model.commit(.guidance)
+        #expect(calls.state.withLock { $0.started }.count == 1)
+        #expect(model.fieldErrors[.guidance] == TypesModel.line(for: .guidance))
+        #expect(model.fieldErrors[.guidance]?.contains("characters at most") == true)
+        #expect(model.guidanceText.count == TypesModel.guidanceLimit + 1, "what was typed stays")
+    }
+
+    @Test func aRefusalOfGuidanceFromAnAppKeepsTheTextAndGivesTheCommandOnce() async {
+        let calls = listing()
+        let model = await guidanceOpen(calls)
+        calls.state.withLock { $0.refusal = .guidanceByApp }
+        model.guidanceText = "Put the client on every job."
+        await model.commit(.guidance)
+        #expect(model.guidanceNeedsCommand)
+        #expect(model.guidanceText == "Put the client on every job.")
+        #expect(model.pageFailure == nil, "it is told on the field, not above the page")
+        #expect(TypesModel.guidanceCommand(for: "user.job") == "marfa types replace user.job --file user.job.json")
+        await model.commit(.guidance)
+        #expect(calls.state.withLock { $0.started }.count == 1, "leaving the field again sends the same text again to no purpose")
+        model.guidanceText = "Put the client on every job, and the site."
+        calls.state.withLock { $0.refusal = nil }
+        await model.commit(.guidance)
+        #expect(!model.guidanceNeedsCommand, "a text the server takes ends the command")
+        #expect(calls.state.withLock { $0.types[2].guidance } == "Put the client on every job, and the site.")
+    }
+
+    @Test func aSignInSheetTheOwnerClosedSavesNothingAndSaysNothing() async {
+        let calls = listing()
+        let model = await guidanceOpen(calls)
+        calls.state.withLock { $0.refusal = .canceled }
+        model.guidanceText = "Changed."
+        await model.commit(.guidance)
+        #expect(model.pageFailure == nil && model.fieldErrors[.guidance] == nil && !model.guidanceNeedsCommand)
+        #expect(model.guidanceText == "Changed.", "the text stays to be saved again")
+        #expect(calls.state.withLock { $0.types[2].guidance } == "One job is one piece of paid work.")
+    }
+
+    @Test func aDeclinedSignInIsToldAsNotChanged() async {
+        let calls = listing()
+        let model = await guidanceOpen(calls)
+        calls.state.withLock { $0.refusal = .owner(.notConfirmed) }
+        model.guidanceText = "Changed."
+        await model.commit(.guidance)
+        #expect(model.pageFailure == .notConfirmed)
+        #expect(model.guidanceText == "Changed.")
+    }
+
+    @Test func guidanceTypedAndNotKeptIsHandedBackWhenSettingsCloses() async {
+        let calls = listing()
+        let model = await guidanceOpen(calls)
+        model.guidanceText = "Put the client on every job."
+        let drafts = model.takeDrafts()
+        #expect(drafts.count == 1)
+        #expect(model.guidanceText == "One job is one piece of paid work.")
+    }
+
+    @Test func aPluginsTypeSendsNoGuidance() async {
+        let calls = listing()
+        let model = model(calls)
+        await model.load()
+        model.open("common.ticket")
+        model.guidanceText = "Changed."
+        await model.commit(.guidance)
+        #expect(calls.state.withLock { $0.started }.isEmpty)
     }
 }

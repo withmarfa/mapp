@@ -124,7 +124,7 @@ enum LibraryDescription {
         #else
         let address: String? = nil
         #endif
-        return ClientPluginCalls(server: plainServer, client: confirmingClient, releaseAddress: address)
+        return ClientPluginCalls(server: confirmingServer, client: confirmingClient, releaseAddress: address)
     }
 
     func itemCount(ofType id: String) -> Int { libraries.current?.count(in: .itemType(id)) ?? 0 }
@@ -233,6 +233,18 @@ enum LibraryDescription {
             let server = try Self.server(address: address) { try calls.server() }
                 .confirming(from: { NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow() })
             return Client(server, timeout: calls.timeout)
+        }
+    }
+
+    /// The package's server for a call the generated client does not hold, set as `confirmingClient` is: installing a plugin
+    /// whose types carry guidance asks the owner to sign in again, and sends the bundle once more.
+    private var confirmingServer: (@Sendable () throws -> Server)? {
+        guard let connection = host.configuredConnection else { return nil }
+        let signIns = host.signIns
+        let address = connection.address.absoluteString
+        return {
+            try Self.server(address: address) { try MarfaServerCalls(connection: connection, signIns: signIns).server() }
+                .confirming(from: { NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow() })
         }
     }
 
