@@ -152,7 +152,7 @@ private struct TypeDetail: View {
                 }
             } else {
                 iconRow
-                SettingsRow("Description") { SettingsLockedValue(text: type.description ?? String(localized: "None")) }
+                SettingsStackRow(title: Text("Description")) { SettingsStackText(text: type.description ?? String(localized: "None"), isLocked: true) }
             }
         }
     }
