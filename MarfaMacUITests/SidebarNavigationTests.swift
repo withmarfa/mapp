@@ -170,7 +170,7 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     private func sidebarText(_ title: String) -> XCUIElement {
-        // Section identifiers propagate to their rows, and headings may have a distinct accessibility role.
+        // The visible name: a heading keeps the section's identifier, and a row keeps its own.
         sidebar.descendants(matching: .any)
             .matching(NSPredicate(format: "label == %@ OR value == %@", title, title))
             .element(boundBy: 0)

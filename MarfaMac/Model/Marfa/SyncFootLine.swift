@@ -21,6 +21,8 @@ nonisolated struct SyncFootLine: Hashable, Sendable {
     let text: String
     /// The reason, for a tooltip.
     let help: String?
+    /// The copy is still being filled, as against a later update that says the same "Syncing…".
+    let showsFill: Bool
 
     var showsSpinner: Bool { kind == .syncing }
 
@@ -33,36 +35,38 @@ nonisolated struct SyncFootLine: Hashable, Sendable {
         state: MarfaConnectionState, report: SyncReport, lastSynced: Date?, now: Date, locale: Locale = .current
     ) {
         let status = SyncStatus(state: state, report: report, now: now)
+        let showsFill = FillWording.shows(report.fill, in: state)
         switch state {
         case .disconnected:
             return nil
         case .keyRefused, .unavailable, .otherVersion, .inUse:
-            self.init(.failed, String(localized: "Couldn’t sync"), help: Self.reason(of: state, status))
+            self.init(.failed, String(localized: "Couldn’t sync"), help: Self.reason(of: state, status), showsFill: showsFill)
         case .online, .connecting, .offline:
             let reachable = if case .offline = state { false } else { true }
             if !report.problems.isEmpty {
-                self.init(.needsAttention, Words.needAttentionLine(report.problems.count), help: status.notices.first { $0.kind == .needsAttention }?.detail)
+                self.init(.needsAttention, Words.needAttentionLine(report.problems.count), help: status.notices.first { $0.kind == .needsAttention }?.detail, showsFill: showsFill)
             } else if reachable, report.phase != .current || state == .connecting {
-                self.init(.syncing, String(localized: "Syncing…"), help: nil)
+                self.init(.syncing, String(localized: "Syncing…"), help: nil, showsFill: showsFill)
             } else if !reachable {
                 let line = report.waiting > 0
                     ? Words.offlineLine(report.waiting)
                     : lastSynced.map { Self.offline(since: $0, now: now, locale: locale) } ?? String(localized: "Offline")
-                self.init(.offline, line, help: status.notices.first { $0.kind == .offline }?.detail)
+                self.init(.offline, line, help: status.notices.first { $0.kind == .offline }?.detail, showsFill: showsFill)
             } else if status.primary?.kind == .sending {
-                self.init(.waiting, Words.waitingToSend(report.waiting), help: status.primary?.detail)
+                self.init(.waiting, Words.waitingToSend(report.waiting), help: status.primary?.detail, showsFill: showsFill)
             } else if let lastSynced {
-                self.init(.updated, Self.updated(since: lastSynced, now: now, locale: locale), help: nil)
+                self.init(.updated, Self.updated(since: lastSynced, now: now, locale: locale), help: nil, showsFill: showsFill)
             } else {
                 return nil
             }
         }
     }
 
-    private init(_ kind: Kind, _ text: String, help: String?) {
+    private init(_ kind: Kind, _ text: String, help: String?, showsFill: Bool) {
         self.kind = kind
         self.text = text
         self.help = help
+        self.showsFill = showsFill
     }
 
     private static func reason(of state: MarfaConnectionState, _ status: SyncStatus) -> String? {

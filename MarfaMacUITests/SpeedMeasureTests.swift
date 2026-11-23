@@ -370,10 +370,13 @@ final class SpeedMeasureTests: XCTestCase {
         }
     }
 
-    /// The sidebar lists the library's types, which it can only do once the copy has loaded, and the fill is done.
+    /// The sidebar lists a type, which it can do only once the copy has loaded, and the copy is no longer filling.
+    /// The fill marker is one element, so it is asked before the type rows.
     private var showsLibrary: Bool {
-        let type = sidebar.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'SidebarType-'"))
-        return type.firstMatch.exists && !element("LibraryFillProgress").exists
+        if sidebarElement("LibraryFillProgress").exists { return false }
+        return sidebar.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'SidebarType-'"))
+            .firstMatch.exists
     }
 
     private func signpost(_ name: String) -> XCTOSSignpostMetric {
