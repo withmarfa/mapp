@@ -86,7 +86,6 @@ import Testing
     }
 
     var pluginCalls: any PluginCalls = FakePluginCalls()
-    func itemCount(ofType id: String) -> Int { 0 }
     func chooseBundleFile() async -> PluginFileChoice? { nil }
 
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome {
