@@ -191,8 +191,9 @@ import Observation
         if rowErrors[plugin] == nil { await reload(plugin) }
     }
 
-    /// While a run is asked for, reads the connector again until it has taken the request, so the page stops saying "Run
-    /// requested" once the connector has started. It stops after `attempts` reads, and when the page that called it closes.
+    /// While a run is asked for, reads the connector again until the server clears the request, which it does when the
+    /// connector reports the run, not when it starts. A run that outlasts `attempts` reads keeps "Run requested" until the page
+    /// is read again. It also stops when the page that called it closes.
     func followRun(_ plugin: String, every interval: Duration = .seconds(5), attempts: Int = 18) async {
         for _ in 0..<attempts {
             guard entry(plugin)?.control?.runRequested != nil else { return }
@@ -364,10 +365,16 @@ import Observation
         }
         _ = await show(start.address)
         do {
-            switch try await context.calls.connectorSignInStatus(of: plugin) {
-            case .signedIn: break
-            case .failed(let reason): signInProblems[plugin] = ConnectorWording.signInFailure(reason, provider: provider)
-            case .none, .pending, .expired: signInProblems[plugin] = ConnectorWording.signInFailure(nil, provider: provider)
+            let reading = try await context.calls.connectorSignInStatus(of: plugin)
+            // A later start, from another window or another app, replaced this sign-in: its outcome is not this one's.
+            if reading.id != start.id {
+                signInProblems[plugin] = ConnectorWording.signInFailure(nil, provider: provider)
+            } else {
+                switch reading.status {
+                case .signedIn: break
+                case .failed(let reason): signInProblems[plugin] = ConnectorWording.signInFailure(reason, provider: provider)
+                case .none, .pending, .expired: signInProblems[plugin] = ConnectorWording.signInFailure(nil, provider: provider)
+                }
             }
         } catch {
             signInProblems[plugin] = OwnerWording.line(error)

@@ -303,7 +303,7 @@ nonisolated protocol OwnerCalls: Sendable {
     func assignConnector(_ plugin: String, toHost host: String) async throws(OwnerFailure)
     /// Starts the vendor sign-in, for the browser to be sent back to `address`, which the app registered.
     func startConnectorSignIn(of plugin: String, returningTo address: String) async throws(OwnerFailure) -> ConnectorSignInStart
-    func connectorSignInStatus(of plugin: String) async throws(OwnerFailure) -> ConnectorSignInStatus
+    func connectorSignInStatus(of plugin: String) async throws(OwnerFailure) -> ConnectorSignInReading
 }
 
 /// What changing the addresses would do, as the server said before anything was written, with the change it said it

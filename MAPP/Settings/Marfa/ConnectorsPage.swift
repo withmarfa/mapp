@@ -81,7 +81,7 @@ struct ConnectorsPage: View {
                         let health = model.health(of: entry)
                         SettingsLinkRow(
                             verbatim: entry.summary.title, line: line(of: entry), lead: .well(host.markGlyph(entry.summary.mark)),
-                            value: ConnectorWording.title(health), dot: Self.dot(health)
+                            value: ConnectorWording.title(health), dot: Self.dot(health), lines: 1
                         ) { push(Self.subpage(for: entry.summary)) }
                     }
                 }
@@ -244,7 +244,7 @@ private struct ConnectorDetail: View {
             switch setting.kind {
             case .boolean:
                 SettingsRow(verbatim: setting.label, error: error) {
-                    SettingsToggle(title: LocalizedStringKey(setting.label), isOn: Binding {
+                    SettingsToggle(verbatim: setting.label, isOn: Binding {
                         if case .flag(let on)? = setting.value { on } else { false }
                     } set: { on in
                         Task { await model.set(.flag(on), for: setting, in: summary.name) }
@@ -253,7 +253,7 @@ private struct ConnectorDetail: View {
             case .choice:
                 SettingsRow(verbatim: setting.label, error: error) {
                     SettingsPopUp(
-                        title: LocalizedStringKey(setting.label), selection: Binding<String?> {
+                        verbatim: setting.label, selection: Binding<String?> {
                             if case .text(let text)? = setting.value { text } else { nil }
                         } set: { choice in
                             Task { await model.set(choice.map { .text($0) }, for: setting, in: summary.name) }
@@ -263,10 +263,20 @@ private struct ConnectorDetail: View {
                         ForEach(setting.choices, id: \.self) { Text(verbatim: ConnectorWording.kindTitle($0)).tag(String?.some($0)) }
                     }
                 }
-            case .text, .number:
+            case .number:
+                SettingsRow(verbatim: setting.label, error: error) {
+                    SettingsNumberField(
+                        verbatim: setting.label,
+                        text: Binding { model.text(of: setting, in: summary.name) } set: { model.drafts[key] = $0 },
+                        unit: nil,
+                        isError: error != nil && model.settingErrors[key] != nil,
+                        onSubmit: { Task { await model.commit(setting, in: summary.name) } },
+                        onEndEditing: { Task { await model.commit(setting, in: summary.name) } })
+                }
+            case .text:
                 SettingsRow(verbatim: setting.label, error: error) {
                     SettingsField(
-                        title: LocalizedStringKey(setting.label),
+                        verbatim: setting.label,
                         text: Binding { model.text(of: setting, in: summary.name) } set: { model.drafts[key] = $0 },
                         isError: error != nil && model.settingErrors[key] != nil,
                         onSubmit: { Task { await model.commit(setting, in: summary.name) } },
@@ -309,7 +319,7 @@ private struct ConnectorSecretSheet: View {
             ) {
                 SettingsSheetField(verbatim: sheet.label, error: model.secretError) {
                     SettingsField(
-                        title: LocalizedStringKey(sheet.label), text: $model.secretDraft,
+                        verbatim: sheet.label, text: $model.secretDraft,
                         prompt: sheet.isSet ? String(localized: "Type it again to change it") : nil,
                         isError: model.secretError != nil, isSecure: true, width: nil, onSubmit: { Task { await model.saveSecret() } })
                     .accessibilityIdentifier("ConnectorSecretField")

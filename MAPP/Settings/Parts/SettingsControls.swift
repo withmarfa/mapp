@@ -97,13 +97,29 @@ extension View {
 /// A pop-up of choices, as the system draws it, at the one width every pop-up of Settings has, so those of a page line
 /// up in a column at the rows' trailing edge. `isError` puts the red ring round it.
 struct SettingsPopUp<Value: Hashable, Content: View>: View {
-    let title: LocalizedStringKey
+    private let title: Text
     @Binding var selection: Value
     var isError = false
     @ViewBuilder let content: Content
 
+    init(title: LocalizedStringKey, selection: Binding<Value>, isError: Bool = false, @ViewBuilder content: () -> Content) {
+        self.init(label: Text(title), selection: selection, isError: isError, content: content)
+    }
+
+    /// For a title the server or a plugin wrote, which is never looked up as a key.
+    init(verbatim title: String, selection: Binding<Value>, isError: Bool = false, @ViewBuilder content: () -> Content) {
+        self.init(label: Text(verbatim: title), selection: selection, isError: isError, content: content)
+    }
+
+    private init(label: Text, selection: Binding<Value>, isError: Bool, @ViewBuilder content: () -> Content) {
+        title = label
+        _selection = selection
+        self.isError = isError
+        self.content = content()
+    }
+
     var body: some View {
-        Picker(title, selection: $selection) { content }
+        Picker(selection: $selection) { content } label: { title }
             .labelsHidden()
             .pickerStyle(.menu)
             .settingsPopUpSize()
@@ -113,11 +129,22 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
 
 /// A switch. The system draws it, and its label is the row's title for VoiceOver.
 struct SettingsToggle: View {
-    let title: LocalizedStringKey
+    private let title: Text
     @Binding var isOn: Bool
 
+    init(title: LocalizedStringKey, isOn: Binding<Bool>) {
+        self.title = Text(title)
+        _isOn = isOn
+    }
+
+    /// For a title the server or a plugin wrote, which is never looked up as a key.
+    init(verbatim title: String, isOn: Binding<Bool>) {
+        self.title = Text(verbatim: title)
+        _isOn = isOn
+    }
+
     var body: some View {
-        Toggle(title, isOn: $isOn)
+        Toggle(isOn: $isOn) { title }
             .labelsHidden()
             .toggleStyle(.switch)
             .controlSize(.mini)
@@ -199,7 +226,7 @@ extension View {
 
 /// A text field, 200 wide. The system draws the field, at its own height; `isError` puts the red ring round it.
 struct SettingsField: View {
-    let title: LocalizedStringKey
+    private let title: Text
     @Binding var text: String
     /// A hint that says something the label does not. With none, the field is empty: the label is never repeated in it.
     var prompt: String?
@@ -213,12 +240,48 @@ struct SettingsField: View {
     @FocusState private var isFocused: Bool
     @Environment(\.settingsTextScale) private var scale
 
+    init(
+        title: LocalizedStringKey, text: Binding<String>, prompt: String? = nil, isError: Bool = false, isSecure: Bool = false,
+        isMonospaced: Bool = false, width: CGFloat? = SettingsTokens.Metric.controlWidth, onSubmit: @escaping () -> Void = {},
+        onEndEditing: (() -> Void)? = nil
+    ) {
+        self.init(
+            label: Text(title), text: text, prompt: prompt, isError: isError, isSecure: isSecure, isMonospaced: isMonospaced, width: width,
+            onSubmit: onSubmit, onEndEditing: onEndEditing)
+    }
+
+    /// For a title the server or a plugin wrote, which is never looked up as a key.
+    init(
+        verbatim title: String, text: Binding<String>, prompt: String? = nil, isError: Bool = false, isSecure: Bool = false,
+        isMonospaced: Bool = false, width: CGFloat? = SettingsTokens.Metric.controlWidth, onSubmit: @escaping () -> Void = {},
+        onEndEditing: (() -> Void)? = nil
+    ) {
+        self.init(
+            label: Text(verbatim: title), text: text, prompt: prompt, isError: isError, isSecure: isSecure, isMonospaced: isMonospaced,
+            width: width, onSubmit: onSubmit, onEndEditing: onEndEditing)
+    }
+
+    private init(
+        label: Text, text: Binding<String>, prompt: String?, isError: Bool, isSecure: Bool, isMonospaced: Bool, width: CGFloat?,
+        onSubmit: @escaping () -> Void, onEndEditing: (() -> Void)?
+    ) {
+        title = label
+        _text = text
+        self.prompt = prompt
+        self.isError = isError
+        self.isSecure = isSecure
+        self.isMonospaced = isMonospaced
+        self.width = width
+        self.onSubmit = onSubmit
+        self.onEndEditing = onEndEditing
+    }
+
     var body: some View {
         Group {
             if isSecure {
-                SecureField(title, text: $text, prompt: Text(verbatim: prompt ?? ""))
+                SecureField(text: $text, prompt: Text(verbatim: prompt ?? "")) { title }
             } else {
-                TextField(title, text: $text, prompt: Text(verbatim: prompt ?? ""))
+                TextField(text: $text, prompt: Text(verbatim: prompt ?? "")) { title }
             }
         }
         .labelsHidden()
@@ -255,17 +318,48 @@ struct SettingsReadOnlyValue: View {
 
 /// A number: a field with its unit inside at the trailing edge, never minus and plus.
 struct SettingsNumberField: View {
-    let title: LocalizedStringKey
+    private let title: Text
     @Binding var text: String
-    let unit: LocalizedStringKey
+    /// What the number counts, shown inside the field; nil where the server names none.
+    let unit: LocalizedStringKey?
     var prompt: String?
     var isError = false
     var onSubmit: () -> Void = {}
     var onEndEditing: (() -> Void)?
     @FocusState private var isFocused: Bool
 
+    init(
+        title: LocalizedStringKey, text: Binding<String>, unit: LocalizedStringKey?, prompt: String? = nil, isError: Bool = false,
+        onSubmit: @escaping () -> Void = {}, onEndEditing: (() -> Void)? = nil
+    ) {
+        self.init(label: Text(title), text: text, unit: unit, prompt: prompt, isError: isError, onSubmit: onSubmit, onEndEditing: onEndEditing)
+    }
+
+    /// For a title the server or a plugin wrote, which is never looked up as a key.
+    init(
+        verbatim title: String, text: Binding<String>, unit: LocalizedStringKey?, prompt: String? = nil, isError: Bool = false,
+        onSubmit: @escaping () -> Void = {}, onEndEditing: (() -> Void)? = nil
+    ) {
+        self.init(
+            label: Text(verbatim: title), text: text, unit: unit, prompt: prompt, isError: isError, onSubmit: onSubmit,
+            onEndEditing: onEndEditing)
+    }
+
+    private init(
+        label: Text, text: Binding<String>, unit: LocalizedStringKey?, prompt: String?, isError: Bool, onSubmit: @escaping () -> Void,
+        onEndEditing: (() -> Void)?
+    ) {
+        title = label
+        _text = text
+        self.unit = unit
+        self.prompt = prompt
+        self.isError = isError
+        self.onSubmit = onSubmit
+        self.onEndEditing = onEndEditing
+    }
+
     var body: some View {
-        TextField(title, text: $text, prompt: Text(verbatim: prompt ?? ""))
+        TextField(text: $text, prompt: Text(verbatim: prompt ?? "")) { title }
             .labelsHidden()
             .textFieldStyle(.roundedBorder)
             .controlSize(.large)
@@ -275,12 +369,14 @@ struct SettingsNumberField: View {
             .onChange(of: isFocused) { if !$1 { onEndEditing?() } }
             .padding(.trailing, 0)
             .overlay(alignment: .trailing) {
-                Text(unit)
-                    .settingsFont(.title)
-                    .foregroundStyle(SettingsTokens.secondaryText)
-                    .padding(.trailing, 8)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
+                if let unit {
+                    Text(unit)
+                        .settingsFont(.title)
+                        .foregroundStyle(SettingsTokens.secondaryText)
+                        .padding(.trailing, 8)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
             }
             .frame(width: SettingsTokens.Metric.controlWidth)
             .settingsErrorRing(isError)

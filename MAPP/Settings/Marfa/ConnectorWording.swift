@@ -37,6 +37,7 @@ nonisolated enum ConnectorHealth: Hashable, Sendable {
         if control.paused { return .paused }
         if let missing = settings?.missing, !missing.isEmpty { return .needsSetup(missing: missing) }
         guard control.host != nil else { return .noMachine }
+        if control.registration != nil, registration == nil { return .unread }
         let signs = [registration?.lastHeartbeat, registration?.lastRun?.finished, host?.lastSeen].compactMap { $0 }
         guard let latest = signs.max(), registration != nil else { return .waiting(machineSeen: host?.lastSeen != nil) }
         if now.timeIntervalSince(latest) > silentAfter { return .silent(since: latest) }
@@ -99,11 +100,11 @@ enum ConnectorWording {
         }
     }
 
-    /// "Today, 14:02", or the day and time.
+    /// "today, 14:02", or the day and time, for the middle of a sentence: every caller sets it after other words.
     static func when(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> String {
         let format = DateFormat.stored()
         guard calendar.isDate(date, inSameDayAs: now) else { return DateDisplay.text(of: date, place: .value, format: format, now: now, calendar: calendar) }
-        return String(localized: "Today, \(DateDisplay.timeOfDay(of: date, format: format, calendar: calendar))")
+        return String(localized: "today, \(DateDisplay.timeOfDay(of: date, format: format, calendar: calendar))")
     }
 
     /// "2 hours ago", as the Mac's region says it.

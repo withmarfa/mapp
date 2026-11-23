@@ -121,6 +121,8 @@ nonisolated enum ConnectorSettingChange: Hashable, Sendable {
 }
 
 nonisolated struct ConnectorSignInStart: Hashable, Sendable {
+    /// The sign-in's own ID, which the status read names while this sign-in is the latest.
+    var id: String
     var address: URL
     var expires: Date
 }
@@ -130,6 +132,13 @@ nonisolated enum ConnectorSignInStatus: Hashable, Sendable {
     /// `reason` is the server's one outcome word for how it failed.
     case failed(reason: String?)
     case expired
+}
+
+/// The latest sign-in a connector has, and which one it is.
+nonisolated struct ConnectorSignInReading: Hashable, Sendable {
+    var status: ConnectorSignInStatus
+    /// The latest sign-in's ID, nil where none was started.
+    var id: String?
 }
 
 extension ClientOwnerCalls {
@@ -285,7 +294,7 @@ extension ClientOwnerCalls {
             guard let url = URL(string: started.url), url.scheme == "https" else {
                 throw OwnerFailure.failed(String(localized: "The server’s address for signing in couldn’t be read."))
             }
-            return ConnectorSignInStart(address: url, expires: started.expiresAt)
+            return ConnectorSignInStart(id: started.id, address: url, expires: started.expiresAt)
         } catch let failure as OwnerFailure {
             throw failure
         } catch {
@@ -297,16 +306,18 @@ extension ClientOwnerCalls {
         }
     }
 
-    func connectorSignInStatus(of plugin: String) async throws(OwnerFailure) -> ConnectorSignInStatus {
+    func connectorSignInStatus(of plugin: String) async throws(OwnerFailure) -> ConnectorSignInReading {
         try await run { client in
             let status = try await client.getPluginConnectorSignIn(path: .init(name: plugin)).ok.body.json
-            switch status.status {
-            case .none: return .none
-            case .pending: return .pending
-            case .signedIn: return .signedIn
-            case .failed: return .failed(reason: status.reason)
-            case .expired: return .expired
-            }
+            let stands: ConnectorSignInStatus =
+                switch status.status {
+                case .none: .none
+                case .pending: .pending
+                case .signedIn: .signedIn
+                case .failed: .failed(reason: status.reason)
+                case .expired: .expired
+                }
+            return ConnectorSignInReading(status: stands, id: status.id)
         }
     }
 }

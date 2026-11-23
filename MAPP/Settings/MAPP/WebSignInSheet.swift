@@ -1,5 +1,6 @@
 import AppKit
 import AuthenticationServices
+import Synchronization
 
 /// The system's web authentication sheet over a window, for a page the server shows and then sends the browser back from, such
 /// as a connector's sign-in at its service. It ends where the browser comes back to the app's own address, and keeps no
@@ -21,12 +22,20 @@ import AuthenticationServices
 
     private func run(_ address: URL, scheme: String) async -> Bool {
         await withCheckedContinuation { continuation in
+            // The completion handler and a refused start can both answer; the first one counts.
+            let answer = Mutex(Optional(continuation))
+            let finish: @Sendable (Bool) -> Void = { came in
+                answer.withLock { held in
+                    held?.resume(returning: came)
+                    held = nil
+                }
+            }
             let session = ASWebAuthenticationSession(url: address, callback: .customScheme(scheme)) { callback, _ in
-                continuation.resume(returning: callback != nil)
+                finish(callback != nil)
             }
             session.presentationContextProvider = self
             self.session = session
-            if !session.start() { continuation.resume(returning: false) }
+            if !session.start() { finish(false) }
         }
     }
 

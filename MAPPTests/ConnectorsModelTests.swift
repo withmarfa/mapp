@@ -318,6 +318,41 @@ import Testing
 
     // MARK: The page
 
+    @Test func aSignInReadBackAsAnotherOnesIsToldAsNotFinishedWhateverItsStatus() async {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = calendar(bench)
+        await model.load()
+        bench.calls.state.withLock { $0.signInReadID = "someone-elses" }
+        await model.signIn("google-calendar", returningTo: "x:/y") { _ in true }
+        #expect(model.signInProblems["google-calendar"] == "The sign-in didn’t finish.")
+        bench.calls.state.withLock { $0.signInReadID = nil }
+        await model.signIn("google-calendar", returningTo: "x:/y") { _ in true }
+        #expect(model.signInProblems["google-calendar"] == nil)
+    }
+
+    @Test func aRegistrationThatCouldNotBeReadIsNotTakenForOneThatHasNotStarted() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = rss(bench)
+        bench.calls.fail("connectorRegistration", with: .failed("No answer."))
+        await model.load()
+        let entry = try #require(model.entry("rss"))
+        #expect(model.health(of: entry, now: Self.now) == .unread)
+        bench.calls.fail("connectorRegistration", with: nil)
+        await model.reload("rss")
+        let read = try #require(model.entry("rss"))
+        #expect(model.health(of: read, now: Self.now) == .ran(Self.now.addingTimeInterval(-120)))
+    }
+
+    @Test func aTimeInASentenceHasItsDayInLowercase() {
+        let now = Self.now
+        let calendar = Calendar(identifier: .gregorian)
+        let earlier = now.addingTimeInterval(-300)
+        let line = ConnectorWording.head(hostName: nil, run: ConnectorRunInfo(succeeded: true, started: earlier, finished: earlier, summary: nil), now: now)
+        #expect(line.hasPrefix("Last run today, "))
+        #expect(ConnectorWording.line(.silent(since: earlier), hostName: nil, now: now).hasPrefix("Last heard from today, "))
+        #expect(ConnectorWording.line(.lastRunFailed(earlier), hostName: nil, now: now).hasPrefix("Its last run, today, "))
+    }
+
     @Test func theSidebarListsConnectorsBesideWebhooksAndFoldersAndItNeedsConnectorsManage() {
         #expect(MarfaSettingsPage.groups.contains([.connectors, .webhooks, .folders]))
         #expect(MarfaSettingsPage.connectors.permission == .connectorsManage)

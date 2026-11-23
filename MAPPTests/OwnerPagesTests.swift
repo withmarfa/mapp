@@ -97,9 +97,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         /// The machine each assignment named.
         var connectorAssigned: [(plugin: String, host: String)] = []
         /// What the sign-in start answers, and the address the browser was asked to return to.
-        var signInStart = ConnectorSignInStart(address: URL(string: "https://accounts.example.com/sign-in")!, expires: .now.addingTimeInterval(600))
+        var signInStart = ConnectorSignInStart(id: "sign-in-1", address: URL(string: "https://accounts.example.com/sign-in")!, expires: .now.addingTimeInterval(600))
         var signInReturnedTo: [String] = []
         var signInStatus = ConnectorSignInStatus.signedIn
+        /// The ID the status read names, where it is not the start's: another sign-in replaced it.
+        var signInReadID: String?
         /// What the server holds after a sign-in finishes: the setting the token goes in, which a finished sign-in sets.
         var signInSetsToken: (plugin: String, setting: String)?
     }
@@ -639,7 +641,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         }
     }
 
-    func connectorSignInStatus(of plugin: String) async throws(OwnerFailure) -> ConnectorSignInStatus {
+    func connectorSignInStatus(of plugin: String) async throws(OwnerFailure) -> ConnectorSignInReading {
         try enter("connectorSignInStatus")
         return state.withLock { state in
             if state.signInStatus == .signedIn, let token = state.signInSetsToken, var reading = state.connectorSettings[token.plugin],
@@ -648,7 +650,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
                 reading.settings[index].isSet = true
                 state.connectorSettings[token.plugin] = reading
             }
-            return state.signInStatus
+            return ConnectorSignInReading(status: state.signInStatus, id: state.signInReadID ?? state.signInStart.id)
         }
     }
 }
