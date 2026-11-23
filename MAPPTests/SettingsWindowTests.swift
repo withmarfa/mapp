@@ -106,7 +106,7 @@ struct SettingsWindowTests {
         #expect(SettingsPage.mappGroups.flatMap { $0 } == [.general, .appearance, .keyboard, .editor, .lists, .layouts, .search, .onThisMac, .connection])
         #expect(
             SettingsPage.marfaGroups.flatMap { $0 } == [
-                .overview, .account, .apps, .keys, .addresses, .types, .sources, .recentlyDeleted, .history, .fileStorage, .connectors, .webhooks, .folders,
+                .overview, .account, .apps, .keys, .addresses, .plugins, .types, .sources, .recentlyDeleted, .history, .fileStorage, .connectors, .webhooks, .folders,
                 .backups, .updates, .housekeeping, .activity, .monitoring, .limits, .startUp,
             ])
     }
@@ -119,6 +119,7 @@ struct SettingsWindowTests {
         #expect(MarfaSettingsPage.keys.permission == .keysManage)
         #expect(MarfaSettingsPage.addresses.permission == .configManage)
         #expect(MarfaSettingsPage.types.permission == .schemaWrite)
+        #expect(MarfaSettingsPage.plugins.permission == .schemaWrite)
     }
 
     @Test func aServerThatLastAnsweredTodayIsToldByTheTime() {
