@@ -18,6 +18,8 @@ import Observation
     private(set) var hasBody = false
     /// Changes when a field the page header shows changes, not when only the version, preview, sync or embeds move.
     private(set) var headerStamp = 0
+    /// Changes only when `version` changes. The inspector's Version cell follows this, not the whole item.
+    private(set) var versionStamp = 0
     /// Changes when an edge touching this item comes, goes or changes, including one another item holds.
     private(set) var linkStamp = 0
 
@@ -27,6 +29,8 @@ import Observation
     private(set) var embedStamp = 0
     /// The item as `headerStamp` last counted it. Not observed: a reader follows `headerStamp`.
     @ObservationIgnored private(set) var headerSnapshot: Item
+    /// The version as `versionStamp` last counted it. Not observed: a reader follows `versionStamp`.
+    @ObservationIgnored private(set) var versionSnapshot: ItemVersion
     /// The text as `textIsEmpty` last counted it. Not observed: a reader follows `textIsEmpty` and `hasBody`.
     @ObservationIgnored private(set) var bodySnapshot: ItemBody?
     /// The bound embeds as `embedStamp` last counted them. Not observed: a reader follows `embedStamp`.
@@ -35,6 +39,7 @@ import Observation
     init(_ item: Item) {
         self.item = item
         headerSnapshot = item
+        versionSnapshot = item.version
         embedSnapshot = item.boundEmbeds
     }
 
@@ -43,6 +48,10 @@ import Observation
         if item.boundEmbeds != old.boundEmbeds {
             embedSnapshot = item.boundEmbeds
             embedStamp &+= 1
+        }
+        if item.version != old.version {
+            versionSnapshot = item.version
+            versionStamp &+= 1
         }
         if Self.affectsHeader(old, item) {
             headerSnapshot = item
@@ -1120,6 +1129,16 @@ import Observation
         guard record.isHeld else { return nil }
         _ = record.headerStamp
         return record.headerSnapshot
+    }
+
+    func itemVersion(_ id: ItemID) -> ItemVersion? {
+        guard let record = records[id] else {
+            _ = membershipRevision
+            return nil
+        }
+        guard record.isHeld else { return nil }
+        _ = record.versionStamp
+        return record.versionSnapshot
     }
 
     func textIsEmpty(_ id: ItemID) -> Bool {

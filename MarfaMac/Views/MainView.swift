@@ -129,7 +129,7 @@ struct MainView: View {
 
     private func windowToolbar(hasListColumn: Bool = false) -> WindowToolbar {
         WindowToolbar(
-            browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
+            browser: browser, items: browser.selectedHeaderItems(in: library), editor: editor, details: details,
             hasListColumn: hasListColumn)
     }
 

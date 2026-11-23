@@ -53,7 +53,7 @@ struct AppCommands: Commands {
         CommandGroup(after: .newItem) {
             let ids: Set<ItemID> = focused?.ids ?? []
             // Sharing an item reads one item; the commands below act on files too.
-            let shown = ids.compactMap { library?.item($0) }.filter { !$0.isFile }
+            let shown = ids.compactMap { library?.headerItem($0) }.filter { !$0.isFile }
             let one = ids.count == 1 ? shown.first : nil
             command(.open)
             command(.openAsModal)
@@ -63,9 +63,8 @@ struct AppCommands: Commands {
             command(.openOriginal)
             command(.openInBrowser)
             Divider()
-            ItemShareLink(share: library.map { library in
-                ItemShare(item: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, in: library)
-            } ?? ItemShare())
+            ItemShareLink(
+                item: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, library: library)
             if let library {
                 ItemActions(ids: ids, undoManager: focused?.undoManager, inMenuBar: true, shortcuts: shortcuts)
                     .environment(\.library, library)

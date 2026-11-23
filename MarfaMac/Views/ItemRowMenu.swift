@@ -36,7 +36,7 @@ struct ItemRowMenu<LayoutActions: View>: View {
                 Task { await browser.quickLookSelection(in: library) }
             }
         case .share:
-            ItemShareLink(share: ItemShare(item: single, fileURL: single.flatMap { browser.fileURL(of: $0.id) }, in: library))
+            ItemShareLink(item: single, fileURL: single.flatMap { browser.fileURL(of: $0.id) }, library: library)
         case .favorite: FavoriteButton(ids: ids, undoManager: undoManager)
         case .tag: AddTagButton(ids: ids, details: details, undoManager: undoManager)
         case .collection: CollectionActions(selection: ids, details: details, undoManager: undoManager)

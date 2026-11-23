@@ -436,6 +436,12 @@ final class Browser {
         selection.compactMap { library.item($0) }
     }
 
+    /// The selected items as a header shows them. A toolbar reads this: a keystroke, or a publish of only the version,
+    /// preview, sync or embeds, is not a change it shows.
+    func selectedHeaderItems(in library: any ItemLibrary) -> [Item] {
+        selection.compactMap { library.headerItem($0) }
+    }
+
     /// Whether the list shows its place's own order rather than the chosen sort: a collection lists its members in
     /// the order Marfa keeps for them, until a search lists results instead.
     var keepsPlaceOrder: Bool {

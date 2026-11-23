@@ -93,7 +93,7 @@ struct ItemModal: View {
         let id = browser.modalItem
         let neighbors = browser.modalNeighbors(in: library, order: order)
         let tools = ItemToolbarActions(
-            library: library, browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
+            library: library, browser: browser, items: browser.selectedHeaderItems(in: library), editor: editor, details: details)
         return GlassEffectContainer(spacing: 8) {
             HStack(spacing: 8) {
                 capsule {

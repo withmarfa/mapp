@@ -54,7 +54,7 @@ struct ItemCommandContext {
         self.init(
             library: library, ids: ids, hasBrowser: browser != nil,
             pageItem: Self.pageItem(showsPage: browser?.showsPage ?? true, editorHasItem: editor?.hasItem == true, pageItemID: editor?.pageItemID),
-            pageIsEditable: editor?.isEditable ?? false, showsSource: editor?.caret.sourceMode ?? false,
+            pageIsEditable: editor?.isEditable ?? false,
             fileURL: single.flatMap { browser?.fileURL(of: $0) } ?? fileURL, browser: browser,
             pageLook: browser?.showsPage != false ? details?.pageLook : nil,
             showsPage: browser?.showsPage ?? true, details: details)
@@ -66,8 +66,8 @@ struct ItemCommandContext {
         showsPage && editorHasItem ? pageItemID : nil
     }
 
-    /// The one selected item.
-    var item: Item? { ids.count == 1 ? ids.first.flatMap { library?.item($0) } : nil }
+    /// The one selected item, as a header shows it. A command follows that, not the item's version or its text.
+    var item: Item? { ids.count == 1 ? ids.first.flatMap { library?.headerItem($0) } : nil }
 
     /// The item on the page, which Print, Export, the source view and Add Attachment act on.
     var visibleItem: Item? {
@@ -105,7 +105,9 @@ enum ItemCommand: CaseIterable {
         }
     }
 
-    func title(in context: ItemCommandContext) -> LocalizedStringResource {
+    /// `sourceMode` is the page's, read by the button that shows it. Nil uses `context.showsSource`, so building a
+    /// context for a menu does not follow the caret.
+    func title(in context: ItemCommandContext, sourceMode: Bool? = nil) -> LocalizedStringResource {
         switch self {
         case .open: "Open"
         case .openAsModal: ItemOpening.modal.commandTitle
@@ -115,7 +117,7 @@ enum ItemCommand: CaseIterable {
         case .openOriginal: "Open Original"
         case .openInBrowser: "Open in Browser"
         case .addAttachment: "Add Attachment…"
-        case .toggleSource: context.showsSource ? "Show Formatted Text" : "Show Markdown Source"
+        case .toggleSource: (sourceMode ?? context.showsSource) ? "Show Formatted Text" : "Show Markdown Source"
         case .toggleReader: context.pageLook?.mode == .original ? "Show Reader" : "Show Original"
         case .toggleFormats: context.details?.isFormatsOpen(on: context.visibleItem?.id) == true ? "Hide Formats" : "Show Formats"
         case .toggleFocus: context.details?.isFocused(on: context.focusItem?.id) == true ? "Leave Focus" : "Focus"
@@ -214,7 +216,9 @@ struct ItemCommandButton: View {
     var shortcuts: ShortcutBindings?
 
     var body: some View {
-        Button(command.title(in: context), systemImage: command.systemImage) {
+        // Only Show Markdown Source reads the caret, and only this button does, so the rest of a menu stays as it was.
+        let sourceMode = command == .toggleSource ? editor?.caret.sourceMode : nil
+        Button(command.title(in: context, sourceMode: sourceMode), systemImage: command.systemImage) {
             command.perform(in: context, editor: editor) { openWindow(value: $0) }
         }
         .shortcut(command.shortcutCommand, shortcuts)

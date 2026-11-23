@@ -198,7 +198,8 @@ extension MarfaLibrary {
     }
 
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] {
-        guard let item = item(id) else { return [] }
+        // Body links are edges, which the header follows. The version and the text are not what a mention row shows.
+        guard let item = headerItem(id) else { return [] }
         return item.edgesOut.filter { $0.origin == .body }.map { edge in
             switch edge.to {
             case .item(let other): target(other)
