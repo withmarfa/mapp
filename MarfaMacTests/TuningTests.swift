@@ -85,7 +85,7 @@ struct TuningTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let empty = Tuning(knobs: [], defaults: defaults)
-        #expect(empty.report(build: "19") == "The app build 19")
+        #expect(empty.report(build: "19") == "Marfa for Mac build 19")
         empty.reset()
     }
 
