@@ -2163,7 +2163,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     @Test func theNewPagesAreInTheSidebarInTheBoardsOrder() {
         #expect(
             MarfaSettingsPage.groups == [
-                [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage], [.connectors, .webhooks, .folders],
+                [.overview], [.account, .apps, .keys, .addresses], [.types, .sources], [.recentlyDeleted, .history, .fileStorage], [.connectors, .webhooks, .folders],
                 [.backups, .updates, .housekeeping], [.activity, .monitoring], [.limits, .startUp],
             ])
         for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {
