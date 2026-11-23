@@ -3,6 +3,7 @@ import Foundation
 import Marfa
 import MarfaAPI
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The name of the library in use: the name a server gave itself, or its host until one has been read.
 @MainActor
@@ -49,7 +50,7 @@ enum LibraryDescription {
         return made
     }
 
-    func show(_ page: MarfaSettingsPage) { launcher.show(.marfa(page)) }
+    func show(_ page: MarfaSettingsPage, subpage: SettingsSubpage?) { launcher.show(.marfa(page), subpage: subpage) }
 
     // MARK: Sources
 
@@ -113,6 +114,19 @@ enum LibraryDescription {
         AnyView(TypeMark(icon: typeIcon(of: id), size: .large))
     }
 
+    // MARK: Plugins
+
+    /// The plugins release is read by the app itself, never through the server, at the latest release of the plugins repository.
+    /// A Debug build reads the release `MARFA_PLUGINS_URL` names instead, as the command line does, to try a release of its own.
+    var pluginCalls: any PluginCalls {
+        #if DEBUG
+        let address = ProcessInfo.processInfo.environment["MARFA_PLUGINS_URL"]
+        #else
+        let address: String? = nil
+        #endif
+        return ClientPluginCalls(server: plainServer, client: confirmingClient, releaseAddress: address)
+    }
+
     func itemCount(ofType id: String) -> Int { libraries.current?.count(in: .itemType(id)) ?? 0 }
 
     func typePlural(of id: String) -> String? {
@@ -132,6 +146,19 @@ enum LibraryDescription {
         case .refused(let reason): .refused(reason)
         case .unsupported, .failed: .failed(failure.message)
         }
+    }
+
+    func chooseBundleFile() async -> PluginFileChoice? {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = String(localized: "Choose a plugin bundle.")
+        panel.prompt = String(localized: "Install")
+        guard await panel.begin() == .OK, let url = panel.url else { return nil }
+        // A release serves a bundle of at most 16 MiB, so a larger file is not one.
+        guard let data = try? Data(contentsOf: url), data.count <= 16 * 1024 * 1024 else { return .unreadable(name: url.lastPathComponent) }
+        return .file(name: url.lastPathComponent, path: url.path(percentEncoded: false), data: data)
     }
 
     var serverName: String { LibraryDescription.name(libraries) }

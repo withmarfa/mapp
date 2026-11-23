@@ -23,10 +23,10 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 ## Working here
 
 - MAPP is an app for items of every type. Names, strings and comments say "note" only for a `core.note`'s text, a type's own name or the Note callout.
-- Use American English. Put no time estimates, absolute paths, machine or account names or credentials in any file. A comment says only why.
+- Use American English. Put no time estimates, absolute paths, machine or account names or credentials in files. A comment says only why.
 - Use scoped lowercase Conventional Commits in the present tense: `feat(app):`, `fix(editor):`.
 - Work on a branch in a worktree under `.claude/worktrees/` and reach `main` through a pull request. Merge it as `.agents/skills/land-a-pull-request/SKILL.md` says.
-- CI (`.github/workflows/checks.yml`) runs each check only when its files changed, and retries nothing; `Checks` is the one required check. A draft runs no Swift job, yet `Checks` reports green.
+- CI (`.github/workflows/checks.yml`) runs each check only when its files changed, and retries nothing; `Checks` is the one required check. A draft runs no Swift job; `Checks` still reports green.
 - Keep no legacy: no shims, deprecation aliases or migration paths.
 
 ## Platform
@@ -34,20 +34,20 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 - Target macOS 27 and Xcode 27 only, with no `#available` checks. Swift 6 language mode, main-actor isolation by default. Unit tests use Swift Testing; UI tests use XCTest.
 - Use SwiftUI with native containers and controls, and AppKit only where SwiftUI cannot express something. Check API questions against Apple's documentation.
 - Every user-facing string goes through the String Catalog. Building in Xcode updates `MAPP/Localizable.xcstrings`; `xcodebuild` alone does not.
-- App Sandbox and the hardened runtime stay on. Only WebKit's page process, the Marfa server, `PictureFetcher` and `Reporting` may connect out. Neither the item page nor a sealed web page loads anything from the network itself.
+- App Sandbox and the hardened runtime stay on. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting` and the plugins release reader (`PluginRelease`) may connect out. Neither the item page nor a sealed web page loads from the network itself.
 
 ## Data rules
 
-- Never drop or silently overwrite a person's text. A write that cannot be kept where it was meant to go is kept where the person can get it back (a conflicted copy, the queue, the clipboard) and the person is told.
+- Never drop or silently overwrite a person's text. A write that cannot be kept where meant is kept where the person can get it back (a conflicted copy, the queue, the clipboard) and the person is told.
 - An item's Markdown text is held byte for byte. Opened and left alone, it is never rewritten; an edit keeps the text of every block it did not reach.
 - Views, commands, and the editor reach a library only through `ItemLibrary`, read from the environment's `library` value, and name items by `ItemID`, never by path.
 - MAPP's settings sync through the connected Marfa (`PreferencesSync`), but for what `PreferencesMap.staysOnMac` names.
 
 ## Project layout
 
-- `MAPP.xcodeproj` uses folder-synchronized groups for `MAPP/`, `MAPPTests/` (unit tests) and `MAPPUITests/` (UI tests). Add a source file by creating it on disk, not by editing `project.pbxproj`. Every file under `MAPP/` becomes an app resource unless the MAPP target's membership exceptions list it. `Design/` holds artwork that is not built into the app.
+- `MAPP.xcodeproj` uses folder-synchronized groups for `MAPP/`, `MAPPTests/` (unit tests) and `MAPPUITests/` (UI tests). Add a source file by creating it on disk, not in `project.pbxproj`. Every file under `MAPP/` becomes an app resource unless the MAPP target's membership exceptions list it. `Design/` holds artwork that is not built into the app.
 - Debug is `com.withmarfa.mapp.debug` and never shares the installed app's data or sign-ins; `MAPP/Info.plist` claims it as the sign-in's URL scheme. Key anything that must differ on `Bundle.main.bundleIdentifier`, never a literal.
-- To compare design values, add a knob to the Debug-only `MAPP/Tuning/` panel, not variants, and remove it once the value is settled.
+- To compare design values, add a knob to the Debug-only `MAPP/Tuning/` panel, not variants, and remove it once settled.
 
 ## Commands
 
@@ -57,7 +57,7 @@ The unit, UI and `Live` test commands, and measuring, are in `MAPPTests/AGENTS.m
 
 - Never commit a team identifier, a report destination (`MAPP_POSTHOG_HOST`, `MAPP_POSTHOG_PROJECT_TOKEN`) or a version. They go in the ignored `Config/Local.xcconfig`; `MARKETING_VERSION` stays `0.0.0`.
 - A version exists only as a git tag (`v0.0.x`, candidates `v0.0.x-rcN`), made soon after a merge to `main` that changes what a person sees or does; tests, CI and docs alone are not tagged. Before you sign, tag or check a release, read the README's Signing and Releasing sections.
-- TestFlight is for internal testers: tag freely. Use a local build to try a choice before it ships.
+- TestFlight is for internal testers: tag freely. Try a choice in a local build first.
 
 ## Code Review Rules
 

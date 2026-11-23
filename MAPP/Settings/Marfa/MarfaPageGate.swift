@@ -66,6 +66,7 @@ struct MarfaSettingsPageView: View {
             case .apps: AppsPage(host: host, subpage: subpage)
             case .keys: KeysPage(host: host, subpage: subpage)
             case .addresses: AddressesPage(host: host)
+            case .plugins: PluginsPage(host: host, subpage: subpage)
             case .sources: SourcesPage(host: host, subpage: subpage)
             case .types: TypesPage(host: host, subpage: subpage)
             case .activity: ActivityPage(host: host)
