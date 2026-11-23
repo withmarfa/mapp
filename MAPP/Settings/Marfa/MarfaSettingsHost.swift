@@ -140,6 +140,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func largeTypeMark(for id: String) -> AnyView
     /// How many items the type holds itself, never those of its subtypes, as the library counts them.
     func itemCount(ofType id: String) -> Int
+    /// The type's plural as the working copy reads it, where it has one.
+    func typePlural(of id: String) -> String?
     /// The icon the type shows now, an icon ID, or nil where it has none.
     func typeIcon(of id: String) -> String?
     /// Sets the type's icon, or with nil takes the owner's away, for every app. Answers why the server refused, or nil once it took it.

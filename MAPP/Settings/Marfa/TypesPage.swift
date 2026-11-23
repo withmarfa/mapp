@@ -17,12 +17,12 @@ struct TypesPage: View {
         let access = TypeAccess(
             ownItems: { [host] in host.itemCount(ofType: $0) }, currentIcon: { [host] in host.typeIcon(of: $0) },
             setIcon: { [host] icon, id in await host.changeTypeIcon(icon, ofType: id) }, markSets: host.markSets,
-            marks: { [host] query, set in host.marks(matching: query, in: set) })
+            marks: { [host] query, set in host.marks(matching: query, in: set) }, plural: { [host] in host.typePlural(of: $0) })
         _model = State(initialValue: TypesModel(context: OwnerContext(host: host), calls: host.typeCalls, access: access))
     }
 
-    static func subpage(for type: TypeRecord) -> SettingsSubpage {
-        SettingsSubpage(id: "type:" + type.id, title: type.title)
+    private func subpage(for type: TypeRecord) -> SettingsSubpage {
+        SettingsSubpage(id: "type:" + type.id, title: model.title(of: type))
     }
 
     private var openID: String? {
@@ -39,7 +39,7 @@ struct TypesPage: View {
             .onChange(of: model.made) {
                 guard let id = model.made, let type = model.record(id) else { return }
                 model.acknowledgeMade()
-                push(Self.subpage(for: type))
+                push(subpage(for: type))
             }
             .settingsSheet(presenting: model.hasSheet, dismiss: { model.closeSheet() }) { TypeSheet(model: model, host: host) }
             .accessibilityIdentifier("TypesPage")
@@ -87,9 +87,9 @@ struct TypesPage: View {
 
     private func row(_ type: TypeRecord) -> some View {
         SettingsLinkRow(
-            verbatim: type.title, line: model.subtitle(of: type), lead: .custom(host.typeMark(for: type.id)),
+            verbatim: model.title(of: type), line: model.subtitle(of: type), lead: .custom(host.typeMark(for: type.id)),
             value: model.count(of: type.id).formatted()
-        ) { push(Self.subpage(for: type)) }
+        ) { push(subpage(for: type)) }
     }
 }
 
@@ -103,7 +103,7 @@ private struct TypeDetail: View {
 
     var body: some View {
         SettingsPageColumn {
-            SettingsHead(lead: host.largeTypeMark(for: type.id), title: Text(verbatim: type.title), line: Text(verbatim: model.headLine(of: type))) {
+            SettingsHead(lead: host.largeTypeMark(for: type.id), title: Text(verbatim: model.title(of: type)), line: Text(verbatim: model.headLine(of: type))) {
                 SettingsButton("New Child Type…") { model.beginChild(of: type.id) }
             }
             if let failure = model.pageFailure { OwnerProblem(title: "Not Changed", failure: failure, page: .types, host: host) }
@@ -138,7 +138,7 @@ private struct TypeDetail: View {
                     ) {
                         Text("Nothing").tag(String?.none)
                         Divider()
-                        ForEach(model.basedOnChoices(for: type.id)) { Text(verbatim: $0.title).tag(Optional($0.id)) }
+                        ForEach(model.basedOnChoices(for: type.id)) { Text(verbatim: model.title(of: $0)).tag(Optional($0.id)) }
                     }
                 }
                 SettingsStackRow(
@@ -201,7 +201,7 @@ private struct TypeDetail: View {
             return Text("Each word counts as one of four.")
         }
         if type.origin == .plugin { return Text("A plugin’s type can’t change here. A child type adds words and fields.") }
-        return Text("Built-in types can’t change. Base a type on \(type.title) to add words.")
+        return Text("Built-in types can’t change. Base a type on \(model.title(of: type)) to add words.")
     }
 
     private var statusSection: some View {
@@ -260,7 +260,7 @@ private struct TypeDetail: View {
     private var source: String {
         switch type.origin {
         case .platform: String(localized: "Built In")
-        case .plugin: String(localized: "From \(TypesModel.title(ofPlugin: type.plugin?.name ?? ""))")
+        case .plugin: String(localized: "From \(model.title(ofPlugin: type.plugin?.name ?? ""))")
         case .registered, .unknown: type.parent.map { String(localized: "From \(model.title(of: $0))") } ?? String(localized: "Yours")
         }
     }
@@ -302,7 +302,7 @@ private struct TypeSheet: View {
                 }
                 SettingsSheetField(label: "Based On") {
                     SettingsPopUp(title: "Based On", selection: $model.childParent) {
-                        ForEach(model.basedOnChoices(for: "")) { Text(verbatim: $0.title).tag(Optional($0.id)) }
+                        ForEach(model.basedOnChoices(for: "")) { Text(verbatim: model.title(of: $0)).tag(Optional($0.id)) }
                     }
                 }
             }

@@ -17,7 +17,7 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
 
     let state = Mutex(State())
 
-    func types() async throws(TypeFailure) -> TypeListing { TypeListing(types: state.withLock { $0.types }, counts: [:]) }
+    func types() async throws(TypeFailure) -> TypeListing { TypeListing(types: state.withLock { $0.types }, pluginTitles: ["tickets": "Tickets"]) }
 
     func reading(of type: String) async throws(TypeFailure) -> TypeReading {
         state.withLock { $0.readings[type] } ?? TypeReading(guidance: nil, ancestors: [])
@@ -58,7 +58,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     private func model(_ calls: FakeTypeCalls, counts: [String: Int] = [:]) -> TypesModel {
         let access = TypeAccess(
             ownItems: { counts[$0] ?? 0 }, currentIcon: { _ in nil }, setIcon: { _, _ in nil },
-            markSets: [MarfaMarkSet(id: "lucide", title: "Lucide")], marks: { _, _ in [] })
+            markSets: [MarfaMarkSet(id: "lucide", title: "Lucide")], marks: { _, _ in [] }, plural: { _ in nil })
         return TypesModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.schemaWrite] }), calls: calls, access: access)
     }
 
@@ -151,7 +151,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         await model.commitWord()
         #expect(model.wordDraft == "2nd Fitting")
         #expect(model.addingGroup == "in_progress")
-        #expect(model.fieldErrors[.word] == "A status word starts with a letter.")
+        #expect(model.fieldErrors[.word] == "A status word starts with a letter, then letters, numbers and spaces.")
     }
 
     @Test func aRefusalNamesTheFieldItIsAbout() {
@@ -171,8 +171,20 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         model.descriptionText = String(repeating: "x", count: 201)
         await model.commit(.description)
         #expect(model.descriptionText.count == 201)
-        #expect(model.fieldErrors[.description] == "Expected a string of at most 200 characters.")
+        #expect(model.fieldErrors[.description] == "A description can be 200 characters at most.")
         #expect(model.fieldErrors[.name] == nil)
+    }
+
+    @Test func aTypeOpenedBeforeTheTypesAreReadShowsWhatTheServerHoldsOnceTheyAre() async {
+        let calls = listing()
+        calls.state.withLock { $0.types[2].description = "Kitchens and joinery for clients." }
+        let model = model(calls)
+        model.open("user.job")
+        #expect(model.name.isEmpty)
+        await model.load()
+        #expect(model.name == "Job")
+        #expect(model.plural == "Jobs")
+        #expect(model.descriptionText == "Kitchens and joinery for clients.")
     }
 
     @Test func aDescriptionLeftAloneSendsNothing() async {
@@ -299,5 +311,30 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
             try await TypeDefinitionEdit.run(.description("x"), to: "common.ticket", read: { [ticket] }, replace: { _ in replaced += 1 })
         }
         #expect(replaced == 0)
+    }
+}
+
+/// How the server's refusals of a type's replacement are read.
+@Suite struct TypeRefusalTests {
+    private func answer(_ json: String, status: UInt16 = 400, code: String) throws -> ServerAnswer {
+        ServerAnswer(status: status, code: code, details: try JSONValue(json: json), requestId: nil)
+    }
+
+    @Test func aRefusalNamesItsFieldFromTheServersAnswerNotFromTheErrorsOwnDetails() throws {
+        let server = try answer(#"{"errors":[{"field":"fields.status.status_values.1.value","message":"Expected a word."}]}"#, code: "invalid_schema")
+        let error = MarfaError.validation(code: "invalid_schema", message: "Invalid type schema", details: nil, server: server)
+        #expect(ServerTypeCalls.failure(error) == .invalid(field: "fields.status.status_values.1.value", message: "Expected a word."))
+    }
+
+    @Test func aRefusalForGuidanceAnAppMadeIsToldApartFromOneForAMissingPermission() throws {
+        let server = try answer(#"{"changes":["guidance"],"required_scope":"schema.write"}"#, status: 403, code: "forbidden")
+        let error = MarfaError.forbidden(code: "forbidden", message: "Forbidden", server: server)
+        #expect(ServerTypeCalls.failure(error) == .guidanceByApp)
+    }
+
+    @Test func aRefusalForAMissingPermissionNamesIt() throws {
+        let server = try answer(#"{"required_scope":"schema.write"}"#, status: 403, code: "forbidden")
+        let error = MarfaError.forbidden(code: "forbidden", message: "Forbidden", server: server)
+        #expect(ServerTypeCalls.failure(error) == .owner(.notPermitted("schema.write")))
     }
 }

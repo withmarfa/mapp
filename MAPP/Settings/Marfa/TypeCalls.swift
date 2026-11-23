@@ -55,10 +55,10 @@ nonisolated struct TypeRecord: Identifiable, Hashable, Sendable {
     var title: String { plural ?? label }
 }
 
-/// Every type the server lists, with how many items each holds on its own.
+/// Every type the server lists, and the title each plugin gives itself, by the plugin's name.
 nonisolated struct TypeListing: Hashable, Sendable {
     var types: [TypeRecord]
-    var counts: [String: Int]
+    var pluginTitles: [String: String] = [:]
 }
 
 /// One type's guidance, as read for a type below it.

@@ -74,6 +74,7 @@ import Testing
     var typeCalls: any TypeCalls = FakeTypeCalls()
     func largeTypeMark(for id: String) -> AnyView { AnyView(TypeMark(icon: typeIcons[id], size: .large)) }
     func itemCount(ofType id: String) -> Int { 0 }
+    func typePlural(of id: String) -> String? { nil }
     func typeIcon(of id: String) -> String? { typeIcons[id] }
     func changeTypeIcon(_ icon: String?, ofType id: String) async -> OwnerFailure? {
         typeIcons[id] = icon

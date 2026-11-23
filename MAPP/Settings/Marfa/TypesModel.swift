@@ -11,6 +11,8 @@ struct TypeAccess {
     var setIcon: (String?, String) async -> OwnerFailure?
     var markSets: [MarfaMarkSet]
     var marks: (String, MarfaMarkSet) -> [String]
+    /// The plural the working copy reads for a type, which a type that declares none shows by the regular rule.
+    var plural: (String) -> String?
 }
 
 /// The Types page: the types the server lists, in what the owner made, what plugins brought and what Marfa ships, and a type's
@@ -38,6 +40,7 @@ struct TypeAccess {
     private let access: TypeAccess
 
     private(set) var records: [TypeRecord] = []
+    private(set) var pluginTitles: [String: String] = [:]
     private(set) var readings: [String: TypeReading] = [:]
     private(set) var failure: OwnerFailure?
     private(set) var hasLoaded = false
@@ -49,6 +52,7 @@ struct TypeAccess {
 
     // The drafts of the open type: what was typed, kept until it is saved or the page leaves.
     private(set) var openID: String?
+    private var draftedID: String?
     var name = ""
     var plural = ""
     var descriptionText = ""
@@ -84,13 +88,18 @@ struct TypeAccess {
             hasLoaded = true
         }
         do {
-            records = try await calls.types().types.filter { !Self.isHidden($0.id) }
+            let listing = try await calls.types()
+            records = listing.types.filter { !Self.isHidden($0.id) }
+            pluginTitles = listing.pluginTitles
             failure = nil
         } catch {
             failure = Self.owner(error)
             await context.learn(from: Self.owner(error))
         }
-        if let id = openID { await loadReading(of: id) }
+        if let id = openID {
+            open(id)
+            await loadReading(of: id)
+        }
     }
 
     /// `system.*` and `app.*` are machinery that no app lists.
@@ -121,7 +130,7 @@ struct TypeAccess {
 
     private func sorted(_ types: [TypeRecord]) -> [TypeRecord] {
         types.sorted {
-            let order = $0.title.localizedStandardCompare($1.title)
+            let order = title(of: $0).localizedStandardCompare(title(of: $1))
             return order == .orderedSame ? $0.id < $1.id : order == .orderedAscending
         }
     }
@@ -151,14 +160,21 @@ struct TypeAccess {
     }
 
     /// The type's name for a row: the plural, which is how every list of types reads.
-    func title(of id: String) -> String { record(id)?.title ?? id }
+    func title(of id: String) -> String {
+        guard let type = record(id) else { return id }
+        return type.plural ?? access.plural(id) ?? type.label
+    }
+
+    func title(of type: TypeRecord) -> String { title(of: type.id) }
+
+    func title(ofPlugin name: String) -> String { pluginTitles[name] ?? Self.title(ofPlugin: name) }
 
     /// The line under a type in the list: where it came from, what it is based on and what is based on it.
     func subtitle(of type: TypeRecord) -> String? {
         var parts: [String] = []
-        if type.origin == .plugin, let plugin = type.plugin { parts.append(String(localized: "From \(Self.title(ofPlugin: plugin.name)).")) }
+        if type.origin == .plugin, let plugin = type.plugin { parts.append(String(localized: "From \(title(ofPlugin: plugin.name)).")) }
         if let parent = type.parent, record(parent) != nil { parts.append(String(localized: "Based on \(title(of: parent)).")) }
-        let below = children(of: type.id).map(\.title)
+        let below = children(of: type.id).map { title(of: $0) }
         if !below.isEmpty, below.count <= 4 { parts.append(String(localized: "With \(below.formatted(.list(type: .and))).")) }
         return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
@@ -176,7 +192,7 @@ struct TypeAccess {
         case .platform: return String(localized: "Built into Marfa. ") + held
         case .plugin:
             guard let plugin = type.plugin else { return held }
-            return String(localized: "From the \(Self.title(ofPlugin: plugin.name)) plugin, \(plugin.version). ") + held
+            return String(localized: "From the \(title(ofPlugin: plugin.name)) plugin, \(plugin.version). ") + held
         case .registered, .unknown:
             if let parent = type.parent, record(parent) != nil { return String(localized: "Based on \(title(of: parent)). ") + held }
             return held
@@ -185,24 +201,31 @@ struct TypeAccess {
 
     // MARK: A type's page
 
-    /// Opens a type: its drafts are what the server holds.
+    /// Opens a type: its drafts are what the server holds. Called again once the types have loaded, it fills the drafts
+    /// of a type that was open before they were read, and never replaces what is being typed.
     func open(_ id: String) {
-        guard openID != id else { return }
-        openID = id
-        fieldErrors = [:]
-        pageFailure = nil
-        addingGroup = nil
-        wordDraft = ""
-        meaningWord = nil
-        if let type = record(id) {
+        if openID != id {
+            openID = id
+            draftedID = nil
+            fieldErrors = [:]
+            pageFailure = nil
+            addingGroup = nil
+            wordDraft = ""
+            meaningWord = nil
+            Task { await loadReading(of: id) }
+        }
+        if draftedID != id, let type = record(id) {
+            draftedID = id
             name = type.label
             plural = type.plural ?? ""
             descriptionText = type.description ?? ""
         }
-        Task { await loadReading(of: id) }
     }
 
-    func close() { openID = nil }
+    func close() {
+        openID = nil
+        draftedID = nil
+    }
 
     func reading(of id: String) -> TypeReading? { readings[id] }
 
@@ -367,7 +390,8 @@ struct TypeAccess {
     private func refused(_ error: TypeFailure, field: Field) async {
         switch error {
         case .invalid(let path, let message):
-            fieldErrors[Self.field(named: path) ?? field] = message
+            let named = Self.field(named: path)
+            fieldErrors[named ?? field] = named.flatMap(Self.line(for:)) ?? message
         case .changedOnServer:
             pageFailure = .conflict
             await reread()
@@ -376,6 +400,18 @@ struct TypeAccess {
             await context.learn(from: failure)
         case .pluginType, .guidanceByApp:
             pageFailure = Self.owner(error)
+        }
+    }
+
+    /// What a refusal of `field` says, in the page's words. The server's own sentence names the rule in its terms.
+    static func line(for field: Field) -> String? {
+        switch field {
+        case .name: String(localized: "A name can be 100 characters at most.")
+        case .plural: String(localized: "A plural can be 100 characters at most.")
+        case .description: String(localized: "A description can be \(descriptionLimit) characters at most.")
+        case .meaning: String(localized: "What a word means can be \(wordMeaningLimit) characters at most.")
+        case .word: String(localized: "A status word starts with a letter, then letters, numbers and spaces.")
+        case .basedOn, .newType: nil
         }
     }
 
@@ -396,6 +432,7 @@ struct TypeAccess {
     private func reread() async {
         guard let listing = try? await calls.types() else { return }
         records = listing.types.filter { !Self.isHidden($0.id) }
+        pluginTitles = listing.pluginTitles
     }
 
     /// Shows what the server holds in the field that was just sent, and leaves the others as typed.

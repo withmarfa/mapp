@@ -115,6 +115,8 @@ enum LibraryDescription {
 
     func itemCount(ofType id: String) -> Int { libraries.current?.count(in: .itemType(id)) ?? 0 }
 
+    func typePlural(of id: String) -> String? { libraries.current.map { $0.catalogue.plural(for: TypeID(id)) } }
+
     func typeIcon(of id: String) -> String? { libraries.current?.catalogue.icon(for: TypeID(id)) }
 
     func changeTypeIcon(_ icon: String?, ofType id: String) async -> OwnerFailure? {

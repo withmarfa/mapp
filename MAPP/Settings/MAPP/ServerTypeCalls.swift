@@ -10,7 +10,9 @@ nonisolated struct ServerTypeCalls: TypeCalls {
     func types() async throws(TypeFailure) -> TypeListing {
         try await run { client in
             let listed = try await client.listTypes().ok.body.json.data
-            return TypeListing(types: listed.map(Self.record), counts: [:])
+            // A plugin's own title is a nicety: without it the name is made readable.
+            let plugins = (try? await client.listPlugins().ok.body.json.data) ?? []
+            return TypeListing(types: listed.map(Self.record), pluginTitles: Dictionary(plugins.map { ($0.name, $0.title) }) { first, _ in first })
         }
     }
 
@@ -109,8 +111,8 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         }
         if let known = ClientOwnerCalls.marfaError(error) {
             switch known {
-            case .validation(let code, let message, let details, _) where code == "invalid_schema":
-                let first = details?.object?["errors"]?.array?.first?.object
+            case .validation(let code, let message, let details, let server) where code == "invalid_schema":
+                let first = (details ?? server?.details)?.object?["errors"]?.array?.first?.object
                 return .invalid(field: first?["field"]?.string, message: first?["message"]?.string ?? message)
             case .forbidden(_, _, let server):
                 let changes = server?.details?.object?["changes"]?.array?.compactMap(\.string) ?? []

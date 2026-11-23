@@ -68,12 +68,13 @@ struct SettingsWordChips: View {
                 .foregroundStyle(word.isLocked ? SettingsTokens.secondaryText : SettingsTokens.primaryText)
         }
         if word.isLocked {
-            label.frame(maxWidth: SettingsTokens.Metric.chipMaxWidth).help(word.meaning ?? "")
+            label.frame(maxWidth: SettingsTokens.Metric.chipMaxWidth).fixedSize(horizontal: true, vertical: false).help(word.meaning ?? "")
         } else {
             label
                 .padding(.horizontal, SettingsTokens.Metric.chipPadding)
                 .frame(height: SettingsTokens.Metric.chipHeight)
                 .frame(maxWidth: SettingsTokens.Metric.chipMaxWidth)
+                .fixedSize(horizontal: true, vertical: false)
                 .background(SettingsTokens.buttonFill, in: .rect(cornerRadius: SettingsTokens.Metric.chipRadius))
                 .help(word.meaning ?? "")
                 .contextMenu { menu?(word) }
