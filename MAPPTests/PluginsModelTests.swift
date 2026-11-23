@@ -7,7 +7,7 @@ import Testing
 
 /// A server and a release with every answer scripted.
 /// Holds a scripted answer until the test lets it go.
-actor Gate {
+actor ReleaseGate {
     private var isOpen = false
     private var waiting: [CheckedContinuation<Void, Never>] = []
 
@@ -36,7 +36,8 @@ final class FakePluginCalls: PluginCalls, @unchecked Sendable {
         var removals: [String] = []
         var removalAnswer: PluginRemoval?
         var hostNames: [String: String] = [:]
-        var releaseGate: Gate?
+        var releaseGate: ReleaseGate?
+        var bundleFailure: PluginFailure?
         var installedFailure: OwnerFailure?
         /// Makes the next read of the installed plugins fail once an install has been taken.
         var failReadAfterInstall = false
@@ -68,6 +69,7 @@ final class FakePluginCalls: PluginCalls, @unchecked Sendable {
     }
 
     func bundle(of plugin: ReleasePlugin) async throws(PluginFailure) -> ReleaseBundle {
+        if let failure = state.withLock({ $0.bundleFailure }) { throw failure }
         guard let bundle = state.withLock({ $0.bundles[plugin.name] }) else { throw .releaseUnreadable("missing") }
         return bundle
     }
@@ -321,7 +323,7 @@ private func bundle(
 
     @Test func theInstalledPluginsShowAtOnceWhileTheReleaseIsStillBeingRead() async {
         let calls = FakePluginCalls()
-        let gate = Gate()
+        let gate = ReleaseGate()
         calls.state.withLock {
             $0.installed = [installed("tickets", "Tickets", version: "0.0.13")]
             $0.release = [listed("tickets", "Tickets", version: "0.0.13")]
@@ -329,7 +331,7 @@ private func bundle(
         }
         let model = model(calls)
         let loading = Task { await model.load() }
-        while !model.hasLoaded { await Task.yield() }
+        #expect(await eventually { model.hasLoaded })
         #expect(model.installed.map(\.name) == ["tickets"])
         #expect(model.release == .reading, "the release is still being read, and the page already shows what is installed")
         await gate.open()
@@ -387,9 +389,13 @@ private func bundle(
         let model = model(calls)
         await model.load()
         #expect(model.release == .reading, "nothing is drawn for a read that stopped; the next load reads it again")
-        calls.state.withLock { $0.releaseFailure = nil }
+        calls.state.withLock {
+            $0.releaseFailure = nil
+            $0.bundleFailure = .canceled
+        }
         await model.install(entry)
-        #expect(model.problem == nil)
+        #expect(model.problem == nil, "a cancelled bundle read is no refusal")
+        #expect(model.bundles["tickets"] == nil, "it is read again when asked, not kept as a failure")
     }
 
     @Test func aFileInstalledAfterAnotherThatNeededTheCommandLineDropsThatCommand() async {
