@@ -291,8 +291,8 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
     }
 
     /// The items the library lists: the active ones in either tier, without parts (`part eq false`), which are the
-    /// files attached to an item and the other items that live with a host. The server leaves out `system.*` items
-    /// and the ones the key cannot read by itself.
+    /// files attached to an item and the other items that live with a host. The server leaves out hidden items
+    /// (`system.*` and `app.*`, `items/hidden-types`) and the ones the key cannot read by itself.
     @concurrent func counts() async throws(SourceEditFailure) -> [String: Int] {
         do {
             return try await server().itemCountsBySource(state: "active", filter: "part eq false", timeout: timeout)

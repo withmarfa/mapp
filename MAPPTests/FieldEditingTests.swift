@@ -82,8 +82,8 @@ private func catalogue() -> Catalogue {
     }
 
     @Test func theReservedRootsAreShippedAndNoOtherIs() {
-        #expect(["core.task", "core.media.book", "system.view", "marfa.thing"].allSatisfy { TypeID($0).isShipped })
-        #expect(["app.books.entry", "acme.deal", "corex.thing", "local.core"].allSatisfy { !TypeID($0).isShipped })
+        #expect(["core.task", "core.media.book", "system.view", "marfa.thing", "common.ticket"].allSatisfy { TypeID($0).isShipped })
+        #expect(["app.books.entry", "acme.deal", "corex.thing", "local.core", "common-pub.thing", "user.ticket"].allSatisfy { !TypeID($0).isShipped })
     }
 }
 
@@ -325,6 +325,17 @@ private func catalogue() -> Catalogue {
         let edit = try plan(.remove(key: "genre"))
         await #expect(throws: TypeSchemaFailure.changedOnServer) {
             try await TypeDefinitionEdit.run(edit, read: { [listed(), above] }, replace: { _ in replaced += 1 })
+        }
+        #expect(replaced == 0)
+    }
+
+    @Test func aTypeAPluginInstalledRefusesTheChangeWhateverItsName() async throws {
+        var replaced = 0
+        var installed = listed()
+        installed.value2.provenance = .init(origin: .plugin, plugin: .init(name: "books", version: "1.0.0"))
+        let edit = try plan(.rename(key: "genre", label: "Kind"))
+        await #expect(throws: TypeSchemaFailure.pluginType) {
+            try await TypeDefinitionEdit.run(edit, read: { [installed] }, replace: { _ in replaced += 1 })
         }
         #expect(replaced == 0)
     }

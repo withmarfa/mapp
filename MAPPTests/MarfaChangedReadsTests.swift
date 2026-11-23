@@ -323,6 +323,37 @@ import Testing
         await finish(scene)
     }
 
+    /// A copy holding MAPP's own hidden settings, as a Marfa that has them does.
+    private func heldSettings(_ scene: Scene) async throws -> String {
+        try await scene.copy.declareTypes([PreferencesType.definition])
+        let queued = try await scene.copy.items.create(Draft(type: PreferencesType.id, properties: [:]))
+        return try #require(queued.itemId)
+    }
+
+    @Test func aReadOfWhatChangedNeverPutsAHeldAppItemInTheLibrary() async throws {
+        let scene = try await makeScene()
+        let hidden = try await heldSettings(scene)
+        scene.reads.rewrite.withLock { rewrite in
+            rewrite = { answer in .named(ChangedRows(items: [hidden]), next: answer.next) }
+        }
+        await scene.source.hear(Change(origin: .server(event: "item.updated", cursor: "c"), itemId: nil, edgeId: nil))
+        _ = try await scene.note("After")
+        await scene.caughtUp()
+        try await scene.wait("the item made after it") { $0.item(titled: "After") != nil }
+        #expect(await scene.source.engine.rows[hidden] == nil)
+        #expect(scene.log.current.snapshot?.items.contains { $0.id.rawValue == hidden } != true)
+        await finish(scene)
+    }
+
+    @Test func aRereadByIDNeverPutsAHeldAppItemInTheLibrary() async throws {
+        let scene = try await makeScene()
+        let hidden = try await heldSettings(scene)
+        await scene.source.engine.reread([hidden])
+        #expect(await scene.source.engine.rows[hidden] == nil)
+        #expect(scene.log.current.snapshot?.items.contains { $0.id.rawValue == hidden } != true)
+        await finish(scene)
+    }
+
     @Test func aCopyThatCannotNameWhatChangedIsReadWhole() async throws {
         let scene = try await makeScene()
         let whole = scene.reads.whole
