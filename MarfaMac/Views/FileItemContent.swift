@@ -119,11 +119,23 @@ private struct FilePDFPreview: View {
             }
         }
         .modifier(OfferedFileView(viewing: viewing, item: item, details: details, isReady: document != nil))
-        // A document with no pages, as a locked one has, has nothing to page through or zoom.
+        // A document with no pages, as a locked one has, has nothing to page through or zoom. Parsed off the main
+        // actor; a load that was cancelled or replaced does not show its document.
         .task(id: url) {
-            let document = PDFDocument(url: url)
-            loaded = (url, document.flatMap { $0.pageCount > 0 ? $0 : nil })
+            let parsed = await Self.parse(url)
+            guard !Task.isCancelled else { return }
+            loaded = (url, parsed.document)
         }
+    }
+
+    /// PDFKit's document is not sendable. It is parsed away from the main actor and used only there afterwards.
+    private nonisolated struct ParsedPDF: @unchecked Sendable {
+        let document: PDFDocument?
+    }
+
+    @concurrent private static func parse(_ url: URL) async -> ParsedPDF {
+        let document = PDFDocument(url: url).flatMap { $0.pageCount > 0 ? $0 : nil }
+        return ParsedPDF(document: document)
     }
 }
 
