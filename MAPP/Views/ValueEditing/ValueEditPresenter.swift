@@ -26,6 +26,9 @@ final class ValueEditPresenter {
 
     typealias Factory = @MainActor (ValueEditRequest, NSView, NSRect?) -> any ValueEditSession
 
+    /// Opens a type's page in Settings > Types, which a status panel's Edit Statuses asks for. The app sets it once.
+    var editType: ((TypeID) -> Void)?
+
     private(set) var session: (any ValueEditSession)?
     private let makeSession: Factory
     /// A click on the value while its editor is open closes it as an outside click; the click then asks to open it

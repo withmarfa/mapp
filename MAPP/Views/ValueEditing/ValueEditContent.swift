@@ -14,6 +14,7 @@ struct ValueEditContent: View {
         VStack(alignment: .leading, spacing: 0) {
             if model.hasSearch { searchArea }
             listArea
+            if let type = model.typeToEditStatuses { editStatuses(type) }
             if let notice = model.notice { noticeArea(notice) }
         }
         .padding(ValueEditMetrics.padding * scale)
@@ -98,6 +99,24 @@ struct ValueEditContent: View {
             }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    // MARK: Edit Statuses
+
+    /// A status panel ends with the way to the words themselves: the type's page in Settings > Types.
+    private func editStatuses(_ type: TypeID) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider().padding(.vertical, 5 * scale)
+            Button { model.editStatuses(of: type) } label: {
+                Text("Edit Statuses…")
+                    .font(.system(size: ValueEditMetrics.textSize * scale))
+                    .padding(.horizontal, 8 * scale)
+                    .frame(maxWidth: .infinity, minHeight: ValueEditMetrics.rowHeight * scale, alignment: .leading)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("ValueEditEditStatuses")
+        }
     }
 
     // MARK: Typed

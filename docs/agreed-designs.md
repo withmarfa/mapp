@@ -10,8 +10,7 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 
 What is not built yet. The built part is in [Value components](value-components.md) and [Item page](item-page.md).
 
-- A status's value panel ends with Edit Statuses, which opens the type in Settings > Types. Settings > Types does not exist yet.
-- A field's menu has Edit the type in Settings, which opens the same page, and waits for it too.
+- A field's menu has Edit the type in Settings, which opens a type's page in Settings > Types. The page is built (see [The Marfa's half of Settings](marfa-settings.md)); the menu row is not.
 - Renaming a choice word is left out. A rename that carried the values to the new word is not in Marfa's contract, so the items that hold the old word would keep a word the type no longer lists. Choices can be added, reordered and taken out; a taken-out choice stays on the items that hold it.
 - An empty In Collection row for an item in no collection. Add to Collection from the menu, the toolbar and the palette reaches it, and the page's own row appears once the item is in one.
 
@@ -68,7 +67,8 @@ Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Lay
 Only the agreed changes are listed. A change marked "needs a server change" waits on Marfa first.
 
 - **Built:** Overview, Account, Apps, Keys (with Extend… beside the expiry date, which keeps the secret), Addresses, Sources, Recently Deleted, History, File Storage, Connectors (each connector's health, Pause, Run Now, settings and vendor sign-in; adding one and its mapping wait), Webhooks (every app's, grouped by who made them, any of which the owner can end), a read-only Folders, Backups, Updates, Housekeeping, Activity, Monitoring (was Reporting), Limits (new) and Start-Up (read-only) are in [The Marfa's half of Settings](marfa-settings.md).
-- **Plugins and Types** are drawn and agreed separately, and wait on server work. Connectors is built except its mapping screen and adding a connector.
+- **Types** is built: see [The Marfa's half of Settings](marfa-settings.md). Still agreed and not built on it: an owner's type's Fields, Rules, Feed, History and Delete Type, a field's own page, and writing Guidance (waits for August's decision on whether an app may write it).
+- **Plugins** is drawn and agreed separately, and waits on server work. Connectors is built except its mapping screen and adding a connector.
 
 ### Settings sync through Marfa
 
