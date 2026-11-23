@@ -39,6 +39,16 @@ struct SettingsStackRow<Content: View>: View {
 struct SettingsStackText: View {
     let text: String
     var isLocked = false
+    /// Read the text as Markdown, inline only, so `**bold**` shows bold and nothing else changes shape. A link opens only
+    /// when the person clicks it.
+    var isMarkdown = false
+
+    private var shown: Text {
+        guard isMarkdown, let styled = try? AttributedString(
+            markdown: text, options: .init(allowsExtendedAttributes: false, interpretedSyntax: .inlineOnlyPreservingWhitespace))
+        else { return Text(verbatim: text) }
+        return Text(styled)
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: SettingsTokens.Metric.dotGap) {
@@ -46,7 +56,7 @@ struct SettingsStackText: View {
                 Image(systemName: "lock").font(.system(size: SettingsTokens.Metric.lockGlyph)).foregroundStyle(SettingsTokens.tertiaryText)
                     .accessibilityHidden(true)
             }
-            Text(verbatim: text).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText).textSelection(.enabled)
+            shown.settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText).textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }

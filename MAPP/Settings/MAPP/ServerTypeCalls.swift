@@ -20,7 +20,7 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         try await run { client in
             let read = try await client.getType(path: .init(id: type)).ok.body.json
             return TypeReading(
-                guidance: read.value1.guidance,
+                guidance: read.value1.guidance, plural: read.value1.plural,
                 ancestors: (read.value2.ancestorGuidance ?? []).map { TypeGuidanceRecord(type: $0._type, guidance: $0.guidance) })
         }
     }

@@ -67,7 +67,11 @@ struct TypeAccess {
     private(set) var isMakingChild = false
     var childParent: String?
     var childName = ""
-    private(set) var isWorking = false
+    /// How many changes to the type are queued or in flight. Each reads the type, makes its one change and replaces it, and
+    /// a replacement carries no version, so two at once would send back each other's old values.
+    private var pending = 0
+    private var tail: Task<Void, Never>?
+    var isWorking: Bool { pending > 0 }
     /// The type a child type was made as, so the page can open it.
     private(set) var made: String?
 
@@ -162,7 +166,7 @@ struct TypeAccess {
     /// The type's name for a row: the plural, which is how every list of types reads.
     func title(of id: String) -> String {
         guard let type = record(id) else { return id }
-        return type.plural ?? access.plural(id) ?? type.label
+        return type.plural ?? readings[id]?.plural ?? access.plural(id) ?? type.label
     }
 
     func title(of type: TypeRecord) -> String { title(of: type.id) }
@@ -304,7 +308,7 @@ struct TypeAccess {
 
     /// Keeps the typed word. A refusal leaves the field open with what was typed, and says why under the section.
     func commitWord() async {
-        guard let id = openID, let group = addingGroup, !isWorking else { return }
+        guard let id = openID, let group = addingGroup else { return }
         let value = Self.value(ofTyped: wordDraft)
         guard !value.isEmpty else { return cancelWord() }
         if await apply(.addWord(group: group, value: value), to: id, field: .word) {
@@ -338,7 +342,7 @@ struct TypeAccess {
 
     /// Sends the name, plural or description as typed, when it differs from what the server holds.
     func commit(_ field: Field) async {
-        guard let id = openID, let type = record(id), isEditable(type), !isWorking else { return }
+        guard let id = openID, let type = record(id), isEditable(type) else { return }
         let edit: TypeEdit
         switch field {
         case .name:
@@ -368,22 +372,38 @@ struct TypeAccess {
         await apply(.parent(parent), to: id, field: .basedOn)
     }
 
-    /// Makes `edit` on the server and reads the types again. Answers whether the server took it; on a refusal what was typed
+    /// Makes `edit` on the server and reads the types again. Changes run one at a time, in the order they were made, so each
+    /// is built from the type as the one before it left it. Answers whether the server took it; on a refusal what was typed
     /// stays and the field it is about says why.
     @discardableResult
     private func apply(_ edit: TypeEdit, to id: String, field: Field) async -> Bool {
-        isWorking = true
+        pending += 1
         fieldErrors[field] = nil
         pageFailure = nil
-        defer { isWorking = false }
+        let previous = tail
+        let work = Task { () -> Bool in
+            await previous?.value
+            return await send(edit, to: id, field: field)
+        }
+        tail = Task { _ = await work.value }
+        let took = await work.value
+        pending -= 1
+        return took
+    }
+
+    private func send(_ edit: TypeEdit, to id: String, field: Field) async -> Bool {
         do {
             try await calls.change(id, edit)
         } catch {
             await refused(error, field: field)
             return false
         }
-        await reread()
-        showSaved(field, of: id)
+        // A re-read that fails leaves the records as they were, so nothing is refilled from them.
+        guard await reread() else { return true }
+        if case .parent = edit { await loadReading(of: id) }
+        if case .plural = edit { await loadReading(of: id) }
+        // Another change is waiting behind this one: the field may hold what was typed since.
+        if pending == 1 { showSaved(field, of: id) }
         return true
     }
 
@@ -391,7 +411,8 @@ struct TypeAccess {
         switch error {
         case .invalid(let path, let message):
             let named = Self.field(named: path)
-            fieldErrors[named ?? field] = named.flatMap(Self.line(for:)) ?? message
+            let target = named ?? field
+            fieldErrors[target] = Self.isLengthRule(message) ? Self.line(for: target) ?? message : message
         case .changedOnServer:
             pageFailure = .conflict
             await reread()
@@ -401,6 +422,12 @@ struct TypeAccess {
         case .pluginType, .guidanceByApp:
             pageFailure = Self.owner(error)
         }
+    }
+
+    /// Whether the server's sentence is about a length limit, which the page words with the limit it counts in code points.
+    static func isLengthRule(_ message: String) -> Bool {
+        let lowered = message.lowercased()
+        return lowered.contains("at most") || lowered.contains("longer than") || lowered.contains("too long")
     }
 
     /// What a refusal of `field` says, in the page's words. The server's own sentence names the rule in its terms.
@@ -429,10 +456,12 @@ struct TypeAccess {
     }
 
     /// Reads the types again, so the page shows what the server holds.
-    private func reread() async {
-        guard let listing = try? await calls.types() else { return }
+    @discardableResult
+    private func reread() async -> Bool {
+        guard let listing = try? await calls.types() else { return false }
         records = listing.types.filter { !Self.isHidden($0.id) }
         pluginTitles = listing.pluginTitles
+        return true
     }
 
     /// Shows what the server holds in the field that was just sent, and leaves the others as typed.
@@ -531,9 +560,9 @@ struct TypeAccess {
 
     func makeChild() async {
         guard canMakeChild, let parent = childParent else { return }
-        isWorking = true
+        pending += 1
         fieldErrors[.newType] = nil
-        defer { isWorking = false }
+        defer { pending -= 1 }
         let id = identifier(forNamed: trimmedChildName)
         do {
             try await calls.addChild(id: id, label: trimmedChildName, below: parent)
@@ -564,11 +593,25 @@ struct TypeAccess {
             isMakingChild = false
         }
         if let id = openID, let type = record(id), isEditable(type) {
+            let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty, name != type.label {
+                drafts.append(.typed(title: String(localized: "Type Name Change Not Kept"), text: name))
+                self.name = type.label
+            }
+            let plural = plural.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !plural.isEmpty, plural != (type.plural ?? "") {
+                drafts.append(.typed(title: String(localized: "Type Plural Not Kept"), text: plural))
+                self.plural = type.plural ?? ""
+            }
             let description = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
             if description != (type.description ?? "") {
                 drafts.append(.typed(title: String(localized: "Type Description Not Kept"), text: description))
                 descriptionText = type.description ?? ""
             }
+        }
+        if meaningWord != nil, !meaningDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isSavingMeaning {
+            drafts.append(.typed(title: String(localized: "Word Meaning Not Kept"), text: meaningDraft.trimmingCharacters(in: .whitespacesAndNewlines)))
+            meaningWord = nil
         }
         if !wordDraft.isEmpty {
             drafts.append(.typed(title: String(localized: "Status Word Not Kept"), text: wordDraft))

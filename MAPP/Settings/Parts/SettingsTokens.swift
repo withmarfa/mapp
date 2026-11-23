@@ -188,6 +188,8 @@ enum SettingsTokens {
         static let statusDot: CGFloat = 7
         static let dotGap: CGFloat = 6
         static let lockGlyph: CGFloat = 10
+        /// The mark before a status group.
+        static let statusMark: CGFloat = 14
         /// A word chip (a status word): its height, corner, side padding, the space between chips and the small add button.
         static let chipHeight: CGFloat = 22
         static let chipRadius: CGFloat = 6

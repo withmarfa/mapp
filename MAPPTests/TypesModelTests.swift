@@ -5,6 +5,23 @@ import Synchronization
 import Testing
 @testable import MAPP
 
+/// Holds a call until the test lets it go.
+actor TypeCallGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var isOpen = false
+
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func open() {
+        isOpen = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
 /// A server that lists types and takes a change, with every call scripted.
 final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
     struct State {
@@ -12,7 +29,9 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         var readings: [String: TypeReading] = [:]
         var changes: [(type: String, edit: TypeEdit)] = []
         var children: [(id: String, label: String, parent: String)] = []
+        var started: [TypeEdit] = []
         var refusal: TypeFailure?
+        var gate: TypeCallGate?
     }
 
     let state = Mutex(State())
@@ -24,6 +43,8 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
     }
 
     func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure) {
+        state.withLock { $0.started.append(edit) }
+        if let gate = state.withLock({ $0.gate }) { await gate.wait() }
         if let refusal = state.withLock({ $0.refusal }) { throw refusal }
         state.withLock { $0.changes.append((type, edit)) }
     }
@@ -151,7 +172,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         await model.commitWord()
         #expect(model.wordDraft == "2nd Fitting")
         #expect(model.addingGroup == "in_progress")
-        #expect(model.fieldErrors[.word] == "A status word starts with a letter, then letters, numbers and spaces.")
+        #expect(model.fieldErrors[.word] == "A status word starts with a letter.")
     }
 
     @Test func aRefusalNamesTheFieldItIsAbout() {
@@ -226,6 +247,91 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let model = model(listing())
         await model.load()
         #expect(model.basedOnChoices(for: "user.job").map(\.id) == ["core.task", "common.ticket"])
+    }
+
+    @Test func changesRunOneAtATimeSoALaterOneIsBuiltFromTheTypeTheEarlierOneLeft() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.descriptionText = "Kitchens and joinery"
+        let description = Task { await model.commit(.description) }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        let parent = Task { await model.setParent("common.ticket", of: "user.job") }
+        model.plural = "Fittings"
+        let plural = Task { await model.commit(.plural) }
+        // The first call has not landed, so the others have not started.
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(calls.state.withLock { $0.started } == [.description("Kitchens and joinery")])
+        await gate.open()
+        await description.value
+        await parent.value
+        await plural.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.description("Kitchens and joinery"), .parent("common.ticket"), .plural("Fittings")])
+    }
+
+    @Test func aPluralCommittedDuringANameSaveIsStillSent() async {
+        let calls = listing()
+        let gate = TypeCallGate()
+        calls.state.withLock { $0.gate = gate }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.name = "Piece of Work"
+        let name = Task { await model.commit(.name) }
+        #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
+        model.plural = "Pieces of Work"
+        let plural = Task { await model.commit(.plural) }
+        await gate.open()
+        await name.value
+        await plural.value
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.label("Piece of Work"), .plural("Pieces of Work")])
+    }
+
+    @Test func aNameAPluralAndAMeaningTypedAndNotKeptAreHandedBackWhenSettingsCloses() async {
+        let model = model(listing())
+        await model.load()
+        model.open("user.job")
+        model.name = "Piece of Work"
+        model.plural = "Pieces of Work"
+        model.beginMeaning(of: "waiting", in: "user.job")
+        model.meaningDraft = "Parts ordered."
+        #expect(model.takeDrafts() == [
+            .typed(title: "Type Name Change Not Kept", text: "Piece of Work"), .typed(title: "Type Plural Not Kept", text: "Pieces of Work"),
+            .typed(title: "Word Meaning Not Kept", text: "Parts ordered."),
+        ])
+        #expect(model.name == "Job" && model.plural == "Jobs" && model.meaningWord == nil)
+    }
+
+    @Test func aRefusalShowsTheServersReasonUnlessItIsTheLengthRule() {
+        #expect(TypesModel.isLengthRule("Expected a string of at most 100 characters."))
+        #expect(!TypesModel.isLengthRule("Status word \"waiting\" is already used."))
+    }
+
+    @Test func aRepeatedWordShowsTheServersReasonOnTheWordField() async {
+        let calls = listing()
+        calls.state.withLock { $0.refusal = .invalid(field: "fields.status.status_values.1.value", message: "The word waiting is already used.") }
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.beginWord(in: "in_progress")
+        model.wordDraft = "Waiting"
+        await model.commitWord()
+        #expect(model.fieldErrors[.word] == "The word waiting is already used.")
+    }
+
+    @Test func aClearedPluralShowsTheOneTheServerNowReadsForTheType() async {
+        let calls = listing()
+        calls.state.withLock { $0.readings["user.job"] = TypeReading(guidance: nil, plural: "Jobs", ancestors: []) }
+        let model = model(calls)
+        await model.load()
+        calls.state.withLock { $0.types[2].plural = nil; $0.readings["user.job"] = TypeReading(guidance: nil, plural: "Jobs", ancestors: []) }
+        model.open("user.job")
+        model.plural = ""
+        await model.commit(.plural)
+        #expect(model.title(of: "user.job") == "Jobs")
     }
 
     @Test func aNameTypedInTheNewTypeSheetIsHandedBackWhenSettingsCloses() async {

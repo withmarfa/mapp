@@ -70,6 +70,8 @@ nonisolated struct TypeGuidanceRecord: Hashable, Sendable {
 /// A type read on its own: its guidance and its ancestors', nearest first.
 nonisolated struct TypeReading: Hashable, Sendable {
     var guidance: String?
+    /// The plural the server shows the type by, made by its regular rule where the type declares none.
+    var plural: String?
     var ancestors: [TypeGuidanceRecord]
 }
 

@@ -159,11 +159,11 @@ private struct TypeDetail: View {
 
     private var iconRow: some View {
         let maker = type.origin == .plugin ? String(localized: "the plugin’s") : String(localized: "Marfa’s")
-        return SettingsRow(
-            title: Text("Icon"), line: isEditable ? nil : Text("Yours shows in place of \(maker)."),
-            lead: .custom(host.typeMark(for: type.id))
-        ) {
-            SettingsButton("Change…") { model.beginIcon(of: type.id) }
+        return SettingsRow(title: Text("Icon"), line: isEditable ? nil : Text("Yours shows in place of \(maker).")) {
+            HStack(spacing: SettingsTokens.Metric.dotGap) {
+                host.typeMark(for: type.id)
+                SettingsButton("Change…") { model.beginIcon(of: type.id) }
+            }
         }
     }
 
@@ -183,10 +183,10 @@ private struct TypeDetail: View {
                 SettingsStackRow(
                     title: Text(type.origin == .plugin ? "From the Plugin" : "Guidance"),
                     line: isEditable ? Text("\(TypesModel.length(of: own)) of \(TypesModel.guidanceLimit) characters.") : nil
-                ) { SettingsStackText(text: own, isLocked: true) }
+                ) { SettingsStackText(text: own, isLocked: true, isMarkdown: true) }
             }
             ForEach(ancestors, id: \.type) { above in
-                SettingsStackRow(title: Text("From \(model.title(of: above.type))")) { SettingsStackText(text: above.guidance, isLocked: true) }
+                SettingsStackRow(title: Text("From \(model.title(of: above.type))")) { SettingsStackText(text: above.guidance, isLocked: true, isMarkdown: true) }
             }
         }
     }
@@ -222,7 +222,7 @@ private struct TypeDetail: View {
                 }
             }
             if let line = model.fieldErrors[.word] {
-                Text(verbatim: "\(line) \(host.serverName) kept the words as they were.")
+                Text("\(line) \(host.serverName) kept the words as they were.")
                     .settingsFont(.line).foregroundStyle(SettingsTokens.errorRed).fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, SettingsTokens.Metric.inset)
             }
@@ -238,7 +238,7 @@ private struct TypeDetail: View {
             case "canceled": "xmark.circle"
             default: "circle"
             }
-        return Image(systemName: symbol).font(.system(size: 14))
+        return Image(systemName: symbol).font(.system(size: SettingsTokens.Metric.statusMark))
             .foregroundStyle(group == "in_progress" ? SettingsTokens.systemAccent : SettingsTokens.secondaryText)
             .accessibilityHidden(true)
     }
