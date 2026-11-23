@@ -417,21 +417,22 @@ struct MarfaSourceOfflineTests {
     }
 
     /// The child is queued and answered as itself; a parent link that cannot be made is told on its own.
-    @Test
+    @Test @MainActor
     func aCreateIsKeptWhateverBecomesOfItsParentLink() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try await open(root)
-        let log = ChangeLog(source)
-        _ = try #require(await log.wait { $0.snapshot != nil })
-        let write = WriteID()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        try #require(await eventually { library.isLoaded })
         let child = ItemID.mint()
         source.submit(
             .create(id: child, ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST child", body: "Queued", parent: ItemID("not-an-item"))),
-            as: write)
-        let queued = try #require(await log.wait { $0.item(titled: "MARFAMACTEST child") != nil })
-        #expect(queued.item(titled: "MARFAMACTEST child")?.id == child)
-        #expect(queued.answer(to: write) == nil)
+            as: WriteID())
+        let told = await eventually {
+            library.notices.waiting.contains { $0.message.contains("couldn’t be put under its parent") }
+        }
+        #expect(told, "told: \(library.notices.waiting.map(\.message))")
+        #expect(library.item(child)?.title == "MARFAMACTEST child")
         let creates = try await source.copy.queue.all().filter { $0.kind == .createItem }
         #expect(creates.map(\.itemId) == [child.rawValue])
         await source.close()
