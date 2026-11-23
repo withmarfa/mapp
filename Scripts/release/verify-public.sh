@@ -9,7 +9,8 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 sha() { (shasum -a 256 "$1" 2>/dev/null || sha256sum "$1") | cut -d' ' -f1; }
-size() { stat -f %z "$1" 2>/dev/null || stat -c %s "$1"; }
+# wc, not stat: GNU stat reads -f as "file system" and succeeds, so a fallback never runs on Linux.
+size() { wc -c <"$1" | tr -d ' '; }
 
 # A query keeps a cached copy of an earlier version from answering.
 curl --silent --show-error --fail --location --retry 5 --retry-all-errors --retry-delay 3 \
