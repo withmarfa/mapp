@@ -1035,7 +1035,7 @@ struct TypeAccess {
             }
             let guidance = guidanceText.trimmingCharacters(in: .whitespacesAndNewlines)
             if guidance != (type.guidance ?? "").trimmingCharacters(in: .whitespacesAndNewlines) {
-                if !guidance.isEmpty { drafts.append(.typed(title: String(localized: "Type Guidance Not Kept"), text: guidance)) }
+                drafts.append(.typed(title: String(localized: "Type Guidance Not Kept"), text: guidance))
                 guidanceText = type.guidance ?? ""
                 guidanceNeedsCommand = false
             }

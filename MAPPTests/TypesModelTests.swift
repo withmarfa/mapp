@@ -1042,6 +1042,15 @@ extension TypesModelTests {
         #expect(model.guidanceText == "One job is one piece of paid work.")
     }
 
+    @Test func guidanceClearedAndNotKeptIsToldWhenSettingsCloses() async {
+        let calls = listing()
+        let model = await guidanceOpen(calls)
+        model.guidanceText = ""
+        let drafts = model.takeDrafts()
+        #expect(drafts.count == 1)
+        #expect(model.guidanceText == "One job is one piece of paid work.")
+    }
+
     @Test func aPluginsTypeSendsNoGuidance() async {
         let calls = listing()
         let model = model(calls)
