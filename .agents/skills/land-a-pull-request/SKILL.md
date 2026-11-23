@@ -1,6 +1,6 @@
 ---
 name: land-a-pull-request
-description: Merge your own MAPP pull request, from draft to merged, including the five admin merges that go ahead without waiting for the ready run's Checks and a fix to a red main. Use when a pull request in this repository is finished and needs to reach main, or when main is red.
+description: Merge your own pull request, from draft to merged, including the five admin merges that go ahead without waiting for the ready run's Checks and a fix to a red main. Use when a pull request in this repository is finished and needs to reach main, or when main is red.
 ---
 
 # Land a pull request

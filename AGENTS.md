@@ -1,28 +1,28 @@
-# MAPP
+# Marfa for Mac
 
-MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a page, like Notes and Mail. It works only through the `marfa-swift` package's working copy, names no item type but its hidden settings (`app.mapp.preferences`), and holds no power another app lacks. The item editor is a web page built on Inkkit in a `WKWebView`. Concepts and agreed designs are in `docs/`; a directory's rules are in the `AGENTS.md` beside its code.
+Marfa for Mac is a macOS app for a Marfa server's items, with a sidebar, a list and a page. It works only through the `marfa-swift` package's working copy, names no item type but its hidden settings (`app.marfa-mac.preferences`), and holds no power another app lacks. Concepts and agreed designs are in `docs/`; each directory's rules are in its `AGENTS.md`.
 
 ## Read before you change
 
 | If you change | Read first |
 | --- | --- |
-| `MarfaMac/Model/` | `MarfaMac/Model/AGENTS.md`; for `Marfa/` also `MarfaMac/Model/Marfa/AGENTS.md` |
+| `MarfaMac/Model/` | its `AGENTS.md`; for `Marfa/` also that folder's |
 | `MarfaMac/Views/` or `MarfaMac/Settings/` | `AGENTS.md` there; for `Settings/Marfa/` also its own |
 | `MarfaMac/Editor/` or `editor/` | both `AGENTS.md` files, since the bridge spans them |
 | `MarfaMacTests/` | `MarfaMacTests/AGENTS.md` |
 | How anything looks: a row, chip, card, page or panel | the matching page in `docs/`; `docs/glossary.md` lists the terms |
-| What Marfa holds and what stays on the Mac | `docs/marfa-and-mapp.md`, `docs/settings-storage.md` |
+| What Marfa holds and what stays on the Mac | `docs/marfa-and-the-mac-app.md`, `docs/settings-storage.md` |
 
 ## Instruction files
 
 - Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, which delivers it to Claude Code. Edit the file, never the link. Codex loads no nested file, so the table above is how it finds the rest.
-- Keep each file under 200 lines and each chain from this file to a nested one under 32,000 bytes (Codex stops at 32 KiB). Detail about one type belongs in its doc comment, a concept in `docs/`, stated once and linked.
-- List a new `AGENTS.md` under `MarfaMac/` and its link in the MAPP target's membership exceptions in `project.pbxproj`, or the build fails on duplicate resources.
+- Keep each file under 200 lines and each chain from this file to a nested one under 32,000 bytes (Codex stops at 32 KiB). Detail about one type belongs in its doc comment, a concept in `docs/`.
+- List a new `AGENTS.md` under `MarfaMac/` and its link in the MarfaMac target's membership exceptions in `project.pbxproj`, or the build fails on duplicate resources.
 - Run `python3 Scripts/check-instructions.py` after changing an instruction file, a doc or a name a doc cites. It checks the limits, links, membership exceptions and that each name on a doc's "Where it lives" line exists. CI runs it as `Instructions`, on drafts too.
 
 ## Working here
 
-- MAPP is an app for items of every type. Names, strings and comments say "note" only for a `core.note`'s text, a type's own name or the Note callout.
+- Marfa for Mac is an app for items of every type. Names, strings and comments say "note" only for a `core.note`'s text, a type's own name or the Note callout.
 - Use American English. Put no time estimates, absolute paths, machine or account names or credentials in files. A comment says only why.
 - Use scoped lowercase Conventional Commits in the present tense: `feat(app):`, `fix(editor):`.
 - Work on a branch in a worktree under `.claude/worktrees/` and reach `main` through a pull request. Merge it as `.agents/skills/land-a-pull-request/SKILL.md` says.
@@ -32,7 +32,7 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 ## Platform
 
 - Target macOS 27 and Xcode 27 only, with no `#available` checks. Swift 6 language mode, main-actor isolation by default. Unit tests use Swift Testing; UI tests use XCTest.
-- Use SwiftUI with native containers and controls, and AppKit only where SwiftUI cannot express something. Check API questions against Apple's documentation.
+- Use SwiftUI with native containers and controls, and AppKit only where SwiftUI cannot express something.
 - Every user-facing string goes through the String Catalog. Building in Xcode updates `MarfaMac/Localizable.xcstrings`; `xcodebuild` alone does not.
 - App Sandbox and the hardened runtime stay on. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting` and the plugins release reader (`PluginRelease`) may connect out. Neither the item page nor a sealed web page loads from the network itself.
 
@@ -41,11 +41,11 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 - Never drop or silently overwrite a person's text. A write that cannot be kept where meant is kept where the person can get it back (a conflicted copy, the queue, the clipboard) and the person is told.
 - An item's Markdown text is held byte for byte. Opened and left alone, it is never rewritten; an edit keeps the text of every block it did not reach.
 - Views, commands, and the editor reach a library only through `ItemLibrary`, read from the environment's `library` value, and name items by `ItemID`, never by path.
-- MAPP's settings sync through the connected Marfa (`PreferencesSync`), but for what `PreferencesMap.staysOnMac` names.
+- This app's settings sync through the connected Marfa (`PreferencesSync`), but for what `PreferencesMap.staysOnMac` names.
 
 ## Project layout
 
-- `MarfaMac.xcodeproj` uses folder-synchronized groups for `MarfaMac/`, `MarfaMacTests/` (unit tests) and `MarfaMacUITests/` (UI tests). Add a source file by creating it on disk, not in `project.pbxproj`. Every file under `MarfaMac/` becomes an app resource unless the MAPP target's membership exceptions list it. `Design/` holds artwork that is not built into the app.
+- `MarfaMac.xcodeproj` uses folder-synchronized groups for `MarfaMac/`, `MarfaMacTests/` (unit tests) and `MarfaMacUITests/` (UI tests). Add a source file by creating it on disk, not in `project.pbxproj`. Every file under `MarfaMac/` becomes an app resource unless the MarfaMac target's membership exceptions list it. `Design/` holds artwork that is not built into the app.
 - Debug is `com.withmarfa.mapp.debug` and never shares the installed app's data or sign-ins; `MarfaMac/Info.plist` claims it as the sign-in's URL scheme. Key anything that must differ on `Bundle.main.bundleIdentifier`, never a literal.
 - To compare design values, add a knob to the Debug-only `MarfaMac/Tuning/` panel, not variants, and remove it once settled.
 

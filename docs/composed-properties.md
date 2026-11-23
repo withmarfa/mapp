@@ -4,23 +4,23 @@ Location shipped in v0.0.45 and Relation in v0.0.47. Count is available in this 
 
 Where it lives: `PropertyRow` (with its `Value`) under `MarfaMac/Model/Items/`, and `MarfaMapping` under `MarfaMac/Model/Marfa/`. Location is `ItemLocation` and `LocationFrame` under `MarfaMac/Model/Items/`, and `LocationPanelContent` and `LocationPanelModel` under `MarfaMac/Views/ValueEditing/`. Relation is `Relation`, `RelatedItem` and `ItemRelations` under `MarfaMac/Model/Items/`. Composed properties are built in a type's look from these.
 
-A composed property is a property that MAPP builds from a type's fields and links. Marfa holds no such property, so building one changes nothing in Marfa and stores nothing new there.
+A composed property is a property that the app builds from a type's fields and links. Marfa holds no such property, so building one changes nothing in Marfa and stores nothing new there.
 
 ## The properties
 
-- **Location.** A place on a map, built from the `latitude` and `longitude` fields. Marfa's `core.event`, `core.entity.place`, `core.file.image` and `core.file.video` types have them, and a type may also carry `place` or address fields. A person looks for an area with a search, clicks the map to place the pin and drags it to adjust, and MAPP writes only that point's latitude and longitude. The numbers stay hidden unless the person turns on Show Coordinates. An event's name is its `place` field, a place item's name is the item's own name and is never changed, and an image or video has no name, so it shows the map only. See "How Location works".
-- **Relation.** A link shown as a property: Parent, Children or In Collection. Marfa links items with edges, which are global, so a relation is how MAPP shows an edge as a row. See "How Relation works".
+- **Location.** A place on a map, built from the `latitude` and `longitude` fields. Marfa's `core.event`, `core.entity.place`, `core.file.image` and `core.file.video` types have them, and a type may also carry `place` or address fields. A person looks for an area with a search, clicks the map to place the pin and drags it to adjust, and the app writes only that point's latitude and longitude. The numbers stay hidden unless the person turns on Show Coordinates. An event's name is its `place` field, a place item's name is the item's own name and is never changed, and an image or video has no name, so it shows the map only. See "How Location works".
+- **Relation.** A link shown as a property: Parent, Children or In Collection. Marfa links items with edges, which are global, so a relation is how the app shows an edge as a row. See "How Relation works".
 - **Count.** A look can show how many children an item has, how many children with a status are finished, how many members a collection has, or how many rows an item holds in a table. See [Looks](looks.md).
 
 ## Later, not now
 
 - **Reading time.** The proposed value uses the item's text.
-- **Rollup and Formula.** Marfa cannot sort or filter by a value that MAPP computes, so these wait.
+- **Rollup and Formula.** Marfa cannot sort or filter by a value that the app computes, so these wait.
 - **A Marfa location kind.** Marfa has none today. When one exists, Location reads it in place of the two numbers.
 
 ## How Location works
 
-- **Why a search never fills the pin.** Apple's Developer Program License Agreement (Attachment 6, section 2.5) allows map data to be stored only for a moment, and only a Place ID is exempt. Marfa has no field for a Place ID, so MAPP writes nothing that a search returned. A search result only moves the map to an area; the person places the pin.
+- **Why a search never fills the pin.** Apple's Developer Program License Agreement (Attachment 6, section 2.5) allows map data to be stored only for a moment, and only a Place ID is exempt. Marfa has no field for a Place ID, so the app writes nothing that a search returned. A search result only moves the map to an area; the person places the pin.
 - **One row.** A type with both numbers shows one Location row in place of the two (`mappin.and.ellipse`). It reads the name, or Map where the item has a point and no name. Latitude and longitude are rows of their own only while Show Coordinates is on. The row is in the property block, can be pinned, and is in the right sidebar as the name beside a small pin. Both open the same panel, and Customize Sidebar counts it as one property.
 - **The panel.** A search field, an Apple map with the item's point as a pin, a name field where the type has a name, the Show Coordinates switch and Clear Location. The map is always an Apple map, with its logo and legal link left uncovered. A click on the map places the pin only where the item has none; after that the pin moves only when it is dragged, and a double-click only zooms the map.
 - **One edit.** Placing or moving the pin writes both numbers, and the name if it changed, as one queued edit and one undo step. It works offline, though the map may then lack tiles. Clear Location removes both numbers in one undo step, keeps the name, and asks nothing.
@@ -51,5 +51,5 @@ Only one is open: whether Marfa should add a field that holds a Place ID, so tha
 ## Related pages
 
 - [Looks](looks.md)
-- [Marfa and MAPP](marfa-and-mapp.md)
+- [Marfa and the app](marfa-and-the-mac-app.md)
 - [Item page](item-page.md)

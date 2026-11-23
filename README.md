@@ -1,6 +1,6 @@
-# MAPP
+# Marfa for Mac
 
-MAPP is a native macOS app for the items in a Marfa server. Its editor is built on [Inkkit](https://github.com/aicayzer/inkkit).
+Marfa for Mac is a native macOS app for the items in a Marfa server. Its editor is built on [Inkkit](https://github.com/aicayzer/inkkit).
 
 ## Requirements
 
@@ -10,10 +10,10 @@ MAPP is a native macOS app for the items in a Marfa server. Its editor is built 
 ## Build and test
 
 ```sh
-xcodebuild -project MarfaMac.xcodeproj -scheme MAPP -destination 'platform=macOS' -derivedDataPath build test
+xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -destination 'platform=macOS' -derivedDataPath build test
 ```
 
-This builds the app and runs the unit tests. To run the app, open `MarfaMac.xcodeproj` in Xcode and run the `MAPP` scheme.
+This builds the app and runs the unit tests. To run the app, open `MarfaMac.xcodeproj` in Xcode and run the `MarfaMac` scheme.
 
 ## Signing
 

@@ -1,24 +1,24 @@
 # Settings storage
 
-Status: Built. MAPP's settings are kept in the connected Marfa so every Mac that connects uses them; window sizes, column widths and On This Mac stay on each Mac. The store of type looks and the list density are built in v0.0.44. See [Looks](looks.md).
+Status: Built. This app's settings are kept in the connected Marfa so every Mac that connects uses them; window sizes, column widths and On This Mac stay on each Mac. The store of type looks and the list density are built in v0.0.44. See [Looks](looks.md).
 
 Where it lives: `ListKey`, `PageKey`, `OrderKey`, `InterfaceKey` and `AppearanceKey` under `MarfaMac/Views/`, and `MacSettings`, `StartWith`, `ReopenWindows`, `NewItemType`, `NewRowTypes`, `WeekStart`, `CalendarHourHeight`, `PagePlacements`, `ViewLayouts`, `PlaceDefaults`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `SearchLeaveOuts`, `SearchOptions`, `DateFormat` and `RemotePictureSetting` under `MarfaMac/Model/`, `ShortcutBindings` and `AnyAppShortcuts` under `MarfaMac/Model/Shortcuts/`, and `PreferencesType`, `PreferencesMap`, `PreferencesMerge`, `PreferencesSync`, `PreferencesCopy` and `ConnectionSettings` under `MarfaMac/Model/Marfa/`.
 
-MAPP's settings have three homes. A setting belongs in the narrowest one that matches what the person would expect.
+This app's settings have three homes. A setting belongs in the narrowest one that matches what the person would expect.
 
 ## The three homes
 
 | Home | What it holds | Where |
 | --- | --- | --- |
-| The Marfa's own data | Items, types, views, the sign-in's grants. Never a MAPP setting. | The Marfa. |
-| MAPP's settings | Every setting that should follow the person to another Mac. | One hidden item per Marfa, of type `app.mapp.preferences`. |
+| The Marfa's own data | Items, types, views, the sign-in's grants. Never an app setting. | The Marfa. |
+| This app's settings | Every setting that should follow the person to another Mac. | One hidden item per Marfa, of type `app.marfa-mac.preferences`. |
 | This Mac only | Window sizes and positions, column widths, On This Mac, the connection and the sync's own bookkeeping. | The defaults on this Mac. |
 
-The defaults on this Mac stay the store MAPP's code reads, so a launch reads nothing from the network and `@AppStorage` keeps working. Where the settings sync, the defaults are this Mac's copy of the Marfa's settings, and `PreferencesSync` keeps the two together.
+The defaults on this Mac stay the store the app's code reads, so a launch reads nothing from the network and `@AppStorage` keeps working. Where the settings sync, the defaults are this Mac's copy of the Marfa's settings, and `PreferencesSync` keeps the two together.
 
-## MAPP's settings in the Marfa
+## This app's settings in the Marfa
 
-`app.mapp.preferences` is hidden: the library never lists it as an item, and Marfa stores and syncs it without reading it. It has five fields, each an `object` keyed by MAPP's defaults key, and five tables, each with the columns `key`, `setting` and `value` (the value is the JSON text MAPP stores).
+`app.marfa-mac.preferences` is hidden: the library never lists it as an item, and Marfa stores and syncs it without reading it. It has five fields, each an `object` keyed by the app's defaults key, and five tables, each with the columns `key`, `setting` and `value` (the value is the JSON text the app stores).
 
 | Place | Keys |
 | --- | --- |
@@ -39,7 +39,7 @@ A mark's color and a place's section change one at a time, so each is its own ro
 
 ### The type's shape never changes
 
-Every Mac is another OAuth client to the server, and only the client that registered the first type under `app.mapp` may replace it (withmarfa/marfa#3462). A later MAPP could not change the type, so a new setting is a new member inside a field or a new `setting` word in a table, never a new field, table or column. `PreferencesTypeTests` fails on any change to the definition.
+Every Mac is another OAuth client to the server, and only the client that registered the first type under `app.marfa-mac` may replace it (withmarfa/marfa#3462). A later the app could not change the type, so a new setting is a new member inside a field or a new `setting` word in a table, never a new field, table or column. `PreferencesTypeTests` fails on any change to the definition.
 
 ## What stays on this Mac
 
@@ -49,10 +49,10 @@ Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `in
 
 Nothing is decided until the hydration is complete, the sign-in reaches the type and every table is held whole; until then the defaults stay as they are and Connection says the settings are not ready.
 
-- **The sign-in lacks the permission** (a sign-in made before the settings synced holds neither `app.mapp.*:write` nor `metadata.types:write`): nothing syncs, the defaults are untouched and Connection offers Allow More….
+- **The sign-in lacks the permission** (a sign-in made before the settings synced holds neither `app.marfa-mac.*:write` nor `metadata.types:write`): nothing syncs, the defaults are untouched and Connection offers Allow More….
 - **Before the first write or adoption**, every synced key's value on this Mac is copied once into `preferencesBeforeSync`, kept until Reset.
 - **The Marfa holds no item, and this Mac never adopted a Marfa:** the item is made from this Mac's settings.
-- **The Marfa holds no item, and this Mac adopted another Marfa before:** the synced settings go back to MAPP's defaults and an empty item is made, so a new Marfa does not take another's arrangement.
+- **The Marfa holds no item, and this Mac adopted another Marfa before:** the synced settings go back to the app's defaults and an empty item is made, so a new Marfa does not take another's arrangement.
 - **The item exists:** what it holds wins, and what it lacks is filled from this Mac, once. The adoption is recorded for the Marfa's instance.
 - **Two items** (two Macs made one at once): the one created first is used and what it lacks is filled from the other. The other stays hidden until Remove… bins every settings item.
 - **Switching Marfa** loads the other Marfa's settings into the defaults whole, and switching back loads the first Marfa's again.
@@ -61,7 +61,7 @@ Nothing is decided until the hydration is complete, the sign-in reaches the type
 
 One step compares this Mac's settings and the item's with what both held after the last step. A change on this Mac is written to the item, and a change from another Mac is written into the defaults, after which the observable stores read them again and open windows follow. A change on this Mac waits one second, so a slider's drag is one write, and the sync asks the library to send it at once, so another Mac sees it without waiting for the next connection. Nothing is written for what was just applied, so there is no echo.
 
-Fields are written by member. Where two Macs change different members, both changes stand; where the server keeps another Mac's member and writes this Mac's to a conflicted copy, MAPP writes the members it sent again, takes the members the other Mac changed, and bins the copy.
+Fields are written by member. Where two Macs change different members, both changes stand; where the server keeps another Mac's member and writes this Mac's to a conflicted copy, the app writes the members it sent again, takes the members the other Mac changed, and bins the copy.
 
 ## Two Macs changing one setting
 
@@ -74,12 +74,12 @@ The later write wins, row by row and member by member, and nothing is lost: each
 - **A store's older value** that no longer decodes (`pagePlacementsSetAside`, `viewLayoutsSetAside`, `sidebarLayoutsSetAside`, `typeLooksSetAside`, `placeDensitiesSetAside`, `placeDefaultsSetAside`, `itemTableColumnsSetAside`, `searchLeaveOutsSetAside`, `keyboardShortcutsSetAside`, `anyAppShortcutsSetAside`, `dateFormatSetAside`) is kept under that key and the store starts from its defaults, so a person's arrangement can be recovered. An older Date Format value that no longer reads is set aside the same way at launch and never translated.
 - **A new field on a stored value is optional.** A value saved before the field existed must still decode.
 
-## Connection's MAPP's Settings section
+## Connection's This App's Settings section
 
 Settings > Connection shows where the settings are kept, in the state the sync is in (`ConnectionSettings`):
 
 - **Syncing:** "Kept in <name>. Every Mac that connects to it uses them." with Remove….
-- **Needs a permission:** "Kept on This Mac Only", saying MAPP isn't allowed to keep them in the Marfa yet, with Allow More…. After the sign-in is approved the section moves to Syncing without a relaunch.
+- **Needs a permission:** "Kept on This Mac Only", saying the app isn't allowed to keep them in the Marfa yet, with Allow More…. After the sign-in is approved the section moves to Syncing without a relaunch.
 - **Not filled yet:** a quiet line while the copy downloads, with no button.
 - **Removed** (here or on another Mac): "Kept on This Mac Only", saying they were removed and this Mac keeps its own, with Keep in Marfa Again.
 - **No Marfa** (the sample library): the section is not shown.
@@ -88,11 +88,11 @@ A footer names what stays on each Mac. Remove… asks first, saying every Mac th
 
 ### Disconnect
 
-Disconnect's alert has a checkbox, "Also remove MAPP's settings from <name>", off by default and offered only while the settings are kept in the Marfa. Checked, MAPP removes the item and waits until the server has taken that removal, judged by its own write and no other, before it signs out, since afterwards nothing can be removed. If the removal fails, MAPP says so, stays connected, and disconnects only if the person chooses Disconnect Anyway; the checkbox is then offered only if the settings are still kept. The question about changes that wait (the Departure sheet) has the same checkbox, and nothing is removed until the person has chosen how to leave the copy. Sending the removal sends the whole queue, so the checkbox goes with Keep Copy only: Discard Changes is off while it is checked, and a removal asked for with a discard is refused, never sent, so a change the person chose to discard never reaches the server. A removal that was queued and not taken counts among the changes that wait; the sheet says one of them removes MAPP's settings from the Marfa, and that discarding the copy leaves the settings there.
+Disconnect's alert has a checkbox, "Also remove this app's settings from <name>", off by default and offered only while the settings are kept in the Marfa. Checked, the app removes the item and waits until the server has taken that removal, judged by its own write and no other, before it signs out, since afterwards nothing can be removed. If the removal fails, the app says so, stays connected, and disconnects only if the person chooses Disconnect Anyway; the checkbox is then offered only if the settings are still kept. The question about changes that wait (the Departure sheet) has the same checkbox, and nothing is removed until the person has chosen how to leave the copy. Sending the removal sends the whole queue, so the checkbox goes with Keep Copy only: Discard Changes is off while it is checked, and a removal asked for with a discard is refused, never sent, so a change the person chose to discard never reaches the server. A removal that was queued and not taken counts among the changes that wait; the sheet says one of them removes this app's settings from the Marfa, and that discarding the copy leaves the settings there.
 
 ## Reset
 
-Settings > General > Reset MAPP's Settings… clears every key in `MacSettings.keys`, and the keys that come one for each app's inspector, and so removes MAPP's own `NSQuitAlwaysKeepsWindows`, which puts Reopen Windows back to the Mac's answer. Where the settings sync, the Marfa's settings are put back with them, for every Mac, as one write for each changed field and one batch for each table, and the alert says so. It leaves the copy of the library, its queue, the sign-in, the connection (the server's address and its names), the sync's bookkeeping and any value set aside under a `...SetAside` key. The shortcuts held in memory are put back with it (`Libraries.resetMacSettings`), so the menus and the hot keys follow at once. One list holds the keys, which the Reset and the sample library's clean start both read: a new setting stored on this Mac is added to `MacSettings.keys` in the same change, and a test checks that each group of keys is in it.
+Settings > General > Reset This App's Settings… clears every key in `MacSettings.keys`, and the keys that come one for each app's inspector, and so removes the app's own `NSQuitAlwaysKeepsWindows`, which puts Reopen Windows back to the Mac's answer. Where the settings sync, the Marfa's settings are put back with them, for every Mac, as one write for each changed field and one batch for each table, and the alert says so. It leaves the copy of the library, its queue, the sign-in, the connection (the server's address and its names), the sync's bookkeeping and any value set aside under a `...SetAside` key. The shortcuts held in memory are put back with it (`Libraries.resetMacSettings`), so the menus and the hot keys follow at once. One list holds the keys, which the Reset and the sample library's clean start both read: a new setting stored on this Mac is added to `MacSettings.keys` in the same change, and a test checks that each group of keys is in it.
 
 ## Rules
 
@@ -105,15 +105,15 @@ The rules that apply to every setting are in the `AGENTS.md` files: [what syncs 
 
 Where it lives: `SettingsWindowView`, `SettingsPage`, `SettingsNavigation`, `SettingsLauncher`, `SettingsSidebar`, `SettingsTokens` and `MarfaSettingsHost`, under `MarfaMac/Settings/`.
 
-Settings is a window of its own, opened by MAPP > Settings… (⌘,), with one instance that comes forward if it is already open and keeps the size it was left at (1200 by 900 points at first). It is a `Window` scene, not the system's `Settings` scene, which is sized to its content for a few tabs and gives no toolbar of ours or remembered, resizable frame. Every route that opens Settings names a page in the same window: the command, the sidebar's Settings shortcut, the palette's Settings commands, the connect and sign-in buttons, and the notices that offer Settings (`SettingsLauncher`). The main window keeps no Settings place, and no Settings column or width.
+Settings is a window of its own, opened by Marfa > Settings… (⌘,), with one instance that comes forward if it is already open and keeps the size it was left at (1200 by 900 points at first). It is a `Window` scene, not the system's `Settings` scene, which is sized to its content for a few tabs and gives no toolbar of ours or remembered, resizable frame. Every route that opens Settings names a page in the same window: the command, the sidebar's Settings shortcut, the palette's Settings commands, the connect and sign-in buttons, and the notices that offer Settings (`SettingsLauncher`). The main window keeps no Settings place, and no Settings column or width.
 
-The sidebar lists MAPP's pages, then the Marfa's: General, Appearance, Keyboard, Editor, Lists, Layouts, Search, On This Mac and Connection; then the Marfa's pages, which [The Marfa's half of Settings](marfa-settings.md) lists. A page is listed once it is built, so the pages in [Agreed designs](agreed-designs.md#settings) that are not here yet appear as they are. Settings > Sidebar and Settings > About are gone: the sidebar is customized in place, and About is the MAPP menu's About MAPP.
+The sidebar names its two halves App and Marfa. App lists General, Appearance, Keyboard, Editor, Lists, Layouts, Search, On This Mac and Connection; Marfa lists the pages that [The Marfa's half of Settings](marfa-settings.md) lists. A page is listed once it is built, so the pages in [Agreed designs](agreed-designs.md#settings) that are not here yet appear as they are. Settings > Sidebar and Settings > About are gone: the sidebar is customized in place, and About is Marfa > About Marfa.
 
 - **General, Appearance, Editor, Lists and Layouts** are in [Settings](settings.md). Appearance has no Settings column width.
-- **Search, On This Mac and Connection** are in [Settings](settings.md). Connection holds the server and how it stands, the account, each change that needs the person, MAPP's Settings, the other server and Disconnect; the downloaded files moved to On This Mac and the error reports switch to General.
+- **Search, On This Mac and Connection** are in [Settings](settings.md). Connection holds the server and how it stands, the account, each change that needs the person, this app's Settings, the other server and Disconnect; the downloaded files moved to On This Mac and the error reports switch to General.
 - **Keyboard** holds the shortcut of every menu command and the few that work in any app ([Keyboard shortcuts](keyboard-shortcuts.md)).
-- **Overview** holds This Marfa's fields until the page is built out, and **Recently Deleted** the bin. Both are the Marfa's: each needs an owner permission (`config.manage` and `items.purge`), which the sign-in holds only if the owner approved it. Allow More… signs in again through the package, asking for MAPP's scopes, the permissions already held and the page's own, and hands the new sign-in to the open copy as Sign In Again does. Every sign-in again, by the browser or with a code, asks for the permissions already held, or for every permission the pages use where the Keychain cannot say what is held. The owner may untick permissions on the approval page, and that stands, but never silently: when a permission held before is no longer held, MAPP says so in one notice that names what it is no longer allowed to do, and the page that asked shows Needs a Permission again.
-- **The Marfa's half** (`Settings/Marfa/`) reaches MAPP only through `MarfaSettingsHost`, so another app could take its pages.
+- **Overview** holds This Marfa's fields until the page is built out, and **Recently Deleted** the bin. Both are the Marfa's: each needs an owner permission (`config.manage` and `items.purge`), which the sign-in holds only if the owner approved it. Allow More… signs in again through the package, asking for the app's scopes, the permissions already held and the page's own, and hands the new sign-in to the open copy as Sign In Again does. Every sign-in again, by the browser or with a code, asks for the permissions already held, or for every permission the pages use where the Keychain cannot say what is held. The owner may untick permissions on the approval page, and that stands, but never silently: when a permission held before is no longer held, the app says so in one notice that names what it is no longer allowed to do, and the page that asked shows Needs a Permission again.
+- **The Marfa's half** (`Settings/Marfa/`) reaches the app only through `MarfaSettingsHost`, so another app could take its pages.
 
 The measurements of a page's rows and boxes are in [Views and lists](views-and-lists.md#settings). The agreed pages not built yet are in [Agreed designs](agreed-designs.md#settings).
 
@@ -125,5 +125,5 @@ The measurements of a page's rows and boxes are in [Views and lists](views-and-l
 
 - [Keyboard shortcuts](keyboard-shortcuts.md)
 - [Looks](looks.md)
-- [Marfa and MAPP](marfa-and-mapp.md)
+- [Marfa and the app](marfa-and-the-mac-app.md)
 - [Views and lists](views-and-lists.md)

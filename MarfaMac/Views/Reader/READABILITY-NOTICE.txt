@@ -1,7 +1,7 @@
 Mozilla Readability
 
 Readability.js and Readability-readerable.js in this folder are copies, unmodified, of @mozilla/readability 0.6.0
-(https://github.com/mozilla/readability), published under the Apache License, Version 2.0. They are the scripts MAPP
+(https://github.com/mozilla/readability), published under the Apache License, Version 2.0. They are the scripts Marfa for Mac
 runs, in a world of its own that a document cannot reach, to find the article in a saved web page.
 
 Package:    @mozilla/readability 0.6.0

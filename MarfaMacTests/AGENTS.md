@@ -12,12 +12,12 @@
 
 ```sh
 # Unit tests: no window, no Dock icon, so they can run while the Mac is in use.
-xcodebuild -project MarfaMac.xcodeproj -scheme MAPP -destination 'platform=macOS' -derivedDataPath build test
+xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -destination 'platform=macOS' -derivedDataPath build test
 # UI tests: take control of the keyboard and mouse.
 xcodebuild -project MarfaMac.xcodeproj -scheme 'MarfaMac UI Tests' -destination 'platform=macOS' -derivedDataPath build test
 # Before a release: the Live plan, against a Marfa test instance only.
 TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> TEST_RUNNER_MARFA_TEST_INSTANCE_ID=<instance_id> \
-  xcodebuild -project MarfaMac.xcodeproj -scheme MAPP -testPlan Live -destination 'platform=macOS' -derivedDataPath build test
+  xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -testPlan Live -destination 'platform=macOS' -derivedDataPath build test
 ```
 
 Replace `test` with `build` to build only. `Scripts/measure-ui.sh` times the window on a test instance's library, with the screen to itself; its header says how.
@@ -26,7 +26,7 @@ Replace `test` with `build` to build only. `Scripts/measure-ui.sh` times the win
 
 `TestPlans/` holds these plans:
 
-- `Unit` (the `MAPP` scheme's default) runs every unit test not tagged `live`. The `measure` suites skip by their own switch.
+- `Unit` (the `MarfaMac` scheme's default) runs every unit test not tagged `live`. The `measure` suites skip by their own switch.
 - `Live` runs only the tests tagged `live`, against a Marfa test instance.
 - `UI` (the `MarfaMac UI Tests` scheme's) runs the UI tests.
 - `Measure` and `Measure UI` time the app and print lines to read, never a gate.
@@ -41,7 +41,7 @@ Replace `test` with `build` to build only. `Scripts/measure-ui.sh` times the win
 
 - `FakeItemLibrary` holds items in memory for view models and the editor.
 - `FakeItemSource` is a source a test drives, for `MarfaLibrary`.
-- A Debug build launched with `-MAPPSampleLibrary` uses a sample library held in memory, beside `-MAPPSampleUnconfigured`, `-MAPPCollectionSample`, `-MAPPSelectItem <item id>` or `-MAPPOpenPlace <type id>` with `-MAPPLayout <layout>`, and `-MAPPAppearance dark|light`. A sample launch forgets the settings an earlier run kept, a table's columns and a saved view's layout among them (`SampleLibrary.forgetStoredChoices`), unless `-MAPPKeepSampleSettings` is given. UI tests open it through `XCUIApplication.sample()`. With `MARFA_MAC_TEST_MARFA_URL` and `MARFA_MAC_TEST_MARFA_KEY` set, it connects to that test server and keeps the key in memory only; with `-MAPPSyncSettings` too, MAPP's settings are kept in that server's `app.mapp.preferences` item, so the settings of this debug build start empty and a test server's settings change.
+- A Debug build launched with `-MarfaMacSampleLibrary` uses a sample library held in memory, beside `-MarfaMacSampleUnconfigured`, `-MarfaMacCollectionSample`, `-MarfaMacSelectItem <item id>` or `-MarfaMacOpenPlace <type id>` with `-MarfaMacLayout <layout>`, and `-MarfaMacAppearance dark|light`. A sample launch forgets the settings an earlier run kept, a table's columns and a saved view's layout among them (`SampleLibrary.forgetStoredChoices`), unless `-MarfaMacKeepSampleSettings` is given. UI tests open it through `XCUIApplication.sample()`. With `MARFA_MAC_TEST_MARFA_URL` and `MARFA_MAC_TEST_MARFA_KEY` set, it connects to that test server and keeps the key in memory only; with `-MarfaMacSyncSettings` too, this app's settings are kept in that server's `app.marfa-mac.preferences` item, so the settings of this debug build start empty and a test server's settings change.
 
 ## Tests never touch real data
 
@@ -49,5 +49,5 @@ Under the unit tests' background-only host, previews and the sample library, `Li
 
 ## Code Review Rules
 
-- **Tests touch real data.** Flag a test that reaches the Keychain, the default store location, or a server, and a UI test run without `-MAPPSampleLibrary`.
+- **Tests touch real data.** Flag a test that reaches the Keychain, the default store location, or a server, and a UI test run without `-MarfaMacSampleLibrary`.
 - **Sleep instead of waiting.** Flag a loop of short sleeps, an `async` suite without `.hangLimit`, or a fixed sleep with no comment saying what it waits for.
