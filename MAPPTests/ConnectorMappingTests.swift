@@ -125,6 +125,35 @@ import Testing
         #expect(bench.calls.state.withLock { $0.mappings["feed"]?.kinds["entry"]?.tier } == .library)
     }
 
+    @Test func aReadingOlderThanTheOneHeldDoesNotReplaceTheDraft() async {
+        let (model, bench) = await loaded()
+        await model.setTier(.library, for: "entry")
+        bench.calls.state.withLock {
+            $0.mappings["feed"] = ConnectorMappingReading(version: 3, kinds: ["entry": Self.entryMapping], rewrites: [])
+        }
+        await model.load()
+        #expect(model.version == 4)
+        #expect(model.kinds["entry"]?.draft.tier == .library)
+        #expect(model.kinds["entry"]?.saved.tier == .library)
+    }
+
+    @Test func aReadWhileASaveRunsIsNotTaken() async {
+        let (model, bench) = await loaded()
+        let gate = bench.calls.hold("saveConnectorMapping")
+        let saving = Task { await model.setTier(.library, for: "entry") }
+        #expect(await eventually { bench.calls.calls.contains("saveConnectorMapping") })
+        bench.calls.state.withLock { $0.mappings["feed"]?.version = 9 }
+        await model.load()
+        #expect(model.version == 3)
+        #expect(model.kinds["entry"]?.draft.tier == .library)
+        gate.open()
+        await saving.value
+        #expect(model.isStale)
+        #expect(model.version == 3)
+        #expect(model.kinds["entry"]?.draft.tier == .library)
+        #expect(model.kinds["entry"]?.saved.tier == .feed)
+    }
+
     @Test func aChangeMadeWhileASaveRunsIsSavedAfterIt() async {
         let (model, bench) = await loaded()
         let gate = bench.calls.hold("saveConnectorMapping")
@@ -154,6 +183,15 @@ import Testing
     }
 
     // MARK: Fields
+
+    @Test func anEmptyTemplateOnARequiredFieldUsesMappsSentence() async {
+        let (model, _) = await loaded()
+        await model.setTarget("user.job", for: "entry")
+        let client = Self.job.field("client")!
+        await model.setChoice(.template, for: client, in: "entry")
+        #expect(model.wire("entry")?.fields["client"] == nil)
+        #expect(model.error(for: client, in: "entry") == "Job needs Client. Choose a field or a fixed value.")
+    }
 
     @Test func aTemplateIsSentOnlyOnceItHoldsTextAndIsNotWrittenBack() async {
         let (model, bench) = await loaded()
@@ -189,6 +227,26 @@ import Testing
         let title = Self.task.field("title")!
         #expect(model.sources(for: due, in: "entry").map(\.name) == ["published_at"])
         #expect(Set(model.sources(for: title, in: "entry").map(\.name)) == ["body", "entry_id", "title"])
+    }
+
+    @Test func aStatusRefusalIsShownOnItsWordAndEveryOtherFaultIsKept() async {
+        let (model, bench) = await loaded()
+        await model.setTarget("core.task", for: "entry")
+        await model.setChoice(.field("state"), for: Self.task.field("status")!, in: "entry")
+        bench.calls.state.withLock {
+            $0.scriptedMappingFaults = [
+                MappingFault(path: "kinds.entry.status_overrides.closed", message: "Closed is not a word of Task."),
+                MappingFault(path: "kinds.entry.status_overrides.open", message: "Open is not a word of Task."),
+                MappingFault(path: "kinds.entry.target_type", message: "Task can't be written."),
+                MappingFault(path: "kinds.entry.target_type", message: "Choose another type."),
+                MappingFault(path: "kinds.entry.tier", message: "Feed is not a tier here."),
+            ]
+        }
+        await model.setTier(.library, for: "entry")
+        #expect(model.targetError("entry") == "Task can't be written.\nChoose another type.")
+        #expect(model.overrideError(of: "closed", in: "entry") == "Closed is not a word of Task.")
+        #expect(model.overrideError(of: "open", in: "entry") == "Open is not a word of Task.")
+        #expect(model.looseFaults("entry").map(\.message) == ["Feed is not a tier here."])
     }
 
     @Test func aKindWithAStatusFieldMapsItsWordsByGroupWithAnOverridePerWord() async {
@@ -239,6 +297,22 @@ import Testing
         #expect(model.previewState("entry") == .failed("No item to show."))
     }
 
+    @Test func aFailedPollFromAnOlderPreviewDoesNotReplaceANewerOne() async {
+        let (model, bench) = await loaded()
+        let gate = bench.calls.hold("mappingPreview")
+        let older = Task { await model.preview("entry", every: .milliseconds(1)) }
+        #expect(await eventually { bench.calls.state.withLock { $0.waiting["mappingPreview"] ?? 0 } >= 1 })
+        bench.calls.state.withLock {
+            $0.previewStart = .ready(item())
+            $0.previewFailureAfterWait = .unreachable
+        }
+        await model.preview("entry", every: .milliseconds(1))
+        #expect(model.previewState("entry") == .ready(item()))
+        gate.open()
+        await older.value
+        #expect(model.previewState("entry") == .ready(item()))
+    }
+
     @Test func aPreviewTheServerNoLongerKeepsIsExpired() async {
         let (model, bench) = await loaded()
         bench.calls.fail("mappingPreview", with: .notFound)
@@ -258,6 +332,20 @@ import Testing
 
     // MARK: Existing items
 
+    @Test func aFailedReadAfterApplyIsShown() async {
+        let (model, bench) = await loaded()
+        bench.calls.fail("connectorMapping", with: .unreachable)
+        model.askToApply("entry")
+        await model.apply("entry")
+        #expect(model.rewriteFailure == nil)
+        #expect(model.readBackFailure == .unreachable)
+        #expect(model.pending("entry").isEmpty)
+        bench.calls.fail("connectorMapping", with: nil)
+        await model.readBack()
+        #expect(model.readBackFailure == nil)
+        #expect(model.pending("entry").count == 1)
+    }
+
     @Test func applyingToExistingItemsCountsFirstThenAsksAndShowsTheRequestPending() async {
         let (model, bench) = await loaded()
         #expect(bench.calls.state.withLock { $0.rewritesAsked.map(\.dryRun) } == [true])
@@ -269,6 +357,51 @@ import Testing
         #expect(asked.map(\.dryRun) == [true, false, true])
         #expect(asked[1].kinds == ["entry"])
         #expect(model.pending("entry").count == 1)
+    }
+
+    @Test func aFailedDryRunClearsTheCountAndANewTargetDoesNotKeepTheOldOne() async {
+        let (model, bench) = await loaded()
+        #expect(model.canApply("entry"))
+        bench.calls.fail("rewriteConnectorItems", with: .unreachable)
+        await model.count("entry")
+        #expect(model.counts["entry"] == nil)
+        #expect(!model.canApply("entry"))
+        bench.calls.fail("rewriteConnectorItems", with: nil)
+        await model.count("entry")
+        let gate = bench.calls.hold("rewriteConnectorItems")
+        let changing = Task { await model.setTarget("core.task", for: "entry") }
+        #expect(await eventually {
+            model.version == 4 && bench.calls.state.withLock { ($0.waiting["rewriteConnectorItems"] ?? 0) >= 1 }
+        })
+        #expect(model.counts["entry"] == nil)
+        #expect(!model.canApply("entry"))
+        #expect(!model.isSaving)
+        gate.open()
+        await changing.value
+        #expect(model.counts["entry"] == 40)
+        #expect(model.kinds["entry"]?.saved.targetType == "core.task")
+        #expect(model.canApply("entry"))
+    }
+
+    @Test func aCountFromThePreviousTargetDoesNotComeBack() async {
+        let (model, bench) = await loaded()
+        let first = bench.calls.hold("rewriteConnectorItems")
+        let recount = Task { await model.count("entry") }
+        #expect(await eventually { bench.calls.state.withLock { ($0.waiting["rewriteConnectorItems"] ?? 0) >= 1 } })
+        let second = bench.calls.hold("rewriteConnectorItems")
+        bench.calls.state.withLock { $0.rewriteCounts["entry"] = 2 }
+        let changing = Task { await model.setTarget("core.task", for: "entry") }
+        #expect(await eventually {
+            model.version == 4 && bench.calls.state.withLock { ($0.waiting["rewriteConnectorItems"] ?? 0) >= 2 }
+        })
+        first.open()
+        await recount.value
+        #expect(model.counts["entry"] == nil)
+        #expect(!model.canApply("entry"))
+        second.open()
+        await changing.value
+        #expect(model.counts["entry"] == 2)
+        #expect(model.canApply("entry"))
     }
 
     @Test func nothingIsAppliedWhileTheDraftIsUnsavedOrThereIsNothingToMove() async {

@@ -55,15 +55,21 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
     private(set) var previews: [String: MappingPreviewState] = [:]
     /// How many existing items each kind's rewrite would move, once counted.
     private(set) var counts: [String: Int] = [:]
+    /// A dry run that failed, by kind, so Apply is not offered on a number from an earlier mapping.
+    private(set) var countFailures: [String: OwnerFailure] = [:]
     private(set) var rewriteFailure: OwnerFailure?
     private(set) var isAsking = false
     /// The kind whose rewrite the owner is being asked about.
     var question: String?
+    /// The mapping could not be read back after Apply, so the pending request is not on the page yet.
+    private(set) var readBackFailure: OwnerFailure?
     /// How many times a kind's mapping was last sent or read, so the preview asks again only when that changed.
     private(set) var previewRuns: [String: Int] = [:]
 
     private var queued: Set<String> = []
     private var generation: [String: Int] = [:]
+    /// Which dry run may still write a kind's count. A newer count, or a change of target, retires the older one.
+    private var countGeneration: [String: Int] = [:]
 
     init(context: OwnerContext, plugin: PluginConnectorSummary) {
         self.context = context
@@ -95,11 +101,19 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
         }
     }
 
-    /// Takes what the server holds as the saved mapping. A kind with a change made and not saved keeps it.
-    private func take(_ reading: ConnectorMappingReading) {
+    /// Takes what the server holds, where that reading is at least as new as the one held and no save is in flight. A kind
+    /// with a change made and not saved keeps it. An older reading is left, so one from before a save cannot roll the draft
+    /// back after the save's own answer.
+    @discardableResult private func take(_ reading: ConnectorMappingReading) -> Bool {
+        guard !isSaving, reading.version >= version else { return false }
+        let targets = kinds.mapValues(\.saved.targetType)
         version = reading.version
         rewrites = reading.rewrites
         for (name, mapping) in reading.kinds {
+            if targets[name] != mapping.targetType {
+                counts[name] = nil
+                countFailures[name] = nil
+            }
             if var held = kinds[name] {
                 let clean = held.draft == held.saved
                 held.saved = mapping
@@ -109,6 +123,7 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
                 kinds[name] = Kind(saved: mapping, draft: mapping)
             }
         }
+        return true
     }
 
     func ensureType(_ id: String) async {
@@ -182,18 +197,23 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
         if case .fixed(.flag(let on))? = kinds[kind]?.draft.fields[field] { on } else { false }
     }
 
-    /// The first of the fields the server refused for `field`, or a number typed that is not one.
+    /// What the server refused for `field`, or a number typed that is not one. A value `wire` leaves out counts as unfilled,
+    /// so an empty template uses MAPP's sentence rather than the server's line, which names a type id.
     func error(for field: MappingTypeField, in kind: String) -> String? {
         if let word = numberError(field, in: kind) { return word }
         guard let entry = kinds[kind] else { return nil }
-        guard let fault = entry.faults.first(where: { $0.path == "fields.\(field.name)" || $0.path.hasPrefix("fields.\(field.name).") }) else {
-            return nil
+        let prefix = "fields.\(field.name)"
+        let matched = entry.faults.filter { $0.path == prefix || $0.path.hasPrefix(prefix + ".") }
+        guard !matched.isEmpty else { return nil }
+        let filled = wire(kind)?.fields[field.name] != nil
+        let messages = matched.map { fault in
+            if field.required, !filled, fault.path == prefix {
+                MappingWording.needs(typeName(entry.draft.targetType), field: MappingWording.fieldTitle(field))
+            } else {
+                fault.message
+            }
         }
-        let filled = entry.draft.fields[field.name] != nil
-        if field.required, !filled, fault.path == "fields.\(field.name)" {
-            return MappingWording.needs(typeName(entry.draft.targetType), field: MappingWording.fieldTitle(field))
-        }
-        return fault.message
+        return messages.joined(separator: "\n")
     }
 
     private func numberError(_ field: MappingTypeField, in kind: String) -> String? {
@@ -210,12 +230,47 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
         return try? Double(trimmed, format: .number)
     }
 
-    /// What a kind's target type is refused for, which no field of it names.
-    func kindFault(_ kind: String) -> MappingFault? {
-        kinds[kind]?.faults.first { !$0.path.hasPrefix("fields.") }
+    /// What As shows: every refusal of the target type.
+    func targetError(_ kind: String) -> String? {
+        Self.messages(faults(kind) { $0 == "target_type" || $0.hasPrefix("target_type.") })
+    }
+
+    /// What a status word's row shows.
+    func overrideError(of word: String, in kind: String) -> String? {
+        let prefix = "status_overrides.\(word)"
+        return Self.messages(faults(kind) { $0 == prefix || $0.hasPrefix(prefix + ".") })
+    }
+
+    /// Refusals no row on screen shows: a status word's, when its rows are hidden, and anything that names neither a field,
+    /// the target type nor a word of the pair.
+    func looseFaults(_ kind: String) -> [MappingFault] {
+        let enabled = kinds[kind]?.draft.enabled ?? false
+        let words = enabled ? Set(statusPair(of: kind)?.own.statusWords.map(\.value) ?? []) : []
+        return faults(kind) { path in
+            if enabled, path.hasPrefix("fields.") { return false }
+            if enabled, path == "target_type" || path.hasPrefix("target_type.") { return false }
+            if let word = Self.overrideWord(path), words.contains(word) { return false }
+            return true
+        }
     }
 
     func isRefused(_ kind: String) -> Bool { !(kinds[kind]?.faults.isEmpty ?? true) }
+
+    private func faults(_ kind: String, where match: (String) -> Bool) -> [MappingFault] {
+        (kinds[kind]?.faults ?? []).filter { match($0.path) }
+    }
+
+    private static func messages(_ faults: [MappingFault]) -> String? {
+        let text = faults.map(\.message).filter { !$0.isEmpty }
+        return text.isEmpty ? nil : text.joined(separator: "\n")
+    }
+
+    /// The word a `status_overrides.<word>` path names.
+    private static func overrideWord(_ path: String) -> String? {
+        let parts = path.split(separator: ".")
+        guard parts.count >= 2, parts[0] == "status_overrides" else { return nil }
+        return String(parts[1])
+    }
 
     // MARK: Status words
 
@@ -262,6 +317,9 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
     /// that names none.
     func setTarget(_ id: String, for kind: String) async {
         guard let entry = kinds[kind], entry.draft.targetType != id else { return }
+        counts[kind] = nil
+        countFailures[kind] = nil
+        countGeneration[kind, default: 0] += 1
         await ensureType(id)
         let shared = Set(ownType(of: kind)?.fields.map(\.name) ?? []).intersection(types[id]?.fields.map(\.name) ?? [])
         edit(kind) { draft in
@@ -400,7 +458,10 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
         saveFailure = nil
         take(reading)
         isStale = false
-        for kind in kinds.keys.sorted() { await commit(kind) }
+        for kind in kinds.keys.sorted() {
+            await commit(kind)
+            if counts[kind] == nil, countFailures[kind] == nil { await count(kind) }
+        }
     }
 
     // MARK: Preview
@@ -433,9 +494,11 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
             do {
                 current = try await context.calls.mappingPreview(of: plugin.name, id: current.id)
             } catch {
+                guard generation[kind] == mine else { return }
                 previews[kind] = error == .notFound ? .expired : .unavailable(OwnerWording.line(error))
                 return
             }
+            guard generation[kind] == mine else { return }
         }
     }
 
@@ -444,16 +507,35 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
     // MARK: Existing items
 
     func count(_ kind: String) async {
-        guard let entry = kinds[kind], entry.saved.enabled else { counts[kind] = 0; return }
-        if let answer = try? await context.calls.rewriteConnectorItems(of: plugin.name, kinds: [kind], dryRun: true) {
-            counts[kind] = answer.kinds[kind]?.count ?? 0
+        guard let entry = kinds[kind], entry.saved.enabled else {
+            counts[kind] = 0
+            countFailures[kind] = nil
+            return
         }
+        let target = entry.saved.targetType
+        countGeneration[kind, default: 0] += 1
+        let mine = countGeneration[kind] ?? 0
+        let answer: MappingRewrite
+        do {
+            answer = try await context.calls.rewriteConnectorItems(of: plugin.name, kinds: [kind], dryRun: true)
+        } catch {
+            guard countGeneration[kind] == mine, kinds[kind]?.saved.targetType == target else { return }
+            counts[kind] = nil
+            countFailures[kind] = error
+            await context.learn(from: error)
+            return
+        }
+        guard countGeneration[kind] == mine, kinds[kind]?.saved.targetType == target else { return }
+        counts[kind] = answer.kinds[kind]?.count ?? 0
+        countFailures[kind] = nil
     }
 
     func pending(_ kind: String) -> [PendingRewrite] { rewrites.filter { $0.kinds.contains(kind) } }
 
-    /// Whether Apply to Them… can be offered: the draft is saved, so what is applied is what the server holds.
-    func canApply(_ kind: String) -> Bool { !isUnsaved(kind) && !isSaving && !isAsking && (counts[kind] ?? 0) > 0 }
+    /// Whether Apply to Them… can be offered: the draft is what is stored, and the count is the one just read for it.
+    func canApply(_ kind: String) -> Bool {
+        !isUnsaved(kind) && !isSaving && !isAsking && countFailures[kind] == nil && (counts[kind] ?? 0) > 0
+    }
 
     func askToApply(_ kind: String) { if canApply(kind) { question = kind } }
 
@@ -473,8 +555,19 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
             await context.learn(from: error)
             return
         }
-        if let reading = try? await context.calls.connectorMapping(of: plugin.name) { take(reading) }
+        await readBack()
         await count(kind)
+    }
+
+    /// Reads the mapping again so a rewrite asked for can be shown. A failure is kept: the request was made, and the page says it could not read it back.
+    func readBack() async {
+        do {
+            let reading = try await context.calls.connectorMapping(of: plugin.name)
+            if take(reading) { readBackFailure = nil }
+        } catch {
+            readBackFailure = error
+            await context.learn(from: error)
+        }
     }
 
     // MARK: Closing

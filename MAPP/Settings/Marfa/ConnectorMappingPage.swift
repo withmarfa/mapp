@@ -43,7 +43,7 @@ struct ConnectorMappingPage: View {
             Button("Cancel", role: .cancel) {}
             Button("Apply") { Task { await model.apply(name) } }
         } message: {
-            Text("\(summary.title) moves \(model.counts[name] ?? 0) existing items to \(model.typeName(entry?.draft.targetType ?? "")) and fills them as this mapping says, at its next run.")
+            Text("\(summary.title) moves ^[\(model.counts[name] ?? 0) existing item](inflect: true) to \(model.typeName(entry?.draft.targetType ?? "")) and fills them as this mapping says, at its next run.")
         }
         .accessibilityIdentifier("ConnectorMappingPage")
     }
@@ -94,7 +94,7 @@ struct ConnectorMappingPage: View {
                 case .waiting:
                     SettingsRow(
                         verbatim: String(localized: "Waiting for \(summary.title)"),
-                        line: String(localized: "It answers at its next run, which can take up to a minute.")
+                        line: String(localized: "It answers at its next run.")
                     ) { ProgressView().controlSize(.small) }
                 case .ready(let item): previewRows(item)
                 case .failed(let reason):
@@ -112,7 +112,9 @@ struct ConnectorMappingPage: View {
                         SettingsButton("Try Again") { Task { await model.preview(name) } }
                     }
                 case .unavailable(let line):
-                    SettingsRow(verbatim: String(localized: "No Preview Yet"), line: line)
+                    SettingsRow(verbatim: String(localized: "No Preview Yet"), line: line) {
+                        SettingsButton("Try Again") { Task { await model.preview(name) } }
+                    }
                 }
             }
         }
@@ -141,12 +143,10 @@ struct ConnectorMappingPage: View {
                 })
             }
             if entry.draft.enabled {
-                SettingsRow(
-                    "As", error: model.kindFault(name).map { $0.message }
-                ) {
+                SettingsRow("As", error: model.targetError(name), lines: nil) {
                     SettingsPopUp(
                         title: "As", selection: Binding { entry.draft.targetType } set: { id in Task { await model.setTarget(id, for: name) } },
-                        isError: model.kindFault(name) != nil
+                        isError: model.targetError(name) != nil
                     ) {
                         ForEach(model.targetChoices(for: name)) { Text(verbatim: model.typeName($0.id)).tag($0.id) }
                     }
@@ -156,6 +156,9 @@ struct ConnectorMappingPage: View {
                         ForEach(KeyTier.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
                     }
                 }
+            }
+            ForEach(Array(model.looseFaults(name).enumerated()), id: \.offset) { _, fault in
+                SettingsRow(verbatim: MappingWording.faultTitle(fault.path), error: fault.message, lines: nil)
             }
         }
         if model.isRefused(name) {
@@ -182,7 +185,9 @@ struct ConnectorMappingPage: View {
         let title = MappingWording.fieldTitle(field)
         let choice = model.choice(of: field.name, in: name)
         let error = model.error(for: field, in: name)
-        SettingsRow(verbatim: title, line: choice == .template ? String(localized: "Filled by a template. Not written back.") : nil, error: error) {
+        SettingsRow(
+            verbatim: title, line: choice == .template ? String(localized: "Filled by a template. Not written back.") : nil, error: error, lines: nil
+        ) {
             SettingsPopUp(
                 verbatim: title, selection: Binding { choice } set: { picked in Task { await model.setChoice(picked, for: field, in: name) } },
                 isError: error != nil
@@ -249,11 +254,16 @@ struct ConnectorMappingPage: View {
                 line: Text("A word goes to the word in its group, unless you choose another.")
             ) {
                 ForEach(pair.own.statusWords, id: \.value) { word in
-                    SettingsRow(verbatim: MappingWording.word(word.value), line: String(localized: "In \(MappingWording.group(word.group)).")) {
+                    let error = model.overrideError(of: word.value, in: name)
+                    SettingsRow(
+                        verbatim: MappingWording.word(word.value), line: String(localized: "In \(MappingWording.group(word.group))."), error: error,
+                        lines: nil
+                    ) {
                         SettingsPopUp(
                             verbatim: word.value, selection: Binding<String?> { model.override(of: word.value, in: name) } set: { target in
                                 Task { await model.setOverride(target, for: word.value, in: name) }
-                            }
+                            },
+                            isError: error != nil
                         ) {
                             Text("By Group").tag(String?.none)
                             Divider()
@@ -267,6 +277,12 @@ struct ConnectorMappingPage: View {
 
     // MARK: Existing items
 
+    /// A missing permission uses the page's own line, so Allow More… fits it. Anything else says the request was made.
+    private func readBackLine(_ failure: OwnerFailure) -> String? {
+        if case .notPermitted = failure { return nil }
+        return String(localized: "The request was made. MAPP couldn’t read it back to show it here.")
+    }
+
     @ViewBuilder private func existing(_ entry: ConnectorMappingModel.Kind) -> some View {
         SettingsSection(name: Text("Existing \(plural)")) {
             if let failure = model.rewriteFailure {
@@ -274,14 +290,23 @@ struct ConnectorMappingPage: View {
                     title: Text("Not Asked"), line: Text(verbatim: OwnerWording.line(failure, on: .connectors)),
                     actions: [])
             }
+            if let failure = model.readBackFailure {
+                OwnerProblemRow(
+                    title: "Couldn’t Show the Request", failure: failure, line: readBackLine(failure), page: .connectors, host: host
+                ) { Task { await model.readBack() } }
+            }
             ForEach(model.pending(name)) { rewrite in
                 SettingsRow(
                     verbatim: MappingWording.pendingTitle(rewrite, plural: plural), line: MappingWording.pendingLine(rewrite, connector: summary.title)
                 ) { ProgressView().controlSize(.small) }
             }
+            if let failure = model.countFailures[name] {
+                OwnerProblemRow(title: "Couldn’t Count", failure: failure, page: .connectors, host: host) { Task { await model.count(name) } }
+            }
             let count = model.counts[name]
             SettingsRow(
-                verbatim: count.map { String(localized: "\($0) \(plural) Brought Before") } ?? String(localized: "Counting…"),
+                verbatim: count.map { String(localized: "\($0) \(plural) Brought Before") }
+                    ?? (model.countFailures[name] == nil ? String(localized: "Counting…") : String(localized: "Not Counted")),
                 line: (count ?? 1) == 0
                     ? String(localized: "None are left to change.")
                     : String(localized: "They keep the old mapping until you apply this one.")

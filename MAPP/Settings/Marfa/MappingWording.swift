@@ -11,6 +11,17 @@ enum MappingWording {
     /// A status word as a row's title: "in_progress" is "In Progress".
     static func word(_ word: String) -> String { ConnectorWording.kindTitle(word) }
 
+    /// The row a refusal belongs on when no control on the page shows it.
+    static func faultTitle(_ path: String) -> String {
+        switch path {
+        case "target_type": String(localized: "As")
+        case "tier": String(localized: "To")
+        case "enabled": String(localized: "Bring In")
+        case "status_overrides": String(localized: "Status Words")
+        default: word(path.split(separator: ".").last.map(String.init) ?? path)
+        }
+    }
+
     static func group(_ group: String) -> String { word(group) }
 
     /// Whether a field of one sort of value can fill a field of another.

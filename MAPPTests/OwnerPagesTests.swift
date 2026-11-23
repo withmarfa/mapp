@@ -118,6 +118,14 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         /// The items a rewrite would move, by kind, and each rewrite asked for.
         var rewriteCounts: [String: Int] = [:]
         var rewritesAsked: [(kinds: [String], dryRun: Bool)] = []
+        /// Faults the next saves return, in place of the required-field check, until a test clears them.
+        var scriptedMappingFaults: [MappingFault]?
+        /// What a preview's start answers, where a test does not want the first pending state.
+        var previewStart: MappingPreviewStatus?
+        /// A failure a preview poll raises after it has been let go, so a test can fail one that is already waiting.
+        var previewFailureAfterWait: OwnerFailure?
+        /// How many calls of each name are inside `held`, waiting or about to wait.
+        var waiting: [String: Int] = [:]
     }
 
     let state = Mutex(State())
@@ -133,7 +141,12 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     private func held(_ call: String) async {
-        if let gate = state.withLock({ $0.gates[call] }) { await gate.wait() }
+        let gate = state.withLock { state -> OwnerCallGate? in
+            state.waiting[call, default: 0] += 1
+            return state.gates[call]
+        }
+        if let gate { await gate.wait() }
+        state.withLock { $0.waiting[call, default: 0] -= 1 }
     }
 
     /// Takes `readDelay` while counted as in flight.
@@ -687,6 +700,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             state.mappingSaves.append((plugin, version, kinds))
             guard var mapping = state.mappings[plugin] else { throw .notFound }
             if version != mapping.version { return .stale(current: mapping.version) }
+            if let faults = state.scriptedMappingFaults { return .refused(faults) }
             var faults: [MappingFault] = []
             for (name, kind) in kinds where kind.enabled {
                 for field in state.mappingTypes[kind.targetType]?.fields ?? [] where field.required && kind.fields[field.name] == nil {
@@ -706,12 +720,14 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return state.withLock { state in
             state.previewsAsked.append((kind, draft))
             let expires = Date.now.addingTimeInterval(state.previewLife)
-            return MappingPreview(id: "preview-\(state.previewsAsked.count)", status: .pending, expires: expires)
+            return MappingPreview(id: "preview-\(state.previewsAsked.count)", status: state.previewStart ?? .pending, expires: expires)
         }
     }
 
     func mappingPreview(of plugin: String, id: String) async throws(OwnerFailure) -> MappingPreview {
         try enter("mappingPreview")
+        await held("mappingPreview")
+        if let failure = state.withLock({ $0.previewFailureAfterWait }) { throw failure }
         return state.withLock { state in
             let index = min(state.previewReads, max(state.previewAnswers.count - 1, 0))
             state.previewReads += 1
@@ -722,6 +738,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func rewriteConnectorItems(of plugin: String, kinds: [String], dryRun: Bool) async throws(OwnerFailure) -> MappingRewrite {
         try enter("rewriteConnectorItems")
+        await held("rewriteConnectorItems")
+        if let failure = state.withLock({ $0.failures["rewriteConnectorItems"] }) { throw failure }
         return state.withLock { state in
             state.rewritesAsked.append((kinds, dryRun))
             let version = state.mappings[plugin]?.version ?? 0
