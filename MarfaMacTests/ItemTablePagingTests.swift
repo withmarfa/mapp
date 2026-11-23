@@ -43,12 +43,28 @@ struct ItemTablePagingTests {
         #expect(paging.slice(rows, size: .fifty) == .init(rows: rows, remaining: 0))
     }
 
-    @Test func eachGroupPagesOnItsOwn() {
+    @Test func aFoldedGroupAfterAFullPageShowsItsHeading() {
+        let paging = TablePaging()
+        let drawn = paging.slice(groups: [Self.group("a", 50), Self.group("b", 20)], collapsed: ["b"], size: .fifty)
+        #expect(drawn.groups.map(\.group.id) == ["a", "b"])
+        #expect(drawn.groups[0].rows.count == 50)
+        #expect(drawn.groups[1].rows.isEmpty)
+        #expect(drawn.remaining == 0)
+    }
+
+    @Test func aGroupedPlaceShowsOnePageInGroupOrder() {
         var paging = TablePaging()
-        let (first, second) = (Self.group("a", 60), Self.group("b", 60))
-        paging.loadMore(group: "a")
-        #expect(paging.slice(first.rows, size: .fifty, group: "a").remaining == 0)
-        #expect(paging.slice(second.rows, size: .fifty, group: "b").remaining == 10)
+        let groups = [Self.group("a", 60), Self.group("b", 60), Self.group("c", 10)]
+        let first = paging.slice(groups: groups, collapsed: [], size: .fifty)
+        #expect(first.groups.map(\.group.id) == ["a"])
+        #expect(first.groups[0].rows.count == 50)
+        #expect(first.remaining == 80)
+        paging.loadMore()
+        let second = paging.slice(groups: groups, collapsed: [], size: .fifty)
+        #expect(second.groups.map(\.group.id) == ["a", "b"])
+        #expect(second.groups[0].rows.count == 60)
+        #expect(second.groups[1].rows.count == 40)
+        #expect(second.remaining == 30)
     }
 
     @Test func revealingASelectedRowLoadsEnoughPages() {
@@ -62,12 +78,16 @@ struct ItemTablePagingTests {
         #expect(paging.pages == 3, "a row the table does not hold loads nothing")
     }
 
-    @Test func revealingInGroupsLoadsOnlyTheGroupHoldingItAndSkipsFoldedOnes() {
+    @Test func revealingInAGroupLoadsThePlacePageAndSkipsFoldedGroups() {
         var paging = TablePaging()
         let groups = [Self.group("a", 120), Self.group("b", 120)]
         paging.reveal([ItemID("a110"), ItemID("b110")], rows: [], groups: groups, collapsed: ["b"], size: .fifty)
-        #expect(paging.pages(of: "a") == 3)
-        #expect(paging.pages(of: "b") == 1)
+        #expect(paging.pages == 3)
+        let drawn = paging.slice(groups: groups, collapsed: ["b"], size: .fifty)
+        #expect(drawn.groups.map(\.group.id) == ["a", "b"])
+        #expect(drawn.groups[0].rows.count == 120)
+        #expect(drawn.groups[1].rows.isEmpty)
+        #expect(drawn.remaining == 0)
     }
 
     // MARK: When the count starts again
