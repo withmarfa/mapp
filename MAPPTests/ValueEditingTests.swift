@@ -53,6 +53,31 @@ struct ValueEditingTests {
         #expect(!rows.contains { $0.id == ValueEditOptions.notSetID })
     }
 
+    // MARK: Edit Statuses
+
+    @Test func aStatusPanelOffersEditStatusesForTheItemsTypeAndOtherPanelsDoNot() {
+        let item = Self.item(["status": .string("doing")])
+        let library = Self.library([item])
+        let status = ValueEditModel(Self.request(.status(Self.status), item: item, in: library))
+        #expect(status.typeToEditStatuses == Self.task)
+        #expect(ValueEditModel(Self.request(.choice(Self.priority), item: item, in: library)).typeToEditStatuses == nil)
+    }
+
+    @Test func editStatusesClosesThePanelAndOpensTheTypeInSettings() {
+        let item = Self.item(["status": .string("doing")])
+        let model = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
+        var opened: [TypeID] = []
+        var closed = 0
+        let presenter = ValueEditPresenter.shared
+        let before = presenter.editType
+        defer { presenter.editType = before }
+        presenter.editType = { opened.append($0) }
+        model.close = { closed += 1 }
+        model.editStatuses(of: Self.task)
+        #expect(opened == [Self.task])
+        #expect(closed == 1)
+    }
+
     // MARK: Quick dates
 
     @Test func quickDatesFollowThePersonsCalendar() {
