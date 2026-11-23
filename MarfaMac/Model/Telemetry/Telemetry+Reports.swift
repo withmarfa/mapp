@@ -147,19 +147,35 @@ nonisolated extension Telemetry {
         }
     }
 
-    /// MetricKit's daily summary: counts and the slowest bucket of each launch and hang metric.
+    /// MetricKit's daily summary: counts and the slowest bucket of each launch and hang metric, and the day's CPU
+    /// time when the report carries it.
     static func metricsSummarized(_ summary: MetricsListener.Summary, reporting: Reporting = .shared) {
-        reporting.sink.log(
-            "metrickit_report",
-            attributes: [
-                "interval_s": ReportAttribute(summary.intervalSeconds),
-                "hang_samples": ReportAttribute(summary.hang.samples),
-                "hang_slowest_ms": ReportAttribute(summary.hang.slowestMilliseconds),
-                "first_draw_samples": ReportAttribute(summary.firstDraw.samples),
-                "first_draw_slowest_ms": ReportAttribute(summary.firstDraw.slowestMilliseconds),
-                "launch_samples": ReportAttribute(summary.launch.samples),
-                "launch_slowest_ms": ReportAttribute(summary.launch.slowestMilliseconds),
-            ])
+        if let cpuTimeMilliseconds = summary.cpuTimeMilliseconds {
+            reporting.sink.log(
+                "metrickit_report",
+                attributes: [
+                    "interval_s": ReportAttribute(summary.intervalSeconds),
+                    "hang_samples": ReportAttribute(summary.hang.samples),
+                    "hang_slowest_ms": ReportAttribute(summary.hang.slowestMilliseconds),
+                    "first_draw_samples": ReportAttribute(summary.firstDraw.samples),
+                    "first_draw_slowest_ms": ReportAttribute(summary.firstDraw.slowestMilliseconds),
+                    "launch_samples": ReportAttribute(summary.launch.samples),
+                    "launch_slowest_ms": ReportAttribute(summary.launch.slowestMilliseconds),
+                    "cpu_time_ms": ReportAttribute(cpuTimeMilliseconds),
+                ])
+        } else {
+            reporting.sink.log(
+                "metrickit_report",
+                attributes: [
+                    "interval_s": ReportAttribute(summary.intervalSeconds),
+                    "hang_samples": ReportAttribute(summary.hang.samples),
+                    "hang_slowest_ms": ReportAttribute(summary.hang.slowestMilliseconds),
+                    "first_draw_samples": ReportAttribute(summary.firstDraw.samples),
+                    "first_draw_slowest_ms": ReportAttribute(summary.firstDraw.slowestMilliseconds),
+                    "launch_samples": ReportAttribute(summary.launch.samples),
+                    "launch_slowest_ms": ReportAttribute(summary.launch.slowestMilliseconds),
+                ])
+        }
     }
 
     /// A hang MetricKit measured.

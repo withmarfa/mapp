@@ -10,9 +10,11 @@ final class RecordingSink: ReportSink {
         var operation: String
     }
 
-    private let recorded = Mutex<(errors: [Error], logs: [String])>(([], []))
+    private let recorded = Mutex<(errors: [Error], logs: [String], attributes: [String: [String: ReportAttribute]])>(([], [], [:]))
     var errors: [Error] { recorded.withLock { $0.errors } }
     var logs: [String] { recorded.withLock { $0.logs } }
+    /// The attributes of the last record of each name.
+    var attributes: [String: [String: ReportAttribute]] { recorded.withLock { $0.attributes } }
 
     func report(_ error: MarfaError, during operation: StaticString) {
         recorded.withLock { $0.errors.append(Error(type: error.fixedText.type, sentence: error.fixedText.sentence, operation: "\(operation)")) }
@@ -23,6 +25,12 @@ final class RecordingSink: ReportSink {
     }
 
     func log(_ name: StaticString, level: ReportLevel, attributes: KeyValuePairs<StaticString, ReportAttribute>) {
-        recorded.withLock { $0.logs.append("\(name)") }
+        var stored: [String: ReportAttribute] = [:]
+        for (key, value) in attributes { stored["\(key)"] = value }
+        recorded.withLock {
+            let name = "\(name)"
+            $0.logs.append(name)
+            $0.attributes[name] = stored
+        }
     }
 }
