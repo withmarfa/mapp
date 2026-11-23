@@ -375,6 +375,22 @@ final class Browser {
         Cost.measure(.items) { searchResults(in: library)?.items ?? placeItems(in: library) }
     }
 
+    /// Whether the open place lists anything, without copying its items.
+    /// A search, or a saved view's list, is the copy's answer, filters included. No index count matches it.
+    /// Chip filters narrow a layout after the list is made. They are not part of what `items(in:)` answered.
+    func listsAnything(in library: any ItemLibrary) -> Bool {
+        if isSearching || isViewPlace {
+            return !items(in: library).isEmpty
+        }
+        // Include Subtypes lists a subtype's items. This is true only when one of those subtypes holds an item,
+        // so the place lists something even when the type itself does not.
+        if stacksSubtypes(in: library) { return true }
+        // Recents' count does not read `membershipRevision` itself. The rest do. Either way the answer follows
+        // membership, which is what moves an item into or out of the place, and not a keystroke.
+        _ = library.membershipRevision
+        return library.count(in: item) > 0
+    }
+
     /// The types whose list also shows their subtypes' items, kept in the defaults and mirrored here so the views
     /// that list items follow a change (`IncludedSubtypes`).
     var stackedTypes: Set<String> = []

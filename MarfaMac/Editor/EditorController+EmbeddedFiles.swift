@@ -184,8 +184,9 @@ extension EditorController {
     /// that arrived, was renamed or removed, or an embed the copy has since bound. The page then asks again for just
     /// those (`refreshReferences`). It also follows the files attached to the item that were saved from a web
     /// address, and has the page ask again about the pictures at those addresses when a file arrives, is changed or goes
-    /// (`ItemLibrary.openSavedPicture`). Changes come in bursts, as files arrive and text is saved, so the page hears
-    /// once they pause. Never rewrites the item.
+    /// (`ItemLibrary.openSavedPicture`). Changes come in bursts, as files arrive and the copy binds embeds, so the page
+    /// hears once they pause. A keystroke that changes neither an embed nor a saved picture is not one of them.
+    /// Never rewrites the item.
     ///
     /// Known limit: it follows the library's own state, so a connection that returns after an offline spell does not
     /// redraw an embed that showed an error card. The card's retry does, and so does any later change.
