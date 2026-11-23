@@ -5,9 +5,8 @@ import Testing
 @testable import MarfaMac
 
 /// Draws Search Items offscreen, in light, to set beside the design's board. Each picture is attached to its test as a PNG
-/// and, where the host may write there, saved to the folder `MARFA_MAC_RENDER_DIR` names. Skipped by name where that is unset,
-/// as the `measure` suites are; the sandboxed host writes only inside its own container, so read the attachments from
-/// the result bundle (`xcresulttool export attachments`).
+/// and, where `MARFA_MAC_RENDER_DIR` is set, saved there. Skipped by name where that is unset, as the `measure` suites are.
+/// The result bundle holds the attachments (`xcresulttool export attachments`).
 @MainActor
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["MARFA_MAC_RENDER_DIR"] != nil), .serialized, .hangLimit)
 struct SearchItemsRenderTests {

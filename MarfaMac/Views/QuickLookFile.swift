@@ -37,9 +37,10 @@ nonisolated struct QuickLookFile {
         return String(kept) + ending
     }
 
-    /// The folder that holds this process's copies under `folderName`. Another running copy of the app (a test run beside a
-    /// build a person is using) has a folder of its own, so neither clears the other's files.
-    static func processFolder(_ folderName: String, in root: URL = .temporaryDirectory, process: Int32 = ProcessInfo.processInfo.processIdentifier) -> URL {
+    /// The folder that holds this process's copies under `folderName`. The root is this copy's own temporary folder, and
+    /// another process of this copy (a test run beside a build a person is using) has a folder of its own, so neither
+    /// clears the other's files.
+    static func processFolder(_ folderName: String, in root: URL = AppPaths.temporaryRoot, process: Int32 = ProcessInfo.processInfo.processIdentifier) -> URL {
         root.appending(path: folderName, directoryHint: .isDirectory).appending(path: String(process), directoryHint: .isDirectory)
     }
 
@@ -83,10 +84,10 @@ nonisolated struct QuickLookFile {
     /// The folders copies are made in.
     static let folderNames = ["Quick Look", ItemReference.folder, "Web Pages", "Device Import"]
 
-    /// Removes what earlier runs left in the temporary folder: copies shown, dragged out or opened elsewhere, which the
-    /// receiving app may read for as long as it likes, so nothing else can say when they are done with. Only the folders
-    /// of processes that are no longer running go, since another copy of the app may be using its own.
-    static func removeLeftovers(in root: URL = .temporaryDirectory, isRunning: (Int32) -> Bool = isRunningCopy) {
+    /// Removes what earlier runs of this copy left in its temporary folder: copies shown, dragged out or opened
+    /// elsewhere, which the receiving app may read for as long as it likes, so nothing else can say when they are done
+    /// with. Only the folders of processes that are no longer running go. Another bundle's folders are never here.
+    static func removeLeftovers(in root: URL = AppPaths.temporaryRoot, isRunning: (Int32) -> Bool = isRunningCopy) {
         for name in folderNames {
             let base = root.appending(path: name, directoryHint: .isDirectory)
             let entries = (try? FileManager.default.contentsOfDirectory(at: base, includingPropertiesForKeys: nil)) ?? []
@@ -98,7 +99,7 @@ nonisolated struct QuickLookFile {
         }
     }
 
-    /// Whether `process` is a running copy of this app, whichever build, since they share a bundle identifier.
+    /// Whether `process` is a running copy of this app: the same bundle identifier, and still running.
     static func isRunningCopy(_ process: Int32) -> Bool {
         guard let running = NSRunningApplication(processIdentifier: process) else { return false }
         return !running.isTerminated && running.bundleIdentifier == Bundle.main.bundleIdentifier

@@ -19,7 +19,7 @@ extension QuickLookRequest {
 extension Notification.Name {
     /// Posted, with the browser or editor that asked as its object, when a window shows Quick Look. The panel is
     /// shared by every window, so the others give up theirs and remove their copies.
-    static let quickLookTaken = Notification.Name("com.withmarfa.mapp.quickLookTaken")
+    static let quickLookTaken = Notification.Name("\(AppPaths.bundleIdentifier).quickLookTaken")
 }
 
 extension Browser {

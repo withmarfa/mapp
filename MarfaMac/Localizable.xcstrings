@@ -4796,7 +4796,7 @@
     "Keep the copy and the changes stay on this Mac. Connect to the same server again and they’re sent. Discard the copy and they’re lost." : {
       "extractionState" : "manual"
     },
-    "Keep the copy and the changes stay on this Mac. Install the previous build of the app from TestFlight and connect it to the same server, and it sends them. Discard the copy and they’re lost." : {
+    "Keep the copy and the changes stay on this Mac. Install the previous version of the app and connect it to the same server, and it sends them. Discard the copy and they’re lost." : {
       "extractionState" : "manual"
     },
     "Keep things for less time?" : {
@@ -6400,7 +6400,7 @@
     "They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it." : {
       "extractionState" : "manual"
     },
-    "They’re still in that copy. To send them, install the previous build of the app from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update the app again." : {
+    "They’re still in that copy. To send them, install the previous version of the app and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update the app again." : {
       "extractionState" : "manual"
     },
     "Thin Old Versions" : {
@@ -6646,7 +6646,7 @@
     "To keep what you wrote, copy it before you discard this change." : {
       "extractionState" : "manual"
     },
-    "To send any changes it holds, install the previous build of the app from TestFlight and connect it to this server if it isn’t already. The app can’t remove a copy it can’t count, so when that build has sent everything, update the app, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again." : {
+    "To send any changes it holds, install the previous version of the app and connect it to this server if it isn’t already. The app can’t remove a copy it can’t count, so when that version has sent everything, update the app, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again." : {
       "extractionState" : "manual"
     },
     "To start a new copy from this server, choose Disconnect in Settings, then connect again." : {

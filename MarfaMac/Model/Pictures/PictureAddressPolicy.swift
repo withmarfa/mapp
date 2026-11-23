@@ -92,7 +92,7 @@ nonisolated enum PictureAddressPolicy {
 
     /// `getaddrinfo` blocks until the system's resolver answers, which can be many seconds, so it runs on queues of
     /// its own and never holds a thread of Swift's cooperative pool.
-    private static let lookups = DispatchQueue(label: "com.withmarfa.mapp.picture-lookup", qos: .utility, attributes: .concurrent)
+    private static let lookups = DispatchQueue(label: "\(AppPaths.bundleIdentifier).picture-lookup", qos: .utility, attributes: .concurrent)
 
     private static func lookup(_ name: String) async throws -> [IPAddress] {
         try await withCheckedThrowingContinuation { continuation in

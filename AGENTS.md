@@ -34,7 +34,7 @@ Marfa for Mac is a macOS app for a Marfa server's items, with a sidebar, a list 
 - Target macOS 27 and Xcode 27 only, with no `#available` checks. Swift 6 language mode, main-actor isolation by default. Unit tests use Swift Testing; UI tests use XCTest.
 - Use SwiftUI with native containers and controls, and AppKit only where SwiftUI cannot express something. Check API questions against Apple's documentation.
 - Every user-facing string goes through the String Catalog. Building in Xcode updates `MarfaMac/Localizable.xcstrings`; `xcodebuild` alone does not.
-- App Sandbox and the hardened runtime stay on. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting` and the plugins release reader (`PluginRelease`) may connect out. Neither the item page nor a sealed web page loads from the network itself.
+- The app is not sandboxed and keeps the hardened runtime with no exceptions. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting` and the plugins release reader (`PluginRelease`) may connect out. Neither the item page nor a sealed web page loads from the network itself.
 
 ## Data rules
 
@@ -45,8 +45,8 @@ Marfa for Mac is a macOS app for a Marfa server's items, with a sidebar, a list 
 
 ## Project layout
 
-- `MarfaMac.xcodeproj` uses folder-synchronized groups for `MarfaMac/`, `MarfaMacTests/` (unit tests) and `MarfaMacUITests/` (UI tests). Add a source file by creating it on disk, not in `project.pbxproj`. Every file under `MarfaMac/` becomes an app resource unless the MarfaMac target's membership exceptions list it. `Design/` holds artwork that is not built into the app.
-- Debug is `com.withmarfa.mapp.debug` and never shares the installed app's data or sign-ins; `MarfaMac/Info.plist` claims it as the sign-in's URL scheme. Key anything that must differ on `Bundle.main.bundleIdentifier`, never a literal.
+- `MarfaMac.xcodeproj` uses folder-synchronized groups for `MarfaMac/`, `MarfaMacTests/` and `MarfaMacUITests/`. Add a file on disk, not in `project.pbxproj`. A file under `MarfaMac/` is a resource unless the MarfaMac target's membership exceptions list it. `Design/` is not in the app.
+- Debug is `com.withmarfa.marfa.debug` and never shares the installed app's data or sign-ins. Its working copy is Application Support under that identifier, never Marfa's command-line folder. `MarfaMac/Info.plist` claims it as the sign-in URL scheme. Key on `Bundle.main.bundleIdentifier`, never a literal.
 - To compare design values, add a knob to the Debug-only `MarfaMac/Tuning/` panel, not variants, and remove it once settled.
 
 ## Commands

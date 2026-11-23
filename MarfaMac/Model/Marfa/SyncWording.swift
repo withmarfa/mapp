@@ -183,12 +183,12 @@ nonisolated enum Words {
         case let count?:
             return [
                 lead, notSent(Int(clamping: count)),
-                String(localized: "They’re still in that copy. To send them, install the previous build of the app from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update the app again."),
+                String(localized: "They’re still in that copy. To send them, install the previous version of the app and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update the app again."),
             ].joined(separator: " ")
         case nil:
             return [
                 lead, String(localized: "The app can’t tell whether that copy holds changes that haven’t reached the server."),
-                String(localized: "To send any changes it holds, install the previous build of the app from TestFlight and connect it to this server if it isn’t already. The app can’t remove a copy it can’t count, so when that build has sent everything, update the app, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again."),
+                String(localized: "To send any changes it holds, install the previous version of the app and connect it to this server if it isn’t already. The app can’t remove a copy it can’t count, so when that version has sent everything, update the app, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again."),
             ].joined(separator: " ")
         }
     }

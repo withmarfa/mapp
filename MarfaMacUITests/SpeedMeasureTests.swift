@@ -18,11 +18,11 @@ import XCTest
 /// signposts").
 @MainActor
 final class SpeedMeasureTests: XCTestCase {
-    private static let subsystem = "com.withmarfa.mapp.debug"
+    private static let subsystem = "com.withmarfa.marfa.debug"
     private static let iterations = 5
     /// Marks where each test's measured part begins and ends, and which process the app is, in the log, for
     /// `Scripts/measure-ui.sh`; another session's debug build shares the subsystem.
-    private static let phases = Logger(subsystem: "com.withmarfa.mapp.speedtest", category: "phase")
+    private static let phases = Logger(subsystem: "com.withmarfa.marfa.speedtest", category: "phase")
     /// Whether this run has left a complete copy of the instance for a warm launch to open.
     private static var hasCopy = false
 

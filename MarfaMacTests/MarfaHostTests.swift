@@ -216,13 +216,7 @@ import Testing
         let store = bench.location.store(for: first)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         await (try await WorkingCopy.open(store: store)).close()
-        let holder: OtherProcessLock
-        do {
-            holder = try await OtherProcessLock(store)
-        } catch OtherProcessLock.Failure.notStarted(let reason) {
-            Issue.record("The test sandbox forbids starting /usr/bin/sqlite3, so another process can't hold the lock here: \(reason)")
-            return
-        }
+        let holder = try await OtherProcessLock(store)
         defer { holder.release() }
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .otherVersion(unsent: 1), message: "The package’s words.") }
         let host = bench.host()
@@ -441,13 +435,7 @@ import Testing
         await host.launch()
         let shown = UnsentChanges(ids: Set(held))
         await expect(.changesWaiting(shown)) { () throws(MarfaHost.Problem) in try await host.disconnect() }
-        let holder: OtherProcessLock
-        do {
-            holder = try await OtherProcessLock(store)
-        } catch OtherProcessLock.Failure.notStarted(let reason) {
-            Issue.record("The test sandbox forbids starting /usr/bin/sqlite3, so another process can't hold the lock here: \(reason)")
-            return
-        }
+        let holder = try await OtherProcessLock(store)
         defer { holder.release() }
 
         await expect(.notRemoved(signIn: nil, copy: Words.inUse)) { () throws(MarfaHost.Problem) in

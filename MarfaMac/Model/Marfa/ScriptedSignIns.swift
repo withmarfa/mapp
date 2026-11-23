@@ -32,7 +32,7 @@ nonisolated final class ScriptedSignIns: SignIns {
         var askedScopes: [[String]] = []
     }
 
-    private static let service = "com.withmarfa.mapp.scripted-sign-ins"
+    private static let service = "\(AppPaths.bundleIdentifier).scripted-sign-ins"
 
     private let keychain = MemoryKeychain()
     private let state = Mutex(State())

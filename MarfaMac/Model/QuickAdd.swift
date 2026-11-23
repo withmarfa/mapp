@@ -60,8 +60,8 @@ final class QuickAdd {
         }
     }
 
-    /// Holds a sandbox extension to a file the person gave, so the file can be read later, and gives it up once
-    /// nothing holds the file.
+    /// Holds the security scope of a file the person chose in a panel, which `fileImporter` gives sandboxed or not, so
+    /// the file can be read later, and gives it up once nothing holds the file.
     nonisolated final class FileAccess: Sendable {
         private let url: URL
         private let scoped: Bool

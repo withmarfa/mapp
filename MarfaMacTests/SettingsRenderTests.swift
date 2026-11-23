@@ -24,7 +24,7 @@ import Testing
     var openInApp: ((String) -> Void)? { nil }
     var ownAppVendor: String? { "app.marfa-mac" }
 
-    var webSignInReturn: String { "com.withmarfa.mapp.test:/signed-in" }
+    var webSignInReturn: String { "com.withmarfa.marfa.test:/signed-in" }
     /// What the web sign-in sheet answers, and the addresses it was shown.
     var webSignInAnswer = true
     var webSignIns: [URL] = []

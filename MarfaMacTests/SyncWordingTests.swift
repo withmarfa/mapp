@@ -323,10 +323,10 @@ struct ConnectionStatusTests {
         #expect(some.title == "Library unavailable")
         #expect(some.isProblem)
         #expect(some.detail?.contains("3 changes") == true)
-        #expect(some.detail?.contains("previous build") == true)
+        #expect(some.detail?.contains("previous version") == true)
         #expect(Words.otherVersion(unsent: 1).contains("1 change on this Mac hasn’t reached the server."))
 
-        // The count stays unread after the previous build sends everything, and the package never removes a copy it can’t count, so the way out is to remove the copy’s folder.
+        // The count stays unread after the previous version sends everything, and the package never removes a copy it can’t count, so the way out is to remove the copy’s folder.
         let unknown = try #require(ConnectionStatus(.otherVersion(unsent: nil)).detail)
         #expect(unknown.contains("Keep Copy and Disconnect"), "an uncountable copy is never removed for the person, so the way out is named")
 

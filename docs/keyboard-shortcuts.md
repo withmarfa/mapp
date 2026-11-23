@@ -1,6 +1,6 @@
 # Keyboard shortcuts
 
-Status: Built, not yet released. The shortcuts that work in any app must be tried in a sandboxed TestFlight build before a release.
+Status: Built, not yet released. The shortcuts that work in any app must be tried before a release.
 
 Where it lives: `Shortcut`, `ShortcutCommand`, `ShortcutBindings`, `ShortcutsFile`, `AnyAppShortcuts` and `SystemHotKeys` under `MarfaMac/Model/Shortcuts/`, `FrontBrowser` and the catalogue of commands (an extension of `ShortcutCommand`) under `MarfaMac/Views/`, and `KeyboardPage`, `KeyboardPageModel` and `KeyboardFiles` under `MarfaMac/Settings/App/`.
 
@@ -20,7 +20,7 @@ Settings > Keyboard gives every menu command the app adds a shortcut that its pe
 ## Global Shortcuts
 
 - The Keyboard page lists them under Global Shortcuts: Show Command Palette, Search Items and Quick Add (named apart from File's New Item), off until set, while the app is running. Each must include ⌘ or ⌃ (an Option-only shortcut fails on recent macOS), and two of them never share keys. One the system uses, or that another app already holds (the system refuses to register it), is shown as taken, with one line under the row, and nothing new is kept.
-- A shortcut is registered with the system only while it is set: setting it registers it, clearing it unregisters it, and nothing is registered before launch finishes. It uses Carbon's `RegisterEventHotKey` through the KeyboardShortcuts package, which needs no Accessibility permission and works in the sandbox.
+- A shortcut is registered with the system only while it is set: setting it registers it, clearing it unregisters it, and nothing is registered before launch finishes. It uses Carbon's `RegisterEventHotKey` through the KeyboardShortcuts package, which needs no Accessibility permission.
 - Until the palette can be shown over another app (not designed yet), each brings the app forward and does its action in the window that was in front. With no such window it only brings the app forward.
 
 ## Search

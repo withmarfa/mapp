@@ -261,7 +261,7 @@ import Testing
         await model.load()
         bench.calls.fail("startConnectorSignIn", with: .signInNeeds(["google_client_id", "google_client_secret"]))
         var shown: [URL] = []
-        await model.signIn("google-calendar", returningTo: "com.withmarfa.mapp:/signed-in") { shown.append($0); return true }
+        await model.signIn("google-calendar", returningTo: "com.withmarfa.marfa:/signed-in") { shown.append($0); return true }
         #expect(shown.isEmpty)
         #expect(model.signInProblems["google-calendar"] == "Set Google client ID and Google client secret first.")
     }
@@ -271,8 +271,8 @@ import Testing
         let model = calendar(bench)
         await model.load()
         var shown: [URL] = []
-        await model.signIn("google-calendar", returningTo: "com.withmarfa.mapp:/signed-in") { shown.append($0); return true }
-        #expect(bench.calls.state.withLock { $0.signInReturnedTo } == ["com.withmarfa.mapp:/signed-in"])
+        await model.signIn("google-calendar", returningTo: "com.withmarfa.marfa:/signed-in") { shown.append($0); return true }
+        #expect(bench.calls.state.withLock { $0.signInReturnedTo } == ["com.withmarfa.marfa:/signed-in"])
         #expect(shown == [URL(string: "https://accounts.example.com/sign-in")!])
         #expect(model.signInProblems["google-calendar"] == nil)
         #expect(model.entry("google-calendar").map(model.isSignedIn) == true)
