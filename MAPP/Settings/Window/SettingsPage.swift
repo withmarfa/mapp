@@ -11,11 +11,8 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     static let apps = SettingsPage.marfa(.apps)
     static let keys = SettingsPage.marfa(.keys)
     static let addresses = SettingsPage.marfa(.addresses)
-<<<<<<< HEAD
-    static let types = SettingsPage.marfa(.types)
-=======
     static let plugins = SettingsPage.marfa(.plugins)
->>>>>>> fce5d5f8 (feat(settings): the Plugins page, with install, updates and removal)
+    static let types = SettingsPage.marfa(.types)
     static let sources = SettingsPage.marfa(.sources)
     static let recentlyDeleted = SettingsPage.marfa(.recentlyDeleted)
     static let history = SettingsPage.marfa(.history)
