@@ -15,6 +15,7 @@ nonisolated enum OwnerWording {
         case .unsupported: String(localized: "There are no server settings to show for this library.")
         case .notConfirmed: String(localized: "Nothing was changed: the sign-in wasn’t confirmed.")
         case .refused(let reason), .sourceHeld(let reason), .failed(let reason): reason
+        case .signInNeeds: String(localized: "Set the client settings the sign-in needs first.")
         }
     }
 

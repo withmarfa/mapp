@@ -195,6 +195,8 @@ nonisolated enum OwnerFailure: Error, Hashable, Sendable {
     case refused(String)
     /// A new key's source is another key's own, in the server's words.
     case sourceHeld(String)
+    /// A connector's sign-in cannot start until these of its settings, named as the server names them, hold a value.
+    case signInNeeds([String])
     case failed(String)
 }
 
@@ -282,6 +284,26 @@ nonisolated protocol OwnerCalls: Sendable {
 
     func folders() async throws(OwnerFailure) -> FolderListing
     func folderReport(_ id: String) async throws(OwnerFailure) -> FolderReport
+
+    /// The installed plugins that hold a connector (`connectors.manage`).
+    func connectorPlugins() async throws(OwnerFailure) -> [PluginConnectorSummary]
+    /// What the owner chose for a plugin's connector.
+    func connectorControl(of plugin: String) async throws(OwnerFailure) -> ConnectorControl
+    /// What the connector registered under `id` has reported itself.
+    func connectorRegistration(_ id: String) async throws(OwnerFailure) -> ConnectorRegistration
+    func connectorHosts() async throws(OwnerFailure) -> [ConnectorHostInfo]
+    func connectorSettings(of plugin: String) async throws(OwnerFailure) -> ConnectorSettingsReading
+    /// Sends only the settings `changes` names, and answers every setting as the server now holds it.
+    func changeConnectorSettings(of plugin: String, _ changes: [String: ConnectorSettingChange]) async throws(OwnerFailure) -> ConnectorSettingsReading
+    /// The three choices a connector follows at its next run. Each answers the choice as stored.
+    func pauseConnector(_ plugin: String) async throws(OwnerFailure) -> ConnectorControl
+    func resumeConnector(_ plugin: String) async throws(OwnerFailure) -> ConnectorControl
+    /// Refused while the connector is paused.
+    func runConnector(_ plugin: String) async throws(OwnerFailure) -> ConnectorControl
+    func assignConnector(_ plugin: String, toHost host: String) async throws(OwnerFailure)
+    /// Starts the vendor sign-in, for the browser to be sent back to `address`, which the app registered.
+    func startConnectorSignIn(of plugin: String, returningTo address: String) async throws(OwnerFailure) -> ConnectorSignInStart
+    func connectorSignInStatus(of plugin: String) async throws(OwnerFailure) -> ConnectorSignInStatus
 }
 
 /// What changing the addresses would do, as the server said before anything was written, with the change it said it

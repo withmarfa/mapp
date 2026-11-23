@@ -23,6 +23,15 @@ import Testing
     var canDeletePermanently = true
     var openInApp: ((String) -> Void)? { nil }
     var ownAppVendor: String? { "app.mapp" }
+
+    var webSignInReturn: String { "com.withmarfa.mapp.test:/signed-in" }
+    /// What the web sign-in sheet answers, and the addresses it was shown.
+    var webSignInAnswer = true
+    var webSignIns: [URL] = []
+    func showWebSignIn(at address: URL) async -> Bool {
+        webSignIns.append(address)
+        return webSignInAnswer
+    }
     var allowed: [Set<InstancePermission>] = []
     var ownerCalls: any OwnerCalls = FakeOwnerCalls()
     var instanceCalls: any InstanceCalls = FakeInstanceCalls()

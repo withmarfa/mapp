@@ -206,9 +206,13 @@ nonisolated struct SystemSignIns: SignIns {
         self.anchor = anchor
     }
 
+    /// The address the server sends the browser back to once an approval ends, which the app registers as its redirect. A
+    /// connector's vendor sign-in is sent back to it too, so the system's sheet ends there.
+    var redirectAddress: String { scheme + ":/signed-in" }
+
     func authorization(for connection: MarfaConnection, asking permissions: Set<InstancePermission> = []) throws -> Authorization {
         let client = Authorization.Client(
-            name: Self.clientName, redirect: URL(string: scheme + ":/signed-in"), scopes: Self.scopes,
+            name: Self.clientName, redirect: URL(string: redirectAddress), scopes: Self.scopes,
             permissions: permissions.sorted { $0.rawValue < $1.rawValue })
         return try Authorization(server: connection.address, client: client, service: service)
     }

@@ -67,8 +67,8 @@ Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Lay
 
 Only the agreed changes are listed. A change marked "needs a server change" waits on Marfa first.
 
-- **Built:** Overview, Account, Apps, Keys (with Extend… beside the expiry date, which keeps the secret), Addresses, Sources, Recently Deleted, History, File Storage, Webhooks (every app's, grouped by who made them, any of which the owner can end), a read-only Folders, Backups, Updates, Housekeeping, Activity, Monitoring (was Reporting), Limits (new) and Start-Up (read-only) are in [The Marfa's half of Settings](marfa-settings.md).
-- **Plugins, Connectors and Types** are drawn and agreed separately, and wait on server work.
+- **Built:** Overview, Account, Apps, Keys (with Extend… beside the expiry date, which keeps the secret), Addresses, Sources, Recently Deleted, History, File Storage, Connectors (each connector's health, Pause, Run Now, settings and vendor sign-in; adding one and its mapping wait), Webhooks (every app's, grouped by who made them, any of which the owner can end), a read-only Folders, Backups, Updates, Housekeeping, Activity, Monitoring (was Reporting), Limits (new) and Start-Up (read-only) are in [The Marfa's half of Settings](marfa-settings.md).
+- **Plugins and Types** are drawn and agreed separately, and wait on server work. Connectors is built except its mapping screen and adding a connector.
 
 ### Settings sync through Marfa
 
