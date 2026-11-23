@@ -6130,6 +6130,27 @@
     "The editor stopped responding, so the app couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
 
     },
+    "Couldn’t Save Your Typing" : {
+
+    },
+    "Some Typing Might Be Missing" : {
+
+    },
+    "The editor sent your typing in a form the app couldn’t read." : {
+
+    },
+    "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close this window, then open the item again to check it." : {
+
+    },
+    "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing." : {
+
+    },
+    "The item changed several times in quick succession, so the app couldn’t tell which version your typing belongs to." : {
+
+    },
+    "Typing in “%@” Might Be Missing" : {
+
+    },
     "The entry changed or was removed while you were editing it." : {
       "extractionState" : "manual"
     },

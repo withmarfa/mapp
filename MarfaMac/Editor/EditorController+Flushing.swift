@@ -14,6 +14,9 @@ extension EditorController {
     /// logged with the page's own words and told at once as a problem with the editor, with the step to take, and the
     /// page is given up on the same way.
     ///
+    /// A page that went down after it had been ready (`pageWentDown`) may have lost what the person typed last, so a
+    /// flush fails while it is down, and one under way when it went down fails too.
+    ///
     /// Outside text reloading the item mid-flush leaves the item the one being flushed, so the flush goes ahead. A
     /// flush whose item was replaced on the page stops, and the person is told why.
     ///
@@ -47,8 +50,9 @@ extension EditorController {
     private func handOver(then done: @escaping (Bool) -> Void) {
         guard let pageItemID else { return done(true) }
         let generation = generation
-        // A page that is not ready has nothing unreported: it reports every change as it is made, and one whose
-        // process ended comes back with the text it last reported.
+        let losses = pageLosses
+        if !isReady, pageLoss != nil { return done(!lossHoldsFlush()) }
+        // A page still loading for the first time has nothing unreported: it reports every change as it is made.
         guard isReady, generation != abandonedGeneration else { return done(true) }
         var finished = false
         var watchdog: Task<Void, Never>?
@@ -61,6 +65,11 @@ extension EditorController {
         func capture() {
             guard !finished else { return }
             guard self.pageItemID == pageItemID else { return replaced() }
+            // The page went down while this flush waited for it, taking what it held back.
+            guard losses == pageLosses else {
+                tellPageLoss()
+                return finish(false)
+            }
             guard isReady else { return finish(true) }
             // Asked for the generation the flush began on even after outside text reloaded the item: the page puts
             // a reload off while the person composes, so it can still hold text of that generation. A page that
@@ -124,6 +133,47 @@ extension EditorController {
         capture()
     }
 
+    /// Records that the page went down after it had been ready, as when its process ended or loading it again failed,
+    /// and tells the person. Where it held no item they could edit, nothing typed can be missing.
+    func pageWentDown(comingBack: Bool) {
+        guard let item = pageLoss?.item ?? (isEditable ? pageItemID : nil) else { return }
+        pageLoss = PageLoss(item: item, comingBack: comingBack)
+        pageLosses += 1
+        tellPageLoss()
+    }
+
+    /// Whether a flush fails because the page is down after a loss: while it is coming back, so the person can check
+    /// the item before they go, and, where it cannot come back, until they have answered being told. A flush it holds
+    /// tells them again where they have answered already, so a refused close or quit always says why.
+    func lossHoldsFlush() -> Bool {
+        guard let pageLoss else { return false }
+        let waiting = isLossNoticeWaiting(pageLoss)
+        guard pageLoss.comingBack else { return waiting }
+        if !waiting { tellPageLoss() }
+        return true
+    }
+
+    /// Tells the person the page went down, unless that notice still waits for their answer.
+    func tellPageLoss() {
+        guard let pageLoss, let notices = library?.notices, !isLossNoticeWaiting(pageLoss) else { return }
+        let notice = lossNotice(pageLoss)
+        notices.notKept(notice.title, text: nil, reason: notice.message, standsAlone: true)
+    }
+
+    private func isLossNoticeWaiting(_ loss: PageLoss) -> Bool {
+        let notice = lossNotice(loss)
+        return library?.notices.waiting.contains { $0.title == notice.title && $0.message == notice.message } == true
+    }
+
+    private func lossNotice(_ loss: PageLoss) -> (title: String, message: String) {
+        let title = library?.item(loss.item).map { String(localized: "Typing in “\($0.displayTitle)” Might Be Missing") }
+            ?? String(localized: "Some Typing Might Be Missing")
+        let message = loss.comingBack
+            ? String(localized: "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing.")
+            : String(localized: "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close this window, then open the item again to check it.")
+        return (title, message)
+    }
+
     /// The page reports each change as it is made, so what it never reported is not on the page to give back.
     private func tellNotSaved(_ pageItemID: ItemID, reason: String) {
         let title = library?.item(pageItemID).map { String(localized: "Couldn’t Save “\($0.displayTitle)”") }
@@ -143,6 +193,14 @@ extension EditorController {
 
     private static var replacedReason: String {
         String(localized: "Another item opened before the app finished saving this one, so your most recent typing might not be saved. Try again.")
+    }
+
+    /// The page went down after it had been ready, holding an item the person could edit, so what they typed last may
+    /// not have reached the app.
+    struct PageLoss {
+        let item: ItemID
+        /// Whether the page is loading again. One that ended again before it was ready, or failed to load, is not.
+        let comingBack: Bool
     }
 
     /// Destructive transitions proceed only once every editor has handed over its current text and its window's
