@@ -1,0 +1,345 @@
+name: Release
+
+# A `v*` tag publishes Marfa for Mac: a Developer ID signed, notarized and stapled app in a notarized, stapled disk image,
+# a Sparkle appcast and a GitHub release. The README's Releasing section says how to tag and how to check a release.
+# - `build` signs and notarizes, and holds the Apple identity and the Sparkle key; it has no write access to the
+#   repository and no access to the downloads bucket.
+# - `publish` creates the GitHub release and uploads to the bucket; it holds those, and no Apple identity. The disk
+#   image goes first and the appcast last, so the feed never names a file that is not there yet.
+# - Both run in the `release` environment, which holds every secret and admits only `v*` tags. The values are validated and
+#   never printed.
+# - A pull request that changes this workflow, `Scripts/release/` or the project, and a manual run, make a dry run: the same
+#   steps with ad hoc signing and a throwaway Sparkle key, which skip the export, notarizing and the upload, build the
+#   appcast from a fixture feed and keep the disk image and the appcast as the `dry-run` artifact. A dry run reads no secret.
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - .github/workflows/release.yml
+      - Scripts/release/**
+      - MarfaMac.xcodeproj/**
+      - MarfaMac/Info.plist
+      - Config/**
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, sign and notarize
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # The hosted image with Xcode 27 (a public preview at the time of writing).
+    runs-on: xcode-27
+    timeout-minutes: 90
+    environment: ${{ github.event_name == 'push' && 'release' || '' }}
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      build: ${{ steps.release.outputs.build }}
+      candidate: ${{ steps.release.outputs.candidate }}
+      file: ${{ steps.release.outputs.file }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The whole history, to tell whether a tag is on main's.
+          fetch-depth: 0
+          persist-credentials: false
+      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
+
+      # A dry run builds a fixed candidate, so it has a version that Sparkle sorts above the fixture feed's.
+      - name: Work out the version from the tag
+        id: release
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT" = push ]; then tag="$REF_NAME"; else tag=v0.0.99-rc1; fi
+          python3 Scripts/release/version.py "$tag" | tee -a "$GITHUB_OUTPUT"
+          echo "file=Marfa-${tag#v}.dmg" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse a tag that is not on main
+        if: github.event_name == 'push'
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::The tag is not on main's history. Tag a commit that has been merged."
+            exit 1
+          fi
+
+      - name: Check the environment's values
+        if: github.event_name == 'push'
+        env:
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          SPARKLE_ED_PUBLIC_KEY: ${{ secrets.SPARKLE_ED_PUBLIC_KEY }}
+          MARFA_MAC_DOWNLOADS_URL: ${{ secrets.MARFA_MAC_DOWNLOADS_URL }}
+          MARFA_MAC_POSTHOG_HOST: ${{ secrets.MARFA_MAC_POSTHOG_HOST }}
+          MARFA_MAC_POSTHOG_PROJECT_TOKEN: ${{ secrets.MARFA_MAC_POSTHOG_PROJECT_TOKEN }}
+        run: |
+          bash Scripts/release/check-secrets.sh build
+          # The app is built to trust the public key, and the disk image is signed with the private one.
+          derived=$(printf '%s\n' "$SPARKLE_ED_PRIVATE_KEY" | swift Scripts/release/sparkle-key.swift public)
+          if [ "$derived" != "$SPARKLE_ED_PUBLIC_KEY" ]; then
+            echo "::error::SPARKLE_ED_PUBLIC_KEY is not the public half of SPARKLE_ED_PRIVATE_KEY."
+            exit 1
+          fi
+
+      - name: Make a throwaway Sparkle key, for a dry run
+        if: github.event_name != 'push'
+        run: |
+          keys=$(swift Scripts/release/sparkle-key.swift generate)
+          private=$(sed -n 1p <<<"$keys")
+          echo "::add-mask::$private"
+          {
+            echo "SPARKLE_ED_PRIVATE_KEY=$private"
+            echo "SPARKLE_ED_PUBLIC_KEY=$(sed -n 2p <<<"$keys")"
+            echo "MARFA_MAC_DOWNLOADS_URL=https://downloads.example.invalid/marfa-mac/"
+          } >> "$GITHUB_ENV"
+
+      - name: Write Config/Local.xcconfig
+        if: github.event_name == 'push'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SPARKLE_ED_PUBLIC_KEY: ${{ secrets.SPARKLE_ED_PUBLIC_KEY }}
+          MARFA_MAC_DOWNLOADS_URL: ${{ secrets.MARFA_MAC_DOWNLOADS_URL }}
+          MARFA_MAC_POSTHOG_HOST: ${{ secrets.MARFA_MAC_POSTHOG_HOST }}
+          MARFA_MAC_POSTHOG_PROJECT_TOKEN: ${{ secrets.MARFA_MAC_POSTHOG_PROJECT_TOKEN }}
+        run: bash Scripts/release/write-config.sh
+
+      - name: Write Config/Local.xcconfig, for a dry run
+        if: github.event_name != 'push'
+        run: bash Scripts/release/write-config.sh
+
+      - name: Import the Developer ID identity
+        if: github.event_name == 'push'
+        env:
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+        run: bash Scripts/release/signing-keychain.sh import
+
+      - name: Archive
+        if: github.event_name == 'push'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VERSION: ${{ steps.release.outputs.version }}
+          BUILD: ${{ steps.release.outputs.build }}
+        run: bash Scripts/release/archive.sh signed "$VERSION" "$BUILD" "$RUNNER_TEMP/Marfa.xcarchive" "$RUNNER_TEMP/derived"
+
+      - name: Archive, signed ad hoc for a dry run
+        if: github.event_name != 'push'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          BUILD: ${{ steps.release.outputs.build }}
+        run: bash Scripts/release/archive.sh adhoc "$VERSION" "$BUILD" "$RUNNER_TEMP/Marfa.xcarchive" "$RUNNER_TEMP/derived"
+
+      - name: Export for Developer ID
+        if: github.event_name == 'push'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          bash Scripts/release/export-app.sh "$RUNNER_TEMP/Marfa.xcarchive" "$RUNNER_TEMP/export"
+          echo "APP=$RUNNER_TEMP/export/Marfa.app" >> "$GITHUB_ENV"
+
+      - name: Use the archive's app, for a dry run
+        if: github.event_name != 'push'
+        run: echo "APP=$RUNNER_TEMP/Marfa.xcarchive/Products/Applications/Marfa.app" >> "$GITHUB_ENV"
+
+      - name: Verify the app
+        env:
+          APPLE_TEAM_ID: ${{ github.event_name == 'push' && secrets.APPLE_TEAM_ID || '' }}
+          MARFA_MAC_DOWNLOADS_URL: ${{ github.event_name == 'push' && secrets.MARFA_MAC_DOWNLOADS_URL || '' }}
+          MODE: ${{ github.event_name == 'push' && 'signed' || 'adhoc' }}
+          VERSION: ${{ steps.release.outputs.version }}
+          BUILD: ${{ steps.release.outputs.build }}
+        run: bash Scripts/release/verify-app.sh "$APP" "$VERSION" "$BUILD" "$MODE"
+
+      - name: Notarize and staple the app
+        if: github.event_name == 'push'
+        env:
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          bash Scripts/release/notarize.sh "$APP"
+          spctl -a -t exec -vv "$APP"
+
+      - name: Make the disk image
+        env:
+          FILE: ${{ steps.release.outputs.file }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/artifacts"
+          bash Scripts/release/make-dmg.sh "$APP" "$RUNNER_TEMP/artifacts/$FILE"
+
+      - name: Sign, notarize and staple the disk image
+        if: github.event_name == 'push'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          FILE: ${{ steps.release.outputs.file }}
+        run: |
+          dmg="$RUNNER_TEMP/artifacts/$FILE"
+          bash Scripts/release/sign-disk-image.sh "$dmg"
+          bash Scripts/release/notarize.sh "$dmg"
+          spctl -a -t open --context context:primary-signature -vv "$dmg"
+          xcrun stapler validate "$APP"
+          xcrun stapler validate "$dmg"
+
+      - name: Sign the disk image for Sparkle
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ github.event_name == 'push' && secrets.SPARKLE_ED_PRIVATE_KEY || env.SPARKLE_ED_PRIVATE_KEY }}
+          FILE: ${{ steps.release.outputs.file }}
+        run: |
+          sign_update="$RUNNER_TEMP/derived/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
+          bash Scripts/release/sparkle-sign.sh "$sign_update" "$RUNNER_TEMP/artifacts/$FILE" > "$RUNNER_TEMP/artifacts/sparkle.env"
+          cat "$RUNNER_TEMP/artifacts/sparkle.env"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/artifacts/
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Remove the signing keychain
+        if: always() && github.event_name == 'push'
+        run: bash Scripts/release/signing-keychain.sh remove
+
+  publish:
+    name: Publish
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      # Only the step that creates the GitHub release writes; nothing else here touches the repository.
+      contents: write
+    env:
+      TAG: ${{ needs.build.outputs.tag }}
+      VERSION: ${{ needs.build.outputs.version }}
+      BUILD: ${{ needs.build.outputs.build }}
+      CANDIDATE: ${{ needs.build.outputs.candidate }}
+      FILE: ${{ needs.build.outputs.file }}
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/artifacts
+
+      - name: Check the environment's values
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_S3_ENDPOINT: ${{ secrets.R2_S3_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          MARFA_MAC_DOWNLOADS_URL: ${{ secrets.MARFA_MAC_DOWNLOADS_URL }}
+        run: bash Scripts/release/check-secrets.sh publish
+
+      # A rebuilt tag finds its release and replaces the disk image on it.
+      - name: Create the GitHub release
+        run: |
+          dmg="$RUNNER_TEMP/artifacts/$FILE"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$dmg" --clobber
+          else
+            flags=(--verify-tag --generate-notes)
+            if [ "$CANDIDATE" = true ]; then flags+=(--prerelease); fi
+            gh release create "$TAG" "$dmg" "${flags[@]}"
+          fi
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+
+      - name: Build the appcast
+        env:
+          DOWNLOADS: ${{ secrets.MARFA_MAC_DOWNLOADS_URL }}
+          RELEASES: ${{ github.server_url }}/${{ github.repository }}/releases
+        run: |
+          bash Scripts/release/fetch-feed.sh "${DOWNLOADS}appcast.xml" "$RUNNER_TEMP/live.xml"
+          signature=$(grep '^signature=' "$RUNNER_TEMP/artifacts/sparkle.env" | cut -d= -f2-)
+          length=$(grep '^length=' "$RUNNER_TEMP/artifacts/sparkle.env" | cut -d= -f2-)
+          python3 Scripts/release/appcast.py --feed "$RUNNER_TEMP/live.xml" --out "$RUNNER_TEMP/appcast.xml" \
+            --tag "$TAG" --downloads-url "$DOWNLOADS" --file-name "$FILE" --signature "$signature" --length "$length" \
+            --notes "$RUNNER_TEMP/notes.md" --releases-url "$RELEASES"
+
+      - name: Upload to the downloads bucket
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_S3_ENDPOINT: ${{ secrets.R2_S3_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          DOWNLOADS: ${{ secrets.MARFA_MAC_DOWNLOADS_URL }}
+        run: |
+          dmg="$RUNNER_TEMP/artifacts/$FILE"
+          # The versioned disk image first, and held to what is served before anything points at it.
+          bash Scripts/release/upload-r2.sh "$dmg" "$FILE" application/x-apple-diskimage "public, max-age=31536000, immutable"
+          bash Scripts/release/verify-public.sh "${DOWNLOADS}${FILE}" "$dmg"
+          # The stable download for the website is a release's alone.
+          if [ "$CANDIDATE" != true ]; then
+            bash Scripts/release/upload-r2.sh "$dmg" Marfa.dmg application/x-apple-diskimage no-cache
+            bash Scripts/release/verify-public.sh "${DOWNLOADS}Marfa.dmg" "$dmg"
+          fi
+          # The appcast last, so the feed never names a file that is not there.
+          bash Scripts/release/upload-r2.sh "$RUNNER_TEMP/appcast.xml" appcast.xml application/xml no-cache
+          bash Scripts/release/verify-public.sh "${DOWNLOADS}appcast.xml" "$RUNNER_TEMP/appcast.xml"
+
+  dry-run-appcast:
+    name: Dry run appcast
+    needs: build
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TAG: ${{ needs.build.outputs.tag }}
+      FILE: ${{ needs.build.outputs.file }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/artifacts
+
+      - name: Build the appcast from the fixture feed
+        run: |
+          signature=$(grep '^signature=' "$RUNNER_TEMP/artifacts/sparkle.env" | cut -d= -f2-)
+          length=$(grep '^length=' "$RUNNER_TEMP/artifacts/sparkle.env" | cut -d= -f2-)
+          python3 Scripts/release/appcast.py --feed Scripts/release/fixtures/feed-existing.xml --out "$RUNNER_TEMP/artifacts/appcast.xml" \
+            --tag "$TAG" --downloads-url https://downloads.example.invalid/marfa-mac/ --file-name "$FILE" \
+            --signature "$signature" --length "$length" --notes Scripts/release/fixtures/notes-generated.md \
+            --releases-url https://example.invalid/releases
+          # The new candidate is first, in the beta channel, with the fixture's two items after it.
+          python3 - "$RUNNER_TEMP/artifacts/appcast.xml" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          ns = {"sparkle": "http://www.andymatuschak.org/xml-namespaces/sparkle"}
+          items = ET.parse(sys.argv[1]).getroot().find("channel").findall("item")
+          builds = [item.findtext("sparkle:version", namespaces=ns) for item in items]
+          assert builds == ["9901", "5899", "5801"], builds
+          assert items[0].findtext("sparkle:channel", namespaces=ns) == "beta"
+          print("The appcast holds", ", ".join(builds))
+          PY
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dry-run
+          path: ${{ runner.temp }}/artifacts/
+          if-no-files-found: error
+          retention-days: 3

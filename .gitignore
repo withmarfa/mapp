@@ -9,3 +9,4 @@ Config/Local.xcconfig
 Config/Local.xcconfig.*
 .claude/*
 !.claude/skills/
+__pycache__/
