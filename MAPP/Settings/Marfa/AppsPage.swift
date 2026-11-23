@@ -129,6 +129,12 @@ private struct AppDetail: View {
     }
 
     var body: some View {
+        content
+            // Here, not on the data section, which draws nothing until the first read ends.
+            .task(id: app.id) { await model.readData(of: app) }
+    }
+
+    private var content: some View {
         SettingsPageColumn {
             SettingsHead(
                 symbol: AppsPage.symbol(app.kind), tone: .purple, title: Text(verbatim: name), line: Text(verbatim: kindLine))
@@ -206,7 +212,6 @@ private struct AppDataSection: View {
                 }
             }
         }
-        .task(id: app.id) { await model.readData(of: app) }
     }
 
     private func row(_ held: AppData, among count: Int) -> some View {
@@ -214,7 +219,7 @@ private struct AppDataSection: View {
         return SettingsRow(
             verbatim: title, line: AppDataWording.line(held, appName: name, keptByMAPP: model.isOwn(held.vendor)), lines: nil
         ) {
-            if !model.isOwn(held.vendor) {
+            if !model.isOwn(held.vendor), !held.types.isEmpty {
                 SettingsButton("Remove…", role: .destructive) { model.askToRemoveData(app, vendor: held.vendor) }
                     .disabled(model.removing.contains(app.id))
             }
