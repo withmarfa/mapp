@@ -54,7 +54,7 @@ import WebKit
         // The document's own title differs, so Readability keeps the heading and the cleanup is what drops it.
         let html = page(documentTitle: "Slow Walks routes, maps and the newsletter of an unhurried coast")
         let article = try #require(try await analyze(html).article)
-        #expect(!article.html.contains("slow down"), "the title is MAPP's, above the page")
+        #expect(!article.html.contains("slow down"), "the title is the app's, above the page")
         let other = try #require(try await analyze(html, title: "Something else").article)
         #expect(other.html.contains("slow down"), "a heading that is not the title stays")
     }
@@ -82,9 +82,9 @@ import WebKit
     @Test func theFirstPictureBeforeAnyTextIsTheLeadPicture() async throws {
         let lead = "<figure><img src=\"https://example.com/lead.jpg\"><figcaption>The path west of Lulworth.</figcaption></figure>"
         let withLead = try #require(try await analyze(page(body: lead + prose())).article).html
-        #expect(withLead.contains("mapp-lead"))
+        #expect(withLead.contains("marfa-lead"))
         let later = try #require(try await analyze(page(body: prose() + lead)).article).html
-        #expect(!later.contains("mapp-lead"), "a picture in the middle of the text is part of it")
+        #expect(!later.contains("marfa-lead"), "a picture in the middle of the text is part of it")
     }
 
     // MARK: Not an article
@@ -109,9 +109,9 @@ import WebKit
             (1...6).map { "<tr><td>Stage \($0)</td><td>\($0 * 2)</td></tr>" }.joined() + "</table>"
         let layout = "<table role=\"presentation\"><tr><td>" + longProse(2) + "</td></tr><tr><td>" + longProse(2) + "</td></tr></table>"
         let article = try #require(try await analyze(page(body: longProse(4) + data + layout)).article)
-        #expect(article.html.contains("class=\"mapp-data\""), "a table of rows and columns keeps its grid")
+        #expect(article.html.contains("class=\"marfa-data\""), "a table of rows and columns keeps its grid")
         #expect(article.html.components(separatedBy: "<table").count == 3)
-        #expect(article.html.components(separatedBy: "mapp-data").count == 2, "a layout table is not styled as data")
+        #expect(article.html.components(separatedBy: "marfa-data").count == 2, "a layout table is not styled as data")
     }
 
     // MARK: Documents that go wrong

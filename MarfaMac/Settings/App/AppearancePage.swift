@@ -132,7 +132,7 @@ struct AppearancePage: View {
     // MARK: Fonts
 
     private var fonts: some View {
-        SettingsSection("Fonts", line: "The rest of MAPP uses the system font.") {
+        SettingsSection("Fonts", line: "The rest of the app uses the system font.") {
             SettingsRow("Text Font", line: "An item’s text.") {
                 fontPopUp("Text Font", selection: $textFont, defaultName: String(localized: "System"), installed: families)
                     .accessibilityIdentifier("TextFont")

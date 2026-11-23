@@ -266,12 +266,12 @@ import Testing
         #expect(model.releaseVersion == "0.0.89")
     }
 
-    @Test func aConcernIsToldByItsTitleAndALineMAPPWordsNeverTheServersMessage() {
+    @Test func aConcernIsToldByItsTitleAndALineTheAppWordsNeverTheServersMessage() {
         let backup = AttentionConcern(kind: .backup, reference: "no_backup_destination", title: "No backups are kept")
         #expect(backup.shownTitle == "No backups are kept")
         #expect(backup.shownLine == "There is nowhere to keep backups.")
         let secret = AttentionConcern(kind: .setting, reference: "object_store_secret_key", title: "Set object_store_secret_key again")
-        #expect(secret.shownTitle == "Set a Secret Again", "a setting MAPP has no name for is never told by its key")
+        #expect(secret.shownTitle == "Set a Secret Again", "a setting the app has no name for is never told by its key")
         #expect(secret.shownLine?.contains("_") == false)
         let token = AttentionConcern(kind: .setting, reference: "posthog_project_token", title: "Set posthog_project_token again")
         #expect(token.shownTitle == "Set PostHog Project Token Again")

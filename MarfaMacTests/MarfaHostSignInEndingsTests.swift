@@ -161,12 +161,12 @@ import Testing
         #expect(notice.message.contains("http://first.test:8210"), "the previous server is named by its address: \(notice.message)")
         #expect(!notice.message.contains("second.test"))
         #expect(notice.message.contains("marfa apps revoke <id>"))
-        #expect(!notice.message.contains("older MAPP entry"))
+        #expect(!notice.message.contains("older app entry"))
         #expect(host.connection?.address.absoluteString == "http://second.test:8210")
     }
 
     @Test(arguments: [MarfaHost.Problem.notRevoked(address: "https://marfa.test"), .copyKept(.changed(now: 2), signIn: nil, approvalAt: "https://marfa.test"), .notRemoved(signIn: nil, copy: "x", approvalAt: "https://marfa.test")])
-    func theApprovalWordsNeverClaimWhatTheServerHoldsOrThatMAPPIsSignedIn(problem: MarfaHost.Problem) throws {
+    func theApprovalWordsNeverClaimWhatTheServerHoldsOrThatTheAppIsSignedIn(problem: MarfaHost.Problem) throws {
         for reached in [MarfaSettingsModel.Reached.left, .switched] {
             let notice = try #require(MarfaSettingsModel.notice(for: problem, reached: reached))
             let text = notice.title + " " + notice.message
@@ -206,7 +206,7 @@ import Testing
 
     // MARK: An address that is not a Marfa server
 
-    /// A reply that is no OAuth error, such as a proxy's page, reaches MAPP as the package's `http_<status>`.
+    /// A reply that is no OAuth error, such as a proxy's page, reaches the app as the package's `http_<status>`.
     @Test(arguments: ["http_404", "http_403", "http_200"])
     func anAddressThatAnswersWithAPlainStatusStartsNoSignInAndIsToldAsNotMarfa(code: String) async throws {
         let bench = try HostBench()
@@ -332,7 +332,7 @@ import Testing
 
     nonisolated private static let raw = "NSCocoaErrorDomain Code=513 errSecItemNotFound /Users/someone/Library/copy.sqlite"
 
-    @Test func aCopyThatCannotBeMadeAfterSigningInIsToldInMAPPsWords() async throws {
+    @Test func aCopyThatCannotBeMadeAfterSigningInIsToldInTheAppsWords() async throws {
         let bench = try HostBench()
         let host = bench.host(opener: { _, _, _ in throw NSError(domain: NSCocoaErrorDomain, code: 513, userInfo: [NSLocalizedDescriptionKey: Self.raw]) })
         let told = await problem { () throws(MarfaHost.Problem) in try await host.connect(address: "http://first.test:8210", key: "k") }
@@ -344,7 +344,7 @@ import Testing
         }
     }
 
-    @Test func aCopyThatCannotBeMadeForTheServerSwitchedToIsToldInMAPPsWords() async throws {
+    @Test func aCopyThatCannotBeMadeForTheServerSwitchedToIsToldInTheAppsWords() async throws {
         let bench = try HostBench()
         let first = try MarfaConnection(address: "http://first.test:8210")
         let inner = bench.servers.opener
@@ -357,7 +357,7 @@ import Testing
         #expect(told == .unavailable(message: Words.copyCouldNotBeOpened))
     }
 
-    @Test func aSignInAgainThatCannotReadTheCredentialIsToldInMAPPsWords() async throws {
+    @Test func aSignInAgainThatCannotReadTheCredentialIsToldInTheAppsWords() async throws {
         let bench = try HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
@@ -368,8 +368,8 @@ import Testing
         #expect(host.source === source)
     }
 
-    /// A package error that carries the system's own words is told in MAPP's, whichever step it stopped.
-    @Test func aStoreErrorFromThePackageIsToldInMAPPsWordsWhenTheCopyIsOpened() async throws {
+    /// A package error that carries the system's own words is told in the app's, whichever step it stopped.
+    @Test func aStoreErrorFromThePackageIsToldInTheAppsWordsWhenTheCopyIsOpened() async throws {
         let raw = "SQLite says: disk I/O error at /Users/someone/Library/copy.sqlite"
         let bench = try HostBench()
         let host = bench.host(opener: { _, _, _ in throw MarfaError.store(message: raw) })
@@ -382,7 +382,7 @@ import Testing
         }
     }
 
-    @Test func aStoreErrorMeetWhileOpeningTheCopyIsToldInMAPPsWords() {
+    @Test func aStoreErrorMeetWhileOpeningTheCopyIsToldInTheAppsWords() {
         let failure = MarfaSource.failure(opening: MarfaError.store(message: "SQLite says: disk I/O error"))
         #expect(failure.message == Words.copyCouldNotBeOpened)
     }
@@ -418,7 +418,7 @@ import Testing
     @Test func aReplacedApprovalIsToldHowToFindTheEarlierOne() {
         let words = Words.replacedApproval(address: "https://marfa.test")
         #expect(words.contains("Run “marfa apps list” with the command line signed in to https://marfa.test as the owner."))
-        #expect(words.contains("Use the approval date to identify the earlier MAPP approval."))
+        #expect(words.contains("Use the approval date to identify the earlier “Marfa for Mac” approval."))
         #expect(words.contains("If you can identify it, run “marfa apps revoke <id>” with that entry’s ID."))
     }
 }

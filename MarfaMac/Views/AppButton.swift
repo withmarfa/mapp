@@ -1,11 +1,11 @@
 import SwiftUI
 
 /// What a button is for. `outline` is the menu button's look, a white button with a hairline and a chevron.
-enum MappButtonRole {
+enum AppButtonRole {
     case primary, secondary, plain, destructive, outline
 }
 
-enum MappButtonSize {
+enum AppButtonSize {
     case small, regular
 
     /// Height, corner radius, side padding and text size at the default interface text size.
@@ -15,12 +15,12 @@ enum MappButtonSize {
     fileprivate var textSize: CGFloat { self == .small ? 12 : 13 }
 }
 
-/// The one button MAPP draws itself (`docs/components.md`): a rounded rectangle, or a circle for an icon-only button,
+/// The one button the app draws itself (`docs/components.md`): a rounded rectangle, or a circle for an icon-only button,
 /// in the fills of the design system's `.m-b`. The toolbar's glass buttons and the system's menus, alerts and
 /// controls stay the system's.
-struct MappButtonStyle: ButtonStyle {
-    let role: MappButtonRole
-    let size: MappButtonSize
+struct AppButtonStyle: ButtonStyle {
+    let role: AppButtonRole
+    let size: AppButtonSize
     let isIcon: Bool
 
     func makeBody(configuration: Configuration) -> some View {
@@ -29,8 +29,8 @@ struct MappButtonStyle: ButtonStyle {
 
     private struct Content: View {
         let configuration: Configuration
-        let role: MappButtonRole
-        let size: MappButtonSize
+        let role: AppButtonRole
+        let size: AppButtonSize
         let isIcon: Bool
         @State private var isHovered = false
         @Environment(\.isEnabled) private var isEnabled
@@ -111,17 +111,17 @@ struct MappButtonStyle: ButtonStyle {
 }
 
 extension View {
-    /// Draws a button as MAPP's one button style. `icon` is for a button whose label is only a symbol, which is round.
-    func mappButton(_ role: MappButtonRole, size: MappButtonSize = .regular, icon: Bool = false) -> some View {
-        buttonStyle(MappButtonStyle(role: role, size: size, isIcon: icon))
+    /// Draws a button as the app's one button style. `icon` is for a button whose label is only a symbol, which is round.
+    func appButton(_ role: AppButtonRole, size: AppButtonSize = .regular, icon: Bool = false) -> some View {
+        buttonStyle(AppButtonStyle(role: role, size: size, isIcon: icon))
             .focusEffectDisabled()
     }
 
-    /// Draws a menu as the outlined button among MAPP's buttons: its label and a chevron, as tall as the buttons beside it.
-    func mappMenu(size: MappButtonSize = .regular) -> some View {
+    /// Draws a menu as the outlined button among the app's buttons: its label and a chevron, as tall as the buttons beside it.
+    func appMenu(size: AppButtonSize = .regular) -> some View {
         menuStyle(.button)
             .menuIndicator(.hidden)
-            .mappButton(.outline, size: size)
+            .appButton(.outline, size: size)
             .fixedSize()
     }
 }

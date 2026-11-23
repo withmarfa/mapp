@@ -87,7 +87,7 @@ struct KeysPage: View {
             SettingsAddRow("New Key…") { model.beginNewKey() }
         } else {
             SettingsAddRow(
-                off: "New Key…", line: "MAPP isn’t allowed to make keys.",
+                off: "New Key…", line: "The app isn’t allowed to make keys.",
                 remedy: (host.isAllowingMore ? "Waiting…" : "Allow More…", {
                     let host = host
                     Task { _ = await host.allowMore([.keysMint]) }
@@ -183,10 +183,10 @@ private struct KeyDetail: View {
             SettingsRow("Expires") { SettingsValue(verbatim: ends) }
             OwnerProblemRow(
                 title: "Can’t Extend This Key Yet", failure: failure,
-                line: String(localized: "MAPP couldn’t read when its own sign-in ends, which limits how long a key can be given."), page: .keys,
+                line: String(localized: "The app couldn’t read when its own sign-in ends, which limits how long a key can be given."), page: .keys,
                 host: host, retry: { Task { await model.load() } })
         } else if model.extensions(of: key).isEmpty {
-            SettingsRow("Expires", line: key.expires == nil ? "It never ends." : "MAPP’s own sign-in ends sooner, so it can’t give this key longer.") {
+            SettingsRow("Expires", line: key.expires == nil ? "It never ends." : "The app’s own sign-in ends sooner, so it can’t give this key longer.") {
                 SettingsValue(verbatim: ends)
             }
         } else {

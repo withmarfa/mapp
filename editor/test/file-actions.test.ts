@@ -45,7 +45,7 @@ async function withItem(source: string, run: (editor: ItemEditor) => Promise<voi
 const actions = () => [...document.querySelectorAll<HTMLElement>('.inkkit-file-actions button')]
 
 test('a file card has Quick Look as an icon before Open, named for the file', async () => {
-  app({ kind: 'file', name: 'report.txt', url: 'mapp-embed:x/report.txt' })
+  app({ kind: 'file', name: 'report.txt', url: 'marfa-embed:x/report.txt' })
   await withItem('![[report.txt]]\n', async () => {
     await vi.waitFor(() => expect(actions()).toHaveLength(2))
     const [quickLook, open] = actions()
@@ -57,7 +57,7 @@ test('a file card has Quick Look as an icon before Open, named for the file', as
 })
 
 test('Quick Look asks the app for the embed as written and changes no text', async () => {
-  const host = app({ kind: 'file', name: 'report.txt', url: 'mapp-embed:x/report.txt' })
+  const host = app({ kind: 'file', name: 'report.txt', url: 'marfa-embed:x/report.txt' })
   const source = 'Before\n\n![[report.txt]]\n\nAfter\n'
   await withItem(source, async (editor) => {
     await vi.waitFor(() => expect(actions()).toHaveLength(2))
@@ -70,7 +70,7 @@ test('Quick Look asks the app for the embed as written and changes no text', asy
 })
 
 test('a PDF card has Quick Look too, and a card the app could not resolve has none', async () => {
-  app({ kind: 'pdf', name: 'paper.pdf', url: 'mapp-embed:x/paper.pdf' })
+  app({ kind: 'pdf', name: 'paper.pdf', url: 'marfa-embed:x/paper.pdf' })
   await withItem('![[paper.pdf]]\n', async () => {
     await vi.waitFor(() => expect(actions()).toHaveLength(2))
     expect(actions()[0]!.getAttribute('aria-label')).toBe('Quick Look paper.pdf')

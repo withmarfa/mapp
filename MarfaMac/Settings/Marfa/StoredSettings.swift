@@ -101,8 +101,8 @@ nonisolated enum StoredSettingWording {
     static func elsewhere(_ names: [String]) -> String {
         let list = names.formatted(.list(type: .and))
         return names.count == 1
-            ? String(localized: "\(list) was changed elsewhere. MAPP read the new value; yours wasn’t saved.")
-            : String(localized: "\(list) were changed elsewhere. MAPP read the new values; yours weren’t saved.")
+            ? String(localized: "\(list) was changed elsewhere. The app read the new value; yours wasn’t saved.")
+            : String(localized: "\(list) were changed elsewhere. The app read the new values; yours weren’t saved.")
     }
 
     private static func plain(_ text: String) -> Bool {

@@ -3,7 +3,7 @@ import MarfaBrandIcons
 import MarfaIcons
 import Observation
 
-/// A set of icons the picker offers. The SDK owns the lists; MAPP keeps none.
+/// A set of icons the picker offers. The SDK owns the lists; the app keeps none.
 nonisolated enum IconSet: String, CaseIterable, Identifiable, Sendable {
     case lucide
     case simpleIcons = "simple-icons"

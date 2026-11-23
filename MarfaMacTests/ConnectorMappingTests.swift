@@ -184,7 +184,7 @@ import Testing
 
     // MARK: Fields
 
-    @Test func anEmptyTemplateOnARequiredFieldUsesMappsSentence() async {
+    @Test func anEmptyTemplateOnARequiredFieldUsesTheAppsSentence() async {
         let (model, _) = await loaded()
         await model.setTarget("user.job", for: "entry")
         let client = Self.job.field("client")!

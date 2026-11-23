@@ -84,7 +84,7 @@ import Testing
         .notRemoved(signIn: nil, copy: "NSCocoaErrorDomain 513"), .notConnected, .busy, .notAServer,
         .otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse,
         .copyKept(.changed(now: 2), signIn: nil), .copyKept(.unreadable(folder: "/Library/Marfa/ab12"), signIn: "errSecItemNotFound"),
-        .copyKept(.notMapps(folder: "/Library/Marfa/ab12"), signIn: nil), .cannotDiscard(folder: "/Library/Marfa/ab12")
+        .copyKept(.notMadeByApp(folder: "/Library/Marfa/ab12"), signIn: nil), .cannotDiscard(folder: "/Library/Marfa/ab12")
     ])
     func everyProblemIsToldAsWhatHappenedAndWhatToDo(problem: MarfaHost.Problem) throws {
         let notice = try #require(MarfaSettingsModel.notice(for: problem))
@@ -103,20 +103,20 @@ import Testing
         func title(_ outcome: SignInOutcome) throws -> String {
             try #require(MarfaSettingsModel.notice(for: .signIn(outcome))).title
         }
-        #expect(try title(.denied) == "MAPP Wasn’t Approved")
+        #expect(try title(.denied) == "This App Wasn’t Approved")
         #expect(try title(.expired) == "The Code Expired")
         #expect(try title(.refused) == "The Server Refused the Sign-In")
         #expect(try title(.unreachable) == "Can’t Reach the Server")
         #expect(try title(.notMarfa) == "Check the Address")
         #expect(try title(.couldNotFinish) == "Couldn’t Finish Signing In")
         #expect(try title(.notVerified) == "Couldn’t Confirm the Sign-In")
-        #expect(try #require(MarfaSettingsModel.notice(for: .signIn(.notVerified))).message == "MAPP couldn’t verify the approval. Try signing in again.")
+        #expect(try #require(MarfaSettingsModel.notice(for: .signIn(.notVerified))).message == "The app couldn’t verify the approval. Try signing in again.")
         #expect(try title(.noWindow) == "No Window to Sign In From")
         #expect(try title(.failed) == "Couldn’t Sign In")
         #expect(try title(.keychain) == "Can’t Keep the Sign-In")
         #expect(try title(.inUse) == "The Sign-In Is in Use")
         let revoke = try #require(MarfaSettingsModel.notice(for: .notRevoked(address: "https://marfa.test")))
-        #expect(revoke.title == "Disconnected, but MAPP May Still Be Approved")
+        #expect(revoke.title == "Disconnected, but This App May Still Be Approved")
         #expect(revoke.message.contains("marfa apps list"))
         #expect(revoke.message.contains("marfa apps revoke"))
         for claim in ["Connected apps", "still lists", "You are signed in"] {
@@ -142,14 +142,14 @@ import Testing
         #expect(!model.isWorking)
     }
 
-    @Test func aSignInTheServerRefusesIsToldInMAPPsWordsNotTheServers() async throws {
+    @Test func aSignInTheServerRefusesIsToldInTheAppsWordsNotTheServers() async throws {
         let bench = try HostBench()
         let (model, _) = model(bench)
         bench.signIns.script(browser: [.failure(SignInError.refused(code: "invalid_client", message: "This app is not known."))])
         model.address = "http://first.test:8210"
         await model.connect()
         #expect(model.notice?.title == "The Server Refused the Sign-In")
-        #expect(model.notice?.message.hasPrefix("The server wouldn’t approve MAPP, so nothing changed.") == true)
+        #expect(model.notice?.message.hasPrefix("The server wouldn’t approve the app, so nothing changed.") == true)
         #expect(model.notice?.message.contains("invalid_client") == false)
         #expect(model.notice?.message.contains("This app is not known.") == false)
         #expect(!model.isConnected)
@@ -239,7 +239,7 @@ import Testing
         _ = model.host.scripted("key-2")
         await model.signInAgain()
         #expect(model.notice?.title == "Can’t Open the Library")
-        #expect(model.notice?.message == "MAPP kept the new sign-in, but the copy of your library on this Mac can’t be opened. MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again.")
+        #expect(model.notice?.message == "The app kept the new sign-in, but the copy of your library on this Mac can’t be opened. The app couldn’t make or open the copy of your library on this Mac. Check that app can change its own files, then try again.")
         #expect(try bench.signIns.key(for: first.address) == "key-2")
     }
 
@@ -503,7 +503,7 @@ import Testing
         await model.disconnect()
         #expect(!model.isConnected)
         #expect(bench.savedAddress == nil)
-        #expect(model.notice?.title == "Disconnected, but MAPP May Still Be Approved")
+        #expect(model.notice?.title == "Disconnected, but This App May Still Be Approved")
     }
 
     /// Only a sign-out the server did not confirm leaves an approval standing; one the server ended, or one that had

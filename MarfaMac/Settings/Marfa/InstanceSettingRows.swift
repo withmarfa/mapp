@@ -220,7 +220,7 @@ enum InstanceSettingsQuestion {
 /// A page of the server's own settings: loads them, and where they can't be shown says why instead of showing fields that
 /// would not save.
 struct InstanceSettingsGate<Content: View>: View {
-    /// The page the gate stands in, which words what MAPP isn't allowed to do there.
+    /// The page the gate stands in, which words what the app isn't allowed to do there.
     let page: MarfaSettingsPage
     let host: any MarfaSettingsHost
     @ViewBuilder let content: Content

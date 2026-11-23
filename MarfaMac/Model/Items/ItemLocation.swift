@@ -36,7 +36,7 @@ nonisolated struct LocationPoint: Hashable, Sendable {
 /// fields the type already has, so nothing in Marfa is added for it. Pure, with no map: the page, the sidebar and the
 /// panel each ask it what to show and what an edit writes.
 ///
-/// MAPP writes only what the person gave it: a point they put on the map and a name they typed. Nothing that a map
+/// the app writes only what the person gave it: a point they put on the map and a name they typed. Nothing that a map
 /// search returns is ever written, since Apple's terms for its map data (Developer Program License Agreement,
 /// Attachment 6, section 2.5) allow it to be kept only for a moment.
 nonisolated struct ItemLocation: Hashable, Sendable {

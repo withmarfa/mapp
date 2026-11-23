@@ -372,7 +372,7 @@ struct GroupByTests {
         browser.chooseGrouping(.column("field.starts_at", by: .presence))
         let lanes = try! #require(browser.boardLanes(in: library))
         #expect(lanes.all.map(\.title) == ["Not Set", "Set"])
-        #expect(lanes.all.map(\.takesItems) == [true, false], "Set takes no card, since MAPP would have to invent a value")
+        #expect(lanes.all.map(\.takesItems) == [true, false], "Set takes no card, since the app would have to invent a value")
         let set = Self.events[1]
         #expect(ItemBoardLayout.move(set, key: "starts_at", to: .missing, catalogue: Self.catalogue) == .set(nil))
         #expect(ItemBoardLayout.move(Self.events[0], key: "starts_at", to: .missing, catalogue: Self.catalogue) == .unchanged)

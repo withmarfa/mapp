@@ -52,7 +52,7 @@ struct FoldersPage: View {
         SettingsPageColumn {
             SettingsSection(
                 name: Text("Folders"),
-                footer: Text("Folders are made with the command line. Only folders MAPP may read are listed.")
+                footer: Text("Folders are made with the command line. Only folders the app may read are listed.")
             ) {
                 if model.folders.isEmpty {
                     SettingsEmptyCard(

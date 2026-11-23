@@ -247,7 +247,7 @@ struct WebPageItemPage: View {
             ContentUnavailableView {
                 Label("Can’t Get This File", systemImage: "exclamationmark.icloud")
             } description: {
-                Text("MAPP couldn’t get the file from the server. Check your connection, then try again.")
+                Text("The app couldn’t get the file from the server. Check your connection, then try again.")
             } actions: {
                 Button("Try Again") { attempt += 1 }
             }
@@ -371,7 +371,7 @@ struct PicturesCalloutDismissal: Equatable {
 
 /// At the top of the page while some of its pictures wait for the person, in the words and the layout of the pictures
 /// banner at the top of an item's page (`#picture-bar` in the editor), which follows Mail's mailing-list banner: how
-/// many are not loaded, MAPP's small gray button that loads them, and a plain round close button that hides the banner
+/// many are not loaded, the app's small gray button that loads them, and a plain round close button that hides the banner
 /// for the page. Its spacing is the item page's, in steps of 4/13 of the interface text size (4 points at 13).
 struct PicturesWaitingCallout: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
@@ -400,12 +400,12 @@ struct PicturesWaitingCallout: View {
                 Button(action: load) {
                     if count == 1 { Text("Load Picture") } else { Text("Load Pictures") }
                 }
-                .mappButton(.secondary, size: .small)
+                .appButton(.secondary, size: .small)
                 Button(action: close) {
                     Image(systemName: "xmark")
                         .font(.system(size: size * 9 / 13, weight: .bold))
                 }
-                .mappButton(.plain, size: .small, icon: true)
+                .appButton(.plain, size: .small, icon: true)
                 .help("Close")
                 .accessibilityLabel("Close")
                 .accessibilityIdentifier("PicturesWaitingCalloutClose")

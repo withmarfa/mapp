@@ -19,9 +19,9 @@ final class KeyboardPageModel {
             case needsModifier
             case needsCommandOrControl
             case unknownKey
-            /// Another command has the keys. `canReplace` is false for one of the system's, which MAPP's commands cannot take.
+            /// Another command has the keys. `canReplace` is false for one of the system's, which the app's commands cannot take.
             case taken(by: String, canReplace: Bool)
-            /// The system would not give the keys to MAPP, since another app holds them.
+            /// The system would not give the keys to the app, since another app holds them.
             case unavailable
         }
 

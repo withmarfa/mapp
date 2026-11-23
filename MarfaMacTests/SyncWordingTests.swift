@@ -139,7 +139,7 @@ struct ProblemWordingTests {
     @Test func aMissingPermissionSaysWhoToAsk() {
         let grant = SyncProblem.Grant(kind: .type, name: "core.task", level: .write)
         let wording = wording(entry(.refused, reason: SyncProblem(code: "forbidden", grant: grant)))
-        #expect(wording.explanation.hasPrefix("MAPP doesn’t have permission for “core.task”. Ask whoever runs the server to allow it"))
+        #expect(wording.explanation.hasPrefix("The app doesn’t have permission for “core.task”. Ask whoever runs the server to allow it"))
     }
 
     @Test func anItemInTheServersBinSaysToRestoreItFirst() {
@@ -182,7 +182,7 @@ struct ProblemWordingTests {
         let why = "the delete has no confirmed server version to remove; read the item before deleting it"
         let reason = SyncProblem(code: "refused_unsent", message: Words.unsent(.notSent(reason: why)), unsent: .notSent(reason: why))
         let wording = wording(entry(.refused, reason: reason))
-        #expect(wording.explanation.hasPrefix("MAPP couldn’t send this change."))
+        #expect(wording.explanation.hasPrefix("The app couldn’t send this change."))
         #expect(!wording.explanation.contains("earlier change"))
         #expect(!wording.explanation.contains("The server refused it"))
         #expect(wording.explanation.contains("copy it before you discard"))
@@ -201,7 +201,7 @@ struct ProblemWordingTests {
     @Test func aChangeFromACopyReadInPartIsHeldUntilThePersonSays() {
         let wording = wording(entry(.blocked(.recordUnread)))
         #expect(wording.headline == "A change to “Plan the launch” is on hold")
-        #expect(wording.explanation.hasPrefix("This change came from a copy that MAPP could only partly read"))
+        #expect(wording.explanation.hasPrefix("This change came from a copy that app could only partly read"))
         #expect(wording.actions.map(\.action) == [.tryAgain, .withdraw])
         #expect(wording.actions.map(\.title) == ["Try Again", "Undo Change"])
         #expect(wording.confirmation(for: .withdraw)?.copiesText == true)

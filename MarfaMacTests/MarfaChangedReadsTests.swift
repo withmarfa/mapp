@@ -323,7 +323,7 @@ import Testing
         await finish(scene)
     }
 
-    /// A copy holding MAPP's own hidden settings, as a Marfa that has them does.
+    /// A copy holding the app's own hidden settings, as a Marfa that has them does.
     private func heldSettings(_ scene: Scene) async throws -> String {
         try await scene.copy.declareTypes([PreferencesType.definition])
         let queued = try await scene.copy.items.create(Draft(type: PreferencesType.id, properties: [:]))

@@ -104,7 +104,7 @@ import Observation
         return outcome == .allowed
     }
 
-    /// Opens the sheet that changes the password, asking first for `sign_ins.manage` where MAPP lacks it. Cancelled, or
+    /// Opens the sheet that changes the password, asking first for `sign_ins.manage` where the app lacks it. Cancelled, or
     /// approved without it, nothing opens and the page says so.
     func beginChangePassword() async {
         note = nil

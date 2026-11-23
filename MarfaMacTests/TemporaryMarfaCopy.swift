@@ -19,7 +19,7 @@ nonisolated struct TemporaryMarfaCopy {
 }
 
 extension Marfa.ItemType {
-    /// A note as the server ships it, for a fake copy's catalog: an app declares only `app.*` types, which MAPP hides.
+    /// A note as the server ships it, for a fake copy's catalog: an app declares only `app.*` types, which the app hides.
     nonisolated static let shippedNote = Marfa.ItemType(
         id: "core.note", label: "Note",
         fields: [

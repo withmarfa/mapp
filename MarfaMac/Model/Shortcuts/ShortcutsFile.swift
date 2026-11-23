@@ -1,10 +1,10 @@
 import Foundation
 
-/// What Export Shortcuts writes and Import Shortcuts reads: MAPP's own shortcuts as JSON, with the format's name and
-/// version so a file that is something else, or from a later MAPP, is refused. It holds every menu command's shortcut as
+/// What Export Shortcuts writes and Import Shortcuts reads: the app's own shortcuts as JSON, with the format's name and
+/// version so a file that is something else, or from a later version of the app, is refused. It holds every menu command's shortcut as
 /// it was, and the shortcuts that work in any app.
 nonisolated struct ShortcutsFile: Codable, Equatable, Sendable {
-    static let format = "mapp-shortcuts"
+    static let format = "marfa-mac-shortcuts"
     static let version = 1
 
     let format: String
@@ -24,7 +24,7 @@ nonisolated struct ShortcutsFile: Codable, Equatable, Sendable {
     enum ReadError: Error, Equatable {
         /// Not JSON, or JSON that is not a shortcuts file.
         case notOurs
-        /// A shortcuts file written by a later MAPP, which this one does not read.
+        /// A shortcuts file written by a later version of the app, which this one does not read.
         case newerVersion
     }
 

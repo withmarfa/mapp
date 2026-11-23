@@ -109,7 +109,7 @@ nonisolated struct Shortcut: Hashable, Codable, Sendable {
         return nil
     }
 
-    /// For a shortcut that works in any app, while MAPP is running.
+    /// For a shortcut that works in any app, while the app is running.
     var anyAppProblem: Problem? {
         if modifiers.isDisjoint(with: [.command, .control]) { return .needsCommandOrControl }
         if keyCode == nil { return .unknownKey }

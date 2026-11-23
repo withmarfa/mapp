@@ -1,6 +1,6 @@
 import Foundation
 
-/// A page of Settings: one of MAPP's own, or one of the Marfa's. The window lists a page only once it exists, so a later
+/// A page of Settings: one of the app's own, or one of the Marfa's. The window lists a page only once it exists, so a later
 /// piece adds its pages here and to the sidebar's groups, and nothing else.
 nonisolated enum SettingsPage: Hashable, Sendable {
     case general, appearance, keyboard, lists, editor, layouts, search, onThisMac, connection
@@ -28,12 +28,12 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     static let limits = SettingsPage.marfa(.limits)
     static let startUp = SettingsPage.marfa(.startUp)
 
-    /// MAPP's pages as the sidebar lists them, in groups split by space.
-    static let mappGroups: [[SettingsPage]] = [[.general, .appearance, .keyboard], [.editor, .lists, .layouts, .search], [.onThisMac, .connection]]
+    /// The app's pages as the sidebar lists them, in groups split by space.
+    static let appGroups: [[SettingsPage]] = [[.general, .appearance, .keyboard], [.editor, .lists, .layouts, .search], [.onThisMac, .connection]]
     /// The Marfa's pages, in groups.
     static let marfaGroups: [[SettingsPage]] = MarfaSettingsPage.groups.map { $0.map(SettingsPage.marfa) }
 
-    static var all: [SettingsPage] { (mappGroups + marfaGroups).flatMap { $0 } }
+    static var all: [SettingsPage] { (appGroups + marfaGroups).flatMap { $0 } }
 
     /// A name for tests and accessibility, which never changes with the language.
     var key: String {
@@ -104,7 +104,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
                 String(localized: "Start With"), String(localized: "Reopen Windows"), String(localized: "Open Items"),
                 String(localized: "New Items Are"), String(localized: "Today and Yesterday"), String(localized: "Week Starts On"),
                 String(localized: "Date Format"), String(localized: "Time Format"), String(localized: "Pictures from Websites"),
-                String(localized: "Send Error Reports"), String(localized: "Reset MAPP’s Settings"),
+                String(localized: "Send Error Reports"), String(localized: "Reset This App’s Settings"),
             ]
         case .appearance:
             [
@@ -116,7 +116,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .keyboard:
             [
                 String(localized: "Shortcuts"), String(localized: "Export Shortcuts"), String(localized: "Import Shortcuts"),
-                String(localized: "Restore Defaults"), String(localized: "In Any App"),
+                String(localized: "Restore Defaults"), String(localized: "Global Shortcuts"),
             ] + AnyAppCommand.allCases.map(\.title) + ShortcutCommand.all.map(\.title)
         case .lists:
             [

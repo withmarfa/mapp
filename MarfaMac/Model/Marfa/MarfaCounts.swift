@@ -1,7 +1,7 @@
 import Foundation
 import Marfa
 
-/// Maps MAPP's count queries to the working copy and leaves unanswered items out of the result.
+/// Maps the app's count queries to the working copy and leaves unanswered items out of the result.
 nonisolated struct MarfaCounts: Sendable {
     /// The package's call behind one closure, which a test answers.
     typealias Ask = @Sendable ([String], Counted) async throws -> [Marfa.ItemCount]

@@ -54,7 +54,7 @@ struct PlaceEmptyState: View {
         EmptyState(title: Text(verbatim: empty.title), detail: empty.line.map { Text(verbatim: $0) }) {
             if let type = empty.makes, let title = empty.buttonTitle {
                 Button(title, systemImage: "plus") { browser.openQuickAdd(typeID: type, in: library) }
-                    .mappButton(.secondary)
+                    .appButton(.secondary)
                     .padding(.top, 6)
                     .accessibilityIdentifier("EmptyStateNew")
             }

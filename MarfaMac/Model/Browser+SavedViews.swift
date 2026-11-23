@@ -179,7 +179,7 @@ extension Browser {
 
     /// Changes the calendar's scale. A saved view keeps it on this Mac as it is made, and a place keeps it in its default
     /// view. Undo takes either back.
-    func changeCalendarScale(_ scale: CalendarScale, calendar: Calendar = .mapp) {
+    func changeCalendarScale(_ scale: CalendarScale, calendar: Calendar = .chosenWeekStart) {
         // A week shown from a month starts where the calendar's weeks do, as a week chosen in the card does.
         if scale == .week, let day = calendarDay { calendarDay = CalendarLayout.firstDay(ofWeekHolding: day, calendar: calendar) }
         if case .view(let id) = item {
@@ -199,7 +199,7 @@ extension Browser {
 
     /// Moves the calendar by seven days or by months, or back to the week that holds today with `steps` nil. A week moves
     /// from the first day shown, which a swipe may have put on any day, and from the week that holds today where none was.
-    func moveCalendar(by steps: Int?, now: Date, calendar: Calendar = .mapp) {
+    func moveCalendar(by steps: Int?, now: Date, calendar: Calendar = .chosenWeekStart) {
         calendarMoves += 1
         guard let steps else {
             calendarDay = nil

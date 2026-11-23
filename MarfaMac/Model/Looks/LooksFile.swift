@@ -3,7 +3,7 @@ import Foundation
 /// The file Export Looks writes and Import Looks reads: every look of one server's types as JSON, keyed by type
 /// identifier, with the format's name and version so a file that is something else is refused. It names no server.
 nonisolated struct LooksFile: Codable, Equatable, Sendable {
-    static let format = "mapp-looks"
+    static let format = "marfa-mac-looks"
     static let version = 1
 
     let format: String

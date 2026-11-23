@@ -5,7 +5,7 @@ import Marfa
 import Testing
 @testable import MarfaMac
 
-/// Every way a sign-in can end is told in MAPP's own words: what happened and what to do, with nothing the package,
+/// Every way a sign-in can end is told in the app's own words: what happened and what to do, with nothing the package,
 /// the system or the server said.
 @Suite(.hangLimit)
 @MainActor struct SignInWordsTests {
@@ -60,7 +60,7 @@ import Testing
         #expect(SignInOutcome(NoSignInWindow()) == .noWindow)
         let notice = try #require(MarfaSettingsModel.notice(for: .signIn(.noWindow)))
         #expect(notice.title == "No Window to Sign In From")
-        #expect(notice.message == "MAPP needs a window to show the server’s sign-in page over. Open a MAPP window, then try again, or use a code instead.")
+        #expect(notice.message == "The app needs a window to show the server’s sign-in page over. Open one of its windows, then try again, or use a code instead.")
     }
 
     @Test func aMacWithNoWindowThrowsTheAppsOwnErrorNotText() async throws {
@@ -105,11 +105,11 @@ import Testing
         try await host.connect(address: "https://marfa.test", key: "two")
         let told = host.notices.waiting
         if stands {
-            #expect(told.map(\.title) == ["MAPP’s Earlier Approval May Still Stand"])
+            #expect(told.map(\.title) == ["This App’s Earlier Approval May Still Stand"])
             let message = try #require(told.first?.message)
             #expect(message.contains("marfa apps list") && message.contains("marfa apps revoke <id>") && message.contains("approval date"))
             #expect(message.contains("https://marfa.test"), "the server is named by its address: \(message)")
-            #expect(!message.contains("older MAPP entry"))
+            #expect(!message.contains("older app entry"))
             #expect(!message.contains("Connected apps") && !message.contains("You are signed in") && !message.contains("still lists"))
         } else {
             #expect(told.isEmpty)
@@ -126,7 +126,7 @@ import Testing
             code: "ABCD-1234", address: URL(string: "https://marfa.test/device")!, completeAddress: nil,
             expiresAt: .distantFuture, finish: { signIns.save("approved", for: address); return signIns.signedIn }))])
         try await host.connect(address: "https://marfa.test", via: .code(shown: { _ in }))
-        #expect(host.notices.waiting.map(\.title) == ["MAPP’s Earlier Approval May Still Stand"])
+        #expect(host.notices.waiting.map(\.title) == ["This App’s Earlier Approval May Still Stand"])
     }
 
     // MARK: The package's credential
@@ -149,7 +149,7 @@ import Testing
         }
         let notice = try #require(MarfaSettingsModel.notice(for: .signIn(.couldNotFinish)))
         #expect(notice.title == "Couldn’t Finish Signing In")
-        #expect(notice.message == "MAPP couldn’t finish signing in. Check your connection and try again, or sign in with a code.")
+        #expect(notice.message == "The app couldn’t finish signing in. Check your connection and try again, or sign in with a code.")
         #expect(!(notice.title + notice.message).localizedCaseInsensitiveContains("reach"))
     }
 }

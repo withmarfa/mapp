@@ -5,7 +5,7 @@ import WebKit
 
 /// An embed as the item's text holds it, such as `![[photo.png|400]]` or `![](a\_b.png)`: the page names an embed
 /// this way and Marfa's core lists each one it bound this way (`BoundEmbed.text`), so the two are matched whole,
-/// kind included, and MAPP reads no name out of an embed itself.
+/// kind included, and the app reads no name out of an embed itself.
 nonisolated struct EmbedReference: Hashable, Sendable {
     let text: String
 
@@ -152,7 +152,7 @@ extension ItemLibrary {
 /// page loads nothing else: a file is streamed from disk in pieces, answering ranges as sound and video ask for
 /// them, and never read whole into memory.
 final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerWithReply {
-    nonisolated static let scheme = "mapp-embed"
+    nonisolated static let scheme = "marfa-embed"
     /// How much of a file is read and handed over at a time.
     nonisolated static let piece = 1 << 20
 

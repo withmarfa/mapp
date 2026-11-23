@@ -3,7 +3,7 @@ import Marfa
 import Testing
 @testable import MarfaMac
 
-/// Connection's "MAPP’s Settings" section in each state, and Disconnect's choice to remove them first.
+/// Connection's "This App’s Settings" section in each state, and Disconnect's choice to remove them first.
 @Suite(.hangLimit)
 @MainActor struct ConnectionSettingsTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
@@ -25,14 +25,14 @@ import Testing
     @Test func withoutAPermissionTheySayTheyStayOnThisMacAndOfferAllowMore() {
         let needing = words(.off(.needsPermission))
         #expect(needing.title == "Kept on This Mac Only")
-        #expect(needing.line == "MAPP isn’t allowed to keep them in Home yet. Once it is, every Mac that connects uses them.")
+        #expect(needing.line == "The app isn’t allowed to keep them in Home yet. Once it is, every Mac that connects uses them.")
         #expect(needing.action == .allowMore && needing.actionTitle == "Allow More…")
     }
 
     @Test func whileTheCopyFillsItIsAQuietLineWithNothingToPress() {
         let filling = words(.off(.notFilled))
         #expect(filling.isShown && filling.action == .none && filling.actionTitle == nil)
-        #expect(filling.line == "MAPP keeps them in Home once this Mac has finished downloading it.")
+        #expect(filling.line == "The app keeps them in Home once this Mac has finished downloading it.")
     }
 
     @Test func removedSettingsStayOnThisMacUntilThePersonKeepsThemAgain() {
@@ -48,7 +48,7 @@ import Testing
 
     @Test func removingAsksFirstAndSaysEveryMacLosesThem() {
         let syncing = words(.syncing)
-        #expect(syncing.removeTitle == "Remove MAPP’s Settings from Home?")
+        #expect(syncing.removeTitle == "Remove This App’s Settings from Home?")
         #expect(syncing.removeMessage == "Every Mac that connects to Home loses them. This Mac keeps its own, and your items stay.")
         #expect(ConnectionSettings.footer == "Window sizes and positions, column widths and On This Mac stay on each Mac.")
     }
@@ -289,7 +289,7 @@ import Testing
         #expect(model.departure?.holdsSettingsRemoval == true)
 
         let words = words(.syncing)
-        #expect(words.removalWaiting == "One of them removes MAPP’s settings from Home. Discard the copy and the settings stay there.")
+        #expect(words.removalWaiting == "One of them removes this app’s settings from Home. Discard the copy and the settings stay there.")
     }
 
     @Test func aRemovalQueuedAndNeverDeliveredIsFoundAmongTheUnsentWrites() async throws {

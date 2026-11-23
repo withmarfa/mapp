@@ -45,7 +45,7 @@ final class QuickAdd {
             if !names.isEmpty {
                 notices.tell(
                     String(localized: "Can’t Add File"),
-                    String(localized: "MAPP can’t read \(names.formatted(.list(type: .and))) as a file."))
+                    String(localized: "The app can’t read \(names.formatted(.list(type: .and))) as a file."))
             }
             if unreadable > 0 {
                 notices.tell(String(localized: "Can’t Add File"), AttributedString(localized: "^[\(unreadable) item](inflect: true) can’t be added as a file.").text)
@@ -341,7 +341,7 @@ final class QuickAdd {
     static func unsettableNote(_ fields: [ItemTypeInfo.Field]) -> String? {
         guard !fields.isEmpty else { return nil }
         let names = fields.map(\.label).formatted(.list(type: .and))
-        return String(localized: "Adding will be refused: this kind of item needs \(names), which MAPP can’t fill in. Choose another kind.")
+        return String(localized: "Adding will be refused: this kind of item needs \(names), which the app can’t fill in. Choose another kind.")
     }
 
     /// The kind quick add opens in: the one asked for, else the one a type's own place holds, else the one Settings >

@@ -241,7 +241,7 @@ struct LocationPanelContent: View {
                     Button("Keep My Edit") { model.keepName() }
                     Button("Use Current Name") { model.useHeldName() }
                 }
-                .mappButton(.secondary, size: .small)
+                .appButton(.secondary, size: .small)
                 .padding(.horizontal, 3 * scale)
                 .padding(.top, 2 * scale)
             }

@@ -100,7 +100,7 @@ extension EditorController {
         func failed(detail: String) {
             abandonedGeneration = self.generation
             Telemetry.logger(.editor).error("flush failed: \(detail)")
-            tellNotSaved(pageItemID, reason: String(localized: "The editor ran into a problem, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
+            tellNotSaved(pageItemID, reason: String(localized: "The editor ran into a problem, so the app couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
             finish(false)
         }
         // Held weakly, so a finished flush does not keep a closed editor among the open ones until the limit.
@@ -116,7 +116,7 @@ extension EditorController {
             }
             // The page answers in order, so one that has not answered this flush holds every later load too.
             abandonedGeneration = self.generation
-            tellNotSaved(pageItemID, reason: String(localized: "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
+            tellNotSaved(pageItemID, reason: String(localized: "The editor stopped responding, so the app couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
             finish(false)
         }
         capture()
@@ -140,7 +140,7 @@ extension EditorController {
     }
 
     private static var replacedReason: String {
-        String(localized: "Another item opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again.")
+        String(localized: "Another item opened before the app finished saving this one, so your most recent typing might not be saved. Try again.")
     }
 
     /// Destructive transitions proceed only once every editor has handed over its current text and its window's

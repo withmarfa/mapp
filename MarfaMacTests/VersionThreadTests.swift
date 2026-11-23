@@ -244,7 +244,7 @@ private let english = Locale(identifier: "en_US")
     // MARK: Facts
 
     @Test func theFactsSayWhoWroteTheVersionWhatItChangedAndWhatChangedSince() {
-        let writer = ItemSnapshot.Writer(kind: .app, name: "MAPP")
+        let writer = ItemSnapshot.Writer(kind: .app, name: "Marfa for Mac")
         let current = item(version: 4, title: "Plan now", created: date(2026, 10, 1), modified: date(2026, 11, 6))
         let list = VersionList(
             snapshots: [
@@ -255,7 +255,7 @@ private let english = Locale(identifier: "en_US")
             current: current, currentText: "one five four", isComplete: true, in: catalogue)
         let entry = list.entry("v2")!
         let facts = VersionFacts.make(for: entry, after: list.older(than: entry), current: list.current!, in: catalogue, dateFormat: .standard)
-        #expect(facts.writtenBy == "MAPP")
+        #expect(facts.writtenBy == "Marfa for Mac")
         #expect(facts.version == 2 && facts.latest == 4)
         #expect(facts.saved == date(2026, 10, 2))
         #expect(!facts.savedIsApproximate)

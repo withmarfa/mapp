@@ -2,10 +2,10 @@ import AppKit
 import SwiftUI
 
 /// The Connection page: the server in use and how it stands, the account (who is signed in, what the owner has allowed
-/// MAPP, what waits to be sent), each change that needs the person, the other server, and Disconnect. With no server set
+/// the app, what waits to be sent), each change that needs the person, the other server, and Disconnect. With no server set
 /// it is the address to sign in to. What each step does is `MarfaSettingsModel`'s, unchanged; this draws it from the parts.
 struct ConnectionPage: View {
-    let settingsHost: MAPPMarfaSettingsHost
+    let settingsHost: AppSettingsHost
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
     @State private var isChoosingOther = false
@@ -26,7 +26,7 @@ struct ConnectionPage: View {
             } else {
                 disconnected
             }
-            if host.configuredConnection != nil { mappSettings }
+            if host.configuredConnection != nil { appSettings }
             codeSection
             noticeSection
             if let connection = host.configuredConnection {
@@ -40,21 +40,21 @@ struct ConnectionPage: View {
             model.isConfirmingDisconnect = false
             askToDisconnect()
         }
-        .alert(Text(verbatim: mappSettingsWords.removeTitle), isPresented: $isConfirmingRemoval) {
+        .alert(Text(verbatim: appSettingsWords.removeTitle), isPresented: $isConfirmingRemoval) {
             Button("Cancel", role: .cancel) {}
             Button("Remove", role: .destructive) { removeSettings() }
         } message: {
-            Text(mappSettingsWords.removeMessage)
+            Text(appSettingsWords.removeMessage)
         }
         .alert(
-            "Couldn’t Remove MAPP’s Settings",
+            "Couldn’t Remove This App’s Settings",
             isPresented: Binding { model.settingsRemovalFailure != nil } set: { if !$0 { model.stayConnected() } }
         ) {
             Button("Stay Connected", role: .cancel) {}
             Button("Disconnect Anyway", role: .destructive) { Task { await model.disconnectAnyway() } }
         } message: {
             Text(verbatim: model.settingsRemovalFailure?.reason == .discardedChangesWait
-                ? mappSettingsWords.discardedChangesWait : mappSettingsWords.removalNotTaken)
+                ? appSettingsWords.discardedChangesWait : appSettingsWords.removalNotTaken)
         }
         .task(id: NameRequest(connection: host.configuredConnection, isOnline: host.state == .online, readsProfile: host.readsProfile)) {
             if accountNameServer != host.configuredConnection {
@@ -76,7 +76,7 @@ struct ConnectionPage: View {
     // MARK: Not connected
 
     private var disconnected: some View {
-        SettingsSection("Connect to a Marfa", line: "MAPP shows one Marfa at a time.") {
+        SettingsSection("Connect to a Marfa", line: "The app shows one Marfa at a time.") {
             SettingsRow("Address") {
                 SettingsField(
                     title: "Address", text: Bindable(model).address, onSubmit: { model.start(.connect(usingCode: false)) }
@@ -190,7 +190,7 @@ struct ConnectionPage: View {
 
     private var otherServer: some View {
         SettingsSection("Other Marfas") {
-            SettingsRow("Use Another Marfa", line: "MAPP shows one Marfa at a time.") {
+            SettingsRow("Use Another Marfa", line: "The app shows one Marfa at a time.") {
                 SettingsButton(isChoosingOther ? "Hide" : "Choose…") { isChoosingOther.toggle() }
             }
             if isChoosingOther {
@@ -212,7 +212,7 @@ struct ConnectionPage: View {
         SettingsSection("Disconnect") {
             SettingsRow(
                 verbatim: String(localized: "Disconnect from \(LibraryDescription.name(libraries))"),
-                line: String(localized: "Removes this Mac’s copy and signs MAPP out.")
+                line: String(localized: "Removes this Mac’s copy and signs the app out.")
             ) {
                 HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if model.isWorking { ProgressView().controlSize(.small) }
@@ -224,16 +224,16 @@ struct ConnectionPage: View {
         }
     }
 
-    // MARK: MAPP's Settings
+    // MARK: This App's Settings
 
-    private var mappSettingsWords: ConnectionSettings {
+    private var appSettingsWords: ConnectionSettings {
         ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries))
     }
 
-    @ViewBuilder private var mappSettings: some View {
-        let words = mappSettingsWords
+    @ViewBuilder private var appSettings: some View {
+        let words = appSettingsWords
         if words.isShown {
-            SettingsSection(name: Text("MAPP’s Settings"), footer: Text(ConnectionSettings.footer)) {
+            SettingsSection(name: Text("This App’s Settings"), footer: Text(ConnectionSettings.footer)) {
                 SettingsRow(
                     verbatim: words.title, line: words.line, error: settingsProblem
                 ) {
@@ -245,17 +245,17 @@ struct ConnectionPage: View {
                         .accessibilityIdentifier(identifier(of: words.action))
                     }
                 }
-                .accessibilityIdentifier("MAPPSettingsRow")
+                .accessibilityIdentifier("AppSettingsRow")
             }
-            .accessibilityIdentifier("MAPPSettings")
+            .accessibilityIdentifier("AppSettings")
         }
     }
 
     private func identifier(of action: ConnectionSettings.Action) -> String {
         switch action {
-        case .remove: "RemoveMAPPSettings"
-        case .allowMore: "AllowMoreForMAPPSettings"
-        case .keepAgain: "KeepMAPPSettingsAgain"
+        case .remove: "RemoveAppSettings"
+        case .allowMore: "AllowMoreForAppSettings"
+        case .keepAgain: "KeepAppSettingsAgain"
         case .none: ""
         }
     }
@@ -292,14 +292,14 @@ struct ConnectionPage: View {
         }
     }
 
-    /// The question before Disconnect, with the choice to take MAPP's settings out of the Marfa too where they are kept there.
+    /// The question before Disconnect, with the choice to take this app's settings out of the Marfa too where they are kept there.
     private func askToDisconnect() {
         let name = LibraryDescription.name(libraries)
         SettingsAlert.confirm(
             title: String(localized: "Disconnect from \(name)?"),
-            message: String(localized: "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay."),
+            message: String(localized: "The app removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay."),
             confirm: String(localized: "Disconnect"),
-            checkbox: model.offersSettingsRemoval ? mappSettingsWords.disconnectChoice : nil,
+            checkbox: model.offersSettingsRemoval ? appSettingsWords.disconnectChoice : nil,
             window: NSApp.keyWindow
         ) { confirmed, checked in
             guard confirmed else { return }
@@ -335,7 +335,7 @@ struct ConnectionPage: View {
     @ViewBuilder private var codeSection: some View {
         if let code = model.code {
             SettingsSection(
-                name: Text("Approve MAPP with This Code"),
+                name: Text("Approve This App with This Code"),
                 footer: Text("Open \(code.address.absoluteString) on any device, sign in and type the code. It stops working at \(DateDisplay.timeOfDay(of: code.expiresAt, format: .stored())).")
             ) {
                 SettingsRow(verbatim: code.code) {

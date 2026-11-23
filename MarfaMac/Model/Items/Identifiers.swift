@@ -32,7 +32,7 @@ nonisolated struct TypeID: RawRepresentable, Hashable, Codable, Sendable {
     /// Items and search rather than as a type.
     static let file = TypeID("core.file")
 
-    /// Marfa's bookkeeping (`system.*`) and what apps keep for themselves (`app.*`, MAPP's own settings among them):
+    /// Marfa's bookkeeping (`system.*`) and what apps keep for themselves (`app.*`, the app's own settings among them):
     /// never an item of the library, a type a person makes or picks, or a type in any list.
     var isHidden: Bool { Self.isHidden(rawValue) }
 

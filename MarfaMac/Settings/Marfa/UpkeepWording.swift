@@ -1,7 +1,7 @@
 import Foundation
 
 /// The words of Backups, Updates and Housekeeping. The server's own errors and descriptions are never shown, since they name
-/// settings by key and requests by path: each title and line here is MAPP's own, from what the server counts or names.
+/// settings by key and requests by path: each title and line here is the app's own, from what the server counts or names.
 nonisolated enum UpkeepWording {
     /// A moment as "Today, 14:00", "Yesterday, 14:00" or "12 November, 14:00" (with the year when it is not this one).
     /// A server value with no time of day (`hasTime` false) is its day alone, read as the day it names, not as a midnight in this
@@ -43,7 +43,7 @@ nonisolated enum UpkeepWording {
 
     // MARK: Failures
 
-    /// A failure in MAPP's own words: a refusal or fault carries the server's text, which names settings by key and requests by
+    /// A failure in the app's own words: a refusal or fault carries the server's text, which names settings by key and requests by
     /// path, so it is never shown.
     static func owned(_ failure: OwnerFailure) -> OwnerFailure {
         switch failure {
@@ -140,7 +140,7 @@ nonisolated enum UpkeepWording {
         return (known, others)
     }
 
-    /// "The heartbeat address and the PostHog project token." with, for settings MAPP has no name for, "2 other settings are set on
+    /// "The heartbeat address and the PostHog project token." with, for settings the app has no name for, "2 other settings are set on
     /// the machine Marfa runs on."
     static func secretsLine(_ keys: [String], serverName: String) -> String {
         let (known, others) = secretsToSet(keys)

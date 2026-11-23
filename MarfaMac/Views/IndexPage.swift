@@ -116,7 +116,7 @@ private struct IndexTabButton: View {
                 Text(count, format: .number).monospacedDigit().foregroundStyle(.secondary)
             }
         }
-        .mappButton(isSelected ? .secondary : .plain)
+        .appButton(isSelected ? .secondary : .plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("IndexTab.\(tab.rawValue)")
     }

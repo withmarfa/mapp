@@ -7,7 +7,7 @@ struct TypeIconRequest: Identifiable, Hashable {
     var id: TypeID { type }
 }
 
-/// Chooses the icon of a type from the Lucide and Simple Icons sets, each drawn as MAPP will draw it. The choice is saved
+/// Chooses the icon of a type from the Lucide and Simple Icons sets, each drawn as the app will draw it. The choice is saved
 /// as a full ID, such as `simple-icons:github`, on the server for every app, and the new icon shows at once. Use Default hands the choice back to the type.
 struct TypeIconPicker: View {
     @Environment(\.dismiss) private var dismiss
@@ -63,7 +63,7 @@ struct TypeIconPicker: View {
                 if results.isEmpty { ContentUnavailableView.search(text: model.search) }
             }
             if !model.canChoose, !model.isWorking, model.failure == nil {
-                Text("Icons are kept on your server, so you can choose one once MAPP is connected.")
+                Text("Icons are kept on your server, so you can choose one once the app is connected.")
                     .interfaceFont(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -76,13 +76,13 @@ struct TypeIconPicker: View {
             }
             HStack {
                 Button("Use Default") { choose(nil) }
-                    .mappButton(.secondary)
+                    .appButton(.secondary)
                     .disabled(!model.canChoose)
                     .accessibilityIdentifier("TypeIconUseDefault")
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                    .mappButton(.secondary)
+                    .appButton(.secondary)
                     .disabled(!model.canCancel)
             }
         }

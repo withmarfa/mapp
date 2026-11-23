@@ -25,7 +25,7 @@ struct DepartureSheet: View {
     /// read from it, so a copy whose changes can't be listed is kept, never discarded.
     private var canDiscard: Bool { departure.unsent != nil }
 
-    /// Where the copy is, for the person to remove when MAPP can't.
+    /// Where the copy is, for the person to remove when the app can't.
     private var copyFolder: String {
         model.host.configuredConnection.map { model.host.location.directory(for: $0).path } ?? ""
     }
@@ -48,7 +48,7 @@ struct DepartureSheet: View {
                     if !canDiscard {
                         Text("Keep the copy and the changes stay on this Mac.")
                     } else if isOtherVersion {
-                        Text("Keep the copy and the changes stay on this Mac. Install the previous build of MAPP from TestFlight and connect it to the same server, and it sends them. Discard the copy and they’re lost.")
+                        Text("Keep the copy and the changes stay on this Mac. Install the previous build of the app from TestFlight and connect it to the same server, and it sends them. Discard the copy and they’re lost.")
                     } else {
                         Text("Keep the copy and the changes stay on this Mac. Connect to the same server again and they’re sent. Discard the copy and they’re lost.")
                     }

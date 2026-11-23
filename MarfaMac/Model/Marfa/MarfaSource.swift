@@ -69,7 +69,7 @@ nonisolated final class MarfaSource: ItemSource {
     private let hub = MarfaHub()
     let engine: MarfaEngine
     let events: MarfaEngine.Events
-    /// The answers to MAPP's writes to its settings item, which the engine takes with the rest.
+    /// The answers to the app's writes to its settings item, which the engine takes with the rest.
     let preferenceAnswers = PreferenceAnswers()
     private let counting: MarfaCounts
 
@@ -106,7 +106,7 @@ nonisolated final class MarfaSource: ItemSource {
             throw SourceFailure(kind: .failed, message: Words.signInUnreadable)
         }
         guard let server else {
-            throw SourceFailure(kind: .denied, message: String(localized: "MAPP isn’t signed in to this Marfa server."))
+            throw SourceFailure(kind: .denied, message: String(localized: "The app isn’t signed in to this Marfa server."))
         }
         try FileManager.default.createDirectory(at: location.directory(for: connection), withIntermediateDirectories: true)
         let copy: WorkingCopy
@@ -127,7 +127,7 @@ nonisolated final class MarfaSource: ItemSource {
     }
 
     /// Another program holding the store, as its writer or mid-write, is the same to the person: another copy of
-    /// MAPP has the library open.
+    /// the app has the library open.
     nonisolated static func failure(opening error: MarfaError) -> SourceFailure {
         switch error {
         case .wrongSchema(_, _, let unsent, let message): SourceFailure(kind: .otherVersion(unsent: unsent), message: message)
@@ -277,7 +277,7 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
-    /// The core's refusal in the person's words where MAPP can say more than the core does: an end that already holds the
+    /// The core's refusal in the person's words where the app can say more than the core does: an end that already holds the
     /// one link of its type is named, as is a link made twice. Any other refusal is the core's own.
     private func refusal(_ error: MarfaError) async -> String {
         guard case .validation("edge_constraint_violation", _, let details, _) = error else { return error.message }
@@ -327,7 +327,7 @@ nonisolated final class MarfaSource: ItemSource {
     }
 
     /// Where kept copies are, cleared when the library is disconnected or its downloads are removed.
-    nonisolated static let keptFiles = URL.temporaryDirectory.appending(path: "MAPP Files", directoryHint: .isDirectory)
+    nonisolated static let keptFiles = URL.temporaryDirectory.appending(path: "Marfa Files", directoryHint: .isDirectory)
 
     /// The file's title as a name on disk, with the extension its type has where the title has none, since the
     /// page, Open and the Finder all tell a file's kind by its extension.
@@ -515,7 +515,7 @@ nonisolated final class MarfaSource: ItemSource {
             }
             throw SourceUseFailure(cause: error, closed: closed)
         }
-        // Another sign-in may reach MAPP's own settings where this one did not, or no longer reach them.
+        // Another sign-in may reach the app's own settings where this one did not, or no longer reach them.
         Task { [engine] in await engine.sync.reconsiderSlice() }
         return copy.handle == .writer ? .writer : .reader
     }

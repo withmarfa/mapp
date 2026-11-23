@@ -4,8 +4,8 @@ import Testing
 @testable import MarfaMac
 
 extension LiveMarfaTests {
-    /// MAPP's settings across two Macs on the test instance: two copies, each with a store and defaults of its own. The
-    /// key holds the test instance's MAPP key, which reaches `app.mapp.preferences` as its owner made it. Every settings
+    /// this app's settings across two Macs on the test instance: two copies, each with a store and defaults of its own. The
+    /// key holds the test instance's the app key, which reaches `app.marfa-mac.preferences` as its owner made it. Every settings
     /// item is purged before and after each test.
     @MainActor
     @Suite(.serialized)
@@ -184,7 +184,7 @@ extension LiveMarfaTests {
                 try await start(one)
                 await one.send()
                 let queued = try await one.source.copy.items.create(
-                    Draft(type: "core.note", properties: JSONObject([("title", .string("MAPP live removal test"))])))
+                    Draft(type: "core.note", properties: JSONObject([("title", .string("The app live removal test"))])))
                 let note = try #require(queued.itemId)
                 binned.append(ItemID(note))
 

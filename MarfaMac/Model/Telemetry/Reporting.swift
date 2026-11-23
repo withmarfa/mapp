@@ -113,7 +113,7 @@ nonisolated final class Reporting: Sendable {
         let gate = Gate.current(info: info, isTestHost: isTestHost)
         guard gate.mayReport, let destination = Self.destination(in: info) else { return }
         SDKReporter.shared.configure(
-            SDKReporter.Configuration(destination: destination, serviceName: "mapp", serviceVersion: Self.version(info)))
+            SDKReporter.Configuration(destination: destination, serviceName: "marfa-mac", serviceVersion: Self.version(info)))
         SDKReporter.shared.isEnabled = gate.switchIsOn
     }
 

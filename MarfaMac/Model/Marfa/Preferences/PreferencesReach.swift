@@ -1,6 +1,6 @@
 import Foundation
 
-/// Whether the copy's slice takes `app.mapp.preferences`.
+/// Whether the copy's slice takes `app.marfa-mac.preferences`.
 ///
 /// A slice that names a type the sign-in cannot read, or one the server does not hold and the hydration could not
 /// register, fails the whole hydration (the core refuses it before it clears anything), so the type joins the slice only

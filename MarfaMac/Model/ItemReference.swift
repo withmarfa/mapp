@@ -46,7 +46,7 @@ nonisolated struct ItemReference: Codable, Transferable, Identifiable {
     private var fileName: String { QuickLookFile.name(for: title, type: type) }
 
     static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .mappItem)
+        CodableRepresentation(contentType: .marfaItem)
         FileRepresentation(exportedContentType: .plainText) { reference in
             guard case .text(let text) = reference.content,
                   let staged = QuickLookFile.write(text, titled: reference.title, as: reference.type, in: Self.folder, key: reference.id.rawValue)
@@ -74,7 +74,7 @@ nonisolated struct ItemReference: Codable, Transferable, Identifiable {
 extension UTType {
     /// Named for the bundle identifier, as `MarfaMac/Info.plist` declares it, so the Debug build and the installed app
     /// each own their type and an item never drags from one into the other.
-    nonisolated static let mappItem = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").item")
+    nonisolated static let marfaItem = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").item")
 }
 
 extension ItemLibrary {

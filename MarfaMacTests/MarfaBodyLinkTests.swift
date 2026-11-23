@@ -6,7 +6,7 @@ import Testing
 
 extension LiveMarfaTests {
     /// What Marfa answers for the links in an item's text, against the test instance, in the Live test plan. Every
-    /// item has a title starting `MAPPTEST ` and is purged when the test ends.
+    /// item has a title starting `MARFAMACTEST ` and is purged when the test ends.
     @Suite(.serialized)
     struct MarfaBodyLinkLiveTests {
         private static let note = TypeID("core.note")
@@ -54,11 +54,11 @@ extension LiveMarfaTests {
         func anOldLinkKeepsItsTargetWhenALinkToAnItemWithItsTitleIsAdded() async throws {
             try await withSource { source, log, made in
                 let token = UUID().uuidString.prefix(8)
-                let title = "MAPPTEST Plan \(token)"
+                let title = "MARFAMACTEST Plan \(token)"
                 let (plan, reader, reused) = (made.mint(), made.mint(), made.mint())
                 source.submit(.create(id: plan, ItemDraft(type: Self.note, title: title, body: "Plan")), as: WriteID())
-                source.submit(.create(id: reader, ItemDraft(type: Self.note, title: "MAPPTEST Reader \(token)", body: "See [[\(title)]].")), as: WriteID())
-                _ = try #require(await log.wait { $0.item(titled: title) != nil && $0.item(titled: "MAPPTEST Reader \(token)") != nil })
+                source.submit(.create(id: reader, ItemDraft(type: Self.note, title: "MARFAMACTEST Reader \(token)", body: "See [[\(title)]].")), as: WriteID())
+                _ = try #require(await log.wait { $0.item(titled: title) != nil && $0.item(titled: "MARFAMACTEST Reader \(token)") != nil })
                 await source.flush()
                 let first = try await targets(of: reader, in: source, count: 1)
                 #expect(first == ["[[\(title)]]": .item(id: plan.rawValue)])
@@ -88,10 +88,10 @@ extension LiveMarfaTests {
             try await withSource { source, log, made in
                 let token = UUID().uuidString.prefix(8)
                 let (target, decoy, reader) = (made.mint(), made.mint(), made.mint())
-                source.submit(.create(id: target, ItemDraft(type: Self.note, title: "MAPPTEST Target \(token)", body: "Target")), as: WriteID())
+                source.submit(.create(id: target, ItemDraft(type: Self.note, title: "MARFAMACTEST Target \(token)", body: "Target")), as: WriteID())
                 source.submit(.create(id: decoy, ItemDraft(type: Self.note, title: target.rawValue, body: "Decoy")), as: WriteID())
-                source.submit(.create(id: reader, ItemDraft(type: Self.note, title: "MAPPTEST Reader \(token)", body: "See [[\(decoy.rawValue)]].")), as: WriteID())
-                _ = try #require(await log.wait { $0.item(titled: "MAPPTEST Reader \(token)") != nil && $0.item(titled: target.rawValue) != nil })
+                source.submit(.create(id: reader, ItemDraft(type: Self.note, title: "MARFAMACTEST Reader \(token)", body: "See [[\(decoy.rawValue)]].")), as: WriteID())
+                _ = try #require(await log.wait { $0.item(titled: "MARFAMACTEST Reader \(token)") != nil && $0.item(titled: target.rawValue) != nil })
                 await source.flush()
                 #expect(try await targets(of: reader, in: source, count: 1) == ["[[\(decoy.rawValue)]]": .item(id: decoy.rawValue)])
 

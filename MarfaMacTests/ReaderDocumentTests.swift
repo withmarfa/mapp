@@ -59,7 +59,7 @@ import WebKit
 
     @Test func thePicturesAreTheAppsToGiveLikeAnyOtherDocuments() throws {
         let item = ItemID("item")
-        let document = ReaderDocument.html(for: article("<figure class=\"mapp-lead\"><img src=\"https://example.com/lead.jpg\"></figure>"))
+        let document = ReaderDocument.html(for: article("<figure class=\"marfa-lead\"><img src=\"https://example.com/lead.jpg\"></figure>"))
         let rewritten = SealedPictureRewrite.rewrite(Data(document.utf8), item: item, version: 3)
         #expect(rewritten.addresses == [URL(string: "https://example.com/lead.jpg")!] && rewritten.encoding == .utf8)
         let html = String(decoding: rewritten.html, as: UTF8.self)

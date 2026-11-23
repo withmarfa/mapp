@@ -4,7 +4,7 @@ import MarfaTesting
 import Testing
 @testable import MarfaMac
 
-/// Search is narrowed by the copy through the sets it is given, and MAPP keeps every hit it returns
+/// Search is narrowed by the copy through the sets it is given, and the app keeps every hit it returns
 /// (`MarfaSource.search`), so the limit counts items shown and the bin never takes a place in it.
 @Suite(.serialized, .hangLimit)
 struct MarfaSearchSetsTests {

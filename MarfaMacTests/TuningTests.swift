@@ -72,7 +72,7 @@ struct TuningTests {
         try tuning { tuning, _ in
             tuning[strength] = .number(0.35)
             #expect(tuning.report(build: "19") == """
-                MAPP build 19
+                the app build 19
                 band.strength = 0.35
                 band.enabled = true
                 shapes.shape = round
@@ -85,7 +85,7 @@ struct TuningTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let empty = Tuning(knobs: [], defaults: defaults)
-        #expect(empty.report(build: "19") == "MAPP build 19")
+        #expect(empty.report(build: "19") == "The app build 19")
         empty.reset()
     }
 

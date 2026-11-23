@@ -181,7 +181,7 @@ private struct LimitSourcesPage: View {
             OwnerLoading()
         } else {
             SettingsPageColumn {
-                Text("For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. MAPP too.")
+                Text("For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. The app too.")
                     .settingsFont(.sectionLine).foregroundStyle(SettingsTokens.secondaryText)
                     .padding(.horizontal, SettingsTokens.Metric.inset)
                 SettingsSection("Types", line: "Types with no limit read every source.") {

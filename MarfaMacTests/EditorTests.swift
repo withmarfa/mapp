@@ -697,14 +697,14 @@ struct EditorTests {
         let rejected = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
         #expect(rejected?["snapshotError"] == nil)
         #expect(rejected?["assetCount"] as? Int == 1)
-        #expect((rejected?["html"] as? String)?.contains("mapp-embed:") == false)
+        #expect((rejected?["html"] as? String)?.contains("marfa-embed:") == false)
         library.updateBody(of: note.id, to: "![a](Attachments/Photo%201.png)\n")
         page.editor.itemChanged(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
         let printable = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
         let html = try #require(printable?["html"] as? String)
         #expect(html.contains("data:image/png;base64,"))
-        #expect(!html.contains("mapp-embed:"))
+        #expect(!html.contains("marfa-embed:"))
     }
 
     @Test func anEditRewritesOnlyTheBlockItTouched() async throws {

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Settings window's sidebar, the system's: a search field, then MAPP's pages and the Marfa's in sections, each page a
+/// The Settings window's sidebar, the system's: a search field, then the app's pages and the Marfa's in sections, each page a
 /// colored tile, its name and an optional count. A search keeps the pages whose name, or the title of a row they hold, it
 /// finds. The first group of each half carries the half's name as its header; the later groups are split by the space the
 /// system puts between sections.
@@ -20,7 +20,7 @@ struct SettingsSidebar: View {
     /// The groups as they stand once the search has kept what it finds.
     private var groups: [Group] {
         var result: [Group] = []
-        for (name, source) in [(LocalizedStringKey("MAPP"), SettingsPage.mappGroups), (LocalizedStringKey("Marfa"), SettingsPage.marfaGroups)] {
+        for (name, source) in [(LocalizedStringKey("App"), SettingsPage.appGroups), (LocalizedStringKey("Marfa"), SettingsPage.marfaGroups)] {
             let kept = source.map { $0.filter { $0.matches(search) } }.filter { !$0.isEmpty }
             for (index, pages) in kept.enumerated() { result.append(Group(name: index == 0 ? name : nil, pages: pages, id: result.count)) }
         }

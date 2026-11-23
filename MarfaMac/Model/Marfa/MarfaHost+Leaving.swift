@@ -170,7 +170,7 @@ extension MarfaHost {
         } catch MarfaError.unsentDiffers {
             return .kept(.unreadable(folder: directory.path))
         } catch MarfaError.invalid {
-            return .kept(.notMapps(folder: directory.path))
+            return .kept(.notMadeByApp(folder: directory.path))
         } catch {
             return .failed(Self.message(error))
         }

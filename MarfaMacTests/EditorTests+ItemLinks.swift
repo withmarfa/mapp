@@ -157,7 +157,7 @@ extension EditorTests {
     @Test func theSlashMenuAndItsWordsComeFromTheAppsStrings() async throws {
         let page = try await Page()
         try await page.load("\n")
-        let labels = try await page.editor.webView.evaluateJavaScript("window.mappLabels") as? [String: String]
+        let labels = try await page.editor.webView.evaluateJavaScript("window.marfaLabels") as? [String: String]
         #expect(labels?["linkToItem"] == "Link to Item")
         #expect(labels?["slashTable"] == "Table")
         #expect(labels?["suggestionsLoading"] == "Loading…")

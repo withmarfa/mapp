@@ -167,7 +167,7 @@ nonisolated enum ItemBoardLayout {
     }
 
     /// The lanes of any other grouping, from its groups (`ItemTableLayout.groups`): only Not Set takes a card, which
-    /// clears the field; a date's span, Set and the rest take none, since MAPP would have to invent a value.
+    /// clears the field; a date's span, Set and the rest take none, since the app would have to invent a value.
     static func lanes(of groups: [ItemTableGroup], mode: GroupMode, order: [ItemID: Int]? = nil) -> [ItemBoardLane] {
         groups.map { group in
             let items = sorted(group.rows.map(\.item), by: order)

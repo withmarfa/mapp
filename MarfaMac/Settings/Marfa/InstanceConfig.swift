@@ -272,7 +272,7 @@ nonisolated extension InstanceSetting {
 /// Why the server's settings could not be read or changed, in terms the page can word for a person.
 nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
     case unreachable
-    /// MAPP’s sign-in lacks `config.manage`.
+    /// the app’s sign-in lacks `config.manage`.
     case notPermitted
     /// Another instance answers at the address than the one the settings were read from.
     case instanceChanged
@@ -289,15 +289,15 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
     var message: String {
         switch self {
         case .unreachable:
-            String(localized: "MAPP can’t reach the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected.")
+            String(localized: "The app can’t reach the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected.")
         case .notPermitted:
-            String(localized: "MAPP’s sign-in isn’t allowed to change this server’s settings. Ask whoever runs the server to allow it, or use the server’s console.")
+            String(localized: "The app’s sign-in isn’t allowed to change this server’s settings. Ask whoever runs the server to allow it, or use the server’s console.")
         case .instanceChanged:
             Self.anotherMarfaSentence + " " + String(localized: "These are its settings, not the ones you were editing.")
         case .unsupported:
             OwnerWording.line(.unsupported)
         case .keyRefused:
-            String(localized: "The server has ended MAPP’s sign-in. Sign in again in Connection.")
+            String(localized: "The server has ended the app’s sign-in. Sign in again in Connection.")
         case .refused(let reason), .failed(let reason):
             reason
         }

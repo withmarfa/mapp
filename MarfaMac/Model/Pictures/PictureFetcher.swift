@@ -30,7 +30,7 @@ nonisolated final class PictureFetcher: @unchecked Sendable {
         var redirects = 4
     }
 
-    static let userAgent = "MAPP"
+    static let userAgent = "MarfaMac"
 
     private let limits: Limits
     private let resolver: PictureAddressPolicy.Resolver

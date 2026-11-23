@@ -27,7 +27,7 @@ extension OwnerFailure {
 
 /// What the owner's pages say in place of themselves when the server could not give what they show.
 struct OwnerFailureState: View {
-    /// The page the state stands in for, which words what MAPP isn't allowed to do there.
+    /// The page the state stands in for, which words what the app isn't allowed to do there.
     let page: MarfaSettingsPage
     let failure: OwnerFailure
     let host: any MarfaSettingsHost
@@ -75,7 +75,7 @@ struct OwnerLoading: View {
 struct OwnerProblemRow: View {
     let title: LocalizedStringKey
     let failure: OwnerFailure
-    /// The row's own words for what MAPP isn't allowed to do, where the page's one line for its permission doesn't fit.
+    /// The row's own words for what the app isn't allowed to do, where the page's one line for its permission doesn't fit.
     var line: String?
     let page: MarfaSettingsPage
     let host: any MarfaSettingsHost

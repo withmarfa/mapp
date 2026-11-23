@@ -24,7 +24,7 @@ enum LooksFiles {
         guard let library = libraries.current else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = String(localized: "MAPP Layouts") + ".json"
+        panel.nameFieldStringValue = String(localized: "Marfa Layouts") + ".json"
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             do {
@@ -66,7 +66,7 @@ enum LooksFiles {
         case .notLoaded:
             notLoadedMessage
         case .notALooksFile, .unwritable:
-            String(localized: "“\(file)” is not a layouts file that MAPP can read. No layouts were changed.")
+            String(localized: "“\(file)” is not a layouts file that app can read. No layouts were changed.")
         }
     }
 }

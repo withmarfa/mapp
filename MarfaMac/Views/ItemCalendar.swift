@@ -17,7 +17,7 @@ struct ItemCalendar: View {
         let _ = daysSeen
         let _ = weekStart
         let items = browser.filteredItems(in: library)
-        let calendar = Calendar.mapp
+        let calendar = Calendar.chosenWeekStart
         let now = library.now()
         let anchor = browser.calendarDay ?? now
         let firstShown = CalendarLayout.firstDayShown(browser.calendarDay, now: now, calendar: calendar)

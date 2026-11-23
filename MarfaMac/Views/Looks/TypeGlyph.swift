@@ -1,7 +1,7 @@
 import MarfaIcons
 import SwiftUI
 
-/// The symbols MAPP draws for a type's icon in place of the SDK's choice, by icon id, so no item type is named here.
+/// The symbols the app draws for a type's icon in place of the SDK's choice, by icon id, so no item type is named here.
 /// At the 10 to 12 points of a mark the SDK's `note.text` reads as a little calendar, and it has no symbol for the
 /// others, whose Lucide artwork is a heavier line than the symbols round it.
 nonisolated enum TypeSymbol {

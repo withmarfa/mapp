@@ -66,7 +66,7 @@ nonisolated struct SyncStatus: Hashable, Sendable {
     private static var unavailable: Notice {
         Notice(
             kind: .unavailable, title: String(localized: "Library unavailable"), line: String(localized: "Library unavailable"),
-            detail: String(localized: "MAPP can’t open the copy of your library on this Mac. Open Settings to see what to do."),
+            detail: String(localized: "The app can’t open the copy of your library on this Mac. Open Settings to see what to do."),
             symbol: "exclamationmark.triangle", isWarning: true)
     }
 
@@ -151,7 +151,7 @@ nonisolated enum Words {
         case .afterRefusal:
             return String(localized: "It went with an earlier change that wasn’t sent, so it wasn’t sent either. Make it again.")
         case .notSent:
-            return String(localized: "MAPP couldn’t send this change.")
+            return String(localized: "The app couldn’t send this change.")
         }
     }
 
@@ -178,17 +178,17 @@ nonisolated enum Words {
     /// that can't be read stays unread after that version sends everything, and the package never removes a copy whose
     /// changes it can't read, so the way out then is to remove the copy's folder.
     static func otherVersion(unsent: UInt64?) -> String {
-        let lead = String(localized: "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it.")
+        let lead = String(localized: "This version of the app can’t read the copy of your library on this Mac, because a different version made it.")
         switch unsent {
         case let count?:
             return [
                 lead, notSent(Int(clamping: count)),
-                String(localized: "They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again."),
+                String(localized: "They’re still in that copy. To send them, install the previous build of the app from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update the app again."),
             ].joined(separator: " ")
         case nil:
             return [
-                lead, String(localized: "MAPP can’t tell whether that copy holds changes that haven’t reached the server."),
-                String(localized: "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. MAPP can’t remove a copy it can’t count, so when that build has sent everything, update MAPP, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again."),
+                lead, String(localized: "The app can’t tell whether that copy holds changes that haven’t reached the server."),
+                String(localized: "To send any changes it holds, install the previous build of the app from TestFlight and connect it to this server if it isn’t already. The app can’t remove a copy it can’t count, so when that build has sent everything, update the app, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again."),
             ].joined(separator: " ")
         }
     }
@@ -196,12 +196,12 @@ nonisolated enum Words {
     /// The package removes a copy only against the list of the changes in it, so a copy whose changes can't be listed
     /// is left for the person, who is shown where it is.
     static func cannotDiscard(folder: String) -> String {
-        String(localized: "MAPP can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit MAPP first, then move the folder “\(folder)” to the Trash. Anything in it that hasn’t reached the server is lost.")
+        String(localized: "The app can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit the app first, then move the folder “\(folder)” to the Trash. Anything in it that hasn’t reached the server is lost.")
     }
 
-    /// Another process holds the copy as its writer, which on this Mac is another copy of MAPP.
+    /// Another process holds the copy as its writer, which on this Mac is another copy of the app.
     static var inUse: String {
-        String(localized: "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one.")
+        String(localized: "Another copy of the app on this Mac is using your library. Quit the other copy, then quit and reopen this one.")
     }
 
     /// The package's notice is in English, so the app says it in its own words.
@@ -215,44 +215,44 @@ nonisolated enum Words {
 
     /// The Keychain would not give the sign-in, which is not the same as there being none or the server ending it.
     static var signInUnreadable: String {
-        String(localized: "MAPP couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen MAPP, or sign in again in Settings.")
+        String(localized: "The app couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen the app, or sign in again in Settings.")
     }
 
     /// How the owner ends an approval the server at `address` may still hold: only they can, with the command line
     /// signed in to that address.
     private static func endApproval(at address: String) -> String {
-        String(localized: "To end it, run “marfa apps list” with the command line signed in to \(address) as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”.")
+        String(localized: "To end it, run “marfa apps list” with the command line signed in to \(address) as the owner, find the “Marfa for Mac” entry, then run “marfa apps revoke <id>”.")
     }
 
-    /// A sign-in that replaced another on the same server, where MAPP could not confirm the older approval ended.
+    /// A sign-in that replaced another on the same server, where the app could not confirm the older approval ended.
     static var replacedApprovalTitle: String {
-        String(localized: "MAPP’s Earlier Approval May Still Stand")
+        String(localized: "This App’s Earlier Approval May Still Stand")
     }
 
     static func replacedApproval(address: String) -> String {
-        String(localized: "MAPP couldn’t confirm that \(address) ended MAPP’s earlier approval.") + " " + String(localized: "Run “marfa apps list” with the command line signed in to \(address) as the owner. Use the approval date to identify the earlier MAPP approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID.")
+        String(localized: "The app couldn’t confirm that \(address) ended the app’s earlier approval.") + " " + String(localized: "Run “marfa apps list” with the command line signed in to \(address) as the owner. Use the approval date to identify the earlier “Marfa for Mac” approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID.")
     }
 
-    /// What MAPP is no longer allowed to do after a sign-in the owner approved with fewer permissions than it held.
+    /// What the app is no longer allowed to do after a sign-in the owner approved with fewer permissions than it held.
     static var permissionsLostTitle: String {
         String(localized: "Fewer Permissions Allowed")
     }
 
     static func permissionsLost(_ lost: Set<InstancePermission>) -> String {
         let list = lost.sorted { $0.rawValue < $1.rawValue }.map(\.allowedTo).formatted(.list(type: .and))
-        return String(localized: "MAPP is no longer allowed to \(list). Allow it again from the page that needs it.")
+        return String(localized: "The app is no longer allowed to \(list). Allow it again from the page that needs it.")
     }
 
     /// A clean-up sign-out that threw before it forgot or revoked anything, so the sign-in and the approval may both stand.
     static var signOutFailedTitle: String {
-        String(localized: "MAPP’s Sign-In May Still Be Kept")
+        String(localized: "This App’s Sign-In May Still Be Kept")
     }
 
     static func signOutFailed(address: String) -> String {
-        String(localized: "MAPP couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at \(address).") + " " + endApproval(at: address)
+        String(localized: "The app couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at \(address).") + " " + endApproval(at: address)
     }
 
-    /// A sign-in MAPP dropped, or forgot on this Mac, whose approval it could not confirm the server ended.
+    /// A sign-in the app dropped, or forgot on this Mac, whose approval it could not confirm the server ended.
     enum ForgottenApproval {
         /// The sign-in of the server the person left.
         case left
@@ -264,9 +264,9 @@ nonisolated enum Words {
 
     static func approvalMayStandTitle(_ which: ForgottenApproval) -> String {
         switch which {
-        case .left: String(localized: "Disconnected, but MAPP May Still Be Approved")
-        case .previous: String(localized: "Switched Servers, but MAPP May Still Be Approved on the Previous One")
-        case .abandoned: String(localized: "MAPP May Still Be Approved")
+        case .left: String(localized: "Disconnected, but This App May Still Be Approved")
+        case .previous: String(localized: "Switched Servers, but This App May Still Be Approved on the Previous One")
+        case .abandoned: String(localized: "This App May Still Be Approved")
         }
     }
 
@@ -274,33 +274,33 @@ nonisolated enum Words {
     static func approvalMayStand(_ which: ForgottenApproval, address: String) -> String {
         let told = switch which {
         case .left:
-            String(localized: "MAPP forgot its sign-in on this Mac, but couldn’t confirm that \(address) ended the approval.")
+            String(localized: "The app forgot its sign-in on this Mac, but couldn’t confirm that \(address) ended the approval.")
         case .previous:
-            String(localized: "MAPP forgot the previous server’s sign-in on this Mac, but couldn’t confirm that \(address) ended the approval.")
+            String(localized: "The app forgot the previous server’s sign-in on this Mac, but couldn’t confirm that \(address) ended the approval.")
         case .abandoned:
-            String(localized: "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that \(address) ended its approval.")
+            String(localized: "The app dropped a sign-in it didn’t use, but couldn’t confirm that \(address) ended its approval.")
         }
         return told + " " + endApproval(at: address)
     }
 
     /// The copy could not be opened or made, for a reason the package did not name.
     static var copyCouldNotBeOpened: String {
-        String(localized: "MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again.")
+        String(localized: "The app couldn’t make or open the copy of your library on this Mac. Check that app can change its own files, then try again.")
     }
 
     /// The copy's file is damaged. It says where the copy is, what it holds that no server has taken (`unsent` is nil
     /// where the queue could not be read), and, when setting the damaged copy aside stopped partway, that opening the
     /// library again finishes it.
     static func storeDamaged(folder: String?, unsent: UInt64?, setAsideStopped: Bool) -> String {
-        var parts = [String(localized: "The copy of your library on this Mac is damaged, so MAPP can’t open it.")]
+        var parts = [String(localized: "The copy of your library on this Mac is damaged, so the app can’t open it.")]
         if let folder { parts.append(String(localized: "The copy is in the folder “\(folder)”.")) }
         switch unsent {
         case let count? where count > 0: parts.append(notSent(Int(clamping: count)))
         case 0?: parts.append(String(localized: "It holds no changes that haven’t reached the server."))
-        default: parts.append(String(localized: "MAPP couldn’t read whether it holds changes that haven’t reached the server."))
+        default: parts.append(String(localized: "The app couldn’t read whether it holds changes that haven’t reached the server."))
         }
         if setAsideStopped {
-            parts.append(String(localized: "MAPP started to set the damaged copy aside and stopped partway. Open the library again to finish it."))
+            parts.append(String(localized: "The app started to set the damaged copy aside and stopped partway. Open the library again to finish it."))
         }
         return parts.joined(separator: " ")
     }
@@ -316,29 +316,29 @@ nonisolated enum Words {
     static func renewalRefused(_ reason: RenewalRefusalReason) -> String {
         switch reason {
         case .refused:
-            String(localized: "MAPP couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again.")
+            String(localized: "The app couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again.")
         case .redirected:
-            String(localized: "MAPP couldn’t renew its sign-in because the server redirected the request. Check the server address in Settings, then try again. If this keeps happening, sign in again.")
+            String(localized: "The app couldn’t renew its sign-in because the server redirected the request. Check the server address in Settings, then try again. If this keeps happening, sign in again.")
         case .unreadable:
-            String(localized: "MAPP couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again.")
+            String(localized: "The app couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again.")
         }
     }
 
-    /// The server ended MAPP's sign-in, whatever step met it.
+    /// The server ended the app's sign-in, whatever step met it.
     static var signInEnded: String {
-        String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
+        String(localized: "The server has ended the app’s sign-in. Sign in again in Settings.")
     }
 
-    /// MAPP and the server speak different versions of Marfa. Where a write was sent, the server may have made it.
+    /// The app and the server speak different versions of Marfa. Where a write was sent, the server may have made it.
     static func contractMismatch(writeSent: Bool) -> String {
         writeSent
-            ? String(localized: "This version of MAPP and the server use different versions of Marfa, and the change may already have been made. Update MAPP or the server, then check the change.")
-            : String(localized: "This version of MAPP and the server use different versions of Marfa, so the server didn’t make the change. Update MAPP or the server, then try again.")
+            ? String(localized: "This version of the app and the server use different versions of Marfa, and the change may already have been made. Update the app or the server, then check the change.")
+            : String(localized: "This version of the app and the server use different versions of Marfa, so the server didn’t make the change. Update the app or the server, then try again.")
     }
 
-    /// The server or the copy stopped a step for a reason MAPP can't resolve itself.
+    /// The server or the copy stopped a step for a reason the app can't resolve itself.
     static var syncFailed: String {
-        String(localized: "MAPP ran into a problem it can’t resolve itself. Choose Refresh to try again.")
+        String(localized: "The app ran into a problem it can’t resolve itself. Choose Refresh to try again.")
     }
 
     /// There is not enough room on this Mac for the copy.
@@ -348,12 +348,12 @@ nonisolated enum Words {
 
     /// The address reaches another Marfa server than the one the open library was made for, which a new sign-in cannot change.
     static var differentServer: String {
-        String(localized: "This address reaches a different Marfa server from the one this library was made for, so MAPP left the library as it was.")
+        String(localized: "This address reaches a different Marfa server from the one this library was made for, so the app left the library as it was.")
     }
 
     /// The server could not be reached.
     static var serverUnreachable: String {
-        String(localized: "MAPP couldn’t reach the server. Check your connection, then try again.")
+        String(localized: "The app couldn’t reach the server. Check your connection, then try again.")
     }
 
     /// What to show a person of an error the package raised, in the app's words: what the package, the system or the
@@ -380,7 +380,7 @@ nonisolated enum Words {
     /// The address now reaches another Marfa server than the one this copy was made for, so nothing in the copy is
     /// sent there. The count is of the changes the copy holds that no server has taken; `nil` where it can't be read.
     static func otherServer(unsent: UInt64?) -> String {
-        let lead = String(localized: "This address now reaches a different Marfa server from the one this copy of your library was made for, so MAPP has stopped syncing it.")
+        let lead = String(localized: "This address now reaches a different Marfa server from the one this copy of your library was made for, so the app has stopped syncing it.")
         let way = String(localized: "To start a new copy from this server, choose Disconnect in Settings, then connect again.")
         switch unsent {
         case let count? where count > 0:
@@ -388,7 +388,7 @@ nonisolated enum Words {
         case 0?:
             return [lead, way].joined(separator: " ")
         default:
-            return [lead, String(localized: "MAPP can’t tell whether this copy holds changes that haven’t reached a server."), way]
+            return [lead, String(localized: "The app can’t tell whether this copy holds changes that haven’t reached a server."), way]
                 .joined(separator: " ")
         }
     }
@@ -448,7 +448,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
             headline = Self.refusedHeadline(entry.change, name: name)
             let reason = entry.reason
             if let grant = reason?.grant {
-                explanation = String(localized: "MAPP doesn’t have permission for “\(grant.name)”. Ask whoever runs the server to allow it, then make the change again.")
+                explanation = String(localized: "The app doesn’t have permission for “\(grant.name)”. Ask whoever runs the server to allow it, then make the change again.")
             } else if reason?.isTrashed == true {
                 explanation = String(localized: "The item is in Recently Deleted on the server, so it can’t be changed. Restore it, then make the change again.")
             } else if let unsent = reason?.unsent {
@@ -469,13 +469,13 @@ nonisolated struct ProblemWording: Hashable, Sendable {
             case .ancestorUnavailable: String(localized: "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it.")
             case .conflictUnresolved: String(localized: "It can’t be applied until a conflict on the item is settled. Undoing it puts the item back as the server has it.")
             case .instanceChanged: String(localized: "This change was made for a library the server no longer holds as it was. Try again to send it to the library as it is now, or undo it to put the item back as the server has it.")
-            case .recordUnread: String(localized: "This change came from a copy that MAPP could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it.")
+            case .recordUnread: String(localized: "This change came from a copy that app could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it.")
             case .serverRestored: String(localized: "The server was restored to an earlier point, and this change would put back what the restore removed. Try again to send it anyway, or undo it to keep the item as the server has it.")
             case .failingAlone: String(localized: "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it.")
             }
         case .dead:
             headline = Self.stoppedHeadline(name: name)
-            explanation = String(localized: "MAPP tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it.")
+            explanation = String(localized: "The app tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it.")
         }
         self.headline = headline
         self.explanation = explanation
@@ -543,7 +543,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
 }
 
 extension InstancePermission {
-    /// What holding the permission lets MAPP do, said as the Settings pages say it after "MAPP isn’t allowed to".
+    /// What holding the permission lets the app do, said as the Settings pages say it after "The app isn’t allowed to".
     nonisolated var allowedTo: String {
         switch self {
         case .configManage: String(localized: "see and change the server’s settings")

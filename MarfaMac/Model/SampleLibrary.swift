@@ -4,32 +4,32 @@ import Marfa
 import MarfaTesting
 
 /// A Marfa library to try the app with, held in memory by marfa-swift's fake working copy, for the UI tests and
-/// screenshots. A debug build launched with `-MAPPSampleLibrary` connects to it as if to a server. Nothing ships
+/// screenshots. A debug build launched with `-MarfaMacSampleLibrary` connects to it as if to a server. Nothing ships
 /// with it, and nothing it holds outlives the run.
 nonisolated enum SampleLibrary {
-    static let flag = "-MAPPSampleLibrary"
+    static let flag = "-MarfaMacSampleLibrary"
 
     static var isRequested: Bool { ProcessInfo.processInfo.arguments.contains(flag) }
 
     /// With the sample flag, starts with no server set instead of the sample, as a first launch does, still clear of
     /// the person's saved server and Keychain.
-    static var startsUnconfigured: Bool { ProcessInfo.processInfo.arguments.contains("-MAPPSampleUnconfigured") }
+    static var startsUnconfigured: Bool { ProcessInfo.processInfo.arguments.contains("-MarfaMacSampleUnconfigured") }
 
     /// Also asks for the tasks and events a board and a timeline show.
-    static var withCollections: Bool { ProcessInfo.processInfo.arguments.contains("-MAPPCollectionSample") }
+    static var withCollections: Bool { ProcessInfo.processInfo.arguments.contains("-MarfaMacCollectionSample") }
 
-    /// With the sample flag, `-MAPPOpenPlace <type id>` opens that type's place (`items` opens Items) and
-    /// `-MAPPLayout list|gallery|table|board|timeline|calendar` the layout, for a screenshot of one view.
+    /// With the sample flag, `-MarfaMacOpenPlace <type id>` opens that type's place (`items` opens Items) and
+    /// `-MarfaMacLayout list|gallery|table|board|timeline|calendar` the layout, for a screenshot of one view.
     static var launchPlace: SidebarItem? {
-        argument(after: "-MAPPOpenPlace").map { $0 == "items" ? .allItems : .itemType($0) }
+        argument(after: "-MarfaMacOpenPlace").map { $0 == "items" ? .allItems : .itemType($0) }
     }
 
-    static var launchLayout: ItemViewMode? { argument(after: "-MAPPLayout").flatMap(ItemViewMode.init(rawValue:)) }
+    static var launchLayout: ItemViewMode? { argument(after: "-MarfaMacLayout").flatMap(ItemViewMode.init(rawValue:)) }
 
     /// Forgets what an earlier run chose and the defaults kept, so a sample launch opens as a first launch does: the
     /// order, page, list and interface settings, each place's default view, each table's columns and each saved view's
     /// layout. Without these a column hidden or a layout chosen in one session stayed in every later one, whatever
-    /// `-MAPPLayout` or the place's look says.
+    /// `-MarfaMacLayout` or the place's look says.
     @MainActor static func forgetStoredChoices(in defaults: UserDefaults) {
         MacSettings.reset(in: defaults)
     }

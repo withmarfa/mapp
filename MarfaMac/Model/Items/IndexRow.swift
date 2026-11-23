@@ -42,7 +42,7 @@ nonisolated struct IndexRow: Identifiable, Hashable, Sendable {
     var latestOrOldest: Date { latest ?? .distantPast }
 }
 
-/// The mark beside a source: the one the server gives it, else a neutral symbol, since MAPP does not know what kind a
+/// The mark beside a source: the one the server gives it, else a neutral symbol, since the app does not know what kind a
 /// source is (a folder, a connector, an app or an API key).
 nonisolated enum SourceTile {
     static let fallbackSymbol = "antenna.radiowaves.left.and.right"

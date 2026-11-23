@@ -30,8 +30,8 @@ if [[ -z ${TEST_RUNNER_MARFA_TEST_INSTANCE_ID:-} || -z $reported || $reported !=
   exit 2
 fi
 
-log=$(mktemp -t mapp-measure-log)
-out=$(mktemp -t mapp-measure-out)
+log=$(mktemp -t marfa-mac-measure-log)
+out=$(mktemp -t marfa-mac-measure-out)
 
 # The articles the large-item test opens, made once for the run when the command line can reach the instance.
 if command -v marfa > /dev/null && [[ -n ${TEST_RUNNER_MARFA_API_URL:-} && -n ${TEST_RUNNER_MARFA_API_KEY:-} ]]; then

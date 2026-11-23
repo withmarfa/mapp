@@ -8,7 +8,7 @@ import Synchronization
 import Testing
 @testable import MarfaMac
 
-/// A host for the Marfa's pages with canned answers, which shows they need nothing of MAPP but the protocol.
+/// A host for the Marfa's pages with canned answers, which shows they need nothing of the app but the protocol.
 @Observable @MainActor final class StubMarfaHost: MarfaSettingsHost {
     var serverName = "Castell Studio"
     var serverAddress: String? = "marfa.castell.studio"
@@ -22,7 +22,7 @@ import Testing
     var deletedRetentionDays: Int? = 60
     var canDeletePermanently = true
     var openInApp: ((String) -> Void)? { nil }
-    var ownAppVendor: String? { "app.mapp" }
+    var ownAppVendor: String? { "app.marfa-mac" }
 
     var webSignInReturn: String { "com.withmarfa.mapp.test:/signed-in" }
     /// What the web sign-in sheet answers, and the addresses it was shown.
@@ -277,7 +277,7 @@ struct RenderedWindow<Detail: View>: View {
         let (libraries, bench) = try await connected()
         _ = bench
         try await SettingsRender.png(
-            RenderedWindow(selection: .connection, detail: ConnectionPage(settingsHost: MAPPMarfaSettingsHost(libraries: libraries, launcher: SettingsLauncher())).environment(libraries).environment(libraries.host)),
+            RenderedWindow(selection: .connection, detail: ConnectionPage(settingsHost: AppSettingsHost(libraries: libraries, launcher: SettingsLauncher())).environment(libraries).environment(libraries.host)),
             size: Self.size, named: "Connection")
     }
 
@@ -296,13 +296,13 @@ struct RenderedWindow<Detail: View>: View {
             bench.signIns.save("k", for: URL(string: "https://marfa.castell.studio")!, permissions: Set(InstancePermission.allCases))
         }
         if !readsName {
-            // A sign-in made before MAPP asked for the owner's name.
+            // A sign-in made before the app asked for the owner's name.
             bench.signIns.save("k", for: URL(string: "https://marfa.castell.studio")!, permissions: SystemSignIns.askedAtSignIn, profile: false)
         }
         source.report.set(SyncReport(lastSynced: .now.addingTimeInterval(-60), waiting: waiting, queueRead: true))
         source.state.set(state)
         await libraries.host.refreshGrants()
-        let page = ConnectionPage(settingsHost: MAPPMarfaSettingsHost(libraries: libraries, launcher: SettingsLauncher()))
+        let page = ConnectionPage(settingsHost: AppSettingsHost(libraries: libraries, launcher: SettingsLauncher()))
         try await SettingsRender.png(
             RenderedWindow(selection: .connection, detail: page.environment(libraries).environment(libraries.host)),
             size: Self.size, named: name, settle: .milliseconds(800))
@@ -323,7 +323,7 @@ struct RenderedWindow<Detail: View>: View {
         let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         try await SettingsRender.png(
-            RenderedWindow(selection: .connection, detail: ConnectionPage(settingsHost: MAPPMarfaSettingsHost(libraries: libraries, launcher: SettingsLauncher())).environment(libraries).environment(libraries.host)),
+            RenderedWindow(selection: .connection, detail: ConnectionPage(settingsHost: AppSettingsHost(libraries: libraries, launcher: SettingsLauncher())).environment(libraries).environment(libraries.host)),
             size: Self.size, named: "Connection, not connected")
     }
 
@@ -430,7 +430,7 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     private static let sourceRows = [
-        MarfaSourceRow(code: "mapp", name: "MAPP", mark: nil, count: 4_212, hasChosenName: false),
+        MarfaSourceRow(code: "marfa-mac", name: "Marfa for Mac", mark: nil, count: 4_212, hasChosenName: false),
         MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, hasChosenName: true),
         MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, hasChosenName: false),
         MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, hasChosenName: false),
@@ -446,7 +446,7 @@ struct RenderedWindow<Detail: View>: View {
         fake(host).state.withLock {
             $0.names = ["core.highlight": "Highlights", "core.bookmark": "Bookmarks"]
             $0.sourceLimit = SourceLimit(
-                instanceID: "instance-1", isOn: true, types: ["core.highlight"], sources: ["mapp", "readwise"], strictTypes: nil, allowlist: nil)
+                instanceID: "instance-1", isOn: true, types: ["core.highlight"], sources: ["marfa-mac", "readwise"], strictTypes: nil, allowlist: nil)
         }
         try await SettingsRender.png(
             windowed(.sources, host: host, subpage: SourcesPage.limitSources), size: Self.size, named: "Sources, Limit Sources")
@@ -492,7 +492,7 @@ struct RenderedWindow<Detail: View>: View {
             $0.deletedItems = titles.enumerated().map { index, title in
                 MarfaDeletedItem(
                     id: "item-\(index)", title: title, deleted: Date.now.addingTimeInterval(-Double(index) * 86_400 * 2), kind: "Notes",
-                    source: "MAPP")
+                    source: "Marfa for Mac")
             }
             $0.deletedCount = 1_204
         }
@@ -507,7 +507,7 @@ struct RenderedWindow<Detail: View>: View {
         let host = await stub { $0.grants = [] }
         try await SettingsRender.png(
             RenderedWindow(selection: .recentlyDeleted, detail: MarfaSettingsPageView(page: .recentlyDeleted, host: host)),
-            size: Self.size, named: "A page MAPP may not open")
+            size: Self.size, named: "A page the app may not open")
     }
 
     @Test func notAnswering() async throws {
@@ -546,7 +546,7 @@ struct RenderedWindow<Detail: View>: View {
             ]
             state.names = ["core.task": "Tasks", "core.note": "Notes", "core.bookmark": "Bookmarks"]
             state.apps = [
-                AppAccess(id: "g1", clientID: "mapp", kind: .app, name: "MAPP on MacBook Pro", origins: [], scopes: ["*:read", "*:write"], granted: Self.days(30), lastUsed: .now),
+                AppAccess(id: "g1", clientID: "marfa-mac", kind: .app, name: "Marfa for Mac on MacBook Pro", origins: [], scopes: ["*:read", "*:write"], granted: Self.days(30), lastUsed: .now),
                 AppAccess(id: "g2", clientID: "raycast", kind: .app, name: "Raycast", origins: [], scopes: ["core.task:read", "core.task:write", "core.note:read", "core.note:write", "core.bookmark:read"], granted: Self.days(50), lastUsed: Self.days(0)),
                 AppAccess(id: "g3", clientID: "shortcuts", kind: .app, name: "Shortcuts", origins: [], scopes: ["core.task:read", "core.task:write"], granted: Self.days(40), lastUsed: Self.days(2)),
                 AppAccess(id: "g4", clientID: "marfa-cli", kind: .commandLine, name: "marfa on Mac mini", origins: [], scopes: ["*:read", "*:write"], granted: Self.days(20), lastUsed: Self.days(3)),
@@ -558,13 +558,13 @@ struct RenderedWindow<Detail: View>: View {
                 KeyInfo(id: "k4", label: "Raycast capture", source: "raycast", permissions: [], tier: .feed, types: ["core.note": .write], created: Self.days(30), expires: nil, lastUsed: .now, appClientID: "raycast"),
             ]
             // A key sign-in, since a signed-in app can't be told from another app by anything it knows about itself.
-            state.identity = OwnIdentity(keyID: "k-mapp", expires: nil)
-            let mapp = OwnerWebhook.Maker(kind: .key, id: "k-mapp", name: "MAPP on MacBook Pro")
+            state.identity = OwnIdentity(keyID: "k-marfa-mac", expires: nil)
+            let ownMaker = OwnerWebhook.Maker(kind: .key, id: "k-marfa-mac", name: "Marfa for Mac on MacBook Pro")
             let raycast = OwnerWebhook.Maker(kind: .app, id: "raycast", name: "Raycast")
             let zine = OwnerWebhook.Maker(kind: .key, id: "k2", name: "Lisbon zine importer")
             state.webhooks = [
-                OwnerWebhook(id: "w1", url: "https://build.castell.studio/hooks/marfa", events: ["item.created", "item.updated", "item.trashed"], typeFilter: "core.task", secretTail: "8f2c", active: true, created: Self.days(48), maker: mapp),
-                OwnerWebhook(id: "w2", url: "https://hooks.ledgerly.app/marfa", events: ["item.created"], typeFilter: "core.task", secretTail: "1a9d", active: false, created: Self.days(20), maker: mapp),
+                OwnerWebhook(id: "w1", url: "https://build.castell.studio/hooks/marfa", events: ["item.created", "item.updated", "item.trashed"], typeFilter: "core.task", secretTail: "8f2c", active: true, created: Self.days(48), maker: ownMaker),
+                OwnerWebhook(id: "w2", url: "https://hooks.ledgerly.app/marfa", events: ["item.created"], typeFilter: "core.task", secretTail: "1a9d", active: false, created: Self.days(20), maker: ownMaker),
                 OwnerWebhook(id: "w3", url: "https://raycast.castell.studio/notify", events: ["item.created", "item.updated"], typeFilter: "core.task", secretTail: "5e07", active: true, created: Self.days(30), maker: raycast),
                 OwnerWebhook(id: "w4", url: "https://zine.castell.studio/hooks/new", events: ["item.created"], typeFilter: "core.bookmark", secretTail: "c3b1", active: true, created: Self.days(12), maker: zine),
             ]
@@ -804,7 +804,7 @@ struct RenderedWindow<Detail: View>: View {
             $0.consequences = [
                 .init(code: "browser_sessions_end", sentence: "Every browser signs in again at the new address. 2 are signed in.", count: 2),
                 .init(code: "passkeys_unusable", sentence: "A passkey works only where it was added. Add them again.", count: 2),
-                .init(code: "apps_sign_in_again", sentence: "MAPP included. Each signs in at the new address.", count: 4),
+                .init(code: "apps_sign_in_again", sentence: "The app included. Each signs in at the new address.", count: 4),
             ]
         }
         let model = AddressesModel(context: context(host))

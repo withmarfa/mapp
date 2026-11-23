@@ -212,7 +212,7 @@ extension ClientOwnerCalls {
         return details?.object?["settings"]?.array?.compactMap(\.string) ?? []
     }
 
-    /// Whether the server refused a sign-in's `return_to`, as it does for a sign-in that is not an app's: the redirect MAPP
+    /// Whether the server refused a sign-in's `return_to`, as it does for a sign-in that is not an app's: the redirect the app
     /// registered is only accepted from the app that registered it.
     static func signInReturnRefused(_ error: any Error) -> Bool {
         guard case .validation(_, let message, let details, let server)? = marfaError(error) else { return false }
@@ -300,7 +300,7 @@ extension ClientOwnerCalls {
         } catch {
             if let settings = Self.signInSettingsMissing(error) { throw .signInNeeds(settings) }
             if Self.signInReturnRefused(error) {
-                throw .failed(String(localized: "A connector’s sign-in needs MAPP signed in as an app. Sign in again in Connection."))
+                throw .failed(String(localized: "A connector’s sign-in needs the app signed in as an app. Sign in again in Connection."))
             }
             throw Self.failure(error)
         }

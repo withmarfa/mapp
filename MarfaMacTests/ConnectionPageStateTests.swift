@@ -27,8 +27,8 @@ import Testing
     @Test func notAnsweringOffersTryAgainAndSaysSince() {
         let state = standing(.offline(reason: "refused"), synced: Self.now.addingTimeInterval(-3_600))
         #expect(state.word == "Not Answering" && state.tone == .warning && state.action == .tryAgain)
-        #expect(state.line?.hasPrefix("Not answering since ") == true && state.line?.hasSuffix("MAPP keeps trying.") == true)
-        #expect(standing(.offline(reason: nil)).line == "Not answering. MAPP keeps trying.")
+        #expect(state.line?.hasPrefix("Not answering since ") == true && state.line?.hasSuffix("The app keeps trying.") == true)
+        #expect(standing(.offline(reason: nil)).line == "Not answering. The app keeps trying.")
     }
 
     @Test func signedOutOffersSignInAndSaysTheCopyIsKept() {
@@ -54,7 +54,7 @@ import Testing
         let grants: Set<InstancePermission> = [.itemsPurge, .configManage, .schemaWrite, .auditRead, .keysMint]
         let account = ConnectionAccount(state: .online, grants: grants, grantsRead: true, waiting: 0, serverName: "X")
         #expect(!account.holdsAll && account.held == 5)
-        #expect(account.permissionsLine == "MAPP holds 5 of the owner’s 14 permissions.")
+        #expect(account.permissionsLine == "The app holds 5 of the owner’s 14 permissions.")
     }
 
     /// One count everywhere: a key's and an app's pages say "N of 14", and Connection counts the same 14 and asks for every
@@ -67,7 +67,7 @@ import Testing
         #expect(all.holdsAll && all.permissionsValue == "All 14")
         let without = ConnectionAccount(
             state: .online, grants: Set(InstancePermission.allCases).subtracting([.signInsManage]), grantsRead: true, waiting: 0, serverName: "X")
-        #expect(!without.holdsAll && without.permissionsLine == "MAPP holds 13 of the owner’s 14 permissions.")
+        #expect(!without.holdsAll && without.permissionsLine == "The app holds 13 of the owner’s 14 permissions.")
     }
 
     /// S26 to S30: Signed In As is shown while the sign-in is held, answered or not, and not once it has ended.
@@ -82,7 +82,7 @@ import Testing
     @Test func withoutTheNameScopeSignedInAsIsEmptyAndPointsToTheOneAllowMore() {
         let without = ConnectionAccount(state: .online, grants: [], grantsRead: true, readsProfile: false, waiting: 0, serverName: "X")
         #expect(without.showsName && without.offersName)
-        #expect(without.nameLine == "Allow More… lets MAPP read the owner’s name.")
+        #expect(without.nameLine == "Allow More… lets the app read the owner’s name.")
         let with = ConnectionAccount(state: .online, grants: [], grantsRead: true, readsProfile: true, waiting: 0, serverName: "X")
         #expect(with.nameLine == nil)
         // Where no Allow More… is there to give the name, no line promises one.
@@ -107,7 +107,7 @@ import Testing
         #expect(ConnectionAccount(state: .online, grants: [], grantsRead: true, waiting: nil, serverName: "X").unsent == "Unknown")
     }
 
-    /// withmarfa/mapp#454: progress stops showing once the copy has stopped.
+    /// withmarfa/marfa-mac#454: progress stops showing once the copy has stopped.
     @Test func downloadProgressIsShownOnlyWhileTheCopyCanStillBeFilled() {
         let filling = LibraryFill(state: .filling, listed: 10, expected: 100)
         #expect(FillWording.shows(filling, in: .online) && FillWording.shows(filling, in: .connecting))

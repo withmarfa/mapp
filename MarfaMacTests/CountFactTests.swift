@@ -47,7 +47,7 @@ import Testing
         let file = LooksFile(looks: [TypeID("core.task"): look])
         #expect(LooksFile.read(try file.encoded()) == file)
         #expect(CountFact(word: "count:rows:") == nil)
-        let unknown = #"{"format":"mapp-looks","version":1,"looks":{"a":{"date":"none","secondary":[],"facts":["count:siblings"]}}}"#
+        let unknown = #"{"format":"marfa-mac-looks","version":1,"looks":{"a":{"date":"none","secondary":[],"facts":["count:siblings"]}}}"#
         #expect(LooksFile.read(Data(unknown.utf8)) == nil)
     }
 

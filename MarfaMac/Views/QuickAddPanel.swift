@@ -135,7 +135,7 @@ struct QuickAddPanel: View {
         } label: {
             if let chosen { kindLabel(chosen) } else { Text("Kind") }
         }
-        .mappMenu()
+        .appMenu()
         .help("Kind of Item")
         .accessibilityLabel("Kind of Item")
         .accessibilityIdentifier("QuickAddType")
@@ -497,7 +497,7 @@ struct QuickAddPanel: View {
             moreMenu(draft, isFile: isFile)
             Spacer(minLength: 12)
             Button("Cancel") { putAway() }
-                .mappButton(.secondary)
+                .appButton(.secondary)
                 .accessibilityIdentifier("QuickAddCancel")
             Button {
                 save()
@@ -508,7 +508,7 @@ struct QuickAddPanel: View {
                         .accessibilityHidden(true)
                 }
             }
-            .mappButton(.primary)
+            .appButton(.primary)
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(!QuickAdd.canSave(draft, in: library) || quickAdd.isSaving || !quickAdd.unfinishedLists.isEmpty)
             .accessibilityIdentifier("QuickAddAdd")
@@ -548,7 +548,7 @@ struct QuickAddPanel: View {
         }
         .menuStyle(.button)
         .menuIndicator(.hidden)
-        .mappButton(.secondary, icon: true)
+        .appButton(.secondary, icon: true)
         .fixedSize()
         .popover(isPresented: parentPopover(isOpen: { quickAdd.draft?.parentID == nil }), arrowEdge: .top) { parentList(draft) }
         .help("Add File or Property")

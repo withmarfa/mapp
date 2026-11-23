@@ -178,7 +178,7 @@ private struct AppDetail: View {
 }
 
 /// What one app keeps under its own `app.<vendor>` namespaces, counted by state, with Remove…. Marfa answers counts, never a
-/// size. MAPP's own settings are shown and never removed here.
+/// size. The app's own settings are shown and never removed here.
 private struct AppDataSection: View {
     let model: AppsModel
     let app: AppAccess
@@ -220,7 +220,7 @@ private struct AppDataSection: View {
     private func row(_ held: AppData, among count: Int) -> some View {
         let title = count == 1 ? String(localized: "\(name)’s Own Data") : held.vendor
         return SettingsRow(
-            verbatim: title, line: AppDataWording.line(held, appName: name, keptByMAPP: model.isOwn(held.vendor)), lines: nil
+            verbatim: title, line: AppDataWording.line(held, appName: name, keptByApp: model.isOwn(held.vendor)), lines: nil
         ) {
             if !model.isOwn(held.vendor), !held.types.isEmpty {
                 SettingsButton("Remove…", role: .destructive) { model.askToRemoveData(app, vendor: held.vendor) }

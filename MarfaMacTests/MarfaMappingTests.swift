@@ -500,7 +500,7 @@ struct MarfaMappingTests {
         #expect(!wording.explanation.contains("The server refused it"), "the copy refused it, not the server")
     }
 
-    /// Only a table row's conflict names no copy, and MAPP writes no rows, so such an answer leaves the item as
+    /// Only a table row's conflict names no copy, and the app writes no rows, so such an answer leaves the item as
     /// merged rather than pointing at a copy that does not exist.
     @Test func aConflictNamingNoCopyIsReadAsMerged() {
         #expect(MarfaMapping.outcome(.conflicted(siblingId: nil, fields: ["title"])) == .merged(fields: ["title"]))

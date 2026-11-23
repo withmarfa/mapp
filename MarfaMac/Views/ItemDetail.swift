@@ -165,7 +165,7 @@ private struct SavedAsCopyBanner: View {
                 .foregroundStyle(.secondary)
             Spacer()
             Button("Open Copy") { openWindow(value: copy) }
-                .mappButton(.secondary, size: .small)
+                .appButton(.secondary, size: .small)
         }
         .interfaceFont(.callout)
         .padding(.horizontal, 16)
@@ -202,7 +202,7 @@ private struct DeletedItemBanner: View {
                 .foregroundStyle(.secondary)
             Spacer()
             Button("Recover") { library.recover([id], undoManager: undoManager) }
-                .mappButton(.secondary, size: .small)
+                .appButton(.secondary, size: .small)
         }
         .interfaceFont(.callout)
         .padding(.horizontal, 16)

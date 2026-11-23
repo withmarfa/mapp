@@ -11,7 +11,7 @@ final class MarfaSettingsTests: XCTestCase {
 
     override func setUp() async throws {
         continueAfterFailure = false
-        app = XCUIApplication.sample(flags: ["-MAPPSampleUnconfigured"])
+        app = XCUIApplication.sample(flags: ["-MarfaMacSampleUnconfigured"])
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
     }

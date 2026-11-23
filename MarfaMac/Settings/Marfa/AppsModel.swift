@@ -34,12 +34,12 @@ import Observation
     nonisolated static let disconnectRemovalLimit = 1000
 
     private let context: OwnerContext
-    /// The namespace MAPP keeps its own settings in, whose data this page never removes: `PreferencesSync` keeps them.
+    /// The namespace the app keeps its own settings in, whose data this page never removes: `PreferencesSync` keeps them.
     private let ownVendor: String?
 
     private(set) var apps: [AppAccess] = []
     private(set) var typeNames: [String: String] = [:]
-    /// The keys each app made, by the app's client ID, where MAPP may list keys.
+    /// The keys each app made, by the app's client ID, where the app may list keys.
     private(set) var keysMade: [String: [KeyInfo]] = [:]
     private(set) var failure: OwnerFailure?
     private(set) var isLoading = false
@@ -118,10 +118,10 @@ import Observation
             confirm: String(localized: "Narrow"))
     }
 
-    /// The namespaces of `app` whose data can be removed here: not MAPP's own settings.
+    /// The namespaces of `app` whose data can be removed here: not the app's own settings.
     func removableVendors(of app: AppAccess) -> [String] { app.vendors.filter { $0 != ownVendor } }
 
-    /// Whether the namespace is the one MAPP keeps its own settings in.
+    /// Whether the namespace is the one the app keeps its own settings in.
     func isOwn(_ vendor: String) -> Bool { vendor == ownVendor }
 
     func askToDisconnect(_ app: AppAccess) {

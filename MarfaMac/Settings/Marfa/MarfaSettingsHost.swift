@@ -65,8 +65,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     let title: String
 }
 
-/// What MAPP lends the Marfa's pages: the one way they reach the app that holds them, so another app could take them
-/// without MAPP. The pages reach nothing of MAPP's model or views beyond this protocol and the parts.
+/// What the app lends the Marfa's pages: the one way they reach the app that holds them, so another app could take them
+/// without the app. The pages reach nothing of the app's model or views beyond this protocol and the parts.
 @MainActor protocol MarfaSettingsHost: AnyObject, Observable {
     /// The server's own name, or its host until one is read.
     var serverName: String { get }
@@ -79,7 +79,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// Signs in again, asking for the permissions already held and `permissions`. Cancelled, or approved with fewer than
     /// asked, nothing is added; an approval that drops a permission held before is told to the owner.
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome
-    /// Reads what the sign-in holds again, where the server refused for want of a permission MAPP thought it held.
+    /// Reads what the sign-in holds again, where the server refused for want of a permission the app thought it held.
     func refreshGrants() async
     /// What the owner's pages (Account, Apps, Keys, Addresses) ask of the server.
     var ownerCalls: any OwnerCalls { get }
@@ -93,7 +93,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func showConnection()
     /// The package's client over the current server, which a page's own calls go through.
     func client() throws -> Client
-    /// What opens something in MAPP, such as Show in MAPP; nil where the app has no such place.
+    /// What opens something in the app, such as Show in the app; nil where the app has no such place.
     var openInApp: ((String) -> Void)? { get }
     /// The `app.<vendor>` namespace the app keeps its own synced settings in, which the Apps page never removes the data of;
     /// nil where the app keeps none.
@@ -256,7 +256,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
 
     /// The permission the page needs to open, which the owner may not have approved. Account needs none to open: its
     /// sign-ins need `sign_ins.manage`, which it asks for from Change Password and never at sign-in. Folders needs none: a
-    /// folder is read as an item, under the access MAPP holds to every type.
+    /// folder is read as an item, under the access the app holds to every type.
     var permission: InstancePermission? {
         switch self {
         case .overview, .updates, .housekeeping: .instanceRead
@@ -276,31 +276,31 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// What MAPP isn't allowed to do on this page without its permission, in the page's own words from what the
+    /// What the app isn't allowed to do on this page without its permission, in the page's own words from what the
     /// permission opens there. Pages that share a permission still say different things, since each opens a different part.
     var permissionLine: String {
         switch self {
-        case .overview: String(localized: "MAPP isn’t allowed to read the server’s health and status.")
+        case .overview: String(localized: "The app isn’t allowed to read the server’s health and status.")
         case .account: ""
-        case .apps: String(localized: "MAPP isn’t allowed to list, narrow or disconnect apps.")
-        case .keys: String(localized: "MAPP isn’t allowed to list, make, extend or revoke keys.")
-        case .types: String(localized: "MAPP isn’t allowed to change types, their icons, words or fields.")
-        case .plugins: String(localized: "MAPP isn’t allowed to install, update or remove plugins.")
-        case .sources: String(localized: "MAPP isn’t allowed to rename, mark or limit sources.")
-        case .addresses: String(localized: "MAPP isn’t allowed to see or change the server’s addresses.")
-        case .recentlyDeleted: String(localized: "MAPP isn’t allowed to list or permanently delete deleted items.")
-        case .history: String(localized: "MAPP isn’t allowed to see or change version and log retention.")
-        case .fileStorage: String(localized: "MAPP isn’t allowed to see or change how the server keeps files.")
-        case .connectors: String(localized: "MAPP isn’t allowed to see, pause, run or set up connectors.")
-        case .webhooks: String(localized: "MAPP isn’t allowed to list, make, change or remove webhooks.")
+        case .apps: String(localized: "The app isn’t allowed to list, narrow or disconnect apps.")
+        case .keys: String(localized: "The app isn’t allowed to list, make, extend or revoke keys.")
+        case .types: String(localized: "The app isn’t allowed to change types, their icons, words or fields.")
+        case .plugins: String(localized: "The app isn’t allowed to install, update or remove plugins.")
+        case .sources: String(localized: "The app isn’t allowed to rename, mark or limit sources.")
+        case .addresses: String(localized: "The app isn’t allowed to see or change the server’s addresses.")
+        case .recentlyDeleted: String(localized: "The app isn’t allowed to list or permanently delete deleted items.")
+        case .history: String(localized: "The app isn’t allowed to see or change version and log retention.")
+        case .fileStorage: String(localized: "The app isn’t allowed to see or change how the server keeps files.")
+        case .connectors: String(localized: "The app isn’t allowed to see, pause, run or set up connectors.")
+        case .webhooks: String(localized: "The app isn’t allowed to list, make, change or remove webhooks.")
         case .folders: ""
-        case .backups: String(localized: "MAPP isn’t allowed to see, take or restore backups.")
-        case .updates: String(localized: "MAPP isn’t allowed to read whether a newer Marfa is ready.")
-        case .housekeeping: String(localized: "MAPP isn’t allowed to read the jobs the server runs by itself.")
-        case .activity: String(localized: "MAPP isn’t allowed to read the server’s audit log.")
-        case .monitoring: String(localized: "MAPP isn’t allowed to see or change how the server is monitored.")
-        case .limits: String(localized: "MAPP isn’t allowed to see or change the server’s limits.")
-        case .startUp: String(localized: "MAPP isn’t allowed to read the settings the server started with.")
+        case .backups: String(localized: "The app isn’t allowed to see, take or restore backups.")
+        case .updates: String(localized: "The app isn’t allowed to read whether a newer Marfa is ready.")
+        case .housekeeping: String(localized: "The app isn’t allowed to read the jobs the server runs by itself.")
+        case .activity: String(localized: "The app isn’t allowed to read the server’s audit log.")
+        case .monitoring: String(localized: "The app isn’t allowed to see or change how the server is monitored.")
+        case .limits: String(localized: "The app isn’t allowed to see or change the server’s limits.")
+        case .startUp: String(localized: "The app isn’t allowed to read the settings the server started with.")
         }
     }
 

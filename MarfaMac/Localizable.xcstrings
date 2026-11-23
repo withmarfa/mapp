@@ -217,10 +217,10 @@
     "%@. %@" : {
 
     },
-    "%@ was changed elsewhere. MAPP read the new value; yours wasn’t saved." : {
+    "%@ was changed elsewhere. The app read the new value; yours wasn’t saved." : {
 
     },
-    "%@ were changed elsewhere. MAPP read the new values; yours weren’t saved." : {
+    "%@ were changed elsewhere. The app read the new values; yours weren’t saved." : {
 
     },
     "%@ Took Another Date" : {
@@ -416,7 +416,7 @@
     "%@ Isn’t Answering" : {
 
     },
-    "%@ ended MAPP’s sign-in. Sign in again in Connection." : {
+    "%@ ended the app’s sign-in. Sign in again in Connection." : {
 
     },
     "%@ Failed" : {
@@ -464,25 +464,25 @@
     "list, extend and revoke keys" : {
       "extractionState" : "manual"
     },
-    "MAPP isn’t allowed to give a key more time." : {
+    "The app isn’t allowed to give a key more time." : {
 
     },
-    "MAPP isn’t allowed to list, make, change or remove webhooks." : {
+    "The app isn’t allowed to list, make, change or remove webhooks." : {
 
     },
-    "MAPP isn’t allowed to list, make, extend or revoke keys." : {
+    "The app isn’t allowed to list, make, extend or revoke keys." : {
 
     },
-    "MAPP stopped waiting. Check again to see where it stands." : {
+    "The app stopped waiting. Check again to see where it stands." : {
 
     },
-    "Choose a date before MAPP’s sign-in ends." : {
+    "Choose a date before the app’s sign-in ends." : {
 
     },
-    "MAPP couldn’t read when its own sign-in ends, which limits how long a key can be given." : {
+    "The app couldn’t read when its own sign-in ends, which limits how long a key can be given." : {
 
     },
-    "MAPP’s own sign-in ends sooner, so it can’t give this key longer." : {
+    "The app’s own sign-in ends sooner, so it can’t give this key longer." : {
 
     },
     "Marfa %@ is ready." : {
@@ -518,7 +518,7 @@
     "All Activity" : {
 
     },
-    "Allow More… lets MAPP read the owner’s name." : {
+    "Allow More… lets the app read the owner’s name." : {
 
     },
     "Anything that uses it will stop working when it expires." : {
@@ -713,22 +713,22 @@
     "Lower and Save" : {
 
     },
-    "MAPP isn’t allowed to list or permanently delete deleted items." : {
+    "The app isn’t allowed to list or permanently delete deleted items." : {
 
     },
-    "MAPP isn’t allowed to list, narrow or disconnect apps." : {
+    "The app isn’t allowed to list, narrow or disconnect apps." : {
 
     },
-    "MAPP isn’t allowed to read whether a newer Marfa is ready." : {
+    "The app isn’t allowed to read whether a newer Marfa is ready." : {
 
     },
-    "MAPP isn’t allowed to rename, mark or limit sources." : {
+    "The app isn’t allowed to rename, mark or limit sources." : {
 
     },
-    "MAPP isn’t allowed to see or change version and log retention." : {
+    "The app isn’t allowed to see or change version and log retention." : {
 
     },
-    "MAPP isn’t allowed to see, take or restore backups." : {
+    "The app isn’t allowed to see, take or restore backups." : {
 
     },
     "Key Requests per Window" : {
@@ -740,7 +740,7 @@
     "Largest Delivery" : {
 
     },
-    "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." : {
+    "The app removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." : {
 
     },
     "Needs more disk space." : {
@@ -828,7 +828,7 @@
     "%@ runs these by itself. Jobs that delete pause while its clock looks wrong." : {
 
     },
-    "%lld were skipped: MAPP no longer has their commands, or their keys can’t be used." : {
+    "%lld were skipped: the app no longer has their commands, or their keys can’t be used." : {
 
     },
     "12-Hour" : {
@@ -873,7 +873,7 @@
     "Abbreviated" : {
 
     },
-    "About MAPP" : {
+    "About Marfa" : {
 
     },
     "Accent" : {
@@ -888,7 +888,7 @@
     "Add Shortcut" : {
 
     },
-    "After you quit MAPP." : {
+    "After you quit Marfa." : {
 
     },
     "All %lld" : {
@@ -999,7 +999,7 @@
     "Connect to a Marfa in Connection to see this page." : {
 
     },
-    "Connect to a Marfa in Connection to see what MAPP keeps of it." : {
+    "Connect to a Marfa in Connection to see what the app keeps of it." : {
 
     },
     "Connection" : {
@@ -1026,13 +1026,13 @@
     "Couldn’t export. %@ isn’t answering." : {
 
     },
-    "Couldn’t export. MAPP can’t write to that folder." : {
+    "Couldn’t export. The app can’t write to that folder." : {
 
     },
-    "Couldn’t export. MAPP couldn’t write to that folder." : {
+    "Couldn’t export. The app couldn’t write to that folder." : {
 
     },
-    "Couldn’t export. MAPP isn’t allowed to export %@." : {
+    "Couldn’t export. The app isn’t allowed to export %@." : {
 
     },
     "Couldn’t export. Sign in again in Connection first." : {
@@ -1113,7 +1113,7 @@
     "Minute" : {
 
     },
-    "One was skipped: MAPP no longer has its command, or its keys can’t be used." : {
+    "One was skipped: the app no longer has its command, or its keys can’t be used." : {
 
     },
     "Paste and Match Style" : {
@@ -1281,7 +1281,7 @@
     "Keep Opened Files" : {
 
     },
-    "Kept here so MAPP works offline and searches fast." : {
+    "Kept here so the app works offline and searches fast." : {
 
     },
     "Leave Out a Type or Source" : {
@@ -1410,7 +1410,7 @@
     "The least used go first when there’s no room." : {
 
     },
-    "The owner’s permissions MAPP holds." : {
+    "The owner’s permissions the app holds." : {
 
     },
     "Sign out “%@”?" : {
@@ -1545,7 +1545,7 @@
     "Items you delete wait here before they are permanently deleted." : {
 
     },
-    "Last answered %@. MAPP keeps trying." : {
+    "Last answered %@. The app keeps trying." : {
 
     },
     "Last Used" : {
@@ -1578,16 +1578,13 @@
     "manage webhooks" : {
       "extractionState" : "manual"
     },
-    "MAPP" : {
-
-    },
-    "MAPP is no longer allowed to %@. Allow it again from the page that needs it." : {
+    "The app is no longer allowed to %@. Allow it again from the page that needs it." : {
       "extractionState" : "manual"
     },
-    "MAPP keeps trying." : {
+    "The app keeps trying." : {
 
     },
-    "MAPP shows one Marfa at a time." : {
+    "The app shows one Marfa at a time." : {
 
     },
     "Materials" : {
@@ -1662,7 +1659,7 @@
     "read the server’s health and status" : {
       "extractionState" : "manual"
     },
-    "Removes this Mac’s copy and signs MAPP out." : {
+    "Removes this Mac’s copy and signs the app out." : {
 
     },
     "Reopen Windows" : {
@@ -1671,10 +1668,10 @@
     "Reset" : {
 
     },
-    "Reset MAPP’s Settings" : {
+    "Reset This App’s Settings" : {
 
     },
-    "Reset MAPP’s Settings?" : {
+    "Reset This App’s Settings?" : {
 
     },
     "Reset…" : {
@@ -1698,16 +1695,16 @@
     "Start With" : {
 
     },
-    "Switched Servers, but MAPP May Still Be Approved on the Previous One" : {
+    "Switched Servers, but This App May Still Be Approved on the Previous One" : {
 
     },
-    "MAPP May Still Be Approved" : {
+    "This App May Still Be Approved" : {
 
     },
-    "MAPP forgot the previous server’s sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
+    "The app forgot the previous server’s sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
 
     },
-    "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that %@ ended its approval." : {
+    "The app dropped a sign-in it didn’t use, but couldn’t confirm that %@ ended its approval." : {
 
     },
     "Switches, sliders and the text cursor." : {
@@ -1725,10 +1722,10 @@
     "Text Font" : {
 
     },
-    "The rest of MAPP uses the system font." : {
+    "The rest of the app uses the system font." : {
 
     },
-    "The server has ended MAPP’s sign-in. Sign in again in Connection." : {
+    "The server has ended the app’s sign-in. Sign in again in Connection." : {
 
     },
     "The sidebar, lists and controls." : {
@@ -1770,10 +1767,10 @@
     "Title When Scrolling" : {
 
     },
-    "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”." : {
+    "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find the “Marfa for Mac” entry, then run “marfa apps revoke <id>”." : {
 
     },
-    "The copy of your library on this Mac is damaged, so MAPP can’t open it." : {
+    "The copy of your library on this Mac is damaged, so the app can’t open it." : {
 
     },
     "The copy is in the folder “%@”." : {
@@ -1782,52 +1779,52 @@
     "It holds no changes that haven’t reached the server." : {
 
     },
-    "MAPP couldn’t read whether it holds changes that haven’t reached the server." : {
+    "The app couldn’t read whether it holds changes that haven’t reached the server." : {
 
     },
-    "MAPP started to set the damaged copy aside and stopped partway. Open the library again to finish it." : {
+    "The app started to set the damaged copy aside and stopped partway. Open the library again to finish it." : {
 
     },
-    "Run “marfa apps list” with the command line signed in to %@ as the owner. Use the approval date to identify the earlier MAPP approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
+    "Run “marfa apps list” with the command line signed in to %@ as the owner. Use the approval date to identify the earlier “Marfa for Mac” approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
 
     },
-    "MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again." : {
+    "The app couldn’t make or open the copy of your library on this Mac. Check that app can change its own files, then try again." : {
 
     },
     "Couldn’t Finish Signing In" : {
 
     },
-    "MAPP couldn’t finish signing in. Check your connection and try again, or sign in with a code." : {
+    "The app couldn’t finish signing in. Check your connection and try again, or sign in with a code." : {
 
     },
     "Sign in to the previous server again to see them." : {
 
     },
-    "MAPP’s Sign-In May Still Be Kept" : {
+    "This App’s Sign-In May Still Be Kept" : {
 
     },
-    "MAPP couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at %@." : {
+    "The app couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at %@." : {
 
     },
-    "MAPP ran into a problem it can’t resolve itself. Choose Refresh to try again." : {
+    "The app ran into a problem it can’t resolve itself. Choose Refresh to try again." : {
 
     },
     "There isn’t enough room on this Mac for the copy of your library. Free some space, then try again." : {
 
     },
-    "MAPP couldn’t reach the server. Check your connection, then try again." : {
+    "The app couldn’t reach the server. Check your connection, then try again." : {
 
     },
-    "MAPP couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again." : {
+    "The app couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again." : {
 
     },
-    "MAPP couldn’t renew its sign-in because the server redirected the request. Check the server address in Settings, then try again. If this keeps happening, sign in again." : {
+    "The app couldn’t renew its sign-in because the server redirected the request. Check the server address in Settings, then try again. If this keeps happening, sign in again." : {
 
     },
-    "MAPP couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again." : {
+    "The app couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again." : {
 
     },
-    "This address reaches a different Marfa server from the one this library was made for, so MAPP left the library as it was." : {
+    "This address reaches a different Marfa server from the one this library was made for, so the app left the library as it was." : {
 
     },
     "Customize Sidebar…" : {
@@ -1917,10 +1914,10 @@
     "Keyboard Shortcuts" : {
 
     },
-    "MAPP Help" : {
+    "Marfa Help" : {
 
     },
-    "MAPP needs a window to show the server’s sign-in page over. Open a MAPP window, then try again, or use a code instead." : {
+    "The app needs a window to show the server’s sign-in page over. Open one of its windows, then try again, or use a code instead." : {
 
     },
     "Marfa Documentation" : {
@@ -1971,7 +1968,7 @@
     "Purple" : {
 
     },
-    "Adding will be refused: this kind of item needs %@, which MAPP can’t fill in. Choose another kind." : {
+    "Adding will be refused: this kind of item needs %@, which the app can’t fill in. Choose another kind." : {
 
     },
     "Red" : {
@@ -2028,19 +2025,19 @@
     "Teal" : {
 
     },
-    "That address isn’t a Marfa server MAPP can sign in to. Check the address, then try again." : {
+    "That address isn’t a Marfa server the app can sign in to. Check the address, then try again." : {
 
     },
-    "MAPP couldn’t verify the approval. Try signing in again." : {
+    "The app couldn’t verify the approval. Try signing in again." : {
 
     },
-    "MAPP’s Earlier Approval May Still Stand" : {
+    "This App’s Earlier Approval May Still Stand" : {
 
     },
-    "The editor ran into a problem, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
+    "The editor ran into a problem, so the app couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
 
     },
-    "The server wouldn’t approve MAPP, so nothing changed. Check that you are signing in to the right server and account, then try again." : {
+    "The server wouldn’t approve the app, so nothing changed. Check that you are signing in to the right server and account, then try again." : {
 
     },
     "To PostHog’s error tracking." : {
@@ -2202,7 +2199,7 @@
     "What went wrong, never your items." : {
 
     },
-    "What’s New in MAPP" : {
+    "What’s New in Marfa" : {
 
     },
     "Where a proxy puts the caller’s address." : {
@@ -2363,16 +2360,16 @@
     "The collection is deleted for every app connected to your Marfa server." : {
 
     },
-    "MAPP couldn’t confirm that %@ ended MAPP’s earlier approval." : {
+    "The app couldn’t confirm that %@ ended its earlier approval." : {
 
     },
     "You closed Settings before this was saved." : {
 
     },
-    "You quit MAPP before saving the changes to this Marfa’s settings." : {
+    "You quit the app before saving the changes to this Marfa’s settings." : {
       "extractionState" : "manual"
     },
-    "You quit MAPP before this was saved." : {
+    "You quit the app before this was saved." : {
 
     },
     "Your items are still loading." : {
@@ -3431,7 +3428,7 @@
     "A collection can’t be in another collection." : {
       "extractionState" : "manual"
     },
-    "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that MAPP can change its own files, then try again." : {
+    "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that app can change its own files, then try again." : {
       "extractionState" : "manual"
     },
     "A deletion wasn’t sent" : {
@@ -3644,13 +3641,13 @@
         }
       }
     },
-    "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one." : {
+    "Another copy of the app on this Mac is using your library. Quit the other copy, then quit and reopen this one." : {
       "extractionState" : "manual"
     },
-    "Another copy of MAPP or another app is using the sign-in on this Mac, so nothing changed. Wait a moment, then try again." : {
+    "Another copy of this app or another app is using the sign-in on this Mac, so nothing changed. Wait a moment, then try again." : {
       "extractionState" : "manual"
     },
-    "Another item opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again." : {
+    "Another item opened before the app finished saving this one, so your most recent typing might not be saved. Try again." : {
 
     },
     "Apache-2.0" : {
@@ -3662,7 +3659,7 @@
     "Appearance" : {
 
     },
-    "Approve MAPP With This Code" : {
+    "Approve This App With This Code" : {
       "extractionState" : "manual"
     },
     "Arrange" : {
@@ -4090,7 +4087,7 @@
     "Connect to a Marfa server in Library to see and change its settings here." : {
       "extractionState" : "manual"
     },
-    "Connect to a Marfa server to read and edit its items here. MAPP opens the server’s own page to sign in and never sees your password." : {
+    "Connect to a Marfa server to read and edit its items here. The app opens the server’s own page to sign in and never sees your password." : {
       "extractionState" : "manual"
     },
     "Connect to a server first." : {
@@ -4144,7 +4141,7 @@
     "Couldn’t Quit" : {
 
     },
-    "Couldn’t read downloaded files. MAPP will try again." : {
+    "Couldn’t read downloaded files. The app will try again." : {
       "extractionState" : "manual"
     },
     "Couldn’t remove downloaded files. %@" : {
@@ -4305,7 +4302,7 @@
     "Disconnect…" : {
 
     },
-    "Disconnected, but MAPP May Still Be Approved" : {
+    "Disconnected, but This App May Still Be Approved" : {
       "extractionState" : "manual"
     },
     "Disconnected, but Not Everything Was Removed" : {
@@ -4381,7 +4378,7 @@
     "Empty Recently Deleted…" : {
 
     },
-    "Emptying “%@” goes back to the server’s own default, which MAPP can’t read. That may remove items sooner than the server’s current setting, %@. What it removes can’t be recovered." : {
+    "Emptying “%@” goes back to the server’s own default, which the app can’t read. That may remove items sooner than the server’s current setting, %@. What it removes can’t be recovered." : {
       "extractionState" : "manual"
     },
     "Ends" : {
@@ -4666,7 +4663,7 @@
     "Icon Set" : {
       "extractionState" : "manual"
     },
-    "Icons are kept on your server, so you can choose one once MAPP is connected." : {
+    "Icons are kept on your server, so you can choose one once the app is connected." : {
       "extractionState" : "manual"
     },
     "Image" : {
@@ -4799,7 +4796,7 @@
     "Keep the copy and the changes stay on this Mac. Connect to the same server again and they’re sent. Discard the copy and they’re lost." : {
       "extractionState" : "manual"
     },
-    "Keep the copy and the changes stay on this Mac. Install the previous build of MAPP from TestFlight and connect it to the same server, and it sends them. Discard the copy and they’re lost." : {
+    "Keep the copy and the changes stay on this Mac. Install the previous build of the app from TestFlight and connect it to the same server, and it sends them. Discard the copy and they’re lost." : {
       "extractionState" : "manual"
     },
     "Keep things for less time?" : {
@@ -4943,115 +4940,115 @@
     "Manage Connections…" : {
 
     },
-    "MAPP can’t fill these required fields: %@." : {
+    "The app can’t fill these required fields: %@." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t open or follow the copy of your library on this Mac." : {
+    "The app can’t open or follow the copy of your library on this Mac." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t open the copy of your library on this Mac." : {
+    "The app can’t open the copy of your library on this Mac." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t open the copy of your library on this Mac. Open Settings to see what to do." : {
+    "The app can’t open the copy of your library on this Mac. Open Settings to see what to do." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t reach the server. Changing a source needs the server, so try again once it’s back." : {
+    "The app can’t reach the server. Changing a source needs the server, so try again once it’s back." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t reach the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected." : {
+    "The app can’t reach the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected." : {
+    "The app can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t reach the server. Your changes are kept on this Mac and sent when it can." : {
+    "The app can’t reach the server. Your changes are kept on this Mac and sent when it can." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t reach the server. Your icon choice needs the server, so try again once it’s back." : {
+    "The app can’t reach the server. Your icon choice needs the server, so try again once it’s back." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t reach your Marfa server, so nothing was saved. Try again when it’s back." : {
+    "The app can’t reach your Marfa server, so nothing was saved. Try again when it’s back." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t read %@ as a file." : {
+    "The app can’t read %@ as a file." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit MAPP first, then move the folder “%@” to the Trash. Anything in it that hasn’t reached the server is lost." : {
+    "The app can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit the app first, then move the folder “%@” to the Trash. Anything in it that hasn’t reached the server is lost." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t tell whether that copy holds changes that haven’t reached the server." : {
+    "The app can’t tell whether that copy holds changes that haven’t reached the server." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t tell whether this copy holds changes that haven’t reached a server." : {
+    "The app can’t tell whether this copy holds changes that haven’t reached a server." : {
       "extractionState" : "manual"
     },
-    "MAPP closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back." : {
+    "The app closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back." : {
       "extractionState" : "manual"
     },
-    "MAPP closed the library before it could keep your change. Make the change again." : {
+    "The app closed the library before it could keep your change. Make the change again." : {
       "extractionState" : "manual"
     },
-    "MAPP couldn’t reach that address, so nothing changed. Check the address and your connection, then try again." : {
+    "The app couldn’t reach that address, so nothing changed. Check the address and your connection, then try again." : {
       "extractionState" : "manual"
     },
-    "MAPP couldn’t get the file from the server. Check your connection, then try again." : {
+    "The app couldn’t get the file from the server. Check your connection, then try again." : {
       "extractionState" : "manual"
     },
-    "MAPP couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back." : {
+    "The app couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back." : {
       "extractionState" : "manual"
     },
-    "MAPP couldn’t keep some of your changes. Make them again." : {
+    "The app couldn’t keep some of your changes. Make them again." : {
       "extractionState" : "manual"
     },
-    "MAPP couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen MAPP, or sign in again in Settings." : {
+    "The app couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen the app, or sign in again in Settings." : {
       "extractionState" : "manual"
     },
-    "MAPP couldn’t send this change." : {
+    "The app couldn’t send this change." : {
       "extractionState" : "manual"
     },
-    "MAPP doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
+    "The app doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
       "extractionState" : "manual"
     },
-    "MAPP forgot its sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
+    "The app forgot its sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
       "extractionState" : "manual"
     },
-    "MAPP is still saving what you last typed. Try again in a moment." : {
+    "The app is still saving what you last typed. Try again in a moment." : {
 
     },
-    "MAPP is still saving your changes on this Mac. Try again in a moment." : {
+    "The app is still saving your changes on this Mac. Try again in a moment." : {
 
     },
-    "MAPP isn’t signed in to this Marfa server." : {
+    "The app isn’t signed in to this Marfa server." : {
       "extractionState" : "manual"
     },
-    "MAPP isn’t signed in to this server. Sign in again in Settings." : {
+    "The app isn’t signed in to this server. Sign in again in Settings." : {
       "extractionState" : "manual"
     },
-    "MAPP isn’t signed in to this server. Sign in below." : {
+    "The app isn’t signed in to this server. Sign in below." : {
       "extractionState" : "manual"
     },
-    "MAPP kept the copy, because it now holds a different number of changes than you saw." : {
+    "The app kept the copy, because it now holds a different number of changes than you saw." : {
       "extractionState" : "manual"
     },
-    "MAPP kept the previous server’s copy, because it now holds a different number of changes than you saw." : {
+    "The app kept the previous server’s copy, because it now holds a different number of changes than you saw." : {
       "extractionState" : "manual"
     },
-    "MAPP reads and writes your library on a Marfa server. Enter its address and sign in from Settings." : {
+    "The app reads and writes your library on a Marfa server. Enter its address and sign in from Settings." : {
       "extractionState" : "manual"
     },
-    "MAPP tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it." : {
+    "The app tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it." : {
       "extractionState" : "manual"
     },
-    "MAPP Wasn’t Approved" : {
+    "This App Wasn’t Approved" : {
       "extractionState" : "manual"
     },
-    "MAPP’s sign-in can’t change views on your Marfa server." : {
+    "The app’s sign-in can’t change views on your Marfa server." : {
       "extractionState" : "manual"
     },
-    "MAPP’s sign-in isn’t allowed to change this server’s settings. Ask whoever runs the server to allow it, or use the server’s console." : {
+    "The app’s sign-in isn’t allowed to change this server’s settings. Ask whoever runs the server to allow it, or use the server’s console." : {
       "extractionState" : "manual"
     },
-    "MAPP’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it." : {
+    "The app’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it." : {
       "extractionState" : "manual"
     },
     "Marfa" : {
@@ -5715,7 +5712,7 @@
     "Restarting" : {
 
     },
-    "Restarting. MAPP reconnects when it is back." : {
+    "Restarting. The app reconnects when it is back." : {
 
     },
     "Restore" : {
@@ -5935,10 +5932,10 @@
     "Showing the first %lld results." : {
       "extractionState" : "manual"
     },
-    "Showing what’s on this Mac while MAPP reaches the server." : {
+    "Showing what’s on this Mac while the app reaches the server." : {
       "extractionState" : "manual"
     },
-    "Shown in the sidebar and wherever MAPP names this server. Empty uses “Marfa”." : {
+    "Shown in the sidebar and wherever the app names this server. Empty uses “Marfa”." : {
       "extractionState" : "manual"
     },
     "Shows the group’s items" : {
@@ -6019,7 +6016,7 @@
     "Sources" : {
       "extractionState" : "manual"
     },
-    "Sources are named on your server, so you can change one once MAPP is connected." : {
+    "Sources are named on your server, so you can change one once the app is connected." : {
       "extractionState" : "manual"
     },
     "Standard" : {
@@ -6106,10 +6103,10 @@
     "The connections could not be saved. Your selection has been kept." : {
       "extractionState" : "manual"
     },
-    "The copy in the folder “%@” isn’t one MAPP made, so MAPP left it. Move the folder to the Trash if you don’t need it." : {
+    "The copy in the folder “%@” isn’t one the app made, so the app left it. Move the folder to the Trash if you don’t need it." : {
       "extractionState" : "manual"
     },
-    "The copy is still on this Mac. MAPP removes it before it connects to that server again." : {
+    "The copy is still on this Mac. The app removes it before it connects to that server again." : {
       "extractionState" : "manual"
     },
     "The copy of your library on this Mac can’t be opened." : {
@@ -6118,7 +6115,7 @@
     "The date couldn’t be saved." : {
       "extractionState" : "manual"
     },
-    "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
+    "The editor stopped responding, so the app couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
 
     },
     "The entry changed or was removed while you were editing it." : {
@@ -6181,7 +6178,7 @@
     "The item's title and path cannot be represented as an unambiguous file link." : {
       "extractionState" : "manual"
     },
-    "The Keychain wouldn’t keep or give the sign-in. Check that MAPP can use the Keychain, then try again." : {
+    "The Keychain wouldn’t keep or give the sign-in. Check that app can use the Keychain, then try again." : {
       "extractionState" : "manual"
     },
     "The library is still being brought up to date, so the change wasn’t made." : {
@@ -6253,10 +6250,10 @@
     "The picture took too long to load." : {
 
     },
-    "The previous server’s copy is still on this Mac. MAPP removes it before it connects to that server again." : {
+    "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again." : {
       "extractionState" : "manual"
     },
-    "The previous server’s sign-in is still in your Keychain, and its copy is still on this Mac. Remove the sign-in in Keychain Access. MAPP removes the copy before it connects to that server again." : {
+    "The previous server’s sign-in is still in your Keychain, and its copy is still on this Mac. Remove the sign-in in Keychain Access. The app removes the copy before it connects to that server again." : {
       "extractionState" : "manual"
     },
     "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access." : {
@@ -6265,19 +6262,19 @@
     "The search for “%@”" : {
       "extractionState" : "manual"
     },
-    "The server has ended MAPP’s sign-in. Sign in again below." : {
+    "The server has ended the app’s sign-in. Sign in again below." : {
       "extractionState" : "manual"
     },
-    "The server has ended MAPP’s sign-in. Sign in again in Library." : {
+    "The server has ended the app’s sign-in. Sign in again in Library." : {
       "extractionState" : "manual"
     },
-    "The server has ended MAPP’s sign-in. Sign in again in Settings." : {
+    "The server has ended the app’s sign-in. Sign in again in Settings." : {
       "extractionState" : "manual"
     },
-    "The server has ended MAPP’s sign-in. Sign in again, or disconnect to start again. Changes not yet sent stay on this Mac until you are signed in or choose what to do with them." : {
+    "The server has ended the app’s sign-in. Sign in again, or disconnect to start again. Changes not yet sent stay on this Mac until you are signed in or choose what to do with them." : {
       "extractionState" : "manual"
     },
-    "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind MAPP isn’t approved to read." : {
+    "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind the app isn’t approved to read." : {
       "extractionState" : "manual"
     },
     "The server keeps every version for the first period, then one a day, then one a week. Each period must be at least as long as the one before. A type’s own policy wins. Empty uses the server’s defaults." : {
@@ -6301,13 +6298,13 @@
     "The server stopped this change from going through. Try again to send it." : {
       "extractionState" : "manual"
     },
-    "The server was told not to approve MAPP, so nothing changed. Sign in again to try again." : {
+    "The server was told not to approve the app, so nothing changed. Sign in again to try again." : {
       "extractionState" : "manual"
     },
     "The Sign-In Is in Use" : {
       "extractionState" : "manual"
     },
-    "The sign-in is still in your Keychain, and the copy is still on this Mac. Remove the sign-in in Keychain Access. MAPP removes the copy before it connects to that server again." : {
+    "The sign-in is still in your Keychain, and the copy is still on this Mac. Remove the sign-in in Keychain Access. The app removes the copy before it connects to that server again." : {
       "extractionState" : "manual"
     },
     "The sign-in is still in your Keychain. Remove it in Keychain Access." : {
@@ -6403,7 +6400,7 @@
     "They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it." : {
       "extractionState" : "manual"
     },
-    "They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again." : {
+    "They’re still in that copy. To send them, install the previous build of the app from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update the app again." : {
       "extractionState" : "manual"
     },
     "Thin Old Versions" : {
@@ -6415,10 +6412,10 @@
     "This address is on a private network, so it isn’t loaded." : {
 
     },
-    "This address now reaches a different Marfa server from the one this copy of your library was made for, so MAPP has stopped syncing it." : {
+    "This address now reaches a different Marfa server from the one this copy of your library was made for, so the app has stopped syncing it." : {
       "extractionState" : "manual"
     },
-    "This change came from a copy that MAPP could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it." : {
+    "This change came from a copy that app could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it." : {
       "extractionState" : "manual"
     },
     "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it." : {
@@ -6469,7 +6466,7 @@
     "This item can no longer be edited. Your change wasn’t saved." : {
       "extractionState" : "manual"
     },
-    "This item can’t be changed now, so MAPP couldn’t keep what you typed." : {
+    "This item can’t be changed now, so the app couldn’t keep what you typed." : {
       "extractionState" : "manual"
     },
     "This item can’t be changed right now." : {
@@ -6478,7 +6475,7 @@
     "This item changed elsewhere, so your changes were saved as a copy." : {
       "extractionState" : "manual"
     },
-    "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. MAPP reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected." : {
+    "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The app reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected." : {
       "extractionState" : "manual"
     },
     "This item has no file." : {
@@ -6580,13 +6577,13 @@
     "This version has no text or title that fits this item, so it can only be read." : {
       "extractionState" : "manual"
     },
-    "This version of MAPP and the server use different versions of Marfa, and the change may already have been made. Update MAPP or the server, then check the change." : {
+    "This version of the app and the server use different versions of Marfa, and the change may already have been made. Update the app or the server, then check the change." : {
       "extractionState" : "manual"
     },
-    "This version of MAPP and the server use different versions of Marfa, so the server didn’t make the change. Update MAPP or the server, then try again." : {
+    "This version of the app and the server use different versions of Marfa, so the server didn’t make the change. Update the app or the server, then try again." : {
       "extractionState" : "manual"
     },
-    "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it." : {
+    "This version of the app can’t read the copy of your library on this Mac, because a different version made it." : {
       "extractionState" : "manual"
     },
     "This view has changed since, so that change was left as it is." : {
@@ -6649,7 +6646,7 @@
     "To keep what you wrote, copy it before you discard this change." : {
       "extractionState" : "manual"
     },
-    "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. MAPP can’t remove a copy it can’t count, so when that build has sent everything, update MAPP, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again." : {
+    "To send any changes it holds, install the previous build of the app from TestFlight and connect it to this server if it isn’t already. The app can’t remove a copy it can’t count, so when that build has sent everything, update the app, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again." : {
       "extractionState" : "manual"
     },
     "To start a new copy from this server, choose Disconnect in Settings, then connect again." : {
@@ -6901,7 +6898,7 @@
     "Yesterday, %@" : {
 
     },
-    "MAPP kept the new sign-in, but the copy of your library on this Mac can’t be opened." : {
+    "The app kept the new sign-in, but the copy of your library on this Mac can’t be opened." : {
       "extractionState" : "manual"
     },
     "You can bring them back from Recently Deleted." : {
@@ -6988,13 +6985,13 @@
     "The page shows this field as the item’s title, its text or its link to the source, so it can’t be removed." : {
 
     },
-    "MAPP can’t reach the server. Changing a field changes the type for every item, so it needs the server. Try again once it’s back." : {
+    "The app can’t reach the server. Changing a field changes the type for every item, so it needs the server. Try again once it’s back." : {
 
     },
     "This connection can’t change a type. Ask whoever runs the server to allow it, or sign in again and approve it." : {
 
     },
-    "This type has changed on the server since MAPP last read it, so nothing was changed. Look at the field again and try once more." : {
+    "This type has changed on the server since the app last read it, so nothing was changed. Look at the field again and try once more." : {
 
     },
     "This type belongs to a plugin, so it can only change with the plugin." : {
@@ -7261,7 +7258,7 @@
     "It can’t sign in again. Browsers already signed in keep working." : {
 
     },
-    "It changed somewhere else, so MAPP read it again. Nothing was changed." : {
+    "It changed somewhere else, so the app read it again. Nothing was changed." : {
 
     },
     "It couldn’t be put in place." : {
@@ -7297,16 +7294,16 @@
     "Look After This Marfa" : {
 
     },
-    "MAPP fetches the whole library from %@ again. It keeps working while it downloads." : {
+    "The app fetches the whole library from %@ again. It keeps working while it downloads." : {
 
     },
-    "MAPP fetches the whole library from %@ again. The %@ not yet sent stay on this Mac and are sent afterwards." : {
+    "The app fetches the whole library from %@ again. The %@ not yet sent stay on this Mac and are sent afterwards." : {
 
     },
-    "MAPP holds %lld of the owner’s %lld permissions." : {
+    "The app holds %lld of the owner’s %lld permissions." : {
 
     },
-    "MAPP will try again." : {
+    "The app will try again." : {
 
     },
     "Most Recent" : {
@@ -7318,10 +7315,10 @@
     "Not Answering" : {
 
     },
-    "Not answering since %@. MAPP keeps trying." : {
+    "Not answering since %@. The app keeps trying." : {
 
     },
-    "Not answering. MAPP keeps trying." : {
+    "Not answering. The app keeps trying." : {
 
     },
     "On This Mac" : {
@@ -7342,22 +7339,22 @@
     "Sent when %@ answers." : {
 
     },
-    "MAPP can’t reach the server. Nothing was changed." : {
+    "The app can’t reach the server. Nothing was changed." : {
 
     },
-    "MAPP isn’t allowed to %@." : {
+    "The app isn’t allowed to %@." : {
 
     },
-    "MAPP isn’t allowed to do this." : {
+    "The app isn’t allowed to do this." : {
 
     },
-    "MAPP isn’t allowed to do this: it needs “%@”." : {
+    "The app isn’t allowed to do this: it needs “%@”." : {
 
     },
-    "MAPP isn’t allowed to list and end your sign-ins." : {
+    "The app isn’t allowed to list and end your sign-ins." : {
 
     },
-    "MAPP isn’t allowed to make keys." : {
+    "The app isn’t allowed to make keys." : {
 
     },
     "Made %@." : {
@@ -7582,7 +7579,7 @@
     "The server accepts this address." : {
 
     },
-    "The server ended MAPP’s sign-in. Sign in again in Connection." : {
+    "The server ended the app’s sign-in. Sign in again in Connection." : {
 
     },
     "The server was restored to an earlier point, and this change would put back what the restore removed. Try again to send it anyway, or undo it to keep the item as the server has it." : {
@@ -7678,10 +7675,10 @@
     "%lld shortcuts were imported." : {
 
     },
-    "Brings MAPP forward to add an item." : {
+    "Brings the app forward to add an item." : {
 
     },
-    "Brings MAPP forward with the palette open." : {
+    "Brings the app forward with the palette open." : {
 
     },
     "Quick Add" : {
@@ -7729,7 +7726,7 @@
     "Imported Shortcuts" : {
 
     },
-    "In Any App" : {
+    "Global Shortcuts" : {
 
     },
     "Include ⌘ or ⌃." : {
@@ -7744,7 +7741,7 @@
     "Keyboard" : {
 
     },
-    "MAPP Shortcuts" : {
+    "Marfa Shortcuts" : {
 
     },
     "Minimize" : {
@@ -7765,7 +7762,7 @@
     "No command matches your search." : {
 
     },
-    "Off until you set one. They work from any app while MAPP is running." : {
+    "Off until you set one. They work from any app while Marfa is running." : {
 
     },
     "One command uses %@." : {
@@ -7858,10 +7855,10 @@
     "“%@” could not be read. No shortcuts were changed." : {
 
     },
-    "“%@” is not a shortcuts file that MAPP can read. No shortcuts were changed." : {
+    "“%@” is not a shortcuts file that app can read. No shortcuts were changed." : {
 
     },
-    "“%@” was made by a newer version of MAPP. Update MAPP to import it. No shortcuts were changed." : {
+    "“%@” was made by a newer version of the app. Update the app to import it. No shortcuts were changed." : {
 
     },
     "%@ in %@" : {
@@ -7915,7 +7912,7 @@
     "Another Marfa Answers" : {
 
     },
-    "Approve MAPP with This Code" : {
+    "Approve This App with This Code" : {
 
     },
     "Articles Open In" : {
@@ -8059,7 +8056,7 @@
     "Longer titles are cut short." : {
 
     },
-    "MAPP Layouts" : {
+    "Marfa Layouts" : {
 
     },
     "Markdown" : {
@@ -8173,7 +8170,7 @@
     "“%@” could not be read. No layouts were changed." : {
 
     },
-    "“%@” is not a layouts file that MAPP can read. No layouts were changed." : {
+    "“%@” is not a layouts file that app can read. No layouts were changed." : {
 
     },
     "“%@” was attached to “%@” but isn’t in its text. It was meant for a folded section or text not yet shown." : {
@@ -8438,13 +8435,13 @@
     "For one item." : {
 
     },
-    "For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. MAPP too." : {
+    "For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. The app too." : {
 
     },
     "Found %@" : {
 
     },
-    "Going back to the default for “%@” uses the server’s own default, which MAPP can’t read. That may remove %@ sooner than the server’s current setting, %@. What it removes can’t be recovered." : {
+    "Going back to the default for “%@” uses the server’s own default, which the app can’t read. That may remove %@ sooner than the server’s current setting, %@. What it removes can’t be recovered." : {
 
     },
     "Health" : {
@@ -8501,7 +8498,7 @@
     "Logs" : {
 
     },
-    "MAPP Can Look After Part of %@" : {
+    "This App Can Look After Part of %@" : {
 
     },
     "Largest File Read" : {
@@ -8552,7 +8549,7 @@
     "Made an item" : {
 
     },
-    "MAPP can’t change this setting." : {
+    "The app can’t change this setting." : {
 
     },
     "MB" : {
@@ -9002,28 +8999,28 @@
     "Couldn’t Read %@’s Settings" : {
 
     },
-    "Folders are made with the command line. Only folders MAPP may read are listed." : {
+    "Folders are made with the command line. Only folders the app may read are listed." : {
 
     },
     "manage files across the server" : {
 
     },
-    "MAPP isn’t allowed to read the server’s audit log." : {
+    "The app isn’t allowed to read the server’s audit log." : {
 
     },
-    "MAPP isn’t allowed to read the server’s health and status." : {
+    "The app isn’t allowed to read the server’s health and status." : {
 
     },
-    "MAPP isn’t allowed to read the settings the server started with." : {
+    "The app isn’t allowed to read the settings the server started with." : {
 
     },
-    "MAPP isn’t allowed to see or change how the server keeps files." : {
+    "The app isn’t allowed to see or change how the server keeps files." : {
 
     },
-    "MAPP isn’t allowed to see or change the server’s addresses." : {
+    "The app isn’t allowed to see or change the server’s addresses." : {
 
     },
-    "MAPP isn’t allowed to see or change the server’s limits." : {
+    "The app isn’t allowed to see or change the server’s limits." : {
 
     },
     "Pages on it can no longer call the server." : {
@@ -9068,10 +9065,10 @@
     "You closed Settings before saving the changes to the server’s settings." : {
 
     },
-    "MAPP isn’t allowed to read the jobs the server runs by itself." : {
+    "The app isn’t allowed to read the jobs the server runs by itself." : {
 
     },
-    "MAPP isn’t allowed to see or change how the server is monitored." : {
+    "The app isn’t allowed to see or change how the server is monitored." : {
 
     },
     "Remove %@ From New" : {

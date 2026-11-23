@@ -117,7 +117,7 @@ extension LiveMarfaTests {
             try #require(await eventually { library.isLoaded && library.reachesServer })
 
             let settings = LibraryViewSettings(
-                title: "MAPPTEST view \(UUID().uuidString.prefix(8))",
+                title: "MARFAMACTEST view \(UUID().uuidString.prefix(8))",
                 query: LibraryViewQuery(
                     types: [TypeID("core.task")], states: [.active],
                     filter: #"properties.status eq "todo" OR backref[parent-of] not_exists"#),

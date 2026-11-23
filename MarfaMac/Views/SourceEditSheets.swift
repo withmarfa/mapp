@@ -35,17 +35,17 @@ struct SourceNameSheet: View {
             SourceEditNotice(model: model)
             HStack {
                 Button("Use Default Name") { run { await model.useDefaultName() } }
-                    .mappButton(.secondary)
+                    .appButton(.secondary)
                     .disabled(!model.canUseDefaultName)
                     .accessibilityIdentifier("SourceUseDefaultName")
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                    .mappButton(.secondary)
+                    .appButton(.secondary)
                     .disabled(!model.canCancel)
                 Button("Rename", action: rename)
                     .keyboardShortcut(.defaultAction)
-                    .mappButton(.primary)
+                    .appButton(.primary)
                     .disabled(!model.canRename)
                     .accessibilityIdentifier("SourceRename")
             }
@@ -65,7 +65,7 @@ struct SourceNameSheet: View {
     }
 }
 
-/// Chooses the mark of a source from the Lucide and Simple Icons sets, each drawn as MAPP will draw it. The mark is
+/// Chooses the mark of a source from the Lucide and Simple Icons sets, each drawn as the app will draw it. The mark is
 /// saved as a full ID, such as `simple-icons:readwise`, on the server for every app.
 struct SourceMarkSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -122,13 +122,13 @@ struct SourceMarkSheet: View {
             SourceEditNotice(model: model)
             HStack {
                 Button("Remove Mark") { choose(nil) }
-                    .mappButton(.secondary)
+                    .appButton(.secondary)
                     .disabled(!model.canRemoveMark)
                     .accessibilityIdentifier("SourceRemoveMark")
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                    .mappButton(.secondary)
+                    .appButton(.secondary)
                     .disabled(!model.canCancel)
             }
         }
@@ -157,7 +157,7 @@ private struct SourceEditNotice: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("SourceEditFailure")
         } else if model.canCancel, !model.canChange {
-            Text("Sources are named on your server, so you can change one once MAPP is connected.")
+            Text("Sources are named on your server, so you can change one once the app is connected.")
                 .interfaceFont(.callout)
                 .foregroundStyle(.secondary)
         }

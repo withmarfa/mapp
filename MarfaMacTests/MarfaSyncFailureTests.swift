@@ -121,7 +121,7 @@ struct MarfaSyncFailureTests {
     /// A refused key and a contract mismatch each have words of their own for every caller of `Words.message(for:)`.
     @Test func aRefusedKeyAndAContractMismatchAreToldInTheAppsWords() {
         let raw = "https://marfa.example.test refused"
-        let ended = "The server has ended MAPP’s sign-in. Sign in again in Settings."
+        let ended = "The server has ended the app’s sign-in. Sign in again in Settings."
         let refusals = [
             MarfaError.signedOut(origin: "https://marfa.example.test", message: raw),
             .unauthorized(code: "unauthorized", message: raw, server: nil),
@@ -132,8 +132,8 @@ struct MarfaSyncFailureTests {
 
         let unsent = MarfaError.contractMismatch(served: "9", expected: 1, status: 412, writeSent: false, message: raw, server: nil)
         let sent = MarfaError.contractMismatch(served: "9", expected: 1, status: nil, writeSent: true, message: raw, server: nil)
-        #expect(Words.message(for: unsent) == "This version of MAPP and the server use different versions of Marfa, so the server didn’t make the change. Update MAPP or the server, then try again.")
-        #expect(Words.message(for: sent) == "This version of MAPP and the server use different versions of Marfa, and the change may already have been made. Update MAPP or the server, then check the change.")
+        #expect(Words.message(for: unsent) == "This version of the app and the server use different versions of Marfa, so the server didn’t make the change. Update the app or the server, then try again.")
+        #expect(Words.message(for: sent) == "This version of the app and the server use different versions of Marfa, and the change may already have been made. Update the app or the server, then check the change.")
         #expect(!Words.message(for: sent).contains("example.test"))
     }
 
@@ -173,7 +173,7 @@ struct MarfaSyncFailureTests {
         await source.close()
     }
 
-    /// withmarfa/mapp#454: a first hydration that is filling and then stops for a server too old leaves the Settings pages
+    /// withmarfa/marfa-mac#454: a first hydration that is filling and then stops for a server too old leaves the Settings pages
     /// no progress to show, though the package's last fill is still on the report.
     @Test func aFirstFillThatStopsForAServerTooOldLeavesSettingsNoProgress() async throws {
         let tooOld = MarfaError.serverTooOld(served: "0.0.77", oldest: "0.0.78", message: "Copy streams require exactly edges=all&copy=1")
@@ -192,9 +192,9 @@ struct MarfaSyncFailureTests {
     /// A renewal the server or the app's renewer could not finish, with the sign-in kept, is the package's
     /// `renewalRefused`: each reason has its own words, and none of the package's text.
     @Test(arguments: [
-        (RenewalRefusalReason.refused, "MAPP couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again."),
-        (RenewalRefusalReason.redirected, "MAPP couldn’t renew its sign-in because the server redirected the request. Check the server address in Settings, then try again. If this keeps happening, sign in again."),
-        (RenewalRefusalReason.unreadable, "MAPP couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again."),
+        (RenewalRefusalReason.refused, "The app couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again."),
+        (RenewalRefusalReason.redirected, "The app couldn’t renew its sign-in because the server redirected the request. Check the server address in Settings, then try again. If this keeps happening, sign in again."),
+        (RenewalRefusalReason.unreadable, "The app couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again."),
     ])
     func aRefusedRenewalIsToldInTheAppsWordsForItsReason(reason: RenewalRefusalReason, words: String) {
         let raw = "https://marfa.example.test refused to renew the sign-in: the server answered 301"

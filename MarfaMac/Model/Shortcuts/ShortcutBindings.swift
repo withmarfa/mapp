@@ -5,7 +5,7 @@ import Observation
 /// better default reaches every command nobody changed; a command the person cleared is stored as cleared. Shortcuts sync
 /// through the connected Marfa (`PreferencesMap`).
 ///
-/// A stored command that MAPP no longer has is ignored and kept, in case it returns. Stored text that cannot be read is
+/// A stored command that app no longer has is ignored and kept, in case it returns. Stored text that cannot be read is
 /// moved aside under a key of its own, kept and never removed, and the commands start from their defaults.
 @Observable @MainActor
 final class ShortcutBindings {
@@ -21,7 +21,7 @@ final class ShortcutBindings {
     /// Who holds a shortcut a person tried to give a command.
     enum Holder: Equatable {
         case command(ShortcutCommand)
-        /// One of the system's own commands, which a command of MAPP's cannot take.
+        /// One of the system's own commands, which a command of the app's cannot take.
         case system(String)
 
         var name: String {
@@ -96,7 +96,7 @@ final class ShortcutBindings {
         save()
     }
 
-    /// Puts every command back to its default. A stored command MAPP no longer has stays as it was.
+    /// Puts every command back to its default. A stored command the app no longer has stays as it was.
     func restoreDefaults() {
         for command in commands { chosen.removeValue(forKey: command.id) }
         save()
@@ -135,12 +135,12 @@ final class ShortcutBindings {
     struct Applied: Equatable {
         /// The commands the file gave a shortcut or none.
         var applied = 0
-        /// The file's commands MAPP no longer has, and the shortcuts left out because another command already holds the
+        /// The file's commands the app no longer has, and the shortcuts left out because another command already holds the
         /// same keys, the system does, or they do not fit a menu. Such a command keeps what it had.
         var skipped = 0
     }
 
-    /// Takes the file's shortcuts and leaves every command it does not name as it was. A command MAPP does not have is
+    /// Takes the file's shortcuts and leaves every command it does not name as it was. A command the app does not have is
     /// skipped and counted, and a shortcut that a command the file does not name, an earlier one, or the system already
     /// holds is left out and counted, so what results never gives two commands one key.
     func apply(_ shortcuts: [String: Shortcut?]) -> Applied {

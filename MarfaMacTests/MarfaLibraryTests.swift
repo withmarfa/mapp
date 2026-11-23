@@ -1219,7 +1219,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         await source.close()
         library.setFavorite([LibraryFixture.n1], false, undoManager: nil)
-        #expect(library.notices.waiting.last?.message == "MAPP closed the library before it could keep your change. Make the change again.")
+        #expect(library.notices.waiting.last?.message == "The app closed the library before it could keep your change. Make the change again.")
         #expect(source.submitted.isEmpty)
     }
 

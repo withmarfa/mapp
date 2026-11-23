@@ -77,7 +77,7 @@ import Observation
     private let context: OwnerContext
 
     private(set) var webhooks: [OwnerWebhook] = []
-    /// Who MAPP is signed in as, which tells its own webhooks from the others'. Read only where the list holds others'.
+    /// Who the app is signed in as, which tells its own webhooks from the others'. Read only where the list holds others'.
     private(set) var identity: OwnIdentity?
     /// Whether the list on show was read with every maker's webhooks in it. The grants may change under a list already read,
     /// so what the list holds is told by this, not by the grants now.
@@ -131,7 +131,7 @@ import Observation
     var seesEvery: Bool { context.grants().isSuperset(of: [.webhooksManage, .keysManage]) }
 
     /// Whether this sign-in made `webhook`, which alone may change it or send a delivery again. Where the list holds only
-    /// this sign-in's, all of it is; where it holds every maker's, the maker is matched with who MAPP is signed in as, by
+    /// this sign-in's, all of it is; where it holds every maker's, the maker is matched with who the app is signed in as, by
     /// identity (`OwnIdentity.made`).
     func isOwn(_ webhook: OwnerWebhook) -> Bool {
         guard listedEvery else { return true }
@@ -191,7 +191,7 @@ import Observation
         }
     }
 
-    /// The name above a group: "Made by MAPP", "Made by the key Lisbon zine importer".
+    /// The name above a group: "Made by the app", "Made by the key Lisbon zine importer".
     func heading(of group: Group) -> String {
         if group.isOwn {
             guard let name = group.name else { return String(localized: "Made by This Sign-In") }
@@ -244,8 +244,8 @@ import Observation
         }
     }
 
-    /// Reads only the list, and answers whether it could. Where the list holds every maker's, who MAPP is is read first: with
-    /// no answer the page shows the failure and Try Again, never a list in which MAPP's own look like another's.
+    /// Reads only the list, and answers whether it could. Where the list holds every maker's, who the app is is read first: with
+    /// no answer the page shows the failure and Try Again, never a list in which the app's own look like another's.
     private func readList() async -> Bool {
         defer { hasLoaded = true }
         let every = seesEvery
@@ -273,7 +273,7 @@ import Observation
         }
     }
 
-    /// Reads who MAPP is signed in as, and the keys, so the others' webhooks are told from MAPP's own and an expired maker from
+    /// Reads who the app is signed in as, and the keys, so the others' webhooks are told from the app's own and an expired maker from
     /// one that stands. The keys only tell an expired maker from one that stands, so a read that fails keeps what was known.
     private func readMakers() async throws(OwnerFailure) {
         if identity == nil { identity = try await context.calls.identity() }
@@ -482,7 +482,7 @@ import Observation
 
     // MARK: Redelivery
 
-    /// Whether a delivery can be sent again: only a failed one of a webhook MAPP made, and only while it is on, as the server
+    /// Whether a delivery can be sent again: only a failed one of a webhook the app made, and only while it is on, as the server
     /// refuses both other ways (`events/redeliver-inactive`, `events/webhook-owner-no-change`).
     func canRedeliver(_ delivery: WebhookDeliveryInfo, of webhook: OwnerWebhook) -> Bool {
         isOwn(webhook) && webhook.active && delivery.status == .failed && !redelivering.contains(delivery.id)

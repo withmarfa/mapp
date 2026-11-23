@@ -72,24 +72,24 @@ nonisolated struct ConnectionStanding: Equatable, Sendable {
         }
     }
 
-    /// "Not answering since 09:12. MAPP keeps trying.": the time of the last answer, as the date and clock are set.
+    /// "Not answering since 09:12. The app keeps trying.": the time of the last answer, as the date and clock are set.
     static func notAnswering(_ lastAnswered: Date?, now: Date, calendar: Calendar, format: DateFormat) -> String {
-        guard let lastAnswered else { return String(localized: "Not answering. MAPP keeps trying.") }
+        guard let lastAnswered else { return String(localized: "Not answering. The app keeps trying.") }
         let time = DateDisplay.timeOfDay(of: lastAnswered, format: format, calendar: calendar)
         let when = calendar.isDate(lastAnswered, inSameDayAs: now)
             ? time : DateDisplay.text(of: lastAnswered, place: .value, format: format, now: now, calendar: calendar)
-        return String(localized: "Not answering since \(when). MAPP keeps trying.")
+        return String(localized: "Not answering since \(when). The app keeps trying.")
     }
 }
 
-/// What the Account section of Connection holds in each state: who is signed in, what the owner has allowed MAPP, and
+/// What the Account section of Connection holds in each state: who is signed in, what the owner has allowed the app, and
 /// what waits to be sent.
 nonisolated struct ConnectionAccount: Equatable, Sendable {
     /// Every owner permission: what Connection counts and what Allow More… asks for, `sign_ins.manage` included, as a
     /// key's and an app's pages count them. Only the sign-in itself leaves it out (`SystemSignIns.askedAtSignIn`).
     static let asked: Set<InstancePermission> = Set(InstancePermission.allCases)
 
-    /// The permissions MAPP holds, and how many of the `asked` ones that is; nil where the sign-in cannot be read or
+    /// The permissions the app holds, and how many of the `asked` ones that is; nil where the sign-in cannot be read or
     /// the server is not reached, when nothing is said.
     var held: Int?
     var total: Int { Self.asked.count }
@@ -100,7 +100,7 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
     var showsPermissions: Bool
     /// Whether Signed In As is shown: whenever the sign-in is held, so also while the server does not answer.
     var showsName: Bool
-    /// Signed In As cannot be told because the sign-in may not read the owner's name, as one made before MAPP asked for it
+    /// Signed In As cannot be told because the sign-in may not read the owner's name, as one made before the app asked for it
     /// cannot; Allow More… gives it, and it is the one Allow More… on the page, beside Look After This Marfa.
     var offersName: Bool
 
@@ -126,13 +126,13 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
 
     /// What sits under Signed In As where the name is not read: nothing unless Allow More… is there to give it.
     var nameLine: String? {
-        offersName ? String(localized: "Allow More… lets MAPP read the owner’s name.") : nil
+        offersName ? String(localized: "Allow More… lets the app read the owner’s name.") : nil
     }
 
-    /// "MAPP holds 5 of the owner’s 14 permissions."
+    /// "The app holds 5 of the owner’s 14 permissions."
     var permissionsLine: String {
-        guard let held, !holdsAll else { return String(localized: "The owner’s permissions MAPP holds.") }
-        return String(localized: "MAPP holds \(held) of the owner’s \(total) permissions.")
+        guard let held, !holdsAll else { return String(localized: "The owner’s permissions the app holds.") }
+        return String(localized: "The app holds \(held) of the owner’s \(total) permissions.")
     }
 
     /// "All 14", where every permission is held.

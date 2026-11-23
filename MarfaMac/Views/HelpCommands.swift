@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Help menu, after the system's search field: MAPP's own help, its keyboard shortcuts and what is new, then Marfa's
+/// The Help menu, after the system's search field: the app's own help, its keyboard shortcuts and what is new, then Marfa's
 /// documentation and Report a Problem…. The links open in the browser, so a Mac with no network has nothing to handle here.
 /// Keyboard Shortcuts opens Settings at the Keyboard page.
 struct HelpCommands: Commands {

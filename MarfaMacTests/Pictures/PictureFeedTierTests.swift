@@ -4,7 +4,7 @@ import Testing
 @testable import MarfaMac
 
 /// Which items Always loads pictures for without asking. Marfa stamps every item with the source of the key that wrote
-/// it, so an item written in MAPP has a source too: the tier is what tells the feed from the library. The items are
+/// it, so an item written in the app has a source too: the tier is what tells the feed from the library. The items are
 /// mapped from rows as the library maps them, and the answers come from the editor's own wiring.
 @Suite(.hangLimit)
 @MainActor struct PictureFeedTierTests {
@@ -39,10 +39,10 @@ import Testing
     }
 
     @Test func alwaysLoadsInTheFeedAndAsksInTheLibraryEvenWhereTheLibraryItemHasASource() async throws {
-        let written = item("written-in-mapp", tier: .library, source: "mapp")
-        let captured = item("captured", tier: .feed, source: "mapp")
+        let written = item("written-in-marfa-mac", tier: .library, source: "marfa-mac")
+        let captured = item("captured", tier: .feed, source: "marfa-mac")
         let connector = item("from-a-connector", tier: .feed, source: "rss")
-        #expect(written.source == "mapp" && written.tier == .library, "the library item has a source, as every item does")
+        #expect(written.source == "marfa-mac" && written.tier == .library, "the library item has a source, as every item does")
         let library = FakeItemLibrary(items: [written, captured, connector])
         let editor = editor(library)
         // The stub counts requests by host, so each picture is on a host of its own.
@@ -62,7 +62,7 @@ import Testing
     }
 
     @Test func choosingStillLoadsAPictureInALibraryItemAndItThenShowsWithoutAsking() async throws {
-        let written = item("written-in-mapp", tier: .library, source: "mapp")
+        let written = item("written-in-marfa-mac", tier: .library, source: "marfa-mac")
         let library = FakeItemLibrary(items: [written])
         let editor = editor(library)
         let address = "https://\(PictureStub.newHost())/a.png"
@@ -77,14 +77,14 @@ import Testing
     }
 
     @Test func aPictureLoadedInTheFeedKeepsShowingOnceTheItemMovesToTheLibrary() async throws {
-        let captured = item("captured", tier: .feed, source: "mapp")
+        let captured = item("captured", tier: .feed, source: "marfa-mac")
         let library = FakeItemLibrary(items: [captured])
         let editor = editor(library)
         let address = "https://\(PictureStub.newHost())/a.png"
         PictureStub.answer(address, with: .body([SamplePicture.png()]))
         _ = await editor.pictureRequests.reply(to: try request(captured.id, address, ask: "drawing"))
 
-        library.items = [item("captured", tier: .library, source: "mapp")]
+        library.items = [item("captured", tier: .library, source: "marfa-mac")]
         let later = await editor.pictureRequests.reply(to: try request(captured.id, address, ask: "drawing"))
 
         #expect(later?["state"] == "loaded")

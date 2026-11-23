@@ -2,7 +2,7 @@ import Marfa
 import SwiftUI
 
 /// The Overview page: the Marfa's head card, what needs the owner's attention, its name and release, and how it stands. A part
-/// the sign-in may not read is left out, and MAPP says so in the first row of Needs Attention, with Allow More….
+/// the sign-in may not read is left out, and the app says so in the first row of Needs Attention, with Allow More….
 struct OverviewPage: View {
     let host: any MarfaSettingsHost
 
@@ -65,7 +65,7 @@ struct OverviewPage: View {
 
     private var permissionsRow: some View {
         SettingsProblemRow(
-            title: Text("MAPP Can Look After Part of \(host.serverName)"),
+            title: Text("This App Can Look After Part of \(host.serverName)"),
             line: Text("It holds \(host.grants.count) of the owner’s \(InstancePermission.allCases.count) permissions."),
             actions: [
                 SettingsProblemAction("Allow More…", isPrimary: true) {

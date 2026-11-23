@@ -23,7 +23,7 @@ extension LiveMarfaTests {
                     let library = MarfaLibrary(source: source, notices: notices)
                     source.refresh()
                     try #require(await eventually { library.isLoaded && library.item(id) == nil }, "the copy never heard of the purge")
-                    let typed = "MAPPTEST purged elsewhere, then everything typed after"
+                    let typed = "MARFAMACTEST purged elsewhere, then everything typed after"
                     let log = ChangeLog(source)
                     // As a property editor still showing the item saves, by the library, which follows the answer.
                     library.submitPropertyEdit(
@@ -59,7 +59,7 @@ extension LiveMarfaTests {
                 try await closing(source) {
                     let state = try #require(await log.wait { $0.painted != nil })
                     #expect(state.painted?.items.contains { $0.id == id } == true)
-                    let typed = "MAPPTEST purged elsewhere, then everything typed after"
+                    let typed = "MARFAMACTEST purged elsewhere, then everything typed after"
                     let edit = WriteID(), behind = WriteID()
                     source.submit(.editProperties(id, ["title": .string(typed)], base: version, undoing: nil), as: edit)
                     source.submit(.tag(id, ItemTag.favorite, on: true), as: behind)
@@ -96,7 +96,7 @@ extension LiveMarfaTests {
                     first.refresh()
                     try #require(await eventually { LiveMarfa.isWhole(first.syncReport) && first.connectionState == .online })
                     let created = WriteID()
-                    first.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST purged elsewhere", body: "One")), as: created)
+                    first.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST purged elsewhere", body: "One")), as: created)
                     await first.flush()
                     let settled = try #require(await log.wait { state in
                         state.answer(to: created) == .accepted && state.snapshot?.items.first { $0.id == id }?.sync == .settled
@@ -130,7 +130,7 @@ extension LiveMarfaTests {
         func aWrongKeyIsRefusedUntilTheRightOneIsGiven() async throws {
             let bench = try HostBench()
             let host = host(bench)
-            try await host.connect(address: try LiveMarfa.address(), key: "mapptest-not-a-key-\(UUID().uuidString)")
+            try await host.connect(address: try LiveMarfa.address(), key: "marfamactest-not-a-key-\(UUID().uuidString)")
             #expect(await eventually { host.state == .keyRefused }, "\(host.state)")
             try await host.signInAgain(via: host.scripted(try LiveMarfa.key()))
             #expect(await eventually { host.state == .online }, "\(host.state)")

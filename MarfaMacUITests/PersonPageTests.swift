@@ -6,7 +6,7 @@ final class PersonPageTests: XCTestCase {
 
     override func setUp() async throws {
         continueAfterFailure = false
-        app = XCUIApplication.sample(flags: ["-MAPPCollectionSample"])
+        app = XCUIApplication.sample(flags: ["-MarfaMacCollectionSample"])
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
     }

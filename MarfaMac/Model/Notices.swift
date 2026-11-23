@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// What MAPP has to tell the person: something a library could not do, a change it could not keep, or a server
+/// What the app has to tell the person: something a library could not do, a change it could not keep, or a server
 /// that would read the key unencrypted. The one way any of them reaches the person: each waits here, in the order
 /// it was told, until one window shows it and the person answers. The host makes one and gives it to every library
 /// it opens, so a notice from a library the windows have since left is still told.
@@ -126,14 +126,14 @@ import Observation
             return text == nil ? reason : String(localized: "\(reason) Your text is on the clipboard, so you can paste it back.")
         }
         return text == nil
-            ? String(localized: "MAPP closed the library before it could keep your change. Make the change again.")
-            : String(localized: "MAPP closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back.")
+            ? String(localized: "The app closed the library before it could keep your change. Make the change again.")
+            : String(localized: "The app closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back.")
     }
 
     /// Changes not kept for different reasons share the plainest account of them.
     private static func someNotKeptMessage(text: String?) -> String {
         text == nil
-            ? String(localized: "MAPP couldn’t keep some of your changes. Make them again.")
-            : String(localized: "MAPP couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back.")
+            ? String(localized: "The app couldn’t keep some of your changes. Make them again.")
+            : String(localized: "The app couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back.")
     }
 }

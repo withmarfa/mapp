@@ -39,13 +39,13 @@ nonisolated struct SidebarSectionDrag: Codable, Transferable {
     let id: String
 
     static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .mappSidebarSection)
+        CodableRepresentation(contentType: .marfaSidebarSection)
     }
 }
 
 extension UTType {
     /// Named for the bundle identifier, as `MarfaMac/Info.plist` declares it, so a section never drags into the other build.
-    nonisolated static let mappSidebarSection = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").sidebar-section")
+    nonisolated static let marfaSidebarSection = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").sidebar-section")
 }
 
 /// The mark at the trailing edge of a row and a section while the sidebar is being customized: it says the row can be
@@ -452,7 +452,7 @@ struct SidebarTabBar: View {
             Spacer(minLength: 0)
             Button("New Tab", systemImage: "plus") { ask(.newTab(moving: nil)) }
                 .labelStyle(.iconOnly)
-                .mappButton(.plain, size: .small, icon: true)
+                .appButton(.plain, size: .small, icon: true)
                 .accessibilityIdentifier("SidebarNewTab")
         }
         .padding(.horizontal, 12)

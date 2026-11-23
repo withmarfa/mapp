@@ -386,17 +386,17 @@ struct ShortcutTests {
 
     @Test func aFileThatIsNotOursIsRefused() throws {
         #expect(throws: ShortcutsFile.ReadError.notOurs) { try ShortcutsFile.read(Data("not json".utf8)) }
-        #expect(throws: ShortcutsFile.ReadError.notOurs) { try ShortcutsFile.read(Data("{\"format\":\"mapp-looks\",\"version\":1}".utf8)) }
+        #expect(throws: ShortcutsFile.ReadError.notOurs) { try ShortcutsFile.read(Data("{\"format\":\"marfa-mac-looks\",\"version\":1}".utf8)) }
         #expect(throws: ShortcutsFile.ReadError.notOurs) { try ShortcutsFile.read(Data("[1,2]".utf8)) }
-        #expect(throws: ShortcutsFile.ReadError.notOurs) { try ShortcutsFile.read(Data("{\"format\":\"mapp-shortcuts\",\"version\":1}".utf8)) }
+        #expect(throws: ShortcutsFile.ReadError.notOurs) { try ShortcutsFile.read(Data("{\"format\":\"marfa-mac-shortcuts\",\"version\":1}".utf8)) }
     }
 
     @Test func aFileFromANewerVersionIsRefused() {
-        let newer = "{\"format\":\"mapp-shortcuts\",\"version\":\(ShortcutsFile.version + 1),\"shortcuts\":{}}"
+        let newer = "{\"format\":\"marfa-mac-shortcuts\",\"version\":\(ShortcutsFile.version + 1),\"shortcuts\":{}}"
         #expect(throws: ShortcutsFile.ReadError.newerVersion) { try ShortcutsFile.read(Data(newer.utf8)) }
     }
 
-    @Test func aShortcutNamingACommandMAPPNoLongerHasIsSkippedAndCounted() {
+    @Test func aShortcutNamingACommandTheAppNoLongerHasIsSkippedAndCounted() {
         let bindings = ShortcutBindings(defaults: defaults())
         let result = bindings.apply(["removedCommand": key("x"), "refresh": key("j", [.command, .option])])
         #expect(result.skipped == 1)

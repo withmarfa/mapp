@@ -22,7 +22,7 @@ import Observation
     private(set) var isRestarting = false
     /// Why the last check, start or switch was refused, in one line, until the next.
     private(set) var error: OwnerFailure?
-    /// Whether the update was lost track of: the server did not come back in the time MAPP waits. Until a read of the status
+    /// Whether the update was lost track of: the server did not come back in the time the app waits. Until a read of the status
     /// shows where it stands, the server may still be updating, so Update is not offered again.
     private(set) var lostTrack = false
     /// The one task that follows an update, held so it ends with the page.
@@ -160,7 +160,7 @@ import Observation
     }
 
     /// Reads the update until it ends. The server ends itself to start the new release, so a read that fails while it runs is
-    /// the restart, not a fault; MAPP waits `patience` reads for it and then says it lost track. The server answers a second
+    /// the restart, not a fault; the app waits `patience` reads for it and then says it lost track. The server answers a second
     /// start with the update that runs, in the same 202, so a start is followed whichever it was.
     private func read() async {
         var unanswered = 0

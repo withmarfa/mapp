@@ -48,7 +48,7 @@ extension EditorTests {
         #expect(PictureStub.requests(to: address).isEmpty)
         try await page.run("document.querySelector('.inkkit-file-action').click()")
         let loaded = try await settle(page.editor,
-            "(() => { const image = document.querySelector('.inkkit-image img'); return !!image && image.naturalWidth > 0 && image.src.startsWith('mapp-embed:'); })()",
+            "(() => { const image = document.querySelector('.inkkit-image img'); return !!image && image.naturalWidth > 0 && image.src.startsWith('marfa-embed:'); })()",
             as: Bool.self) { $0 == true }
         #expect(loaded == true)
         #expect(PictureStub.requests(to: address).count == 1)

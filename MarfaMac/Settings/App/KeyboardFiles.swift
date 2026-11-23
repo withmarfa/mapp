@@ -7,7 +7,7 @@ enum KeyboardFiles {
     static func export(from libraries: Libraries) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = String(localized: "MAPP Shortcuts") + ".json"
+        panel.nameFieldStringValue = String(localized: "Marfa Shortcuts") + ".json"
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             do {
@@ -32,7 +32,7 @@ enum KeyboardFiles {
         }
     }
 
-    /// Reads the file and applies it, or tells why it was not: a file that is not MAPP's, one from a newer MAPP, or one that
+    /// Reads the file and applies it, or tells why it was not: a file that is not the app's, one from a newer version of the app, or one that
     /// could not be read. A refused file changes no shortcut.
     static func `import`(_ url: URL, into libraries: Libraries) {
         let title = String(localized: "Couldn’t Import Shortcuts")
@@ -53,8 +53,8 @@ enum KeyboardFiles {
             libraries.host.notices.tell(String(localized: "Imported Shortcuts"), summary(applied: applied, skipped: skipped))
         } catch {
             let message = switch error {
-            case .notOurs: String(localized: "“\(url.lastPathComponent)” is not a shortcuts file that MAPP can read. No shortcuts were changed.")
-            case .newerVersion: String(localized: "“\(url.lastPathComponent)” was made by a newer version of MAPP. Update MAPP to import it. No shortcuts were changed.")
+            case .notOurs: String(localized: "“\(url.lastPathComponent)” is not a shortcuts file that app can read. No shortcuts were changed.")
+            case .newerVersion: String(localized: "“\(url.lastPathComponent)” was made by a newer version of the app. Update the app to import it. No shortcuts were changed.")
             }
             libraries.host.notices.tell(title, message)
         }
@@ -64,8 +64,8 @@ enum KeyboardFiles {
         let done = applied == 1 ? String(localized: "One shortcut was imported.") : String(localized: "\(applied) shortcuts were imported.")
         guard skipped > 0 else { return done }
         let left = skipped == 1
-            ? String(localized: "One was skipped: MAPP no longer has its command, or its keys can’t be used.")
-            : String(localized: "\(skipped) were skipped: MAPP no longer has their commands, or their keys can’t be used.")
+            ? String(localized: "One was skipped: the app no longer has its command, or its keys can’t be used.")
+            : String(localized: "\(skipped) were skipped: the app no longer has their commands, or their keys can’t be used.")
         return done + " " + left
     }
 }

@@ -198,7 +198,7 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
     }
 
     /// What the server refused for `field`, or a number typed that is not one. A value `wire` leaves out counts as unfilled,
-    /// so an empty template uses MAPP's sentence rather than the server's line, which names a type id.
+    /// so an empty template uses the app's sentence rather than the server's line, which names a type id.
     func error(for field: MappingTypeField, in kind: String) -> String? {
         if let word = numberError(field, in: kind) { return word }
         guard let entry = kinds[kind] else { return nil }

@@ -11,7 +11,7 @@ import Testing
         (.unavailable(message: "Stopped."), false),
     ]
 
-    /// A key the server takes reaches it, whatever the key may write: MAPP does not know a key's permissions, so a
+    /// A key the server takes reaches it, whatever the key may write: the app does not know a key's permissions, so a
     /// key that can read but not write is offered these commands, and the server's refusal is told (as
     /// `TypeIconPickerTests.aRefusalChangesNothingAndSaysWhy` and the view write tests show). A refused key does not.
     @Test(arguments: 0..<states.count)

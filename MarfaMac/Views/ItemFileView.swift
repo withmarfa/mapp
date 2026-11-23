@@ -75,7 +75,7 @@ struct ItemFileView: View {
                     if let reason {
                         Text(reason)
                     } else {
-                        Text("MAPP couldn’t get the file from the server. Check your connection, then try again.")
+                        Text("The app couldn’t get the file from the server. Check your connection, then try again.")
                     }
                 } actions: {
                     Button("Try Again") { Task { await load() } }

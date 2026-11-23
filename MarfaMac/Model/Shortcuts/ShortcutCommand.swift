@@ -6,7 +6,7 @@ nonisolated enum ShortcutMenu: Int, CaseIterable, Comparable, Sendable {
 
     var title: String {
         switch self {
-        case .app: String(localized: "MAPP")
+        case .app: String(localized: "Marfa")
         case .file: String(localized: "File")
         case .edit: String(localized: "Edit")
         case .view: String(localized: "View")
@@ -17,7 +17,7 @@ nonisolated enum ShortcutMenu: Int, CaseIterable, Comparable, Sendable {
     static func < (left: Self, right: Self) -> Bool { left.rawValue < right.rawValue }
 }
 
-/// A menu command MAPP adds, which a person can give a shortcut of their own. `id` never changes once shipped, since a
+/// A menu command the app adds, which a person can give a shortcut of their own. `id` never changes once shipped, since a
 /// stored or exported shortcut names the command by it.
 nonisolated struct ShortcutCommand: Hashable, Identifiable, Sendable {
     let id: String
@@ -33,7 +33,7 @@ nonisolated struct ShortcutCommand: Hashable, Identifiable, Sendable {
     }
 }
 
-/// The keys of the system's own commands that MAPP does not add, which no command of MAPP's can take.
+/// The keys of the system's own commands that app does not add, which no command of the app's can take.
 nonisolated enum SystemShortcuts {
     /// The command a shortcut belongs to in the system's menus, or nil if it is free.
     static func owner(of shortcut: Shortcut) -> String? { reserved[shortcut] }

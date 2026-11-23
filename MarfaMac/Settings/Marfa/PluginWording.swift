@@ -66,7 +66,7 @@ nonisolated enum PluginWording {
         case .owner(let failure): OwnerWording.line(failure)
         case .releaseUnreadable(let line): line
         case .digestMismatch:
-            String(localized: "What the release served isn’t what it lists, so MAPP used none of it.")
+            String(localized: "What the release served isn’t what it lists, so the app used none of it.")
         case .needsNewerServer(let marfa, let server):
             if let title { String(localized: "\(title) needs Marfa \(marfa) or later. This server runs \(server).") } else {
                 String(localized: "This plugin needs Marfa \(marfa) or later. This server runs \(server).")
@@ -74,7 +74,7 @@ nonisolated enum PluginWording {
         case .carriesGuidance:
             String(localized: "This Marfa takes a plugin that carries guidance only from the command line for now.")
         case .releaseChanged:
-            String(localized: "The release changed since it was read, so MAPP used none of it. Try again to read it.")
+            String(localized: "The release changed since it was read, so the app used none of it. Try again to read it.")
         case .canceled: ""
         }
     }

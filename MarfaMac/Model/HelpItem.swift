@@ -6,9 +6,9 @@ nonisolated enum HelpItem: CaseIterable {
 
     var title: LocalizedStringResource {
         switch self {
-        case .help: "MAPP Help"
+        case .help: "Marfa Help"
         case .keyboardShortcuts: "Keyboard Shortcuts"
-        case .whatsNew: "What’s New in MAPP"
+        case .whatsNew: "What’s New in Marfa"
         case .marfaDocumentation: "Marfa Documentation"
         case .reportAProblem: "Report a Problem…"
         }

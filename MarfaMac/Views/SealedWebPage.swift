@@ -154,8 +154,8 @@ import WebKit
         if (root) {
           const apply = () => {
             const style = dom.style(root);
-            const want = globalThis.mappRoom + 'px solid transparent';
-            if (globalThis.mappRoom > 0) {
+            const want = globalThis.marfaRoom + 'px solid transparent';
+            if (globalThis.marfaRoom > 0) {
               if (style.getPropertyValue('border-top') !== want || style.getPropertyPriority('border-top') !== 'important') {
                 style.setProperty('border-top', want, 'important');
               }
@@ -163,10 +163,10 @@ import WebKit
               style.removeProperty('border-top');
             }
           };
-          globalThis.mappRoom = points;
-          if (!globalThis.mappRoomWatch) {
-            globalThis.mappRoomWatch = new MutationObserver(apply);
-            globalThis.mappRoomWatch.observe(root, { attributes: true, attributeFilter: ['style'] });
+          globalThis.marfaRoom = points;
+          if (!globalThis.marfaRoomWatch) {
+            globalThis.marfaRoomWatch = new MutationObserver(apply);
+            globalThis.marfaRoomWatch.observe(root, { attributes: true, attributeFilter: ['style'] });
           }
           apply();
         }
@@ -181,7 +181,7 @@ import WebKit
 
     /// The world the app's own scripts run in: its globals are not the document's, so the document cannot see or change
     /// them, while the DOM is shared.
-    static let world = WKContentWorld.world(name: "MAPPSealedPictures")
+    static let world = WKContentWorld.world(name: "SealedPictures")
 
     nonisolated static let redraw = SafeDOM.script + """
 
@@ -259,7 +259,7 @@ import WebKit
     private static func ruleList() async throws -> WKContentRuleList {
         if let compiled { return compiled }
         let store = WKContentRuleListStore.default()
-        let list = try await store?.compileContentRuleList(forIdentifier: "MAPPSealedWebPage", encodedContentRuleList: rules)
+        let list = try await store?.compileContentRuleList(forIdentifier: "SealedWebPage", encodedContentRuleList: rules)
         guard let list else { throw SealFailure.rulesNotCompiled }
         compiled = list
         return list

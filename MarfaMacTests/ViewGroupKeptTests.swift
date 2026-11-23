@@ -3,8 +3,8 @@ import Marfa
 import Testing
 @testable import MarfaMac
 
-/// What a saved view's group holds survives MAPP: the order and hidden groups another app set, a grouping MAPP cannot
-/// show, and a date's day, week, month or year, which MAPP reads and groups by.
+/// What a saved view's group holds survives the app: the order and hidden groups another app set, a grouping the app cannot
+/// show, and a date's day, week, month or year, which the app reads and groups by.
 @MainActor
 @Suite(.hangLimit)
 struct ViewGroupKeptTests {
@@ -80,7 +80,7 @@ struct ViewGroupKeptTests {
                 #expect(options.grouping == .column(column, by: .bucket(bucket)), "\(field) by \(bucket)")
             }
         }
-        // A span of something that is no date, and a link MAPP has no column for, open ungrouped.
+        // A span of something that is no date, and a link the app has no column for, open ungrouped.
         #expect(ViewDraft.options(for: Self.view(LibraryViewGroup(field: "properties.note", bucket: .week)), catalogue: Self.catalogue).grouping == .none)
         #expect(ViewDraft.options(for: Self.view(LibraryViewGroup(field: "edge[cites]")), catalogue: Self.catalogue).grouping == .none)
         #expect(ViewDraft.options(for: Self.view(LibraryViewGroup(field: "tier")), catalogue: Self.catalogue).grouping == .none)
@@ -92,7 +92,7 @@ struct ViewGroupKeptTests {
         let groups = [
             LibraryViewGroup(field: "properties.due_at", bucket: .week, order: Self.otherApps.order, hidden: Self.otherApps.hidden),
             LibraryViewGroup(field: "properties.status", order: [.string("doing")], hidden: [.null]),
-            // Groupings MAPP cannot show, which open ungrouped.
+            // Groupings the app cannot show, which open ungrouped.
             LibraryViewGroup(field: "edge[cites]", order: [.string("item-1")], hidden: [.string("item-2")]),
             LibraryViewGroup(field: "properties.note", bucket: .month, order: [.string("2026-11-01")]),
         ]
@@ -141,10 +141,10 @@ struct ViewGroupKeptTests {
         #expect(monthly.unkept.isEmpty)
     }
 
-    @Test func anotherFieldDropsTheOldGroupsAndWritesMappsOrder() {
+    @Test func anotherFieldDropsTheOldGroupsAndWritesTheAppsOrder() {
         let view = Self.view(LibraryViewGroup(field: "properties.priority", order: [.string("high")], hidden: [.string("low")]))
         let byStatus = Self.change(view, window: Self.window(grouping: Self.statusColumn)) { $0.grouping = .column("field.status") }
-        // The words by their groups, as MAPP lists them: Not Started, In Progress, Completed.
+        // The words by their groups, as the app lists them: Not Started, In Progress, Completed.
         #expect(byStatus.change.group == .set(LibraryViewGroup(
             field: "properties.status", order: [.string("todo"), .string("doing"), .string("done")], hidden: [])))
 
@@ -160,14 +160,14 @@ struct ViewGroupKeptTests {
             catalogue: Self.catalogue, replaced: ["properties.status": earlier])
         #expect(back.change.group == .set(earlier))
 
-        // A date has no order of MAPP's: its groups follow Marfa's.
+        // A date has no order of the app's: its groups follow Marfa's.
         let byDue = Self.change(view, window: Self.window(grouping: Self.dueColumn, mode: .bucket(.week))) {
             $0.grouping = .column("field.due_at", by: .bucket(.week))
         }
         #expect(byDue.change.group == .set(LibraryViewGroup(field: "properties.due_at", bucket: .week)))
     }
 
-    @Test func aNewViewWritesTheOrderMappListsItsGroupsIn() throws {
+    @Test func aNewViewWritesTheOrderTheAppListsItsGroupsIn() throws {
         var window = Self.window(grouping: Self.statusColumn)
         window.place = .itemType(Self.task.rawValue)
         let draft = try #require(ViewDraft.draft(window, catalogue: Self.catalogue, views: []))
@@ -277,7 +277,7 @@ struct ViewGroupKeptTests {
         #expect(library.views.first?.group == Self.statusElsewhere)
     }
 
-    @Test func aWeekShownInTheWindowIsNeverWrittenOverAGroupingMappCannotShow() async throws {
+    @Test func aWeekShownInTheWindowIsNeverWrittenOverAGroupingTheAppCannotShow() async throws {
         let week = LibraryViewGroup(field: "properties.due_at", bucket: .week)
         let cites = LibraryViewGroup(field: "edge[cites]", order: [.string("item-1")])
         let (browser, library) = Self.opened(Self.view(week))
@@ -296,7 +296,7 @@ struct ViewGroupKeptTests {
 
     /// A bucket the package does not name, such as another release's `fortnight`, is read, shown ungrouped and handed
     /// back to Marfa as read, with the views beside it unaffected.
-    @Test func aViewGroupedByABucketMappDoesNotKnowIsListedOpensUngroupedAndRenamesWithItsGroupAsRead() async throws {
+    @Test func aViewGroupedByABucketTheAppDoesNotKnowIsListedOpensUngroupedAndRenamesWithItsGroupAsRead() async throws {
         let fortnight = ViewGrouping(
             by: "properties.due_at", bucket: ViewGrouping.Bucket(rawValue: "fortnight"),
             order: Self.otherApps.order, hidden: Self.otherApps.hidden)
@@ -306,7 +306,7 @@ struct ViewGroupKeptTests {
             SavedView(id: "dated", version: 2, settings: ViewSettings(title: "Dated", group: ViewGrouping(by: "properties.due_at", bucket: .week))),
         ]
         let views = saved.compactMap(MarfaMapping.view)
-        #expect(views.map(\.id.rawValue) == ["plain", "view-tasks", "dated"], "one view MAPP cannot show does not hide the rest")
+        #expect(views.map(\.id.rawValue) == ["plain", "view-tasks", "dated"], "one view the app cannot show does not hide the rest")
         let read = views[1]
         #expect(read.group?.bucket == nil && read.group?.otherBucket == "fortnight")
         #expect(MarfaMapping.viewSettings(read.settings).group == fortnight, "handed back as read")

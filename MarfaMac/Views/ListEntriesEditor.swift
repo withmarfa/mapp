@@ -29,7 +29,7 @@ struct ListEntriesEditor: View {
             }
             if isEditable, editing.pending == nil {
                 Button { editing.startEntry() } label: { Label("Add Entry", systemImage: "plus") }
-                    .mappButton(.plain, size: .small)
+                    .appButton(.plain, size: .small)
                     // The row's own label names the list beside the button; a spoken one needs it said.
                     .accessibilityLabel("Add Entry to \(label)")
                     .accessibilityIdentifier("ItemListAdd.\(key)")
@@ -78,7 +78,7 @@ struct ListEntriesEditor: View {
                     if index ?? count == 0 { Text("Main").interfaceFont(.caption).foregroundStyle(.secondary) }
                     Spacer()
                     if let index { entryMenu(id, index: index, count: count) } else {
-                        Button("Cancel") { editing.cancelEntry() }.mappButton(.plain, size: .small)
+                        Button("Cancel") { editing.cancelEntry() }.appButton(.plain, size: .small)
                     }
                 }
                 ForEach(shape.members) { member in
@@ -118,7 +118,7 @@ struct ListEntriesEditor: View {
                 editing.set(name, to: nil, of: id, in: shape, value: value, write: onChange)
             }
             .labelStyle(.iconOnly)
-            .mappButton(.plain, size: .small, icon: true)
+            .appButton(.plain, size: .small, icon: true)
             .help("Remove")
             .accessibilityIdentifier("ItemListRemoveMember.\(key).\(name)")
         }
@@ -218,7 +218,7 @@ private struct MemberField: View {
                 Button("Use Current Value") { discard() }
                     .accessibilityIdentifier("ItemListUseCurrent.\(key)")
             }
-            .mappButton(.secondary, size: .small)
+            .appButton(.secondary, size: .small)
         }
     }
 }

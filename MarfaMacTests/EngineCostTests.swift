@@ -136,7 +136,7 @@ nonisolated enum EngineServer {
                 ids.append(id)
                 items.append([
                     "id": id.rawValue, "type": "core.note", "tier": "library", "tags": [tag], "source_id": "\(tag)-\(index)",
-                    "properties": ["title": "MAPPTEST flood \(index)"],
+                    "properties": ["title": "MARFAMACTEST flood \(index)"],
                 ])
             }
             let reply = try await send("POST", "/items/bulk", body: try json(["items": items, "mode": "create_only"]))
@@ -196,12 +196,12 @@ nonisolated enum EngineServer {
     }
 }
 
-/// What MAPP's engine costs over a real core, against a test instance: opening a copy, reading it all again, what
+/// What the app's engine costs over a real core, against a test instance: opening a copy, reading it all again, what
 /// the main actor does after a change, a write's round trip, and following a server that deletes a lot at once.
 /// Run it with the Measure test plan, given a test instance's address and key through `TEST_RUNNER_MARFA_API_URL`
 /// and `TEST_RUNNER_MARFA_API_KEY`. It prints one `ENGINE|<name>|<value>|<unit>` line per number and checks only
 /// that each step reached its end: the numbers are for a person to read, never a gate. It creates and purges items
-/// on the instance, so it is for a test instance only; every item it makes is titled `MAPPTEST` and is removed
+/// on the instance, so it is for a test instance only; every item it makes is titled `MARFAMACTEST` and is removed
 /// when the test ends, passed or not.
 @MainActor
 @Suite(
@@ -362,7 +362,7 @@ struct EngineCostTests {
             let opened = try await openWhole(bench)
             let library = opened.library
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MAPPTEST change 0", body: "", properties: [:], parentID: nil, in: .allItems, undoManager: nil))
+                typeID: "core.note", title: "MARFAMACTEST change 0", body: "", properties: [:], parentID: nil, in: .allItems, undoManager: nil))
             bench.made.add(id)
             try #require(await eventually { library.item(id)?.sync == .settled })
 
@@ -372,8 +372,8 @@ struct EngineCostTests {
             var countTimes: [String: [Double]] = [:]
             var totals: [Double] = []
             for round in 1...3 {
-                #expect(library.setItemProperty(id, key: "title", value: .string("MAPPTEST change \(round)"), undoManager: nil))
-                try #require(await eventually { library.item(id)?.title == "MAPPTEST change \(round)" })
+                #expect(library.setItemProperty(id, key: "title", value: .string("MARFAMACTEST change \(round)"), undoManager: nil))
+                try #require(await eventually { library.item(id)?.title == "MARFAMACTEST change \(round)" })
                 var total = Duration.zero
                 for (name, place) in places {
                     let start = ContinuousClock.now
@@ -409,7 +409,7 @@ struct EngineCostTests {
             let opened = try await openWhole(bench)
             let library = opened.library, source = opened.source
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MAPPTEST write", body: "First", properties: [:], parentID: nil, in: .allItems, undoManager: nil))
+                typeID: "core.note", title: "MARFAMACTEST write", body: "First", properties: [:], parentID: nil, in: .allItems, undoManager: nil))
             bench.made.add(id)
             try #require(await eventually { library.item(id)?.sync == .settled })
             await source.engineTook()
@@ -428,7 +428,7 @@ struct EngineCostTests {
             let probe = LoopProbe(source, every: .milliseconds(100))
             let read = library.body(of: id)?.version ?? library.item(id)?.version ?? ItemVersion(0)
             let start = ContinuousClock.now
-            library.saveText("Second, typed by the engine cost test", of: id, readAt: read, failing: "MAPPTEST save")
+            library.saveText("Second, typed by the engine cost test", of: id, readAt: read, failing: "MARFAMACTEST save")
             await source.queueSubmitted()
             line("save_to_queued", ContinuousClock.now - start)
             try #require(await eventually { library.item(id)?.sync == .settled })
@@ -459,7 +459,7 @@ struct EngineCostTests {
             var steps: [Double] = []
             for round in 0..<5 {
                 // A tag of its own each round, since an item's source id is its tag and its place in the call.
-                let tag = "mapptest-catchup-\(UUID().uuidString.prefix(8).lowercased())"
+                let tag = "marfamactest-catchup-\(UUID().uuidString.prefix(8).lowercased())"
                 bench.tags.append(tag)
                 let made = try await EngineServer.createItems(count: 1, tag: tag)
                 try #require(await eventually(within: .seconds(60)) { made.allSatisfy { library.item($0) != nil } }, "round \(round)")
@@ -502,7 +502,7 @@ struct EngineCostTests {
             let opened = try await openWhole(bench)
             let library = opened.library, source = opened.source
             line("flood_items", Double(flood), "count")
-            let tag = "mapptest-flood-\(UUID().uuidString.prefix(8).lowercased())"
+            let tag = "marfamactest-flood-\(UUID().uuidString.prefix(8).lowercased())"
             bench.tags.append(tag)
 
             let meter = MainActorMeter()

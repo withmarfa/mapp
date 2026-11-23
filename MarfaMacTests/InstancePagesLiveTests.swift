@@ -71,7 +71,7 @@ extension LiveMarfaTests {
             guard before.setting(key)?.isSet == false else { return }
             var result: Result<Void, any Error> = .success(())
             do {
-                try await calls.change([key: .set(.text("x-mapptest=1"))], instanceID: before.instanceID)
+                try await calls.change([key: .set(.text("x-marfamactest=1"))], instanceID: before.instanceID)
                 let set = try #require(try await calls.storedSettings().setting(key))
                 #expect(set.isSet && set.value == nil)
             } catch {

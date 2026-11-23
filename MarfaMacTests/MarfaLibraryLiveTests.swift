@@ -6,7 +6,7 @@ import Testing
 
 extension LiveMarfaTests {
     /// The library over a real copy of the test instance, in the Live test plan. Every item it makes has a title
-    /// starting `MAPPTEST ` and is purged when the test ends, passed or not.
+    /// starting `MARFAMACTEST ` and is purged when the test ends, passed or not.
     @MainActor
     @Suite(.serialized)
     struct MarfaLibraryLiveTests {
@@ -43,7 +43,7 @@ extension LiveMarfaTests {
                 let token = "zb" + UUID().uuidString.prefix(8).lowercased()
                 @MainActor func make(_ title: String, under parent: ItemID? = nil, in place: SidebarItem = .allItems) throws -> ItemID {
                     let id = library.createItem(
-                        typeID: "core.note", title: "MAPPTEST \(title) \(token)", body: "Made by the MAPP tests.",
+                        typeID: "core.note", title: "MARFAMACTEST \(title) \(token)", body: "Made by the app tests.",
                         parentID: parent, in: place, undoManager: nil)
                     if let id { made.add(id) }
                     return try #require(id)
@@ -72,8 +72,8 @@ extension LiveMarfaTests {
                     }
                 }
                 // A library may hold untitled notes, so what is read back is the titles of the notes made here.
-                #expect(library.item(project)?.title == "MAPPTEST project \(token)")
-                #expect(children.map { library.item($0)?.title } == ["MAPPTEST first child \(token)", "MAPPTEST second child \(token)"])
+                #expect(library.item(project)?.title == "MARFAMACTEST project \(token)")
+                #expect(children.map { library.item($0)?.title } == ["MARFAMACTEST first child \(token)", "MARFAMACTEST second child \(token)"])
                 // One copy holds both tiers: the Inbox is the feed, and All Items has the feed's items among the rest.
                 let inbox = library.items(in: .inbox)
                 #expect(inbox.contains { $0.id == captured })
@@ -89,7 +89,7 @@ extension LiveMarfaTests {
                     #expect(parent?.targets.map(\.itemID) == [project])
                     #expect(parent?.label == "Parent")
                 }
-                #expect(library.body(of: project)?.text == "Made by the MAPP tests.")
+                #expect(library.body(of: project)?.text == "Made by the app tests.")
                 #expect(!library.relationshipCandidates(for: project, field: "about").isEmpty)
                 #expect(await eventually { library.search(token, in: .everywhere).items.contains { $0.id == project } })
             }
@@ -99,11 +99,11 @@ extension LiveMarfaTests {
         func filesItemsInACollectionAndTakesThemOut() async throws {
             try await withLibrary { library, source, made in
                 let token = "zc" + UUID().uuidString.prefix(8).lowercased()
-                // Whatever type the instance gives the `container` role, as MAPP never names one.
+                // Whatever type the instance gives the `container` role, as the app never names one.
                 let type = try #require(library.catalogue.collectionTypes.map(\.rawValue).sorted().first)
                 @MainActor func make(_ title: String, type: String) throws -> ItemID {
                     let id = library.createItem(
-                        typeID: type, title: "MAPPTEST \(title) \(token)", body: "", properties: [:], parentID: nil,
+                        typeID: type, title: "MARFAMACTEST \(title) \(token)", body: "", properties: [:], parentID: nil,
                         in: .allItems, undoManager: nil)
                     if let id { made.add(id) }
                     return try #require(id)
@@ -125,7 +125,7 @@ extension LiveMarfaTests {
                 #expect(membership?.targets.map(\.itemID) == [collection])
                 #expect(library.relationships(for: collection).first { $0.field == "inverse:in-collection" }?.label == "Contents")
 
-                // The server refuses nesting, and MAPP never sends it.
+                // The server refuses nesting, and the app never sends it.
                 #expect(!library.addToCollection([other], collection, undoManager: nil))
 
                 #expect(library.removeFromCollection([first], collection, undoManager: nil))
@@ -153,7 +153,7 @@ extension LiveMarfaTests {
                 let token = "zq" + UUID().uuidString.prefix(8).lowercased()
                 @MainActor func make(_ title: String, under parent: ItemID? = nil) throws -> ItemID {
                     let id = library.createItem(
-                        typeID: "core.note", title: "MAPPTEST \(title) \(token)", body: "Made by the MAPP tests.",
+                        typeID: "core.note", title: "MARFAMACTEST \(title) \(token)", body: "Made by the app tests.",
                         parentID: parent, in: .allItems, undoManager: nil)
                     if let id { made.add(id) }
                     return try #require(id)
@@ -167,7 +167,7 @@ extension LiveMarfaTests {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [parent]
                 })
                 #expect(library.relationships(for: parent).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child])
-                #expect(library.body(of: child)?.text == "Made by the MAPP tests.")
+                #expect(library.body(of: child)?.text == "Made by the app tests.")
 
                 // Text: held at once, and the copy's own once the server has answered.
                 library.updateBody(of: child, to: "Edited \(token) text.")
@@ -179,8 +179,8 @@ extension LiveMarfaTests {
 
                 // A title, and its undo.
                 let title = try #require(library.item(child)?.title)
-                step { #expect(library.setItemProperty(child, key: "title", value: .string("MAPPTEST renamed \(token)"), undoManager: undo)) }
-                #expect(await eventually { library.item(child)?.title == "MAPPTEST renamed \(token)" })
+                step { #expect(library.setItemProperty(child, key: "title", value: .string("MARFAMACTEST renamed \(token)"), undoManager: undo)) }
+                #expect(await eventually { library.item(child)?.title == "MARFAMACTEST renamed \(token)" })
                 undo.undo()
                 #expect(await eventually { library.item(child)?.title == title })
 
@@ -284,10 +284,10 @@ extension LiveMarfaTests {
             try await withLibrary { library, source, made in
                 let token = "zq" + UUID().uuidString.prefix(8).lowercased()
                 let kept = try #require(library.createItem(
-                    typeID: "core.note", title: "MAPPTEST bin kept \(token)", body: "Kept.", parentID: nil, in: .allItems,
+                    typeID: "core.note", title: "MARFAMACTEST bin kept \(token)", body: "Kept.", parentID: nil, in: .allItems,
                     undoManager: nil))
                 let purged = try #require(library.createItem(
-                    typeID: "core.note", title: "MAPPTEST bin purged \(token)", body: "Purged.", parentID: nil, in: .allItems,
+                    typeID: "core.note", title: "MARFAMACTEST bin purged \(token)", body: "Purged.", parentID: nil, in: .allItems,
                     undoManager: nil))
                 made.add(kept)
                 made.add(purged)
@@ -322,11 +322,11 @@ extension LiveMarfaTests {
         func linksAndEmbedsInTheTextAreEdgesBothWays() async throws {
             try await withLibrary { library, source, made in
                 let token = "zq" + UUID().uuidString.prefix(8).lowercased()
-                let targetTitle = "MAPPTEST link target \(token)"
+                let targetTitle = "MARFAMACTEST link target \(token)"
                 let target = try #require(library.createItem(
                     typeID: "core.note", title: targetTitle, body: "Linked.", parentID: nil, in: .allItems, undoManager: nil))
                 let host = try #require(library.createItem(
-                    typeID: "core.note", title: "MAPPTEST link host \(token)", body: "Nothing yet.", parentID: nil,
+                    typeID: "core.note", title: "MARFAMACTEST link host \(token)", body: "Nothing yet.", parentID: nil,
                     in: .allItems, undoManager: nil))
                 made.add(target)
                 made.add(host)
@@ -334,14 +334,14 @@ extension LiveMarfaTests {
                 await source.flush()
 
                 // A link to the target, and to a name nothing answers to.
-                library.updateBody(of: host, to: "See [[\(targetTitle)]] and [[MAPPTEST nowhere \(token)]].")
+                library.updateBody(of: host, to: "See [[\(targetTitle)]] and [[MARFAMACTEST nowhere \(token)]].")
                 await source.flush()
                 try #require(await eventually {
                     library.relationships(for: target).first { $0.field == "inverse:references" }?.targets.map(\.itemID) == [host]
                 })
                 let mentions = library.bodyMentions(for: host)
                 #expect(mentions.contains { $0.itemID == target && $0.resolution == .resolved(target) })
-                #expect(mentions.contains { $0.title == "MAPPTEST nowhere \(token)" && $0.resolution == .missing })
+                #expect(mentions.contains { $0.title == "MARFAMACTEST nowhere \(token)" && $0.resolution == .missing })
 
                 // Taking the link out of the text takes the edge out.
                 library.updateBody(of: host, to: "Nothing again.")
@@ -353,9 +353,9 @@ extension LiveMarfaTests {
 
                 // A file attached through the package, and embedded where the page writes it.
                 let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
-                let report = await library.attach([(name: "MAPPTEST attachment \(token).png", data: png)], to: host)
+                let report = await library.attach([(name: "MARFAMACTEST attachment \(token).png", data: png)], to: host)
                 let embed = try #require(report.embeds.first, "\(report.failed)")
-                #expect(embed.name == "MAPPTEST attachment \(token).png")
+                #expect(embed.name == "MARFAMACTEST attachment \(token).png")
                 library.updateBody(of: host, to: "A picture: ![\(embed.name)](\(embed.link))")
                 await source.flush()
                 try #require(await eventually {
@@ -388,20 +388,20 @@ extension LiveMarfaTests {
                 #expect(Set(status.sliceEdgeTypes) == Set(MarfaSync.sliceEdgeTypes))
 
                 let token = "zv" + UUID().uuidString.prefix(8).lowercased()
-                let title = "MAPPTEST view note \(token)"
+                let title = "MARFAMACTEST view note \(token)"
                 let id = try #require(library.createItem(
-                    typeID: "core.note", title: title, body: "Made by the MAPP tests.", parentID: nil, in: .allItems,
+                    typeID: "core.note", title: title, body: "Made by the app tests.", parentID: nil, in: .allItems,
                     undoManager: nil))
                 made.add(id)
                 await source.flush()
                 let query = ViewQuery(types: ["core.note"], filter: "properties.title eq \"\(title)\"")
-                let view = try await source.copy.createView(ViewSettings(title: "MAPPTEST view \(token)", query: query))
+                let view = try await source.copy.createView(ViewSettings(title: "MARFAMACTEST view \(token)", query: query))
                 func deleteView() async { try? await source.copy.deleteView(view.id) }
                 do {
                     let place = SidebarItem.view(ItemID(view.id))
                     try #require(await eventually { library.views.contains { $0.id.rawValue == view.id } })
                     #expect(SidebarPlan(library, layout: SidebarLayout()).library.contains(.views))
-                    #expect(library.name(of: place) == "MAPPTEST view \(token)")
+                    #expect(library.name(of: place) == "MARFAMACTEST view \(token)")
                     #expect(await eventually { library.items(in: place).map(\.id) == [id] })
 
                     #expect(library.item(ItemID(view.id)) == nil)
@@ -429,7 +429,7 @@ extension LiveMarfaTests {
         @Test(.timeLimit(.minutes(2)))
         func textTypedOnAnItemJustMadeIsKeptSaveAfterSave() async throws {
             try await withLibrary { library, source, made in
-                let title = "MAPPTEST typed after quick add " + UUID().uuidString.prefix(8).lowercased()
+                let title = "MARFAMACTEST typed after quick add " + UUID().uuidString.prefix(8).lowercased()
                 let id = try #require(library.createItem(
                     typeID: "core.note", title: title, body: "Ask about the leak under the sink.", parentID: nil,
                     in: .allItems, undoManager: nil))

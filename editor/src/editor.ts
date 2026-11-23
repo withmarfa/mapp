@@ -50,7 +50,7 @@ export function hostMessage(error: Error): EditorMessage {
 }
 
 /** The words the app hands the page. Inkkit rejects a label it does not know, so only Inkkit's own go to it;
- *  the header's and the Link to Item command's are MAPP's. */
+ *  the header's and the Link to Item command's are the app's. */
 export interface AppWords extends PictureWords {
   linkToItem?: string
   /** The name of Quick Look on a file's card, with `%@` where the file's name goes. */

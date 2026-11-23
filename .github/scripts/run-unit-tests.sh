@@ -23,7 +23,7 @@ while kill -0 "$build" 2>/dev/null; do
   if ((SECONDS >= deadline)); then
     echo "::error::The unit tests did not finish within $limit seconds; sampling them before they are stopped."
     # Only this run's own test host: other processes on a shared Mac are none of its business.
-    hosts="$derived/Build/Products/.*/MarfaMac\.app/Contents/MacOS/MarfaMac"
+    hosts="$derived/Build/Products/.*/Marfa\.app/Contents/MacOS/Marfa"
     pids=$(pgrep -f "$hosts" || true)
     {
       date -u

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MarfaMac
 
-/// What MAPP keeps on this Mac about each saved view: read without SwiftUI, and never lost to text it cannot read.
+/// What the app keeps on this Mac about each saved view: read without SwiftUI, and never lost to text it cannot read.
 struct ViewLayoutsTests {
     private static let columns: [ItemTableColumn] = [.title, .type, .edited, .created]
     private static let view = ItemID("view-open-tasks")

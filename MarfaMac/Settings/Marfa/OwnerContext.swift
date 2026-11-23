@@ -30,7 +30,7 @@ import Marfa
     }
 
     /// What a failed call asks of the page: the grants are read again where the server says one is missing, since the owner
-    /// may have narrowed MAPP's access from another device.
+    /// may have narrowed the app's access from another device.
     func learn(from failure: OwnerFailure) async {
         if case .notPermitted = failure { await refreshGrants() }
     }

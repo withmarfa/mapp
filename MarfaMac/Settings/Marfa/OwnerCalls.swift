@@ -131,7 +131,7 @@ nonisolated enum KeyExpiry: Hashable, Sendable {
 
 /// Who this sign-in is, so a page can tell what it made from what another credential made.
 nonisolated struct OwnIdentity: Hashable, Sendable {
-    /// The key MAPP is signed in with where it is one; nil for a signed-in app.
+    /// The key the app is signed in with where it is one; nil for a signed-in app.
     var keyID: String?
     /// When that key ends, where it does. A signed-in app counts as having no expiry of its own.
     var expires: Date?

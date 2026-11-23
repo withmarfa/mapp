@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Every menu command MAPP adds that a person can give a shortcut, in the order of the menus. The menus bind these
+/// Every menu command the app adds that a person can give a shortcut, in the order of the menus. The menus bind these
 /// through `ShortcutBindings`, and Settings > Keyboard lists them, so the two cannot differ. A command the system adds
 /// (Copy, Quit) is not here.
 nonisolated extension ShortcutCommand {

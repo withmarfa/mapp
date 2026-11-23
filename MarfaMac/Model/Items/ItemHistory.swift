@@ -34,12 +34,12 @@ nonisolated enum ItemHistoryFailure: Error, Hashable, Sendable {
     /// The server could not be reached. The package reports a refused plain-http address the same way as a network
     /// that is down, so the wording does not say which.
     case unreachable
-    /// MAPP’s sign-in may not read this item's history.
+    /// the app’s sign-in may not read this item's history.
     case notPermitted
     /// The server holds no readable history for the item: it is deleted, of a type the sign-in cannot read, or not sent
     /// to the server yet.
     case unavailable
-    /// The server has ended MAPP’s sign-in.
+    /// The server has ended the app’s sign-in.
     case keyRefused
     /// This library keeps no history to read.
     case unsupported
@@ -48,11 +48,11 @@ nonisolated enum ItemHistoryFailure: Error, Hashable, Sendable {
     var message: String {
         switch self {
         case .unreachable:
-            String(localized: "MAPP can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected.")
+            String(localized: "The app can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected.")
         case .notPermitted:
-            String(localized: "MAPP’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it.")
+            String(localized: "The app’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it.")
         case .unavailable:
-            String(localized: "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind MAPP isn’t approved to read.")
+            String(localized: "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind the app isn’t approved to read.")
         case .keyRefused:
             Words.signInEnded
         case .unsupported:

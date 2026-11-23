@@ -52,7 +52,7 @@ struct StartUpPage: View {
     }
 }
 
-/// What each start-up setting does, in MAPP's words. A setting a newer server adds has none until MAPP names it.
+/// What each start-up setting does, in the app's words. A setting a newer server adds has none until the app names it.
 nonisolated enum StartUpWording {
     static func what(_ name: String) -> String { known[name] ?? "" }
 

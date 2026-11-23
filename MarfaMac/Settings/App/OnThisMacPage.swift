@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The On This Mac page: the copy of the library MAPP keeps on this Mac, and what can be done to it. The space it uses, the
+/// The On This Mac page: the copy of the library the app keeps on this Mac, and what can be done to it. The space it uses, the
 /// files opened and attachments kept offline, Export Everything to a folder, and Download Everything Again. What each file
 /// step does is `DownloadedFiles`', unchanged; a hydration keeps every change not yet sent (`MarfaSync.rehydrate`).
 struct OnThisMacPage: View {
@@ -32,7 +32,7 @@ struct OnThisMacPage: View {
             } else {
                 SettingsPageState(
                     symbol: "laptopcomputer", title: Text("No Marfa Open"),
-                    line: Text("Connect to a Marfa in Connection to see what MAPP keeps of it."),
+                    line: Text("Connect to a Marfa in Connection to see what the app keeps of it."),
                     action: ("Open Connection…", openConnection))
             }
         }
@@ -68,7 +68,7 @@ struct OnThisMacPage: View {
     }
 
     private var headLine: String {
-        let kept = String(localized: "Kept here so MAPP works offline and searches fast.")
+        let kept = String(localized: "Kept here so the app works offline and searches fast.")
         return storeBytes.map { "\(StoreSize.text($0)). \(kept)" } ?? kept
     }
 
@@ -108,7 +108,7 @@ struct OnThisMacPage: View {
                     SettingsRow("Reading Downloaded Files…") { ProgressView().controlSize(.small) }
                 }
                 if readFailed {
-                    SettingsProblemRow(title: Text("Couldn’t Read Downloaded Files"), line: Text("MAPP will try again."), actions: [])
+                    SettingsProblemRow(title: Text("Couldn’t Read Downloaded Files"), line: Text("The app will try again."), actions: [])
                 }
                 if let actionFailure {
                     SettingsRow(verbatim: actionFailure, size: .compact, lines: nil) {}
@@ -217,9 +217,9 @@ struct OnThisMacPage: View {
     /// What the alert says before the whole library is fetched again: nothing waiting is lost.
     static func downloadMessage(name: String, unsent: Int) -> String {
         guard unsent > 0 else {
-            return String(localized: "MAPP fetches the whole library from \(name) again. It keeps working while it downloads.")
+            return String(localized: "The app fetches the whole library from \(name) again. It keeps working while it downloads.")
         }
-        return String(localized: "MAPP fetches the whole library from \(name) again. The \(Words.changes(unsent)) not yet sent stay on this Mac and are sent afterwards.")
+        return String(localized: "The app fetches the whole library from \(name) again. The \(Words.changes(unsent)) not yet sent stay on this Mac and are sent afterwards.")
     }
 
     // MARK: Reading

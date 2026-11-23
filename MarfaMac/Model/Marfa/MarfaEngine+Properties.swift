@@ -36,7 +36,7 @@ extension MarfaEngine {
             let fields = missing.map(\.label).joined(separator: ", ")
             throw Refused(problem: SyncProblem(
                 code: "invalid_properties",
-                message: String(localized: "MAPP can’t fill these required fields: \(fields).")))
+                message: String(localized: "The app can’t fill these required fields: \(fields).")))
         }
         return properties
     }

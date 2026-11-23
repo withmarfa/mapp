@@ -108,7 +108,7 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
 
     let id: ItemID
     var type: TypeID
-    /// What MAPP edits and writes as the item's title; never shown as the item's name (`displayTitle`).
+    /// What the app edits and writes as the item's title; never shown as the item's name (`displayTitle`).
     var title: String
     /// The name the core gives the item, by its type's display hints and fallback fields, or nil where the server
     /// would say "Untitled". Only shown, never written.
@@ -133,18 +133,18 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
     var problem: ItemProblem?
     /// Whether the server advises that a person's connector keeps this item, so a change made here would be put back
     /// on the connector's next run. Advice only: the server refuses no write, and the value can be older than 15
-    /// minutes. MAPP offers no change to such an item (`allowsChanges`).
+    /// minutes. The app offers no change to such an item (`allowsChanges`).
     var readOnly = false
     /// Each embed in this item's text, in order, with the file item the library bound it to or why it has none.
     var boundEmbeds: [BoundEmbed] = []
     /// What made the item, as the library names it: for a Marfa item, the source of the key that wrote it. Nil
-    /// where the library does not know. An item written in MAPP has one too, so this does not separate captured
+    /// where the library does not know. An item written in the app has one too, so this does not separate captured
     /// items from the person's own.
     var source: String?
 
     var isFavorite: Bool { tags.contains(ItemTag.favorite) }
 
-    /// The name as a person reads it: the core's, or MAPP's own "Untitled" where the core gives none. Only shown,
+    /// The name as a person reads it: the core's, or the app's own "Untitled" where the core gives none. Only shown,
     /// never written into the item.
     var displayTitle: String { name ?? String(localized: "Untitled") }
 

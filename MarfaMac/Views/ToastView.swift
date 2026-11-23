@@ -22,11 +22,11 @@ struct ToastView: View {
                 .padding(.trailing, 4 * scale)
             if toast.undo != nil {
                 Button("Undo") { presenter.undo() }
-                    .mappButton(.primary, size: .small)
+                    .appButton(.primary, size: .small)
             }
             Button("Dismiss", systemImage: "xmark") { presenter.dismiss() }
                 .labelStyle(.iconOnly)
-                .mappButton(.plain, size: .small, icon: true)
+                .appButton(.plain, size: .small, icon: true)
         }
         .padding(.leading, 16 * scale)
         .padding(.trailing, 8 * scale)

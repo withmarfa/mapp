@@ -28,20 +28,20 @@ nonisolated struct LayoutRowDrag: Codable, Transferable {
     let id: String
 
     static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .mappLayoutRow)
+        CodableRepresentation(contentType: .marfaLayoutRow)
     }
 }
 
 extension UTType {
     /// Named for the bundle identifier, as `MarfaMac/Info.plist` declares it, so a row never drags into the other build.
-    nonisolated static let mappLayoutRow = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").layout-row")
+    nonisolated static let marfaLayoutRow = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").layout-row")
 }
 
 /// The right sidebar while Customize Layout is on. Page arranges the item's rows in three groups, Pinned (up to four), On
 /// the Page and Hidden, by dragging, by the pin on a row, or with Move Up and Move Down; Sidebar orders, removes and adds
 /// the sidebar's own sections (`SidebarArrangement`). The page and the sidebar stay in view and follow each change at
 /// once. Both choices are for the item's type (`PagePlacements`), so they hold for every item of the type, and they are
-/// MAPP's own: the item is not changed, so a read-only item can be laid out too.
+/// the app's own: the item is not changed, so a read-only item can be laid out too.
 struct ItemLayoutPanel: View {
     private enum Arranging: Hashable { case page, sidebar }
 

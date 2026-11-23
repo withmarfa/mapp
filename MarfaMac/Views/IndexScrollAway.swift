@@ -59,7 +59,7 @@ struct IndexScaffold<Top: View, Extra: View, Content: View>: View {
 }
 
 /// The blurred band over the toolbar, which the rows scroll under once the block of header and the pinned headings have
-/// gone past: the window hides its toolbar's background, so the band is MAPP's own (`ToolbarBand`), as every other
+/// gone past: the window hides its toolbar's background, so the band is the app's own (`ToolbarBand`), as every other
 /// scroll view's is. Its own view, so a scroll redraws it and no other.
 private struct IndexToolbarBand: View {
     let scroll: IndexScroll

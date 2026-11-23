@@ -184,7 +184,7 @@ private struct PluginProblem: View {
     }
 }
 
-/// The command to run for a plugin MAPP does not install, with a button that copies it.
+/// The command to run for a plugin the app does not install, with a button that copies it.
 private struct PluginCommandSection: View {
     let model: PluginsModel
     let name: Text

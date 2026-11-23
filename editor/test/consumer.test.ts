@@ -223,7 +223,7 @@ test('embeds are asked by their text as written, once each, and asked again only
         embeds: {
           postMessage: async (request: { text: string }) => {
             asked.push(request)
-            return { kind: 'image', name, url: `mapp-embed:x/${name}` }
+            return { kind: 'image', name, url: `marfa-embed:x/${name}` }
           },
         },
       },
@@ -241,7 +241,7 @@ test('embeds are asked by their text as written, once each, and asked again only
       await vi.waitFor(() =>
         expect(
           [...document.querySelectorAll('.inkkit-file img')].filter(
-            (e) => e.getAttribute('src') === 'mapp-embed:x/two.png',
+            (e) => e.getAttribute('src') === 'marfa-embed:x/two.png',
           ),
         ).toHaveLength(2),
       )

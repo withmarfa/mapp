@@ -8,7 +8,7 @@ nonisolated enum RemotePictureSetting: String, CaseIterable, Identifiable, Senda
     /// A picture in an item in the feed tier loads without asking. In the library tier, where the person's own items
     /// are, it asks as Ask does. The feed tier is where connectors write and captures land, and also where an item made
     /// while the Inbox is selected lands (`MarfaLibrary.createItem`), so Always loads that item's pictures too.
-    /// `Item.source` cannot tell these apart: every item carries the source of the key that wrote it, MAPP's included.
+    /// `Item.source` cannot tell these apart: every item carries the source of the key that wrote it, the app's included.
     case always
     /// No picture is fetched.
     case never

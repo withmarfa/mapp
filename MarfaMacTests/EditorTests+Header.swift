@@ -445,7 +445,7 @@ extension EditorTests {
         try await page.load("Some text.\n")
         let id = try #require(page.editor.pageItemID)
         var header = Self.header("Review the findings", id: id)
-        header.properties.append(PropertyRow(id: "repo", label: "Repo", value: .text("withmarfa/mapp")))
+        header.properties.append(PropertyRow(id: "repo", label: "Repo", value: .text("withmarfa/marfa-mac")))
         page.editor.setHeader(header)
         var events = 0
         page.editor.onHeaderEvent = { _ in events += 1 }

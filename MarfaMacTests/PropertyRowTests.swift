@@ -171,8 +171,8 @@ struct PropertyRowTests {
     }
 
     @Test func tagsEndTheBlockAsChips() {
-        let rows = Self.rows(["priority": .string("low")], tags: ["mapp", "storage"])
-        #expect(rows.last?.value == .tags(["mapp", "storage"]))
+        let rows = Self.rows(["priority": .string("low")], tags: ["marfa-mac", "storage"])
+        #expect(rows.last?.value == .tags(["marfa-mac", "storage"]))
         #expect(Self.rows([:], tags: []).contains { $0.id == "#tags" } == false)
     }
 

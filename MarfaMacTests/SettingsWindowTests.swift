@@ -103,7 +103,7 @@ struct SettingsWindowTests {
     }
 
     @Test func onlyThePagesThatExistAreListed() {
-        #expect(SettingsPage.mappGroups.flatMap { $0 } == [.general, .appearance, .keyboard, .editor, .lists, .layouts, .search, .onThisMac, .connection])
+        #expect(SettingsPage.appGroups.flatMap { $0 } == [.general, .appearance, .keyboard, .editor, .lists, .layouts, .search, .onThisMac, .connection])
         #expect(
             SettingsPage.marfaGroups.flatMap { $0 } == [
                 .overview, .account, .apps, .keys, .addresses, .plugins, .types, .sources, .recentlyDeleted, .history, .fileStorage, .connectors, .webhooks, .folders,
@@ -125,7 +125,7 @@ struct SettingsWindowTests {
     @Test func aServerThatLastAnsweredTodayIsToldByTheTime() {
         let calendar = Calendar(identifier: .gregorian)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        #expect(MarfaPageGate<EmptyView>.notAnswering(nil, now: now, calendar: calendar) == "MAPP keeps trying.")
+        #expect(MarfaPageGate<EmptyView>.notAnswering(nil, now: now, calendar: calendar) == "The app keeps trying.")
         let today = MarfaPageGate<EmptyView>.notAnswering(now.addingTimeInterval(-60), now: now, calendar: calendar)
         #expect(today.hasPrefix("Last answered today, "))
         let earlier = MarfaPageGate<EmptyView>.notAnswering(now.addingTimeInterval(-3 * 86_400), now: now, calendar: calendar)

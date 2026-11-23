@@ -61,7 +61,7 @@ nonisolated enum SourceEditFailure: Error, Hashable, Sendable {
     var message: String {
         switch self {
         case .unreachable:
-            String(localized: "MAPP can’t reach the server. Changing a source needs the server, so try again once it’s back.")
+            String(localized: "The app can’t reach the server. Changing a source needs the server, so try again once it’s back.")
         case .notPermitted:
             String(localized: "This connection can’t change this source. Ask whoever runs the server to allow it, or sign in again and approve it.")
         case .keyRefused:

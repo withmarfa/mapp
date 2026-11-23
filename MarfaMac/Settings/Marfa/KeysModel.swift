@@ -92,10 +92,10 @@ import Observation
     var renameDraft = ""
     private(set) var renameError: String?
     private(set) var revoked: String?
-    /// Who MAPP is signed in as, which holds a key's extension to its own expiry. Nil until read, and where it can't be: an
+    /// Who the app is signed in as, which holds a key's extension to its own expiry. Nil until read, and where it can't be: an
     /// expiry not known is not "no limit", so a key is extended only once this is read.
     private(set) var identity: OwnIdentity?
-    /// Why who MAPP is signed in as could not be read, while it is not known.
+    /// Why who the app is signed in as could not be read, while it is not known.
     private(set) var identityFailure: OwnerFailure?
     var extensionChoice: Extension = .days(30)
     private(set) var extendError: String?
@@ -116,15 +116,15 @@ import Observation
         (lhs.lastUsed ?? .distantPast) > (rhs.lastUsed ?? .distantPast)
     }
 
-    /// Whether MAPP may make a key, which is a different permission from listing and revoking them.
+    /// Whether the app may make a key, which is a different permission from listing and revoking them.
     var canMake: Bool { context.grants().contains(.keysMint) }
 
-    /// Whether MAPP may give a key more time, which `keys.manage` allows for any key.
+    /// Whether the app may give a key more time, which `keys.manage` allows for any key.
     var canExtend: Bool { context.grants().contains(.keysManage) }
 
-    /// What a key can be extended to now: only a later day than it ends on, and none past the day the key MAPP is signed in
+    /// What a key can be extended to now: only a later day than it ends on, and none past the day the key the app is signed in
     /// with ends, which the server holds it to. A key that never ends has nothing to extend, and never is offered only where
-    /// MAPP's own sign-in does not end. Nothing is offered while MAPP's own sign-in is not known.
+    /// the app's own sign-in does not end. Nothing is offered while the app's own sign-in is not known.
     func extensions(of key: KeyInfo, now: Date = .now) -> [Extension] {
         guard let ends = key.expires, let identity else { return [] }
         let ceiling = identity.expires
@@ -136,7 +136,7 @@ import Observation
         return choices
     }
 
-    /// The permissions MAPP may hand a new key: only what it holds itself.
+    /// The permissions the app may hand a new key: only what it holds itself.
     var givablePermissions: [String] {
         InstancePermission.allCases.filter { context.grants().contains($0) }.map(\.rawValue).sorted()
     }
@@ -296,12 +296,12 @@ import Observation
     }
 
     /// What a refused extension says. A refusal that names no permission is the server holding the key to the end of the key
-    /// MAPP is signed in with.
-    static let notAllowedToExtend = String(localized: "MAPP isn’t allowed to give a key more time.")
+    /// the app is signed in with.
+    static let notAllowedToExtend = String(localized: "The app isn’t allowed to give a key more time.")
 
     static func extendLine(_ failure: OwnerFailure) -> String {
         switch failure {
-        case .notPermitted(nil): String(localized: "Choose a date before MAPP’s sign-in ends.")
+        case .notPermitted(nil): String(localized: "Choose a date before the app’s sign-in ends.")
         case .notPermitted(InstancePermission.keysManage.rawValue?): notAllowedToExtend
         default: OwnerWording.line(failure, on: .keys)
         }

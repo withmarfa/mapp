@@ -236,7 +236,7 @@ extension LiveMarfaTests {
                 await source.flush()
                 // Conflicted copies the tests caused, found by their tag and the token in their title.
                 for item in library.items(in: .allItems) + library.deletedItems
-                where item.tags.contains(MarfaProblems.conflictedCopyTag) && item.title.hasPrefix("MAPPTEST review") {
+                where item.tags.contains(MarfaProblems.conflictedCopyTag) && item.title.hasPrefix("MARFAMACTEST review") {
                     made.add(item.id)
                 }
                 await source.close()
@@ -258,7 +258,7 @@ extension LiveMarfaTests {
 
         private func make(_ library: MarfaLibrary, _ source: MarfaSource, _ made: LiveMarfa.Made, _ token: String) async throws -> ItemID {
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MAPPTEST review \(token)", body: "start", parentID: nil, in: .allItems,
+                typeID: "core.note", title: "MARFAMACTEST review \(token)", body: "start", parentID: nil, in: .allItems,
                 undoManager: nil))
             made.add(id)
             await source.flush()
@@ -414,7 +414,7 @@ extension LiveMarfaTests {
             try await withLibrary { library, source, made in
                 let token = "zt" + UUID().uuidString.prefix(8).lowercased()
                 let id = try #require(library.createItem(
-                    typeID: "core.note", title: "MAPPTEST review \(token)", body: "captured", parentID: nil, in: .inbox,
+                    typeID: "core.note", title: "MARFAMACTEST review \(token)", body: "captured", parentID: nil, in: .inbox,
                     undoManager: nil))
                 made.add(id)
                 #expect(await eventually { library.items(in: .inbox).contains { $0.id == id } })

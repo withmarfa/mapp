@@ -66,7 +66,7 @@ extension FocusedValues {
     @Entry var settingsNavigation: SettingsNavigation?
 }
 
-/// MAPP > Settings…, which opens the window. Back and Forward (⌘[ and ⌘]) are the View menu's own, which move through the
+/// Marfa > Settings…, which opens the window. Back and Forward (⌘[ and ⌘]) are the View menu's own, which move through the
 /// Settings window's pages while it is key (`AppCommands`).
 struct SettingsCommands: Commands {
     let launcher: SettingsLauncher

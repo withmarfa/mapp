@@ -8,7 +8,7 @@ final class WindowBringBackUITests: XCTestCase {
         let app = XCUIApplication()
         // Windows are kept on quit whatever System Settings says about closing them.
         app.launchArguments = (fresh ? ["-ApplePersistenceIgnoreState", "YES"] : [])
-            + ["-NSQuitAlwaysKeepsWindows", "YES", "-MAPPSampleLibrary"]
+            + ["-NSQuitAlwaysKeepsWindows", "YES", "-MarfaMacSampleLibrary"]
         app.launch()
         return app
     }

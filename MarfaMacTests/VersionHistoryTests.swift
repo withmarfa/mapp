@@ -150,7 +150,7 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         #expect(library.restoreCheck(of: snapshot(1, body: "Old"), for: note.id) == .ready(RestorePlan(text: "Old")))
         // Recently Deleted is for reading only.
         if case .unavailable = library.restoreCheck(of: snapshot(1), for: deleted.id) {} else { Issue.record("restorable in the bin") }
-        // A version of a kind with no text or title MAPP edits can be read, not restored.
+        // A version of a kind with no text or title the app edits can be read, not restored.
         let unknown = snapshot(1, body: nil, type: TypeID("elsewhere.kind"))
         if case .unavailable = library.restoreCheck(of: unknown, for: note.id) {} else { Issue.record("restorable without text") }
         // An item deleted elsewhere while Version History was open.

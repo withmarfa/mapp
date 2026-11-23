@@ -49,7 +49,7 @@ import os
     /// The shortcuts that work in any app, off until the person sets one.
     let anyAppShortcuts: AnyAppShortcuts
 
-    /// MAPP's own settings, kept in the connected Marfa so every Mac that connects to it uses them.
+    /// The app's own settings, kept in the connected Marfa so every Mac that connects to it uses them.
     let preferences: PreferencesSync
 
     /// Asks every open page for its last edit and answers whether they all handed it over. A test gives its own, since
@@ -109,7 +109,7 @@ import os
         Task { await preferences.flush() }
     }
 
-    /// Has MAPP's settings follow the library's copy, where it has one of a Marfa server.
+    /// Has this app's settings follow the library's copy, where it has one of a Marfa server.
     private func follow(_ library: MarfaLibrary?) {
         guard let source = library?.source as? MarfaSource else {
             preferences.detach()
@@ -202,8 +202,8 @@ import os
     /// posted when the app quits, and the draft has no other home.
     func handOffDraftsAtQuit() {
         instanceSettings.handOver(
-            to: host.notices, because: String(localized: "You quit MAPP before saving the changes to this Marfa’s settings."))
-        ownerDrafts.handOver(to: host.notices, because: String(localized: "You quit MAPP before this was saved."))
+            to: host.notices, because: String(localized: "You quit the app before saving the changes to this Marfa’s settings."))
+        ownerDrafts.handOver(to: host.notices, because: String(localized: "You quit the app before this was saved."))
     }
 
     /// Quitting waits at most `limit` and is cancelled if the editors or library cannot finish. A page or a title
@@ -226,8 +226,8 @@ import os
                 trace.logTimeout(after: limit)
                 // A page's hand-over can wait its turn behind another, each for up to the editor's own limit.
                 let message = trace.unfinished.first == .editors
-                    ? String(localized: "MAPP is still saving what you last typed. Try again in a moment.")
-                    : String(localized: "MAPP is still saving your changes on this Mac. Try again in a moment.")
+                    ? String(localized: "The app is still saving what you last typed. Try again in a moment.")
+                    : String(localized: "The app is still saving your changes on this Mac. Try again in a moment.")
                 host.notices.tell(String(localized: "Couldn’t Quit"), message)
             }
         }
@@ -269,16 +269,16 @@ import os
             let suite = "MarfaMac.SampleMarfa"
             let defaults = UserDefaults(suiteName: suite) ?? .standard
             let root = URL.temporaryDirectory.appending(path: "Sample Marfa", directoryHint: .isDirectory)
-            // A run against a test server may ask to keep the copy the last run left (`-MAPPKeepTestStore`), so the
+            // A run against a test server may ask to keep the copy the last run left (`-MarfaMacKeepTestStore`), so the
             // speed tests can time a launch on a copy that is already there.
             let keepsCopy = environment["MARFA_MAC_TEST_MARFA_URL"] != nil
-                && ProcessInfo.processInfo.arguments.contains("-MAPPKeepTestStore")
+                && ProcessInfo.processInfo.arguments.contains("-MarfaMacKeepTestStore")
             if !keepsCopy {
                 defaults.removePersistentDomain(forName: suite)
                 try? FileManager.default.removeItem(at: root)
             }
             guard SampleLibrary.isRequested, !SampleLibrary.startsUnconfigured else {
-                // The unit tests, previews and `-MAPPSampleUnconfigured` start with no server, as a first launch does.
+                // The unit tests, previews and `-MarfaMacSampleUnconfigured` start with no server, as a first launch does.
                 let host = MarfaHost(defaults: defaults, signIns: ScriptedSignIns(), location: location(root: root))
                 return Libraries(host: host, defaults: defaults)
             }
@@ -293,13 +293,13 @@ import os
                 host.presetTestServer(connection)
                 // The key holds what the server says it holds, so a key without an owner's permissions shows Needs a Permission.
                 Task {
-                    // The test key is MAPP's own, which may write the settings' type, as a sign-in asks (`SystemSignIns`).
+                    // The test key is the app's own, which may write the settings' type, as a sign-in asks (`SystemSignIns`).
                     await signIns.adoptScopes(for: connection, adding: [PreferencesType.vendorScope])
                     await host.refreshGrants()
                 }
-                // `-MAPPSyncSettings` keeps MAPP's settings in the test server's item, as a real sign-in does. The pages
+                // `-MarfaMacSyncSettings` keeps this app's settings in the test server's item, as a real sign-in does. The pages
                 // read the standard defaults, so the sync follows those, which this debug build starts empty.
-                guard ProcessInfo.processInfo.arguments.contains("-MAPPSyncSettings") else { return Libraries(host: host, defaults: defaults) }
+                guard ProcessInfo.processInfo.arguments.contains("-MarfaMacSyncSettings") else { return Libraries(host: host, defaults: defaults) }
                 UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier ?? "")
                 return Libraries(host: host, defaults: .standard, syncsPreferences: true)
             }

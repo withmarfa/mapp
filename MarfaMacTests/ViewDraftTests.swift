@@ -191,7 +191,7 @@ struct ViewDraftTests {
         #expect(try draft(.list(ItemOrder(sort: .dateCreated, groupsByDate: false))).sort
             == [LibraryViewSort(field: "created_at", ascending: false)])
 
-        // The board's cards follow the sort the window shows them in, and its lanes keep MAPP's order of the words.
+        // The board's cards follow the sort the window shows them in, and its lanes keep the app's order of the words.
         let board = try draft(.board)
         #expect(board.group == LibraryViewGroup(field: "properties.status", order: ViewDraft.declaredOrder(of: Self.statusColumn)))
         #expect(board.sort == [LibraryViewSort(field: "properties.status", ascending: true)])

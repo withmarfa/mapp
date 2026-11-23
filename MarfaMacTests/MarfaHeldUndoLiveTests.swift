@@ -9,7 +9,7 @@ extension LiveMarfaTests {
     /// parent moves the source of its edge, which the server answers by expiring the copy, so the copy hydrates again
     /// and its package refuses the edge write an Undo makes until it is whole. The hydration is held back until the
     /// test lets it go, so the Undo is always pressed inside that window and the refusal is always the package's.
-    /// Every item it makes has a title starting `MAPPTEST ` and is purged when the test ends, passed or not.
+    /// Every item it makes has a title starting `MARFAMACTEST ` and is purged when the test ends, passed or not.
     @MainActor
     @Suite(.serialized)
     struct MarfaHeldUndoLiveTests {
@@ -121,7 +121,7 @@ extension LiveMarfaTests {
                 let token = "zu" + UUID().uuidString.prefix(8).lowercased()
                 @MainActor func make(_ title: String, under parent: ItemID? = nil) throws -> ItemID {
                     let id = library.createItem(
-                        typeID: "core.note", title: "MAPPTEST \(title) \(token)", body: "Made by the MAPP tests.",
+                        typeID: "core.note", title: "MARFAMACTEST \(title) \(token)", body: "Made by the app tests.",
                         parentID: parent, in: .allItems, undoManager: nil)
                     if let id { made.add(id) }
                     return try #require(id)

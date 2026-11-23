@@ -12,7 +12,7 @@ nonisolated enum MarfaProblems {
     /// program wrote to. The server still holds the item. The copy is hydrated once for it, which replaces the row; if
     /// it is still unreadable after that, only a new copy helps.
     static var unreadableMessage: String {
-        String(localized: "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. MAPP reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected.")
+        String(localized: "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The app reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected.")
     }
 
     nonisolated struct ConflictedCopy: Hashable, Sendable {

@@ -59,7 +59,7 @@ import os
         /// connecting its address again removes it first, or fails with this. `approvalAt` is the address of the
         /// server left where the sign-out also could not confirm it ended the approval.
         case notRemoved(signIn: String?, copy: String?, approvalAt: String? = nil)
-        /// The connection to the server at `address` was left and the sign-in forgotten on this Mac, but MAPP could not
+        /// The connection to the server at `address` was left and the sign-in forgotten on this Mac, but the app could not
         /// confirm that the server ended the approval, which may stand there until the owner ends it.
         case notRevoked(address: String)
         /// The copy was not removed, and is no longer marked to go: the package would not remove it. `signIn` is why
@@ -81,8 +81,8 @@ import os
         /// Its changes can't be read, and the package never removes a copy whose changes it can't read. `folder` is
         /// where it is, for the person to remove.
         case unreadable(folder: String)
-        /// It is a folder's store, which is not MAPP's to remove.
-        case notMapps(folder: String)
+        /// It is a folder's store, which is not the app's to remove.
+        case notMadeByApp(folder: String)
     }
 
     /// What the person agreed to lose with a copy they discard: the writes they were shown, by queue id. A count
@@ -355,7 +355,7 @@ import os
         let held = grantsRead ? grants : nil
         try await signIn(to: connection, via: method, asking: permissions.union(held ?? Self.usedPermissions))
         await refreshGrants()
-        // The owner may approve fewer than MAPP held, and that stands, but never silently.
+        // The owner may approve fewer than the app held, and that stands, but never silently.
         if let held, grantsRead {
             let lost = held.subtracting(grants)
             if !lost.isEmpty { notices.tell(Words.permissionsLostTitle, Words.permissionsLost(lost)) }
@@ -646,7 +646,7 @@ import os
     private(set) var grants: Set<InstancePermission> = []
     /// Whether `grants` has been read for the copy shown: a sign-in the Keychain cannot give reads as holding none.
     private(set) var grantsRead = false
-    /// Whether the kept sign-in may read the owner's name, once `grantsRead`: a sign-in made before MAPP asked for it
+    /// Whether the kept sign-in may read the owner's name, once `grantsRead`: a sign-in made before the app asked for it
     /// cannot, and Allow More… or signing in again gives it.
     private(set) var readsProfile = false
 
@@ -746,7 +746,7 @@ import os
     }
 
     /// What to tell of an error a step met. What a package error or the system said is never shown: the detail goes
-    /// to the log, and the person is told what MAPP could not do.
+    /// to the log, and the person is told what the app could not do.
     static func message(_ error: any Error) -> String {
         if let error = error as? MarfaError { return Words.message(for: error) }
         // A string logged without a privacy level is private.

@@ -6,11 +6,11 @@ enum Launch {
     static func main() {
         LaunchTrace.shared.mark(.appInit)
         // Made first, so it is the shared application whatever asks for one next.
-        _ = MAPPApplication.shared
+        _ = MarfaMacApplication.shared
         #if DEBUG
-        // `-MAPPAppearance dark|light` fixes the app's appearance for a screenshot, whatever the Mac is set to.
+        // `-MarfaMacAppearance dark|light` fixes the app's appearance for a screenshot, whatever the Mac is set to.
         let arguments = ProcessInfo.processInfo.arguments
-        if let flag = arguments.firstIndex(of: "-MAPPAppearance"), arguments.indices.contains(flag + 1) {
+        if let flag = arguments.firstIndex(of: "-MarfaMacAppearance"), arguments.indices.contains(flag + 1) {
             NSApp.appearance = NSAppearance(named: arguments[flag + 1] == "dark" ? .darkAqua : .aqua)
         }
         #endif
@@ -140,7 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The sample library starts as a person's first launch does, whatever an earlier run chose, so no UI test
         // inherits another's settings, a hidden sidebar or a dragged column among them, which the window keeps.
         if SampleLibrary.isRequested,
-           !ProcessInfo.processInfo.arguments.contains("-MAPPKeepSampleSettings") {
+           !ProcessInfo.processInfo.arguments.contains("-MarfaMacKeepSampleSettings") {
             let defaults = UserDefaults.standard
             let kept = defaults.dictionaryRepresentation().keys.filter {
                 $0.hasPrefix("NSSplitView Subview Frames") || $0.hasPrefix("NSToolbar Configuration")
@@ -155,9 +155,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Select All in a long list is routed by `MAPPApplication`; under another application object it would build
+        // Select All in a long list is routed by `MarfaMacApplication`; under another application object it would build
         // every selected row's view again, with every test still passing.
-        assert(NSApp is MAPPApplication, "MAPP runs under MAPPApplication")
+        assert(NSApp is MarfaMacApplication, "The app runs under MarfaMacApplication")
         QuickLookFile.removeLeftovers()
         separators.start()
         AppTheme.apply(.stored())

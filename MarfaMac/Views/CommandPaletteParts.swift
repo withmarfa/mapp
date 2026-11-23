@@ -234,7 +234,7 @@ struct PaletteLeftOutLine: View {
                     .truncationMode(.tail)
                 Spacer(minLength: 8)
                 Button("Show", action: show)
-                    .mappButton(.secondary, size: .small)
+                    .appButton(.secondary, size: .small)
                     .accessibilityLabel(Text("Show Matches Left Out of Search"))
                     .accessibilityIdentifier("CommandPaletteShowLeftOut")
             }

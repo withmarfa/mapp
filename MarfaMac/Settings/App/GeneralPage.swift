@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The General page: how MAPP opens, what a new item is, how dates and times read, what MAPP does with the web, and
+/// The General page: how the app opens, what a new item is, how dates and times read, what the app does with the web, and
 /// putting every setting back.
 struct GeneralPage: View {
     let libraries: Libraries
@@ -24,7 +24,7 @@ struct GeneralPage: View {
             reset
         }
         .accessibilityIdentifier("GeneralPage")
-        .alert("Reset MAPP’s Settings?", isPresented: $isConfirmingReset) {
+        .alert("Reset This App’s Settings?", isPresented: $isConfirmingReset) {
             Button("Cancel", role: .cancel) {}
             Button("Reset", role: .destructive) { resetSettings() }
         } message: {
@@ -56,7 +56,7 @@ struct GeneralPage: View {
                 }
                 .accessibilityIdentifier("StartWith")
             }
-            SettingsRow("Reopen Windows", line: "After you quit MAPP.") {
+            SettingsRow("Reopen Windows", line: "After you quit Marfa.") {
                 SettingsToggle(title: "Reopen Windows", isOn: $reopensWindows).accessibilityIdentifier("ReopenWindows")
             }
             SettingsRow("Open Items", line: "From a list or a search.") {
@@ -176,7 +176,7 @@ struct GeneralPage: View {
 
     private var reset: some View {
         SettingsSection("Reset") {
-            SettingsRow("Reset MAPP’s Settings", line: libraries.preferences.syncs ? "On every Mac that connects to this Marfa. Your items stay." : "Every setting on this Mac. Your items stay.") {
+            SettingsRow("Reset This App’s Settings", line: libraries.preferences.syncs ? "On every Mac that connects to this Marfa. Your items stay." : "Every setting on this Mac. Your items stay.") {
                 SettingsButton("Reset…", role: .destructive) { isConfirmingReset = true }
                     .accessibilityIdentifier("ResetSettings")
             }
@@ -187,9 +187,9 @@ struct GeneralPage: View {
     private var resetMessage: String {
         guard libraries.preferences.syncs else { return String(localized: "Every setting on this Mac starts over. Your items and sign-in stay.") }
         guard let name = libraries.preferences.marfaName else {
-            return String(localized: "MAPP’s settings start over on every Mac that connects to this Marfa. Your items and sign-in stay.")
+            return String(localized: "This app’s settings start over on every Mac that connects to this Marfa. Your items and sign-in stay.")
         }
-        return String(localized: "MAPP’s settings start over on every Mac that connects to \(name). Your items and sign-in stay.")
+        return String(localized: "This app’s settings start over on every Mac that connects to \(name). Your items and sign-in stay.")
     }
 
     private func resetSettings() {

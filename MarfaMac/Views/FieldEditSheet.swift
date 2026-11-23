@@ -60,10 +60,10 @@ struct FieldEditSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                    .mappButton(.secondary)
+                    .appButton(.secondary)
                 Button(request.kind == .rename ? "Rename" : "Done", action: save)
                     .keyboardShortcut(.defaultAction)
-                    .mappButton(.primary)
+                    .appButton(.primary)
                     .disabled(isSaving)
                     .accessibilityIdentifier("FieldEditDone")
             }

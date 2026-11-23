@@ -249,7 +249,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         await model.commit(.tries)
         #expect(calls.sent.isEmpty, "nothing is written over the newer value")
         #expect(model.text(.tries) == "7", "the page shows what is there now")
-        #expect(model.notice == "Tries was changed elsewhere. MAPP read the new value; yours wasn’t saved.")
+        #expect(model.notice == "Tries was changed elsewhere. The app read the new value; yours wasn’t saved.")
     }
 
     @Test func anotherMarfaAtTheAddressIsToldAsThatAndNothingIsAdopted() async {
@@ -536,7 +536,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         model.sheet?.inputs["posthog_host"] = "https://eu.example"
         model.sheet?.inputs["posthog_project_token"] = "phc_secret"
         await model.save()
-        #expect(model.notice == "PostHog Host was changed elsewhere. MAPP read the new value; yours wasn’t saved.")
+        #expect(model.notice == "PostHog Host was changed elsewhere. The app read the new value; yours wasn’t saved.")
         model.dismissNotice()
         #expect(model.notice == nil)
     }
@@ -717,7 +717,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(refreshed.count == 1)
     }
 
-    @Test func wordsAreMAPPsAndNeverTheServersKeys() {
+    @Test func wordsAreTheAppsAndNeverTheServersKeys() {
         #expect(ActivityWording.what("auth.sign_in.success") == "Signed in")
         #expect(ActivityWording.what("config.update") == "Changed the settings")
         #expect(ActivityWording.what("thing.did_something") == "Thing did something", "an unknown action is still put into words")
@@ -754,9 +754,9 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(MarfaSettingsPage.monitoring.permission == .configManage)
         #expect(MarfaSettingsPage.limits.permission == .configManage)
         #expect(MarfaSettingsPage.startUp.permission == .instanceRead)
-        #expect(MarfaSettingsPage.activity.permissionLine == "MAPP isn’t allowed to read the server’s audit log.")
-        #expect(MarfaSettingsPage.monitoring.permissionLine == "MAPP isn’t allowed to see or change how the server is monitored.")
-        #expect(MarfaSettingsPage.limits.permissionLine == "MAPP isn’t allowed to see or change the server’s limits.")
-        #expect(MarfaSettingsPage.startUp.permissionLine == "MAPP isn’t allowed to read the settings the server started with.")
+        #expect(MarfaSettingsPage.activity.permissionLine == "The app isn’t allowed to read the server’s audit log.")
+        #expect(MarfaSettingsPage.monitoring.permissionLine == "The app isn’t allowed to see or change how the server is monitored.")
+        #expect(MarfaSettingsPage.limits.permissionLine == "The app isn’t allowed to see or change the server’s limits.")
+        #expect(MarfaSettingsPage.startUp.permissionLine == "The app isn’t allowed to read the settings the server started with.")
     }
 }

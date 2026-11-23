@@ -3,10 +3,10 @@ import Marfa
 import Observation
 import os
 
-/// Keeps MAPP's own settings in the connected Marfa's `app.mapp.preferences` item, so every Mac that connects to it uses
+/// Keeps the app's own settings in the connected Marfa's `app.marfa-mac.preferences` item, so every Mac that connects to it uses
 /// them.
 ///
-/// The defaults stay the store MAPP's code reads, as this Mac's copy of the Marfa's settings, so a launch reads nothing
+/// The defaults stay the store the app's code reads, as this Mac's copy of the Marfa's settings, so a launch reads nothing
 /// from the network. Each step compares this Mac's settings and the item's with what both held after the last step
 /// (`PreferencesMerge.reconcile`): a change on this Mac is written to the item, coalesced so a slider's drag is one write,
 /// and a change from another Mac is written into the defaults, and the stores read them again so open windows follow.
@@ -14,7 +14,7 @@ import os
 ///
 /// Nothing is decided from a copy that is not whole: until the hydration has completed and the item's tables are held
 /// whole, the defaults stay exactly as they are. Before the first write or adoption, every synced setting on this Mac is
-/// kept in one value (`beforeSyncKey`) until Reset MAPP's Settings, so the Mac's arrangement can always be recovered.
+/// kept in one value (`beforeSyncKey`) until Reset This App's Settings, so the Mac's arrangement can always be recovered.
 @Observable @MainActor
 final class PreferencesSync {
     nonisolated enum Standing: Equatable, Sendable {
@@ -69,10 +69,10 @@ final class PreferencesSync {
     @ObservationIgnored private(set) var item: PreferencesItem?
     /// The answers taken from the copy to field writes, kept until a saved record no longer waits for them.
     @ObservationIgnored private var answered: [String: PreferenceAnswer] = [:]
-    /// This MAPP's build, which judged the settings a store dropped (`Record.Adopted.frozen`).
+    /// This app's build, which judged the settings a store dropped (`Record.Adopted.frozen`).
     @ObservationIgnored private let build: String
 
-    /// The running MAPP's version and build.
+    /// The running app's version and build.
     nonisolated static var appBuild: String {
         let info = Bundle.main.infoDictionary ?? [:]
         return "\(info["CFBundleShortVersionString"] as? String ?? "")+\(info["CFBundleVersion"] as? String ?? "")"
@@ -125,7 +125,7 @@ final class PreferencesSync {
         standing = .off(.noMarfa)
     }
 
-    /// Writes what changed on this Mac now rather than after the pause, as before the library changes or MAPP quits.
+    /// Writes what changed on this Mac now rather than after the pause, as before the library changes or the app quits.
     func flush() async {
         guard copy != nil else { return }
         pending?.cancel()
@@ -305,7 +305,7 @@ final class PreferencesSync {
         } catch is CancellationError {
         } catch {
             // A read or a write the copy refused leaves everything as it was; the next change tries again.
-            Telemetry.logger(.sync).error("MAPP's settings could not sync: \(String(describing: type(of: error)), privacy: .public)")
+            Telemetry.logger(.sync).error("This app's settings could not sync: \(String(describing: type(of: error)), privacy: .public)")
         }
     }
 
@@ -338,7 +338,7 @@ final class PreferencesSync {
     }
 
     /// The Marfa holds no item yet: it is made from this Mac's settings. A Mac that already adopted another Marfa
-    /// (`fresh`) starts the settings every Marfa shares from MAPP's defaults, as a new Marfa should not take another's
+    /// (`fresh`) starts the settings every Marfa shares from the app's defaults, as a new Marfa should not take another's
     /// arrangement, and keeps what it holds for this Marfa alone.
     private func create(local: Local, fresh: Bool, in copy: any PreferencesCopy, generation: Int) async throws -> Record.Adopted? {
         let own = local.units.filter { unit, _ in PreferencesMap.synced.contains { $0.isPerServer && $0.owns(unit) } }
@@ -421,7 +421,7 @@ final class PreferencesSync {
         guard generation == self.generation else { return nil }
 
         let base = adopted.base
-        // A setting the store dropped on reading it stands as the Marfa holds it, until this Mac changes it or a MAPP
+        // A setting the store dropped on reading it stands as the Marfa holds it, until this Mac changes it or an app
         // that reads it runs here.
         let retrying = adopted.frozenBuild == build ? [] : Set(adopted.frozen.keys)
         var mine = switched ? base : local.units
@@ -477,7 +477,7 @@ final class PreferencesSync {
         try unchanged(since: local, writing: outcome.toLocal)
         let settings = writeLocal(outcome.toLocal, from: written)
         if !settings.isEmpty {
-            // A store sets aside what it cannot read, such as a value a later MAPP wrote: that is no change of the
+            // A store sets aside what it cannot read, such as a value a later version of the app wrote: that is no change of the
             // person's, so the Marfa keeps it and nothing deletes it or writes its field without it.
             let held = readLocal().units
             for setting in settings {
@@ -572,7 +572,7 @@ final class PreferencesSync {
             var writes = 0
             /// The settings a store dropped or changed when it read what was written (`apply`), and what it left.
             var frozen: [PreferenceUnit: Frozen] = [:]
-            /// The MAPP that judged `frozen`; another tries those settings again.
+            /// the app that judged `frozen`; another tries those settings again.
             var frozenBuild: String?
             /// Set once this Mac removed the item or saw it in the bin, so an emptied bin does not bring it back.
             var removed: Bool?

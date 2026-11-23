@@ -6,9 +6,9 @@ nonisolated protocol MarfaRefreshing: Sendable {
     func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport
     func catchUp() async throws
     func fetchKept() async throws -> KeptFetch
-    /// Declares MAPP's own type, which a hydration registers where the server lacks it and the sign-in may.
+    /// Declares the app's own type, which a hydration registers where the server lacks it and the sign-in may.
     func declarePreferences() async throws
-    /// Whether the server holds MAPP's own type and what the sign-in's scopes are; nil where either cannot be read.
+    /// Whether the server holds the app's own type and what the sign-in's scopes are; nil where either cannot be read.
     func preferencesEvidence() async -> PreferencesReach.Evidence?
 }
 

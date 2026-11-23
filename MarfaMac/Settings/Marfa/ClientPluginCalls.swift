@@ -139,7 +139,7 @@ nonisolated struct ClientPluginCalls: PluginCalls {
         case .digestMismatch(let file, _, _): .digestMismatch(file: file)
         case .canceled: .canceled
         case .addressCarriesCredentials, .addressUnreadable, .unreachable:
-            .releaseUnreadable(String(localized: "MAPP couldn’t reach it, or it served something that isn’t a release. Installed plugins and Install From a File… still work."))
+            .releaseUnreadable(String(localized: "The app couldn’t reach it, or it served something that isn’t a release. Installed plugins and Install From a File… still work."))
         }
     }
 

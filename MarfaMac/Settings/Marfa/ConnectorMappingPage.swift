@@ -280,7 +280,7 @@ struct ConnectorMappingPage: View {
     /// A missing permission uses the page's own line, so Allow More… fits it. Anything else says the request was made.
     private func readBackLine(_ failure: OwnerFailure) -> String? {
         if case .notPermitted = failure { return nil }
-        return String(localized: "The request was made. MAPP couldn’t read it back to show it here.")
+        return String(localized: "The request was made. The app couldn’t read it back to show it here.")
     }
 
     @ViewBuilder private func existing(_ entry: ConnectorMappingModel.Kind) -> some View {

@@ -57,12 +57,12 @@ extension LiveMarfaTests {
             let calls = try calls()
             let tag = UUID().uuidString.prefix(8).lowercased()
             let made = try await calls.create(
-                NewKey(label: "MAPPTEST \(tag)", source: "mapptest-\(tag)", tier: .feed, expires: nil, types: ["*": .write], permissions: []))
+                NewKey(label: "MARFAMACTEST \(tag)", source: "marfamactest-\(tag)", tier: .feed, expires: nil, types: ["*": .write], permissions: []))
             var result: Result<Void, any Error> = .success(())
             do {
                 #expect(made.secret.hasPrefix("marfa"))
-                let renamed = try await calls.change(made.id, KeyChange(label: "MAPPTEST renamed \(tag)"))
-                #expect(renamed.label == "MAPPTEST renamed \(tag)")
+                let renamed = try await calls.change(made.id, KeyChange(label: "MARFAMACTEST renamed \(tag)"))
+                #expect(renamed.label == "MARFAMACTEST renamed \(tag)")
                 #expect(renamed.tier == .feed)
                 let narrowed = try await calls.change(made.id, KeyChange(types: ["*": .read]))
                 #expect(narrowed.types == ["*": .read])
@@ -91,7 +91,7 @@ extension LiveMarfaTests {
             let calls = try calls()
             let tag = UUID().uuidString.prefix(8).lowercased()
             let made = try await calls.create(
-                NewWebhook(url: "https://example.com/mapptest-\(tag)", events: ["item.created", "item.updated"], typeFilter: "core.note"))
+                NewWebhook(url: "https://example.com/marfamactest-\(tag)", events: ["item.created", "item.updated"], typeFilter: "core.note"))
             var result: Result<Void, any Error> = .success(())
             do {
                 #expect(made.secret.count >= 32)

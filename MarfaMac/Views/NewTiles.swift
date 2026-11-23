@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The New row of the Items page: a tile for each type the person keeps there, tinted with the type's color, which opens
-/// quick add in that type. The types and their order are a MAPP setting (`NewRowTypes`), synced with the rest. While Edit's popover is out
+/// quick add in that type. The types and their order are an app setting (`NewRowTypes`), synced with the rest. While Edit's popover is out
 /// each tile carries a minus badge that takes its type out of the row.
 struct NewTiles: View {
     @CurrentLibrary private var library

@@ -263,9 +263,9 @@ extension MarfaLibrary {
 
     /// What working out a change comes to.
     private enum Planning {
-        /// The field or the item is not one MAPP changes; nothing is told.
+        /// The field or the item is not one the app changes; nothing is told.
         case unavailable
-        /// MAPP's own policy refuses the change, in the words to tell the person.
+        /// the app's own policy refuses the change, in the words to tell the person.
         case refused(String)
         /// The edges to write, and every link they make.
         case change(RelationshipChange, made: [MadeLink])
@@ -291,7 +291,7 @@ extension MarfaLibrary {
     /// Changes run one after another in the order they were made, each once the copy has taken the writes of the one
     /// before (see `relationshipChain`). Nothing is written until the core has answered.
     /// True means the core accepted the change and it is written, or there was nothing to change; false means it was
-    /// refused and told, by MAPP's own policy (`plan`) or by the core's judgement, and the field is as it was. `finish`
+    /// refused and told, by the app's own policy (`plan`) or by the core's judgement, and the field is as it was. `finish`
     /// waits for a change in flight.
     @discardableResult
     func changeItemRelationship(
@@ -364,7 +364,7 @@ extension MarfaLibrary {
     }
 
     /// What the edges would be changed by, and every link it makes, whether added or made by moving an end: what the
-    /// core is asked about. MAPP decides only which edges to write: an end that holds one link of its type has it
+    /// core is asked about. The app decides only which edges to write: an end that holds one link of its type has it
     /// replaced by a move, and a link another item holds as its own is never taken. How many links an end may hold is
     /// the core's to judge, of the links this makes.
     private func plan(_ id: ItemID, field: String, adding wanted: [ItemID], removing unwanted: [ItemID]) -> Planning {

@@ -48,7 +48,7 @@ nonisolated enum GroupKey {
     static let set = "true"
 
     /// A group's key as a view's `group.order` and `group.hidden` hold it: the null group is `null`, a yes-or-no's a
-    /// bool, any other a string. Not Applicable is MAPP's own and is never written.
+    /// bool, any other a string. Not Applicable is the app's own and is never written.
     static func json(_ key: String, booleans: Bool) -> JSONValue? {
         if key == none { return .null }
         if key == notApplicable { return nil }
@@ -84,7 +84,7 @@ nonisolated extension LibraryViewGroup.Bucket {
 /// Groups of dates: the span each covers, its key as Marfa names it, and its title.
 nonisolated enum DateGroups {
     /// The calendar a saved view's dates are grouped on: weeks start on Monday, as Marfa fixes them for every app
-    /// (`device/view-date-bucket`), whatever Settings says. A place's own grouping follows Settings (`Calendar.mapp`).
+    /// (`device/view-date-bucket`), whatever Settings says. A place's own grouping follows Settings (`Calendar.chosenWeekStart`).
     static func viewCalendar(_ base: Calendar = .current) -> Calendar {
         var calendar = base
         calendar.firstWeekday = 2

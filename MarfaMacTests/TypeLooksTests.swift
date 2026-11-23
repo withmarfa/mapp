@@ -188,14 +188,14 @@ struct TypeLooksTests {
         "not json",
         "[]",
         "{}",
-        #"{"format":"mapp-looks","version":1}"#,
+        #"{"format":"marfa-mac-looks","version":1}"#,
         #"{"format":"other","version":1,"looks":{}}"#,
-        #"{"format":"mapp-looks","version":2,"looks":{}}"#,
-        #"{"format":"mapp-looks","version":1,"looks":{"a":{"date":"tomorrow","secondary":[],"facts":[]}}}"#,
-        #"{"format":"mapp-looks","version":1,"looks":{"a":{"date":"none","secondary":["bold"],"facts":[]}}}"#,
-        #"{"format":"mapp-looks","version":1,"looks":{"a":{"date":"none","secondary":["time:"],"facts":[]}}}"#,
-        #"{"format":"mapp-looks","version":1,"looks":{"a":{"date":"none","secondary":[],"facts":["time:starts_at"]}}}"#,
-        #"{"format":"mapp-looks","version":1,"looks":{"a":{"date":"none","secondary":[]}}}"#,
+        #"{"format":"marfa-mac-looks","version":2,"looks":{}}"#,
+        #"{"format":"marfa-mac-looks","version":1,"looks":{"a":{"date":"tomorrow","secondary":[],"facts":[]}}}"#,
+        #"{"format":"marfa-mac-looks","version":1,"looks":{"a":{"date":"none","secondary":["bold"],"facts":[]}}}"#,
+        #"{"format":"marfa-mac-looks","version":1,"looks":{"a":{"date":"none","secondary":["time:"],"facts":[]}}}"#,
+        #"{"format":"marfa-mac-looks","version":1,"looks":{"a":{"date":"none","secondary":[],"facts":["time:starts_at"]}}}"#,
+        #"{"format":"marfa-mac-looks","version":1,"looks":{"a":{"date":"none","secondary":[]}}}"#,
     ])
     func aFileOfAnotherShapeIsNotRead(text: String) {
         #expect(LooksFile.read(data(text)) == nil)
@@ -207,7 +207,7 @@ struct TypeLooksTests {
             "core.event": TypeLook(date: .occurred, secondary: [.time("starts_at"), .field("place")], facts: []),
         ])
         let text = try #require(String(data: file.encoded(), encoding: .utf8))
-        #expect(text.contains(#""format" : "mapp-looks""#))
+        #expect(text.contains(#""format" : "marfa-mac-looks""#))
         #expect(text.contains(#""field:due_at""#))
         #expect(text.contains(#""occurred""#))
         #expect(text.contains(#""time:starts_at""#))
@@ -225,7 +225,7 @@ struct TypeLooksTests {
     @Test func aFileOfTheWrongShapeIsRefusedAndNothingIsWritten() throws {
         let (store, defaults) = store("refused")
         defer { clean(defaults, "refused") }
-        for text in ["not json", #"{"format":"mapp-looks","version":9,"looks":{}}"#] {
+        for text in ["not json", #"{"format":"marfa-mac-looks","version":9,"looks":{}}"#] {
             let url = try temporaryFile(Data(text.utf8))
             defer { try? FileManager.default.removeItem(at: url) }
             #expect(throws: LooksFileError.notALooksFile) { try store.importLooks(from: url, into: one, in: catalogue) }

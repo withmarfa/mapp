@@ -59,9 +59,9 @@ struct RelationLooksTests {
         #expect(text.contains(#""children""#) && text.contains(#""collections""#))
         #expect(LooksFile.read(Data(text.utf8)) == file)
 
-        let older = #"{"format":"mapp-looks","version":1,"looks":{"core.task":{"date":"field:due_at","secondary":["field:project"],"facts":["field:priority","tags"]}}}"#
+        let older = #"{"format":"marfa-mac-looks","version":1,"looks":{"core.task":{"date":"field:due_at","secondary":["field:project"],"facts":["field:priority","tags"]}}}"#
         #expect(LooksFile.read(Data(older.utf8))?.looks["core.task"]?.facts == [.field("priority"), .tags])
-        let unknown = #"{"format":"mapp-looks","version":1,"looks":{"a":{"date":"none","secondary":[],"facts":["siblings"]}}}"#
+        let unknown = #"{"format":"marfa-mac-looks","version":1,"looks":{"a":{"date":"none","secondary":[],"facts":["siblings"]}}}"#
         #expect(LooksFile.read(Data(unknown.utf8)) == nil)
     }
 

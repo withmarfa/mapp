@@ -33,16 +33,16 @@ struct WebLinkSheet: View {
             HStack {
                 if request.removable {
                     Button("Remove Link", action: editor.removeWebLink)
-                        .mappButton(.destructive)
+                        .appButton(.destructive)
                         .accessibilityIdentifier("WebLinkRemove")
                 }
                 Spacer()
                 Button("Cancel", role: .cancel) { editor.cancelWebLink() }
                     .keyboardShortcut(.cancelAction)
-                    .mappButton(.secondary)
+                    .appButton(.secondary)
                 Button(request.removable ? "Done" : "Add", action: add)
                     .keyboardShortcut(.defaultAction)
-                    .mappButton(.primary)
+                    .appButton(.primary)
                     .disabled(address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityIdentifier("WebLinkAdd")
             }

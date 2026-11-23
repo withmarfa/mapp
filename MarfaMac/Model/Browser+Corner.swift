@@ -4,14 +4,14 @@ import Foundation
 /// entry, so the corner's buttons, the menu and the palette share these.
 extension Browser {
     /// Shows the week or month that holds `day`, and puts the month card away.
-    func chooseCalendarDay(_ day: Date, calendar: Calendar = .mapp) {
+    func chooseCalendarDay(_ day: Date, calendar: Calendar = .chosenWeekStart) {
         showCalendarDay(day, calendar: calendar)
         showsCalendarMonth = false
     }
 
     /// Brings `day` into view: the week that holds it, or in a month the month that holds it. The arrow keys use it to
     /// follow the chosen event to a day the calendar is not showing.
-    func showCalendarDay(_ day: Date, calendar: Calendar = .mapp) {
+    func showCalendarDay(_ day: Date, calendar: Calendar = .chosenWeekStart) {
         guard calendarScale == .week else {
             calendarDay = calendar.startOfDay(for: day)
             return

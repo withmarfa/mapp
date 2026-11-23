@@ -131,7 +131,7 @@ struct GeneralSettingsTests {
         defaults.set("chosen", forKey: "\(InterfaceKey.inspectorAppOpen).app.one")
         // What is not a setting: the connection, the sign-in's pending state, a value set aside, a window's frame.
         let kept = [
-            MarfaHost.addressKey, MarfaHost.discardedKey, ViewLayouts.setAsideKey, TypeLooks.setAsideKey, "NSWindow Frame MAPPSettings",
+            MarfaHost.addressKey, MarfaHost.discardedKey, ViewLayouts.setAsideKey, TypeLooks.setAsideKey, "NSWindow Frame MarfaMacSettings",
         ]
         for key in kept { defaults.set("kept", forKey: key) }
 

@@ -6,11 +6,11 @@ nonisolated enum OwnerWording {
     /// What a call that failed says in one line, under the row it was made from.
     static func line(_ failure: OwnerFailure) -> String {
         switch failure {
-        case .unreachable: String(localized: "MAPP can’t reach the server. Nothing was changed.")
-        case .signedOut: String(localized: "The server ended MAPP’s sign-in. Sign in again in Connection.")
+        case .unreachable: String(localized: "The app can’t reach the server. Nothing was changed.")
+        case .signedOut: String(localized: "The server ended the app’s sign-in. Sign in again in Connection.")
         case .notPermitted(let scope): permissionLine(scope)
         case .notFound: String(localized: "It was removed somewhere else.")
-        case .conflict: String(localized: "It changed somewhere else, so MAPP read it again. Nothing was changed.")
+        case .conflict: String(localized: "It changed somewhere else, so the app read it again. Nothing was changed.")
         case .instanceChanged: InstanceConfigFailure.anotherMarfaSentence
         case .unsupported: String(localized: "There are no server settings to show for this library.")
         case .notConfirmed: String(localized: "Nothing was changed: the sign-in wasn’t confirmed.")
@@ -19,13 +19,13 @@ nonisolated enum OwnerWording {
         }
     }
 
-    /// One line naming what MAPP isn't allowed to do, from the permission the server named.
+    /// One line naming what the app isn't allowed to do, from the permission the server named.
     static func permissionLine(_ scope: String?) -> String {
-        guard let scope else { return String(localized: "MAPP isn’t allowed to do this.") }
+        guard let scope else { return String(localized: "The app isn’t allowed to do this.") }
         guard let permission = InstancePermission(rawValue: scope) else {
-            return String(localized: "MAPP isn’t allowed to do this: it needs “\(scope)”.")
+            return String(localized: "The app isn’t allowed to do this: it needs “\(scope)”.")
         }
-        return String(localized: "MAPP isn’t allowed to \(permission.allowedTo).")
+        return String(localized: "The app isn’t allowed to \(permission.allowedTo).")
     }
 
     /// What a failure says on `page`: the page's own words where the server named the page's permission, otherwise the
@@ -212,15 +212,15 @@ nonisolated enum AccessScopes {
 
 /// The words for the data an app keeps, which Marfa answers as counts by state, never as a size.
 nonisolated enum AppDataWording {
-    /// How many items are held, by state, and who can read them. MAPP's own settings say where they are removed.
-    static func line(_ data: AppData, appName: String, keptByMAPP: Bool) -> String {
+    /// How many items are held, by state, and who can read them. The app's own settings say where they are removed.
+    static func line(_ data: AppData, appName: String, keptByApp: Bool) -> String {
         var parts: [String] = []
         if data.active > 0 { parts.append(String(localized: "\(data.active) active")) }
         if data.archived > 0 { parts.append(String(localized: "\(data.archived) archived")) }
         if data.trashed > 0 { parts.append(String(localized: "\(data.trashed) in the trash")) }
         let counts = parts.isEmpty ? String(localized: "No items.") : String(localized: "Items: \(parts.formatted(.list(type: .and))).")
-        let who = keptByMAPP
-            ? String(localized: "These are MAPP’s settings, which every Mac that connects uses. Remove them in Connection, where MAPP keeps them in step.")
+        let who = keptByApp
+            ? String(localized: "These are this app’s settings, which every Mac that connects uses. Remove them in Connection, where the app keeps them in step.")
             : String(localized: "Only \(appName) and you can read it.")
         return counts + " " + who
     }
@@ -234,7 +234,7 @@ nonisolated enum AppDataWording {
     /// which is no longer true.
     static func stoppedAfterRemoving(_ failure: OwnerFailure) -> String {
         switch failure {
-        case .unreachable: String(localized: "MAPP lost the server partway through.")
+        case .unreachable: String(localized: "The app lost the server partway through.")
         case .conflict: String(localized: "It changed somewhere else partway through.")
         case .notConfirmed: String(localized: "The sign-in wasn’t confirmed partway through.")
         default: OwnerWording.line(failure)
@@ -253,7 +253,7 @@ nonisolated enum AppDataWording {
             removed(removal.removedItems),
             removal.stoppedBy.map { stoppedAfterRemoving($0) },
             String(localized: "Some of it may still be there."),
-            couldReadAgain ? nil : String(localized: "MAPP couldn’t read what is left."),
+            couldReadAgain ? nil : String(localized: "The app couldn’t read what is left."),
             String(localized: "Remove it again to finish."),
         ].compactMap { $0 }.joined(separator: " ")
     }

@@ -1,9 +1,9 @@
 import Foundation
 
-/// Where each of MAPP's settings is kept in `app.mapp.preferences`, named once, and the settings that stay on this Mac.
+/// Where each of this app's settings is kept in `app.marfa-mac.preferences`, named once, and the settings that stay on this Mac.
 /// Every key in `MacSettings.keys` is in exactly one of the two lists, which `PreferencesMapTests` checks.
 ///
-/// The defaults stay the store MAPP's code reads: they become this Mac's copy of the connected Marfa's settings, so
+/// The defaults stay the store the app's code reads: they become this Mac's copy of the connected Marfa's settings, so
 /// `@AppStorage` and the stores keep working and a launch reads nothing from the network.
 nonisolated struct SyncedSetting: Sendable {
     /// How a stored value is kept in the defaults.

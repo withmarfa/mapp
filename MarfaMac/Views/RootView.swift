@@ -69,12 +69,12 @@ struct LibraryUnavailableView: View {
         let status = ConnectionStatus(libraries.host.state)
         // The pane's own line points "below", which here is only this button.
         let detail = libraries.host.state == .keyRefused
-            ? String(localized: "MAPP isn’t signed in to this server. Sign in again in Settings.")
+            ? String(localized: "The app isn’t signed in to this server. Sign in again in Settings.")
             : status.detail
         ContentUnavailableView {
             Label("Can’t Open Your Marfa Library", systemImage: "exclamationmark.triangle")
         } description: {
-            Text(detail ?? String(localized: "MAPP can’t open the copy of your library on this Mac."))
+            Text(detail ?? String(localized: "The app can’t open the copy of your library on this Mac."))
         } actions: {
             Button("Open Settings…") { browser.showSettings(.connection) }
                 .buttonStyle(.borderedProminent)
@@ -93,7 +93,7 @@ struct WelcomeView: View {
         ContentUnavailableView {
             Label("Connect to Your Marfa", systemImage: "server.rack")
         } description: {
-            Text("MAPP reads and writes your library on a Marfa server. Enter its address and sign in from Settings.")
+            Text("The app reads and writes your library on a Marfa server. Enter its address and sign in from Settings.")
         } actions: {
             Button("Connect…") { browser.showSettings(.connection) }
                 .buttonStyle(.borderedProminent)

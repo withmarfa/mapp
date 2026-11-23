@@ -385,7 +385,7 @@ private struct SidebarDoneBar: View {
         Button { browser.customizesSidebar = false } label: {
             Text("Done").frame(maxWidth: .infinity)
         }
-        .mappButton(.primary)
+        .appButton(.primary)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .accessibilityIdentifier("SidebarDone")

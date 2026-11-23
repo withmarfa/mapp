@@ -8,7 +8,7 @@ import Testing
 @Suite(.hangLimit) struct WebhooksModelTests {
     private static func hook(
         _ id: String, _ url: String = "https://build.castell.studio/hooks/marfa", type: String? = nil,
-        events: [String] = ["item.created", "item.updated"], active: Bool = true, maker: String = Self.me, makerName: String? = "MAPP"
+        events: [String] = ["item.created", "item.updated"], active: Bool = true, maker: String = Self.me, makerName: String? = "Marfa for Mac"
     ) -> OwnerWebhook {
         OwnerWebhook(
             id: id, url: url, events: events, typeFilter: type, secretTail: "8f2c", active: active, created: Date(timeIntervalSince1970: 1_700_000_000),
@@ -40,7 +40,7 @@ import Testing
         KeyInfo(id: id, label: label, source: id, permissions: [], tier: .feed, types: [:], expires: expires, appClientID: nil)
     }
 
-    /// Every maker's webhooks as the owner's key lists them: MAPP's own, an app's, a live key's, an expired key's and a
+    /// Every maker's webhooks as the owner's key lists them: the app's own, an app's, a live key's, an expired key's and a
     /// revoked key's.
     private func everyMaker(_ bench: OwnerBench) -> WebhooksModel {
         bench.calls.state.withLock {
@@ -57,14 +57,14 @@ import Testing
             ])
     }
 
-    @Test func theWebhooksAreGroupedByWhoMadeThemWithMAPPsOwnFirstAndAMakerThatIsGoneLast() async {
+    @Test func theWebhooksAreGroupedByWhoMadeThemWithTheAppsOwnFirstAndAMakerThatIsGoneLast() async {
         let bench = OwnerBench()
         let model = everyMaker(bench)
         await model.load()
         #expect(model.seesEvery)
         #expect(model.groups.map(\.id) == ["own", "app:raycast-client", "key:k-live", "key:k-old", "key:k-gone"])
         #expect(model.groups.map { model.heading(of: $0) } == [
-            "Made by MAPP", "Made by Raycast", "Made by the key Lisbon zine importer", "Made by the key Backup script (expired)",
+            "Made by the app", "Made by Raycast", "Made by the key Lisbon zine importer", "Made by the key Backup script (expired)",
             "Made by a revoked key",
         ])
         #expect(model.groups.map(\.isOwn) == [true, false, false, false, false])
@@ -95,7 +95,7 @@ import Testing
         #expect(model.isOwn(model.webhooks[0]) && !model.isOwn(model.webhooks[1]))
     }
 
-    @Test func withoutManageKeysTheListIsMAPPsOwnAndNothingMoreIsAsked() async {
+    @Test func withoutManageKeysTheListIsTheAppsOwnAndNothingMoreIsAsked() async {
         let bench = OwnerBench(grants: [.webhooksManage])
         let model = model(bench, hooks: [Self.hook("a")])
         await model.load()
@@ -105,7 +105,7 @@ import Testing
         #expect(!bench.calls.calls.contains("identity") && !bench.calls.calls.contains("keys"))
     }
 
-    @Test func whenWhoMAPPIsCantBeReadThePageShowsTheFailureNotAListOfOnlyOthersWebhooks() async {
+    @Test func whenWhoTheAppIsCantBeReadThePageShowsTheFailureNotAListOfOnlyOthersWebhooks() async {
         let bench = OwnerBench()
         bench.calls.fail("identity", with: .unreachable)
         let model = model(bench, hooks: [Self.hook("a")])
@@ -116,9 +116,9 @@ import Testing
         #expect(model.failure == nil && model.isOwn(model.webhooks[0]))
     }
 
-    @Test func anotherAppWithMAPPsNameIsNotMAPPsOwnWhateverItIsCalled() async {
+    @Test func anotherAppWithTheAppsNameIsNotTheAppsOwnWhateverItIsCalled() async {
         let bench = OwnerBench()
-        let model = model(bench, hooks: [Self.hook("theirs", maker: "other-client", makerName: "MAPP"), Self.hook("mine")])
+        let model = model(bench, hooks: [Self.hook("theirs", maker: "other-client", makerName: "Marfa for Mac"), Self.hook("mine")])
         bench.calls.state.withLock { $0.identity = OwnIdentity(keyID: nil, expires: nil) }
         await model.load()
         #expect(model.webhooks.allSatisfy { !model.isOwn($0) }, "an app sign-in has no identifier to match, so none is taken as its own")
@@ -131,12 +131,12 @@ import Testing
 
     @Test func aWebhookOfAnotherKeyIsNotTheSignedInKeys() async {
         let bench = OwnerBench()
-        let model = model(bench, hooks: [Self.keyHook("theirs", maker: "k-other", name: "MAPP"), Self.hook("mine")])
+        let model = model(bench, hooks: [Self.keyHook("theirs", maker: "k-other", name: "Marfa for Mac"), Self.hook("mine")])
         await model.load()
         #expect(model.webhooks.map(model.isOwn) == [false, true], "a key is told by its id, never its name")
     }
 
-    @Test func losingManageKeysDropsEveryMakersListAndReadsOnlyMAPPsOwn() async {
+    @Test func losingManageKeysDropsEveryMakersListAndReadsOnlyTheAppsOwn() async {
         let bench = OwnerBench()
         let model = model(bench, hooks: [Self.hook("theirs", maker: "raycast-client", makerName: "Raycast"), Self.hook("mine")])
         await model.load()
@@ -144,7 +144,7 @@ import Testing
         bench.calls.state.withLock { $0.webhooks = [$0.webhooks[1]] }
         bench.grants.remove(.keysManage)
         #expect(!model.seesEvery)
-        #expect(model.webhooks.map(model.isOwn) == [false, true], "the cached list of others' webhooks is not taken as MAPP's own")
+        #expect(model.webhooks.map(model.isOwn) == [false, true], "the cached list of others' webhooks is not taken as the app's own")
         await model.readAgainIfScopeChanged()
         #expect(model.webhooks.map(\.id) == ["mine"] && model.isOwn(model.webhooks[0]))
         #expect(model.groups.map(\.id) == ["own"])

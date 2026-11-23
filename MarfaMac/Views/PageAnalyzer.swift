@@ -105,7 +105,7 @@ enum PageAnalyzer {
     /// - A backslash before a quote is removed in text, except in code, keyboard input and sample output, where it may be the code.
     /// - The first heading is removed when nothing readable comes before it and it says exactly the title, ignoring case,
     ///   punctuation and spacing, or extends a title that ends in an ellipsis. Only an ancestor left with nothing else goes with it.
-    /// - A table Readability found to hold data is marked `mapp-data`, so Reader draws a grid only for those.
+    /// - A table Readability found to hold data is marked `marfa-data`, so Reader draws a grid only for those.
     /// - A picture's fixed size is dropped, so the styles size it to the column.
     /// - The first picture, when less than a sentence of text comes before it and it is not an icon, is the lead picture.
     nonisolated static let script = MailColumn.script + #"""
@@ -177,7 +177,7 @@ enum PageAnalyzer {
           const doc = dom.ownerDocument(root);
           clean(root);
           // Readability has already told a table of data from one a mail or page lays itself out in.
-          for (const t of dom.queryAll(root, 'table')) if (t._readabilityDataTable) dom.classList(t).add('mapp-data');
+          for (const t of dom.queryAll(root, 'table')) if (t._readabilityDataTable) dom.classList(t).add('marfa-data');
           const permalink = 'a.anchor, a.heading-anchor, a.header-anchor, a.headerlink, a.permalink, a[aria-label*="ermalink" i]';
           const headings = 'h1, h2, h3, h4, h5, h6';
           for (const a of dom.queryAll(root, 'a')) {
@@ -223,7 +223,7 @@ enum PageAnalyzer {
             const before = dom.createRange(doc);
             before.setStart(root, 0);
             before.setEndBefore(img);
-            if (before.toString().trim().length < 80) dom.classList(dom.closest(img, 'figure') || img).add('mapp-lead');
+            if (before.toString().trim().length < 80) dom.classList(dom.closest(img, 'figure') || img).add('marfa-lead');
             break;
           }
         }

@@ -13,7 +13,7 @@ struct CalendarMonthCard: View {
 
     var body: some View {
         let _ = weekStart
-        let calendar = Calendar.mapp
+        let calendar = Calendar.chosenWeekStart
         let now = library.now()
         let current = browser.calendarDay ?? now
         let anchor = shown ?? current

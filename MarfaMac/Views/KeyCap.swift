@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A key of a shortcut, drawn as MAPP draws key caps outside menus: one glyph in its own small outlined cap, with no
+/// A key of a shortcut, drawn as the app draws key caps outside menus: one glyph in its own small outlined cap, with no
 /// fill, the glyph a touch lighter than secondary text. `onAccent` is for a cap inside a primary button.
 struct KeyCap: View {
     let key: String
@@ -21,7 +21,7 @@ struct KeyCap: View {
     }
 }
 
-/// A shortcut such as ⇧⌘P as one cap for each glyph. Menus keep the system's glyphs; this is for where MAPP draws a
+/// A shortcut such as ⇧⌘P as one cap for each glyph. Menus keep the system's glyphs; this is for where the app draws a
 /// shortcut itself.
 struct ShortcutKeys: View {
     let shortcut: String

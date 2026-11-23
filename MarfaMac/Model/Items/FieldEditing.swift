@@ -12,8 +12,8 @@ nonisolated enum FieldLock: Hashable, Sendable {
 nonisolated extension TypeID {
     /// The roots the contract reserves: `core`, `system` and `marfa` for what Marfa ships
     /// (`types/id-reserved-namespace`, and the server refuses to replace or delete one, `types/shipped-immutable`),
-    /// and `common` for the shared types a plugin brings (`types/id-reserved-common`). MAPP changes none of them. This
-    /// is the one place MAPP tells such a type from the owner's by its name; the catalogue carries no provenance, so
+    /// and `common` for the shared types a plugin brings (`types/id-reserved-common`). The app changes none of them. This
+    /// is the one place the app tells such a type from the owner's by its name; the catalogue carries no provenance, so
     /// a plugin's type under a root of its own is told only where the server's own answer is read
     /// (`TypeDefinitionEdit.run`).
     var isShipped: Bool {
@@ -166,12 +166,12 @@ nonisolated extension ItemTypeInfo {
 /// Why the server did not take a change to a field, in terms the page can word for a person.
 nonisolated enum TypeSchemaFailure: Error, Hashable, Sendable {
     case unreachable
-    /// MAPP’s sign-in does not have `schema.write`, or no write on the type.
+    /// the app’s sign-in does not have `schema.write`, or no write on the type.
     case notPermitted
     case keyRefused
     /// A plugin installed the type, so only a newer version of the plugin changes it.
     case pluginType
-    /// The type is not as the page showed it: another app changed it, or removed it, since MAPP read it.
+    /// The type is not as the page showed it: another app changed it, or removed it, since the app read it.
     case changedOnServer
     /// The server refused the change, with its own sentence.
     case refused(String)
@@ -182,7 +182,7 @@ nonisolated enum TypeSchemaFailure: Error, Hashable, Sendable {
     var message: String {
         switch self {
         case .unreachable:
-            String(localized: "MAPP can’t reach the server. Changing a field changes the type for every item, so it needs the server. Try again once it’s back.")
+            String(localized: "The app can’t reach the server. Changing a field changes the type for every item, so it needs the server. Try again once it’s back.")
         case .notPermitted:
             String(localized: "This connection can’t change a type. Ask whoever runs the server to allow it, or sign in again and approve it.")
         case .keyRefused:
@@ -190,7 +190,7 @@ nonisolated enum TypeSchemaFailure: Error, Hashable, Sendable {
         case .pluginType:
             String(localized: "This type belongs to a plugin, so it can only change with the plugin.")
         case .changedOnServer:
-            String(localized: "This type has changed on the server since MAPP last read it, so nothing was changed. Look at the field again and try once more.")
+            String(localized: "This type has changed on the server since the app last read it, so nothing was changed. Look at the field again and try once more.")
         case .refused(let reason):
             reason
         case .unsupported:

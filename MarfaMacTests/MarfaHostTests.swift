@@ -407,7 +407,7 @@ import Testing
     }
 
     /// The package refuses a folder's store, which can't be made here, so its answer is given to the host. The
-    /// copy stays, its mark is dropped, and the person is told it isn't MAPP's.
+    /// copy stays, its mark is dropped, and the person is told it isn't the app's.
     @Test
     func aMarkedStoreThatIsAFoldersIsLeftAndToldSo() async throws {
         let bench = try HostBench()
@@ -416,7 +416,7 @@ import Testing
         bench.defaults.set(["http://first.test:8210": [String]()], forKey: "MarfaDiscardedCopies")
         let host = bench.host(remover: { _, _ in throw MarfaError.invalid(message: "is a folder’s store") })
 
-        await expect(.copyKept(.notMapps(folder: directory.path), signIn: nil)) { () throws(MarfaHost.Problem) in
+        await expect(.copyKept(.notMadeByApp(folder: directory.path), signIn: nil)) { () throws(MarfaHost.Problem) in
             try await host.connect(address: "http://first.test:8210", key: "k")
         }
         #expect(FileManager.default.fileExists(atPath: directory.path))

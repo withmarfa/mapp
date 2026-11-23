@@ -18,7 +18,7 @@ extension LiveMarfaTests {
 
             await model.load()
             let before = try #require(model.loaded, "the key can read the settings: \(String(describing: model.failure))")
-            let temporary = "MAPPTEST name \(UUID().uuidString.prefix(8).lowercased())"
+            let temporary = "MARFAMACTEST name \(UUID().uuidString.prefix(8).lowercased())"
             var result: Result<Void, any Error> = .success(())
             do {
                 model.draft[.name] = temporary

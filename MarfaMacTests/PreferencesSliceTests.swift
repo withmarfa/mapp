@@ -4,7 +4,7 @@ import MarfaTesting
 import Testing
 @testable import MarfaMac
 
-/// A server that answers whether it holds MAPP's type and what the sign-in holds, and refuses a hydration that takes the
+/// A server that answers whether it holds the app's type and what the sign-in holds, and refuses a hydration that takes the
 /// type where told to, as the core refuses a slice naming a type the sign-in cannot read.
 private actor SliceServer: MarfaRefreshing {
     var evidence: PreferencesReach.Evidence?
@@ -100,7 +100,7 @@ private actor SliceServer: MarfaRefreshing {
     }
 
     @Test func anAppsOwnRowsAndTypesAreNoPartOfTheLibrary() {
-        #expect(TypeID("app.mapp.preferences").isHidden)
+        #expect(TypeID("app.marfa-mac.preferences").isHidden)
         #expect(TypeID("system.view").isHidden)
         #expect(!TypeID("core.note").isHidden)
         #expect(!TypeID("application.thing").isHidden)

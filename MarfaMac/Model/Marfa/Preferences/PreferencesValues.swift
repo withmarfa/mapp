@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where one setting sits in `app.mapp.preferences`: a member of a field, or a row of a table.
+/// Where one setting sits in `app.marfa-mac.preferences`: a member of a field, or a row of a table.
 nonisolated enum PreferenceUnit: Hashable, Sendable, Codable {
     case member(PreferencesField, String)
     case row(PreferencesTable, setting: String, key: String)
@@ -274,7 +274,7 @@ nonisolated extension SyncedSetting {
 /// A mark's color and a place's section change one at a time, so each is a row that two Macs can change apart. The lists
 /// (`order`, `tabs`, `groups`, `hidden`, `collapsed`) each say where many things sit relative to each other, so a row
 /// for each entry would need positions that two Macs fight over; each list is one row, and the later arrangement wins
-/// whole. A member a later MAPP adds is a `layout` row too.
+/// whole. A member a later version of the app adds is a `layout` row too.
 nonisolated enum PreferencesSidebar {
     static let layoutSetting = "layout"
     static let homeSetting = "home"

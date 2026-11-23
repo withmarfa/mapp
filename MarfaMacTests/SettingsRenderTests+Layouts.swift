@@ -5,7 +5,7 @@ import Testing
 /// Draws the Layouts pages from the sample library, for a pull request's pictures. Skipped unless `MARFA_MAC_SETTINGS_RENDERS`
 /// names a folder.
 extension SettingsRenderTests {
-    /// Libraries holding the sample library, as the running app opens it with `-MAPPSampleLibrary`.
+    /// Libraries holding the sample library, as the running app opens it with `-MarfaMacSampleLibrary`.
     private func sampled(_ configure: (Libraries) -> Void = { _ in }) async throws -> (Libraries, HostBench) {
         let bench = try HostBench()
         let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))

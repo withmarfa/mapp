@@ -81,7 +81,7 @@ enum ConnectorWording {
     /// their names as the server gives them.
     static func line(_ health: ConnectorHealth, hostName: String?, labels: [String: String] = [:], now: Date = .now) -> String {
         switch health {
-        case .unread: String(localized: "MAPP couldn’t read how it stands.")
+        case .unread: String(localized: "The app couldn’t read how it stands.")
         case .paused: String(localized: "It does nothing at its next run until you resume it.")
         case .needsSetup(let missing):
             String(localized: "It needs \(list(missing.map { labels[$0] ?? $0 })) before it can run.")

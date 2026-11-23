@@ -81,7 +81,7 @@ struct ItemPropertyRow: View {
                     editing: input.list, isWriting: isWriting, onChange: onChange)
                 if isEditable, editKind != nil {
                     Button { openEditor() } label: { Label("Add Person…", systemImage: "person.badge.plus") }
-                        .mappButton(.plain, size: .small)
+                        .appButton(.plain, size: .small)
                         .accessibilityLabel("Add Person to \(definition.label)")
                         .accessibilityIdentifier("ItemListAddPerson.\(definition.key)")
                 }
@@ -245,7 +245,7 @@ struct ItemPropertyRow: View {
                 Button("Use Current Value") { input.discard(toMatch: currentText); editing = false }
                     .accessibilityIdentifier("ItemPropertyUseCurrent.\(definition.key)")
             }
-            .mappButton(.secondary, size: .small)
+            .appButton(.secondary, size: .small)
         }
     }
 

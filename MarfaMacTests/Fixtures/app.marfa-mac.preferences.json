@@ -1,29 +1,29 @@
 {
-  "id": "app.mapp.preferences",
+  "id": "app.marfa-mac.preferences",
   "version": 1,
-  "label": "MAPP Settings",
-  "plural": "MAPP Settings",
-  "description": "MAPP's own settings for this Marfa, which every Mac that connects to it uses.",
+  "label": "Marfa for Mac Settings",
+  "plural": "Marfa for Mac Settings",
+  "description": "The app's own settings for this Marfa, which every Mac that connects to it uses.",
   "fields": {
     "appearance": {
       "type": "object",
-      "description": "MAPP's Appearance settings, by the key MAPP keeps each under."
+      "description": "The app's Appearance settings, by the key the app keeps each under."
     },
     "general": {
       "type": "object",
-      "description": "MAPP's General settings, by the key MAPP keeps each under."
+      "description": "The app's General settings, by the key the app keeps each under."
     },
     "editor": {
       "type": "object",
-      "description": "MAPP's Editor settings, by the key MAPP keeps each under."
+      "description": "The app's Editor settings, by the key the app keeps each under."
     },
     "lists": {
       "type": "object",
-      "description": "MAPP's Lists settings, by the key MAPP keeps each under."
+      "description": "The app's Lists settings, by the key the app keeps each under."
     },
     "search": {
       "type": "object",
-      "description": "MAPP's Search settings, by the key MAPP keeps each under."
+      "description": "The app's Search settings, by the key the app keeps each under."
     }
   },
   "tables": {
@@ -38,11 +38,11 @@
         "setting": {
           "type": "string",
           "required": true,
-          "description": "Which of MAPP's settings the row holds."
+          "description": "Which of this app's settings the row holds."
         },
         "value": {
           "type": "string",
-          "description": "The setting's value, as the JSON text MAPP stores."
+          "description": "The setting's value, as the JSON text the app stores."
         }
       }
     },
@@ -57,16 +57,16 @@
         "setting": {
           "type": "string",
           "required": true,
-          "description": "Which of MAPP's settings the row holds."
+          "description": "Which of this app's settings the row holds."
         },
         "value": {
           "type": "string",
-          "description": "The setting's value, as the JSON text MAPP stores."
+          "description": "The setting's value, as the JSON text the app stores."
         }
       }
     },
     "views": {
-      "description": "What MAPP shows of each saved view on every Mac.",
+      "description": "What the app shows of each saved view on every Mac.",
       "columns": {
         "key": {
           "type": "string",
@@ -76,11 +76,11 @@
         "setting": {
           "type": "string",
           "required": true,
-          "description": "Which of MAPP's settings the row holds."
+          "description": "Which of this app's settings the row holds."
         },
         "value": {
           "type": "string",
-          "description": "The setting's value, as the JSON text MAPP stores."
+          "description": "The setting's value, as the JSON text the app stores."
         }
       }
     },
@@ -95,11 +95,11 @@
         "setting": {
           "type": "string",
           "required": true,
-          "description": "Which of MAPP's settings the row holds."
+          "description": "Which of this app's settings the row holds."
         },
         "value": {
           "type": "string",
-          "description": "The setting's value, as the JSON text MAPP stores."
+          "description": "The setting's value, as the JSON text the app stores."
         }
       }
     },
@@ -114,11 +114,11 @@
         "setting": {
           "type": "string",
           "required": true,
-          "description": "Which of MAPP's settings the row holds."
+          "description": "Which of this app's settings the row holds."
         },
         "value": {
           "type": "string",
-          "description": "The setting's value, as the JSON text MAPP stores."
+          "description": "The setting's value, as the JSON text the app stores."
         }
       }
     }

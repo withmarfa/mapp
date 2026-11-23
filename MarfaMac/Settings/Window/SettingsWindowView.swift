@@ -9,7 +9,7 @@ import SwiftUI
 struct SettingsWindowView: View {
     let launcher: SettingsLauncher
     let libraries: Libraries
-    @State private var host: MAPPMarfaSettingsHost
+    @State private var host: AppSettingsHost
     @State private var search = ""
     @State private var sheets = SettingsSheetPresenter()
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
@@ -17,7 +17,7 @@ struct SettingsWindowView: View {
     init(launcher: SettingsLauncher, libraries: Libraries) {
         self.launcher = launcher
         self.libraries = libraries
-        _host = State(initialValue: MAPPMarfaSettingsHost(libraries: libraries, launcher: launcher))
+        _host = State(initialValue: AppSettingsHost(libraries: libraries, launcher: launcher))
     }
 
     private var navigation: SettingsNavigation { launcher.navigation }
@@ -74,7 +74,7 @@ struct SettingsWindowView: View {
         .settingsSheet(isPresented: sheets.isPresented, dismiss: { sheets.dismiss() }) {
             if let content = sheets.content { content }
         }
-        .background(WindowCloseWatch(frameName: "MAPPSettings") { closed() })
+        .background(WindowCloseWatch(frameName: "MarfaMacSettings") { closed() })
         .settingsClickOutsideEndsEditing()
         .task(id: host.serverAddress) {
             if host.connection == .connected, host.grants.contains(.instanceRead) { await host.overview.load() }
@@ -90,10 +90,10 @@ struct SettingsWindowView: View {
     }
 }
 
-/// The page the window shows: one of MAPP's own, or one of the Marfa's behind its gate.
+/// The page the window shows: one of the app's own, or one of the Marfa's behind its gate.
 struct SettingsDetail: View {
     let navigation: SettingsNavigation
-    let host: MAPPMarfaSettingsHost
+    let host: AppSettingsHost
     let libraries: Libraries
 
     var body: some View {

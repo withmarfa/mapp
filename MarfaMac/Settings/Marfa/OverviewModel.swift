@@ -20,7 +20,7 @@ import Observation
         healthReader = health ?? ServerHealthModel(context: context)
     }
 
-    /// What the sidebar's badge counts: the server's concerns, not MAPP's own missing permissions.
+    /// What the sidebar's badge counts: the server's concerns, not the app's own missing permissions.
     var attentionCount: Int { concerns.count }
 
     /// The release the server runs, left out for a development build: it carries version 0.0.0, which is no version.

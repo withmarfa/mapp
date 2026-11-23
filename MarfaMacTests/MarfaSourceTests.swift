@@ -158,10 +158,10 @@ struct MarfaSourceOfflineTests {
 
         let write = WriteID()
         let id = ItemID.mint()
-        source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST offline", body: "Kept")), as: write)
-        let queued = try #require(await log.wait { $0.item(titled: "MAPPTEST offline") != nil })
-        #expect(queued.item(titled: "MAPPTEST offline")?.id == id)
-        #expect(queued.item(titled: "MAPPTEST offline")?.sync == .waiting(writes: 1))
+        source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST offline", body: "Kept")), as: write)
+        let queued = try #require(await log.wait { $0.item(titled: "MARFAMACTEST offline") != nil })
+        #expect(queued.item(titled: "MARFAMACTEST offline")?.id == id)
+        #expect(queued.item(titled: "MARFAMACTEST offline")?.sync == .waiting(writes: 1))
         #expect(queued.answer(to: write) == nil)
         await source.flush()
         await source.close()
@@ -169,7 +169,7 @@ struct MarfaSourceOfflineTests {
         let reopened = try await MarfaSource.open(connection, signIns: keys, location: location)
         let again = ChangeLog(reopened)
         let repainted = try #require(await again.wait { $0.snapshot != nil })
-        let kept = try #require(repainted.item(titled: "MAPPTEST offline"))
+        let kept = try #require(repainted.item(titled: "MARFAMACTEST offline"))
         #expect(kept.sync == .waiting(writes: 1))
         #expect(try await reopened.body(of: kept.id).text == "Kept")
         #expect(reopened.connectionState != .online, "a copy is not online before the server has answered")
@@ -187,8 +187,8 @@ struct MarfaSourceOfflineTests {
         _ = try #require(await log.wait { $0.snapshot != nil })
         let write = WriteID()
         let id = ItemID.mint()
-        source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST follow drain", body: "One")), as: write)
-        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST follow drain") != nil })
+        source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST follow drain", body: "One")), as: write)
+        _ = try #require(await log.wait { $0.item(titled: "MARFAMACTEST follow drain") != nil })
         let queued = try #require(try await source.copy.queue.all().first)
 
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
@@ -210,8 +210,8 @@ struct MarfaSourceOfflineTests {
         let source = try await MarfaSource.open(connection, signIns: keys, location: location)
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
-        source.submit(.create(id: ItemID.mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST kept", body: "Kept")), as: WriteID())
-        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST kept") != nil })
+        source.submit(.create(id: ItemID.mint(), ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST kept", body: "Kept")), as: WriteID())
+        _ = try #require(await log.wait { $0.item(titled: "MARFAMACTEST kept") != nil })
         await source.flush()
         await source.close()
         try Self.makeItAnEarlierVersion(location.store(for: connection))
@@ -374,11 +374,11 @@ struct MarfaSourceOfflineTests {
         source.refresh()
         try #require(await eventually { server.filling })
 
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST held", body: "Queued")), as: WriteID())
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST held", body: "Queued")), as: WriteID())
         await source.queueSubmitted()
         #expect(!server.released, "the write waited for the refresh")
         #expect(try await copy.queue.all().count == 1)
-        #expect(await log.wait { $0.item(titled: "MAPPTEST held") != nil } != nil)
+        #expect(await log.wait { $0.item(titled: "MARFAMACTEST held") != nil } != nil)
         #expect(!server.released)
 
         server.release()
@@ -433,10 +433,10 @@ struct MarfaSourceOfflineTests {
         let write = WriteID()
         let child = ItemID.mint()
         source.submit(
-            .create(id: child, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST child", body: "Queued", parent: ItemID("not-an-item"))),
+            .create(id: child, ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST child", body: "Queued", parent: ItemID("not-an-item"))),
             as: write)
-        let queued = try #require(await log.wait { $0.item(titled: "MAPPTEST child") != nil })
-        #expect(queued.item(titled: "MAPPTEST child")?.id == child)
+        let queued = try #require(await log.wait { $0.item(titled: "MARFAMACTEST child") != nil })
+        #expect(queued.item(titled: "MARFAMACTEST child")?.id == child)
         #expect(queued.answer(to: write) == nil)
         let creates = try await source.copy.queue.all().filter { $0.kind == .createItem }
         #expect(creates.map(\.itemId) == [child.rawValue])
@@ -451,15 +451,15 @@ struct MarfaSourceOfflineTests {
         let source = try await open(root)
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST kept", body: "Queued")), as: WriteID())
-        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST kept") != nil })
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST kept", body: "Queued")), as: WriteID())
+        _ = try #require(await log.wait { $0.item(titled: "MARFAMACTEST kept") != nil })
 
         await source.copy.close()
         await source.hear(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         let failed = try #require(await log.wait { state in
             state.changes.contains { if case .unavailable = $0 { true } else { false } }
         })
-        #expect(failed.item(titled: "MAPPTEST kept")?.sync == .waiting(writes: 1))
+        #expect(failed.item(titled: "MARFAMACTEST kept")?.sync == .waiting(writes: 1))
         await source.close()
     }
 
@@ -474,26 +474,26 @@ struct MarfaSourceOfflineTests {
         _ = try #require(await log.wait { $0.snapshot != nil })
         let id = ItemID.mint()
         let draft = ItemDraft(
-            type: TypeID("core.note"), title: "MAPPTEST edits", body: "First", properties: ["description": .string("Kept")])
+            type: TypeID("core.note"), title: "MARFAMACTEST edits", body: "First", properties: ["description": .string("Kept")])
         source.submit(.create(id: id, draft), as: WriteID())
-        let made = try #require(await log.wait { $0.item(titled: "MAPPTEST edits") != nil })
-        let version = try #require(made.item(titled: "MAPPTEST edits")?.version)
+        let made = try #require(await log.wait { $0.item(titled: "MARFAMACTEST edits") != nil })
+        let version = try #require(made.item(titled: "MARFAMACTEST edits")?.version)
 
         source.submit(.editBody(id, "Second", base: version, merge: .ifUnchanged), as: WriteID())
-        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST edits")?.sync == .waiting(writes: 2) })
+        _ = try #require(await log.wait { $0.item(titled: "MARFAMACTEST edits")?.sync == .waiting(writes: 2) })
         let merge = try #require(try await source.copy.queue.all().last { $0.kind == .updateItem })
         #expect(merge.body["properties"]?.object == ["body": "Second"], "only the text is named, so the server merges it")
         #expect(merge.body["properties_mode"] == nil)
 
         source.submit(.editProperties(id, ["description": nil], base: version, undoing: nil), as: WriteID())
-        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST edits")?.sync == .waiting(writes: 3) })
+        _ = try #require(await log.wait { $0.item(titled: "MARFAMACTEST edits")?.sync == .waiting(writes: 3) })
         let clearing = try #require(try await source.copy.queue.all().last { $0.kind == .updateItem })
         #expect(clearing.body["properties_mode"] == nil, "nothing is replaced: the edit names only what it clears")
         #expect(clearing.body["properties"]?.object?.isEmpty ?? true, "and sends no value it does not change")
         #expect(clearing.body["clear_properties"]?.array?.compactMap(\.string) == ["description"])
         let held = try #require(try await source.copy.items.get(id.rawValue))
         #expect(held.properties["description"] == nil, "the property taken away is gone")
-        #expect(held.properties["body"]?.string == "Second" && held.properties["title"]?.string == "MAPPTEST edits", "every other keeps its value")
+        #expect(held.properties["body"]?.string == "Second" && held.properties["title"]?.string == "MARFAMACTEST edits", "every other keeps its value")
         await source.close()
     }
 
@@ -568,11 +568,11 @@ struct MarfaSourceOfflineTests {
     ) async throws -> [ItemID] {
         let ids = names.map { _ in ItemID.mint() }
         for (id, name) in zip(ids, names).dropLast() {
-            source.submit(.create(id: id, ItemDraft(type: Self.note, title: "MAPPTEST \(name)", body: "Queued")), as: WriteID())
+            source.submit(.create(id: id, ItemDraft(type: Self.note, title: "MARFAMACTEST \(name)", body: "Queued")), as: WriteID())
         }
         let (child, name) = (try #require(ids.last), try #require(names.last))
         source.submit(
-            .create(id: child, ItemDraft(type: Self.note, title: "MAPPTEST \(name)", body: "Queued", parent: ids[0])), as: WriteID())
+            .create(id: child, ItemDraft(type: Self.note, title: "MARFAMACTEST \(name)", body: "Queued", parent: ids[0])), as: WriteID())
         _ = try #require(await log.wait { state in
             state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.to == .item(ids[0]) } == true
         })
@@ -784,11 +784,11 @@ struct MarfaSourceOfflineTests {
         _ = try #require(await log.wait { $0.snapshot != nil })
         let original = ItemID.mint(), copy = ItemID.mint(), bystander = ItemID.mint()
         for (id, title) in [(original, "original"), (bystander, "bystander")] {
-            source.submit(.create(id: id, ItemDraft(type: Self.note, title: "MAPPTEST \(title)", body: "Queued")), as: WriteID())
+            source.submit(.create(id: id, ItemDraft(type: Self.note, title: "MARFAMACTEST \(title)", body: "Queued")), as: WriteID())
         }
         source.submit(
             .create(id: copy, ItemDraft(
-                type: Self.note, title: "MAPPTEST original (conflicted copy)", body: "Mine", tags: [MarfaProblems.conflictedCopyTag])),
+                type: Self.note, title: "MARFAMACTEST original (conflicted copy)", body: "Mine", tags: [MarfaProblems.conflictedCopyTag])),
             as: WriteID())
         // Tagged, but not yet linked: no original is known.
         _ = try #require(await log.wait { $0.snapshot?.items.first { $0.id == copy } != nil })
@@ -832,7 +832,7 @@ struct MarfaSourceOfflineTests {
 }
 
 extension LiveMarfaTests {
-    /// Against the test instance, in the Live test plan. Every item it makes has a title starting `MAPPTEST ` and is purged when the test ends, passed or not, over HTTP with the key's
+    /// Against the test instance, in the Live test plan. Every item it makes has a title starting `MARFAMACTEST ` and is purged when the test ends, passed or not, over HTTP with the key's
     /// `items.purge`, which reaches an item the copy never held or has let go of.
     @Suite(.serialized)
     struct MarfaSourceLiveTests {
@@ -900,9 +900,9 @@ extension LiveMarfaTests {
             // A child holds its parent as `child-of`, and the copy lists it beneath the parent.
             let token = "zp" + UUID().uuidString.prefix(8).lowercased()
             let parent = made.mint(), child = made.mint()
-            source.submit(.create(id: parent, ItemDraft(type: Self.note, title: "MAPPTEST parent \(token)", body: "Above.")), as: WriteID())
+            source.submit(.create(id: parent, ItemDraft(type: Self.note, title: "MARFAMACTEST parent \(token)", body: "Above.")), as: WriteID())
             source.submit(
-                .create(id: child, ItemDraft(type: Self.note, title: "MAPPTEST child \(token)", body: "Below.", parent: parent)),
+                .create(id: child, ItemDraft(type: Self.note, title: "MARFAMACTEST child \(token)", body: "Below.", parent: parent)),
                 as: WriteID())
             await source.flush()
             let filed = try #require(await log.wait { state in
@@ -913,8 +913,8 @@ extension LiveMarfaTests {
             })
             let snapshot = try #require(filed.snapshot)
             // A library may hold untitled notes, so what is read back is the titles of the notes made here.
-            #expect(snapshot.items.first { $0.id == parent }?.title == "MAPPTEST parent \(token)")
-            #expect(snapshot.items.first { $0.id == child }?.title == "MAPPTEST child \(token)")
+            #expect(snapshot.items.first { $0.id == parent }?.title == "MARFAMACTEST parent \(token)")
+            #expect(snapshot.items.first { $0.id == child }?.title == "MARFAMACTEST child \(token)")
             let beneath = try await source.copy.items.list(ListFilters(beneath: parent.rawValue)).map { ItemID($0.id) }
             #expect(Set(beneath).subtracting([parent]) == [child])
 
@@ -946,17 +946,17 @@ extension LiveMarfaTests {
         @Test(.timeLimit(.minutes(2)))
         func favoritesEditsArchivesAndBinsItsOwnItem() async throws {
             try await withSource { source, log, made in
-                let title = "MAPPTEST favorite \(UUID().uuidString.prefix(8))"
+                let title = "MARFAMACTEST favorite \(UUID().uuidString.prefix(8))"
                 let created = WriteID()
                 let id = made.mint()
                 source.submit(
-                    .create(id: id, ItemDraft(type: Self.note, title: title, body: "Made by the MAPP tests.", tags: ["mapptest"])),
+                    .create(id: id, ItemDraft(type: Self.note, title: title, body: "Made by the app tests.", tags: ["marfamactest"])),
                     as: created)
                 let answered = try #require(await log.wait { $0.answer(to: created) != nil && $0.item(titled: title)?.sync == .settled })
                 #expect(answered.answer(to: created) == .accepted)
                 let item = try #require(answered.item(titled: title))
                 #expect(item.id == id)
-                #expect(item.tags == ["mapptest"])
+                #expect(item.tags == ["marfamactest"])
                 #expect(item.properties.map(\.key) == ["title"])
 
                 func apply(_ write: ItemWrite) async throws -> ChangeLog.State {
@@ -971,8 +971,8 @@ extension LiveMarfaTests {
                 #expect(state.item(titled: title)?.isFavorite == true)
                 let favorite = try #require(state.item(titled: title))
 
-                state = try await apply(.editBody(item.id, "Edited by the MAPP tests.", base: favorite.version, merge: .ifUnchanged))
-                #expect(try await source.body(of: item.id).text == "Edited by the MAPP tests.")
+                state = try await apply(.editBody(item.id, "Edited by the app tests.", base: favorite.version, merge: .ifUnchanged))
+                #expect(try await source.body(of: item.id).text == "Edited by the app tests.")
 
                 state = try await apply(.tag(item.id, ItemTag.favorite, on: false))
                 #expect(state.item(titled: title)?.isFavorite == false)
@@ -994,7 +994,7 @@ extension LiveMarfaTests {
                 source.submit(.transition(item.id, .trashed), as: binned)
                 let inBin = try #require(await log.wait { $0.answer(to: binned) != nil && $0.item(titled: title)?.state == .trashed })
                 #expect(inBin.answer(to: binned) == .accepted)
-                #expect(try await source.body(of: item.id).text == "Edited by the MAPP tests.")
+                #expect(try await source.body(of: item.id).text == "Edited by the app tests.")
 
                 // Restoring an item the copy let go of is made by its id, and the item arrives once it is answered.
                 state = try await apply(.transition(item.id, .active))
@@ -1035,8 +1035,8 @@ extension LiveMarfaTests {
                 #expect(status.sliceTier == .all)
                 let token = UUID().uuidString.prefix(8)
                 let captured = made.mint(), filed = made.mint()
-                source.submit(.create(id: captured, ItemDraft(type: Self.note, title: "MAPPTEST feed \(token)", tier: .feed)), as: WriteID())
-                source.submit(.create(id: filed, ItemDraft(type: Self.note, title: "MAPPTEST library \(token)")), as: WriteID())
+                source.submit(.create(id: captured, ItemDraft(type: Self.note, title: "MARFAMACTEST feed \(token)", tier: .feed)), as: WriteID())
+                source.submit(.create(id: filed, ItemDraft(type: Self.note, title: "MARFAMACTEST library \(token)")), as: WriteID())
                 await source.flush()
                 _ = try #require(await log.wait { state in
                     state.snapshot?.items.first { $0.id == captured }?.tier == .feed
@@ -1054,7 +1054,7 @@ extension LiveMarfaTests {
         @Test(.timeLimit(.minutes(2)))
         func editsReadBeforeAnotherDevicesEditAreMerged() async throws {
             try await withSource { source, log, made in
-                let title = "MAPPTEST as read \(UUID().uuidString.prefix(8))"
+                let title = "MARFAMACTEST as read \(UUID().uuidString.prefix(8))"
                 let id = made.mint()
                 let created = WriteID()
                 source.submit(.create(id: id, ItemDraft(type: Self.note, title: title, body: "One")), as: created)
@@ -1120,8 +1120,8 @@ extension LiveMarfaTests {
             var source = try await MarfaSource.open(connection, signIns: keys, location: location)
             var log = ChangeLog(source)
             try await hydrated(source)
-            source.submit(.create(id: a, ItemDraft(type: Self.note, title: "MAPPTEST earlier A \(tag)", body: "One")), as: WriteID())
-            source.submit(.create(id: b, ItemDraft(type: Self.note, title: "MAPPTEST earlier B \(tag)", body: "One")), as: WriteID())
+            source.submit(.create(id: a, ItemDraft(type: Self.note, title: "MARFAMACTEST earlier A \(tag)", body: "One")), as: WriteID())
+            source.submit(.create(id: b, ItemDraft(type: Self.note, title: "MARFAMACTEST earlier B \(tag)", body: "One")), as: WriteID())
             let both = try #require(await log.wait { state in
                 [a, b].allSatisfy { id in state.snapshot?.items.first { $0.id == id }?.sync == .settled }
             })
@@ -1196,7 +1196,7 @@ extension LiveMarfaTests {
         @Test(.timeLimit(.minutes(2)))
         func aDrainWaitsUntilTheLastAnswersAreTaken() async throws {
             try await withSource { source, log, made in
-                let title = "MAPPTEST drains \(UUID().uuidString.prefix(8))"
+                let title = "MARFAMACTEST drains \(UUID().uuidString.prefix(8))"
                 let id = made.mint()
                 let created = WriteID()
                 source.submit(.create(id: id, ItemDraft(type: Self.note, title: title, body: "One")), as: created)
@@ -1235,10 +1235,10 @@ extension LiveMarfaTests {
                 let first = made.mint(), second = made.mint(), child = made.mint()
                 let creates = [first, second].map { _ in WriteID() }
                 for (id, write) in zip([first, second], creates) {
-                    source.submit(.create(id: id, ItemDraft(type: Self.note, title: "MAPPTEST parent \(id.rawValue) \(token)", body: "One")), as: write)
+                    source.submit(.create(id: id, ItemDraft(type: Self.note, title: "MARFAMACTEST parent \(id.rawValue) \(token)", body: "One")), as: write)
                 }
                 source.submit(
-                    .create(id: child, ItemDraft(type: Self.note, title: "MAPPTEST moved \(token)", body: "One", parent: first)),
+                    .create(id: child, ItemDraft(type: Self.note, title: "MARFAMACTEST moved \(token)", body: "One", parent: first)),
                     as: WriteID())
                 _ = try #require(await log.wait { state in
                     state.snapshot?.items.first { $0.id == child }?.sync == .settled
@@ -1286,9 +1286,9 @@ extension LiveMarfaTests {
             try await withSource { source, log, made in
                 let token = UUID().uuidString.prefix(8)
                 let a = made.mint(), b = made.mint(), c = made.mint()
-                source.submit(.create(id: a, ItemDraft(type: Self.note, title: "MAPPTEST cycle a \(token)", body: "One")), as: WriteID())
-                source.submit(.create(id: b, ItemDraft(type: Self.note, title: "MAPPTEST cycle b \(token)", body: "One", parent: a)), as: WriteID())
-                source.submit(.create(id: c, ItemDraft(type: Self.note, title: "MAPPTEST cycle c \(token)", body: "One", parent: b)), as: WriteID())
+                source.submit(.create(id: a, ItemDraft(type: Self.note, title: "MARFAMACTEST cycle a \(token)", body: "One")), as: WriteID())
+                source.submit(.create(id: b, ItemDraft(type: Self.note, title: "MARFAMACTEST cycle b \(token)", body: "One", parent: a)), as: WriteID())
+                source.submit(.create(id: c, ItemDraft(type: Self.note, title: "MARFAMACTEST cycle c \(token)", body: "One", parent: b)), as: WriteID())
                 _ = try #require(await log.wait { state in
                     [b, c].allSatisfy { id in
                         state.snapshot?.items.first { $0.id == id }.map { $0.sync == .settled && !$0.edgesOut.isEmpty } == true
@@ -1319,7 +1319,7 @@ extension LiveMarfaTests {
             try await withSource { source, log, made in
                 let write = WriteID()
                 let id = made.mint()
-                source.submit(.create(id: id, ItemDraft(type: TypeID("system.folder"), title: "MAPPTEST refused")), as: write)
+                source.submit(.create(id: id, ItemDraft(type: TypeID("system.folder"), title: "MARFAMACTEST refused")), as: write)
                 let answered = try #require(await log.wait { $0.answer(to: write) != nil })
                 guard case .refused(let problem) = answered.answer(to: write) else {
                     Issue.record("the create was not refused: \(String(describing: answered.answer(to: write)))")
@@ -1476,14 +1476,14 @@ struct MarfaSourceClosingTests {
         let (source, connection, keys, location, root) = try await open()
         defer { try? FileManager.default.removeItem(at: root) }
         let id = ItemID.mint()
-        source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST quit", body: "Typed at once")), as: WriteID())
+        source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST quit", body: "Typed at once")), as: WriteID())
         await source.queueSubmitted()
         await source.close()
 
         let reopened = try await MarfaSource.open(connection, signIns: keys, location: location)
         let log = ChangeLog(reopened)
         let painted = try #require(await log.wait { $0.snapshot != nil })
-        let kept = try #require(painted.item(titled: "MAPPTEST quit"))
+        let kept = try #require(painted.item(titled: "MARFAMACTEST quit"))
         #expect(kept.id == id)
         #expect(try await reopened.body(of: id).text == "Typed at once")
         await reopened.close()

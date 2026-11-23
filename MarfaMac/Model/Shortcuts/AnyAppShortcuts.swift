@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// What a shortcut that works in any app does. Each brings MAPP forward and does its action in the window that was in
+/// What a shortcut that works in any app does. Each brings the app forward and does its action in the window that was in
 /// front, until a palette can be shown over another app.
 nonisolated enum AnyAppCommand: String, CaseIterable, Sendable {
     case commandPalette, searchItems, quickAdd
@@ -17,9 +17,9 @@ nonisolated enum AnyAppCommand: String, CaseIterable, Sendable {
     /// The line under the title.
     var line: String? {
         switch self {
-        case .commandPalette: String(localized: "Brings MAPP forward with the palette open.")
+        case .commandPalette: String(localized: "Brings the app forward with the palette open.")
         case .searchItems: nil
-        case .quickAdd: String(localized: "Brings MAPP forward to add an item.")
+        case .quickAdd: String(localized: "Brings the app forward to add an item.")
         }
     }
 }
@@ -44,7 +44,7 @@ struct NoHotKeys: HotKeyRegistrar {
     func setSuspended(_ suspended: Bool) {}
 }
 
-/// The shortcuts that work in any app, while MAPP is running. Every one is off until the person sets it, and is registered
+/// The shortcuts that work in any app, while the app is running. Every one is off until the person sets it, and is registered
 /// with the system only while it is set: setting one registers it, clearing it unregisters it, and none is registered
 /// before `start`. A shortcut needs ⌘ or ⌃ (`Shortcut.anyAppProblem`). They are kept in the defaults and sync through the connected Marfa (`PreferencesMap`).
 ///
@@ -87,7 +87,7 @@ final class AnyAppShortcuts {
             return
         }
         if let stored = try? JSONDecoder().decode([String: Shortcut].self, from: saved) {
-            // A command a later MAPP added is ignored here and kept in the stored text, which `save` rewrites whole.
+            // A command a later version of the app added is ignored here and kept in the stored text, which `save` rewrites whole.
             chosen = Dictionary(uniqueKeysWithValues: stored.compactMap { key, value in AnyAppCommand(rawValue: key).map { ($0, value) } })
             unknown = stored.filter { AnyAppCommand(rawValue: $0.key) == nil }
         } else {
@@ -118,7 +118,7 @@ final class AnyAppShortcuts {
     enum Refusal: Equatable {
         case unfit(Shortcut.Problem)
         case taken(by: AnyAppCommand)
-        /// The system's own command has the keys, which no shortcut of MAPP's can take.
+        /// The system's own command has the keys, which no shortcut of the app's can take.
         case system(String)
         /// The system refused the hot key when it was registered, since another app holds it.
         case unavailable

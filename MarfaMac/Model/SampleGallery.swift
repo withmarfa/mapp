@@ -9,9 +9,9 @@ import UniformTypeIdentifiers
 import MarfaTesting
 
 /// Pictures, a PDF and bookmarks for a screenshot of the gallery: made here, so no picture ships. A debug build asks for
-/// them with `-MAPPGallerySample`.
+/// them with `-MarfaMacGallerySample`.
 nonisolated enum SampleGallery {
-    static let flag = "-MAPPGallerySample"
+    static let flag = "-MarfaMacGallerySample"
 
     static var isRequested: Bool { ProcessInfo.processInfo.arguments.contains(flag) }
 
@@ -104,7 +104,7 @@ nonisolated enum SampleGallery {
         }
     }
 
-    private static var directory: URL { FileManager.default.temporaryDirectory.appending(path: "mapp-gallery-sample") }
+    private static var directory: URL { FileManager.default.temporaryDirectory.appending(path: "marfa-mac-gallery-sample") }
 
     /// Writes each file's bytes where `url(forBlob:)` finds them: the fake working copy has no blobs to fetch.
     static func writeFiles() {
@@ -133,7 +133,7 @@ nonisolated enum SampleGallery {
 
     /// A one-second clip of a single gradient, written to a temporary file and read back.
     private static func video(top: (Double, Double, Double), bottom: (Double, Double, Double)) -> Data {
-        let url = FileManager.default.temporaryDirectory.appending(path: "mapp-gallery-sample-\(UUID().uuidString).mp4")
+        let url = FileManager.default.temporaryDirectory.appending(path: "marfa-mac-gallery-sample-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: url) }
         guard let writer = try? AVAssetWriter(outputURL: url, fileType: .mp4) else { return Data() }
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [

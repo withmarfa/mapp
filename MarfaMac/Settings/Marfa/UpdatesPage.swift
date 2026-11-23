@@ -47,7 +47,7 @@ struct UpdatesPage: View {
         return SettingsSection("Marfa") {
             SettingsRow(
                 title: release.map { Text("Updating to \($0)") } ?? Text("Updating"),
-                line: Text(model.standing(of: .restarting) == .now ? "Restarting. MAPP reconnects when it is back." : "\(host.serverName) restarts when it is done.")
+                line: Text(model.standing(of: .restarting) == .now ? "Restarting. The app reconnects when it is back." : "\(host.serverName) restarts when it is done.")
             ) {
                 ProgressView(value: Double(done) + 0.5, total: Double(stages.count))
                     .progressViewStyle(.linear)
@@ -87,7 +87,7 @@ struct UpdatesPage: View {
                 if model.lostTrack {
                     SettingsProblemRow(
                         title: Text("\(host.serverName) Hasn’t Come Back Yet"),
-                        line: Text("MAPP stopped waiting. Check again to see where it stands."),
+                        line: Text("The app stopped waiting. Check again to see where it stands."),
                         actions: [SettingsProblemAction("Check Again") { Task { await model.load() } }])
                 }
                 if let error = model.error {

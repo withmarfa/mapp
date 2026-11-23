@@ -6,7 +6,7 @@ import Testing
 
 extension LiveMarfaTests {
     /// Version History over a real test instance: the snapshots `MarfaServerCalls` reads, and a restore written
-    /// back through the library. Every item it makes has a title starting `MAPPTEST ` and is purged when the test
+    /// back through the library. Every item it makes has a title starting `MARFAMACTEST ` and is purged when the test
     /// ends, passed or not.
     @MainActor
     @Suite(.serialized)
@@ -44,7 +44,7 @@ extension LiveMarfaTests {
         private func writtenItem(
             _ library: MarfaLibrary, _ source: MarfaSource, _ made: LiveMarfa.Made
         ) async throws -> ItemID {
-            let title = "MAPPTEST history \(UUID().uuidString.prefix(8).lowercased())"
+            let title = "MARFAMACTEST history \(UUID().uuidString.prefix(8).lowercased())"
             let id = try #require(library.createItem(
                 typeID: "core.note", title: title, body: Self.first, parentID: nil, in: .allItems, undoManager: nil))
             made.add(id)

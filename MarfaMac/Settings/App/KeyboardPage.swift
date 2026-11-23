@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Keyboard page: a shortcut for every menu command MAPP adds, and the few that work in any app. Each is a field that
+/// The Keyboard page: a shortcut for every menu command the app adds, and the few that work in any app. Each is a field that
 /// records the next keys pressed; a shortcut another command holds is shown as taken, with the choice to replace it. The
 /// chosen shortcuts drive the menus at once (`ShortcutBindings`).
 struct KeyboardPage: View {
@@ -35,7 +35,7 @@ struct KeyboardPage: View {
             }
             if !model.anyAppCommands.isEmpty {
                 SettingsSection(
-                    "In Any App", line: "Off until you set one. They work from any app while MAPP is running."
+                    "Global Shortcuts", line: "Off until you set one. They work from any app while Marfa is running."
                 ) {
                     ForEach(model.anyAppCommands, id: \.self) { command in
                         row(command.title, line: command.line, target: .anyApp(command))

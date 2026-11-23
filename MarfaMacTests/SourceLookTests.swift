@@ -73,9 +73,9 @@ import WebKit
         """
 
     @Test func theMailsColumnIsMarkedAndCentered() async throws {
-        let marked = try await value("return document.querySelector('[data-mapp-mail]')?.id", in: mail, look: look(.original, mail: true))
+        let marked = try await value("return document.querySelector('[data-marfa-mail]')?.id", in: mail, look: look(.original, mail: true))
         #expect(marked as? String == "column")
-        let unmarked = try await value("return document.querySelector('[data-mapp-mail]')?.id ?? 'none'", in: mail, look: look(.original))
+        let unmarked = try await value("return document.querySelector('[data-marfa-mail]')?.id ?? 'none'", in: mail, look: look(.original))
         #expect(unmarked as? String == "none")
     }
 
@@ -91,7 +91,7 @@ import WebKit
     @Test func aMailIsNeverRestyledAsReaderIs() async throws {
         let font = try await value("return getComputedStyle(document.querySelector('p')).fontFamily", in: mail, look: look(.original, mail: true))
         #expect(!((font as? String) ?? "").contains("New York"))
-        #expect(look(.original, mail: true).css.contains("data-mapp-mail"))
+        #expect(look(.original, mail: true).css.contains("data-marfa-mail"))
     }
 
     @Test func theSurfaceIsAskedForOnlyWhereTheLookNeedsIt() {
@@ -117,7 +117,7 @@ import WebKit
                 "<table id=\"column\" width=\"600\"><tr><td><font color=\"#eeeeee\">Words that are light on a dark page.</font></td></tr></table></td></tr></table></body></html>"),
         ]
         for (name, html) in darkMails {
-            let marked = try await value("return document.getElementById('column').hasAttribute('data-mapp-mail')", in: html, look: look(.original, mail: true))
+            let marked = try await value("return document.getElementById('column').hasAttribute('data-marfa-mail')", in: html, look: look(.original, mail: true))
             try #require(marked as? Bool == true, "\(name): the column is found")
             let colors = try await value(paint, in: html, look: look(.original, mail: true)) as? String ?? ""
             #expect(!colors.hasPrefix("rgb(255, 255, 255)"), "\(name) was painted white: \(colors)")
@@ -215,7 +215,7 @@ import WebKit
     @Test func aMailInsideAFormThatNamesItsControlsAfterItsPropertiesIsStillFound() async throws {
         let html = "<html><body><form><input type=\"hidden\" name=\"children\"><input type=\"hidden\" name=\"parentElement\"><input type=\"hidden\" name=\"style\">" +
             "<table width=\"100%\"><tr><td align=\"center\"><table id=\"column\" width=\"600\"><tr><td><p>The mail's own words, at the width its sender gave them.</p></td></tr></table></td></tr></table></form></body></html>"
-        let marked = try await value("return document.querySelector('[data-mapp-mail]')?.id", in: html, look: look(.original, mail: true))
+        let marked = try await value("return document.querySelector('[data-marfa-mail]')?.id", in: html, look: look(.original, mail: true))
         #expect(marked as? String == "column")
     }
 

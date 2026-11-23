@@ -113,7 +113,7 @@ import Testing
         #expect(await copy.unitsHeld(second) == [theme: #""dark""#, accent: #""red""#])
     }
 
-    @Test func aMacThatAdoptedAnotherMarfaStartsANewOneFromMAPPsDefaults() async throws {
+    @Test func aMacThatAdoptedAnotherMarfaStartsANewOneFromTheAppsDefaults() async throws {
         var record = PreferencesSync.Record()
         record.marfas["instance-0"] = .init(item: "elsewhere", base: [theme: #""dark""#])
         record.last = "instance-0"
@@ -223,7 +223,7 @@ import Testing
 
     // MARK: Review findings
 
-    /// A value a later MAPP wrote, which a store here sets aside, stays in the Marfa for the Macs that read it: the
+    /// A value a later version of the app wrote, which a store here sets aside, stays in the Marfa for the Macs that read it: the
     /// store dropping it on this Mac is no change of the person's.
     @Test(arguments: [
         PreferenceUnit.row(.types, setting: "look", key: "core.note"),
@@ -233,7 +233,7 @@ import Testing
         PreferenceUnit.row(.commands, setting: "anyAppShortcut", key: "quickAdd"),
     ])
     func aValueAStoreCannotReadIsNeverDeletedFromTheMarfa(unit: PreferenceUnit) async throws {
-        let later = #""a shape a later MAPP writes""#
+        let later = #""a shape a later version of the app writes""#
         let copy = FakePreferencesCopy()
         let item = await copy.add([theme: #""light""#])
         let sync = await syncWithStores(copy)
@@ -249,7 +249,7 @@ import Testing
         #expect(await copy.unitsHeld(item)[unit] == later)
     }
 
-    /// Connecting to another Marfa starts the settings shared by every Marfa from MAPP's defaults, but keeps what this
+    /// Connecting to another Marfa starts the settings shared by every Marfa from the app's defaults, but keeps what this
     /// Mac already holds for this Marfa alone.
     @Test func aNewMarfaKeepsItsOwnSettingsOnThisMac() async throws {
         var record = PreferencesSync.Record()
@@ -310,7 +310,7 @@ import Testing
         #expect(await copy.unitsHeld(item)[accent] == #""green""#)
     }
 
-    /// A field write answered while MAPP was not running, whose answer no sync took, is judged by its conflicted copy.
+    /// A field write answered while the app was not running, whose answer no sync took, is judged by its conflicted copy.
     @Test func aWriteAnsweredBeforeARelaunchIsJudgedByItsConflictedCopy() async throws {
         let copy = FakePreferencesCopy()
         let item = await copy.add([theme: #""light""#, accent: #""blue""#])
@@ -330,7 +330,7 @@ import Testing
         #expect(await copy.removed == [sibling])
     }
 
-    /// A setting a store dropped is tried again by another MAPP build, which may read it.
+    /// A setting a store dropped is tried again by another app build, which may read it.
     @Test func aDroppedSettingIsTriedAgainByAnotherBuild() async throws {
         let look = PreferenceUnit.row(.types, setting: "look", key: "core.note")
         let copy = FakePreferencesCopy()

@@ -15,9 +15,9 @@ enum LibraryDescription {
     }
 }
 
-/// What MAPP lends the Marfa's pages (`MarfaSettingsHost`): its host, its sign-in and its library, told in the pages' own
-/// terms. It is the only place the Marfa's half meets MAPP.
-@Observable @MainActor final class MAPPMarfaSettingsHost: MarfaSettingsHost {
+/// What the app lends the Marfa's pages (`MarfaSettingsHost`): its host, its sign-in and its library, told in the pages' own
+/// terms. It is the only place the Marfa's half meets the app.
+@Observable @MainActor final class AppSettingsHost: MarfaSettingsHost {
     private let libraries: Libraries
     private let launcher: SettingsLauncher
     private(set) var isAllowingMore = false
@@ -303,7 +303,7 @@ enum LibraryDescription {
 
     // MARK: Closing
 
-    /// Hands over what was typed in the Marfa's pages and not saved, as MAPP's rules say for a panel that ends any way but
+    /// Hands over what was typed in the Marfa's pages and not saved, as the app's rules say for a panel that ends any way but
     /// the person's own Cancel: the text goes through `Notices.notKept`, to the clipboard, and the draft is dropped.
     func handOverDrafts() {
         instanceSettings.handOver(

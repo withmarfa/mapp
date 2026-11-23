@@ -338,8 +338,8 @@ import WebKit
         let plain = EmbeddedFiles.pictureURL(for: URL(string: address)!, version: 1)
 
         let served = try await serve(files, plain)
-        let emptyItem = try await serve(files, URL(string: "mapp-embed://picture/?address=\(encoded)&v=1&item=&f=")!)
-        let badEncoding = try await serve(files, URL(string: "mapp-embed://picture/?address=\(encoded)&v=1&item=%E0%A4%A&f=")!)
+        let emptyItem = try await serve(files, URL(string: "marfa-embed://picture/?address=\(encoded)&v=1&item=&f=")!)
+        let badEncoding = try await serve(files, URL(string: "marfa-embed://picture/?address=\(encoded)&v=1&item=%E0%A4%A&f=")!)
 
         #expect(served.response?.statusCode == 200, "a plain picture URL is the cache's")
         #expect(emptyItem.response?.statusCode == 404, "an item field is a request for a saved file, never the cache")

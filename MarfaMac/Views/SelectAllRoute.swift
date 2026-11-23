@@ -13,7 +13,7 @@ extension View {
 /// selection, SwiftUI makes that row's view, even far out of sight, to find out what selecting the row should do, and
 /// AppKit then removes each view again at a cost that grows with how many there are. Select All on a list of about
 /// ten thousand items held the window for over a minute. A selection set through the list's binding makes no row's
-/// view, so `MAPPApplication` sends Select All for a list that has this route to the route instead of to its table.
+/// view, so `MarfaMacApplication` sends Select All for a list that has this route to the route instead of to its table.
 struct SelectAllRoute: NSViewRepresentable {
     let selectAll: () -> Void
 
@@ -48,8 +48,8 @@ struct SelectAllRoute: NSViewRepresentable {
 
 /// The app's `NSApplication`, which sends Select All for a list with a `SelectAllRoute` to that route. The menu
 /// item and its key equivalent both send their action through `sendAction(_:to:from:)`.
-@objc(MAPPApplication)
-final class MAPPApplication: NSApplication {
+@objc(MarfaMacApplication)
+final class MarfaMacApplication: NSApplication {
     override func sendAction(_ action: Selector, to target: Any?, from sender: Any?) -> Bool {
         if action == #selector(NSResponder.selectAll(_:)),
            let table = (target ?? self.target(forAction: action, to: nil, from: sender)) as? NSTableView,

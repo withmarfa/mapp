@@ -51,8 +51,8 @@ nonisolated final class ScriptedSignIns: SignIns {
     }
 
     /// Keeps `key` as a sign-in holding `permissions` and, with `profile`, the read of the owner's name; a sign-in made
-    /// before MAPP asked for it is kept with `profile` false.
-    /// `scopes` are kept beside them, as a sign-in the owner approved for MAPP's own settings holds `app.mapp.*:write`.
+    /// before the app asked for it is kept with `profile` false.
+    /// `scopes` are kept beside them, as a sign-in the owner approved for the app's own settings holds `app.marfa-mac.*:write`.
     func save(
         _ key: String, for address: URL, permissions: Set<InstancePermission> = SystemSignIns.askedAtSignIn, profile: Bool = true,
         scopes: [String] = []
@@ -155,7 +155,7 @@ nonisolated final class ScriptedSignIns: SignIns {
 
     private func authorization(for address: URL) throws -> Authorization {
         try Authorization(
-            server: address, client: Authorization.Client(name: "MAPP", redirect: nil, scopes: []), keychain: keychain.keychain,
+            server: address, client: Authorization.Client(name: "Marfa for Mac", redirect: nil, scopes: []), keychain: keychain.keychain,
             service: Self.service)
     }
 

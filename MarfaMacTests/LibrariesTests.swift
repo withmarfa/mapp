@@ -152,7 +152,7 @@ import Testing
         // Returns at all only because the limit ends the wait, which the editors never would.
         #expect(await libraries.flushEditors(within: .milliseconds(200)) == false)
         #expect(libraries.host.notices.waiting.last?.title == "Couldn’t Quit")
-        #expect(libraries.host.notices.waiting.last?.message == "MAPP is still saving what you last typed. Try again in a moment.")
+        #expect(libraries.host.notices.waiting.last?.message == "The app is still saving what you last typed. Try again in a moment.")
         handOver?(true)
     }
 

@@ -264,7 +264,7 @@ final class EditorController: NSObject {
             preconditionFailure("editor.html missing from the bundle")
         }
         configuration.userContentController.addUserScript(WKUserScript(
-            source: "window.mappLabels = \(json(Self.editorLabels))", injectionTime: .atDocumentStart, forMainFrameOnly: true
+            source: "window.marfaLabels = \(json(Self.editorLabels))", injectionTime: .atDocumentStart, forMainFrameOnly: true
         ))
         pageURL = url
         webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())

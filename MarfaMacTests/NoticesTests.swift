@@ -38,7 +38,7 @@ import Testing
         notices.notKept("Couldn’t Save “Trip”", text: "Book the hotel")
         #expect(notices.waiting.last?.title == "Couldn’t Save “Trip”")
         #expect(notices.waiting.last?.text == "Book the hotel")
-        #expect(notices.waiting.last?.message == "MAPP closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back.")
+        #expect(notices.waiting.last?.message == "The app closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back.")
         let id = try #require(notices.waiting.first?.id)
 
         notices.tell("Can’t Search", "The search failed.")
@@ -77,14 +77,14 @@ import Testing
         notices.notKept("Couldn’t Save “Plan”", text: "Rest", reason: "Try again in a moment.")
         #expect(notices.waiting.last?.title == "Some Changes Weren’t Saved")
         #expect(notices.waiting.last?.text == "Book the hotel\n\nPack\n\nRest")
-        #expect(notices.waiting.last?.message == "MAPP couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back.")
+        #expect(notices.waiting.last?.message == "The app couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back.")
     }
 
     @Test func aChangeNotKeptWithNoTextAsksThePersonToMakeItAgain() {
         let notices = Notices()
         notices.notKept("Couldn’t Save Item", text: "")
         #expect(notices.waiting.last?.text == nil)
-        #expect(notices.waiting.last?.message == "MAPP closed the library before it could keep your change. Make the change again.")
+        #expect(notices.waiting.last?.message == "The app closed the library before it could keep your change. Make the change again.")
     }
 
     @Test func aNoticeIsShownInOneWindowOnly() throws {

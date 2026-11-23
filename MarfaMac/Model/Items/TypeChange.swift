@@ -9,7 +9,7 @@ nonisolated struct TypeChange: Hashable, Sendable {
     enum Obstacle: Error, Hashable, Sendable {
         /// The item has text, or a title that would have to go into its text, and the type keeps no text.
         case noPlaceForText
-        /// A required field of a shape MAPP does not edit, such as a list.
+        /// A required field of a shape the app does not edit, such as a list.
         case cannotFill(ItemTypeInfo.Field)
         /// A value the item holds does not fit the new type's field of that key.
         case valueDoesNotFit(ItemTypeInfo.Field)
@@ -134,7 +134,7 @@ nonisolated struct TypeChangePreview: Hashable, Sendable {
 
 extension ItemLibrary {
     /// What a type change reads of an item: its properties, and its text under the key its type keeps it in. Nil
-    /// for an item whose type MAPP cannot change: a file, one in the bin or with a problem, or one whose text is
+    /// for an item whose type the app cannot change: a file, one in the bin or with a problem, or one whose text is
     /// not read yet.
     func typeChangeValues(of id: ItemID) -> [String: PropertyValue]? {
         guard let item = item(id), item.isEditable else { return nil }

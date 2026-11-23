@@ -39,7 +39,7 @@ extension LiveMarfaTests {
         private func make(_ copy: WorkingCopy, _ made: LiveMarfa.Made, type: String, _ title: String, status: String? = nil) async throws
             -> ItemID
         {
-            var properties: JSONObject = ["title": .string("MAPPTEST counts \(title)")]
+            var properties: JSONObject = ["title": .string("MARFAMACTEST counts \(title)")]
             if let status { properties["status"] = .string(status) }
             let write = try await copy.items.create(Draft(type: type, properties: properties))
             let id = ItemID(try #require(write.itemId))

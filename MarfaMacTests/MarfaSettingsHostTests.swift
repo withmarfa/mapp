@@ -5,7 +5,7 @@ import Synchronization
 import Testing
 @testable import MarfaMac
 
-/// What MAPP lends the Marfa's pages: how the connection reads, what the sign-in holds, Allow More…, and what closing
+/// What the app lends the Marfa's pages: how the connection reads, what the sign-in holds, Allow More…, and what closing
 /// Settings does with a draft. The sign-in is `ScriptedSignIns`, never the Keychain.
 @Suite(.hangLimit)
 @MainActor struct MarfaSettingsHostTests {
@@ -13,10 +13,10 @@ import Testing
 
     private func connected(
         _ bench: HostBench, settings: InstanceSettingsModel? = nil
-    ) async throws -> (MAPPMarfaSettingsHost, Libraries, FakeMarfaSource) {
+    ) async throws -> (AppSettingsHost, Libraries, FakeMarfaSource) {
         let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
-        let adapter = MAPPMarfaSettingsHost(libraries: libraries, launcher: SettingsLauncher(), instanceSettings: settings)
+        let adapter = AppSettingsHost(libraries: libraries, launcher: SettingsLauncher(), instanceSettings: settings)
         try await libraries.host.connect(address: "http://first.test:8210", key: "k")
         let source = try #require(bench.servers.last)
         source.state.set(.online)
@@ -28,7 +28,7 @@ import Testing
         let bench = try HostBench()
         let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
-        let adapter = MAPPMarfaSettingsHost(libraries: libraries, launcher: SettingsLauncher())
+        let adapter = AppSettingsHost(libraries: libraries, launcher: SettingsLauncher())
         #expect(adapter.connection == .notConnected)
         #expect(adapter.grants.isEmpty)
     }
@@ -166,7 +166,7 @@ import Testing
         bench.signIns.script(browser: [.success("narrower")])
         await libraries.marfaSettings.start(.signInAgain(usingCode: false)).value
         let notice = try #require(libraries.host.notices.waiting.first { $0.title == Words.permissionsLostTitle })
-        #expect(notice.message == "MAPP is no longer allowed to list, make and restore backups. Allow it again from the page that needs it.")
+        #expect(notice.message == "The app is no longer allowed to list, make and restore backups. Allow it again from the page that needs it.")
         #expect(!adapter.grants.contains(.backupsManage))
         #expect(adapter.connection == .connected, "the page that asked is gated again by its missing permission")
     }
@@ -194,9 +194,9 @@ import Testing
         #expect(libraries.host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty)
     }
 
-    @Test func everyPageNamesWhatMAPPMayNotDoThereInItsOwnWords() {
+    @Test func everyPageNamesWhatTheAppMayNotDoThereInItsOwnWords() {
         let pages = MarfaSettingsPage.allCases.filter { $0.permission != nil }
-        for page in pages { #expect(page.permissionLine.hasPrefix("MAPP isn’t allowed to "), "\(page)") }
+        for page in pages { #expect(page.permissionLine.hasPrefix("The app isn’t allowed to "), "\(page)") }
         // Two pages share a line only where they share a permission; here none shares one at all.
         let lines = pages.map(\.permissionLine)
         #expect(Set(lines).count == lines.count)
@@ -267,7 +267,7 @@ import Testing
         let notice = try #require(libraries.host.notices.waiting.last)
         #expect(notice.isNotKept)
         #expect(notice.text == "Name: Renamed on quit")
-        #expect(notice.message.contains("quit MAPP"))
+        #expect(notice.message.contains("quit the app"))
         #expect(!model.hasEdits)
         #expect(libraries.host.notices.waiting.count == before + 1)
         let copied = Mutex<[String]>([])
@@ -372,7 +372,7 @@ import Testing
         let notice = try #require(libraries.host.notices.waiting.dropFirst(before).first)
         #expect(notice.title == "Passkey Not Renamed")
         #expect(notice.text == "Work phone")
-        #expect(notice.message.contains("You quit MAPP before this was saved."))
+        #expect(notice.message.contains("You quit the app before this was saved."))
     }
 
     @Test func quittingHandsBackTheOwnerPagesDrafts() async throws {
@@ -389,7 +389,7 @@ import Testing
         let notice = try #require(libraries.host.notices.waiting.dropFirst(before).first)
         #expect(notice.isNotKept)
         #expect(notice.text == "Name: Importer\nSource: importer")
-        #expect(notice.message.contains("You quit MAPP before this was saved."))
+        #expect(notice.message.contains("You quit the app before this was saved."))
     }
 
     @Test func aWriteTheServerRefusesKeepsWhatWasTypedWithItsReason() async throws {

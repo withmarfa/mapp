@@ -403,7 +403,7 @@ test('the property block reads as label and value pairs, each drawn by its kind'
           { title: 'Ship it', item: 'other', symbol: 'square.stack', kind: 'link', tone: 'blue' },
         ],
       },
-      { id: '#tags', label: 'Tags', symbol: 'tag', kind: 'tags', texts: ['mapp', 'storage'] },
+      { id: '#tags', label: 'Tags', symbol: 'tag', kind: 'tags', texts: ['marfa-mac', 'storage'] },
       { id: 'url', label: 'Url', symbol: 'globe', kind: 'url', text: 'https://example.com/a' },
       { id: 'mail', label: 'Email', symbol: 'envelope', kind: 'email', text: 'a@example.com' },
       { id: 'done', label: 'Done', symbol: 'text.alignleft', kind: 'text', text: 'Yes' },
@@ -422,7 +422,7 @@ test('the property block reads as label and value pairs, each drawn by its kind'
   expect(pairs[0]!.querySelector('dd #ItemStatusPin')).not.toBeNull()
   expect(pairs[1]!.querySelector('dd #ItemParentPin')).not.toBeNull()
   expect([...pairs[3]!.querySelectorAll('.item-chip')].map((chip) => chip.textContent)).toEqual([
-    '#mapp',
+    '#marfa-mac',
     '#storage',
   ])
   expect(pairs[6]!.querySelector('dd')!.textContent).toBe('Yes')

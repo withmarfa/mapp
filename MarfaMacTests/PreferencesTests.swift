@@ -6,7 +6,7 @@ import Testing
 @Suite struct PreferencesTypeTests {
     /// Every Mac is another OAuth client, and only the one that registered the type may replace it.
     @Test func theTypeNeverChangesShape() throws {
-        let fixture = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "Fixtures/app.mapp.preferences.json")
+        let fixture = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "Fixtures/app.marfa-mac.preferences.json")
         let frozen = try JSONSerialization.jsonObject(with: Data(contentsOf: fixture)) as? NSDictionary
         let declared = try JSONSerialization.jsonObject(with: Data(PreferencesType.definition.json().utf8)) as? NSDictionary
         #expect(declared == frozen, "The type cannot change: see withmarfa/marfa#3462. Add a setting as a member of a field or a setting word in a table.")

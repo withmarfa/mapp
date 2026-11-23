@@ -7,7 +7,7 @@ import Testing
 extension LiveMarfaTests {
     /// Changing an item's type on the test instance, as Marfa's rules hold it: properties the new type does not
     /// declare stay, the text is read from the new type's key, and a missing required field is refused. Every item
-    /// made has a title starting `MAPPTEST ` and is purged when the test ends, passed or not.
+    /// made has a title starting `MARFAMACTEST ` and is purged when the test ends, passed or not.
     @MainActor
     @Suite(.serialized)
     struct MarfaTypeChangeLiveTests {
@@ -44,7 +44,7 @@ extension LiveMarfaTests {
         /// A value of the field's kind, for a required field the test fills.
         private static func sample(for field: ItemTypeInfo.Field) -> PropertyValue? {
             switch field.kind {
-            case .text: .string("MAPPTEST value")
+            case .text: .string("MARFAMACTEST value")
             case .number: .number(field.minimum ?? 1)
             case .boolean: .bool(true)
             case .date: .string(Marfa.ItemDate.day(Date()))
@@ -56,7 +56,7 @@ extension LiveMarfaTests {
         private func make(_ type: TypeID, _ title: String, body: String, properties: [String: PropertyValue] = [:],
                           in library: MarfaLibrary, made: LiveMarfa.Made) throws -> ItemID {
             let id = library.createItem(
-                typeID: type.rawValue, title: "MAPPTEST \(title) \(UUID().uuidString.prefix(8).lowercased())", body: body,
+                typeID: type.rawValue, title: "MARFAMACTEST \(title) \(UUID().uuidString.prefix(8).lowercased())", body: body,
                 properties: properties, parentID: nil, in: .allItems, undoManager: nil)
             if let id { made.add(id) }
             return try #require(id)

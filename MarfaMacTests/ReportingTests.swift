@@ -42,7 +42,7 @@ struct ReportingTests {
         #expect(!gate(isTestHost: true).sends)
         #expect(!gate(environment: ["XCODE_RUNNING_FOR_PREVIEWS": "1"]).sends)
         #expect(!gate(arguments: [SampleLibrary.flag]).sends)
-        #expect(!gate(arguments: [SampleLibrary.flag, "-MAPPSampleUnconfigured"]).sends)
+        #expect(!gate(arguments: [SampleLibrary.flag, "-MarfaMacSampleUnconfigured"]).sends)
     }
 
     @Test func theIsolatedHostNeverSendsEvenOnATestServer() {

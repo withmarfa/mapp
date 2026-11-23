@@ -1,6 +1,6 @@
 import Foundation
 
-/// What Connection's "MAPP’s Settings" section says in each state of `PreferencesSync.Standing`, in the app's words.
+/// What Connection's "This App’s Settings" section says in each state of `PreferencesSync.Standing`, in the app's words.
 nonisolated struct ConnectionSettings: Equatable, Sendable {
     nonisolated enum Action: Equatable, Sendable {
         /// Moves the settings out of the Marfa.
@@ -31,8 +31,8 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
         switch standing {
         case .syncing: String(localized: "Every Mac that connects to it uses them.")
         case .off(.needsPermission):
-            String(localized: "MAPP isn’t allowed to keep them in \(name) yet. Once it is, every Mac that connects uses them.")
-        case .off(.notFilled): String(localized: "MAPP keeps them in \(name) once this Mac has finished downloading it.")
+            String(localized: "The app isn’t allowed to keep them in \(name) yet. Once it is, every Mac that connects uses them.")
+        case .off(.notFilled): String(localized: "The app keeps them in \(name) once this Mac has finished downloading it.")
         case .off(.removed): String(localized: "They were removed from \(name). This Mac keeps its own.")
         case .off(.noMarfa): nil
         }
@@ -62,13 +62,13 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
     }
 
     /// The question before Remove… takes the settings out of the Marfa.
-    var removeTitle: String { String(localized: "Remove MAPP’s Settings from \(name)?") }
+    var removeTitle: String { String(localized: "Remove This App’s Settings from \(name)?") }
     var removeMessage: String {
         String(localized: "Every Mac that connects to \(name) loses them. This Mac keeps its own, and your items stay.")
     }
 
     /// The checkbox on Disconnect's alert.
-    var disconnectChoice: String { String(localized: "Also remove MAPP’s settings from \(name)") }
+    var disconnectChoice: String { String(localized: "Also remove this app’s settings from \(name)") }
 
     /// Under the checkbox on the question about changes that wait: removing the settings sends the queue, so it can't go
     /// with discarding what is in it.
@@ -78,7 +78,7 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
 
     /// Where one of the changes that wait is the removal itself, which has no text to show.
     var removalWaiting: String {
-        String(localized: "One of them removes MAPP’s settings from \(name). Discard the copy and the settings stay there.")
+        String(localized: "One of them removes this app’s settings from \(name). Discard the copy and the settings stay there.")
     }
 
     /// Why Disconnect stopped, where the removal could not be made without sending what the person chose to discard.
@@ -88,6 +88,6 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
 
     /// Why Disconnect stopped, where the server did not take the removal.
     var removalNotTaken: String {
-        String(localized: "MAPP couldn’t finish removing them from \(name), so you’re still connected. Disconnect anyway and they may stay there.")
+        String(localized: "The app couldn’t finish removing them from \(name), so you’re still connected. Disconnect anyway and they may stay there.")
     }
 }

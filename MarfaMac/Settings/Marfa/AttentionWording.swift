@@ -1,12 +1,12 @@
 import Foundation
 
-/// How a concern from `GET /attention` is told on the Overview: the server's short title and one plain line MAPP words from the
+/// How a concern from `GET /attention` is told on the Overview: the server's short title and one plain line the app words from the
 /// concern's kind and reference. The server's own description is never shown, since it names settings by key and requests by
-/// path for an operator; a kind MAPP has no wording for shows its title alone.
+/// path for an operator; a kind the app has no wording for shows its title alone.
 nonisolated extension AttentionConcern {
     var shownTitle: String {
         guard kind == .setting else { return title }
-        // The server's own title names the setting by its key, so a setting MAPP has no name for is told without it.
+        // The server's own title names the setting by its key, so a setting the app has no name for is told without it.
         guard let secret = MonitoringSecret.named(key: reference) else { return String(localized: "Set a Secret Again") }
         return String(localized: "Set \(secret.settingTitle) Again")
     }

@@ -2,7 +2,7 @@ import Marfa
 import SwiftUI
 
 /// The Webhooks page: every webhook the server lists for this sign-in, grouped by who made it, each opening a page of its
-/// own with its address, the events it sends, its deliveries and Delete. MAPP's own can be changed and a failed delivery sent
+/// own with its address, the events it sends, its deliveries and Delete. The app's own can be changed and a failed delivery sent
 /// again; another maker's can only be read and deleted. New Webhook… makes one, and shows its signing secret once.
 struct WebhooksPage: View {
     let host: any MarfaSettingsHost
@@ -97,7 +97,7 @@ struct WebhooksPage: View {
         }
     }
 
-    /// Without Manage Keys the list holds MAPP's own only, and says what the others need.
+    /// Without Manage Keys the list holds the app's own only, and says what the others need.
     private var othersNeedKeys: some View {
         SettingsSection(name: nil) {
             OwnerProblemRow(
@@ -184,7 +184,7 @@ private struct WebhookDetail: View {
         .task(id: webhook.id) { await model.loadDeliveries(of: webhook.id) }
     }
 
-    /// A webhook MAPP made: its address, what it is for, Sending and the events can all be changed.
+    /// A webhook the app made: its address, what it is for, Sending and the events can all be changed.
     @ViewBuilder private var settings: some View {
             SettingsSection("Webhook") {
                 SettingsRow(verbatim: String(localized: "Address"), line: webhook.url) {
@@ -231,7 +231,7 @@ private struct WebhookDetail: View {
             }
     }
 
-    /// A webhook another app or key made: MAPP shows what it holds and can end it, and changes nothing, as the server
+    /// A webhook another app or key made: the app shows what it holds and can end it, and changes nothing, as the server
     /// leaves a change to the maker.
     @ViewBuilder private var readOnly: some View {
         SettingsSection(name: Text("Webhook"), line: Text("Only \(model.maker(of: webhook)) can change it. You can end it.")) {

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The day a week starts on in every calendar and date panel MAPP draws, as Settings > General > Dates and Times says. A
+/// The day a week starts on in every calendar and date panel the app draws, as Settings > General > Dates and Times says. A
 /// setting kept as one value in the defaults (`key`), which syncs through the Marfa (`PreferencesMap`).
 nonisolated enum WeekStart {
     static let key = "weekStart"
@@ -25,6 +25,6 @@ nonisolated enum WeekStart {
 }
 
 nonisolated extension Calendar {
-    /// The current calendar with the week starting where Settings says. Every calendar MAPP draws uses it.
-    static var mapp: Calendar { WeekStart.calendar(.current) }
+    /// The current calendar with the week starting where Settings says. Every calendar the app draws uses it.
+    static var chosenWeekStart: Calendar { WeekStart.calendar(.current) }
 }

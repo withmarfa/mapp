@@ -31,7 +31,7 @@ final class PictureRequests: NSObject, WKScriptMessageHandlerWithReply {
     let pictures: WebPictures
     /// Whether the item is in the feed tier (`Item.tier`), the only place Always loads pictures without asking: connectors
     /// write there and captures land there. `Item.source` cannot tell, since Marfa stamps every item with the source of
-    /// the key that wrote it, an item the person wrote in MAPP included.
+    /// the key that wrote it, an item the person wrote in the app included.
     var inFeed: (ItemID) -> Bool = { _ in false }
     /// Changed for each item the page shows, as `EmbeddedFiles.version` is, so an answer to an item since left is dropped.
     var version: () -> Int = { 0 }

@@ -94,7 +94,7 @@ const labels = () => cards().map((card) => card.querySelector('.inkkit-file-labe
 const controls = () => [...document.querySelectorAll('.inkkit-file-open, .inkkit-file-action')]
 const open = (index = 0) => (controls()[index] as HTMLElement).click()
 const settled = () => new Promise((resolve) => setTimeout(resolve, 20))
-const loaded: PictureAnswer = { state: 'loaded', url: 'mapp-embed://picture/?address=x&v=1' }
+const loaded: PictureAnswer = { state: 'loaded', url: 'marfa-embed://picture/?address=x&v=1' }
 const picture = '![A picture](https://example.com/a.png)\n'
 
 test('with Ask, a picture at a web address is a quiet box named by its alt text, and nothing is fetched', async () => {

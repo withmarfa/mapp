@@ -413,7 +413,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             let made = OwnerWebhook(
                 id: "hook-\(state.webhooks.count + 1)", url: webhook.url, events: webhook.events, typeFilter: webhook.typeFilter,
                 secretTail: "8f2c", active: true, created: .now,
-                maker: .init(kind: .app, id: "maker", name: "MAPP"))
+                maker: .init(kind: .app, id: "maker", name: "Marfa for Mac"))
             state.webhooks.append(made)
             return CreatedWebhook(webhook: made, secret: "whsec_3fKq8Vn2Lp7Xr1Tz9Bm4Yc6Wd0Hs5Ja2e7b91c4d60a38f5e1b9c2d7a4f08e63b15d9c0a7e24f")
         }
@@ -1129,7 +1129,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             return
         }
         #expect(held.first?.total == 13)
-        let line = AppDataWording.line(held[0], appName: "Raycast", keptByMAPP: false)
+        let line = AppDataWording.line(held[0], appName: "Raycast", keptByApp: false)
         #expect(line.contains("10 active") && line.contains("1 archived") && line.contains("2 in the trash"))
         #expect(line.hasSuffix("Only Raycast and you can read it."))
         #expect(!line.contains("KB"), "Marfa answers counts, so no size is told")
@@ -1244,7 +1244,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(note.title == "Some Data May Be Left")
         #expect(
             note.line
-                == "1,000 items were removed. MAPP lost the server partway through. Some of it may still be there. MAPP couldn’t read what is left. Remove it again to finish.")
+                == "1,000 items were removed. The app lost the server partway through. Some of it may still be there. The app couldn’t read what is left. Remove it again to finish.")
         #expect(!note.line.contains("Nothing was changed"))
     }
 
@@ -1273,7 +1273,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         model.askToRemoveData(model.apps[0], vendor: "app.raycast")
         await model.confirm(try #require(model.question))
         let note = try #require(model.removalNote(for: model.apps[0]))
-        #expect(note.line == "MAPP can’t reach the server. Nothing was changed. Some of it is still there. Remove it again to finish.")
+        #expect(note.line == "The app can’t reach the server. Nothing was changed. Some of it is still there. Remove it again to finish.")
     }
 
     @Test func aDisconnectRefusedAfterTheDataWentSaysTheDataIsGoneAndTheAppIsStillConnected() async throws {
@@ -1291,7 +1291,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         let note = try #require(model.removalNote(for: model.apps[0]))
         #expect(note.title == "Data Removed, Still Connected")
         #expect(
-            note.line == "1,503 items were removed. Raycast is still connected. MAPP lost the server partway through. Disconnect it again to finish.")
+            note.line == "1,503 items were removed. Raycast is still connected. The app lost the server partway through. Disconnect it again to finish.")
         #expect(bench.calls.calls.filter { $0 == "appData" }.count >= 2, "what is left is read again")
     }
 
@@ -1311,18 +1311,18 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.removalNote(for: model.apps[0]) == nil)
     }
 
-    @Test func mappsOwnSettingsAreNeverRemovedFromHere() async throws {
-        var mapp = app()
-        mapp.vendors = ["app.mapp"]
-        let bench = bench(mapp)
-        bench.calls.state.withLock { $0.appData["app.mapp"] = kept("app.mapp") }
-        let model = AppsModel(context: bench.context, ownVendor: "app.mapp")
+    @Test func theAppsOwnSettingsAreNeverRemovedFromHere() async throws {
+        var own = app()
+        own.vendors = ["app.marfa-mac"]
+        let bench = bench(own)
+        bench.calls.state.withLock { $0.appData["app.marfa-mac"] = kept("app.marfa-mac") }
+        let model = AppsModel(context: bench.context, ownVendor: "app.marfa-mac")
         await model.load()
-        model.askToRemoveData(model.apps[0], vendor: "app.mapp")
+        model.askToRemoveData(model.apps[0], vendor: "app.marfa-mac")
         #expect(model.question == nil)
         model.askToDisconnect(model.apps[0])
-        #expect(model.question?.checkbox == nil, "disconnecting never takes MAPP's settings with it")
-        #expect(AppDataWording.line(kept("app.mapp"), appName: "MAPP", keptByMAPP: true).contains("Remove them in Connection"))
+        #expect(model.question?.checkbox == nil, "disconnecting never takes this app's settings with it")
+        #expect(AppDataWording.line(kept("app.marfa-mac"), appName: "Marfa for Mac", keptByApp: true).contains("Remove them in Connection"))
     }
 
     @Test func aRefusalForWantOfAPermissionNamesItAndReadsTheGrantsAgain() async throws {
@@ -1670,7 +1670,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     private static let day: TimeInterval = 86_400
 
-    @Test func aKeyOffersOnlyDaysLaterThanItsOwnEndAndNeverWhereMAPPsSignInDoesNotEnd() async {
+    @Test func aKeyOffersOnlyDaysLaterThanItsOwnEndAndNeverWhereTheAppsSignInDoesNotEnd() async {
         let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
         let model = KeysModel(context: bench.context)
         await model.load()
@@ -1680,7 +1680,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.extensions(of: model.keys[0]).isEmpty, "a key that never ends has nothing to extend")
     }
 
-    @Test func whenMAPPsOwnSignInEndCantBeReadNothingIsOfferedNotNeverAndNotPastIt() async {
+    @Test func whenTheAppsOwnSignInEndCantBeReadNothingIsOfferedNotNeverAndNotPastIt() async {
         let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
         bench.calls.fail("identity", with: .unreachable)
         let model = KeysModel(context: bench.context)
@@ -1696,7 +1696,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.extensions(of: model.keys[0]) == [.days(30), .days(90), .days(365), .never])
     }
 
-    @Test func aKeyIsHeldToTheEndOfTheKeyMAPPIsSignedInWith() async {
+    @Test func aKeyIsHeldToTheEndOfTheKeyTheAppIsSignedInWith() async {
         let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
         bench.calls.state.withLock {
             $0.identity = OwnIdentity(keyID: "me", expires: .now.addingTimeInterval(Self.day * 100))
@@ -1750,14 +1750,14 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         bench.calls.fail("change", with: .notPermitted("keys.manage"))
         await model.extend()
         #expect(model.sheet == .extend("k1") && model.extensionChoice == .days(365))
-        #expect(model.extendError == "MAPP isn’t allowed to give a key more time.")
-        #expect(bench.refreshed == 1, "the server's answer wins over what MAPP thinks it holds")
+        #expect(model.extendError == "The app isn’t allowed to give a key more time.")
+        #expect(bench.refreshed == 1, "the server's answer wins over what the app thinks it holds")
         bench.calls.fail("change", with: .notPermitted(nil))
         await model.extend()
-        #expect(model.extendError == "Choose a date before MAPP’s sign-in ends.")
+        #expect(model.extendError == "Choose a date before the app’s sign-in ends.")
         bench.calls.fail("change", with: .unreachable)
         await model.extend()
-        #expect(model.extendError == "MAPP can’t reach the server. Nothing was changed.")
+        #expect(model.extendError == "The app can’t reach the server. Nothing was changed.")
         #expect(model.sheet == .extend("k1"))
         bench.calls.fail("change", with: nil)
         await model.extend()
@@ -1830,7 +1830,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.keys[0].tier == .feed)
     }
 
-    @Test func aNewKeyOffersOnlyThePermissionsMAPPHolds() {
+    @Test func aNewKeyOffersOnlyThePermissionsTheAppHolds() {
         let bench = OwnerBench(grants: [.keysMint, .keysManage, .itemsPurge])
         #expect(KeysModel(context: bench.context).givablePermissions == ["items.purge", "keys.manage", "keys.mint"])
     }
@@ -2196,7 +2196,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         for scope in [nil] + InstancePermission.allCases.map(\.rawValue) + ["odd.scope"] {
             #expect(!OwnerWording.permissionLine(scope).contains("Allow More"), "\(scope ?? "none")")
         }
-        #expect(OwnerWording.line(.notPermitted(nil)) == "MAPP isn’t allowed to do this.")
+        #expect(OwnerWording.line(.notPermitted(nil)) == "The app isn’t allowed to do this.")
     }
 
     @Test func aProblemRowOffersAllowMoreForARefusalForWantOfAPermissionAndTryAgainForTheRest() {

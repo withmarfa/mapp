@@ -39,7 +39,7 @@ nonisolated enum CardPicture {
         else { .other }
     }
 
-    /// The places an item's picture may come from, in the order they are tried. Empty when MAPP has none to make: an
+    /// The places an item's picture may come from, in the order they are tried. Empty when the app has none to make: an
     /// item with only a web address for a picture (`image_url`) is one, since a picture at a web address loads only when
     /// the person asks, never for a card. `attachments` are the items attached to it, in any state.
     static func sources(of item: Item, attachments: [Item]) -> [Source] {

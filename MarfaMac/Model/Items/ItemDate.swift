@@ -2,7 +2,7 @@ import Foundation
 import Marfa
 
 /// How a date the package reads (`Marfa.ItemDate`) is shown. The package reads and writes the contract's forms
-/// (`types/datetime-value`), so MAPP never parses a date itself and every view that reads or writes one goes through
+/// (`types/datetime-value`), so the app never parses a date itself and every view that reads or writes one goes through
 /// the package.
 nonisolated extension ItemDate {
     /// The value as a person reads it, in their locale and time zone and the format they chose: "27 Oct 2026 at

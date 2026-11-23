@@ -21,7 +21,7 @@ struct MarfaPageGate<Content: View>: View {
         case .signedOut:
             SettingsPageState(
                 symbol: "person.crop.circle.badge.exclamationmark", title: Text("Signed Out"),
-                line: Text("\(host.serverName) ended MAPP’s sign-in. Sign in again in Connection."),
+                line: Text("\(host.serverName) ended the app’s sign-in. Sign in again in Connection."),
                 action: ("Open Connection…", { host.showConnection() }))
         case .notAnswering(let lastAnswered):
             SettingsPageState(
@@ -43,12 +43,12 @@ struct MarfaPageGate<Content: View>: View {
     static func notAnswering(
         _ lastAnswered: Date?, now: Date = .now, calendar: Calendar = .current, format: DateFormat = .stored()
     ) -> String {
-        guard let lastAnswered else { return String(localized: "MAPP keeps trying.") }
+        guard let lastAnswered else { return String(localized: "The app keeps trying.") }
         let time = DateDisplay.timeOfDay(of: lastAnswered, format: format, calendar: calendar)
         let when = calendar.isDate(lastAnswered, inSameDayAs: now)
             ? String(localized: "today, \(time)")
             : DateDisplay.text(of: lastAnswered, place: .value, format: format, now: now, calendar: calendar)
-        return String(localized: "Last answered \(when). MAPP keeps trying.")
+        return String(localized: "Last answered \(when). The app keeps trying.")
     }
 }
 

@@ -2,7 +2,7 @@ import Foundation
 
 /// Which of its two looks a source's HTML is shown in, where it has an article to read.
 nonisolated enum SourceViewMode: String, CaseIterable, Identifiable, Sendable {
-    /// The article in MAPP's own text styles and column, without the source's styling or its artifacts.
+    /// The article in the app's own text styles and column, without the source's styling or its artifacts.
     case reader
     /// The source's own page, as it was written.
     case original
@@ -71,7 +71,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
     /// The baseline for a document that says nothing about its look. Rules in a layer lose to any the document writes.
     var plain: String {
         """
-        @layer mapp {
+        @layer marfa {
           :root { color-scheme: light dark; }
           html { box-sizing: border-box; margin: 0; padding: 16px \(inset) 48px; }
           body { margin: 0; font: \(textSize)px/1.6 -apple-system, system-ui, sans-serif; color: CanvasText; overflow-wrap: break-word; }
@@ -82,7 +82,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
         """
     }
 
-    private static let mailRules = "[data-mapp-mail] { margin-left: auto; margin-right: auto; float: none; }"
+    private static let mailRules = "[data-marfa-mail] { margin-left: auto; margin-right: auto; float: none; }"
 
     /// The board's prose: New York at 14.6 for every 13 of the page's text, a 1.65 line, headings in the same serif.
     private var readerRules: String {
@@ -102,15 +102,15 @@ nonisolated struct SourceLook: Equatable, Sendable {
             img, video, svg { display: block; max-width: 100%; height: auto; margin: 0.8em 0; border-radius: 6px; }
             figure { margin: 0 0 0.75em; }
             figcaption { margin-top: 8px; color: GrayText; font: 0.79em/1.4 -apple-system, system-ui, sans-serif; }
-            .mapp-lead { display: block; margin: 0 0 1.5em; }
-            figure.mapp-lead img, img.mapp-lead { width: 100%; margin: 0; border-radius: 12px; }
+            .marfa-lead { display: block; margin: 0 0 1.5em; }
+            figure.marfa-lead img, img.marfa-lead { width: 100%; margin: 0; border-radius: 12px; }
             blockquote { margin-inline: 0; padding-inline-start: 1em; border-inline-start: 3px solid color-mix(in srgb, CanvasText 20%, transparent); color: GrayText; }
             pre, code { font: 0.77em ui-monospace, Menlo, monospace; }
             pre { padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, CanvasText 7%, transparent); white-space: pre-wrap; }
             :not(pre) > code { padding: 1px 4px; border-radius: 4px; background: color-mix(in srgb, CanvasText 7%, transparent); }
-            table.mapp-data { display: block; overflow-x: auto; border-collapse: collapse; font-size: 0.86em; }
-            .mapp-data th, .mapp-data td { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); padding: 7px 12px; text-align: start; vertical-align: top; }
-            table:not(.mapp-data), table:not(.mapp-data) :is(thead, tbody, tfoot, tr, th, td) { display: block; width: auto; max-width: 100%; padding: 0; }
+            table.marfa-data { display: block; overflow-x: auto; border-collapse: collapse; font-size: 0.86em; }
+            .marfa-data th, .marfa-data td { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); padding: 7px 12px; text-align: start; vertical-align: top; }
+            table:not(.marfa-data), table:not(.marfa-data) :is(thead, tbody, tfoot, tr, th, td) { display: block; width: auto; max-width: 100%; padding: 0; }
             hr { border: 0; border-top: 1px solid color-mix(in srgb, CanvasText 18%, transparent); margin: 2em 0; }
             """
     }
@@ -166,7 +166,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
               return Array.from(held).sort((a, b) => b[1] - a[1])[0]?.[0] ?? getComputedStyle(column).color;
             };
             for (const column of mailColumns(dom.body(document))) {
-              dom.setAttribute(column, 'data-mapp-mail', '');
+              dom.setAttribute(column, 'data-marfa-mail', '');
               let painted = false;
               for (let e = column; e && !painted; e = dom.parentElement(e)) painted = paints(e);
               if (!painted && luminance(textColor(column)) < 0.5) {

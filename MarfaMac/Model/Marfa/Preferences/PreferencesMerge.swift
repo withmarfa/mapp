@@ -58,7 +58,7 @@ nonisolated enum PreferencesMerge {
         return outcome
     }
 
-    /// The settings of the item MAPP uses, with what it lacks filled from the others, in the order they were made.
+    /// The settings of the item the app uses, with what it lacks filled from the others, in the order they were made.
     static func filling(_ first: PreferenceUnits, from others: [PreferenceUnits]) -> PreferenceUnits {
         others.reduce(into: first) { held, other in held.merge(other) { kept, _ in kept } }
     }

@@ -66,7 +66,7 @@ struct IndexTools: View {
     ) -> some View {
         Button(title, systemImage: image, action: action)
             .labelStyle(.iconOnly)
-            .mappButton(isOn ? .secondary : .plain, icon: true)
+            .appButton(isOn ? .secondary : .plain, icon: true)
             .help(title)
             .accessibilityAddTraits(isOn ? .isSelected : [])
             .accessibilityIdentifier(id)

@@ -69,8 +69,8 @@ nonisolated enum MarfaMapping {
     static let positionProperty = "position"
 
     /// Marfa keeps what apps share, such as saved views, as `system.*` rows, and what one app keeps for itself, such as
-    /// MAPP's own settings, as `app.*` rows; neither is an item of the library. The copy holds `system.view` so the
-    /// sidebar can list the views, and `app.mapp.preferences` for `PreferencesSync` (`MarfaSync.slice`).
+    /// the app's own settings, as `app.*` rows; neither is an item of the library. The copy holds `system.view` so the
+    /// sidebar can list the views, and `app.marfa-mac.preferences` for `PreferencesSync` (`MarfaSync.slice`).
     static func isLibraryItem(_ row: Marfa.Item) -> Bool { !TypeID.isHidden(row.type) }
 
     /// A view still in use, as the sidebar lists it.
@@ -161,17 +161,17 @@ nonisolated enum MarfaMapping {
             return ViewWriteFailure(kind: .refused, message: Words.syncFailed)
         }
         if error.isOffline {
-            return ViewWriteFailure(kind: .offline, message: String(localized: "MAPP can’t reach your Marfa server, so nothing was saved. Try again when it’s back."))
+            return ViewWriteFailure(kind: .offline, message: String(localized: "The app can’t reach your Marfa server, so nothing was saved. Try again when it’s back."))
         }
         switch error {
         case .noServer:
-            return ViewWriteFailure(kind: .offline, message: String(localized: "MAPP can’t reach your Marfa server, so nothing was saved. Try again when it’s back."))
+            return ViewWriteFailure(kind: .offline, message: String(localized: "The app can’t reach your Marfa server, so nothing was saved. Try again when it’s back."))
         case .versionConflict:
             return ViewWriteFailure(kind: .conflict, message: String(localized: "This view was changed elsewhere since this window read it, so nothing was saved. The window now shows the view as it is; make your changes again."))
         case .notFound:
             return ViewWriteFailure(kind: .gone, message: String(localized: "Your Marfa server no longer has this view."))
         case .forbidden:
-            return ViewWriteFailure(kind: .notPermitted, message: String(localized: "MAPP’s sign-in can’t change views on your Marfa server."))
+            return ViewWriteFailure(kind: .notPermitted, message: String(localized: "The app’s sign-in can’t change views on your Marfa server."))
         case .validation(_, let message, _, _):
             return ViewWriteFailure(kind: .refused, message: message)
         default:
@@ -560,7 +560,7 @@ nonisolated enum MarfaMapping {
         case .accepted: .accepted
         case .merged(let fields): .merged(fields: fields)
         case .conflicted(let sibling?, let fields, _): .conflicted(sibling: ItemID(sibling), fields: fields)
-        // An item conflict always names the copy it wrote; one that names none is a table row's, which MAPP never writes.
+        // An item conflict always names the copy it wrote; one that names none is a table row's, which the app never writes.
         case .conflicted(nil, let fields, _): .merged(fields: fields)
         case .refused(let refusal): .refused(problem(refusal, afterRefusal: afterRefusal))
         case .blocked(let reason, let refusal): .blocked(blockedReason(reason), refusal.map { problem($0) })

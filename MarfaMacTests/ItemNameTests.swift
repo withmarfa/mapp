@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import MarfaMac
 
-/// The core names an item (`Item.name`), which is not always what MAPP stores as its title: an item with no title
-/// is named by its first line. Wherever MAPP names an item to the person it uses the core's name, and the stored
+/// The core names an item (`Item.name`), which is not always what the app stores as its title: an item with no title
+/// is named by its first line. Wherever the app names an item to the person it uses the core's name, and the stored
 /// title stays what the page edits.
 @MainActor
 @Suite(.hangLimit) struct ItemNameTests {

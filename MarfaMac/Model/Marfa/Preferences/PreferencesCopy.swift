@@ -1,11 +1,11 @@
 import Foundation
 import Marfa
 
-/// An `app.mapp.preferences` item as the copy holds it.
+/// An `app.marfa-mac.preferences` item as the copy holds it.
 nonisolated struct PreferencesItem: Equatable, Sendable {
     let id: String
     let version: Int64
-    /// When the server made it, which picks the item MAPP uses where two Macs made one at once.
+    /// When the server made it, which picks the item the app uses where two Macs made one at once.
     let createdAt: String
     /// Whether the server made it from a write that lost a conflict (`conflicted-copy`).
     let isConflictedCopy: Bool

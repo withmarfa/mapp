@@ -5,7 +5,7 @@ nonisolated enum LinkedFromPlace: String, Codable, Sendable {
     case page, inspector
 }
 
-/// Where an item's properties show, for each type: MAPP's own setting, kept as one value in the defaults and synced
+/// Where an item's properties show, for each type: the app's own setting, kept as one value in the defaults and synced
 /// through the Marfa (`PreferencesMap`). The inspector always lists every property of an item. This says which of them
 /// the page shows too, which are pinned under its title (at most four, in order), and where Linked From goes. A type the
 /// person has never customized has no entry and follows the defaults in `PagePlacement`.

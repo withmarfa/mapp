@@ -385,7 +385,7 @@ struct MainView: View {
             editor.append(attached.embeds, to: attached.id)
         }
         #if DEBUG
-        // A sample launch can open an item without a click, as `-MAPPSelectItem <id>`, once the library holds it.
+        // A sample launch can open an item without a click, as `-MarfaMacSelectItem <id>`, once the library holds it.
         .onChange(of: launchSelection.map { library.item($0) != nil }, initial: true) {
             if let id = launchSelection, library.item(id) != nil { browser.selection = [id] }
         }
@@ -405,7 +405,7 @@ struct MainView: View {
     #if DEBUG
     private var launchSelection: ItemID? {
         let arguments = ProcessInfo.processInfo.arguments
-        guard SampleLibrary.isRequested, let flag = arguments.firstIndex(of: "-MAPPSelectItem"),
+        guard SampleLibrary.isRequested, let flag = arguments.firstIndex(of: "-MarfaMacSelectItem"),
               arguments.indices.contains(flag + 1) else { return nil }
         return ItemID(arguments[flag + 1])
     }

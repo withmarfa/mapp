@@ -337,7 +337,7 @@ final class SpeedMeasureTests: XCTestCase {
     }
 
     private func makeApp(keepingCopy: Bool) -> XCUIApplication {
-        let app = XCUIApplication.sample(flags: keepingCopy ? ["-MAPPKeepTestStore"] : [])
+        let app = XCUIApplication.sample(flags: keepingCopy ? ["-MarfaMacKeepTestStore"] : [])
         app.launchEnvironment["MARFA_MAC_TEST_MARFA_URL"] = address
         app.launchEnvironment["MARFA_MAC_TEST_MARFA_KEY"] = key
         return app

@@ -37,11 +37,11 @@ extension SettingsRenderTests {
             return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
         }
         let rows: [(Date, String?, String, String?)] = [
-            (at(0, 4, 22), "MAPP on MacBook Pro", "type.replace", "81.2.69.160"),
+            (at(0, 4, 22), "The app on MacBook Pro", "type.replace", "81.2.69.160"),
             (at(0, 4, 0), "Marfa", "backup_folder.adopt", nil),
             (at(0, 3, 41), "Raycast", "auth.scopes.narrowed", "81.2.69.160"),
             (at(0, 2, 5), "Backup script", "key.update", "100.84.12.7"),
-            (at(0, 1, 40), "MAPP on MacBook Pro", "webhook.create", "81.2.69.160"),
+            (at(0, 1, 40), "The app on MacBook Pro", "webhook.create", "81.2.69.160"),
             (at(0, 1, 12), "Lisbon zine importer", "items.bulk", "100.84.12.7"),
             (at(0, 0, 30), "Mira Castell", "auth.sign_in.success", "81.2.69.160"),
             (at(1, 18, 20), "Mira Castell", "owner.password.changed", "81.2.69.160"),
@@ -49,7 +49,7 @@ extension SettingsRenderTests {
             (at(1, 8, 0), "Raycast", "auth.grant.created", "81.2.69.160"),
             (at(3, 14, 0), "Marfa", "instance.update.started", nil),
             (at(4, 17, 0), "GitHub connector", "connector.register", "100.84.12.7"),
-            (at(5, 11, 0), "MAPP on MacBook Pro", "key.create", "81.2.69.160"),
+            (at(5, 11, 0), "The app on MacBook Pro", "key.create", "81.2.69.160"),
             (at(6, 3, 0), "Marfa", "backup_folder.adopt", nil),
         ]
         return rows.enumerated().map { index, row in

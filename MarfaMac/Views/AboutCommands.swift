@@ -1,12 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// MAPP > About MAPP: the standard About panel, with what the About page of Settings used to say, as its credits: what
+/// Marfa > About Marfa: the standard About panel, with what the About page of Settings used to say, as its credits: what
 /// the app is, and where to find the project, Marfa's documentation and the license.
 struct AboutCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
-            Button("About MAPP") {
+            Button("About Marfa") {
                 NSApp.activate()
                 NSApp.orderFrontStandardAboutPanel(options: [.credits: Self.credits])
             }
@@ -21,7 +21,7 @@ struct AboutCommands: Commands {
         paragraph.alignment = .center
         credits.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: credits.length))
         let links: [(String, URL)] = [
-            ("github.com/withmarfa/mapp", AppLinks.source), ("docs.marfa.so", AppLinks.marfaDocumentation),
+            ("github.com/withmarfa/marfa-mac", AppLinks.source), ("docs.marfa.so", AppLinks.marfaDocumentation),
             (String(localized: "Apache-2.0"), AppLinks.license),
         ]
         for (index, link) in links.enumerated() {

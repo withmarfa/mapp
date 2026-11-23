@@ -147,7 +147,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
                 record("common.ticket", "Ticket", parent: "core.task", origin: .plugin, words: [word("backlog", "not_started")]),
                 record("user.job", "Job", parent: "core.task", plural: "Jobs", words: [word("waiting", "not_started")]),
                 record("user.rework", "Rework", parent: "user.job"),
-                record("app.mapp.preferences", "MAPP Settings"),
+                record("app.marfa-mac.preferences", "Marfa for Mac Settings"),
             ]
         }
         return calls
@@ -159,7 +159,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.yours.map(\.id) == ["user.job", "user.rework"])
         #expect(model.fromPlugins.map(\.id) == ["common.ticket"])
         #expect(model.builtIn.map(\.id) == ["core.task"])
-        #expect(model.record("app.mapp.preferences") == nil)
+        #expect(model.record("app.marfa-mac.preferences") == nil)
     }
 
     @Test func aTypesCountIsItsOwnItemsAndThoseBelowIt() async {

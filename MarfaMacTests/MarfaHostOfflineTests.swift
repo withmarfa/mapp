@@ -25,7 +25,7 @@ struct MarfaHostOfflineTests {
         try await host.connect(address: address, key: "unused")
         #expect(await eventually { host.report.queueRead })
         let source = try #require(host.source)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST kept", body: "Waiting")), as: WriteID())
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST kept", body: "Waiting")), as: WriteID())
         #expect(await eventually { host.report.waiting == 1 })
         #expect(host.report.oldestWaiting != nil)
 
@@ -41,7 +41,7 @@ struct MarfaHostOfflineTests {
         try await host.connect(address: address, key: "unused")
         #expect(await eventually { host.report.waiting == 1 })
         let log = ChangeLog(try #require(host.source as? MarfaSource))
-        #expect(await log.wait { $0.item(titled: "MAPPTEST kept")?.sync == .waiting(writes: 1) } != nil)
+        #expect(await log.wait { $0.item(titled: "MARFAMACTEST kept")?.sync == .waiting(writes: 1) } != nil)
 
         try await discardEverything(host)
         #expect(!bench.hasCopy(connection))
@@ -71,7 +71,7 @@ struct MarfaHostOfflineTests {
         try await host.connect(address: address, key: "unused")
         #expect(await eventually { host.report.queueRead })
         let source = try #require(host.source)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST last", body: "Just typed")), as: WriteID())
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST last", body: "Just typed")), as: WriteID())
         do {
             try await host.disconnect()
             Issue.record("left a copy with a write waiting")
@@ -93,7 +93,7 @@ struct MarfaHostOfflineTests {
         try await host.connect(address: address, key: "unused")
         #expect(await eventually { host.report.queueRead })
         let source = try #require(host.source)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST shown", body: "One")), as: WriteID())
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST shown", body: "One")), as: WriteID())
         var shown: MarfaHost.Problem?
         do {
             try await host.disconnect()
@@ -101,7 +101,7 @@ struct MarfaHostOfflineTests {
             shown = error
         }
         #expect(shown != nil)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST late", body: "Two")), as: WriteID())
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST late", body: "Two")), as: WriteID())
         do {
             try await host.disconnect(Self.discard(after: shown))
             Issue.record("discarded a write made after the person was asked")
@@ -122,7 +122,7 @@ struct MarfaHostOfflineTests {
         try await host.connect(address: address, key: "unused")
         #expect(await eventually { host.report.queueRead })
         let source = try #require(host.source)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST shown", body: "One")), as: WriteID())
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST shown", body: "One")), as: WriteID())
         var shown: MarfaHost.Problem?
         do {
             try await host.changeAddress(to: other, key: "unused")
@@ -130,7 +130,7 @@ struct MarfaHostOfflineTests {
             shown = error
         }
         #expect(shown != nil)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST late", body: "Two")), as: WriteID())
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST late", body: "Two")), as: WriteID())
         do {
             try await host.changeAddress(to: other, key: "unused", choice: Self.discard(after: shown))
             Issue.record("discarded a write made after the person was asked")

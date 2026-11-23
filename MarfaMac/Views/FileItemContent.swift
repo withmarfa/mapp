@@ -61,7 +61,7 @@ struct FileItemContent: View {
                 Text(title).interfaceFont(.headline).lineLimit(1)
                 Spacer()
                 Button("Open", systemImage: "arrow.up.forward.app") { NSWorkspace.shared.open(url) }
-                    .mappButton(.secondary)
+                    .appButton(.secondary)
             }
             .padding()
             switch FileViewKind.of(type) {

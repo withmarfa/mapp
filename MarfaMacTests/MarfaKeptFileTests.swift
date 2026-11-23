@@ -4,7 +4,7 @@ import Testing
 
 @Suite(.hangLimit) struct MarfaKeptFileTests {
     let folder: TemporaryFolder
-    var kept: URL { folder.url.appending(path: "MAPP Files", directoryHint: .isDirectory) }
+    var kept: URL { folder.url.appending(path: "Marfa Files", directoryHint: .isDirectory) }
 
     init() throws {
         folder = try TemporaryFolder()

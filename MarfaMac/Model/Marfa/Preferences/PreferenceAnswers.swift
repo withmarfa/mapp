@@ -2,7 +2,7 @@ import Foundation
 import Marfa
 import Synchronization
 
-/// What the server answered a write to MAPP's settings item.
+/// What the server answered a write to this app's settings item.
 nonisolated enum PreferenceAnswer: Equatable, Sendable {
     /// The item took the write (accepted, or merged over changes made since).
     case taken

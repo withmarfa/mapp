@@ -4,7 +4,7 @@ import Synchronization
 
 /// The pictures fetched for items, kept on this Mac so a picture shows again without a request or a question.
 ///
-/// They live in the system's caches folder, in a folder of MAPP's own named for the bundle identifier, so a Debug and
+/// They live in the system's caches folder, in a folder of the app's own named for the bundle identifier, so a Debug and
 /// a Release build never share them and the system may clear them. Each picture is in a folder named for a hash of
 /// its address. When the pictures together pass `limit`, the least recently used go first.
 actor PictureCache {

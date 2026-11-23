@@ -214,7 +214,7 @@ struct ValueEditContent: View {
                     Button("Use Current Value") { model.useCurrentValue() }
                         .accessibilityIdentifier("ValueEditUseCurrent")
                 }
-                .mappButton(.secondary, size: .small)
+                .appButton(.secondary, size: .small)
                 .padding(.horizontal, 8 * scale)
                 .padding(.bottom, 2 * scale)
             }

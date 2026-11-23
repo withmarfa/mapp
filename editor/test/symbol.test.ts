@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { showSymbolButton } from '../src/symbol'
 
-const xmark = { url: 'mapp-icon://xmark', width: 9, height: 9 }
+const xmark = { url: 'marfa-mac-icon://xmark', width: 9, height: 9 }
 
 function closeButton() {
   const button = document.createElement('button')

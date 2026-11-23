@@ -55,7 +55,7 @@ final class EditorTypingTests: XCTestCase {
     }
 
     func testLinkToItemAsksWhichItemAndWritesTheLink() throws {
-        try XCTSkipIf(true, "Sample library rejects [[…]] writes without link binding; fixture gap: https://github.com/withmarfa/mapp/issues/209")
+        try XCTSkipIf(true, "Sample library rejects [[…]] writes without link binding; fixture gap: https://github.com/withmarfa/marfa-mac/issues/209")
         app.typeText("/link")
         XCTAssertTrue(menuRow("Link to Item").waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
@@ -84,7 +84,7 @@ final class EditorTypingTests: XCTestCase {
     }
 
     func testDoubleBracketsOfferTheLibrarysItems() throws {
-        try XCTSkipIf(true, "Sample library rejects [[…]] writes without link binding; fixture gap: https://github.com/withmarfa/mapp/issues/209")
+        try XCTSkipIf(true, "Sample library rejects [[…]] writes without link binding; fixture gap: https://github.com/withmarfa/marfa-mac/issues/209")
         app.typeText("See [[bike")
         XCTAssertTrue(menuRow("Bike service").waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])

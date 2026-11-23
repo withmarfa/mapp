@@ -15,7 +15,7 @@ nonisolated protocol SignIns: Sendable {
 
     /// Signs in through the system's web authentication session, which shows the server's own pages over the
     /// window in front. The sign-in is kept before this returns, in place of any kept before. `permissions` are asked
-    /// for besides the scopes MAPP always asks; the owner may approve fewer.
+    /// for besides the scopes the app always asks; the owner may approve fewer.
     @MainActor func signInWithBrowser(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> SignedIn
 
     /// The permissions the sign-in kept for `connection` holds: nil where none is kept or it has ended, and a throw
@@ -23,7 +23,7 @@ nonisolated protocol SignIns: Sendable {
     func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>?
 
     /// Whether the sign-in kept for `connection` may read the owner's name (`SystemSignIns.profileScopes`): nil where none
-    /// is kept or it has ended, and a throw where one is kept and cannot be read. A sign-in made before MAPP asked for it
+    /// is kept or it has ended, and a throw where one is kept and cannot be read. A sign-in made before the app asked for it
     /// does not, until the owner allows more or signs in again.
     func readsProfile(for connection: MarfaConnection) throws -> Bool?
 
@@ -57,7 +57,7 @@ nonisolated struct CodeSignIn: Sendable {
 
 /// What a finished sign-in left behind that the person may need to act on.
 nonisolated struct SignedIn: Hashable, Sendable {
-    /// MAPP could not confirm that the server ended the approval this sign-in replaced, which only its owner can end
+    /// the app could not confirm that the server ended the approval this sign-in replaced, which only its owner can end
     /// there.
     var replacedApprovalStands = false
 
@@ -84,7 +84,7 @@ extension Credential: ReplacedGrant {}
 nonisolated enum SignInOutcome: Hashable, Sendable {
     /// The person closed the browser or stopped waiting for the code.
     case canceled
-    /// The person declined to approve MAPP on the server.
+    /// The person declined to approve the app on the server.
     case denied
     /// The code stopped working before the person approved it.
     case expired
@@ -94,7 +94,7 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
     case unreachable
     /// The sign-in did not finish and the package could not say why: the server or the browser did not answer.
     case couldNotFinish
-    /// The address answered, but not as a Marfa server MAPP can sign in to: not Marfa's answer, or a plain HTTP status.
+    /// The address answered, but not as a Marfa server the app can sign in to: not Marfa's answer, or a plain HTTP status.
     case notMarfa
     /// The approval that came back was not for this sign-in or not from this server, so it was not used.
     case notVerified
@@ -103,13 +103,13 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
     case inUse
     /// The Keychain would not keep or give the sign-in.
     case keychain
-    /// MAPP had no window to show the server's page over.
+    /// the app had no window to show the server's page over.
     case noWindow
     /// Anything else that stopped the sign-in.
     case failed
 
     /// The package words a reply that was no OAuth error, such as a page or a proxy's answer, as `http_<status>`: the
-    /// address is not a Marfa server MAPP can sign in to. A code the server's own OAuth error gave is a refusal.
+    /// address is not a Marfa server the app can sign in to. A code the server's own OAuth error gave is a refusal.
     private static func isHTTPStatus(_ code: String) -> Bool {
         guard code.hasPrefix("http_") else { return false }
         let status = code.dropFirst("http_".count)
@@ -164,14 +164,14 @@ extension Keychain.Failure: KeychainRefusal {}
 /// The package's sign-in, kept in the Keychain under a service of the app's own, so a Debug build never reads or
 /// replaces the installed app's sign-ins.
 nonisolated struct SystemSignIns: SignIns {
-    /// The name MAPP signs in under, which the server shows for what MAPP makes, such as a webhook.
-    static let clientName = "MAPP"
+    /// The name the app signs in under, which the server shows for what the app makes, such as a webhook.
+    static let clientName = "Marfa for Mac"
 
     /// What the app asks the owner to approve: every item to read and write, and every edge (relationships, links
     /// and attachments), which the server grants apart from items (`edge.*`). With them the three permissions its
     /// features use: Permanently Delete (`items.purge`), This Marfa (`config.manage`) and a type's icon
     /// (`schema.write`), and the read of the owner's own name for Signed In As, which `GET /profile` gives a credential
-    /// only with its profile read scope. That read is no owner permission. MAPP's own settings (`PreferencesType`) need
+    /// only with its profile read scope. That read is no owner permission. The app's own settings (`PreferencesType`) need
     /// the scope that names its vendor, which `*:write` never reaches, and registering the type where the Marfa holds
     /// none (`metadata.types:write`); the server drops the vendor's scope while no type sits under it. The owner may
     /// approve less, and what is missing is told where it is needed.

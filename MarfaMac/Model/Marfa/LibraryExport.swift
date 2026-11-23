@@ -52,7 +52,7 @@ nonisolated enum LibraryExport {
         let final = folder.appending(path: name)
         let partial = folder.appending(path: name + ".partial")
         guard manager.createFile(atPath: partial.path, contents: nil), let handle = try? FileHandle(forWritingTo: partial) else {
-            throw Failure(message: String(localized: "Couldn’t export. MAPP can’t write to that folder."))
+            throw Failure(message: String(localized: "Couldn’t export. The app can’t write to that folder."))
         }
         do {
             try await source.stream { try handle.write(contentsOf: $0) }
@@ -69,7 +69,7 @@ nonisolated enum LibraryExport {
     /// The line for an error: the server's state, or the folder's.
     static func failure(_ error: any Error, serverName: String) -> Failure {
         if error is CocoaError || (error as NSError).domain == NSPOSIXErrorDomain {
-            return Failure(message: String(localized: "Couldn’t export. MAPP couldn’t write to that folder."))
+            return Failure(message: String(localized: "Couldn’t export. The app couldn’t write to that folder."))
         }
         let underlying = (error as? ClientError)?.underlyingError ?? error
         let ending = (error as? MarfaServerCalls.Ending)
@@ -80,7 +80,7 @@ nonisolated enum LibraryExport {
         case .keyRefused:
             return Failure(message: String(localized: "Couldn’t export. Sign in again in Connection first."))
         case .notPermitted:
-            return Failure(message: String(localized: "Couldn’t export. MAPP isn’t allowed to export \(serverName)."))
+            return Failure(message: String(localized: "Couldn’t export. The app isn’t allowed to export \(serverName)."))
         case .notFound, .instanceChanged, .refused, .failed:
             return Failure(message: String(localized: "Couldn’t export. \(serverName) didn’t send the archive."))
         }

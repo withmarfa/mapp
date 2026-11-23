@@ -246,7 +246,7 @@ private actor FillServer: MarfaRefreshing {
         }
     }
 
-    /// The package reports the return of the server as a connection; MAPP sends what waited and asks again for the files.
+    /// The package reports the return of the server as a connection; the app sends what waited and asks again for the files.
     private func reconnect(_ fake: FakeCopy, _ told: Told) async throws {
         let target = told.count.withLock { $0 } + 2
         fake.sendUpdate(CopyUpdate(reread: .parts(Reread.Parts()), connection: .offline(.network(message: "offline"))))

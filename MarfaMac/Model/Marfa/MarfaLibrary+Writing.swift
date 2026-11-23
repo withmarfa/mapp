@@ -439,7 +439,7 @@ extension MarfaLibrary {
     /// The files go to the source as files of their own, which this removes once it has taken them. Each is
     /// attached to the item by the package, which says what the page writes in the text to embed it.
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport {
-        let directory = URL.temporaryDirectory.appending(path: "MAPP-attach-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let directory = URL.temporaryDirectory.appending(path: "marfa-mac-attach-\(UUID().uuidString)", directoryHint: .isDirectory)
         let staged = await Self.stage(files, in: directory)
         var report = AttachReport()
         for (file, staged) in zip(files, staged) {

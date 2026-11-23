@@ -16,7 +16,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             isProblem = false
         case .connecting:
             title = String(localized: "Connecting…")
-            detail = String(localized: "Showing what’s on this Mac while MAPP reaches the server.")
+            detail = String(localized: "Showing what’s on this Mac while the app reaches the server.")
             isProblem = false
         case .online:
             title = String(localized: "Connected")
@@ -24,15 +24,15 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             isProblem = false
         case .offline:
             title = String(localized: "Offline")
-            detail = String(localized: "MAPP can’t reach the server. Your changes are kept on this Mac and sent when it can.")
+            detail = String(localized: "The app can’t reach the server. Your changes are kept on this Mac and sent when it can.")
             isProblem = false
         case .keyRefused:
             title = String(localized: "Signed out")
-            detail = String(localized: "The server has ended MAPP’s sign-in. Sign in again below.")
+            detail = String(localized: "The server has ended the app’s sign-in. Sign in again below.")
             isProblem = true
         case .unavailable(let message):
             title = String(localized: "Library unavailable")
-            let sentence = String(localized: "MAPP can’t open or follow the copy of your library on this Mac.")
+            let sentence = String(localized: "The app can’t open or follow the copy of your library on this Mac.")
             detail = message.isEmpty ? sentence : sentence + " " + message
             isProblem = true
         case .otherVersion(let unsent):
@@ -71,7 +71,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         var unsent: UnsentChanges?
         /// More changes arrived after the person was shown the others, so they are asked again.
         var isAskedAgain = false
-        /// One of the changes is the removal of MAPP's settings from the Marfa, which has no text to show.
+        /// One of the changes is the removal of this app's settings from the Marfa, which has no text to show.
         var holdsSettingsRemoval = false
     }
 
@@ -97,7 +97,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     /// Whether the person is asked to confirm a disconnect that has nothing waiting.
     var isConfirmingDisconnect = false
 
-    /// MAPP's own settings in the Marfa, as a disconnect can remove them first.
+    /// The app's own settings in the Marfa, as a disconnect can remove them first.
     struct SettingsKept {
         /// Whether the settings are kept in the connected Marfa now, which decides whether Disconnect offers to remove them.
         var isKept: @MainActor () -> Bool
@@ -337,14 +337,14 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
                 title: String(localized: "Check the Address"),
                 message: String(localized: "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://."))
         case .notSignedIn:
-            Notice(title: String(localized: "Sign In First"), message: String(localized: "MAPP isn’t signed in to this server. Sign in below."))
+            Notice(title: String(localized: "Sign In First"), message: String(localized: "The app isn’t signed in to this server. Sign in below."))
         case .unavailable(let message):
             switch reached {
             case .signedInAgain:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
                     message: sentences(
-                        String(localized: "MAPP kept the new sign-in, but the copy of your library on this Mac can’t be opened."), message))
+                        String(localized: "The app kept the new sign-in, but the copy of your library on this Mac can’t be opened."), message))
             default:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
@@ -371,7 +371,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             case .notOpened, .signedInAgain:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
-                    message: String(localized: "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that MAPP can change its own files, then try again."))
+                    message: String(localized: "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that app can change its own files, then try again."))
             }
         case .copyKept(let kept, let signIn, let approvalAt):
             keptNotice(kept, signIn: signIn, approvalAt: approvalAt, reached: reached)
@@ -391,8 +391,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             nil
         case .denied:
             Notice(
-                title: String(localized: "MAPP Wasn’t Approved"),
-                message: String(localized: "The server was told not to approve MAPP, so nothing changed. Sign in again to try again."))
+                title: String(localized: "This App Wasn’t Approved"),
+                message: String(localized: "The server was told not to approve the app, so nothing changed. Sign in again to try again."))
         case .expired:
             Notice(
                 title: String(localized: "The Code Expired"),
@@ -400,35 +400,35 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .refused:
             Notice(
                 title: String(localized: "The Server Refused the Sign-In"),
-                message: String(localized: "The server wouldn’t approve MAPP, so nothing changed. Check that you are signing in to the right server and account, then try again."))
+                message: String(localized: "The server wouldn’t approve the app, so nothing changed. Check that you are signing in to the right server and account, then try again."))
         case .unreachable:
             Notice(
                 title: String(localized: "Can’t Reach the Server"),
-                message: String(localized: "MAPP couldn’t reach that address, so nothing changed. Check the address and your connection, then try again."))
+                message: String(localized: "The app couldn’t reach that address, so nothing changed. Check the address and your connection, then try again."))
         case .couldNotFinish:
             Notice(
                 title: String(localized: "Couldn’t Finish Signing In"),
-                message: String(localized: "MAPP couldn’t finish signing in. Check your connection and try again, or sign in with a code."))
+                message: String(localized: "The app couldn’t finish signing in. Check your connection and try again, or sign in with a code."))
         case .notMarfa:
             Notice(
                 title: String(localized: "Check the Address"),
-                message: String(localized: "That address isn’t a Marfa server MAPP can sign in to. Check the address, then try again."))
+                message: String(localized: "That address isn’t a Marfa server the app can sign in to. Check the address, then try again."))
         case .notVerified:
             Notice(
                 title: String(localized: "Couldn’t Confirm the Sign-In"),
-                message: String(localized: "MAPP couldn’t verify the approval. Try signing in again."))
+                message: String(localized: "The app couldn’t verify the approval. Try signing in again."))
         case .inUse:
             Notice(
                 title: String(localized: "The Sign-In Is in Use"),
-                message: String(localized: "Another copy of MAPP or another app is using the sign-in on this Mac, so nothing changed. Wait a moment, then try again."))
+                message: String(localized: "Another copy of this app or another app is using the sign-in on this Mac, so nothing changed. Wait a moment, then try again."))
         case .keychain:
             Notice(
                 title: String(localized: "Can’t Keep the Sign-In"),
-                message: String(localized: "The Keychain wouldn’t keep or give the sign-in. Check that MAPP can use the Keychain, then try again."))
+                message: String(localized: "The Keychain wouldn’t keep or give the sign-in. Check that app can use the Keychain, then try again."))
         case .noWindow:
             Notice(
                 title: String(localized: "No Window to Sign In From"),
-                message: String(localized: "MAPP needs a window to show the server’s sign-in page over. Open a MAPP window, then try again, or use a code instead."))
+                message: String(localized: "The app needs a window to show the server’s sign-in page over. Open one of its windows, then try again, or use a code instead."))
         case .failed:
             Notice(
                 title: String(localized: "Couldn’t Sign In"),
@@ -448,15 +448,15 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .changed(let now):
             body = sentences(
                 previous
-                    ? String(localized: "MAPP kept the previous server’s copy, because it now holds a different number of changes than you saw.")
-                    : String(localized: "MAPP kept the copy, because it now holds a different number of changes than you saw."),
+                    ? String(localized: "The app kept the previous server’s copy, because it now holds a different number of changes than you saw.")
+                    : String(localized: "The app kept the copy, because it now holds a different number of changes than you saw."),
                 Words.notSent(Int(clamping: now)) + " " + (previous
                     ? String(localized: "Sign in to the previous server again to see them.")
                     : String(localized: "Sign in to this server again to see them.")))
         case .unreadable(let folder):
             body = Words.cannotDiscard(folder: folder)
-        case .notMapps(let folder):
-            body = String(localized: "The copy in the folder “\(folder)” isn’t one MAPP made, so MAPP left it. Move the folder to the Trash if you don’t need it.")
+        case .notMadeByApp(let folder):
+            body = String(localized: "The copy in the folder “\(folder)” isn’t one the app made, so the app left it. Move the folder to the Trash if you don’t need it.")
         }
         let note = signIn == nil ? nil : String(localized: "The sign-in is still in your Keychain. Remove it in Keychain Access.")
         let told = note.map { sentences(body, $0) } ?? body
@@ -483,22 +483,22 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     private static func removalMessage(signIn: String?, copy: String?) -> String {
         switch (signIn != nil, copy != nil) {
         case (true, true):
-            String(localized: "The sign-in is still in your Keychain, and the copy is still on this Mac. Remove the sign-in in Keychain Access. MAPP removes the copy before it connects to that server again.")
+            String(localized: "The sign-in is still in your Keychain, and the copy is still on this Mac. Remove the sign-in in Keychain Access. The app removes the copy before it connects to that server again.")
         case (true, false):
             String(localized: "The sign-in is still in your Keychain. Remove it in Keychain Access.")
         default:
-            String(localized: "The copy is still on this Mac. MAPP removes it before it connects to that server again.")
+            String(localized: "The copy is still on this Mac. The app removes it before it connects to that server again.")
         }
     }
 
     private static func previousRemovalMessage(signIn: String?, copy: String?) -> String {
         switch (signIn != nil, copy != nil) {
         case (true, true):
-            String(localized: "The previous server’s sign-in is still in your Keychain, and its copy is still on this Mac. Remove the sign-in in Keychain Access. MAPP removes the copy before it connects to that server again.")
+            String(localized: "The previous server’s sign-in is still in your Keychain, and its copy is still on this Mac. Remove the sign-in in Keychain Access. The app removes the copy before it connects to that server again.")
         case (true, false):
             String(localized: "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access.")
         default:
-            String(localized: "The previous server’s copy is still on this Mac. MAPP removes it before it connects to that server again.")
+            String(localized: "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again.")
         }
     }
 

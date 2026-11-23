@@ -393,7 +393,7 @@ nonisolated enum InstanceWording {
         case .mayBeShorter(let to):
             return String(localized: "This may remove \(setting.removes) sooner than the server’s current setting.") + " " + removal(setting, keeping: to)
         case .toDefault(let from):
-            return String(localized: "Going back to the default for “\(setting.title)” uses the server’s own default, which MAPP can’t read. That may remove \(setting.removes) sooner than the server’s current setting, \(amount(setting, from)). What it removes can’t be recovered.")
+            return String(localized: "Going back to the default for “\(setting.title)” uses the server’s own default, which the app can’t read. That may remove \(setting.removes) sooner than the server’s current setting, \(amount(setting, from)). What it removes can’t be recovered.")
         }
     }
 

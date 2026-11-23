@@ -152,7 +152,7 @@ import Observation
     private(set) var refusedCreations: Set<ItemID> = []
     /// Why text typed over an item that can no longer be written is not kept.
     static var cantChange: String {
-        String(localized: "This item can’t be changed now, so MAPP couldn’t keep what you typed.")
+        String(localized: "This item can’t be changed now, so the app couldn’t keep what you typed.")
     }
 
     /// A place's order changes only with what it holds, so a change to one item maps the items again without
@@ -299,7 +299,7 @@ import Observation
     /// the Sources page opens and whenever the items change while it is open; a turn counter stops a read that began
     /// before a rename from undoing it. Counts come from `itemCountsBySource(state: "active", filter: "part eq false")`,
     /// both tiers, which leaves out parts (items that live with a host, such as attached files), as the server's own
-    /// lists do; MAPP's lists hide only attached files, so another kind of part would count lower than the list shows.
+    /// lists do; the app's lists hide only attached files, so another kind of part would count lower than the list shows.
     /// Once the server has answered, the Sources page and sidebar list its sources that hold items
     /// (`SourceDirectory.listing`), the last answer while offline; before that, the loaded items' sources.
     private(set) var sources = SourceDirectory()

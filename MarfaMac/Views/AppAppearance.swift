@@ -31,17 +31,17 @@ nonisolated enum AppTheme: String, CaseIterable, Identifiable {
         defaults.string(forKey: AppearanceKey.theme).flatMap(Self.init(rawValue:)) ?? standard
     }
 
-    /// Sets the app's appearance. A Debug launch that fixes one for a screenshot (`-MAPPAppearance`) keeps it.
+    /// Sets the app's appearance. A Debug launch that fixes one for a screenshot (`-MarfaMacAppearance`) keeps it.
     @MainActor static func apply(_ theme: AppTheme) {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-MAPPAppearance") { return }
+        if ProcessInfo.processInfo.arguments.contains("-MarfaMacAppearance") { return }
         #endif
         guard NSApp.appearance?.name != theme.appearance?.name else { return }
         NSApp.appearance = theme.appearance
     }
 }
 
-/// The color MAPP is tinted with: the system's accent, one MAPP offers, or a color of the person's own, kept as its hex.
+/// The color the app is tinted with: the system's accent, one the app offers, or a color of the person's own, kept as its hex.
 /// A stored value that is none of these is the system's accent.
 nonisolated enum AccentChoice: Hashable, RawRepresentable {
     case system

@@ -41,7 +41,7 @@ nonisolated enum MonitoringSecret: String, CaseIterable, Hashable, Sendable, Ide
     /// The secret a setting key names, if Monitoring holds it.
     static func named(key: String) -> MonitoringSecret? { allCases.first { $0.key == key } }
 
-    /// What the secret is called in a sentence, here and wherever else MAPP names this setting: removing it, and a restore that
+    /// What the secret is called in a sentence, here and wherever else the app names this setting: removing it, and a restore that
     /// asks for it to be set again.
     var removalName: String {
         switch self {

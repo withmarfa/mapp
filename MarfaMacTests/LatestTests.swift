@@ -7,7 +7,7 @@ import Testing
 nonisolated struct LatestTests {
     /// Cancelling a task that watches runs the stream's termination handler while the runtime holds that task's
     /// status lock, and telling the watcher a value needs the same lock. If the two take `Latest`'s lock and the
-    /// task's in opposite orders, an updater and a canceller wait on each other for ever (withmarfa/mapp#91).
+    /// task's in opposite orders, an updater and a canceller wait on each other for ever (withmarfa/marfa-mac#91).
     @Test
     func watchersCancelledWhileValuesAreToldNeverBlockTheUpdaters() async {
         let latest = Latest(0)

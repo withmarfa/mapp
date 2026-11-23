@@ -85,7 +85,7 @@ nonisolated enum ViewDraft {
     }
 
     /// The query a place stands for, or nil where a view cannot stand for it: Recents, which is a count of the
-    /// latest edits, an index, and a single favorite. A view lists active items, as MAPP's places
+    /// latest edits, an index, and a single favorite. A view lists active items, as the app's places
     /// do. A collection's view lists its members, though by the view's own order, since a view cannot sort by an
     /// edge's position.
     static func query(
@@ -219,7 +219,7 @@ nonisolated enum ViewDraft {
         return (sort, unkept)
     }
 
-    /// The group a view holds for the window's grouping by `column`. A value grouping names the order MAPP lists the
+    /// The group a view holds for the window's grouping by `column`. A value grouping names the order the app lists the
     /// values in where the column has one (`declaredOrder(of:)`), so other apps list them alike.
     static func group(_ column: ItemTableColumn?, mode: GroupMode = .value) -> (group: LibraryViewGroup?, unkept: [Unkept]) {
         guard let column else { return (nil, []) }
@@ -237,7 +237,7 @@ nonisolated enum ViewDraft {
         keys.compactMap { GroupKey.json($0, booleans: column.style == .boolean) }
     }
 
-    /// The order MAPP lists a column's values in, as a view's `group.order`: a status's words by their groups and
+    /// The order the app lists a column's values in, as a view's `group.order`: a status's words by their groups and
     /// then as declared, a choice's options as declared. Empty for any other column, whose groups follow Marfa's order.
     static func declaredOrder(of column: ItemTableColumn) -> [JSONValue] {
         guard let field = column.field else { return [] }
@@ -253,7 +253,7 @@ nonisolated enum ViewDraft {
 
     /// The group a write sends in place of `held`, the view's own. Grouping by the same field keeps the groups `held`
     /// orders and hides, which another app may have set: they name that field's values, whatever the span. Grouping by
-    /// another field drops them, since they name the old field's values, and orders the groups as MAPP lists them.
+    /// another field drops them, since they name the old field's values, and orders the groups as the app lists them.
     static func kept(_ group: LibraryViewGroup?, from held: LibraryViewGroup?) -> LibraryViewGroup? {
         guard var group else { return nil }
         if let held, held.field == group.field {
@@ -328,7 +328,7 @@ nonisolated enum ViewDraft {
 
     /// The table options a view opens with: its order and grouping, where the table has a column for them.
     /// A date grouped by day, week, month or year opens grouped so. A view with no grouping opens ungrouped, and one
-    /// grouped by what MAPP cannot show (a link it has no column for, a span of something that is no date) opens
+    /// grouped by what the app cannot show (a link it has no column for, a span of something that is no date) opens
     /// ungrouped too; its group stays in the view as it is, since a write names it only when the person changes it.
     /// A view that lists several types opens with a Type filter keeping them.
     static func options(for view: LibraryView, catalogue: Catalogue) -> ItemTableOptions {

@@ -206,7 +206,7 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
             var body = Operations.UpdateConfig.Input.Body.JsonPayload()
             for (key, change) in changes {
                 guard Self.apply(key, change, to: &body) else {
-                    throw OwnerFailure.failed(String(localized: "MAPP can’t change this setting."))
+                    throw OwnerFailure.failed(String(localized: "The app can’t change this setting."))
                 }
             }
             _ = try await client.updateConfig(headers: .init(xMarfaInstanceId: instanceID), body: .json(body)).ok
