@@ -359,6 +359,30 @@ import Testing
         #expect(model.pending("entry").count == 1)
     }
 
+    @Test func aDryRunThatFailsWhileTheQuestionIsOpenClosesItAndApplySendsNothing() async {
+        let (model, bench) = await loaded()
+        model.askToApply("entry")
+        #expect(model.question == "entry")
+        bench.calls.fail("rewriteConnectorItems", with: .unreachable)
+        await model.count("entry")
+        #expect(model.question == nil)
+        bench.calls.fail("rewriteConnectorItems", with: nil)
+        await model.apply("entry")
+        #expect(!bench.calls.state.withLock { $0.rewritesAsked.map(\.dryRun) }.contains(false))
+    }
+
+    @Test func readingBackATargetChangedElsewhereCountsAgain() async {
+        let (model, bench) = await loaded()
+        bench.calls.state.withLock {
+            $0.mappings["feed"]?.version = 9
+            $0.mappings["feed"]?.kinds["entry"]?.targetType = "core.task"
+        }
+        await model.readBack()
+        #expect(model.kinds["entry"]?.saved.targetType == "core.task")
+        #expect(model.counts["entry"] != nil)
+        #expect(model.canApply("entry"))
+    }
+
     @Test func aFailedDryRunClearsTheCountAndANewTargetDoesNotKeepTheOldOne() async {
         let (model, bench) = await loaded()
         #expect(model.canApply("entry"))

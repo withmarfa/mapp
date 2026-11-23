@@ -522,6 +522,7 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
             guard countGeneration[kind] == mine, kinds[kind]?.saved.targetType == target else { return }
             counts[kind] = nil
             countFailures[kind] = error
+            if question == kind { question = nil }
             await context.learn(from: error)
             return
         }
@@ -544,7 +545,7 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
     /// Asks the connector to move the kind's existing items, then reads the mapping to show the request as pending.
     func apply(_ kind: String) async {
         question = nil
-        guard !isAsking else { return }
+        guard canApply(kind) else { return }
         isAsking = true
         defer { isAsking = false }
         rewriteFailure = nil
@@ -563,7 +564,9 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
     func readBack() async {
         do {
             let reading = try await context.calls.connectorMapping(of: plugin.name)
-            if take(reading) { readBackFailure = nil }
+            guard take(reading) else { return }
+            readBackFailure = nil
+            for kind in kinds.keys.sorted() where counts[kind] == nil && countFailures[kind] == nil { await count(kind) }
         } catch {
             readBackFailure = error
             await context.learn(from: error)
