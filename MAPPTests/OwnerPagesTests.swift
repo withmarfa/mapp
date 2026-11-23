@@ -104,6 +104,28 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var signInReadID: String?
         /// What the server holds after a sign-in finishes: the setting the token goes in, which a finished sign-in sets.
         var signInSetsToken: (plugin: String, setting: String)?
+        /// Each plugin's stored mapping, as the server holds it.
+        var mappings: [String: ConnectorMappingReading] = [:]
+        /// Each save, as the version and kinds it sent.
+        var mappingSaves: [(plugin: String, version: Int, kinds: [String: KindMapping])] = []
+        var mappingTypes: [String: MappingTypeInfo] = [:]
+        /// What each preview read answers in turn, the last staying; the preview as asked is the first.
+        var previewAnswers: [MappingPreviewStatus] = []
+        var previewReads = 0
+        var previewsAsked: [(kind: String, draft: KindMapping?)] = []
+        /// How long a preview is kept, from when it is asked.
+        var previewLife: TimeInterval = 600
+        /// The items a rewrite would move, by kind, and each rewrite asked for.
+        var rewriteCounts: [String: Int] = [:]
+        var rewritesAsked: [(kinds: [String], dryRun: Bool)] = []
+        /// Faults the next saves return, in place of the required-field check, until a test clears them.
+        var scriptedMappingFaults: [MappingFault]?
+        /// What a preview's start answers, where a test does not want the first pending state.
+        var previewStart: MappingPreviewStatus?
+        /// A failure a preview poll raises after it has been let go, so a test can fail one that is already waiting.
+        var previewFailureAfterWait: OwnerFailure?
+        /// How many calls of each name are inside `held`, waiting or about to wait.
+        var waiting: [String: Int] = [:]
     }
 
     let state = Mutex(State())
@@ -119,7 +141,12 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     private func held(_ call: String) async {
-        if let gate = state.withLock({ $0.gates[call] }) { await gate.wait() }
+        let gate = state.withLock { state -> OwnerCallGate? in
+            state.waiting[call, default: 0] += 1
+            return state.gates[call]
+        }
+        if let gate { await gate.wait() }
+        state.withLock { $0.waiting[call, default: 0] -= 1 }
     }
 
     /// Takes `readDelay` while counted as in flight.
@@ -651,6 +678,94 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
                 state.connectorSettings[token.plugin] = reading
             }
             return ConnectorSignInReading(status: state.signInStatus, id: state.signInReadID ?? state.signInStart.id)
+        }
+    }
+
+    // MARK: A connector's mapping
+
+    func connectorMapping(of plugin: String) async throws(OwnerFailure) -> ConnectorMappingReading {
+        try enter("connectorMapping")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let mapping = state.mappings[plugin] else { throw .notFound }
+            return mapping
+        }
+    }
+
+    /// Judges a save as the server does: the version must be current, and a kind landing on a type with a required field that
+    /// nothing fills is refused, naming the field.
+    func saveConnectorMapping(of plugin: String, version: Int, kinds: [String: KindMapping]) async throws(OwnerFailure) -> MappingSaveOutcome {
+        try enter("saveConnectorMapping")
+        await held("saveConnectorMapping")
+        return try state.withLock { state throws(OwnerFailure) in
+            state.mappingSaves.append((plugin, version, kinds))
+            guard var mapping = state.mappings[plugin] else { throw .notFound }
+            if version != mapping.version { return .stale(current: mapping.version) }
+            if let faults = state.scriptedMappingFaults { return .refused(faults) }
+            var faults: [MappingFault] = []
+            for (name, kind) in kinds where kind.enabled {
+                for field in state.mappingTypes[kind.targetType]?.fields ?? [] where field.required && kind.fields[field.name] == nil {
+                    faults.append(MappingFault(path: "kinds.\(name).fields.\(field.name)", message: "\(kind.targetType) requires \(field.name)."))
+                }
+            }
+            if !faults.isEmpty { return .refused(faults) }
+            mapping.version += 1
+            mapping.kinds = kinds
+            state.mappings[plugin] = mapping
+            return .saved(mapping)
+        }
+    }
+
+    func startMappingPreview(of plugin: String, kind: String, draft: KindMapping?) async throws(OwnerFailure) -> MappingPreview {
+        try enter("startMappingPreview")
+        return state.withLock { state in
+            state.previewsAsked.append((kind, draft))
+            let expires = Date.now.addingTimeInterval(state.previewLife)
+            return MappingPreview(id: "preview-\(state.previewsAsked.count)", status: state.previewStart ?? .pending, expires: expires)
+        }
+    }
+
+    func mappingPreview(of plugin: String, id: String) async throws(OwnerFailure) -> MappingPreview {
+        try enter("mappingPreview")
+        await held("mappingPreview")
+        if let failure = state.withLock({ $0.previewFailureAfterWait }) { throw failure }
+        return state.withLock { state in
+            let index = min(state.previewReads, max(state.previewAnswers.count - 1, 0))
+            state.previewReads += 1
+            let status = state.previewAnswers.isEmpty ? MappingPreviewStatus.pending : state.previewAnswers[index]
+            return MappingPreview(id: id, status: status, expires: .now.addingTimeInterval(state.previewLife))
+        }
+    }
+
+    func rewriteConnectorItems(of plugin: String, kinds: [String], dryRun: Bool) async throws(OwnerFailure) -> MappingRewrite {
+        try enter("rewriteConnectorItems")
+        await held("rewriteConnectorItems")
+        if let failure = state.withLock({ $0.failures["rewriteConnectorItems"] }) { throw failure }
+        return state.withLock { state in
+            state.rewritesAsked.append((kinds, dryRun))
+            let version = state.mappings[plugin]?.version ?? 0
+            if !dryRun, var mapping = state.mappings[plugin] {
+                mapping.rewrites.append(PendingRewrite(number: mapping.rewrites.count + 1, kinds: kinds, requested: .now))
+                state.mappings[plugin] = mapping
+            }
+            return MappingRewrite(
+                dryRun: dryRun, number: dryRun ? nil : version,
+                version: version,
+                kinds: Dictionary(uniqueKeysWithValues: kinds.map { kind in
+                    (kind, .init(targetType: state.mappings[plugin]?.kinds[kind]?.targetType ?? "", count: state.rewriteCounts[kind] ?? 0))
+                }))
+        }
+    }
+
+    func mappingTypeOptions() async throws(OwnerFailure) -> [MappingTypeOption] {
+        try enter("mappingTypeOptions")
+        return state.withLock { $0.mappingTypes.values.map { MappingTypeOption(id: $0.id, label: $0.label, parent: nil) }.sorted { $0.id < $1.id } }
+    }
+
+    func mappingType(_ id: String) async throws(OwnerFailure) -> MappingTypeInfo {
+        try enter("mappingType")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let type = state.mappingTypes[id] else { throw .notFound }
+            return type
         }
     }
 }

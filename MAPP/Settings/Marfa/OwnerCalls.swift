@@ -304,6 +304,20 @@ nonisolated protocol OwnerCalls: Sendable {
     /// Starts the vendor sign-in, for the browser to be sent back to `address`, which the app registered.
     func startConnectorSignIn(of plugin: String, returningTo address: String) async throws(OwnerFailure) -> ConnectorSignInStart
     func connectorSignInStatus(of plugin: String) async throws(OwnerFailure) -> ConnectorSignInReading
+
+    /// What the owner chose each kind of a connector brings, with the rewrites asked for and not yet carried out.
+    func connectorMapping(of plugin: String) async throws(OwnerFailure) -> ConnectorMappingReading
+    /// Stores the mapping read as `version`. A mapping that changed since, or one the server refuses, is an outcome, not a failure.
+    func saveConnectorMapping(of plugin: String, version: Int, kinds: [String: KindMapping]) async throws(OwnerFailure) -> MappingSaveOutcome
+    /// Asks the connector to render one of its recent items under `draft`, or under the mapping in force with none.
+    func startMappingPreview(of plugin: String, kind: String, draft: KindMapping?) async throws(OwnerFailure) -> MappingPreview
+    /// A preview as it stands; `notFound` once it has expired.
+    func mappingPreview(of plugin: String, id: String) async throws(OwnerFailure) -> MappingPreview
+    /// Counts the items a rewrite moves, or asks the connector to move them.
+    func rewriteConnectorItems(of plugin: String, kinds: [String], dryRun: Bool) async throws(OwnerFailure) -> MappingRewrite
+    /// The types a kind can land as.
+    func mappingTypeOptions() async throws(OwnerFailure) -> [MappingTypeOption]
+    func mappingType(_ id: String) async throws(OwnerFailure) -> MappingTypeInfo
 }
 
 /// What changing the addresses would do, as the server said before anything was written, with the change it said it

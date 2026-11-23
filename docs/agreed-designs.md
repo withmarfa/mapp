@@ -66,9 +66,9 @@ Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Lay
 
 Only the agreed changes are listed. A change marked "needs a server change" waits on Marfa first.
 
-- **Built:** Overview, Account, Apps, Keys (with Extend… beside the expiry date, which keeps the secret), Addresses, Plugins (installed, updates, available and removal; a plugin that carries guidance installs from the command line), Sources, Recently Deleted, History, File Storage, Connectors (each connector's health, Pause, Run Now, settings and vendor sign-in; adding one and its mapping wait), Webhooks (every app's, grouped by who made them, any of which the owner can end), a read-only Folders, Backups, Updates, Housekeeping, Activity, Monitoring (was Reporting), Limits (new) and Start-Up (read-only) are in [The Marfa's half of Settings](marfa-settings.md).
+- **Built:** Overview, Account, Apps, Keys (with Extend… beside the expiry date, which keeps the secret), Addresses, Plugins (installed, updates, available and removal; a plugin that carries guidance installs from the command line), Sources, Recently Deleted, History, File Storage, Connectors (each connector's health, Pause, Run Now, settings, vendor sign-in and each kind's mapping with a live preview; adding one waits), Webhooks (every app's, grouped by who made them, any of which the owner can end), a read-only Folders, Backups, Updates, Housekeeping, Activity, Monitoring (was Reporting), Limits (new) and Start-Up (read-only) are in [The Marfa's half of Settings](marfa-settings.md).
 - **Types** is built: see [The Marfa's half of Settings](marfa-settings.md). An owner's type's Fields, Feed, History and Delete Type, and a field's own page, are built too. Still agreed and not built on it: Strict and Keep Versions among a type's rules (Strict is an instance setting that needs `config.manage`, and Keep Versions has four numbers with no agreed control), and writing Guidance (waits for August's decision on whether an app may write it).
-- **Connectors** are built except their mapping screen and adding a connector.
+- **Connectors** are built except adding a connector and the Files row of its mapping.
 
 ### Settings sync through Marfa
 
