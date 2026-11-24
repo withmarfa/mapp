@@ -29,6 +29,9 @@ final class FakeItemLibrary: ItemLibrary {
     var downloadedFiles: (any DownloadedFiles)?
     private(set) var downloadedAgain = 0
     func downloadEverythingAgain() { downloadedAgain += 1 }
+    /// The instance id the copy answers, which an item link is checked against.
+    var heldInstanceID: String?
+    func instanceID() async -> String? { heldInstanceID }
     /// Whether counts cannot be answered, as when the copy cannot be sure and the server is out of reach.
     var countsUnavailable = false
     /// The counts the library works out from its items the way Marfa does: only active items, the groups of each child's

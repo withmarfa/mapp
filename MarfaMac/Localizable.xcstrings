@@ -9265,6 +9265,30 @@
     },
     "%@ (Not Kept)" : {
 
+    },
+    "Can’t Open Link" : {
+
+    },
+    "This isn’t a Marfa link." : {
+
+    },
+    "This link is to an item in another Marfa." : {
+
+    },
+    "This Mac isn’t connected to a Marfa. Connect to your Marfa in Settings, then open the link again." : {
+
+    },
+    "Your Marfa library can’t be opened right now. Check the connection in Settings, then open the link again." : {
+
+    },
+    "Your Marfa library is still opening. Open the link again in a moment." : {
+
+    },
+    "This item can’t be found in this Mac’s copy of your Marfa. It may have been deleted, or it may not have synced to this Mac yet." : {
+
+    },
+    "This item is in Recently Deleted." : {
+
     }
   },
   "version" : "1.1"

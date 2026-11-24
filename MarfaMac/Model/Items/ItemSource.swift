@@ -119,6 +119,10 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// queued delete.
     func moreItemsTaken(with ids: [ItemID]) async -> Int?
 
+    /// The instance id of the Marfa the copy holds, as its `GET /` names it; nil until the copy has read it, or where
+    /// it can't be read. Reads only the copy.
+    func instanceID() async -> String?
+
     // MARK: Views, written to the server at once and never queued
 
     /// Each throws `ViewWriteFailure`. A write that failed for want of the server is sent again with the same
@@ -178,6 +182,8 @@ nonisolated extension ItemSource {
     func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer] { throw ItemCountUnavailable() }
 
     func moreItemsTaken(with ids: [ItemID]) async -> Int? { nil }
+
+    func instanceID() async -> String? { nil }
 
     var downloadedFiles: (any DownloadedFiles)? { nil }
 

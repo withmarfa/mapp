@@ -96,6 +96,7 @@ import Observation
     private(set) var syncReport: SyncReport
     var downloadedFiles: (any DownloadedFiles)? { source.downloadedFiles }
     func downloadEverythingAgain() { source.downloadEverythingAgain() }
+    func instanceID() async -> String? { await source.instanceID() }
     /// How the server stands, for the app to show beside the library. The library is the one subscriber to the
     /// source's states; the host reads this while the copy is open.
     private(set) var connection: MarfaConnectionState

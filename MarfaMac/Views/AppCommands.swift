@@ -39,7 +39,7 @@ struct AppCommands: Commands {
                 .shortcut(.newItem, shortcuts)
                 .disabled(browser == nil || library?.isLoaded != true)
             Button("New Window", systemImage: "macwindow.badge.plus") {
-                openWindow(id: "main")
+                openWindow(id: MarfaMacApp.mainWindowID)
             }
             .shortcut(.newWindow, shortcuts)
             Divider()
