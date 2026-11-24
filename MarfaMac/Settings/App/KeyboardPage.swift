@@ -52,13 +52,21 @@ struct KeyboardPage: View {
             if model.searchesByKeys {
                 SettingsNote("With the keyboard button on, pressing keys searches for that shortcut. Typing searches by name.")
             }
-            SettingsBar(edge: .leading) {
-                SettingsButton("Export Shortcuts…") { KeyboardFiles.export(from: libraries) }
-                    .accessibilityIdentifier("ExportShortcuts")
-                SettingsButton("Import Shortcuts…") { KeyboardFiles.importShortcuts(into: libraries) }
-                    .accessibilityIdentifier("ImportShortcuts")
-                SettingsButton("Restore Defaults…") { confirmsRestore = true }
-                    .accessibilityIdentifier("RestoreShortcuts")
+            if !model.isSearching {
+                SettingsSection("Your Shortcuts") {
+                    SettingsRow("Export Shortcuts", line: "As a file you can keep or share.") {
+                        SettingsButton("Export…") { KeyboardFiles.export(from: libraries) }
+                            .accessibilityIdentifier("ExportShortcuts")
+                    }
+                    SettingsRow("Import Shortcuts", line: "Replaces the shortcuts you have now.") {
+                        SettingsButton("Import…") { KeyboardFiles.importShortcuts(into: libraries) }
+                            .accessibilityIdentifier("ImportShortcuts")
+                    }
+                    SettingsRow("Restore Defaults", line: "Every shortcut as Marfa ships it.") {
+                        SettingsButton("Restore…") { confirmsRestore = true }
+                            .accessibilityIdentifier("RestoreShortcuts")
+                    }
+                }
             }
         }
         .alert("Restore Default Shortcuts?", isPresented: $confirmsRestore) {
