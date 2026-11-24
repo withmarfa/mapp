@@ -2,27 +2,26 @@ import XCTest
 
 /// Drives the real app by keyboard alone, with Full Keyboard Access on for this launch only (a launch argument, not
 /// a system setting).
-@MainActor
-final class KeyboardNavigationTests: XCTestCase {
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
+nonisolated final class KeyboardNavigationTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
+    @MainActor private var window: XCUIElement { app.windows.firstMatch }
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample(settings: ["AppleKeyboardUIMode": "3"])
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() async throws {
+    @MainActor override func tearDown() async throws {
         app.terminate()
     }
 
-    private func focusedElement() -> XCUIElement {
+    @MainActor private func focusedElement() -> XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
     }
 
-    func testTabMovesFocusThroughMoreThanOneAreaOfTheWindow() {
+    @MainActor func testTabMovesFocusThroughMoreThanOneAreaOfTheWindow() {
         var seen: [String] = []
         for _ in 0..<14 {
             app.typeKey(.tab, modifierFlags: [])
@@ -41,7 +40,7 @@ final class KeyboardNavigationTests: XCTestCase {
     /// Under Full Keyboard Access Tab steps through the list, the sidebar and its rows only; the toolbar is reached with
     /// Control-F5, which a synthesized key does not trigger, so what can be checked here is that every toolbar control
     /// is a labeled, enabled button that keyboard users and VoiceOver can name.
-    func testEveryToolbarControlIsALabeledButton() {
+    @MainActor func testEveryToolbarControlIsALabeledButton() {
         let toolbar = app.toolbars.firstMatch
         XCTAssertTrue(toolbar.waitForExistence(timeout: 3))
         let buttons = toolbar.buttons.allElementsBoundByIndex.filter(\.isHittable)
@@ -51,7 +50,7 @@ final class KeyboardNavigationTests: XCTestCase {
         }
     }
 
-    func testNewWindowInThePaletteOpensAWindow() {
+    @MainActor func testNewWindowInThePaletteOpensAWindow() {
         app.typeKey("k", modifierFlags: .command)
         let field = window.textFields["CommandPaletteField"]
         XCTAssertTrue(field.waitForExistence(timeout: 3))

@@ -8,8 +8,7 @@ struct WebhooksPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: WebhooksModel
-    @Environment(\.settingsPush) private var push
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -43,7 +42,7 @@ struct WebhooksPage: View {
             } message: { asked in
                 Text(verbatim: asked.message)
             }
-            .onChange(of: model.deleted) { if $1 != nil { back() } }
+            .onChange(of: model.deleted) { if $1 != nil { navigation?.back() } }
             .accessibilityIdentifier("WebhooksPage")
     }
 
@@ -58,7 +57,7 @@ struct WebhooksPage: View {
             } else {
                 SettingsPageState(
                     symbol: "dot.radiowaves.up.forward", title: Text("This Webhook Is Gone"),
-                    line: Text("It was deleted, here or somewhere else."), action: ("Back", back))
+                    line: Text("It was deleted, here or somewhere else."), action: ("Back", { navigation?.back() }))
             }
         } else {
             list
@@ -97,7 +96,7 @@ struct WebhooksPage: View {
                             SettingsLinkRow(
                                 verbatim: WebhooksModel.display(webhook.url), line: model.summary(of: webhook),
                                 lead: .well(symbol: "dot.radiowaves.up.forward"), value: Self.title(state), dot: Self.dot(state)
-                            ) { push(Self.subpage(for: webhook)) }
+                            ) { navigation?.push(Self.subpage(for: webhook)) }
                         }
                         if group.isOwn { addRow }
                     }

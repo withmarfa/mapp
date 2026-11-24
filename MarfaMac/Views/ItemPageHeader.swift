@@ -243,11 +243,22 @@ struct ItemPageHeader: ViewModifier {
                 guard let type else { return }
                 drafts.fieldEdit = FieldEditRequest(kind: command == .rename ? .rename : .choices, type: type, key: row)
             case .remove:
-                guard let type, let plan = try? type.plan(.remove(key: row), in: catalogue) else { return }
+                let title = String(localized: "Couldn’t Remove the Field")
+                guard let type else {
+                    library.notices.tell(title, FieldEditRefusal.unknownField.message)
+                    return
+                }
+                let plan: FieldEditPlan
+                do throws(FieldEditRefusal) {
+                    plan = try type.plan(.remove(key: row), in: catalogue)
+                } catch {
+                    library.notices.tell(title, error.message)
+                    return
+                }
                 FieldRemoval.confirm(plan, typeLabel: type.label, on: NSApp.keyWindow) {
                     Task {
                         if let failure = await library.editField(plan) {
-                            library.notices.tell(String(localized: "Couldn’t Remove the Field"), failure.message)
+                            library.notices.tell(title, failure.message)
                         }
                     }
                 }

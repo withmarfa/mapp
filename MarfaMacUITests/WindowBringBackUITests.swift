@@ -1,10 +1,9 @@
 import XCTest
 
 /// Quits the app and starts it again with the system's window restoration on, which the other UI tests switch off.
-@MainActor
-final class WindowBringBackUITests: XCTestCase {
+nonisolated final class WindowBringBackUITests: XCTestCase {
     /// `fresh` starts from the default window; otherwise the window comes back as the last run left it.
-    private func launch(fresh: Bool = false) -> XCUIApplication {
+    @MainActor private func launch(fresh: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         // Windows are kept on quit whatever System Settings says about closing them.
         app.launchArguments = (fresh ? ["-ApplePersistenceIgnoreState", "YES"] : [])
@@ -13,11 +12,11 @@ final class WindowBringBackUITests: XCTestCase {
         return app
     }
 
-    private func gallery(_ app: XCUIApplication) -> XCUIElement {
+    @MainActor private func gallery(_ app: XCUIApplication) -> XCUIElement {
         app.windows.firstMatch.descendants(matching: .any).matching(identifier: "ItemGallery").element(boundBy: 0)
     }
 
-    func testAHiddenSidebarAndAnOpenItemComeBackAfterQuitting() throws {
+    @MainActor func testAHiddenSidebarAndAnOpenItemComeBackAfterQuitting() throws {
         var app = launch(fresh: true)
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 5))

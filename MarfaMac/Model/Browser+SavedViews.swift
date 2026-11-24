@@ -344,7 +344,7 @@ extension Browser {
     }
 
     /// Keeps the table's column widths as the person drags them.
-    func keepWidths(_ widths: Data?, of id: ItemID) {
+    func keepWidths(_ widths: Data, of id: ItemID) {
         ViewLayouts.update(in: defaults) {
             var settings = $0.settings(for: id) ?? ViewMacSettings()
             guard settings.widths != widths else { return }

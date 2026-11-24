@@ -8,8 +8,7 @@ struct TypesPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: TypesModel
-    @Environment(\.settingsPush) private var push
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -52,12 +51,12 @@ struct TypesPage: View {
             .onChange(of: model.deleted) {
                 guard model.deleted != nil else { return }
                 model.acknowledgeDeleted()
-                back()
+                navigation?.back()
             }
             .onChange(of: model.made) {
                 guard let id = model.made, let type = model.record(id) else { return }
                 model.acknowledgeMade()
-                push(subpage(for: type))
+                navigation?.push(subpage(for: type))
             }
             .settingsSheet(presenting: model.hasSheet, dismiss: { model.closeSheet() }) { TypeSheet(model: model, host: host) }
             .accessibilityIdentifier("TypesPage")
@@ -84,7 +83,7 @@ struct TypesPage: View {
                     } else {
                         SettingsPageState(
                             symbol: "textformat", title: Text("This Field Is Gone"), line: Text("It was removed, here or somewhere else."),
-                            action: ("Back", back))
+                            action: ("Back", { navigation?.back() }))
                     }
                 } else {
                     TypeDetail(model: model, type: type, host: host)
@@ -92,7 +91,7 @@ struct TypesPage: View {
             } else {
                 SettingsPageState(
                     symbol: "shippingbox", title: Text("This Type Is Gone"), line: Text("It was deleted, here or somewhere else."),
-                    action: ("Back", back))
+                    action: ("Back", { navigation?.back() }))
             }
         } else {
             list
@@ -125,6 +124,6 @@ struct TypesPage: View {
         SettingsLinkRow(
             verbatim: model.title(of: type), line: model.subtitle(of: type), lead: .custom(host.typeMark(for: type.id)),
             value: model.count(of: type.id).formatted()
-        ) { push(subpage(for: type)) }
+        ) { navigation?.push(subpage(for: type)) }
     }
 }

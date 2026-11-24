@@ -310,7 +310,7 @@ struct MainView: View {
         }
         .onChange(of: browser.snapshotParts) {
             if restoresWindow {
-                storedBrowser = try? JSONEncoder().encode(browser.snapshot())
+                browser.saveSnapshot { storedBrowser = $0 }
                 StartWith.remember(browser.item)
             }
         }
@@ -333,7 +333,7 @@ struct MainView: View {
                 // The position is saved once the person stops scrolling, not for every line of it.
                 let stored = $storedBrowser
                 browser.listMemory.scrolled = { [snapshotSaver, browser] in
-                    snapshotSaver.schedule { stored.wrappedValue = try? JSONEncoder().encode(browser.snapshot()) }
+                    snapshotSaver.schedule { browser.saveSnapshot { stored.wrappedValue = $0 } }
                 }
             }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }

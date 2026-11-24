@@ -16,33 +16,32 @@ import XCTest
 /// the unified log, which a sandboxed test cannot read: `Scripts/measure-ui.sh` records it around the run and prints
 /// the same kind of lines per test, between the `phase` markers each test logs (`MarfaMac/Model/AGENTS.md`, "Logs and
 /// signposts").
-@MainActor
-final class SpeedMeasureTests: XCTestCase {
+nonisolated final class SpeedMeasureTests: XCTestCase {
     private static let subsystem = "com.withmarfa.marfa.debug"
     private static let iterations = 5
     /// Marks where each test's measured part begins and ends, and which process the app is, in the log, for
     /// `Scripts/measure-ui.sh`; another session's debug build shares the subsystem.
     private static let phases = Logger(subsystem: "com.withmarfa.marfa.speedtest", category: "phase")
     /// Whether this run has left a complete copy of the instance for a warm launch to open.
-    private static var hasCopy = false
+    @MainActor private static var hasCopy = false
 
-    private var address = ""
-    private var key = ""
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
-    private var sidebar: XCUIElement { window.outlines["Sidebar"] }
-    private var sidebarFoot: XCUIElement { window.groups["Sidebar"] }
-    private var list: XCUIElement { window.outlines["ItemList"] }
-    private var label = ""
-    private var samples: [String: [Double]] = [:]
+    @MainActor private var address = ""
+    @MainActor private var key = ""
+    @MainActor private var app: XCUIApplication!
+    @MainActor private var window: XCUIElement { app.windows.firstMatch }
+    @MainActor private var sidebar: XCUIElement { window.outlines["Sidebar"] }
+    @MainActor private var sidebarFoot: XCUIElement { window.groups["Sidebar"] }
+    @MainActor private var list: XCUIElement { window.outlines["ItemList"] }
+    @MainActor private var label = ""
+    @MainActor private var samples: [String: [Double]] = [:]
 
-    private var options: XCTMeasureOptions {
+    @MainActor private var options: XCTMeasureOptions {
         let options = XCTMeasureOptions()
         options.iterationCount = Self.iterations
         return options
     }
 
-    override func setUpWithError() throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         let environment = ProcessInfo.processInfo.environment
         try XCTSkipUnless(environment["MARFA_MAC_MEASURE_UI"] != nil, "MARFA_MAC_MEASURE_UI is not set")
@@ -54,7 +53,7 @@ final class SpeedMeasureTests: XCTestCase {
     /// The run writes to this server, so it goes ahead only when `MARFA_TEST_INSTANCE_ID` holds the `instance_id` the
     /// server reports at its root (`GET /`): reading it from the server and passing it is the acknowledgement that
     /// this is a test instance.
-    private static func refuseUnlessTestInstance(at address: String, acknowledging acknowledged: String?) throws {
+    @MainActor private static func refuseUnlessTestInstance(at address: String, acknowledging acknowledged: String?) throws {
         let given = acknowledged?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let missing = "Set MARFA_TEST_INSTANCE_ID to the instance_id that \(address) reports at its root, to say it is a test instance and holds no one's data."
         XCTAssertFalse(given.isEmpty, missing)
@@ -70,7 +69,7 @@ final class SpeedMeasureTests: XCTestCase {
         }
     }
 
-    override func tearDown() async throws {
+    @MainActor override func tearDown() async throws {
         app?.terminate()
         guard !label.isEmpty else { return }
         Self.phases.notice("end \(self.label, privacy: .public)")
@@ -83,7 +82,7 @@ final class SpeedMeasureTests: XCTestCase {
 
     // MARK: Launch
 
-    func testLaunchCold() throws {
+    @MainActor func testLaunchCold() throws {
         try begin("launch.cold")
         app = makeApp(keepingCopy: false)
         measure(metrics: [XCTApplicationLaunchMetric(waitUntilResponsive: true)], options: options) {
@@ -92,7 +91,7 @@ final class SpeedMeasureTests: XCTestCase {
         Self.hasCopy = true
     }
 
-    func testLaunchWarm() throws {
+    @MainActor func testLaunchWarm() throws {
         try seedCopy()
         try begin("launch.warm")
         app = makeApp(keepingCopy: true)
@@ -103,7 +102,7 @@ final class SpeedMeasureTests: XCTestCase {
 
     // MARK: Moving about
 
-    func testChoosingPlaces() throws {
+    @MainActor func testChoosingPlaces() throws {
         try launchWarm()
         let types = typeRows().prefix(2)
         try XCTSkipIf(types.count < 2, "The instance shows fewer than two types in the sidebar")
@@ -124,7 +123,7 @@ final class SpeedMeasureTests: XCTestCase {
         }
     }
 
-    func testMovingBetweenListAndGallery() throws {
+    @MainActor func testMovingBetweenListAndGallery() throws {
         try launchWarm()
         let place = try XCTUnwrap(typeRows().first, "The instance shows a type in the sidebar")
         sidebarElement(place).click()
@@ -139,7 +138,7 @@ final class SpeedMeasureTests: XCTestCase {
     }
 
     /// The table on each place the sidebar offers, which is where a person feels the table rebuild its columns.
-    func testMovingBetweenTablePlaces() throws {
+    @MainActor func testMovingBetweenTablePlaces() throws {
         try launchWarm()
         let types = typeRows().prefix(2)
         try XCTSkipIf(types.count < 2, "The instance shows fewer than two types in the sidebar")
@@ -161,7 +160,7 @@ final class SpeedMeasureTests: XCTestCase {
     }
 
     /// Moving the selection down the table one row at a time, which moves the soft selection's marks.
-    func testSelectingInTheTable() throws {
+    @MainActor func testSelectingInTheTable() throws {
         try launchWarm()
         sidebarElement("SidebarPlace-all").click()
         app.typeKey("3", modifierFlags: .command)
@@ -178,7 +177,7 @@ final class SpeedMeasureTests: XCTestCase {
     }
 
     /// Clicking one card after another in the gallery.
-    func testSelectingInTheGallery() throws {
+    @MainActor func testSelectingInTheGallery() throws {
         try launchWarm()
         sidebarElement("SidebarPlace-all").click()
         app.typeKey("2", modifierFlags: .command)
@@ -193,7 +192,7 @@ final class SpeedMeasureTests: XCTestCase {
         }
     }
 
-    func testOpeningItems() throws {
+    @MainActor func testOpeningItems() throws {
         try launchWarm()
         let place = try XCTUnwrap(typeRows().first, "The instance shows a type in the sidebar")
         sidebarElement(place).click()
@@ -210,7 +209,7 @@ final class SpeedMeasureTests: XCTestCase {
 
     /// Opens the first item of the place just chosen, the moment the window shows the place: the list is still filling
     /// and the page has just been left, which is when an open was seen to cost most.
-    func testOpeningRightAfterAPlaceChange() throws {
+    @MainActor func testOpeningRightAfterAPlaceChange() throws {
         try launchWarm()
         let types = typeRows().prefix(2)
         try XCTSkipIf(types.count < 2, "The instance shows fewer than two types in the sidebar")
@@ -235,7 +234,7 @@ final class SpeedMeasureTests: XCTestCase {
 
     /// Opens the items `Scripts/measure-ui.sh` makes on the instance: a long article, one with forty pictures at web
     /// addresses, and one with a very long field, each between two short ones, so every open replaces a different page.
-    func testOpeningLargeItems() throws {
+    @MainActor func testOpeningLargeItems() throws {
         try launchWarm()
         let place = try XCTUnwrap(typeRows().first { $0.hasSuffix("core.media.article") }, "The instance shows the Article type in the sidebar")
         sidebarElement(place).click()
@@ -258,7 +257,7 @@ final class SpeedMeasureTests: XCTestCase {
 
     // MARK: Panels
 
-    func testNewOpensQuickAdd() throws {
+    @MainActor func testNewOpensQuickAdd() throws {
         try launchWarm()
         try begin("quickAdd")
         let field = element("QuickAddTitle")
@@ -277,7 +276,7 @@ final class SpeedMeasureTests: XCTestCase {
         }
     }
 
-    func testSearchOpensThePalette() throws {
+    @MainActor func testSearchOpensThePalette() throws {
         try launchWarm()
         try begin("palette")
         let field = element("CommandPaletteField")
@@ -298,7 +297,7 @@ final class SpeedMeasureTests: XCTestCase {
     /// item afterwards. A keystroke's time runs from the key event until the app is idle again; the page reports no
     /// echo to wait on, and reading its accessibility value costs more than a keystroke, so the text is checked once
     /// at the end. The total is the sum.
-    func testTypingInAnItem() throws {
+    @MainActor func testTypingInAnItem() throws {
         try launchWarm()
         try begin("typing")
         let title = "Speed measure \(UUID().uuidString.prefix(8))"
@@ -323,7 +322,7 @@ final class SpeedMeasureTests: XCTestCase {
 
     // MARK: Helpers
 
-    private func begin(_ name: String) throws {
+    @MainActor private func begin(_ name: String) throws {
         label = name
         samples = [:]
         Self.phases.notice("begin \(name, privacy: .public)")
@@ -331,13 +330,13 @@ final class SpeedMeasureTests: XCTestCase {
 
     /// Marks the log for the work inside as a phase of its own, so the signposts of just that work are reported
     /// apart from the rest of the test, as the test's own label does for the whole.
-    private func inPhase(_ name: String, _ work: () -> Void) {
+    @MainActor private func inPhase(_ name: String, _ work: () -> Void) {
         Self.phases.notice("begin \(name, privacy: .public)")
         work()
         Self.phases.notice("end \(name, privacy: .public)")
     }
 
-    private func makeApp(keepingCopy: Bool) -> XCUIApplication {
+    @MainActor private func makeApp(keepingCopy: Bool) -> XCUIApplication {
         let app = XCUIApplication.sample(flags: keepingCopy ? ["-MarfaMacKeepTestStore"] : [])
         app.launchEnvironment["MARFA_MAC_TEST_MARFA_URL"] = address
         app.launchEnvironment["MARFA_MAC_TEST_MARFA_KEY"] = key
@@ -345,7 +344,7 @@ final class SpeedMeasureTests: XCTestCase {
     }
 
     /// One unmeasured cold launch, so a warm launch has a complete copy to open.
-    private func seedCopy() throws {
+    @MainActor private func seedCopy() throws {
         guard !Self.hasCopy else { return }
         app = makeApp(keepingCopy: false)
         launchAndWait()
@@ -353,7 +352,7 @@ final class SpeedMeasureTests: XCTestCase {
         Self.hasCopy = true
     }
 
-    private func launchWarm() throws {
+    @MainActor private func launchWarm() throws {
         try seedCopy()
         app = makeApp(keepingCopy: true)
         launchAndWait()
@@ -361,7 +360,7 @@ final class SpeedMeasureTests: XCTestCase {
 
     /// Launches and waits for the window to show the library, filled from the copy and the server. It is the time a
     /// person waits, seen from outside.
-    private func launchAndWait() {
+    @MainActor private func launchAndWait() {
         if app.state != .notRunning { app.terminate() }
         time("shown") {
             app.launch()
@@ -373,25 +372,25 @@ final class SpeedMeasureTests: XCTestCase {
 
     /// The sidebar lists a type, which it can do only once the copy has loaded, and the copy is no longer filling. The
     /// foot that says so is a bar beside the outline, in a group of a few elements, so it is asked first.
-    private var showsLibrary: Bool {
+    @MainActor private var showsLibrary: Bool {
         if sidebarFoot.descendants(matching: .any)["LibraryFillProgress"].exists { return false }
         return sidebar.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH 'SidebarType-'"))
             .firstMatch.exists
     }
 
-    private func signpost(_ name: String) -> XCTOSSignpostMetric {
+    @MainActor private func signpost(_ name: String) -> XCTOSSignpostMetric {
         XCTOSSignpostMetric(subsystem: Self.subsystem, category: "navigation", name: name)
     }
 
-    private func time(_ name: String, _ work: () -> Void) {
+    @MainActor private func time(_ name: String, _ work: () -> Void) {
         let start = ContinuousClock.now
         work()
         samples[name, default: []].append((ContinuousClock.now - start).milliseconds)
     }
 
     /// Polls as fast as UI testing's own queries allow, since a sleep between them would be counted as the app's time.
-    private func waitUntil(timeout: TimeInterval = 20, _ condition: () -> Bool) -> Bool {
+    @MainActor private func waitUntil(timeout: TimeInterval = 20, _ condition: () -> Bool) -> Bool {
         let deadline = ContinuousClock.now + .seconds(timeout)
         while ContinuousClock.now < deadline {
             if condition() { return true }
@@ -399,29 +398,29 @@ final class SpeedMeasureTests: XCTestCase {
         return false
     }
 
-    private func element(_ identifier: String) -> XCUIElement {
+    @MainActor private func element(_ identifier: String) -> XCUIElement {
         window.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
     }
 
-    private func sidebarText(_ title: String) -> XCUIElement {
+    @MainActor private func sidebarText(_ title: String) -> XCUIElement {
         sidebar.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR value == %@", title, title)).element(boundBy: 0)
     }
 
     /// The identifiers of the sidebar's type rows, in order, once each.
-    private func typeRows() -> [String] {
+    @MainActor private func typeRows() -> [String] {
         var seen: [String] = []
         let rows = sidebar.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'SidebarType-'"))
         for row in rows.allElementsBoundByIndex where !seen.contains(row.identifier) { seen.append(row.identifier) }
         return seen
     }
 
-    private func sidebarElement(_ identifier: String) -> XCUIElement {
+    @MainActor private func sidebarElement(_ identifier: String) -> XCUIElement {
         sidebar.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
     }
 
     /// Where the element's middle is, as a point of the window, so a click on it needs no query of the tree. UI
     /// testing's own queries of a library this size take seconds, which would be counted as the app's time.
-    private func spot(_ element: XCUIElement) -> XCUICoordinate {
+    @MainActor private func spot(_ element: XCUIElement) -> XCUICoordinate {
         let frame = element.frame
         let origin = window.frame.origin
         return window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.midX - origin.x, dy: frame.midY - origin.y))

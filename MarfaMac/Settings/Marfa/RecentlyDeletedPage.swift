@@ -9,7 +9,7 @@ struct RecentlyDeletedPage: View {
 
     let host: any MarfaSettingsHost
     let showsAll: Bool
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
     @State private var search = ""
     @State private var kind: String?
     @State private var selection: Set<String> = []
@@ -93,7 +93,7 @@ struct RecentlyDeletedPage: View {
                     SettingsSectionTable(
                         rows: Array(items.prefix(Self.pageSize)), columns: columns(withType: false), action: restore,
                         total: isFiltered ? items.count : host.deletedCount,
-                        showAll: { push(Self.allDeleted) })
+                        showAll: { navigation?.push(Self.allDeleted) })
                 }
             }
         }

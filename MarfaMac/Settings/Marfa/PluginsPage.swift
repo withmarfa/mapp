@@ -9,8 +9,7 @@ struct PluginsPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: PluginsModel
-    @Environment(\.settingsPush) private var push
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -62,7 +61,7 @@ struct PluginsPage: View {
                 SettingsPageState(
                     symbol: "puzzlepiece.extension", title: model.notice.map { Text(verbatim: $0.title) } ?? Text("This Plugin Isn’t Here"),
                     line: Text(verbatim: model.notice?.line ?? String(localized: "It was removed, or the release no longer lists it.")),
-                    action: ("Back", back))
+                    action: ("Back", { navigation?.back() }))
             }
         } else {
             list
@@ -88,7 +87,7 @@ struct PluginsPage: View {
             ForEach(model.installed) { plugin in
                 SettingsLinkRow(
                     verbatim: plugin.title, line: plugin.description, lead: .well(host.markGlyph(plugin.mark)), value: plugin.version
-                ) { push(Self.subpage(named: plugin.name, title: plugin.title)) }
+                ) { navigation?.push(Self.subpage(named: plugin.name, title: plugin.title)) }
             }
         }
     }
@@ -99,7 +98,7 @@ struct PluginsPage: View {
             SettingsSection("Plugin Updates") {
                 ForEach(updates) { update in
                     PluginUpdateRow(model: model, update: update, host: host) {
-                        push(Self.subpage(named: update.id, title: update.installed.title))
+                        navigation?.push(Self.subpage(named: update.id, title: update.installed.title))
                     }
                 }
             }
@@ -128,7 +127,7 @@ struct PluginsPage: View {
                     SettingsLinkRow(
                         verbatim: entry.title, line: entry.description, lead: .well(host.markGlyph(entry.mark)),
                         value: entry.version.description
-                    ) { push(Self.subpage(named: entry.name, title: entry.title)) }
+                    ) { navigation?.push(Self.subpage(named: entry.name, title: entry.title)) }
                 }
             }
             SettingsAddRow("Install From a File…") { Task { await model.installFile() } }
@@ -270,7 +269,7 @@ private struct PluginDetail: View {
                 }
             }
             PluginNotices(model: model, host: host, plugin: plugin.name)
-            if let update, let command = model.heldCommand(plugin.name) {
+            if update != nil, let command = model.heldCommand(plugin.name) {
                 PluginCommandSection(
                     model: model, name: Text("Update From the Command Line"),
                     line: Text(verbatim: PluginWording.line(.carriesGuidance)),

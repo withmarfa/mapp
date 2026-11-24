@@ -117,10 +117,6 @@ nonisolated final class ScriptedSignIns: SignIns {
     /// and a cancel reaches it as a thrown `CancellationError`.
     let onBrowser = Mutex<(@MainActor @Sendable () async throws -> Void)?>(nil)
 
-    func isHolding(_ connection: MarfaConnection) -> Bool {
-        ((try? held(connection.address)) ?? nil) != nil
-    }
-
     /// Makes the Keychain refuse every read, as a locked one does, until the next sign-in is kept.
     func makeUnreadable(_ connection: MarfaConnection) {
         keychain.failReads(with: errSecInteractionNotAllowed)

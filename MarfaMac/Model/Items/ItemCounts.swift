@@ -160,7 +160,7 @@ final class ItemCounts {
     private func work() {
         guard worker == nil, !pending.isEmpty else { return }
         worker = Task { [weak self] in
-            while let self, let (query, ids) = self.nextBatch() { await self.take(await self.answer(ids, query), for: ids, query) }
+            while let self, let (query, ids) = self.nextBatch() { self.take(await self.answer(ids, query), for: ids, query) }
             self?.worker = nil
         }
     }

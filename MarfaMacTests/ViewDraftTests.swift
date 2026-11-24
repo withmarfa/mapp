@@ -392,7 +392,7 @@ struct ViewDraftTests {
             nil, adding: ["field.status": ["a", "b"], "parent": ["p1", "p2"]], negated: ["field.status"])
         #expect(mixed.unkept == [.mixedFilters])
         // Written and read back, it is the same filter.
-        let view = LibraryView(id: ItemID("v"), title: "V", query: LibraryViewQuery(filter: try #require(not.filter)))
+        let view = LibraryView(id: ItemID("v"), title: "V", query: LibraryViewQuery(filter: not.filter))
         let options = ViewDraft.options(for: view, catalogue: Self.catalogue)
         #expect(Self.shownFilters(options) == ["field.status": ["todo", "done"]])
         #expect(Self.negated(options) == ["field.status"])
