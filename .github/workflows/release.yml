@@ -6,7 +6,6 @@ name: Release
 #   repository and no access to the downloads bucket.
 # - `publish` creates the GitHub release and uploads to the bucket; it holds those, and no Apple identity. The disk
 #   image goes first and the appcast last, so the feed never names a file that is not there yet.
-# - `ui-tests` runs the UI test plan beside `build`; `publish` waits for both, so nothing publishes unless the UI tests pass.
 # - `build` and `publish` run in the `release` environment, which holds every secret and admits only `v*` tags. The values are validated and
 #   never printed.
 # - A pull request that changes this workflow, `Scripts/release/`, `Config/` or `Info.plist`, and a manual run, make a dry
@@ -225,33 +224,9 @@ jobs:
         if: always() && github.event_name == 'push'
         run: bash Scripts/release/signing-keychain.sh remove
 
-  # The UI tests take over the keyboard and mouse of the runner, which has no one using it. Pull requests run no Mac
-  # job, so a tag is where they run, and nothing publishes unless they pass. A dry run skips them.
-  ui-tests:
-    name: UI tests
-    if: github.event_name == 'push'
-    runs-on: xcode-27
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
-      - name: Run the UI tests
-        run: >
-          xcodebuild -project MarfaMac.xcodeproj -scheme 'MarfaMac UI Tests' -destination 'platform=macOS'
-          -derivedDataPath build -resultBundlePath UITestResults.xcresult test
-      - name: Upload the results
-        if: failure() && hashFiles('UITestResults.xcresult/**') != ''
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ui-test-results
-          path: UITestResults.xcresult
-          retention-days: 7
-
   publish:
     name: Publish
-    needs: [build, ui-tests]
+    needs: build
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30

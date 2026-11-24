@@ -23,7 +23,7 @@ A branch does not need to be up to date with `main` to merge. Update it only for
 
 ## After the merge
 
-`main.yml` compiles Release and runs the unit tests on the newest commit on `main`. A failure opens or comments on the issue "Main build failed", and a pass closes it. A broken `main` is acceptable for a while. Fix it forward in a small pull request, and start with the issue if one is open. `release.yml` runs the UI tests before it publishes a tag, so a UI test that was not run locally shows up there.
+`main.yml` compiles Release and runs the unit tests on the newest commit on `main`. A failure opens or comments on the issue "Main build failed", and a pass closes it. A broken `main` is acceptable for a while. Fix it forward in a small pull request, and start with the issue if one is open. CI runs no UI tests, so run the UI test class for any screen a change touches locally.
 
 A change to stored notes, access, a migration or a release needs the full local run above, and the dry run when it touches `release.yml`, `Scripts/release/`, `Config/` or `Info.plist`.
 
