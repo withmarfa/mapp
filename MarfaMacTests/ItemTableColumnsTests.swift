@@ -192,6 +192,24 @@ struct ItemTableColumnsTests {
         #expect(second.shownTableColumns.map { $0.width.rounded() } == widths, "the table opened at widths the person did not set")
     }
 
+    @MainActor
+    @Test func aPlaceWithNoStoredWidthsOpensAtTheIdealsAfterAnotherPlacesDrag() async throws {
+        let suite = "MarfaMac.ItemTableColumnsTests.switching"
+        UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
+        let opened = try await Self.open(width: 1500, inSavedView: false, suite: suite)
+        defer { opened.window.performClose(nil); opened.window.contentView = nil; opened.defaults.removePersistentDomain(forName: suite) }
+        try Self.drag(dividerAfter: opened.shownTableColumns[0], by: 37, in: opened)
+        try #require(await eventually { !opened.stored.isEmpty })
+
+        // The same table moves to a saved view that holds no widths of its own.
+        opened.browser.sidebarItem = .view(ItemID("view-1"))
+        let (library, _) = try await BigLibrary.loaded()
+        let ideals = opened.browser.shownColumns(opened.browser.tableContent(in: library).columns).map { $0.widths.ideal.rounded() }
+        try #require(await eventually { opened.shownTableColumns.count == ideals.count })
+        #expect(await eventually { opened.shownTableColumns.map { $0.width.rounded() } == ideals }, "the saved view kept the last place's widths: \(opened.shownTableColumns.map { $0.width.rounded() }) vs \(ideals)")
+        #expect(opened.stored.isEmpty, "showing the saved view stored widths for it")
+    }
+
     /// A person's widths are layout data the table writes to the stored layout. In a window wide enough for the columns
     /// (so the table does not scroll), AppKit used to fit every column again when one was shown or hidden, and the
     /// table stored what it chose over the widths the person had set.

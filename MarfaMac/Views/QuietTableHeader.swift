@@ -31,14 +31,31 @@ extension View {
 final class ColumnResizing {
     fileprivate weak var header: NSTableHeaderView?
     /// The width each shown column starts at: the one the person kept, or the column's ideal.
-    var widths: [CGFloat] = []
+    var widths: [CGFloat] = [] {
+        didSet { if widths != oldValue { widthsChanged?() } }
+    }
+
+    /// Called when `widths` change, as when the table moves to a place with other widths. Nothing else tells the header
+    /// that the same table has another place to start at.
+    fileprivate var widthsChanged: (() -> Void)?
 
     var isDragging: Bool { (header?.resizedColumn ?? -1) >= 0 }
 
-    fileprivate func restore(_ table: NSTableView) {
+    /// The starting widths and shown columns last applied, so a change of place or of stored widths is applied once, and
+    /// the same table moving to a place with other widths never keeps the last place's.
+    private var applied: (widths: [CGFloat], columns: [NSUserInterfaceItemIdentifier])?
+
+    /// Answers false while the table's shown columns are not yet the ones `widths` is for, as when SwiftUI replaces them
+    /// after a change of place, so the caller tries again once they are.
+    fileprivate func restore(_ table: NSTableView) -> Bool {
+        guard !isDragging else { return true }
         let shown = table.tableColumns.filter { !$0.isHidden }
-        guard shown.count == widths.count else { return }
+        guard shown.count == widths.count else { return false }
+        let columns = shown.map(\.identifier)
+        if let applied, applied.widths == widths, applied.columns == columns { return true }
+        applied = (widths, columns)
         for (column, width) in zip(shown, widths) where column.width != width { column.width = width }
+        return true
     }
 }
 
@@ -87,6 +104,7 @@ private struct QuietTableHeader: NSViewRepresentable {
             }
             (table.headerView as? QuietHeaderView)?.backdrop = backdrop
             resizing?.header = table.headerView
+            resizing?.widthsChanged = { [weak self] in self?.restoreAfterChange() }
             if let scrollView = table.enclosingScrollView { fit(table, in: scrollView) }
             table.headerView?.needsDisplay = true
             follow(table)
@@ -95,6 +113,15 @@ private struct QuietTableHeader: NSViewRepresentable {
 
         /// The width and columns the table was last fitted to.
         private var fittedTo: String?
+        /// How many times the table's columns have been waited for, to match the widths it should start at.
+        private var restoreTries = 0
+
+        /// The widths the table starts at changed during a pass of SwiftUI, which has not yet given the table its columns.
+        /// The header looks again on the next pass of the run loop, and waits for the columns from there.
+        private func restoreAfterChange() {
+            restoreTries = 0
+            DispatchQueue.main.async { [weak self] in self?.refresh() }
+        }
 
         /// Makes the table as wide as the page it sits in, and keeps it so as that width changes. A page whose scroll view
         /// runs under the right-hand inspector gets the inspector's width as a safe area that SwiftUI does not carry into
@@ -110,9 +137,12 @@ private struct QuietTableHeader: NSViewRepresentable {
             let safeRight = scrollView.safeAreaInsets.right
             if abs(scrollView.contentInsets.right - safeRight) > 0.5 { scrollView.contentInsets.right = safeRight }
             if let resizing {
-                if table.columnAutoresizingStyle != .noColumnAutoresizing {
-                    table.columnAutoresizingStyle = .noColumnAutoresizing
-                    resizing.restore(table)
+                if table.columnAutoresizingStyle != .noColumnAutoresizing { table.columnAutoresizingStyle = .noColumnAutoresizing }
+                if resizing.restore(table) {
+                    restoreTries = 0
+                } else if restoreTries < 50 {
+                    restoreTries += 1
+                    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(20)) { [weak self] in self?.refresh() }
                 }
                 return
             }
