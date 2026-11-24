@@ -41,12 +41,14 @@ struct RestoreSettingsSheet: View {
                             Text(verbatim: point.reason.title).settingsFont(.title)
                             Text(verbatim: Self.when(point.date)).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
                         }
+                        .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
                         .tag(point.id)
-                        .padding(.vertical, 3)
                     }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .scrollEdgeEffectHidden(true, for: .all)
                 .frame(height: Self.listHeight(for: restoring.points.count))
                 .accessibilityLabel(Text("Restore Points"))
                 .accessibilityIdentifier("RestoreSettingsList")
@@ -63,9 +65,11 @@ struct RestoreSettingsSheet: View {
         .accessibilityIdentifier("RestoreSettingsSheet")
     }
 
+    private static let rowHeight: CGFloat = 48
+
     /// A list inside the sheet's scroll view has no height of its own, so it is given one: its rows, up to a few more than fit.
     private static func listHeight(for count: Int) -> CGFloat {
-        CGFloat(min(max(count, 1), 6)) * 44 + 8
+        CGFloat(min(max(count, 1), 6)) * rowHeight
     }
 
     /// "23 Nov 14:02", in the Mac's language and clock. The day and the time are formatted apart, since the system joins a

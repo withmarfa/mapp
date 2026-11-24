@@ -117,7 +117,7 @@ final class SettingsFilesModel {
         do throws(RestorePoints.Failure) {
             let applied = try await preferences.importSettings(importing.file, sections: importing.chosen)
             sheet = nil
-            notices.tell(String(localized: "Imported Settings"), Self.summary(applied))
+            notices.tell(String(localized: "Imported Settings"), Self.importSummary(applied))
         } catch {
             sheet = nil
             tellNotChanged(String(localized: "Couldn’t Import Settings"))
@@ -153,7 +153,7 @@ final class SettingsFilesModel {
         do throws(RestorePoints.Failure) {
             let applied = try await preferences.restore(point)
             sheet = nil
-            notices.tell(String(localized: "Restored Settings"), Self.summary(applied))
+            notices.tell(String(localized: "Restored Settings"), Self.restoreSummary(applied, point: restoring.points.first { $0.id == point }))
         } catch {
             sheet = nil
             tellNotChanged(String(localized: "Couldn’t Restore Settings"), unreadable: error == .unreadable)
@@ -170,15 +170,34 @@ final class SettingsFilesModel {
                 : String(localized: "A restore point could not be saved first, so no settings were changed."))
     }
 
-    static func summary(_ result: PreferencesSync.Applied) -> String {
+    /// What an import did: how many settings were applied, or that none changed, and any that were skipped.
+    static func importSummary(_ result: PreferencesSync.Applied) -> String {
         let applied = result.applied
-        let done = applied == 1 ? String(localized: "One setting was applied.") : String(localized: "\(applied) settings were applied.")
-        guard result.skipped > 0 else { return done }
-        let skipped = result.skipped
-        let left = skipped == 1
-            ? String(localized: "One was skipped: this version of the app can’t use it.")
-            : String(localized: "\(skipped) were skipped: this version of the app can’t use them.")
-        return done + " " + left
+        let done = switch applied {
+        case 0: String(localized: "No settings changed.")
+        case 1: String(localized: "One setting was applied.")
+        default: String(localized: "\(applied) settings were applied.")
+        }
+        return done + skippedSentence(result.skipped)
+    }
+
+    /// What a restore did: whose settings are back, and any that were skipped. A point equal to the current settings
+    /// applies nothing and still reads as done.
+    static func restoreSummary(_ result: PreferencesSync.Applied, point: RestorePoint?) -> String {
+        let done = if let point {
+            point.reason.backPhrase(RestoreSettingsSheet.when(point.date))
+        } else {
+            String(localized: "Your earlier settings are back.")
+        }
+        return done + skippedSentence(result.skipped)
+    }
+
+    private static func skippedSentence(_ skipped: Int) -> String {
+        switch skipped {
+        case 0: ""
+        case 1: " " + String(localized: "One was skipped: this version of the app can’t use it.")
+        default: " " + String(localized: "\(skipped) were skipped: this version of the app can’t use them.")
+        }
     }
 
     /// What a sheet says about who it reaches, where the settings sync and where they don't.
@@ -196,5 +215,19 @@ final class SettingsFilesModel {
         return importing
             ? String(localized: "Importing changes these settings on every Mac connected to \(name). A restore point is saved first.")
             : String(localized: "Restoring changes the settings on every Mac connected to \(name). A restore point is saved first.")
+    }
+}
+
+extension RestorePoint.Reason {
+    /// The sentence a restore's notice opens with: whose settings are back, by what the point was saved before and when.
+    func backPhrase(_ when: String) -> String {
+        switch self {
+        case .firstSync: String(localized: "Your settings are back as they were before the first sync, \(when).")
+        case .adoption: String(localized: "Your settings are back as they were before taking another Mac’s settings, \(when).")
+        case .reset: String(localized: "Your settings are back as they were before Reset, \(when).")
+        case .import: String(localized: "Your settings are back as they were before Import, \(when).")
+        case .switching: String(localized: "Your settings are back as they were before switching Marfa, \(when).")
+        case .restoring: String(localized: "Your settings are back as they were before restoring, \(when).")
+        }
     }
 }
