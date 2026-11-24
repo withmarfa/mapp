@@ -23,8 +23,8 @@ nonisolated struct MarfaArchiveSource: ArchiveSource {
     }
 }
 
-/// Closing the gate lets the main actor cancel an export without waiting on the disk. A move that has passed the gate's
-/// check can still finish.
+/// Closing the gate stops an export at its next check. The move into the folder runs while the gate is held, so once
+/// `close()` returns no move is under way and none starts; on a local APFS or HFS+ volume that move is one quick rename.
 nonisolated final class ExportGate: Sendable {
     private struct State {
         var open = true
@@ -55,18 +55,74 @@ nonisolated final class ExportGate: Sendable {
     func checkOpen() throws {
         guard !isClosed, !Task.isCancelled else { throw CancellationError() }
     }
+
+    /// Runs `move` only while the gate is open and holds the gate until it ends, so a close waits for it.
+    func whileOpen(_ move: () -> Int32) throws -> Int32 {
+        try state.withLock { current throws in
+            guard current.open, !Task.isCancelled else { throw CancellationError() }
+            return move()
+        }
+    }
+}
+
+/// The volume a folder is on, as an export judges it.
+nonisolated struct ExportVolume: Equatable, Sendable {
+    /// The file system's name, such as `apfs`, `hfs`, `msdos`, `exfat` or `smbfs`.
+    var format: String
+    var isLocal: Bool
+    var supportsExclusiveRenaming: Bool
+    var uuid: String?
+
+    /// Whether an archive can be published there in one move that never replaces a file: a local APFS or HFS+ volume.
+    var isAccepted: Bool {
+        isLocal && supportsExclusiveRenaming && ["apfs", "hfs"].contains(format) && uuid != nil
+    }
+
+    /// The volume of the directory `descriptor` holds open, or nil where it can't be read.
+    static func of(_ descriptor: Int32) -> ExportVolume? {
+        var info = statfs()
+        guard fstatfs(descriptor, &info) == 0 else { return nil }
+        let format = withUnsafeBytes(of: info.f_fstypename) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+        var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard path.withUnsafeMutableBytes({ fcntl(descriptor, F_GETPATH, $0.baseAddress!) }) == 0 else { return nil }
+        let place = path.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        let values = try? URL(filePath: place, directoryHint: .isDirectory)
+            .resourceValues(forKeys: [.volumeSupportsExclusiveRenamingKey, .volumeUUIDStringKey])
+        return ExportVolume(
+            format: format, isLocal: info.f_flags & UInt32(MNT_LOCAL) != 0,
+            supportsExclusiveRenaming: values?.volumeSupportsExclusiveRenaming == true, uuid: values?.volumeUUIDString)
+    }
+}
+
+/// The folder Export Automatically writes to, as it was when chosen: its path, and its volume and inode, so a folder moved
+/// or replaced since then is told apart from it.
+nonisolated struct ExportFolder: Codable, Equatable, Sendable {
+    let path: String
+    let volume: String
+    let inode: UInt64
+
+    var url: URL { URL(filePath: path, directoryHint: .isDirectory) }
 }
 
 /// Export Everything: the whole library from the server into a folder the person chose. It needs the server, since the
-/// copy on this Mac holds what is cached and not what an archive must hold. The folder is opened once, and from then on
-/// reached through that descriptor for publishing, even if the folder's path changes. The export writes and checks the
-/// archive through the same open file descriptor (`Staging` and `ArchiveCheck`).
+/// copy on this Mac holds what is cached and not what an archive must hold. The folder must be on a local APFS or HFS+
+/// volume. It is opened once, and from then on reached through that descriptor for publishing, even if the folder's path
+/// changes. The export writes and checks the archive through the same open file descriptor (`Staging` and `ArchiveCheck`).
 nonisolated enum LibraryExport {
     /// Why an export did not finish, as one line, and whether it was because the server did not answer.
     struct Failure: Error, Equatable {
         let message: String
         var unreachable = false
+
+        static var cannotWrite: Failure { Failure(message: String(localized: "Couldn’t export. The app can’t write to that folder.")) }
+        static var notOwnDisk: Failure { Failure(message: String(localized: "Choose a folder on this Mac’s own disk.")) }
+        static var replaced: Failure {
+            Failure(message: String(localized: "The export folder was moved or replaced. Choose it again."))
+        }
     }
+
+    /// Reads the volume of a folder's descriptor; tests give another.
+    typealias VolumeReader = @Sendable (Int32) -> ExportVolume?
 
     /// A finished export: its file, the Marfa it holds, and how many files the archive names without carrying their bytes.
     struct Exported: Equatable, Sendable {
@@ -82,18 +138,30 @@ nonisolated enum LibraryExport {
         return number > 1 ? "\(base) \(number).tar" : "\(base).tar"
     }
 
-    /// Writes the archive into `folder` and returns it. Throws `Failure` with the line to show, also for a stream that is
-    /// not a whole archive the app can check and, where `instance` is given, for an archive of another Marfa. Cancelling
-    /// the task or closing `gate` stops the export at its next cancellation check.
+    /// Checks a folder chosen for Export Automatically as an export would, making and removing its private file, and
+    /// answers what to record of it.
+    @concurrent static func choose(_ folder: URL, volume: VolumeReader = ExportVolume.of) async -> Result<ExportFolder, Failure> {
+        do throws(Failure) {
+            let (destination, identity) = try open(folder, expecting: nil, volume: volume)
+            defer { Darwin.close(destination) }
+            try Staging.make(for: folder, destination: destination).end()
+            return .success(identity)
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Writes the archive into `folder` and returns it. Throws `Failure` with the line to show, also for a folder that is
+    /// not on a local APFS or HFS+ volume or, where `expecting` is given, is no longer the folder it names; for a stream
+    /// that is not a whole archive the app can check; and, where `instance` is given, for an archive of another Marfa.
+    /// Cancelling the task or closing `gate` stops the export at its next check.
     @concurrent static func export(
-        from source: any ArchiveSource, serverName: String, to folder: URL, now: Date = .now, instance: String? = nil,
-        gate: ExportGate = ExportGate()
+        from source: any ArchiveSource, serverName: String, to folder: URL, expecting: ExportFolder? = nil, now: Date = .now,
+        instance: String? = nil, gate: ExportGate = ExportGate(), volume: VolumeReader = ExportVolume.of
     ) async throws(Failure) -> Exported {
-        let cannotWrite = Failure(message: String(localized: "Couldn’t export. The app can’t write to that folder."))
-        let destination = open(folder.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
-        guard destination >= 0 else { throw cannotWrite }
-        defer { close(destination) }
-        guard let staging = Staging.make(for: folder, destination: destination) else { throw cannotWrite }
+        let (destination, _) = try open(folder, expecting: expecting, volume: volume)
+        defer { Darwin.close(destination) }
+        let staging = try Staging.make(for: folder, destination: destination)
         defer { staging.end() }
         guard gate.hold(staging.workspace) else { throw failure(CancellationError(), serverName: serverName) }
         do {
@@ -118,6 +186,28 @@ nonisolated enum LibraryExport {
         }
     }
 
+    /// Opens `folder` as a directory, never through a link at its end, on a volume the export accepts. Where `expecting`
+    /// is given, the directory must still be the one it names.
+    private static func open(_ folder: URL, expecting: ExportFolder?, volume: VolumeReader) throws(Failure) -> (Int32, ExportFolder) {
+        let destination = Darwin.open(folder.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard destination >= 0 else { throw expecting == nil ? .cannotWrite : .replaced }
+        var info = stat()
+        guard fstat(destination, &info) == 0 else {
+            Darwin.close(destination)
+            throw .cannotWrite
+        }
+        guard let read = volume(destination), read.isAccepted, let uuid = read.uuid else {
+            Darwin.close(destination)
+            throw .notOwnDisk
+        }
+        let identity = ExportFolder(path: folder.path, volume: uuid, inode: UInt64(info.st_ino))
+        if let expecting, expecting.volume != identity.volume || expecting.inode != identity.inode {
+            Darwin.close(destination)
+            throw .replaced
+        }
+        return (destination, identity)
+    }
+
     private struct Incomplete: Error {}
     private struct Uncheckable: Error {}
     private struct OtherMarfa: Error {}
@@ -127,8 +217,7 @@ nonisolated enum LibraryExport {
     private static func publish(_ staging: Staging, into destination: Int32, server: String, on date: Date, gate: ExportGate) throws -> String {
         for number in 1...10_000 {
             let name = fileName(for: server, on: date, number: number)
-            try gate.checkOpen()
-            let code = staging.move(into: destination, as: name)
+            let code = try staging.move(into: destination, as: name, gate: gate)
             if code == 0 { return name }
             guard code == EEXIST else { throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO) }
         }
@@ -148,6 +237,8 @@ nonisolated enum LibraryExport {
     /// The line for an error: the archive's, the folder's or the server's.
     static func failure(_ error: any Error, serverName: String) -> Failure {
         switch error {
+        case let failure as Failure:
+            return failure
         case is CancellationError:
             return Failure(message: String(localized: "Couldn’t export. The export was stopped."))
         case is Incomplete:
@@ -178,50 +269,47 @@ nonisolated enum LibraryExport {
     }
 }
 
-/// The file an export writes before its archive is whole, made with `O_EXCL` and held open from then on. It is made in a
-/// private directory the system gives on the folder's volume, or, where the system gives none there, as a hidden file in
-/// the folder itself.
+/// The file an export writes before its archive is whole, made with `O_EXCL` in a private directory the system gives on
+/// the folder's volume, and held open from then on. The directory and the file are reached and removed only through
+/// descriptors, never by path.
 nonisolated private final class Staging: Sendable {
     let file: Int32
-    /// The private directory, where the file is in one.
-    let workspace: URL?
-    /// The directory the file is in: the private directory, or the folder.
+    let workspace: URL
+    /// The private directory's parent, which the directory is removed through.
+    private let parent: Int32
+    /// The private directory.
     private let directory: Int32
-    private let name: String
+    private static let name = "export.tar"
 
-    private init(file: Int32, directory: Int32, name: String, workspace: URL?) {
+    private init(file: Int32, parent: Int32, directory: Int32, workspace: URL) {
         self.file = file
+        self.parent = parent
         self.directory = directory
-        self.name = name
         self.workspace = workspace
     }
 
-    static func make(for folder: URL, destination: Int32) -> Staging? {
-        let flags = O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC
+    /// Makes the file, refusing a folder whose private directory the system puts on another volume.
+    static func make(for folder: URL, destination: Int32) throws(LibraryExport.Failure) -> Staging {
         var target = stat()
-        guard fstat(destination, &target) == 0 else { return nil }
-        if let workspace = try? FileManager.default.url(
-            for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: folder, create: true)
-        {
-            let directory = open(workspace.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-            var info = stat()
-            // A private directory on another volume could not move the archive into the folder in one step.
-            if directory >= 0, fstat(directory, &info) == 0, info.st_dev == target.st_dev {
-                let file = openat(directory, "export.tar", flags, 0o644)
-                if file >= 0 { return Staging(file: file, directory: directory, name: "export.tar", workspace: workspace) }
-            }
-            if directory >= 0 { close(directory) }
-            rmdir(workspace.path)
-        }
-        let directory = dup(destination)
-        guard directory >= 0 else { return nil }
-        let name = ".Marfa export \(UUID().uuidString).partial"
-        let file = openat(directory, name, flags, 0o644)
+        guard fstat(destination, &target) == 0,
+            let workspace = try? FileManager.default.url(
+                for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: folder, create: true)
+        else { throw .cannotWrite }
+        // The system's directory of private directories can't be listed, only searched.
+        let parent = open(workspace.deletingLastPathComponent().path, O_SEARCH | O_CLOEXEC)
+        guard parent >= 0 else { throw .cannotWrite }
+        let directory = openat(parent, workspace.lastPathComponent, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        var info = stat()
+        let opened = directory >= 0 && fstat(directory, &info) == 0
+        let file = opened && info.st_dev == target.st_dev
+            ? openat(directory, name, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644) : -1
         guard file >= 0 else {
-            close(directory)
-            return nil
+            if directory >= 0 { close(directory) }
+            unlinkat(parent, workspace.lastPathComponent, AT_REMOVEDIR)
+            close(parent)
+            throw opened && info.st_dev != target.st_dev ? .notOwnDisk : .cannotWrite
         }
-        return Staging(file: file, directory: directory, name: name, workspace: nil)
+        return Staging(file: file, parent: parent, directory: directory, workspace: workspace)
     }
 
     func write(_ bytes: [UInt8]) throws {
@@ -236,24 +324,30 @@ nonisolated private final class Staging: Sendable {
         }
     }
 
-    /// Moves the file into `destination` as `final`, refusing a name that is taken, and answers 0 or the error's code.
-    func move(into destination: Int32, as final: String) -> Int32 {
+    /// Moves the file into `destination` as `final`, refusing a name that is taken, and answers 0 or the error's code. The
+    /// gate is checked last, after the file's own check.
+    func move(into destination: Int32, as final: String, gate: ExportGate) throws -> Int32 {
         guard holdsOwnFile() else { return ENOENT }
-        return renameatx_np(directory, name, destination, final, UInt32(RENAME_EXCL)) == 0 ? 0 : errno
+        return try gate.whileOpen {
+            renameatx_np(directory, Self.name, destination, final, UInt32(RENAME_EXCL)) == 0 ? 0 : errno
+        }
     }
 
+    /// Removes the file and then the private directory, which fails harmlessly where anything else is in it.
     func end() {
-        if holdsOwnFile() { unlinkat(directory, name, 0) }
+        if holdsOwnFile() { unlinkat(directory, Self.name, 0) }
         close(file)
         close(directory)
-        if let workspace { rmdir(workspace.path) }
+        unlinkat(parent, workspace.lastPathComponent, AT_REMOVEDIR)
+        close(parent)
     }
 
-    /// Whether the file's name in its directory is still the file this export holds open.
+    /// Whether the file's name in the private directory is still the file this export holds open. The directory is the
+    /// app's own, so another process of the same user changing it is out of scope.
     private func holdsOwnFile() -> Bool {
         var named = stat()
         var held = stat()
-        return fstatat(directory, name, &named, AT_SYMLINK_NOFOLLOW) == 0 && fstat(file, &held) == 0
+        return fstatat(directory, Self.name, &named, AT_SYMLINK_NOFOLLOW) == 0 && fstat(file, &held) == 0
             && named.st_dev == held.st_dev && named.st_ino == held.st_ino
     }
 }
