@@ -14,6 +14,11 @@ extension EditorController {
     /// logged with the page's own words and told at once as a problem with the editor, with the step to take, and the
     /// page is given up on the same way.
     ///
+    /// A page that went down after it had been ready (`pageWentDown`) may have lost what the person typed last, so a
+    /// flush `leaving` the window or the library (a quit, a window close, a library change) fails while it is down, and
+    /// one under way when it went down fails too. A flush that stays, as when another item is chosen, goes ahead: the
+    /// page holds nothing more to hand over, and the person has been told.
+    ///
     /// Outside text reloading the item mid-flush leaves the item the one being flushed, so the flush goes ahead. A
     /// flush whose item was replaced on the page stops, and the person is told why.
     ///
@@ -22,11 +27,11 @@ extension EditorController {
     /// closes or the app quits just after a selection, waits and then hands over whatever is on the page, instead of
     /// finding its item replaced. Those waiting behind a flush that fails fail with it, without asking the page: they
     /// were waiting on the edit it could not keep, and the person has been told once.
-    func flush(then done: @escaping (Bool) -> Void = { _ in }) {
+    func flush(leaving: Bool = false, then done: @escaping (Bool) -> Void = { _ in }) {
         releaseHeldEdit()
-        guard !isFlushing else { return waitingFlushes.append(done) }
+        guard !isFlushing else { return waitingFlushes.append((leaving, done)) }
         isFlushing = true
-        handOver { [self] kept in
+        handOver(leaving: leaving) { [self] kept in
             // An edit the page reported before the hand-over but that arrived during it was held, and the page's
             // answer leaves it out, since the page counts it as reported.
             releaseHeldEdit()
@@ -36,19 +41,23 @@ extension EditorController {
             let waiting = waitingFlushes
             waitingFlushes = []
             done(kept)
-            guard kept else { return waiting.forEach { $0(false) } }
+            guard kept else { return waiting.forEach { $0.done(false) } }
             // `done` may have started a flush of its own, which keeps its turn.
             waitingFlushes = waiting + waitingFlushes
-            if !isFlushing, !waitingFlushes.isEmpty { flush(then: waitingFlushes.removeFirst()) }
+            if !isFlushing, !waitingFlushes.isEmpty {
+                let next = waitingFlushes.removeFirst()
+                flush(leaving: next.leaving, then: next.done)
+            }
         }
     }
 
     /// One turn of `flush`: asks the page for its last edit and answers once.
-    private func handOver(then done: @escaping (Bool) -> Void) {
+    private func handOver(leaving: Bool, then done: @escaping (Bool) -> Void) {
         guard let pageItemID else { return done(true) }
         let generation = generation
-        // A page that is not ready has nothing unreported: it reports every change as it is made, and one whose
-        // process ended comes back with the text it last reported.
+        let losses = pageLosses
+        if !isReady, pageLoss != nil { return done(!leaving || !lossHoldsFlush()) }
+        // A page still loading for the first time has nothing unreported: it reports every change as it is made.
         guard isReady, generation != abandonedGeneration else { return done(true) }
         var finished = false
         var watchdog: Task<Void, Never>?
@@ -61,6 +70,12 @@ extension EditorController {
         func capture() {
             guard !finished else { return }
             guard self.pageItemID == pageItemID else { return replaced() }
+            // The page went down while this flush waited for it, taking what it held back.
+            guard losses == pageLosses else {
+                guard leaving else { return finish(true) }
+                tellPageLoss()
+                return finish(false)
+            }
             guard isReady else { return finish(true) }
             // Asked for the generation the flush began on even after outside text reloaded the item: the page puts
             // a reload off while the person composes, so it can still hold text of that generation. A page that
@@ -80,8 +95,8 @@ extension EditorController {
                 let refusal = result as? [String: Any]
                 let code = refusal?["commandError"] as? String
                 // A page composing or importing a picture, or holding back a reload until then, hands its edit over
-                // once it is done. A call that did not
-                // run in the page, as when its process ended, is asked again too, and then finds the page not ready.
+                // once it is done. A call that did not run in the page, as when its process ended, is asked again too,
+                // and then finds that the page went down.
                 if code.map(Self.passingFlushRefusals.contains) == true || error.map(Self.ranInPage) == false {
                     Task { try? await Task.sleep(for: .milliseconds(50)); capture() }
                     return
@@ -124,6 +139,57 @@ extension EditorController {
         capture()
     }
 
+    /// Records that the page went down after it had been ready, as when its process ended or loading it again failed,
+    /// and tells the person. Where it held no item they could edit, nothing typed can be missing. The notice's words
+    /// are worked out here, once, so it is still found waiting after its item is renamed or goes. A loss that becomes
+    /// one that cannot come back names the item on the page now, which the person may have chosen meanwhile, and takes
+    /// back the notice saying it would come back where no window has shown it yet, so one true notice is told.
+    func pageWentDown(comingBack: Bool) {
+        let earlier = pageLoss
+        guard earlier != nil || (isEditable && pageItemID != nil) else { return }
+        let title = pageItemID.flatMap { library?.item($0) }.map { String(localized: "Typing in “\($0.displayTitle)” Might Be Missing") }
+            ?? earlier?.title
+            ?? String(localized: "Some Typing Might Be Missing")
+        let message = comingBack
+            ? String(localized: "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing.")
+            : String(localized: "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close the window that shows this item, then open the item again to check it.")
+        pageLoss = PageLoss(title: title, message: message, comingBack: comingBack)
+        pageLosses += 1
+        if let earlier, earlier.title != title || earlier.message != message, let notices = library?.notices,
+           let told = notices.waiting.first(where: { $0.title == earlier.title && $0.message == earlier.message }) {
+            notices.withdraw(told.id)
+        }
+        tellPageLoss()
+    }
+
+    /// The page showed the item again after a loss (`painted`, or the person typed), so it came back, and a later end
+    /// is a loss of its own.
+    func pageWorks(in generation: Int) {
+        guard let loadedAgain = pageLoss?.loadedAgain, generation >= loadedAgain else { return }
+        pageLoss = nil
+    }
+
+    /// Whether a flush fails because the page is down after a loss: while it is coming back, so the person can check
+    /// the item before they go, and, where it cannot come back, until they have answered being told. A flush it holds
+    /// tells them again where they have answered already, so a refused close or quit always says why.
+    func lossHoldsFlush() -> Bool {
+        guard let pageLoss else { return false }
+        let waiting = isLossNoticeWaiting(pageLoss)
+        guard pageLoss.comingBack else { return waiting }
+        if !waiting { tellPageLoss() }
+        return true
+    }
+
+    /// Tells the person the page went down, unless that notice still waits for their answer.
+    func tellPageLoss() {
+        guard let pageLoss, let notices = library?.notices, !isLossNoticeWaiting(pageLoss) else { return }
+        notices.notKept(pageLoss.title, text: nil, reason: pageLoss.message, standsAlone: true)
+    }
+
+    private func isLossNoticeWaiting(_ loss: PageLoss) -> Bool {
+        library?.notices.waiting.contains { $0.title == loss.title && $0.message == loss.message } == true
+    }
+
     /// The page reports each change as it is made, so what it never reported is not on the page to give back.
     private func tellNotSaved(_ pageItemID: ItemID, reason: String) {
         let title = library?.item(pageItemID).map { String(localized: "Couldn’t Save “\($0.displayTitle)”") }
@@ -145,6 +211,20 @@ extension EditorController {
         String(localized: "Another item opened before the app finished saving this one, so your most recent typing might not be saved. Try again.")
     }
 
+    /// The page went down after it had been ready, holding an item the person could edit, so what they typed last may
+    /// not have reached the app. It lasts until the page has shown the item again (`pageWorks`), or has stayed up for
+    /// `settleTime` after it was ready.
+    struct PageLoss {
+        /// The notice that tells the person, as it was told.
+        let title: String
+        let message: String
+        /// Whether the page is loading again. One that ended again before it showed the item, failed to load, or was
+        /// not ready within `reloadLimit` is not.
+        let comingBack: Bool
+        /// The generation the page loaded the item under once ready again.
+        var loadedAgain: Int?
+    }
+
     /// Destructive transitions proceed only once every editor has handed over its current text and its window's
     /// titles. Where the window or the library goes, a title that still cannot be saved stops them as a failed
     /// capture does, since it would otherwise be lost; where they stay, as when an item is deleted, it waits.
@@ -163,7 +243,7 @@ extension EditorController {
                 continue
             }
             if editor.isFlushing { trace?.editorWaitsItsTurn() }
-            editor.flush(then: gate.arrive)
+            editor.flush(leaving: leaving, then: gate.arrive)
         }
     }
 
@@ -198,6 +278,7 @@ extension EditorController {
         for (id, embeds) in pendingEmbeds { notInText(embeds, of: id) }
         pendingEmbeds = [:]
         pictureSettingWatch?.cancel()
+        reloadWatch?.cancel()
         Self.open.remove(self)
     }
 

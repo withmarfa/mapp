@@ -26,7 +26,7 @@ final class PreferencesSync {
     nonisolated enum Reason: Equatable, Sendable {
         /// No Marfa is connected, or this run never syncs (the sample library, the test host, previews).
         case noMarfa
-        /// The sign-in does not reach the item: Allow More… asks for `PreferencesType.vendorScope`, and for
+        /// The sign-in does not reach the item: Allow More… asks for `PreferencesType.rootScope`, and for
         /// `PreferencesType.registeringScope` where the Marfa holds no settings yet.
         case needsPermission
         /// The copy is still filling, or the item's tables are not whole yet.

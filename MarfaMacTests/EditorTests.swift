@@ -371,16 +371,6 @@ struct EditorTests {
         #expect(try await page.markdown() == nil)
     }
 
-    /// The page reports each change as it is made, so one whose process ended holds nothing back while it reloads.
-    @Test func aPageWhoseProcessEndedDoesNotHoldUpLeaving() async throws {
-        let page = try await Page()
-        try await page.load("Original\n")
-        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
-        let kept = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
-        #expect(kept)
-        try await page.wait { page.editor.isReady }
-    }
-
     /// A page that stops answering is given up on once: the person is told, and trying again goes ahead without
     /// waiting. The text it last reported is already saved, so it is not given back.
     @Test func aPageThatStopsAnsweringIsGivenUpOnAndTold() async throws {

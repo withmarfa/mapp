@@ -4,19 +4,21 @@ name: Checks
 # - A draft pull request runs no Swift job; marking it ready runs them once. Builders test locally first.
 # - A change that touches only the String Catalog, assets or UI tests compiles everything but does not run the
 #   unit tests. Views are not left out, since several unit tests host views.
-# - The release build runs beside the unit tests, not after them, and only for a change to the app's own code,
-#   since it compiles none of the tests.
+# - The release configuration is built after a merge to main (`release-build.yml`), not here: Mac runners are few,
+#   and the tag build and `release.yml`'s dry run compile Release before a release too.
 # - The unit tests run one at a time with a 12 minute limit; a run that reaches it uploads samples of its test host
 #   as the `unit-test-diagnostics` artifact and fails. A failed test fails the check, and nothing is retried.
-# - The UI tests are only built here; they take over the keyboard and mouse, so they run locally when a change
-#   needs them.
+# - The UI tests are only built here, and only when they, the test plans or the project change: their target
+#   imports only XCTest, AppKit and os, so app code cannot break their compile. They take over the keyboard and
+#   mouse, so they run locally when a change needs them.
 # - A change to a workflow is checked by actionlint.
 # - The instruction check (`Scripts/check-instructions.py`) is cheap, so it runs on drafts too. It runs for any
 #   Markdown file, `project.pbxproj`, Swift or editor source (a renamed type can leave a doc stale), the script
 #   or this workflow.
 # - The release scripts (`Scripts/release/`) have unit tests, run when they or this workflow change. `release.yml` publishes tagged
 #   releases and rehearses itself on a change to the release files; it is not part of `Checks`.
-# The final job, "Checks", always runs; make it the one required check.
+# The final job, "Checks", is the one required check. It runs after every job, and after a cancelled run when a job
+# failed. A run that a newer push cancelled ends it as cancelled, not failed, and a cancelled check never passes.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -37,7 +39,7 @@ jobs:
       editor: ${{ steps.filter.outputs.editor }}
       swift: ${{ steps.filter.outputs.swift }}
       logic: ${{ steps.filter.outputs.logic }}
-      release: ${{ steps.filter.outputs.release }}
+      uitests: ${{ steps.filter.outputs.uitests }}
       scripts: ${{ steps.filter.outputs.scripts }}
       workflows: ${{ steps.filter.outputs.workflows }}
       instructions: ${{ steps.filter.outputs.instructions }}
@@ -64,10 +66,9 @@ jobs:
           if [ -n "$logic" ]; then
             echo "logic=true" >> "$GITHUB_OUTPUT"
           fi
-          # The release build compiles the app, not the tests, so tests, test plans and the test scripts do not need it.
-          release=$(echo "$app" | grep -E '^(MarfaMac/|MarfaMac\.xcodeproj/|Config/|\.github/workflows/checks\.yml$)' || true)
-          if [ -n "$release" ]; then
-            echo "release=true" >> "$GITHUB_OUTPUT"
+          # The UI test target compiles only its own folder, under the project's settings and the test plans.
+          if echo "$app" | grep -qE '^(MarfaMacUITests/|TestPlans/|MarfaMac\.xcodeproj/|\.github/workflows/checks\.yml$)'; then
+            echo "uitests=true" >> "$GITHUB_OUTPUT"
           fi
           if echo "$files" | grep -qE '^(Scripts/release/|\.github/workflows/checks\.yml$)'; then
             echo "scripts=true" >> "$GITHUB_OUTPUT"
@@ -183,6 +184,7 @@ jobs:
       # The UI tests take over the keyboard and mouse, so they run locally when a change needs them; here they
       # are only built, so a change that breaks them is seen.
       - name: Build the UI tests
+        if: needs.changes.outputs.uitests == 'true'
         run: >
           xcodebuild -project MarfaMac.xcodeproj -scheme 'MarfaMac UI Tests' -destination 'platform=macOS'
           -derivedDataPath build build-for-testing
@@ -204,27 +206,10 @@ jobs:
               print('::warning::%dx %s' % (count, message))
           "
 
-  release:
-    name: Release build
-    needs: changes
-    if: needs.changes.outputs.release == 'true' && github.event.pull_request.draft == false
-    runs-on: xcode-27
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
-      # A tag build archives Release, which leaves out code that only Debug builds hold; see v0.0.21 to v0.0.24-rc1.
-      - name: Build the release configuration
-        run: >
-          xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -configuration Release -destination 'generic/platform=macOS'
-          -derivedDataPath build-release CODE_SIGNING_ALLOWED=NO build
-
   checks:
     name: Checks
-    needs: [changes, editor, actionlint, instructions, release-scripts, swift, release]
-    if: always()
+    needs: [changes, editor, actionlint, instructions, release-scripts, swift]
+    if: ${{ !cancelled() || contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

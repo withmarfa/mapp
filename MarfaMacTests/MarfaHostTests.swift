@@ -141,6 +141,21 @@ import Testing
         #expect(bench.servers.opened.isEmpty)
     }
 
+    @Test func aSavedAddressWithAPathOpensNothingAndIsToldUntilAnAddressIsChosen() async throws {
+        let bench = try HostBench()
+        bench.defaults.set("https://first.test/a", forKey: "MarfaAddress")
+        let host = bench.host()
+        await host.launch()
+        #expect(host.connection == nil)
+        #expect(host.unusableAddress == "https://first.test/a")
+        #expect(bench.servers.opened.isEmpty)
+        #expect(bench.savedAddress == "https://first.test/a", "the saved address is left as it was")
+        #expect(Libraries.mode(hasSource: false, isConfigured: false, state: host.state, isLaunching: false, isBusy: false) == .unconfigured)
+
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        #expect(host.unusableAddress == nil)
+    }
+
     @Test func aCopyThatCannotBeOpenedIsAPlainProblem() async throws {
         let bench = try HostBench()
         let host = bench.host()

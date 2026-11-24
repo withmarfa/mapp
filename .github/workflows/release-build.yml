@@ -1,0 +1,72 @@
+name: Release build
+
+# A tag build archives Release, which leaves out code that only Debug builds hold; see v0.0.21 to v0.0.24-rc1.
+# This builds the release configuration after each merge to main that changes the app's own code, so such a break
+# is found before a tag. Pull requests do not run it, since Mac runners are few; the tag build and `release.yml`'s
+# dry run compile Release too. A failure opens the issue "Release build failed on main", or comments on it while it
+# is open; the next passing build closes it.
+# There is no concurrency group: no push to main is cancelled, so each commit keeps its own result.
+on:
+  push:
+    branches: [main]
+    paths:
+      - MarfaMac/**
+      - MarfaMac.xcodeproj/**
+      - Config/**
+      - .github/workflows/release-build.yml
+      - '!**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Release build
+    # The hosted image with Xcode 27 (a public preview at the time of writing).
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
+      - name: Build the release configuration
+        run: >
+          xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -configuration Release -destination 'generic/platform=macOS'
+          -derivedDataPath build-release CODE_SIGNING_ALLOWED=NO build
+
+  # A job that reaches its time limit can end as cancelled rather than failed, so anything but success is reported.
+  report:
+    name: Report the result
+    needs: release
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESULT: ${{ needs.release.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          title="Release build failed on main"
+          open=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+            --jq "map(select(.title == \"$title\")) | first | .number // empty")
+          if [ "$RESULT" = success ]; then
+            if [ -n "$open" ]; then
+              gh issue close "$open" --comment "The release build passed at $SHA: $RUN_URL"
+            fi
+            exit 0
+          fi
+          message="The release build ended as $RESULT at $SHA: $RUN_URL"
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$message"
+          else
+            gh issue create --title "$title" --label needs-triage --body "$message
+
+          A tag build may fail the same way. Fix main forward before the next tag; the next passing build closes this issue."
+          fi

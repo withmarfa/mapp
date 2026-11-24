@@ -300,7 +300,7 @@ import os
                 host.presetTestServer(connection)
                 // The key holds what the server says it holds, so a key without an owner's permissions shows Needs a Permission.
                 Task {
-                    // The test key is the app's own, which may write the settings' type, as a sign-in asks (`SystemSignIns`).
+                    // The test key is the app's own, which reaches the settings' type through its vendor.
                     await signIns.adoptScopes(for: connection, adding: [PreferencesType.vendorScope])
                     await host.refreshGrants()
                 }

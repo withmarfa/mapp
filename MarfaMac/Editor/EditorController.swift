@@ -14,11 +14,25 @@ final class EditorController: NSObject {
     private(set) var isReady = false
     /// The load whose page stopped answering a flush and was given up on, so the next flush goes ahead without it.
     @ObservationIgnored var abandonedGeneration: Int?
+    /// The page went down after it had been ready, holding an item the person could edit (`pageWentDown`). Cleared once
+    /// the page has shown the item again (`pageWorks`), or has stayed up for `settleTime` after it was ready.
+    @ObservationIgnored var pageLoss: PageLoss?
+    /// How many losses were recorded, so a flush under way when the page goes down fails even if the page is back.
+    @ObservationIgnored var pageLosses = 0
     /// How long a flush waits for the page before giving it up (`flush`). Only a test changes it.
     @ObservationIgnored var flushLimit = Duration.seconds(2)
+    /// How long a page coming back after its process ended has to be ready again before it counts as unable to come
+    /// back (`pageWentDown`). Only a test changes it.
+    @ObservationIgnored var reloadLimit = Duration.seconds(10)
+    /// How long a page that came back after a loss has to stay up before a later end is a loss of its own, where it
+    /// never says it showed the item, as in a hidden window, which draws no frames. Only a test changes it.
+    @ObservationIgnored var settleTime = Duration.seconds(10)
     /// Whether a flush has its turn with the page, and the flushes waiting for theirs (`flush`).
     @ObservationIgnored var isFlushing = false
-    @ObservationIgnored var waitingFlushes: [(Bool) -> Void] = []
+    @ObservationIgnored var waitingFlushes: [(leaving: Bool, done: (Bool) -> Void)] = []
+    /// Gives up on a page coming back that is not ready within `reloadLimit`, and, once it is ready, ends the loss
+    /// after `settleTime`.
+    @ObservationIgnored var reloadWatch: Task<Void, Never>?
     private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false {
@@ -166,6 +180,8 @@ final class EditorController: NSObject {
     /// A Format command's chosen shortcut, or nothing for one the person cleared; a command not here has its default.
     @ObservationIgnored var formatShortcuts: [Format: Shortcut?] = [:]
     @ObservationIgnored private var pageURL: URL?
+    /// The latest load of the page itself, so only its own failure counts as the page failing to load.
+    @ObservationIgnored private(set) var pageNavigation: WKNavigation?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
     @ObservationIgnored var printRenderer: PrintDocumentRenderer?
 
@@ -267,7 +283,7 @@ final class EditorController: NSObject {
             source: "window.marfaLabels = \(json(Self.editorLabels))", injectionTime: .atDocumentStart, forMainFrameOnly: true
         ))
         pageURL = url
-        webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        pageNavigation = webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
     }
 
     // MARK: Driving the page
@@ -432,10 +448,7 @@ final class EditorController: NSObject {
         guard isReady else { return }
         embeds.version += 1
         call("setItem", json(item.id.rawValue))
-        generation += 1
-        // A late report belongs to one of the last few loads, however quickly outside changes came in.
-        shown = shown.filter { $0.key >= generation - 8 }
-        shown[generation] = Shown(id: item.id, read: body.version)
+        nextGeneration(showing: Shown(id: item.id, read: body.version))
         call(function, json(body.text), String(generation), String(isEditable))
         if function == "load" { applyEditingMode() }
         revealPendingHeading(in: item.id)
@@ -480,8 +493,7 @@ final class EditorController: NSObject {
         embeds.version += 1
         outline = nil
         call("setItem", json(""))
-        generation += 1
-        shown = shown.filter { $0.key >= generation - 8 }
+        nextGeneration(showing: nil)
         call("load", json(""), String(generation), "false")
     }
 
@@ -606,7 +618,9 @@ final class EditorController: NSObject {
     /// older version, so the library never lays it over text the person did not see.
     func report(_ markdown: String, of generation: Int) {
         if heldEdit?.generation == generation { heldEdit = nil }
-        guard var page = shown[generation] else { return }
+        guard var page = shown[generation] else {
+            return handBack(markdown, kind: "an edit for a load no longer kept", reason: String(localized: "The item changed several times in quick succession, so the app couldn’t tell which version your typing belongs to."))
+        }
         let isCurrent = page.id == pageItemID && generation == self.generation
         if isCurrent, let body = library?.body(of: page.id), body.text == self.markdown {
             page.read = body.version
@@ -620,12 +634,37 @@ final class EditorController: NSObject {
         if !isCurrent, page.id == pageItemID, let item = library?.item(page.id) { itemChanged(item) }
     }
 
+    /// Starts a generation for what the page loads next. A late report belongs to one of the last few loads, however
+    /// quickly outside changes came in; one for an older load is handed back (`report`). An emptied page's generation
+    /// belongs to no item.
+    private func nextGeneration(showing page: Shown?) {
+        generation += 1
+        shown = shown.filter { $0.key >= generation - 8 }
+        shown[generation] = page
+    }
+
+    /// An edit the app cannot place, for a load no longer kept or in a message that did not decode, may be the only
+    /// copy of what the person typed, so it goes back to them. `kind` is for the log, which never carries the text.
+    private func handBack(_ markdown: String, kind: StaticString, reason: String) {
+        log.error("handed back \(String(describing: kind), privacy: .public)")
+        library?.notices.notKept(String(localized: "Couldn’t Save Your Typing"), text: markdown, reason: reason)
+    }
+
+    /// A message that did not decode. A change whose text is still readable is handed back; anything else is only logged.
+    fileprivate func receiveUnreadable(_ body: Any) {
+        // The body may hold text, which does not belong in the log; its type says what went wrong.
+        log.error("unreadable message of type \(String(describing: (body as? [String: Any])?["type"]), privacy: .public)")
+        guard let markdown = EditorMessage.unreadableChange(body) else { return }
+        handBack(markdown, kind: "an edit that did not decode", reason: String(localized: "The editor sent your typing in a form the app couldn’t read."))
+    }
+
     fileprivate func receive(_ message: EditorMessage) {
         switch message {
         case .ready:
             releaseHeldEdit()
             outline = nil
             isReady = true
+            reloadWatch?.cancel()
             sendHostActivation()
             applyAccent()
             applyKeymap()
@@ -641,23 +680,27 @@ final class EditorController: NSObject {
             if let pageItemID {
                 embeds.version += 1
                 call("setItem", json(pageItemID.rawValue))
-                generation += 1
-                shown[generation] = Shown(id: pageItemID, read: read)
+                nextGeneration(showing: Shown(id: pageItemID, read: read))
                 call("load", json(markdown), String(generation), String(isEditable))
                 applyEditingMode()
             }
+            // A page that ends again before it has shown the item cannot come back: the item may be what ends it.
+            if pageItemID == nil { pageLoss = nil } else { pageLoss?.loadedAgain = generation }
+            if pageLoss != nil { watchSettling() }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
             appendPendingEmbeds()
         case .headings(let headings, let generation):
             let accepted = PageOutline.accepting(headings, generation: generation, current: self.generation, item: shown[generation]?.id)
             if accepted != outline { outline = accepted }
         case .painted(let generation):
+            pageWorks(in: generation)
             guard let open = opening, open.generation == generation else { return }
             open.interval.end()
             opening = nil
         case .changed(let markdown, let generation):
             // A page that reports again is answering, so the next flush waits for it as before.
             if generation == abandonedGeneration { abandonedGeneration = nil }
+            pageWorks(in: generation)
             if isWritingToolsActive() { return holdEdit(markdown, of: generation) }
             report(markdown, of: generation)
         case .state(let state):
@@ -742,8 +785,7 @@ private final class MessageProxy: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let parsed = EditorMessage(body: message.body) else {
-            // The body may hold text, which does not belong in the log; its type says what went wrong.
-            log.error("unreadable message of type \(String(describing: (message.body as? [String: Any])?["type"]), privacy: .public)")
+            target?.receiveUnreadable(message.body)
             return
         }
         target?.receive(parsed)
@@ -764,24 +806,59 @@ extension EditorController: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
         log.error("navigation failed: \(error.localizedDescription)")
+        pageFailedToLoad(navigation, error)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
         log.error("load failed: \(error.localizedDescription)")
+        pageFailedToLoad(navigation, error)
     }
 
-    /// A page that crashes after working comes back with the item it held. One that never got going is not
-    /// retried, since it would only fail again.
+    /// A page that crashes after working comes back with the item it held, as last reported. One that never got
+    /// going is not retried, since it would only fail again, and neither is one that ended again before it showed the
+    /// item, since the item may be what ends it.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        guard isReady, let pageURL else {
-            Telemetry.editorProcessEnded(wasReady: false)
-            return
-        }
-        Telemetry.editorProcessEnded(wasReady: true)
-        // The page's text is gone with its process; the reload brings back what was last reported.
+        Telemetry.editorProcessEnded(wasReady: isReady)
+        guard isReady || pageLoss != nil else { return }
+        let comingBack = isReady && pageLoss == nil
         releaseHeldEdit()
         cancelRequests()
         isReady = false
-        webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL.deletingLastPathComponent())
+        reloadWatch?.cancel()
+        pageWentDown(comingBack: comingBack)
+        guard comingBack, let pageURL else { return }
+        pageNavigation = webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL.deletingLastPathComponent())
+        let losses = pageLosses
+        reloadWatch = Task { [weak self, reloadLimit] in
+            try? await Task.sleep(for: reloadLimit)
+            guard let self, !Task.isCancelled, !isReady, pageLosses == losses else { return }
+            pageWentDown(comingBack: false)
+        }
+    }
+
+    /// A page that came back may never say it showed the item: a hidden window draws no frames, and outside text
+    /// loaded before it painted gives it another generation, for which it posts no `painted`. One that has stayed up
+    /// this long has come back, so only a page that goes down again soon after it came back cannot come back.
+    private func watchSettling() {
+        let losses = pageLosses
+        reloadWatch = Task { [weak self, settleTime] in
+            try? await Task.sleep(for: settleTime)
+            guard let self, !Task.isCancelled, isReady, pageLosses == losses else { return }
+            pageLoss = nil
+        }
+    }
+
+    /// Only the page's own load counts, and only after the page had been ready: one that never got going held nothing
+    /// typed. A load that failed because the process ended is left to `webViewWebContentProcessDidTerminate`, which
+    /// WebKit can call after it, so a page that can come back is reloaded.
+    private func pageFailedToLoad(_ navigation: WKNavigation?, _ error: any Error) {
+        let error = error as NSError
+        if error.domain == WKError.errorDomain, error.code == WKError.webContentProcessTerminated.rawValue { return }
+        guard navigation === pageNavigation, isReady || pageLoss != nil else { return }
+        releaseHeldEdit()
+        cancelRequests()
+        isReady = false
+        reloadWatch?.cancel()
+        pageWentDown(comingBack: false)
     }
 }

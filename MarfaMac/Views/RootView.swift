@@ -87,13 +87,22 @@ struct LibraryUnavailableView: View {
 
 /// Asks the person to connect to their Marfa, on first launch or after they disconnect.
 struct WelcomeView: View {
+    @Environment(Libraries.self) private var libraries
     let browser: Browser
 
     var body: some View {
         ContentUnavailableView {
-            Label("Connect to Your Marfa", systemImage: "server.rack")
+            if libraries.host.unusableAddress == nil {
+                Label("Connect to Your Marfa", systemImage: "server.rack")
+            } else {
+                Label("Change Your Server Address", systemImage: "exclamationmark.triangle")
+            }
         } description: {
-            Text("The app reads and writes your library on a Marfa server. Enter its address and sign in from Settings.")
+            if let address = libraries.host.unusableAddress {
+                Text(verbatim: Words.savedAddressHasMore(address))
+            } else {
+                Text("The app reads and writes your library on a Marfa server. Enter its address and sign in from Settings.")
+            }
         } actions: {
             Button("Connect…") { browser.showSettings(.connection) }
                 .buttonStyle(.borderedProminent)

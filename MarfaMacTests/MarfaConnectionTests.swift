@@ -9,7 +9,22 @@ struct MarfaConnectionTests {
         let typed = try MarfaConnection(address: " HTTP://Marfa.Example:8210/ ")
         #expect(typed.address.absoluteString == "http://marfa.example:8210")
         #expect(typed == (try MarfaConnection(address: "http://marfa.example:8210")))
-        #expect(try MarfaConnection(address: "https://marfa.example/api/").address.absoluteString == "https://marfa.example/api")
+    }
+
+    @Test(arguments: [
+        ("https://marfa.example", "https://marfa.example"), ("https://marfa.example/", "https://marfa.example"),
+        ("https://marfa.example:8443", "https://marfa.example:8443"), ("http://localhost:3000", "http://localhost:3000"),
+    ])
+    func aServerAddressWithNothingAfterItIsAccepted(_ text: String, _ kept: String) throws {
+        #expect(try MarfaConnection(address: text).address.absoluteString == kept)
+    }
+
+    @Test(arguments: [
+        "https://marfa.example/a", "https://marfa.example/a/", "https://marfa.example//", "https://marfa.example/%2F", "https://marfa.example/?x=1",
+        "https://marfa.example?x=1", "https://marfa.example/#f",
+    ])
+    func anAddressWithAPathAQueryOrAFragmentIsRefused(_ text: String) {
+        #expect(throws: MarfaConnection.Problem.hasMore) { try MarfaConnection(address: text) }
     }
 
     /// An address names its copy and its discard marks as it was entered, so a port the scheme already means is kept.
@@ -25,14 +40,14 @@ struct MarfaConnectionTests {
 
     @Test(arguments: [
         ("https://marfa.example:443", "https://marfa.example", true), ("https://marfa.example", "https://marfa.example:443", true),
-        ("http://marfa.example:80/api", "http://marfa.example/api", true), ("https://marfa.example:8443", "https://marfa.example", false),
+        ("http://marfa.example:80", "http://marfa.example/", true), ("https://marfa.example:8443", "https://marfa.example", false),
         ("https://marfa.example", "https://other.example", false), ("https://marfa.example:80", "https://marfa.example", false),
     ])
     func twoAddressesAreOneServerByTheirOriginNotTheirText(_ one: String, _ other: String, _ same: Bool) throws {
         #expect(try MarfaConnection(address: one).sameServer(as: MarfaConnection(address: other)) == same)
     }
 
-    @Test(arguments: ["ftp://marfa.example", "marfa.example", "http://", "https://user:secret@marfa.example", "https://marfa.example/?key=1", ""])
+    @Test(arguments: ["ftp://marfa.example", "marfa.example", "http://", "https://user:secret@marfa.example", ""])
     func anAddressThatNamesNoServerIsRefused(_ text: String) {
         #expect(throws: MarfaConnection.Problem.notAServer) { try MarfaConnection(address: text) }
     }
@@ -75,7 +90,7 @@ struct MarfaConnectionTests {
         #expect(release.service == "com.withmarfa.marfa.marfa-sign-in")
         #expect(debug.service != release.service)
         #expect(debug.scheme == "com.withmarfa.marfa.debug")
-        #expect(SystemSignIns.scopes == ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write", "profile.name:read", "app.marfa-mac.*:write", "metadata.types:write"])
+        #expect(SystemSignIns.scopes == ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write", "profile.name:read", "app.*:write", "metadata.types:write"])
     }
 
     @Test func theAppClaimsTheSchemeTheBrowserReturnsTo() throws {
