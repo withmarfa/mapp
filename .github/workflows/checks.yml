@@ -1,11 +1,11 @@
 name: Checks
 
 # Changes selects jobs by path. An unmatched path selects all regular checks, including the Swift unit tests.
-# A change to this workflow runs every job, since it defines them; the classifier and other workflows get Linux checks.
+# On a ready pull request, a change to this workflow selects every job.
 # A draft runs only Linux checks.
 # Swift starts on ready pull requests after any selected Instructions and Editor checks pass.
-# The String Catalog, assets and UI tests require a build only. CI builds UI tests only when their files,
-# plans or project change. Run UI tests locally with the screen free.
+# Changes limited to the String Catalog, Assets.xcassets or UI tests select the build.
+# CI builds UI tests when their files, test plans, the Xcode project or this workflow change.
 # Unit tests run serially with a 12-minute limit and upload diagnostics on a stall. CI retries nothing.
 # Checks is the required roll-up. A superseded run reports cancellation unless a job failed.
 # Release build and publishing run in release-build.yml and release.yml.
