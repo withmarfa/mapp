@@ -15,7 +15,7 @@ enum LayoutsSubpage {
 }
 
 /// The Layouts page: one row for each type of the server, which opens that type's own page. Nothing is left out, so a type
-/// with no items yet is here too. Import and Export move every layout between Macs and servers as a file.
+/// with no items yet is here too. Export Layouts and Import Layouts move every layout between Macs and servers as a file.
 struct LayoutsPage: View {
     @Environment(\.settingsSubpage) private var subpage
     @Environment(\.library) private var library
@@ -64,9 +64,13 @@ private struct LayoutsList: View {
             SettingsSection("Built In", line: own.isEmpty ? "How each type shows in rows, on cards and on its own page." : nil) {
                 ForEach(builtIn) { row($0, in: catalogue) }
             }
-            SettingsBar(edge: .leading) {
-                SettingsButton("Import…") { LooksFiles.importLooks(into: libraries) }.accessibilityIdentifier("ImportLayouts")
-                SettingsButton("Export…") { LooksFiles.export(from: libraries) }.accessibilityIdentifier("ExportLayouts")
+            SettingsSection("Your Layouts") {
+                SettingsRow("Export Layouts", line: "As a file you can keep or share.") {
+                    SettingsButton("Export…") { LooksFiles.export(from: libraries) }.accessibilityIdentifier("ExportLayouts")
+                }
+                SettingsRow("Import Layouts", line: "Updates the type layouts included in the file.") {
+                    SettingsButton("Import…") { LooksFiles.importLooks(into: libraries) }.accessibilityIdentifier("ImportLayouts")
+                }
             }
         }
     }

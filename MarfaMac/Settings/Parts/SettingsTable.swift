@@ -79,7 +79,7 @@ private struct TableHeader<Row>: View {
     var hasCheck = false
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SettingsTokens.Metric.tableColumnGap) {
             if hasCheck { Color.clear.frame(width: CheckWidth.value) }
             ForEach(columns.indices, id: \.self) { index in
                 Text(columns[index].title)
@@ -112,7 +112,7 @@ private struct TableRow<Row>: View {
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SettingsTokens.Metric.tableColumnGap) {
             if let check {
                 Toggle(isOn: check) { EmptyView() }
                     .toggleStyle(.checkbox)

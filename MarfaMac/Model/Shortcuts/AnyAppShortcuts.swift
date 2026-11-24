@@ -17,9 +17,9 @@ nonisolated enum AnyAppCommand: String, CaseIterable, Sendable {
     /// The line under the title.
     var line: String? {
         switch self {
-        case .commandPalette: String(localized: "Brings the app forward with the palette open.")
+        case .commandPalette: String(localized: "Over whatever you’re doing.")
         case .searchItems: nil
-        case .quickAdd: String(localized: "Brings the app forward to add an item.")
+        case .quickAdd: String(localized: "A new item, over any app.")
         }
     }
 }

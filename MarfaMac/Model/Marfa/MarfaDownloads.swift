@@ -40,7 +40,7 @@ nonisolated extension DownloadedFileState {
         limit = cache.budget
         bytes = cache.held
         attachments = cache.attachments.map {
-            Attachments(held: $0.held, missing: $0.notHeld,
+            Attachments(held: $0.held, heldBytes: $0.heldBytes, missing: $0.notHeld,
                         reasons: $0.notHeldByReason.map { MissingAttachments(reason: $0.reason, count: $0.attachments) })
         }
     }

@@ -19,8 +19,8 @@ struct ListsPage: View {
                     selection: $density)
                     .accessibilityIdentifier("ListsDensity")
             }
-            SettingsSection("Order", line: "The order a place starts in until you change its Sort by or Group by in View Options.") {
-                SettingsRow("Sort By") {
+            SettingsSection("Order") {
+                SettingsRow("Sort By", line: "A view or a place can set its own.") {
                     SettingsPopUp(title: "Sort By", selection: $sort) {
                         ForEach(ItemSort.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
@@ -84,14 +84,14 @@ private struct DensityPicture: View {
                         if index > 0 {
                             Rectangle()
                                 .fill(SettingsTokens.rule)
-                                .frame(height: 1)
+                                .frame(height: SettingsTokens.Metric.ruleThickness)
                         }
                     }
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.top, 4)
+        .padding(.horizontal, SettingsTokens.Metric.previewRowSide)
+        .padding(.top, SettingsTokens.Metric.previewCardInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(SettingsTokens.card)
         .allowsHitTesting(false)

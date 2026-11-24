@@ -7,6 +7,8 @@ struct LayoutTypePage: View {
     let type: TypeID
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
+    @Environment(\.settingsNavigation) private var navigation
+    @Environment(\.colorScheme) private var scheme
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
 
     private var catalogue: Catalogue { library?.catalogue ?? Catalogue() }
@@ -40,7 +42,13 @@ struct LayoutTypePage: View {
         return SettingsHead(
             lead: TypeMark(icon: info?.icon, size: .large),
             title: Text(verbatim: info?.plural ?? type.rawValue),
-            line: Text(verbatim: Self.startsAs(preset.startsAs, changes: changes)))
+            line: Text(verbatim: Self.startsAs(preset.startsAs, changes: changes))
+        ) {
+            SettingsButton("Show in Types") {
+                navigation?.show(.types, subpage: SettingsSubpage(id: "type:" + type.rawValue, title: info?.plural ?? type.rawValue))
+            }
+            .accessibilityIdentifier("ShowInTypes")
+        }
     }
 
     private static func startsAs(_ words: String, changes: Int) -> String {
@@ -88,7 +96,20 @@ struct LayoutTypePage: View {
                     emptyTitle: "Nothing")
                     .accessibilityIdentifier("LayoutSecondary")
             }
+            color
         }
+    }
+
+    /// The color of the type's mark, which comes from its icon (`TypeTone`), so it is read here and chosen there.
+    private var color: some View {
+        let tone = TypeTone(icon: info?.icon)
+        return SettingsRow("Color", line: "\(tone.title) comes from its symbol.") {
+            Circle()
+                .fill(tone.color(for: scheme))
+                .frame(width: SettingsTokens.Metric.swatch, height: SettingsTokens.Metric.swatch)
+                .accessibilityLabel(tone.title)
+        }
+        .accessibilityIdentifier("LayoutColor")
     }
 
     // MARK: Facts
