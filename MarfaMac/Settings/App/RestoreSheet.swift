@@ -35,11 +35,21 @@ struct RestoreSettingsSheet: View {
     var body: some View {
         SettingsSheet(title: Text("Restore Earlier Settings"), line: Text("Choose the settings to go back to.")) {
             SettingsSection(name: Text("Restore Points"), footer: Text(verbatim: model.reach(false))) {
-                ForEach(restoring.points) { point in
-                    SettingsCheckRow(
-                        verbatim: point.reason.title, line: Self.when(point.date),
-                        isOn: Binding { restoring.chosen == point.id } set: { if $0 { model.setRestore(point.id) } })
+                List(selection: Binding { restoring.chosen } set: { if let id = $0 { model.setRestore(id) } }) {
+                    ForEach(restoring.points) { point in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: point.reason.title).settingsFont(.title)
+                            Text(verbatim: Self.when(point.date)).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
+                        }
+                        .tag(point.id)
+                        .padding(.vertical, 3)
+                    }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .frame(height: Self.listHeight(for: restoring.points.count))
+                .accessibilityLabel(Text("Restore Points"))
+                .accessibilityIdentifier("RestoreSettingsList")
             }
         } buttons: {
             SettingsButton("Cancel") { model.close() }
@@ -51,6 +61,11 @@ struct RestoreSettingsSheet: View {
         }
         .disabled(model.isWorking)
         .accessibilityIdentifier("RestoreSettingsSheet")
+    }
+
+    /// A list inside the sheet's scroll view has no height of its own, so it is given one: its rows, up to a few more than fit.
+    private static func listHeight(for count: Int) -> CGFloat {
+        CGFloat(min(max(count, 1), 6)) * 44 + 8
     }
 
     /// "23 Nov 14:02", in the Mac's language and clock. The day and the time are formatted apart, since the system joins a
