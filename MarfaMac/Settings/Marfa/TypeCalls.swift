@@ -225,8 +225,8 @@ nonisolated protocol TypeCalls: Sendable {
     func types() async throws(TypeFailure) -> TypeListing
     /// The type's guidance and its ancestors' (`GET /types/{id}`).
     func reading(of type: String) async throws(TypeFailure) -> TypeReading
-    /// Reads the type's own definition again and sends it back with `edit` made, so what another app changed meanwhile is
-    /// kept (`PUT /types/{id}` replaces the whole definition and has no version).
+    /// Reads the type's own definition again and sends it back with `edit` applied. The replacement keeps the other fields
+    /// from that read (`PUT /types/{id}` replaces the whole definition and has no write precondition).
     func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure)
     /// Registers a `user.*` type with its plural and icon, below its parent or based on nothing (`POST /types`).
     func addType(_ type: NewTypeRecord) async throws(TypeFailure)

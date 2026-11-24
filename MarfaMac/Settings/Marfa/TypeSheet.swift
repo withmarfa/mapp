@@ -232,7 +232,7 @@ struct TypeDeleteSheet: View {
                         }
                     }
                     SettingsRadioRow(
-                        title: Text("Leave Them As They Are"), line: Text("They can’t be edited until \(plural) exists again."),
+                        title: Text("Leave Them As They Are"), line: Text("Their fields stay read-only until \(plural) exists again."),
                         isOn: model.deleteChoice == .leave, choose: { model.deleteChoice = .leave })
                 }
                 if model.deleteChoice == .move { alsoChanges }
@@ -276,9 +276,9 @@ struct TypeDeleteSheet: View {
 
     private static func line(of kind: TypeSettingRecord.Kind, target: String) -> String {
         switch kind {
-        case .folder: String(localized: "It holds \(target).")
-        case .view: String(localized: "It shows \(target).")
-        case .webhook: String(localized: "It sends \(target).")
+        case .folder: String(localized: "Its settings will use \(target).")
+        case .view: String(localized: "Its type filter will use \(target).")
+        case .webhook: String(localized: "It will send events for \(target).")
         }
     }
 

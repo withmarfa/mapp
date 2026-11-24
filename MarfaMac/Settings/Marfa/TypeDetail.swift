@@ -242,7 +242,7 @@ struct TypeDetail: View {
     private var rulesSection: some View {
         SettingsSection("Rules") {
             SettingsRow(
-                title: Text("Strict"), line: Text("Refuse fields \(model.title(of: type)) doesn’t have."), error: model.fieldErrors[.strict]
+                title: Text("Strict"), line: Text("Reject fields this type doesn’t declare or inherit."), error: model.fieldErrors[.strict]
             ) {
                 SettingsToggle(
                     title: "Strict", isOn: Binding { model.isStrict(type.id) } set: { isOn in Task { await model.setStrict(isOn, of: type.id) } })
@@ -283,11 +283,11 @@ struct TypeDetail: View {
         if case .days(let days)? = window {
             let length = Self.title(of: VersionWindow.days(days)).localizedLowercase
             title = String(localized: "Keep Versions for \(length)?")
-            message = String(localized: "Versions of \(items) older than \(length) will be permanently deleted the next time \(host.serverName) tidies up, except each item’s newest. They can’t be recovered.")
+            message = String(localized: "The next time \(host.serverName) thins versions, it can permanently delete versions of \(items) older than \(length). Each item keeps its newest saved version. Items with two or fewer saved versions keep them all. Types based on \(items) may also lose versions.")
         } else {
             let above = model.versionsComeFromAbove(type.id) ? (parentTitle ?? "") : String(localized: "History")
             title = String(localized: "Leave Versions to \(above)?")
-            message = String(localized: "\(model.title(of: type)) will keep versions as \(above) says, which may remove some sooner than now. What it removes can’t be recovered.")
+            message = String(localized: "The inherited limits may remove versions of \(items) and types based on them sooner. Deleted versions can’t be recovered.")
         }
         SettingsAlert.confirm(title: title, message: message, confirm: String(localized: "Change"), window: NSApp.keyWindow) { confirmed, _ in
             guard confirmed else { return }
@@ -374,7 +374,7 @@ struct TypeDetail: View {
         let name = model.title(of: type)
         SettingsAlert.confirm(
             title: String(localized: "Delete \(name)?"),
-            message: String(localized: "\(host.serverName) deletes a type only while no item holds it and no type is based on it. Deleting can’t be undone."),
+            message: String(localized: "\(host.serverName) checks whether any items, settings, or other types still use \(name). If nothing uses it, deleting it can’t be undone."),
             confirm: String(localized: "Delete Type"), window: NSApp.keyWindow
         ) { confirmed, _ in
             guard confirmed else { return }

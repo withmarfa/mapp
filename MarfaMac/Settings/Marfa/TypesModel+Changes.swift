@@ -44,7 +44,7 @@ extension TypesModel {
     enum DeleteChoice: Hashable {
         /// They move to another type first, and the settings name it.
         case move
-        /// The type is deleted with them as they are: the items can be read, and edited only once the type exists again.
+        /// The items stay readable. Their properties can't be edited until the type exists again.
         case leave
     }
 
