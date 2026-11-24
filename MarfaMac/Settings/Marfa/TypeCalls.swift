@@ -50,47 +50,6 @@ nonisolated enum VersionWindow: Hashable, Sendable {
     case custom
 }
 
-/// How long versions stay: the three windows of a version policy and the most kept, each nil where it could not be read.
-nonisolated struct VersionKeeping: Hashable, Sendable {
-    var recent: Int?
-    var daily: Int?
-    /// Zero keeps every version outside the recent and daily windows, subject to the count limit.
-    var weekly: Int?
-    var most: Int?
-
-    /// The one length all three windows share, where they do and it ends.
-    var uniformDays: Int? {
-        guard let recent, recent > 0, daily == recent, weekly == recent else { return nil }
-        return recent
-    }
-
-    /// Whether this keeps every version `other` keeps: each window at least as long and the count at least as high. A
-    /// window not read can't be told, so it is never at least as long.
-    func keepsAll(of other: VersionKeeping) -> Bool {
-        func atLeast(_ new: Int?, _ old: Int?, zeroIsForever: Bool = false) -> Bool {
-            guard let new, let old else { return false }
-            if zeroIsForever { return new == 0 || (old != 0 && new >= old) }
-            return new >= old
-        }
-        let most = most == other.most || atLeast(most, other.most)
-        return atLeast(recent, other.recent) && atLeast(daily, other.daily) && atLeast(weekly, other.weekly, zeroIsForever: true) && most
-    }
-}
-
-/// What decides how long a type's versions stay, read together just before a change to them.
-nonisolated struct VersionKeepingReading: Hashable, Sendable {
-    /// What the type keeps now: its own windows, else those of the types above, else This Marfa's History settings.
-    var now: VersionKeeping
-    /// What it would keep with no windows of its own, its own most kept left as it is.
-    var above: VersionKeeping
-
-    /// What the type keeps once `days` is set, or with nil once its own windows are left out.
-    func after(_ days: Int?) -> VersionKeeping {
-        guard let days else { return above }
-        return VersionKeeping(recent: days, daily: days, weekly: days, most: now.most)
-    }
-}
-
 /// The kinds of field an owner adds. Marfa has more (lists, status words, thumbnails); those come from a plugin or the
 /// command line.
 nonisolated enum FieldKind: String, CaseIterable, Hashable, Sendable {
@@ -171,9 +130,8 @@ nonisolated enum TypeEdit: Hashable, Sendable {
     case feedWindow(FeedWindow?)
     /// Nil leaves the strategy to the type above.
     case mergeStrategy(String?)
-    /// Keeps every version for this many days, then only each item's newest. Nil leaves the windows to the type above. It is
-    /// sent only while the type's versions are still kept as `readAs` says, which the person agreed to change.
-    case versionWindow(Int?, readAs: VersionKeepingReading)
+    /// Keeps every version for this many days, then only each item's newest. Nil leaves the windows to the type above.
+    case versionWindow(Int?)
 }
 
 /// A field the owner adds to a type.
@@ -299,9 +257,6 @@ nonisolated protocol TypeCalls: Sendable {
     /// Reads the type's own definition again and sends it back with `edit` applied. The replacement keeps the other fields
     /// from that read (`PUT /types/{id}` replaces the whole definition and has no write precondition).
     func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure)
-    /// How long the type's versions stay now and would with no windows of its own, read from the type, the types above it
-    /// (`GET /types/{id}`) and, where the sign-in may read them, This Marfa's History settings (`GET /config`).
-    func versionKeeping(of type: String) async throws(TypeFailure) -> VersionKeepingReading
     /// Registers a `user.*` type with its plural and icon, below its parent or based on nothing (`POST /types`).
     func addType(_ type: NewTypeRecord) async throws(TypeFailure)
     /// Deletes a type of the owner's that no type is based on (`DELETE /types/{id}`). Unforced, a type an item or a setting

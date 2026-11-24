@@ -277,36 +277,18 @@ extension TypesModel {
     /// Whether a type above sets how long versions stay, so leaving it to the type above is not the same as History.
     func versionsComeFromAbove(_ id: String) -> Bool { chain(of: id).dropLast().contains { $0.versionWindow != nil } }
 
-    /// A change to how long versions stay, worked out from what the server holds just before it is sent.
-    struct VersionChange: Equatable {
-        /// What the type keeps now.
-        let now: VersionKeeping
-        /// What it keeps after the change.
-        let new: VersionKeeping
-        /// Whether the change can delete versions, which can't be recovered, so it is sent only once the person agrees.
-        var mayDelete: Bool { !new.keepsAll(of: now) }
-    }
-
-    /// Sets how long the type keeps versions, or with nil leaves it to the type above. It waits behind the changes queued
-    /// before it, then reads the type, the types above and History's settings again: a change that can delete versions is
-    /// sent only once `confirm` agrees to what that read says, and only while the server still holds what it read.
-    func setVersionWindow(_ window: VersionWindow?, of id: String, confirm: @escaping @MainActor (VersionChange) async -> Bool) async {
-        guard let type = record(id), isEditable(type), window != .custom, window != versionSelection(of: id) else { return }
+    /// Sets how long the type keeps versions, or with nil leaves it to the type above. Any change can delete versions the new
+    /// choice doesn't keep, so it is sent only once `confirm` agrees to the change from the choice shown to the new one.
+    func setVersionWindow(
+        _ window: VersionWindow?, of id: String, confirm: @MainActor (_ from: VersionWindow?, _ to: VersionWindow?) async -> Bool
+    ) async {
+        let shown = versionSelection(of: id)
+        guard let type = record(id), isEditable(type), window != .custom, window != shown else { return }
         let days: Int? = if case .days(let days)? = window { days } else { nil }
         fieldErrors[.versions] = nil
+        guard await confirm(shown, window) else { return }
         pageFailure = nil
-        _ = await enqueue { () async -> Bool in
-            let read: VersionKeepingReading
-            do throws(TypeFailure) {
-                read = try await self.calls.versionKeeping(of: id)
-            } catch {
-                await self.refused(error, field: .versions)
-                return false
-            }
-            let change = VersionChange(now: read.now, new: read.after(days))
-            if change.mayDelete, !(await confirm(change)) { return false }
-            return await self.send(.versionWindow(days, readAs: read), to: id, field: .versions)
-        }
+        _ = await enqueue { await self.send(.versionWindow(days), to: id, field: .versions) }
     }
 
     /// Reads which types strict mode names, where the sign-in may read the configuration. A failed read leaves the switch out.

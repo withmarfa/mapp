@@ -44,9 +44,6 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         var gate: TypeCallGate?
         /// A refusal of the move's preview, as the server answers a move a setting stops.
         var previewRefusal: TypeFailure?
-        /// How long the type's versions stay as the server reads them now.
-        var keeping = VersionKeepingReading(
-            now: VersionKeeping(recent: 30, daily: 30, weekly: 30, most: 50), above: VersionKeeping(recent: 30, daily: 90, weekly: 365, most: 50))
     }
 
     let state = Mutex(State())
@@ -59,8 +56,6 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
 
     func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure) {
         state.withLock { $0.started.append(edit) }
-        // Like the app's half: versions are changed only while they are kept as the person was told.
-        if case .versionWindow(_, let read) = edit, state.withLock({ $0.keeping }) != read { throw .changedOnServer }
         if let gate = state.withLock({ $0.gate }) { await gate.wait() }
         if let refusal = state.withLock({ $0.refusal }) { throw refusal }
         // Like the server's replacement: a change the type already holds sends nothing, and the rest is made on the type as it is now.
@@ -95,6 +90,8 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
                 guard var field = record.fields[key], field.choices.contains(word), field.choices.count > 1 else { return }
                 field.choices.removeAll { $0 == word }
                 record.fields[key] = field
+            case .versionWindow(let days):
+                record.versionWindow = days.map(VersionWindow.days)
             default:
                 break
             }
@@ -124,8 +121,6 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         if let refusal = state.withLock({ $0.previewRefusal }) { throw refusal }
         return state.withLock { $0.preview }
     }
-
-    func versionKeeping(of type: String) async throws(TypeFailure) -> VersionKeepingReading { state.withLock { $0.keeping } }
 
     func move(_ type: String, to target: String) async throws(TypeFailure) -> TypeMoveResult {
         state.withLock { state in
@@ -913,55 +908,20 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
                 == [.addField(NewFieldRecord(key: "site", label: "Site", kind: .text, isRequired: true, isSearchable: false))])
     }
 
-    @Test func keepingVersionsLongerIsSentWithoutAskingAndShorterOnlyOnceAgreed() async {
+    /// Any change to how long versions stay can let the server delete versions, longer or shorter, so every one asks first
+    /// and is sent only once agreed.
+    @Test func everyChangeToKeepVersionsAsksFirst() async {
         let calls = withFields()
         let model = model(calls)
         await model.load()
-        var asked: [TypesModel.VersionChange] = []
-        await model.setVersionWindow(.days(90), of: "user.job") { asked.append($0); return true }
-        #expect(asked.isEmpty, "every window grows from 30 days")
-        await model.setVersionWindow(.days(7), of: "user.job") { asked.append($0); return false }
-        #expect(asked.map(\.new.recent) == [7])
-        #expect(asked.first?.now == calls.state.withLock { $0.keeping.now })
-        let read = calls.state.withLock { $0.keeping }
-        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.versionWindow(90, readAs: read)])
-    }
-
-    /// The page may show a window another device has since lengthened: the question is decided from the server's answer,
-    /// read just before sending, and so is leaving the windows to the types above.
-    @Test func whetherToAskIsDecidedFromWhatTheServerHoldsNow() async {
-        let calls = withFields()
-        calls.state.withLock { $0.keeping.now = VersionKeeping(recent: 365, daily: 365, weekly: 365, most: 50) }
-        let model = model(calls)
-        await model.load()
-        var asked: [TypesModel.VersionChange] = []
-        await model.setVersionWindow(.days(90), of: "user.job") { asked.append($0); return false }
-        #expect(asked.map(\.now.recent) == [365])
-        #expect(asked.map(\.new.recent) == [90])
-        calls.state.withLock { $0.types[2].versionWindow = .days(365) }
-        await model.load()
-        await model.setVersionWindow(nil, of: "user.job") { asked.append($0); return false }
-        #expect(asked.last?.new == calls.state.withLock { $0.keeping.above }, "History's or the type above's windows, which are shorter")
+        var asked: [[VersionWindow?]] = []
+        await model.setVersionWindow(.days(90), of: "user.job") { asked.append([$0, $1]); return false }
         #expect(calls.state.withLock { $0.changes.isEmpty })
-    }
-
-    @Test func versionsChangedWhileTheOwnerWasAskedAreNotChanged() async {
-        let calls = withFields()
-        let model = model(calls)
-        await model.load()
-        await model.setVersionWindow(.days(7), of: "user.job") { _ in
-            calls.state.withLock { $0.keeping.now.recent = 3 }
-            return true
-        }
-        #expect(calls.state.withLock { $0.changes.isEmpty })
-        #expect(model.fieldErrors[.versions] != nil)
-    }
-
-    @Test func windowsThatCantBeReadAlwaysAsk() {
-        let known = VersionKeeping(recent: 30, daily: 30, weekly: 30, most: nil)
-        #expect(!known.keepsAll(of: VersionKeeping(recent: nil, daily: nil, weekly: nil, most: nil)))
-        #expect(!VersionKeeping(recent: 90, daily: 90, weekly: 90, most: nil).keepsAll(of: VersionKeeping(recent: 30, daily: 90, weekly: 0, most: nil)), "with a weekly window of 0, age does not expire versions past the daily window")
-        #expect(VersionKeeping(recent: 90, daily: 90, weekly: 90, most: nil).keepsAll(of: known))
+        await model.setVersionWindow(.days(90), of: "user.job") { asked.append([$0, $1]); return true }
+        await model.setVersionWindow(.days(7), of: "user.job") { asked.append([$0, $1]); return true }
+        await model.setVersionWindow(nil, of: "user.job") { asked.append([$0, $1]); return true }
+        #expect(asked == [[nil, .days(90)], [nil, .days(90)], [.days(90), .days(7)], [.days(7), nil]])
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.versionWindow(90), .versionWindow(7), .versionWindow(nil)])
     }
 
     @Test func aStrictSwitchTheServerRefusesShowsWhatTheServerHolds() async {

@@ -26,34 +26,11 @@ nonisolated struct ServerTypeCalls: TypeCalls {
     }
 
     func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure) {
-        // A change to how long versions stay is sent only while they are kept as the person was told when agreeing to it.
-        if case .versionWindow(_, let read) = edit, try await versionKeeping(of: type) != read { throw .changedOnServer }
         try await run { client in
             try await TypeDefinitionEdit.run(
                 Self.change(edit), to: type,
                 read: { try await client.listTypes().ok.body.json.data },
                 replace: { _ = try await client.replace(itemType: type, with: $0) })
-        }
-    }
-
-    func versionKeeping(of type: String) async throws(TypeFailure) -> VersionKeepingReading {
-        try await run { client in
-            let listed = try await client.listTypes().ok.body.json.data
-            guard let own = listed.first(where: { $0.value1.id == type })?.value1 else { throw TypeSchemaFailure.changedOnServer }
-            let resolved = try await client.getType(path: .init(id: type)).ok.body.json.value1.versionPolicy
-            var above: Components.Schemas.VersionPolicy?
-            if let parent = own.parent, listed.contains(where: { $0.value1.id == parent }) {
-                above = try await client.getType(path: .init(id: parent)).ok.body.json.value1.versionPolicy
-            }
-            // History's settings stand where no type sets a window; a sign-in that can't read them leaves them unknown.
-            let config = try? await client.getConfig().ok.body.json
-            let now = VersionKeeping(
-                recent: resolved?.recentDays ?? config?.versionRecentDays, daily: resolved?.dailySnapshotDays ?? config?.versionDailySnapshotDays,
-                weekly: resolved?.weeklySnapshotDays ?? config?.versionWeeklySnapshotDays, most: resolved?.maxVersions ?? config?.versionMaxVersions)
-            let without = VersionKeeping(
-                recent: above?.recentDays ?? config?.versionRecentDays, daily: above?.dailySnapshotDays ?? config?.versionDailySnapshotDays,
-                weekly: above?.weeklySnapshotDays ?? config?.versionWeeklySnapshotDays, most: now.most)
-            return VersionKeepingReading(now: now, above: without)
         }
     }
 
@@ -184,7 +161,7 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         case .removeField(let key): .removeField(key: key)
         case .feedWindow(let window): .feedWindow(window)
         case .mergeStrategy(let name): .mergeStrategy(name)
-        case .versionWindow(let days, _): .versionWindow(days)
+        case .versionWindow(let days): .versionWindow(days)
         }
     }
 

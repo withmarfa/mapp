@@ -271,41 +271,31 @@ struct TypeDetail: View {
         }
     }
 
-    /// Sends the choice. The model reads again how long versions stay just before sending, and a change that can delete
-    /// versions, which can't be recovered, asks first, naming how long they stay now and after.
+    /// Sends the choice once the person agrees: any change can delete versions the new choice doesn't keep.
     private func setVersions(_ window: VersionWindow?) {
         let id = type.id
-        let items = model.title(of: type).localizedLowercase
         let server = host.serverName
-        Task { await model.setVersionWindow(window, of: id) { await Self.confirm($0, items: items, server: server) } }
+        let inherited = versionsInheritedTitle
+        Task {
+            await model.setVersionWindow(window, of: id) { from, to in
+                await Self.confirm(from: from.map(Self.title) ?? inherited, to: to.map(Self.title) ?? inherited, server: server)
+            }
+        }
     }
 
-    private static func confirm(_ change: TypesModel.VersionChange, items: String, server: String) async -> Bool {
-        let title: String
-        if let days = change.new.uniformDays {
-            title = String(localized: "Keep Versions for \(Self.title(of: VersionWindow.days(days)))?")
-        } else {
-            title = String(localized: "Change How Long Versions Are Kept?")
-        }
-        let now = describe(change.now)
-        let new = describe(change.new)
-        let message = String(localized: "Versions of \(items) are kept \(now) now, and would be kept \(new). The next time \(server) thins versions, it can permanently delete the ones this no longer keeps. Each item keeps its newest saved version. Items with two or fewer saved versions keep them all. Types based on \(items) may also lose versions.")
+    /// What Keep Versions calls leaving the windows to the type above or to History.
+    private var versionsInheritedTitle: String {
+        if model.versionsComeFromAbove(type.id), let parentTitle { String(localized: "As \(parentTitle)") } else { String(localized: "As in History") }
+    }
+
+    private static func confirm(from: String, to: String, server: String) async -> Bool {
+        let title = String(localized: "Change Keep Versions to \(to)?")
+        let message = String(localized: "Keep Versions changes from \(from) to \(to). The next time \(server) thins versions, it can delete versions that \(to) doesn’t keep. Deleted versions can’t be recovered.")
         return await withCheckedContinuation { continuation in
             SettingsAlert.confirm(title: title, message: message, confirm: String(localized: "Change"), window: NSApp.keyWindow) { confirmed, _ in
                 continuation.resume(returning: confirmed)
             }
         }
-    }
-
-    /// How long versions stay, as a phrase after "kept".
-    private static func describe(_ keeping: VersionKeeping) -> String {
-        guard let recent = keeping.recent, let daily = keeping.daily, let weekly = keeping.weekly else {
-            return String(localized: "for an unknown length of time")
-        }
-        let length = { (days: Int) in Self.title(of: VersionWindow.days(days)).localizedLowercase }
-        if let days = keeping.uniformDays { return String(localized: "for \(length(days))") }
-        let weeks = weekly == 0 ? String(localized: "every older version up to the count limit") : String(localized: "one a week for \(length(weekly))")
-        return String(localized: "every version for \(length(recent)), one a day for \(length(daily)) and \(weeks)")
     }
 
     private static func title(of window: VersionWindow) -> String {
@@ -332,11 +322,7 @@ struct TypeDetail: View {
                     selection: Binding<VersionWindow?> { model.versionSelection(of: type.id) } set: { setVersions($0) },
                     isError: model.fieldErrors[.versions] != nil
                 ) {
-                    if model.versionsComeFromAbove(type.id), let parentTitle {
-                        Text("As \(parentTitle)").tag(VersionWindow?.none)
-                    } else {
-                        Text("As in History").tag(VersionWindow?.none)
-                    }
+                    Text(verbatim: versionsInheritedTitle).tag(VersionWindow?.none)
                     ForEach(model.versionDays(for: type.id), id: \.self) { days in
                         Text(verbatim: Self.title(of: VersionWindow.days(days))).tag(Optional(VersionWindow.days(days)))
                     }
