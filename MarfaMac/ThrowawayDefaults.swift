@@ -5,7 +5,7 @@ import Synchronization
 /// Unit-test defaults backed by a temporary plist. On macOS 27, an absolute suite path lets the process write the
 /// file directly instead of having `cfprefsd` write a named domain under `~/Library/Preferences`.
 /// Keep the returned object alive for as long as the test needs the domain.
-nonisolated final class ThrowawayDefaults: UserDefaults, @unchecked Sendable {
+nonisolated final class ThrowawayDefaults: UserDefaults {
     /// The domain's name, which opens the same defaults again (`UserDefaults(suiteName:)`) while this object lives.
     let suite: String
 
