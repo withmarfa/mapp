@@ -55,6 +55,7 @@ extension MarfaEngine.Event {
         case .unsent: "unsent"
         case .closeAgreeing: "closeAgreeing"
         case .answer: "answer"
+        case .withdrawn: "withdrawn"
         case .attach: "attach"
         case .addFile: "addFile"
         case .attached: "attached"

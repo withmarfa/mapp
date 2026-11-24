@@ -74,11 +74,11 @@ extension MarfaLibrary {
         action()
     }
 
-    /// The engine did not make a held step's writes, because what they touch changed or the copy was not brought up to
-    /// date in time. An undo goes back on the undo stack, and registering outside an undo or redo empties the whole
-    /// redo stack, the step it had registered included; a redo cannot go back, so the undo it registered does nothing
-    /// and says so. A redo's write that carried the person's text is the only copy of it, so `text` is kept where they
-    /// can get it back, as for a library that closed.
+    /// A held step's writes were not made, because what they touch changed or the copy was not brought up to date in
+    /// time. An undo goes back on the undo stack. This happens after its run, and registering outside an undo or redo
+    /// empties the whole redo stack, the step it had registered included. A redo cannot go back, so the undo it
+    /// registered does nothing and says so. A redo's write that carried the person's text is the only copy of it, so
+    /// `text` is kept where they can get it back, as for a library that closed.
     func giveBack(_ run: UndoRun, _ problem: SyncProblem, title: String?, text: String?) {
         let first = !run.told
         run.told = true
@@ -94,6 +94,26 @@ extension MarfaLibrary {
         } else if first {
             let again = restoring ? " " + String(localized: "Choose Undo again to try it as things are now.") : ""
             notices.tell(title, message + again)
+        }
+    }
+
+    /// A property Undo that can be made once an earlier edit is answered, refused while it runs
+    /// (`MarfaLibrary+PropertyEdits`). It goes back on the undo stack once its run has ended, as a held step given back
+    /// does (`giveBack`), which empties the redo stack. Redoing what the run registered instead would make again every
+    /// other step of its undo group.
+    func putBack(_ run: UndoRun, reason: String) {
+        run.outcome.wasMade = false
+        run.told = true
+        notices.tell(run.step.name, reason + " " + String(localized: "Choose Undo again to try it as things are now."))
+        guard let manager = run.step.manager else { return }
+        let step = UndoStep(manager: manager, name: run.step.name, handler: run.step.handler, counterpartOf: run.step.counterpartOf)
+        Task { [weak self] in
+            guard let self else { return }
+            // A manager that does not group by event takes a step only inside a group it was asked to open.
+            let opens = !manager.groupsByEvent && manager.groupingLevel == 0
+            if opens { manager.beginUndoGrouping() }
+            register(step)
+            if opens { manager.endUndoGrouping() }
         }
     }
 }

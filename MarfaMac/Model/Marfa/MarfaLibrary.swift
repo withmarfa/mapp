@@ -230,6 +230,12 @@ import Observation
     /// edits it took lately, so an editor can tell a write that landed and was changed again before it drew from one
     /// refused (`tookPropertyWrite(_:)`).
     @ObservationIgnored private var propertyMarks: [WriteID: Int] = [:]
+    /// This Mac's property edits with no final answer yet (`MarfaLibrary+PropertyEdits`).
+    @ObservationIgnored private var propertyEdits: [WriteID: PropertyEdit] = [:]
+    /// This Mac's newest edit of each key of each item, until it has a final answer and the item has been read since.
+    /// The engine publishes an answer before it reads the item again, so until then the copy may still show a refused
+    /// edit.
+    @ObservationIgnored var newestEdits: [ItemID: [String: PropertyEdit]] = [:]
     @ObservationIgnored private(set) var lastPropertyWrite: Int? = 0
     @ObservationIgnored private var takenMarks: Set<Int> = []
     /// Creates the source refused before it held the item, such as one made while the copy is brought up to date,
@@ -632,10 +638,12 @@ import Observation
         defer { interval.end() }
         switch change {
         case .loaded(let snapshot):
+            forgetAnsweredEdits(of: Set(newestEdits.keys))
             load(snapshot)
         case .changed(let changes):
+            forgetAnsweredEdits(of: Set(changes.upserted.map(\.id)).union(changes.removed))
             take(changes)
-        case .answered(let id, let outcome):
+        case .answered(let id, let outcome, let holding):
             textSaves.removeValue(forKey: id)?.end()
             propertyWrites[id] = nil
             propertyMarks[id] = nil
@@ -643,10 +651,12 @@ import Observation
             answered(id, outcome)
             stateWriteAnswered(id, outcome)
             settle(id)
+            propertyAnswered(id, outcome, holding: holding)
         case .taken(let id):
             textSaves.removeValue(forKey: id)?.end()
             propertyWrites[id] = nil
             if let mark = propertyMarks.removeValue(forKey: id) { remember(taken: mark) }
+            if let edit = propertyEdits[id] { edit.take(holding: { item(edit.item)?.value(of: $0) }) }
             took(id)
             stateWriteTaken(id)
             read(id)
@@ -812,6 +822,8 @@ import Observation
         let run = undoRuns.removeValue(forKey: id)
         if case .refused(let problem) = outcome, let run, MarfaEngine.isHeldRefusal(problem.code) {
             giveBack(run, problem, title: refusal?.title, text: typed ?? refusal?.text)
+        } else if case .refused(let problem) = outcome, problem.code == MarfaEngine.withdrawnCode {
+            // The person withdrew it themselves.
         } else if case .refused(let problem) = outcome, let refusal {
             let message = problem.message ?? String(localized: "The Marfa server refused this change.")
             if problem.code == MarfaEngine.closedCode {
@@ -919,7 +931,7 @@ import Observation
             return text
         case .create:
             return createdText(write)
-        case .editProperties(_, let changes, _, _), .retype(_, _, let changes, _):
+        case .editProperties(_, let changes, _), .retype(_, _, let changes, _):
             let texts = changes.sorted { $0.key < $1.key }.flatMap { $0.value.map(texts(in:)) ?? [] }
             return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
         case .tag(_, let tag, on: true) where tag != ItemTag.favorite:
@@ -947,14 +959,33 @@ import Observation
         return ([draft.title, draft.body] + values).filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
 
-    /// A property edit is followed until the copy takes or refuses it.
-    func submitPropertyEdit(_ write: ItemWrite, of item: ItemID, failing title: String) {
+    /// A property edit is on its way until the copy takes or refuses it, and followed until the server's final answer
+    /// (`MarfaLibrary+PropertyEdits`). Nil where the source took nothing.
+    @discardableResult
+    func submitPropertyEdit(_ item: ItemID, _ changes: [String: PropertyValue?], base: ItemVersion, failing title: String) -> PropertyEdit? {
         let mark = (lastPropertyWrite ?? 0) + 1
         lastPropertyWrite = mark
-        let id = submit(write, failing: title)
-        if refusals[id] != nil {
-            propertyWrites[id] = item
-            propertyMarks[id] = mark
+        let edit = newEdit(of: item, changes)
+        let id = submit(.editProperties(item, changes, base: base), failing: title)
+        guard refusals[id] != nil else { return nil }
+        propertyWrites[id] = item
+        propertyMarks[id] = mark
+        propertyEdits[id] = edit
+        for key in changes.keys { newestEdits[item, default: [:]][key] = edit }
+        return edit
+    }
+
+    private func propertyAnswered(_ id: WriteID, _ outcome: WriteOutcome, holding: [String: PropertyValue]?) {
+        guard let edit = propertyEdits[id], let kept = PropertyEdit.kept(edit.changes.keys, after: outcome, holding: holding, left: edit.left) else { return }
+        edit.kept = kept
+        propertyEdits[id] = nil
+    }
+
+    /// The items were read after any answer published before, so the copy shows what those answers left.
+    private func forgetAnsweredEdits(of items: Set<ItemID>) {
+        for item in items where newestEdits[item] != nil {
+            newestEdits[item] = newestEdits[item]?.filter { $0.value.kept == nil }
+            if newestEdits[item]?.isEmpty == true { newestEdits[item] = nil }
         }
     }
 
@@ -1032,7 +1063,7 @@ import Observation
         switch write {
         case .create, .editBody:
             break
-        case .editProperties(let id, _, _, _), .retype(let id, _, _, _), .retier(let id, _, _), .transition(let id, _),
+        case .editProperties(let id, _, _), .retype(let id, _, _, _), .retier(let id, _, _), .transition(let id, _),
             .purge(let id, _), .tag(let id, _, _):
             sendWaitingText(of: id)
         case .link, .unlink, .moveEdge:

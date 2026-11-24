@@ -212,10 +212,14 @@ nonisolated final class MarfaSource: ItemSource {
             return try await ask { .release(id, $0) }
         case (.write(let id), .withdraw):
             // It reads the server, so it runs beside the engine rather than holding up the writes behind it; the
-            // copy announces the withdrawal, which the engine reads again.
+            // copy announces the withdrawal, which the engine reads again. The server never answers a write taken
+            // out, so the engine answers each as not made.
             do {
                 // An empty answer means nothing was taken, as when the write was no longer withdrawable.
-                return try await !MarfaEngine.asking { try await copy.queue.withdraw(id) }.isEmpty
+                let withdrawn = try await MarfaEngine.asking { try await copy.queue.withdraw(id) }
+                guard !withdrawn.isEmpty else { return false }
+                events.yield(.withdrawn(withdrawn))
+                return true
             } catch let error as MarfaError {
                 throw SourceFailure(kind: .failed, message: Words.message(for: error))
             }

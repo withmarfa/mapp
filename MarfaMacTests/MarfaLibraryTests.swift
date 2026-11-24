@@ -462,14 +462,14 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         #expect(library.setItemProperty(F.en1, key: "title", value: .string(" Ada L. "), undoManager: undo))
-        #expect(source.writes == [.editProperties(F.en1, ["name": .string("Ada L.")], base: ItemVersion(1), undoing: nil)])
+        #expect(source.writes == [.editProperties(F.en1, ["name": .string("Ada L.")], base: ItemVersion(1))])
 
         var moved = try #require(library.item(F.en1))
         moved.version = ItemVersion(7)
         source.send(.upserted([moved]))
         #expect(await eventually { library.item(F.en1)?.version == ItemVersion(7) })
         undo.undo()
-        #expect(source.writes.last == .editProperties(F.en1, ["name": .string("Ada")], base: ItemVersion(7), undoing: nil))
+        #expect(source.writes.last == .editProperties(F.en1, ["name": .string("Ada")], base: ItemVersion(7)))
 
         // A title that is the first line of the text is edited in the text.
         #expect(!library.setItemProperty(F.f1, key: "title", value: .string("X"), undoManager: nil))
@@ -495,11 +495,11 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.setItemProperty(F.t1, key: "due", value: .string("2026-10-06"), undoManager: undo))
         undo.endUndoGrouping()
         undo.undo()
-        #expect(source.writes.last == .editProperties(F.t1, ["due": nil], base: ItemVersion(1), undoing: nil))
+        #expect(source.writes.last == .editProperties(F.t1, ["due": nil], base: ItemVersion(1)))
         undo.undo()
-        #expect(source.writes.last == .editProperties(F.t1, ["status": nil], base: ItemVersion(1), undoing: nil))
+        #expect(source.writes.last == .editProperties(F.t1, ["status": nil], base: ItemVersion(1)))
         undo.redo()
-        #expect(source.writes.last == .editProperties(F.t1, ["status": .string("done")], base: ItemVersion(1), undoing: nil))
+        #expect(source.writes.last == .editProperties(F.t1, ["status": .string("done")], base: ItemVersion(1)))
     }
 
     @Test func favoritesAreTheFavoriteTagAndUndo() async throws {
@@ -1036,7 +1036,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         model.activate(ValueEditOptions.optionID("done"))
         #expect(closed, "the panel does not wait for the server")
         #expect(model.notice == nil)
-        #expect(source.writes == [.editProperties(F.t1, ["status": .string("done")], base: ItemVersion(1), undoing: nil)])
+        #expect(source.writes == [.editProperties(F.t1, ["status": .string("done")], base: ItemVersion(1))])
         #expect(library.notices.waiting.isEmpty, "nothing is told as a fault while offline")
 
         // The copy applies the write at once and marks the item as waiting for the server.
@@ -1422,7 +1422,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.setItemProperty(id, key: "name", value: original, undoManager: nil))
 
         let edits = source.writes.compactMap { write -> PropertyValue?? in
-            guard case .editProperties(let item, let changes, _, _) = write, item == id else { return nil }
+            guard case .editProperties(let item, let changes, _) = write, item == id else { return nil }
             return changes["name"]
         }
         #expect(edits == [.string("Ada L"), original])

@@ -45,6 +45,7 @@ extension MarfaEngine {
                 }
                 let queued = try await Self.asking { try await queue(write) }
                 record(id, queued)
+                if group == nil { giveBackHeld(overtakenBy: write) }
                 if case .moveEdge = write { for written in queued { movedEnds[written.id] = ends } }
                 touched = ends.union(queued.flatMap { [$0.itemId, $0.toId].compactMap(\.self) })
             }
@@ -149,7 +150,7 @@ extension MarfaEngine {
             // A following edit counted the answers it saw as it chose its version (`followingVersion`).
             counted.formUnion(answeredBefore)
             return [queued]
-        case .editProperties(let id, let changes, let base, _):
+        case .editProperties(let id, let changes, let base):
             let (properties, clearing) = Self.propertyEdit(changes)
             return [try await send(id, properties, clearing: clearing) { base.rawValue }]
         case .retype(let id, let type, let changes, let base):

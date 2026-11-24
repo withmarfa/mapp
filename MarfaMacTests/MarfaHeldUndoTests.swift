@@ -73,7 +73,7 @@ import Testing
             switch write {
             case .link, .unlink, .moveEdge:
                 return notWhole
-            case .editProperties(let id, _, _, _), .editBody(let id, _, _, _), .retype(let id, _, _, _), .retier(let id, _, _),
+            case .editProperties(let id, _, _), .editBody(let id, _, _, _), .retype(let id, _, _, _), .retier(let id, _, _),
                 .transition(let id, _), .tag(let id, _, _):
                 return missing.withLock { $0.contains(id.rawValue) } ? notWhole : nil
             case .create, .purge:
@@ -127,7 +127,7 @@ import Testing
             let version = try #require(await copy.items.get(item.id.rawValue)?.version)
             let id = WriteID()
             source.submit(
-                .editProperties(item.id, ["title": .string(title)], base: ItemVersion(version), undoing: nil), as: id, undoing: group)
+                .editProperties(item.id, ["title": .string(title)], base: ItemVersion(version)), as: id, undoing: group)
             return id
         }
 
@@ -266,7 +266,7 @@ import Testing
         let attempts = scene.reads.attempts.withLock { $0 }
         #expect(attempts.count == 3, "each made once: \(attempts)")
         #expect(attempts.first == .unlink(scene.edge) && attempts.dropFirst().first == .unlink(scene.edge))
-        if case .editProperties(let id, _, _, _)? = attempts.last { #expect(id == scene.item.id) } else { Issue.record("\(attempts)") }
+        if case .editProperties(let id, _, _)? = attempts.last { #expect(id == scene.item.id) } else { Issue.record("\(attempts)") }
         #expect(scene.log.current.answer(to: unlink) == nil && scene.log.current.answer(to: edit) == nil)
         await finish(scene)
     }
@@ -285,6 +285,30 @@ import Testing
         #expect(state.refusal(to: edit)?.code == MarfaEngine.heldChangedCode)
         #expect(try await scene.links() == 1, "the link is not removed either")
         #expect(try await scene.title() == "Elsewhere")
+        await finish(scene)
+    }
+
+    /// The newer edits put the title back as it was when Undo was pressed, so only the edit itself tells the held step
+    /// is older than the person's latest.
+    @Test func aHeldUndoIsGivenBackWhenANewerEditOfWhatItTouchesIsTaken() async throws {
+        let scene = try await makeScene()
+        let group = UndoGroup()
+        scene.unlink(as: group)
+        let undo = try await scene.retitle(to: "First", as: group)
+        try #require(try await eventuallyAsking { await scene.held() == 2 })
+
+        // The person edits the item again; the copy holds its row, so each edit is taken at once.
+        for title in ["Third", "Second"] {
+            let version = try #require(await scene.copy.items.get(scene.item.id.rawValue)?.version)
+            scene.source.submit(.editProperties(scene.item.id, ["title": .string(title)], base: ItemVersion(version)), as: WriteID())
+            try #require(try await eventuallyAsking { try await scene.title() == title })
+        }
+
+        await scene.becomeWhole()
+        try #require(try await eventuallyAsking { await scene.held() == 0 })
+        #expect(scene.log.current.refusal(to: undo)?.code == MarfaEngine.heldChangedCode)
+        #expect(try await scene.title() == "Second")
+        #expect(try await scene.links() == 1, "the whole step is given back")
         await finish(scene)
     }
 

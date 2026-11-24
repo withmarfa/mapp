@@ -115,25 +115,12 @@ extension MarfaLibrary {
 
     private func editProperty(_ id: ItemID, key: String, to value: PropertyValue?, undoManager: UndoManager?) -> Bool {
         guard let item = item(id) else { return false }
-        let old = item.value(of: key)
         // A value equal to the stored one still goes while an edit of the item is on its way, since it reverses that
         // edit: skipping it would leave the edit in flight as the value stored.
-        if old != value || isWritingProperties(of: id) {
-            editProperty(id, key: key, from: old, to: value, undoManager: undoManager)
+        if item.value(of: key) != value || isWritingProperties(of: id) {
+            editProperties(id, to: [key: value], actionName: String(localized: "Edit Property"), undoManager: undoManager)
         }
         return true
-    }
-
-    /// Made at the version held when it runs, so an undo goes on top of whatever came after the edit.
-    private func editProperty(
-        _ id: ItemID, key: String, from old: PropertyValue?, to value: PropertyValue?, undoManager: UndoManager?
-    ) {
-        guard let version = item(id)?.version else { return }
-        submitPropertyEdit(.editProperties(id, [key: value], base: version, undoing: nil), of: id, failing: String(localized: "Can’t Edit This Property"))
-        let name = String(localized: "Edit Property")
-        registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.editProperty(id, key: key, from: value, to: old, undoManager: undoManager)
-        }
     }
 
     @discardableResult
@@ -150,20 +137,16 @@ extension MarfaLibrary {
         // edit: leaving it out would let the edit in flight land as the value kept.
         let sent = isWritingProperties(of: id) ? changes : changes.filter { item.value(of: $0.key) != $0.value }
         guard !sent.isEmpty else { return true }
-        let old = Dictionary(uniqueKeysWithValues: sent.keys.map { ($0, item.value(of: $0)) })
-        editProperties(id, to: sent, from: old, actionName: actionName, undoManager: undoManager)
+        editProperties(id, to: sent, actionName: actionName, undoManager: undoManager)
         return true
     }
 
     /// Made at the version held when it runs, so an undo goes on top of whatever came after the edit.
-    private func editProperties(
-        _ id: ItemID, to changes: [String: PropertyValue?], from old: [String: PropertyValue?], actionName: String, undoManager: UndoManager?
-    ) {
-        guard let version = item(id)?.version else { return }
-        submitPropertyEdit(.editProperties(id, changes, base: version, undoing: nil), of: id, failing: String(localized: "Can’t Edit This Property"))
-        registerUndo(undoManager, name: actionName) { [weak undoManager] library in
-            library.editProperties(id, to: old, from: changes, actionName: actionName, undoManager: undoManager)
-        }
+    private func editProperties(_ id: ItemID, to changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) {
+        guard let version = item(id)?.version,
+            let edit = submitPropertyEdit(id, changes, base: version, failing: String(localized: "Can’t Edit This Property"))
+        else { return }
+        registerUndo(of: edit, name: actionName, undoManager: undoManager)
     }
 
     // MARK: Types
@@ -311,7 +294,7 @@ extension MarfaLibrary {
         }
         if let title = change.to.title, case .property(let key) = item.titleRule {
             if item.title == change.from.title {
-                submit(.editProperties(id, [key: .string(title)], base: item.version, undoing: nil), failing: Self.cantRestore)
+                submit(.editProperties(id, [key: .string(title)], base: item.version), failing: Self.cantRestore)
                 wrote = true
             } else {
                 changedSince = true

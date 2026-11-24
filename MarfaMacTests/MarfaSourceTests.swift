@@ -23,7 +23,7 @@ nonisolated final class ChangeLog: Sendable {
         }
 
         func answer(to id: WriteID) -> WriteOutcome? {
-            for case .answered(id, let outcome) in changes { return outcome }
+            for case .answered(id, let outcome, _) in changes { return outcome }
             return nil
         }
     }
@@ -490,7 +490,7 @@ struct MarfaSourceOfflineTests {
         #expect(merge.body["properties"]?.object == ["body": "Second"], "only the text is named, so the server merges it")
         #expect(merge.body["properties_mode"] == nil)
 
-        source.submit(.editProperties(id, ["description": nil], base: version, undoing: nil), as: WriteID())
+        source.submit(.editProperties(id, ["description": nil], base: version), as: WriteID())
         _ = try #require(await log.wait { $0.item(titled: "MARFAMACTEST edits")?.sync == .waiting(writes: 3) })
         let clearing = try #require(try await source.copy.queue.all().last { $0.kind == .updateItem })
         #expect(clearing.body["properties_mode"] == nil, "nothing is replaced: the edit names only what it clears")

@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "An earlier change to this item hasn’t reached the server yet." : {
+      "extractionState" : "manual"
+    },
+    "An earlier change to this item wasn’t made, so this change can’t be undone." : {
+      "extractionState" : "manual"
+    },
     "As in Layouts" : {
 
     },
@@ -168,6 +174,21 @@
     },
     "Show Property" : {
 
+    },
+    "The server’s answer to an earlier change to this item couldn’t be read, so this change can’t be undone." : {
+      "extractionState" : "manual"
+    },
+    "The server’s answer to the undo couldn’t be read, so this change can’t be redone." : {
+      "extractionState" : "manual"
+    },
+    "The server’s answer to this change couldn’t be read, so it can’t be undone." : {
+      "extractionState" : "manual"
+    },
+    "This item has changed since, so this change can’t be redone." : {
+      "extractionState" : "manual"
+    },
+    "This item has changed since, so this change can’t be undone." : {
+      "extractionState" : "manual"
     },
     "Try new versions before they’re released." : {
 

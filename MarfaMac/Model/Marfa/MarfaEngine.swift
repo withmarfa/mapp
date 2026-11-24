@@ -32,6 +32,8 @@ actor MarfaEngine {
         case closeAgreeing(UnsentChanges?, CheckedContinuation<CloseOutcome, Never>)
         /// The verdict on a write made at the server at once rather than queued, such as a purge.
         case answer(WriteID, WriteOutcome)
+        /// Queued writes the person withdrew, which the server will never answer.
+        case withdrawn([String])
         /// Attaches a file, which the package queues as an upload, a file item and an edge.
         case attach(URL, ItemID, CheckedContinuation<Result<Embed, SourceFailure>, Never>)
         /// Adds a file as an item of its own, which the package queues as an upload and a file item.
@@ -97,6 +99,8 @@ actor MarfaEngine {
 
     /// The code of the refusal a write gets when it reaches the engine after the copy closed.
     nonisolated static let closedCode = "closed"
+    /// The code of a write the person withdrew from the queue, which is not made and is not told again.
+    nonisolated static let withdrawnCode = "withdrawn"
 
     /// A write that reached the source after it closed, which no queue holds.
     nonisolated static var notKept: String {
@@ -170,8 +174,8 @@ actor MarfaEngine {
     /// their item has not yet been counted past, so the queue is read with them (`queueWithAnswers`).
     var answeredHeld: [String: Marfa.QueuedWrite] = [:]
     /// Writes the copy keeps with a verdict (a refused write that carried content, a blocked or a dead one), whose
-    /// verdict the app's write has been told, so each is told once.
-    var told: Set<String> = []
+    /// verdict the app's write has been told, so each verdict is told once.
+    var told: [String: Marfa.Verdict] = [:]
     /// Writes of an undo or a redo that the copy refused while it was brought up to date, in the order they were
     /// made, until the copy is whole.
     var held: [Held] = []
@@ -283,6 +287,8 @@ actor MarfaEngine {
             await takeAnswers()
             done.resume()
         case .answer(let write, let outcome): hub.publish(.answered(write, outcome))
+        case .withdrawn(let ids):
+            for id in ids { answered(id, .refused(SyncProblem(code: Self.withdrawnCode))) }
         case .attach(let file, let item, let done): attach(file, to: item, answering: done)
         case .addFile(let file, let title, let tier, let parent, let done):
             addFile(file, title: title, tier: tier, under: parent, answering: done)

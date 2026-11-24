@@ -27,9 +27,9 @@ extension MarfaEngine {
         }
         var answers = taken
         if let queued = try? await copy.queue.all() {
-            answers += queued.filter { $0.verdict != nil && !told.contains($0.id) }
-            // A released write has no verdict, so a later refusal of it is told again.
-            told = Set(queued.filter { $0.verdict != nil }.map(\.id))
+            // A blocked write that is released and then refused carries a new verdict, which is told too.
+            answers += queued.filter { $0.verdict != nil && told[$0.id] != $0.verdict }
+            told = Dictionary(queued.compactMap { write in write.verdict.map { (write.id, $0) } }, uniquingKeysWith: { _, last in last })
         }
         let library = await libraryWrites(answers)
         let shown = Set(library.map(\.id))
@@ -68,7 +68,7 @@ extension MarfaEngine {
                 ids.insert(sibling.rawValue)
                 if let itemID = answer.itemId { originals[sibling.rawValue] = itemID }
             }
-            answered(answer.id, outcome)
+            answered(answer.id, outcome, holding: answer.kind == .updateItem ? MarfaMapping.holding(answeredBy: answer.answer) : nil)
         }
         await reread(ids.union(await settledLinks()))
         // An answer the person's text cannot yet be moved past is held, to be counted by the next save or the next
@@ -118,9 +118,9 @@ extension MarfaEngine {
     }
 
     /// A write the app made as several queued writes is answered once, when the last of them is (`MarfaWriteRecord`).
-    func answered(_ queued: String, _ outcome: WriteOutcome) {
-        guard let (id, outcome) = writes.answer(queued, outcome) else { return }
-        hub.publish(.answered(id, outcome))
+    func answered(_ queued: String, _ outcome: WriteOutcome, holding: [String: PropertyValue]? = nil) {
+        guard let answer = writes.answer(queued, outcome, holding: holding) else { return }
+        hub.publish(.answered(answer.id, answer.outcome, holding: answer.holding))
     }
 
     private func hasLeft(_ raw: String) async -> Bool {

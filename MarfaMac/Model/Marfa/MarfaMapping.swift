@@ -568,6 +568,13 @@ nonisolated enum MarfaMapping {
         }
     }
 
+    /// What the item holds of every property after an item edit, read from the server's whole answer to it, which
+    /// alone says what a merge, a conflict or a rebased edit left. Nil where the answer carries no item.
+    static func holding(answeredBy answer: JSONValue?) -> [String: PropertyValue]? {
+        guard let properties = answer?.object?["item"]?.object?["properties"]?.object else { return nil }
+        return Dictionary(properties.map { ($0.key, value($0.value)) }, uniquingKeysWith: { first, _ in first })
+    }
+
     /// A refusal with no code is either the server's answer with none, stored as a one-word reason, or the copy's
     /// own, never sent, with an English sentence as its reason. The copy's is told in the app's words: too large, or
     /// after a write it waited on (`afterRefusal`, which the caller reads from the queue), or otherwise as not sent.

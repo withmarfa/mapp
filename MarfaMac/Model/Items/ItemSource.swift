@@ -47,7 +47,9 @@ nonisolated enum SourceChange: Hashable, Sendable {
     /// Replaces everything held; always the first change.
     case loaded(SourceSnapshot)
     case changed(ItemChanges)
-    case answered(WriteID, WriteOutcome)
+    /// `holding` is what the server's answer says the item holds of every property after an item edit, a property it
+    /// does not hold being absent; nil for another write, or where the answer can't be read.
+    case answered(WriteID, WriteOutcome, holding: [String: PropertyValue]? = nil)
     /// The write is in the copy, and every item it changed has been read again and sent before this.
     case taken(WriteID)
     case catalogue(Catalogue)
