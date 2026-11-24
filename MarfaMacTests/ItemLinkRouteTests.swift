@@ -145,7 +145,7 @@ struct ItemLinkRouteTests {
 
     /// Defaults of the test's own, holding Settings > General > Open Items.
     private func defaults(opening way: ItemOpening) -> UserDefaults {
-        let suite = UserDefaults(suiteName: "ItemLinkRouteTests.\(UUID().uuidString)")!
+        let suite = ThrowawayDefaults.make("ItemLinkRouteTests")
         suite.set(way.rawValue, forKey: ListKey.openItemsIn)
         return suite
     }

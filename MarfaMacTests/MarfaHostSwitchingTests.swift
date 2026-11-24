@@ -33,7 +33,7 @@ import Testing
     private let second = try! MarfaConnection(address: "http://second.test:8210")
 
     private func libraries(_ bench: HostBench) throws -> Libraries {
-        let defaults = try #require(UserDefaults(suiteName: "MarfaHostSwitchingTests-\(UUID().uuidString)"))
+        let defaults = ThrowawayDefaults.make("MarfaHostSwitchingTests")
         // No page is open here; the real hand-over waits on every page in the process, those of other suites included.
         return Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
     }
@@ -42,7 +42,7 @@ import Testing
     /// the server just left, with its key gone, and says the key was refused.
     @Test(arguments: [MarfaHost.DisconnectChoice.keepCopy, .discardNothing])
     func leavingAServerForgetsItsAddressBeforeRemovingAnything(choice: MarfaHost.DisconnectChoice) async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let suite = bench.suite
@@ -64,7 +64,7 @@ import Testing
     /// The windows go from one server's library to the other's, never through the welcome screen or a failure,
     /// while the old key and copy are removed.
     @Test func switchingServersShowsNothingBetween() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: "http://first.test:8210", key: "k1")
         bench.signIns.onSignOut.withLock { $0 = { Thread.sleep(forTimeInterval: 0.2) } }
@@ -78,7 +78,7 @@ import Testing
 
     /// A copy given a new sign-in stays the library on show while it changes: no wait or failure is shown in its place.
     @Test func aCopyGivenANewSignInStaysOnShowWhileItChanges() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: "http://first.test:8210", key: "good")
         let source = try #require(bench.servers.last)
@@ -96,7 +96,7 @@ import Testing
 
     /// Quitting waits until the copy has queued every write, but only so long, and says why it did not quit.
     @Test func quittingWaitsForTheCopyToQueueButOnlySoLong() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: "http://first.test:8210", key: "k")
         _ = try #require(libraries.current as? MarfaLibrary)

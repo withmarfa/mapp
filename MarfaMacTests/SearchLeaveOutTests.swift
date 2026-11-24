@@ -5,9 +5,7 @@ import Testing
 @MainActor
 @Suite struct SearchLeaveOutsStoreTests {
     private func defaults() -> UserDefaults {
-        let suite = "SearchLeaveOuts-\(UUID())"
-        let defaults = UserDefaults(suiteName: suite) ?? .standard
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = ThrowawayDefaults.make("SearchLeaveOuts")
         return defaults
     }
 

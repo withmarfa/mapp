@@ -9,7 +9,7 @@ import Testing
     private let address = "http://first.test:8210"
 
     private func libraries(_ bench: HostBench) throws -> Libraries {
-        let defaults = try #require(UserDefaults(suiteName: "LibrariesTests-\(UUID().uuidString)"))
+        let defaults = ThrowawayDefaults.make("LibrariesTests")
         // No page is open here; the real hand-over waits on every page in the process, those of other suites included.
         return Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
     }
@@ -40,7 +40,7 @@ import Testing
     }
 
     @Test func withNoServerSetNothingChangesAndTheHostIsNeverOpened() throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let libraries = try libraries(bench)
         #expect(libraries.mode == .unconfigured)
         #expect(libraries.isLaunching == false)
@@ -50,7 +50,7 @@ import Testing
     }
 
     @Test func eachLibraryKeepsItsOwnSidebarLayout() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: address, key: "key")
         #expect(libraries.libraryKey == "marfa:\(address)")
@@ -70,7 +70,7 @@ import Testing
     }
 
     @Test func connectingChoosesTheServersLibraryAndDisconnectingAsksForOneAgain() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: address, key: "key")
         #expect(libraries.mode == .marfa)
@@ -85,7 +85,7 @@ import Testing
     /// A library the windows have left tells what it could not keep, and what it could not do, through the host's
     /// notices, which the window in front shows whatever library it reads by then.
     @Test func whatALeftLibraryTellsReachesTheWindowInFront() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: address, key: "key")
         let library = try #require(libraries.current as? MarfaLibrary)
@@ -99,7 +99,7 @@ import Testing
     }
 
     @Test func anotherServerIsAnotherLibrary() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: address, key: "key")
         let first = try #require(libraries.current as? MarfaLibrary)
@@ -109,7 +109,7 @@ import Testing
     }
 
     @Test func aSavedServerOpensOnLaunchAndPaintsBeforeTheNetwork() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let connection = try MarfaConnection(address: address)
         bench.defaults.set(address, forKey: "MarfaAddress")
         bench.signIns.save("key", for: connection.address)
@@ -125,7 +125,7 @@ import Testing
     }
 
     @Test func aSavedServerWithNoKeyShowsAPageSayingSo() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set(address, forKey: "MarfaAddress")
         let libraries = try libraries(bench)
         await libraries.launch()
@@ -137,8 +137,8 @@ import Testing
     /// A page's hand-over can wait its turn behind another, so a quit can run out of time while the editors are still
     /// handing over; it then says it is the typing that is still being saved, not the library.
     @Test func aQuitThatRunsOutOfTimeInTheEditorsSaysTheTypingIsStillBeingSaved() async throws {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "LibrariesTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("LibrariesTests")
         var handOver: ((Bool) -> Void)?
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { handOver = $0 })
         // Returns at all only because the limit ends the wait, which the editors never would.
@@ -151,7 +151,7 @@ import Testing
     /// A save in This Marfa answers for the server it was sent to. The callback `Libraries` wires carries that address
     /// through, so one that lands after the switch is dropped, never taken by the library now open.
     @Test func aSaveThatAnswersAfterASwitchIsDroppedByTheCallbackLibrariesWires() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: "http://first.test:8210", key: "k")
         try await libraries.host.changeAddress(to: "http://second.test:8210", key: "k", choice: .discardNothing)

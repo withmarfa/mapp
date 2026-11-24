@@ -19,7 +19,7 @@ struct MarfaHostOfflineTests {
 
     @Test
     func aKeptCopyGoesOnWhereItWasLeft() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
         try await host.connect(address: address, key: "unused")
@@ -50,7 +50,7 @@ struct MarfaHostOfflineTests {
     /// A sign-in the Keychain would not give is not a missing one: the library is shown unavailable for that reason.
     @Test
     func anUnreadableSignInIsToldAndNotShownAsSignedOut() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let connection = try MarfaConnection(address: address)
         bench.defaults.set(address, forKey: "MarfaAddress")
         bench.signIns.save("first", for: connection.address)
@@ -65,7 +65,7 @@ struct MarfaHostOfflineTests {
     /// The count comes from the copy once the write is queued, not from a report not yet passed on.
     @Test
     func aWriteMadeJustBeforeLeavingIsNotLost() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
         try await host.connect(address: address, key: "unused")
@@ -87,7 +87,7 @@ struct MarfaHostOfflineTests {
     /// what they were shown.
     @Test
     func aWriteMadeAfterThePersonWasAskedIsNotDiscarded() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
         try await host.connect(address: address, key: "unused")
@@ -115,7 +115,7 @@ struct MarfaHostOfflineTests {
 
     @Test
     func aWriteMadeWhileMovingAddressAfterThePersonWasAskedIsNotDiscarded() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
         let other = "http://127.0.0.1:10"
@@ -145,7 +145,7 @@ struct MarfaHostOfflineTests {
 
     @Test
     func aDamagedCopyIsAPlainProblem() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
         try FileManager.default.createDirectory(at: bench.location.directory(for: connection), withIntermediateDirectories: true)

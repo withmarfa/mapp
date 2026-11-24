@@ -7,26 +7,18 @@ import Testing
 /// What Settings > Appearance keeps on this Mac.
 @MainActor
 struct AppearanceSettingsTests {
-    private func defaults() throws -> (UserDefaults, () -> Void) {
-        let suite = "AppearanceSettingsTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        return (defaults, { defaults.removePersistentDomain(forName: suite) })
-    }
-
     // MARK: Accent
 
     @Test func theSwatchesAfterTheMacsAccentLeaveOutBlueButAStoredBlueStillReads() throws {
         #expect(AccentChoice.Offered.swatched.map(\.rawValue) == ["purple", "pink", "red", "orange", "yellow", "green", "graphite"])
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("AppearanceSettingsTests")
         defaults.set("blue", forKey: AppearanceKey.accent)
         #expect(AccentChoice.stored(in: defaults) == .offered(.blue))
         #expect(AccentChoice.stored(in: defaults).nsColor != nil)
     }
 
     @Test func everyAccentIsReadBackAndAnythingElseIsTheSystems() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("AppearanceSettingsTests")
         #expect(AccentChoice.stored(in: defaults) == .system)
         let choices: [AccentChoice] = [.system] + AccentChoice.Offered.allCases.map { .offered($0) } + [.custom("#FF8800")]
         for choice in choices {
@@ -40,8 +32,7 @@ struct AppearanceSettingsTests {
     }
 
     @Test func aCustomAccentIsStoredAsItsHexAndReadBackAsTheSameColor() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("AppearanceSettingsTests")
         let chosen = Color(.sRGB, red: 1, green: 0.5, blue: 0, opacity: 1)
         let accent = AccentChoice.custom(chosen)
         #expect(accent == .custom("#FF8000"))
@@ -53,8 +44,7 @@ struct AppearanceSettingsTests {
     // MARK: Theme and highlights
 
     @Test func aThemeIsReadBackAndAnUnknownOneFollowsTheSystem() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("AppearanceSettingsTests")
         #expect(AppTheme.stored(in: defaults) == .system)
         for theme in AppTheme.allCases {
             defaults.set(theme.rawValue, forKey: AppearanceKey.theme)

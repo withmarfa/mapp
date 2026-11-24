@@ -10,9 +10,7 @@ struct TextZoomTests {
     }
 
     @Test func applyWritesOnlyTheSettingItActsOn() throws {
-        let suite = "TextZoomTests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("TextZoomTests")
         TextZoom.page.apply(.bigger, in: defaults)
         #expect(defaults.integer(forKey: PageKey.textSize) == 14)
         #expect(defaults.object(forKey: InterfaceKey.textSize) == nil)

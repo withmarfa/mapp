@@ -6,7 +6,7 @@ import Testing
 extension EditorTests {
     @Test func aSavedPictureReplacesItsAddressOnThePageAndTheSettingAnswersAgainWhenItGoes() async throws {
         let folder = try TemporaryFolder()
-        let defaults = try #require(UserDefaults(suiteName: "SavedPicturePage-\(UUID().uuidString)"))
+        let defaults = ThrowawayDefaults.make("SavedPicturePage")
         defaults.set(RemotePictureSetting.never.rawValue, forKey: RemotePictureSetting.key)
         let site = PictureStub.newHost()
         let address = "https://\(site)/a.png"

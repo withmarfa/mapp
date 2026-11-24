@@ -61,8 +61,7 @@ struct SidebarTests {
     }
 
     @Test func aViewsPlaceSurvivesRelaunch() {
-        let defaults = UserDefaults(suiteName: "SidebarTests.views")!
-        defaults.removePersistentDomain(forName: "SidebarTests.views")
+        let defaults = ThrowawayDefaults.make("SidebarTests.views")
         SidebarLayouts(defaults: defaults).update("marfa:one") { $0.setHidden(.view(ItemID("v-Apples")), true) }
         #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isHidden(.view(ItemID("v-Apples"))))
         #expect(!SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isHidden(.view(ItemID("v-Bears"))))
@@ -71,9 +70,7 @@ struct SidebarTests {
     // MARK: Layout
 
     @Test func aSectionCollapsedForOneLibraryStaysCollapsedForThatLibraryOnly() {
-        let defaults = UserDefaults(suiteName: "SidebarTests.collapsed")!
-        defaults.removePersistentDomain(forName: "SidebarTests.collapsed")
-        defer { defaults.removePersistentDomain(forName: "SidebarTests.collapsed") }
+        let defaults = ThrowawayDefaults.make("SidebarTests.collapsed")
         let layouts = SidebarLayouts(defaults: defaults)
         layouts.update("marfa:one") { $0.setCollapsed(.types, true) }
         #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isCollapsed(.types))
@@ -129,9 +126,7 @@ struct SidebarTests {
     }
 
     @Test func aLayoutKeptForOneLibraryDoesNotChangeAnother() {
-        let defaults = UserDefaults(suiteName: "SidebarTests.separate")!
-        defaults.removePersistentDomain(forName: "SidebarTests.separate")
-        defer { defaults.removePersistentDomain(forName: "SidebarTests.separate") }
+        let defaults = ThrowawayDefaults.make("SidebarTests.separate")
         let layouts = SidebarLayouts(defaults: defaults)
         layouts.update("marfa:one") { $0.setHidden(.favorites, true) }
         #expect(layouts.layout(for: "marfa:one").isHidden(.favorites))
@@ -139,9 +134,7 @@ struct SidebarTests {
     }
 
     @Test func aLayoutIsFoundAgainByANewStore() {
-        let defaults = UserDefaults(suiteName: "SidebarTests.persist")!
-        defaults.removePersistentDomain(forName: "SidebarTests.persist")
-        defer { defaults.removePersistentDomain(forName: "SidebarTests.persist") }
+        let defaults = ThrowawayDefaults.make("SidebarTests.persist")
         SidebarLayouts(defaults: defaults).update("marfa:one") {
             $0.setHidden(.type(LibraryFixture.entity.rawValue), true)
             $0.move([.inbox, .all], fromOffsets: IndexSet(integer: 1), toOffset: 0)
@@ -152,17 +145,13 @@ struct SidebarTests {
     }
 
     @Test func aStoredLayoutThatCannotBeReadLeavesTheDefault() {
-        let defaults = UserDefaults(suiteName: "SidebarTests.unreadable")!
-        defaults.removePersistentDomain(forName: "SidebarTests.unreadable")
-        defer { defaults.removePersistentDomain(forName: "SidebarTests.unreadable") }
+        let defaults = ThrowawayDefaults.make("SidebarTests.unreadable")
         defaults.set(Data("not json".utf8), forKey: "sidebarLayouts")
         #expect(SidebarLayouts(defaults: defaults).layout(for: "any") == SidebarLayout())
     }
 
     @Test func aLayoutThatCannotBeReadIsKeptAsideAndLayoutsAreSavedAgain() throws {
-        let defaults = UserDefaults(suiteName: "SidebarTests.unreadableKept")!
-        defaults.removePersistentDomain(forName: "SidebarTests.unreadableKept")
-        defer { defaults.removePersistentDomain(forName: "SidebarTests.unreadableKept") }
+        let defaults = ThrowawayDefaults.make("SidebarTests.unreadableKept")
         var two = SidebarLayout()
         two.setHidden(.favorites, true)
         let readable = try JSONEncoder().encode(["marfa:two": two])
@@ -187,9 +176,7 @@ struct SidebarTests {
     }
 
     @Test func storedLayoutsThatAreNotLayoutsAtAllAreKeptAsideWhole() throws {
-        let defaults = UserDefaults(suiteName: "SidebarTests.unreadableWhole")!
-        defaults.removePersistentDomain(forName: "SidebarTests.unreadableWhole")
-        defer { defaults.removePersistentDomain(forName: "SidebarTests.unreadableWhole") }
+        let defaults = ThrowawayDefaults.make("SidebarTests.unreadableWhole")
         let earlier = Data("set aside before".utf8)
         defaults.set([earlier], forKey: SidebarLayouts.setAsideKey)
         let stored = Data("not json".utf8)

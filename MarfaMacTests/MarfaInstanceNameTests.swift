@@ -10,7 +10,7 @@ import Testing
     private let second = try! MarfaConnection(address: "http://second.test:8210")
 
     @Test func eachServerKeepsItsOwnName() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.names.withLock { $0[first] = "One"; $0[second] = "Two" }
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -21,7 +21,7 @@ import Testing
     }
 
     @Test func theNameIsKeptForTheNextLaunch() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.names.withLock { $0[first] = "Home Marfa" }
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -34,7 +34,7 @@ import Testing
     }
 
     @Test func disconnectingForgetsTheName() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.names.withLock { $0[first] = "Home Marfa" }
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")

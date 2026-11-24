@@ -5,17 +5,10 @@ import Testing
 /// What Settings > General keeps on this Mac and what the app does with it.
 @MainActor
 struct GeneralSettingsTests {
-    private func defaults() throws -> (UserDefaults, () -> Void) {
-        let suite = "GeneralSettingsTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        return (defaults, { defaults.removePersistentDomain(forName: suite) })
-    }
-
     // MARK: Week Starts On
 
     @Test func theWeekStartsWhereTheSystemSaysUntilChosen() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("GeneralSettingsTests")
         var base = Calendar(identifier: .gregorian)
         base.firstWeekday = 2
         #expect(WeekStart.stored(in: defaults) == nil)
@@ -31,8 +24,7 @@ struct GeneralSettingsTests {
     // MARK: Start With
 
     @Test func aChoiceOfPlaceIsReadBackAndAnythingElseIsWhereIWasLeft() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("GeneralSettingsTests")
         #expect(StartWith.stored(in: defaults) == .leftOff)
         for choice in [StartWith.leftOff, .place(.inbox), .place(.itemType("core.task")), .place(.allItems)] {
             defaults.set(choice.rawValue, forKey: StartWith.key)
@@ -45,8 +37,7 @@ struct GeneralSettingsTests {
     // MARK: New Items Are
 
     @Test func theChosenKindIsReadFromTheDefaultsAndEmptyMeansLastUsed() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("GeneralSettingsTests")
         #expect(NewItemType.stored(in: defaults) == nil)
         defaults.set("core.task", forKey: NewItemType.key)
         #expect(NewItemType.stored(in: defaults) == "core.task")
@@ -57,8 +48,7 @@ struct GeneralSettingsTests {
     // MARK: Reopen Windows
 
     @Test func reopeningWindowsFollowsTheMacUntilChangedAndOnlyAChangeWritesTheKey() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("GeneralSettingsTests")
         // Unset, the answer is the Mac's own, or windows come back where it has none.
         #expect(ReopenWindows.stored(in: defaults) == (ReopenWindows.system() ?? ReopenWindows.standard))
         defaults.set(false, forKey: ReopenWindows.key)
@@ -70,8 +60,7 @@ struct GeneralSettingsTests {
     // MARK: Reset
 
     @Test func resetClearsEverySettingTheListNamesAndNothingElse() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("GeneralSettingsTests")
         for key in MacSettings.keys { defaults.set("chosen", forKey: key) }
         defaults.set("chosen", forKey: "\(InterfaceKey.inspectorAppOpen).app.one")
         // What is not a setting: the connection, the sign-in's pending state, a value set aside, a window's frame.
@@ -92,10 +81,9 @@ struct GeneralSettingsTests {
     }
 
     @Test func resetPutsTheLiveShortcutsBackAtOnceAndStoresNothingOfThem() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("GeneralSettingsTests")
         let hotKeys = FakeHotKeys()
-        let bench = try HostBench()
+        let bench = HostBench()
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, hotKeys: hotKeys)
         libraries.anyAppShortcuts.start()
         libraries.shortcuts.set(nil, for: .newItem)
@@ -134,8 +122,7 @@ struct GeneralSettingsTests {
     }
 
     @Test func aStoredColumnWidthIsClearedByResetToo() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
+        let defaults = ThrowawayDefaults.make("GeneralSettingsTests")
         defaults.set(300.0, forKey: ColumnWidth.sidebar.key)
         MacSettings.reset(in: defaults)
         #expect(ColumnWidth.sidebar.stored(in: defaults) == ColumnWidth.sidebar.defaultWidth)

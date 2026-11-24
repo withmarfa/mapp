@@ -12,9 +12,7 @@ struct LayoutsTests {
     private let note = TypeID("core.note")
 
     private func looks(_ name: String) -> (store: TypeLooks, defaults: UserDefaults) {
-        let suite = "LayoutsTests.\(name)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = ThrowawayDefaults.make("LayoutsTests.\(name)")
         return (TypeLooks(defaults: defaults, reporting: Reporting(sink: RecordingSink())), defaults)
     }
 

@@ -36,9 +36,7 @@ struct IncludedSubtypesTests {
     }
 
     @Test func theDefaultsHoldTheChoiceUnderOneKey() throws {
-        let suite = "MarfaMac.IncludedSubtypesTests"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("MarfaMac.IncludedSubtypesTests")
         #expect(IncludedSubtypes.stored(in: defaults) == IncludedSubtypes())
         IncludedSubtypes.update(in: defaults) { $0.set("aic.ticket", included: true) }
         #expect(IncludedSubtypes.stored(in: defaults).types == ["aic.ticket"])

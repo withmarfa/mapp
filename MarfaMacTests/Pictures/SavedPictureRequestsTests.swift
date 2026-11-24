@@ -18,7 +18,7 @@ import WebKit
 
     init() throws {
         let folder = try TemporaryFolder()
-        let defaults = try #require(UserDefaults(suiteName: "SavedPictureRequestsTests-\(UUID().uuidString)"))
+        let defaults = ThrowawayDefaults.make("SavedPictureRequestsTests")
         let library = FakeItemLibrary()
         self.folder = folder
         self.defaults = defaults

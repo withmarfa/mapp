@@ -5,17 +5,14 @@ import Testing
 
 @MainActor @Suite(.hangLimit) final class PreferencesSyncTests {
     let defaults: UserDefaults
-    let suite = "MarfaMacTests.PreferencesSync.\(UUID().uuidString)"
     var reloads = 0
     let theme = PreferenceUnit.member(.appearance, AppearanceKey.theme)
     let accent = PreferenceUnit.member(.appearance, AppearanceKey.accent)
     let placement = PreferenceUnit.row(.types, setting: "pagePlacements", key: "core.note")
 
-    init() throws {
-        defaults = try #require(UserDefaults(suiteName: suite))
+    init() {
+        defaults = ThrowawayDefaults.make("MarfaMacTests.PreferencesSync")
     }
-
-    deinit { UserDefaults().removePersistentDomain(forName: suite) }
 
     private func sync(_ copy: FakePreferencesCopy, library: String = "marfa:https://one") async -> PreferencesSync {
         let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50)) { [weak self] in self?.reloads += 1 }
@@ -463,7 +460,7 @@ import Testing
     /// The library's copy is followed as it opens and let go as it closes; a copy whose slice lacks the type, as the
     /// sample's does, changes nothing on this Mac.
     @Test func theSettingsFollowTheOpenLibrary() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host(opener: { connection, _, _ in SampleLibrary.open(connection) })
         let libraries = Libraries(host: host, defaults: bench.defaults, syncsPreferences: true)
         bench.defaults.set("dark", forKey: AppearanceKey.theme)

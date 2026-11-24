@@ -20,7 +20,7 @@ import Testing
     }
 
     @Test func aSignedOutLibraryKeepsItsCopyOpenAndIsGivenTheNewSignIn() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -48,7 +48,7 @@ import Testing
     }
 
     @Test func aKeychainThatCannotBeReadIsNotReadAsHoldingNothing() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         #expect(await eventually { host.grantsRead })
@@ -61,7 +61,7 @@ import Testing
     }
 
     @Test func signingInAgainWhereTheKeychainCannotBeReadAsksForEverythingThePagesUse() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         #expect(await eventually { host.grantsRead })
@@ -76,7 +76,7 @@ import Testing
 
     /// The package asks for the call after a sign-in that ended even where the credential is the one it had.
     @Test func aSignInAgainThatLeavesTheCredentialUnchangedStillGivesItToTheCopy() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "same")
         let source = try #require(bench.servers.last)
@@ -87,7 +87,7 @@ import Testing
     }
 
     @Test func connectingToTheSameAddressAgainOnlySignsInAgain() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -100,7 +100,7 @@ import Testing
     /// An address that now reaches another instance is told by the sync's hydration, which finds it (`wrongServer`),
     /// as in `MarfaSyncFailureTests`; the host only keeps the library and shows that state.
     @Test func aServerThatIsNowAnotherInstanceLeavesTheLibraryAndItsOtherServerWords() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -118,7 +118,7 @@ import Testing
 
     /// The server forgot the sign-in: the one kept is refused, the person signs in again, and the copy goes on with it.
     @Test func aSignInTheServerForgotIsReplacedAndTheCopyGoesOnWithTheNewOne() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "forgotten")
         let source = try #require(bench.servers.last)
@@ -135,7 +135,7 @@ import Testing
     }
 
     @Test func aCopyThatCouldNotBeGivenTheSignInIsClosedAndTold() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -155,7 +155,7 @@ import Testing
     }
 
     @Test func aServerAtAnotherAddressIsRefusedAndTheLibraryStaysOpen() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -169,7 +169,7 @@ import Testing
 
     /// A library that is not open, because its launch failed, is opened on the new sign-in.
     @Test func aLibraryThatIsNotOpenIsOpenedOnTheNewSignIn() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         let host = bench.host()
         await host.launch()
@@ -184,7 +184,7 @@ import Testing
 
     /// Edits that cannot be handed over refuse the sign-in before anything is asked or changed, as the old path did.
     @Test func editsThatCannotBeHandedOverRefuseSignInAgainAndChangeNothing() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -203,7 +203,7 @@ import Testing
 
     /// Writes begun while the sign-in was made are handed over before the copy is touched.
     @Test func editsBegunDuringTheSignInKeepTheLibraryAndTheCopyUntouched() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -226,7 +226,7 @@ import Testing
         MarfaError.storeBusy(message: "Busy."),
     ])
     func aRefusalThatLeavesTheCopyOpenLeavesTheLibraryOpen(_ error: MarfaError) async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -244,7 +244,7 @@ import Testing
     }
 
     @Test func aSignInTheKeychainNoLongerHoldsLeavesTheLibraryOpenAndTellsThePerson() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -261,7 +261,7 @@ import Testing
     /// Another opener took the writer role while the store opened again, so the copy is a reader: told as an
     /// opening would, with the copy and its queue left in the store.
     @Test func aCopyThatCameBackAReaderIsToldInUseAndItsQueueStays() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let removals = Mutex(0)
         let host = bench.host(remover: { _, _ in removals.withLock { $0 += 1 } })

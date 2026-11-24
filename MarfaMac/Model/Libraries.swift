@@ -273,8 +273,10 @@ import os
             || TestHost.isRequested
             || environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         {
-            let suite = sampleDefaultsSuite
-            let defaults = UserDefaults(suiteName: suite) ?? .standard
+            // The unit tests' defaults go with the libraries; the others keep one named domain, emptied at each start.
+            let throwaway = TestHost.isRequested ? ThrowawayDefaults.make("SampleMarfa") : nil
+            let suite = throwaway?.suite ?? sampleDefaultsSuite
+            let defaults = throwaway ?? UserDefaults(suiteName: suite) ?? .standard
             let root = sampleStore
             // A run against a test server may ask to keep the copy the last run left (`-MarfaMacKeepTestStore`), so the
             // speed tests can time a launch on a copy that is already there.

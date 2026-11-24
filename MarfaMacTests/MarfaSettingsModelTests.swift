@@ -33,7 +33,7 @@ import Testing
     // MARK: Connecting
 
     @Test func connectingNeedsOnlyAnAddressAndHandsOverEditsFirst() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, flushed) = model(bench)
         #expect(!model.canConnect)
         model.address = " http://first.test:8210/ "
@@ -53,7 +53,7 @@ import Testing
 
     @Test(arguments: ["https://marfa.example/a", "https://marfa.example/?x=1", "https://marfa.example/#f"])
     func anAddressWithMoreThanTheServerIsToldInWordsWhereverItIsTyped(text: String) async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, flushed) = model(bench)
         await connect(model, to: text, key: "k")
         let notice = try #require(model.notice)
@@ -73,7 +73,7 @@ import Testing
     }
 
     @Test func aFailureToOpenTheCopyIsToldWithoutRawErrorText() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
         let (model, _) = model(bench)
         await connect(model)
@@ -96,7 +96,7 @@ import Testing
     // MARK: Signing in
 
     @Test func aCanceledBrowserSignInSaysNothingAndKeepsWhatWasTyped() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         bench.signIns.script(browser: [.failure(SignInError.canceled)])
         model.address = "http://first.test:8210"
@@ -108,7 +108,7 @@ import Testing
     }
 
     @Test func aSignInAgainGivesTheOpenCopyTheSignInAndLeavesNoNotice() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
         let source = try #require(bench.servers.last)
@@ -127,7 +127,7 @@ import Testing
     }
 
     @Test func aCodeIsShownWhileTheModelWaitsAndForgottenAfterwards() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         let signIns = bench.signIns
         let address = first.address
@@ -148,7 +148,7 @@ import Testing
     }
 
     @Test func cancellingWhileWaitingForACodeStopsWithoutANoticeAndKeepsNothing() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         let (never, hold) = AsyncStream<Void>.makeStream()
         defer { hold.finish() }
@@ -168,7 +168,7 @@ import Testing
     }
 
     @Test func aCodeThatExpiredIsToldAndCanBeAskedForAgain() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         bench.signIns.script(code: [.success(CodeSignIn(
             code: "X", address: URL(string: "http://first.test:8210/device")!, completeAddress: nil,
@@ -182,7 +182,7 @@ import Testing
     }
 
     @Test func aCopyThatCannotOpenAfterSigningInAgainIsToldAsSuch() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
         let source = try #require(bench.servers.last)
@@ -198,7 +198,7 @@ import Testing
     /// A switch that is done but for removing the old server's sign-in says it switched rather than disconnected, and tells
     /// the person where to remove what is left.
     @Test func aSwitchThatLeavesTheOldSignInBehindSaysItSwitched() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
         bench.signIns.script(signOut: .failure(SourceFailure(kind: .denied, message: "The keychain refused.")))
@@ -216,7 +216,7 @@ import Testing
     // MARK: Leaving a copy
 
     @Test func disconnectingWithNothingWaitingAsksOnceThenRemovesTheCopy() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, flushed) = model(bench)
         await connect(model)
         let before = flushed.count
@@ -235,7 +235,7 @@ import Testing
     }
 
     @Test func disconnectingWithChangesWaitingAsksWhatToDoAndShowsWhatWouldBeLost() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
         let source = try #require(bench.servers.last)
@@ -258,7 +258,7 @@ import Testing
     }
 
     @Test func keepingTheCopyLeavesItOnDiskForTheSameServerToResume() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
         try #require(bench.servers.last).report.set(SyncReport(waiting: 2, queueRead: true))
@@ -274,7 +274,7 @@ import Testing
     }
 
     @Test func discardingPassesTheChangesThePersonWasShownAndRemovesTheCopy() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let (model, _) = model(bench)
         await connect(model)
@@ -294,7 +294,7 @@ import Testing
 
     /// A write that lands while the person decides is not one they were shown, so they are asked again.
     @Test func aChangeThatArrivesAfterTheQuestionIsAskedAgainAndTheCopyIsKept() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let (model, _) = model(bench)
         await connect(model)
@@ -323,7 +323,7 @@ import Testing
     }
 
     @Test func aCopyThatCannotBeReadIsAskedAboutWithoutACount() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
         try #require(bench.servers.last).report.set(SyncReport())
@@ -336,7 +336,7 @@ import Testing
     }
 
     @Test func cancellingLeavesEverythingAsItWas() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
         try #require(bench.servers.last).report.set(SyncReport(waiting: 1, queueRead: true))
@@ -351,7 +351,7 @@ import Testing
     }
 
     @Test func switchingServerAsksAboutTheCopyItLeavesAndKeepsItOnRequest() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, flushed) = model(bench)
         await connect(model)
         try #require(bench.servers.last).report.set(SyncReport(waiting: 1, queueRead: true))
@@ -377,7 +377,7 @@ import Testing
     /// The answer to the question about waiting changes starts the sign-in on the other server, which Cancel stops
     /// like any other, and the question is gone from over it.
     @Test func aSwitchAnsweredAfterTheQuestionCanBeCanceledFromTheCodeSection() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
         try #require(bench.servers.last).report.set(SyncReport(waiting: 1, queueRead: true))
@@ -403,7 +403,7 @@ import Testing
 
     /// Once the person has approved, the sign-in is being used to open the copy: stopping then would revoke it.
     @Test func cancelingWhileTheCopyOpensAfterTheApprovalChangesNothing() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         bench.servers.slow.withLock { $0 = true }
         _ = model.host.scripted("key-1")
@@ -424,7 +424,7 @@ import Testing
     // MARK: A sign-in the server ended
 
     @Test func aSignedOutLibraryCanBeLeftByDisconnectingAndStartingAgain() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
         let source = try #require(bench.servers.last)
@@ -440,7 +440,7 @@ import Testing
     }
 
     @Test func disconnectingTellsWhenTheServerCouldNotEndTheApproval() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
         bench.signIns.script(signOut: .success(.notConfirmed))
@@ -453,7 +453,7 @@ import Testing
     /// A sign-out that waits on a server that does not answer holds the step for up to a minute: the person is shown
     /// it is working, and nothing else may start meanwhile.
     @Test func disconnectingShowsItIsWorkingWhileTheServerDoesNotAnswerAndStartsNothingElse() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (model, _) = model(bench)
         let host = model.host
         await connect(model)
@@ -483,7 +483,7 @@ import Testing
     // MARK: Words and what shows
 
     @Test func aStepAlreadyUnderWayIsNotStartedTwice() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.slow.withLock { $0 = true }
         let (model, flushed) = model(bench)
         model.address = "http://first.test:8210"

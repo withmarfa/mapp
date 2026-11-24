@@ -18,7 +18,7 @@ import Testing
     // MARK: Sorting
 
     @Test func theItemsPageKeepsItsOwnTabAndSort() throws {
-        let defaults = try #require(UserDefaults(suiteName: "ItemIndexTests.\(UUID().uuidString)"))
+        let defaults = ThrowawayDefaults.make("ItemIndexTests")
         IndexPreferences.set(.fromApps, for: .items, in: defaults)
         IndexPreferences.set(IndexSort(column: .source, ascending: true), for: .items, in: defaults)
         #expect(IndexPreferences.tab(for: .items, in: defaults) == .fromApps)
@@ -33,7 +33,7 @@ import Testing
 
     private func browserOnItems(_ library: FakeItemLibrary) -> Browser {
         let browser = Browser()
-        browser.defaults = UserDefaults(suiteName: "ItemIndexTests.\(UUID().uuidString)") ?? .standard
+        browser.defaults = ThrowawayDefaults.make("ItemIndexTests")
         browser.sidebarItem = .allItems
         return browser
     }

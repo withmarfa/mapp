@@ -11,17 +11,13 @@ struct TypeLooksTests {
     private let two = "marfa:http://two.test"
 
     private func store(_ name: String, sink: RecordingSink = RecordingSink()) -> (store: TypeLooks, defaults: UserDefaults) {
-        let suite = "TypeLooksTests.\(name)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = ThrowawayDefaults.make("TypeLooksTests.\(name)")
         return (TypeLooks(defaults: defaults, reporting: Reporting(sink: sink)), defaults)
     }
 
     private func reopen(_ defaults: UserDefaults, sink: RecordingSink = RecordingSink()) -> TypeLooks {
         TypeLooks(defaults: defaults, reporting: Reporting(sink: sink))
     }
-
-    private func clean(_ defaults: UserDefaults, _ name: String) { defaults.removePersistentDomain(forName: "TypeLooksTests.\(name)") }
 
     private func note(_ id: String, parent: String? = nil, _ fields: [ItemTypeInfo.Field] = []) -> LookFixture.Spec {
         LookFixture.make(id, parent: parent, fields)
@@ -48,7 +44,6 @@ struct TypeLooksTests {
 
     @Test func twoServersWithOneTypeIdentifierKeepSeparateLooks() {
         let (store, defaults) = store("servers")
-        defer { clean(defaults, "servers") }
         store.importLooks(file(["core.note": chosenLook]), into: one, in: catalogue)
         #expect(store.looks(in: catalogue, library: one)[TypeID("core.note")] == chosenLook)
         #expect(store.looks(in: catalogue, library: two)[TypeID("core.note")]?.date == .edited)
@@ -59,14 +54,12 @@ struct TypeLooksTests {
 
     @Test func aStoreFindsWhatWasChosenAgain() {
         let (store, defaults) = store("persist")
-        defer { clean(defaults, "persist") }
         store.importLooks(file(["core.task": TypeLook(date: .created, secondary: [], facts: [.tags])]), into: one, in: catalogue)
         #expect(reopen(defaults).looks(in: catalogue, library: one)[TypeID("aic.ticket.task")]?.facts == [.tags])
     }
 
     @Test func aTypeNobodyChoseForIsDerivedAndNothingIsStoredForIt() {
         let (store, defaults) = store("derived")
-        defer { clean(defaults, "derived") }
         #expect(store.looks(in: catalogue, library: one).count == catalogue.itemTypes.count)
         #expect(defaults.data(forKey: TypeLooks.defaultsKey) == nil)
     }
@@ -76,9 +69,7 @@ struct TypeLooksTests {
     @Test func aLookThatCannotBeReadIsSetAsideAndTheRestKept() throws {
         let sink = RecordingSink()
         let name = "unreadable"
-        let defaults = UserDefaults(suiteName: "TypeLooksTests.\(name)")!
-        defaults.removePersistentDomain(forName: "TypeLooksTests.\(name)")
-        defer { clean(defaults, name) }
+        let defaults = ThrowawayDefaults.make("TypeLooksTests.\(name)")
         let stored: [String: Any] = [one: ["a": ["date": "bogus"], "b": ["date": "created"]], two: "not an object"]
         defaults.set(try JSONSerialization.data(withJSONObject: stored), forKey: TypeLooks.defaultsKey)
 
@@ -100,9 +91,7 @@ struct TypeLooksTests {
     @Test func storedTextThatIsNotLooksAtAllIsSetAsideWholeAfterEarlierOnes() throws {
         let sink = RecordingSink()
         let name = "whole"
-        let defaults = UserDefaults(suiteName: "TypeLooksTests.\(name)")!
-        defaults.removePersistentDomain(forName: "TypeLooksTests.\(name)")
-        defer { clean(defaults, name) }
+        let defaults = ThrowawayDefaults.make("TypeLooksTests.\(name)")
         let earlier = Data("set aside before".utf8)
         let text = Data("not json".utf8)
         defaults.set([earlier], forKey: TypeLooks.setAsideKey)
@@ -143,7 +132,6 @@ struct TypeLooksTests {
 
     @Test func aFileOfTheWrongShapeIsRefusedAndNothingIsWritten() throws {
         let (store, defaults) = store("refused")
-        defer { clean(defaults, "refused") }
         for text in ["not json", #"{"format":"marfa-mac-looks","version":9,"looks":{}}"#] {
             let url = try temporaryFile(Data(text.utf8))
             defer { try? FileManager.default.removeItem(at: url) }
@@ -155,7 +143,6 @@ struct TypeLooksTests {
 
     @Test func aLibraryWhoseCatalogueHasNotLoadedIsRefusedAndNothingIsWritten() throws {
         let (store, defaults) = store("unloaded")
-        defer { clean(defaults, "unloaded") }
         let url = try temporaryFile(try file(["core.note": chosenLook]).encoded())
         defer { try? FileManager.default.removeItem(at: url) }
         #expect(throws: LooksFileError.notLoaded) { try store.importLooks(from: url, into: one, in: Catalogue()) }
@@ -167,22 +154,19 @@ struct TypeLooksTests {
 
     @Test func aFileThatCannotBeReadIsRefused() throws {
         let (store, defaults) = store("missing")
-        defer { clean(defaults, "missing") }
         let missing = try temporaryFile()
         #expect(throws: LooksFileError.unreadable) { try store.importLooks(from: missing, into: one, in: catalogue) }
         #expect(defaults.data(forKey: TypeLooks.defaultsKey) == nil)
     }
 
     @Test func aFileThatCannotBeWrittenIsToldSo() throws {
-        let (store, defaults) = store("unwritable")
-        defer { clean(defaults, "unwritable") }
+        let (store, _) = store("unwritable")
         let nowhere = FileManager.default.temporaryDirectory.appending(path: "no-\(UUID().uuidString)/looks.json")
         #expect(throws: LooksFileError.unwritable) { try store.exportLooks(to: nowhere, in: catalogue, library: one) }
     }
 
     @Test func looksForTypesTheServerLacksAreKeptAndUsedWhenTheTypeAppears() throws {
-        let (store, defaults) = store("lacking")
-        defer { clean(defaults, "lacking") }
+        let (store, _) = store("lacking")
         let url = try temporaryFile(try file(["acme.invoice": chosenLook, "core.note": chosenLook]).encoded())
         defer { try? FileManager.default.removeItem(at: url) }
         try store.importLooks(from: url, into: one, in: catalogue)
@@ -195,20 +179,15 @@ struct TypeLooksTests {
     }
 
     @Test func importLeavesTheChoicesOfOtherTypesAlone() {
-        let (store, defaults) = store("others")
-        defer { clean(defaults, "others") }
+        let (store, _) = store("others")
         store.importLooks(file(["core.note": chosenLook]), into: one, in: catalogue)
         store.importLooks(file(["core.message": chosenLook]), into: one, in: catalogue)
         #expect(Set(store.choices(for: one).keys) == [TypeID("core.note"), TypeID("core.message")])
     }
 
     @Test func exportThenImportGivesTheSameLooks() throws {
-        let (first, firstDefaults) = store("exported")
-        let (second, secondDefaults) = store("imported")
-        defer {
-            clean(firstDefaults, "exported")
-            clean(secondDefaults, "imported")
-        }
+        let (first, _) = store("exported")
+        let (second, _) = store("imported")
         first.importLooks(file(["core.task": chosenLook, "acme.gone": chosenLook]), into: one, in: catalogue)
         let url = try temporaryFile()
         defer { try? FileManager.default.removeItem(at: url) }
@@ -225,7 +204,6 @@ struct TypeLooksTests {
 
     @Test func importingYourOwnExportStoresNoChoices() throws {
         let (store, defaults) = store("own")
-        defer { clean(defaults, "own") }
         let url = try temporaryFile()
         defer { try? FileManager.default.removeItem(at: url) }
         try store.exportLooks(to: url, in: catalogue, library: one)
@@ -236,7 +214,6 @@ struct TypeLooksTests {
 
     @Test func importingYourOwnExportLeavesWhatWasChosenAsItWas() throws {
         let (store, defaults) = store("keeps")
-        defer { clean(defaults, "keeps") }
         store.importLooks(file(["core.task": chosenLook, "acme.gone": chosenLook]), into: one, in: catalogue)
         store.importLooks(file(["core.note": TypeLook(date: .created, secondary: [.opening], facts: [.tags])]), into: one, in: catalogue)
         let before = store.choices(for: one)
@@ -250,8 +227,7 @@ struct TypeLooksTests {
     }
 
     @Test func aFileWithOneChangedPlaceStoresExactlyThatPlace() {
-        let (store, defaults) = store("one")
-        defer { clean(defaults, "one") }
+        let (store, _) = store("one")
         var looks = store.file(in: catalogue, library: one).looks
         looks["core.message"]?.secondary = []
         store.importLooks(file(looks), into: one, in: catalogue)
@@ -260,8 +236,7 @@ struct TypeLooksTests {
     }
 
     @Test func aPlaceBackToWhatTheMacWorksOutClearsItsChoice() {
-        let (store, defaults) = store("cleared")
-        defer { clean(defaults, "cleared") }
+        let (store, _) = store("cleared")
         store.importLooks(file(["core.message": chosenLook]), into: one, in: catalogue)
         #expect(store.choices(for: one) == [TypeID("core.message"): TypeLookChoice(date: .created, secondary: [])])
         var looks = store.file(in: catalogue, library: one).looks
@@ -274,8 +249,7 @@ struct TypeLooksTests {
     }
 
     @Test func aLaterBetterPresetStillReachesAPlaceNobodyChose() {
-        let (store, defaults) = store("later")
-        defer { clean(defaults, "later") }
+        let (store, _) = store("later")
         let status = LookFixture.field("state", LookFixture.status)
         let before = LookFixture.catalogue([note("acme.t", [status])])
         let after = LookFixture.catalogue([note("acme.t", [status, LookFixture.field("project")])])
@@ -288,8 +262,7 @@ struct TypeLooksTests {
     }
 
     @Test func aFileGivesEveryTypeTheLookItHoldsAndAChildLikeItsParentStoresNothing() {
-        let (store, defaults) = store("whole")
-        defer { clean(defaults, "whole") }
+        let (store, _) = store("whole")
         var looks = catalogue.looks()
         // A file from another Mac whose person chose a date for tasks, which every task-like child shows too.
         for type in ["core.task", "aic.ticket", "aic.ticket.task"] { looks[TypeID(type)]?.date = .created }
@@ -299,8 +272,7 @@ struct TypeLooksTests {
     }
 
     @Test func aChildThatDiffersFromItsParentKeepsItsOwnChoice() {
-        let (store, defaults) = store("child")
-        defer { clean(defaults, "child") }
+        let (store, _) = store("child")
         var looks = catalogue.looks()
         for type in ["core.task", "aic.ticket"] { looks[TypeID(type)]?.date = .created }
         looks[TypeID("aic.ticket.task")]?.date = .off
@@ -312,8 +284,7 @@ struct TypeLooksTests {
     }
 
     @Test func aParentIsMeasuredBeforeItsChildWhateverTheirIdentifiersSortTo() {
-        let (store, defaults) = store("parentfirst")
-        defer { clean(defaults, "parentfirst") }
+        let (store, _) = store("parentfirst")
         let catalogue = LookFixture.catalogue([note("a.child", parent: "b.parent"), note("b.parent")])
         let preset = LookFixture.look("b.parent", in: catalogue)
         #expect(preset.date == .edited)
@@ -325,8 +296,7 @@ struct TypeLooksTests {
     /// Below ten ancestors the old order was right; past ten, types tie on the count and fell back to their names, so a
     /// child whose identifier sorts first was measured against its parent's old look.
     @Test func aParentIsMeasuredBeforeItsChildInAChainDeeperThanTheAncestorLimit() {
-        let (store, defaults) = store("deep")
-        defer { clean(defaults, "deep") }
+        let (store, _) = store("deep")
         // The deeper the type, the earlier its identifier sorts.
         func id(_ depth: Int) -> String { "t\(99 - depth)" }
         let catalogue = LookFixture.catalogue((0...12).map { note(id($0), parent: $0 == 0 ? nil : id($0 - 1)) })
@@ -340,8 +310,7 @@ struct TypeLooksTests {
     }
 
     @Test func aChildKeepsItsParentsOldLookAsItsOwnChoiceWhenTheParentMoves() {
-        let (store, defaults) = store("oldparent")
-        defer { clean(defaults, "oldparent") }
+        let (store, _) = store("oldparent")
         let catalogue = LookFixture.catalogue([note("a.child", parent: "b.parent"), note("b.parent")])
         let old = LookFixture.look("b.parent", in: catalogue)
         let moved = TypeLook(date: .created, secondary: old.secondary, facts: old.facts)
@@ -354,16 +323,14 @@ struct TypeLooksTests {
     }
 
     @Test func importKeepsAnUnknownTypesWholeLookSinceNothingCanBeMeasured() {
-        let (store, defaults) = store("unknown")
-        defer { clean(defaults, "unknown") }
+        let (store, _) = store("unknown")
         let look = TypeLook(date: .edited, secondary: [.opening], facts: [.tags])
         store.importLooks(file(["acme.later": look]), into: one, in: catalogue)
         #expect(store.choices(for: one) == [TypeID("acme.later"): TypeLookChoice(look)])
     }
 
     @Test func anExportHoldsEveryTypeOfTheCatalogue() {
-        let (store, defaults) = store("everything")
-        defer { clean(defaults, "everything") }
+        let (store, _) = store("everything")
         let looks = store.file(in: catalogue, library: one).looks
         #expect(Set(looks.keys) == Set(catalogue.itemTypes.keys.map(\.rawValue)))
         #expect(looks["core.task"] == catalogue.looks()[TypeID("core.task")])

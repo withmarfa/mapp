@@ -14,7 +14,7 @@ import Testing
     private func connected(
         _ bench: HostBench, settings: InstanceSettingsModel? = nil
     ) async throws -> (AppSettingsHost, Libraries, FakeMarfaSource) {
-        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let defaults = ThrowawayDefaults.make("MarfaSettingsHostTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         let adapter = AppSettingsHost(libraries: libraries, launcher: SettingsLauncher(), instanceSettings: settings)
         try await libraries.host.connect(address: "http://first.test:8210", key: "k")
@@ -25,8 +25,8 @@ import Testing
     }
 
     @Test func withNoServerSetThePagesHaveNoCopyOpen() throws {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("MarfaSettingsHostTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         let adapter = AppSettingsHost(libraries: libraries, launcher: SettingsLauncher())
         #expect(adapter.connection == .notConnected)
@@ -34,7 +34,7 @@ import Testing
     }
 
     @Test func aSignedOutAndANotAnsweringServerAreToldApart() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, _, source) = try await connected(bench)
         source.state.set(.offline(reason: nil))
         #expect(await eventually { if case .notAnswering = adapter.connection { true } else { false } })
@@ -43,7 +43,7 @@ import Testing
     }
 
     @Test func theConnectedPageReadsWhatTheSignInHolds() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, _, _) = try await connected(bench)
         #expect(adapter.grants == SystemSignIns.askedAtSignIn)
         #expect(adapter.grants.contains(.configManage))
@@ -55,7 +55,7 @@ import Testing
     @Test func aSignInAsksForTheReadOfTheOwnersNameAndItIsNoOwnerPermission() async throws {
         #expect(SystemSignIns.scopes.contains("profile.name:read"))
         #expect(SystemSignIns.profileScopes.allSatisfy { InstancePermission(rawValue: $0) == nil })
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         #expect(bench.signIns.askedScopes.last?.contains("profile.name:read") == true)
         #expect(libraries.host.readsProfile)
@@ -63,7 +63,7 @@ import Testing
     }
 
     @Test func aSignInMadeBeforeTheNameWasAskedForShowsItAfterAllowMore() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         bench.signIns.save("old", for: first.address, profile: false)
         await libraries.host.refreshGrants()
@@ -78,7 +78,7 @@ import Testing
     }
 
     @Test func signingInAgainGivesTheNameToASignInThatLackedItAndKeepsItAfter() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (_, libraries, _) = try await connected(bench)
         bench.signIns.save("old", for: first.address, profile: false)
         await libraries.host.refreshGrants()
@@ -91,7 +91,7 @@ import Testing
     }
 
     @Test func anOwnerWhoLeavesTheNameOutIsOfferedItAgainAndNothingIsTold() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         bench.signIns.script(approvingProfile: false)
         bench.signIns.script(browser: [.success("without")])
@@ -101,7 +101,7 @@ import Testing
     }
 
     @Test func allowMoreCancelledChangesNothingAndLeavesThePageMissingIt() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         bench.signIns.script(browser: [.failure(SignInError.canceled)])
         let outcome = await adapter.allowMore([.backupsManage])
@@ -112,7 +112,7 @@ import Testing
     }
 
     @Test func allowMoreApprovedWithFewerChangesNothingTheOwnerWithheld() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, _, _) = try await connected(bench)
         bench.signIns.script(approving: [SystemSignIns.askedAtSignIn])
         bench.signIns.script(browser: [.success("again")])
@@ -123,7 +123,7 @@ import Testing
     }
 
     @Test func allowMoreApprovedInFullOpensThePage() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, _, _) = try await connected(bench)
         bench.signIns.script(browser: [.success("again")])
         let outcome = await adapter.allowMore([.backupsManage])
@@ -133,7 +133,7 @@ import Testing
     }
 
     @Test func signingInAgainKeepsWhatWasAllowedBefore() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         bench.signIns.script(browser: [.success("again")])
         _ = await adapter.allowMore([.backupsManage])
@@ -143,7 +143,7 @@ import Testing
     }
 
     @Test func signingInAgainWithACodeKeepsWhatWasAllowedBefore() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         bench.signIns.script(browser: [.success("again")])
         _ = await adapter.allowMore([.backupsManage])
@@ -157,7 +157,7 @@ import Testing
     }
 
     @Test func anApprovalThatDropsAPermissionHeldIsToldAndTheNeedingPageAsksAgain() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         bench.signIns.script(browser: [.success("again")])
         #expect(await adapter.allowMore([.backupsManage]) == .allowed)
@@ -172,7 +172,7 @@ import Testing
     }
 
     @Test func anAllowMoreApprovedWithFewerThanHeldNamesEveryPermissionLost() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         bench.signIns.script(approving: [[.itemsPurge]])
         bench.signIns.script(browser: [.success("narrower")])
@@ -185,7 +185,7 @@ import Testing
     }
 
     @Test func anApprovalOfFewerThanAskedThatKeepsEverythingHeldTellsNothing() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         bench.signIns.script(approving: [SystemSignIns.askedAtSignIn])
         bench.signIns.script(browser: [.success("again")])
@@ -202,14 +202,14 @@ import Testing
     }
 
     @Test func allowMoreNeverAsksForSignInsManageAtSignIn() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (_, _, _) = try await connected(bench)
         #expect(!SystemSignIns.askedAtSignIn.contains(.signInsManage))
         #expect(!SystemSignIns.scopes.contains(InstancePermission.signInsManage.rawValue))
     }
 
     @Test func closingSettingsHandsAnUnsavedDraftToTheNoticesAndDropsIt() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let source = FakeInstanceConfig([.name: .text("Library")])
         let settings = InstanceSettingsModel { .init(id: "https://marfa.test", source: source) }
         await settings.load()
@@ -228,11 +228,11 @@ import Testing
     }
 
     @Test func quittingHandsAnUnsavedDraftToTheNoticesAndTheClipboard() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let source = FakeInstanceConfig([.name: .text("Library")])
         let settings = InstanceSettingsModel { .init(id: "https://marfa.test", source: source) }
         await settings.load()
-        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let defaults = ThrowawayDefaults.make("MarfaSettingsHostTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, instanceSettings: settings)
         let model = libraries.instanceSettings
         model.draft[.name] = "Renamed on quit"
@@ -253,7 +253,7 @@ import Testing
     }
 
     @Test func closingSettingsHandsBackTheOwnerPagesDrafts() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         let context = OwnerContext(calls: FakeOwnerCalls(), grants: { [.keysMint, .keysManage, .configManage] })
         let addresses = AddressesModel(context: context)
@@ -285,8 +285,8 @@ import Testing
     }
 
     @Test func quittingWithAKeysSecretShownTellsThePersonTheKeyExists() async throws {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("MarfaSettingsHostTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         let keys = KeysModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.keysMint, .keysManage] }))
         libraries.ownerDrafts.register(keys)
@@ -304,8 +304,8 @@ import Testing
     }
 
     @Test func aKeyMadeAfterSettingsClosedTellsThePersonThroughTheSameNotice() async throws {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("MarfaSettingsHostTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         let calls = FakeOwnerCalls()
         let keys = KeysModel(
@@ -328,8 +328,8 @@ import Testing
     }
 
     @Test func quittingHandsBackAPasskeyAndKeyRenameTypedAndNotSaved() async throws {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("MarfaSettingsHostTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         let calls = FakeOwnerCalls()
         calls.state.withLock { $0.passkeys = [OwnerPasskey(id: "p", name: "Phone")] }
@@ -350,8 +350,8 @@ import Testing
     }
 
     @Test func quittingHandsBackTheOwnerPagesDrafts() async throws {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("MarfaSettingsHostTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         let keys = KeysModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.keysMint, .keysManage] }))
         libraries.ownerDrafts.register(keys)

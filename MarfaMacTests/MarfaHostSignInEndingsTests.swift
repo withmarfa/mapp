@@ -31,7 +31,7 @@ import Testing
     /// A saved address names its copy by the text it was saved as, so a saved port is read as saved: the copy and
     /// the writes waiting in it open, and none is orphaned.
     @Test func aSavedAddressWithTheSchemesOwnPortOpensItsOwnCopyAndKeepsItsWrites() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         bench.defaults.set("https://marfa.test:443", forKey: "MarfaAddress")
         bench.signIns.hold("k", for: host443)
@@ -49,7 +49,7 @@ import Testing
     /// discard marks and copy of the saved text are untouched.
     @Test(arguments: ["https://marfa.test", "https://marfa.test/", "HTTPS://Marfa.Test:443"])
     func theSameServerTypedWithoutItsPortSignsInAgainAndRevokesNothing(typed: String) async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("https://marfa.test:443", forKey: "MarfaAddress")
         bench.signIns.hold("old", for: host443)
         let host = bench.host()
@@ -66,7 +66,7 @@ import Testing
     }
 
     @Test func anotherServerTypedIsStillAnotherServer() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "https://marfa.test:443", key: "a")
         try await host.changeAddress(to: "https://other.test", key: "b", choice: .discardNothing)
@@ -79,7 +79,7 @@ import Testing
     /// The server did not confirm the sign-out, and the copy could not be removed or held more writes than were shown:
     /// the person is told of both, not only of the copy.
     @Test func anApprovalTheServerDidNotEndIsToldWhenTheCopyCouldNotBeRemoved() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let host = bench.host(remover: { _, _ in throw MarfaError.storeBusy(message: "Busy.") })
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -103,7 +103,7 @@ import Testing
     }
 
     @Test func anApprovalTheServerDidNotEndIsToldWhenTheCopyHeldMoreWrites() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let host = bench.host(remover: { _, _ in throw MarfaError.unsentDiffers(path: "p", unsent: 3, message: "") })
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -120,7 +120,7 @@ import Testing
     }
 
     @Test func aSignOutTheServerConfirmedAddsNothingToACopyThatCouldNotBeRemoved() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let host = bench.host(remover: { _, _ in throw MarfaError.storeBusy(message: "Busy.") })
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -138,7 +138,7 @@ import Testing
 
     /// After Use a Different Server, the words are about the server left, not the one now open.
     @Test func aSwitchThatLeavesAnApprovalNamesThePreviousServer() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let host = bench.host(remover: { _, _ in throw MarfaError.storeBusy(message: "Busy.") })
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -184,7 +184,7 @@ import Testing
 
     /// A connect whose copy would not open drops the sign-in it made: if the server did not confirm that, the person is told.
     @Test func aConnectThatFailsAfterSigningInTellsWhenTheApprovalMayStand() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .denied, message: "No.") }
         bench.signIns.script(signOut: .success(.notConfirmed))
         let host = bench.host()
@@ -196,7 +196,7 @@ import Testing
 
     @Test(arguments: [SignOutOutcome.endedAtServer, .nothingKept])
     func aCleanUpSignOutThatEndedTheApprovalTellsNothing(outcome: SignOutOutcome) async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .denied, message: "No.") }
         bench.signIns.script(signOut: .success(outcome))
         let host = bench.host()
@@ -209,7 +209,7 @@ import Testing
     /// A reply that is no OAuth error, such as a proxy's page, reaches the app as the package's `http_<status>`.
     @Test(arguments: ["http_404", "http_403", "http_200"])
     func anAddressThatAnswersWithAPlainStatusStartsNoSignInAndIsToldAsNotMarfa(code: String) async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.signIns.script(browser: [.failure(SignInError.refused(code: code, message: "Not Found"))])
         let host = bench.host()
         let told = await problem { () throws(MarfaHost.Problem) in try await host.connect(address: "https://example.test", via: .browser) }
@@ -220,7 +220,7 @@ import Testing
     }
 
     @Test func aSwitchToAnAddressThatIsNotAMarfaServerLeavesTheLibrary() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let source = try #require(bench.servers.last)
@@ -236,7 +236,7 @@ import Testing
     /// The sign-out ran into the Keychain held elsewhere before it forgot or revoked anything: the sign-in may still be
     /// kept and the approval may stand, so the person is told, never left to find out.
     @Test func aCleanUpSignOutThatThrowsTellsThatTheSignInAndApprovalMayStand() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .denied, message: "No.") }
         bench.signIns.script(signOut: .failure(SignInError.heldElsewhere))
         let host = bench.host()
@@ -250,7 +250,7 @@ import Testing
     }
 
     @Test func anAbandonedSwitchWhoseCleanUpSignOutThrowsTellsTheSame() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let first = try MarfaConnection(address: "http://first.test:8210")
         let inner = bench.servers.opener
         let host = bench.host(opener: { connection, signIns, location in
@@ -268,7 +268,7 @@ import Testing
 
     /// Typing the spelling with the port while connected without it is Sign In Again: no new copy, no sign-out.
     @Test func typingTheSpellingWithThePortWhileConnectedWithoutItSignsInAgain() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "https://marfa.test", key: "old")
         let source = try #require(bench.servers.last)
@@ -284,7 +284,7 @@ import Testing
     /// A copy kept under one spelling stays as it is, with its writes, when the other spelling is connected: that is its
     /// own copy, opened empty.
     @Test func aKeptCopyIsNotReachedByTheOtherSpelling() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let host = bench.host()
         try await host.connect(address: "https://marfa.test:443", key: "k")
@@ -305,7 +305,7 @@ import Testing
 
     /// A discard mark names the spelling it was made under only.
     @Test func aDiscardMarkIsNotHonouredUnderTheOtherSpelling() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         let other = try MarfaConnection(address: "https://marfa.test")
         host.markDiscarded(host443, agreed: MarfaHost.Agreed(ids: []))
@@ -318,7 +318,7 @@ import Testing
     nonisolated private static let raw = "NSCocoaErrorDomain Code=513 errSecItemNotFound /Users/someone/Library/copy.sqlite"
 
     @Test func aCopyThatCannotBeMadeAfterSigningInIsToldInTheAppsWords() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host(opener: { _, _, _ in throw NSError(domain: NSCocoaErrorDomain, code: 513, userInfo: [NSLocalizedDescriptionKey: Self.raw]) })
         let told = await problem { () throws(MarfaHost.Problem) in try await host.connect(address: "http://first.test:8210", key: "k") }
         #expect(told == .unavailable(message: Words.copyCouldNotBeOpened))
@@ -330,7 +330,7 @@ import Testing
     }
 
     @Test func aCopyThatCannotBeMadeForTheServerSwitchedToIsToldInTheAppsWords() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let first = try MarfaConnection(address: "http://first.test:8210")
         let inner = bench.servers.opener
         let host = bench.host(opener: { connection, signIns, location in
@@ -343,7 +343,7 @@ import Testing
     }
 
     @Test func aSignInAgainThatCannotReadTheCredentialIsToldInTheAppsWords() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -356,7 +356,7 @@ import Testing
     /// A package error that carries the system's own words is told in the app's, whichever step it stopped.
     @Test func aStoreErrorFromThePackageIsToldInTheAppsWordsWhenTheCopyIsOpened() async throws {
         let raw = "SQLite says: disk I/O error at /Users/someone/Library/copy.sqlite"
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host(opener: { _, _, _ in throw MarfaError.store(message: raw) })
         let told = await problem { () throws(MarfaHost.Problem) in try await host.connect(address: "http://first.test:8210", key: "k") }
         #expect(told == .unavailable(message: Words.copyCouldNotBeOpened))

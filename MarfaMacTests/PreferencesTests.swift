@@ -49,9 +49,8 @@ import Testing
 }
 
 @Suite struct PreferencesValuesTests {
-    private func defaults() throws -> UserDefaults {
-        let suite = "MarfaMacTests.Preferences.\(UUID().uuidString)"
-        return try #require(UserDefaults(suiteName: suite))
+    private func defaults() -> UserDefaults {
+        ThrowawayDefaults.make("MarfaMacTests.Preferences")
     }
 
     private func setting(_ key: String) throws -> SyncedSetting {
@@ -63,7 +62,7 @@ import Testing
     }
 
     @Test func aMemberKeepsItsKindThroughTheMarfa() throws {
-        let here = try defaults(), there = try defaults()
+        let here = defaults(), there = defaults()
         here.set(true, forKey: PageKey.foldsHeadings)
         here.set(1.25, forKey: LineSpacing.key)
         here.set(3, forKey: PageKey.titleLines)
@@ -80,7 +79,7 @@ import Testing
     }
 
     @Test func aTablesWidthsStayWithTheViewOnThisMac() throws {
-        let here = try defaults(), there = try defaults()
+        let here = defaults(), there = defaults()
         here.set(#"{"v1":{"layout":"table","widths":"aGVyZQ=="}}"#, forKey: ViewLayouts.key)
         there.set(#"{"v1":{"layout":"list","widths":"dGhlcmU="}}"#, forKey: ViewLayouts.key)
         let setting = try setting(ViewLayouts.key)
@@ -91,7 +90,7 @@ import Testing
     }
 
     @Test func aServersEntryIsTheOnlyOneSynced() throws {
-        let here = try defaults()
+        let here = defaults()
         let looks = #"{"a":{"core.note":{"date":"created"}},"b":{"core.task":{"date":"due"}}}"#
         here.set(Data(looks.utf8), forKey: TypeLooks.defaultsKey)
         let setting = try setting(TypeLooks.defaultsKey)
@@ -117,7 +116,7 @@ import Testing
     }
 
     @Test func aRowThatIsNotJSONIsSetAsideAndTheStoreKeepsItsDefault() throws {
-        let here = try defaults()
+        let here = defaults()
         let setting = try setting(PagePlacements.key)
         setting.write([.row(.types, setting: "pagePlacements", key: "core.note"): "{not json"], to: here, library: "a")
         #expect(here.stringArray(forKey: PagePlacements.setAsideKey) == ["{not json"])
@@ -125,13 +124,13 @@ import Testing
     }
 
     @Test func storedTextThisMacCannotReadIsNeitherSentNorWrittenOver() throws {
-        let here = try defaults()
+        let here = defaults()
         here.set(Data("not json".utf8), forKey: PlaceDefaults.key)
         #expect(try setting(PlaceDefaults.key).read(here, library: "a") == .unreadable)
     }
 
     @Test func includedSubtypesAreARowEach() throws {
-        let here = try defaults()
+        let here = defaults()
         IncludedSubtypes.update(in: here) { $0.set("core.task", included: true); $0.set("aic.ticket", included: true) }
         let setting = try setting(IncludedSubtypes.key)
         let read = units(setting.read(here, library: "a"))

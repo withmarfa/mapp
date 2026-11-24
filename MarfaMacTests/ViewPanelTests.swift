@@ -10,9 +10,7 @@ import Testing
 @Suite(.serialized, .hangLimit)
 struct ViewPanelTests {
     static func defaults() -> UserDefaults {
-        let suite = "MarfaMac.ViewPanelTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite) ?? .standard
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = ThrowawayDefaults.make("MarfaMac.ViewPanelTests")
         return defaults
     }
 

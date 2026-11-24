@@ -352,10 +352,7 @@ struct SidebarTabsTests {
     }
 
     @Test func aColorSurvivesRelaunchForItsLibraryAlone() throws {
-        let name = "SidebarTabsTests.colors"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        defaults.removePersistentDomain(forName: name)
-        defer { defaults.removePersistentDomain(forName: name) }
+        let defaults = ThrowawayDefaults.make("SidebarTabsTests.colors")
         let view = SidebarPlace.view(ItemID("v-Reading"))
         SidebarLayouts(defaults: defaults).update("marfa:one") { $0.setColor(.teal, of: view) }
         #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").color(of: view) == .teal)
