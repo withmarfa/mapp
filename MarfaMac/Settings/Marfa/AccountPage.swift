@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The Account page: the owner's picture and name, which can be changed, the username and email as the server holds them,
 /// Change Password…, the passkeys with Add a Passkey…, and the browsers signed in, each with Sign Out.

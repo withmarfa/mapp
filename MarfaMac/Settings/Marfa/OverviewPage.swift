@@ -120,24 +120,33 @@ struct OverviewPage: View {
 
     // MARK: This Marfa
 
+    /// This Marfa holds the name and the release, as S33 draws them; a problem reading or updating either has a mark, so it
+    /// takes a section of its own below (F12).
     @ViewBuilder private var thisMarfa: some View {
-        if (canChangeSettings && (settings.isAvailable || settings.isLoading || settings.failure != nil))
-            || model.releaseVersion != nil || model.updateReady != nil || model.releaseFailure != nil
-        {
+        let showsName = canChangeSettings && (settings.isAvailable || settings.isLoading)
+        let showsRelease = updates.isUpdating || model.releaseVersion != nil || model.updateReady != nil
+        if showsName || showsRelease {
             SettingsSection("This Marfa") {
-                if canChangeSettings { nameSetting }
+                if showsName { nameRow }
                 versionRow
             }
         }
-    }
-
-    @ViewBuilder private var nameSetting: some View {
-        if settings.isAvailable || settings.isLoading {
-            nameRow
-        } else if let failure = settings.failure {
-            OwnerProblemRow(
-                title: "Couldn’t Read \(host.serverName)’s Settings", failure: OwnerFailure(failure), page: .overview, host: host,
-                retry: failure == .unsupported ? nil : { Task { await settings.load() } })
+        let settingsFailure = canChangeSettings && !showsName ? settings.failure : nil
+        let updateFailure = updates.error ?? updates.failure
+        if settingsFailure != nil || model.releaseFailure != nil || updateFailure != nil {
+            SettingsSection(name: nil) {
+                if let failure = settingsFailure {
+                    OwnerProblemRow(
+                        title: "Couldn’t Read \(host.serverName)’s Settings", failure: OwnerFailure(failure), page: .overview, host: host,
+                        retry: failure == .unsupported ? nil : { Task { await settings.load() } })
+                }
+                if let failure = model.releaseFailure {
+                    readProblem("Couldn’t Check for Updates", failure: failure)
+                }
+                if let failure = updateFailure {
+                    OwnerProblemRow(title: "Couldn’t Update", failure: failure, page: .overview, host: host)
+                }
+            }
         }
     }
 
@@ -166,12 +175,6 @@ struct OverviewPage: View {
             SettingsRow(title: Text("Marfa \(version)"), line: model.updateReady.map { Text("Marfa \($0) is ready.") }) { updateButton }
         } else if let ready = model.updateReady {
             SettingsRow(title: Text("Marfa \(ready) is ready")) { updateButton }
-        }
-        if let failure = model.releaseFailure {
-            readProblem("Couldn’t Check for Updates", failure: failure)
-        }
-        if let failure = updates.error ?? updates.failure {
-            OwnerProblemRow(title: "Couldn’t Update", failure: failure, page: .overview, host: host)
         }
     }
 
@@ -220,7 +223,8 @@ struct OverviewPage: View {
 
     // MARK: Health
 
-    private var health: some View {
+    /// Health's rows, and below them, in a section of their own since they have a mark (F12), what couldn't be read.
+    @ViewBuilder private var health: some View {
         SettingsSection("Health") {
             let database = model.health(of: .database)
             SettingsRow("Database") {
@@ -231,9 +235,6 @@ struct OverviewPage: View {
                 SettingsValue(verbatim: Self.word(disk.condition), dot: Self.dot(disk.condition))
             }
             filesRow(model.health(of: .files))
-            if let failure = model.metricsFailure {
-                readProblem("Couldn’t Read Database and File Sizes", failure: failure)
-            }
             let backups = model.backups
             if host.grants.contains(.backupsManage) {
                 SettingsLinkRow(
@@ -244,8 +245,16 @@ struct OverviewPage: View {
                     SettingsValue(verbatim: Self.backupsWord(backups), dot: Self.dot(backups))
                 }
             }
-            if let failure = model.lastBackupFailure, host.grants.contains(.backupsManage) {
-                readProblem("Couldn’t Read the Last Backup", failure: failure)
+        }
+        let backupFailure = host.grants.contains(.backupsManage) ? model.lastBackupFailure : nil
+        if model.metricsFailure != nil || backupFailure != nil {
+            SettingsSection(name: nil) {
+                if let failure = model.metricsFailure {
+                    readProblem("Couldn’t Read Database and File Sizes", failure: failure)
+                }
+                if let failure = backupFailure {
+                    readProblem("Couldn’t Read the Last Backup", failure: failure)
+                }
             }
         }
     }
