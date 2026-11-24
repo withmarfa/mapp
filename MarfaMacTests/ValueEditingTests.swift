@@ -605,6 +605,57 @@ struct ValueEditingTests {
         #expect(library.notices.waiting.first?.text == "Labels: c")
     }
 
+    @Test func aDayChosenAfterATimeArrivedElsewhereDoesNotLetTheTypedTimeWriteOverIt() {
+        let written = Written()
+        let item = Self.item(["due": .string("2026-11-07T09:30:00Z")])
+        let library = Self.library([item])
+        var request = Self.request(.date(Self.due), item: item, in: library, write: { written.all.append($0); return true })
+        request.calendar = Self.utc
+        let model = ValueEditModel(request)
+        model.timeDraft = "14:45"
+        library.items[0] = Self.item(["due": .string("2026-11-07T16:00:00Z")])
+        model.chooseDay(Self.moment(8, 0, 0))
+        model.finish(cancelled: false)
+        #expect(written.all == [PropertyValue.string(ItemDate.instant(Self.moment(8, 16, 0)))])
+        #expect(library.notices.waiting.first?.text == "Due: 14:45")
+    }
+
+    @Test func aWordTheListRefusedIsHandedBackEvenAfterAnotherChangeSucceeds() {
+        let (library, written) = (Self.library([]), Written())
+        let model = wordsPanel(["a", "b"], limit: 2, in: library, written: written)
+        add("c", to: model)
+        model.removeToken("a")
+        #expect(model.notice == nil && model.query == "c")
+        model.finish(cancelled: false)
+        #expect(library.notices.waiting.first?.text == "Labels: c")
+    }
+
+    @Test func aFilterForAHeldWordIsNotHandedBackWhenAnotherChangeFails() {
+        let item = Self.item(["labels": Self.list("red", "blue")])
+        let library = Self.library([item])
+        let model = ValueEditModel(Self.request(.words(Self.labels), item: item, in: library))
+        model.query = "blue"
+        model.removeToken("red")
+        #expect(model.notice != nil)
+        model.finish(cancelled: false)
+        model.finish(cancelled: false)
+        #expect(library.notices.told == 0)
+    }
+
+    @Test func aClearedTimeThatCouldNotBeMadeIsTold() {
+        let written = Written()
+        let item = Self.item(["due": .string("2026-11-07T09:30:00Z")])
+        let library = Self.library([item])
+        var request = Self.request(.date(Self.due), item: item, in: library, write: { written.all.append($0); return true })
+        request.calendar = Self.utc
+        let model = ValueEditModel(request)
+        model.timeDraft = ""
+        library.items[0] = Self.item(["due": .string("2026-11-07T16:00:00Z")])
+        model.finish(cancelled: false)
+        #expect(written.all.isEmpty)
+        #expect(library.notices.told == 1 && library.notices.waiting.first?.text == nil)
+    }
+
     @Test func timesAreReadAsPeopleTypeThem() {
         #expect(TimeOfDay.parse("9")?.hour == 9)
         #expect(TimeOfDay.parse("930").map { [$0.hour, $0.minute] } == [9, 30])
