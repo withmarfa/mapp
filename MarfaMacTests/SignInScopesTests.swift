@@ -27,7 +27,9 @@ struct SignInScopesTests {
         let connection = try MarfaConnection(address: "https://marfa.example")
         for permissions in [Set<InstancePermission>(), SystemSignIns.askedAtSignIn, Set(InstancePermission.allCases)] {
             let asked = try signIns.authorization(for: connection, asking: permissions).client.scopes
-            #expect(asked == SystemSignIns.scopes)
+            // The package adds the scopes of the permissions asked for after the app's list.
+            #expect(Array(asked.prefix(SystemSignIns.scopes.count)) == SystemSignIns.scopes)
+            #expect(asked.filter { $0.hasPrefix("app.") } == [Self.root])
         }
     }
 
