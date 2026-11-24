@@ -273,7 +273,6 @@ import os
             || TestHost.isRequested
             || environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         {
-            // The unit tests' defaults go with the libraries; the others keep one named domain, emptied at each start.
             let throwaway = TestHost.isRequested ? ThrowawayDefaults.make("SampleMarfa") : nil
             let suite = throwaway?.suite ?? sampleDefaultsSuite
             let defaults = throwaway ?? UserDefaults(suiteName: suite) ?? .standard

@@ -2,15 +2,9 @@
 import Foundation
 import Synchronization
 
-/// Defaults that a unit test, the test host or a preview uses once and loses, kept in a file in the temporary folder
-/// and removed with the object, so a run leaves nothing behind.
-///
-/// A named domain (`UserDefaults(suiteName:)`) leaves a file in `~/Library/Preferences` that `removePersistentDomain`
-/// empties but never removes, and `cfprefsd` writes it late, so deleting it by hand is not reliable either. A suite
-/// named by an absolute path is kept at that path instead, written by the process itself. The file goes when the last
-/// reference to the defaults does, so a test needs no teardown: hold the defaults for as long as the test uses them.
-/// What a page or window outlives the test with goes when the process exits, and what a killed run left goes at the
-/// next run's first use, once a day old.
+/// Unit-test defaults backed by a temporary plist. On macOS 27, an absolute suite path lets the process write the
+/// file directly instead of having `cfprefsd` write a named domain under `~/Library/Preferences`.
+/// Keep the returned object alive for as long as the test needs the domain.
 nonisolated final class ThrowawayDefaults: UserDefaults, @unchecked Sendable {
     /// The domain's name, which opens the same defaults again (`UserDefaults(suiteName:)`) while this object lives.
     let suite: String
@@ -37,7 +31,6 @@ nonisolated final class ThrowawayDefaults: UserDefaults, @unchecked Sendable {
         _ = start
         let path = folder.appending(path: "\(name)-\(UUID().uuidString)").path
         held.withLock { _ = $0.insert(path) }
-        // Only the global domain and the app's own are refused, and a path is neither.
         return ThrowawayDefaults(path: path)!
     }
 

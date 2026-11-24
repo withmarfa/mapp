@@ -47,10 +47,10 @@ Replace `test` with `build` to build only. `Scripts/measure-ui.sh` times the win
 
 ## Tests never touch real data
 
-Under the unit tests' background-only host, previews and the sample library, `Libraries.standard()` uses `ScriptedSignIns` (a `MemoryKeychain` holding the package's `Credential`, with the browser and code answers scripted), a temporary store and defaults of its own, never the Keychain or the saved server, and each `Browser` keeps its Mac settings in defaults of its own, so what one test leaves in a place's default view never reaches another's. A test's own defaults come from `ThrowawayDefaults.make(name)`, a file in the temporary folder that goes when the last reference does, never `UserDefaults(suiteName:)`, which leaves a file in `~/Library/Preferences` that nothing removes. A unit test drives `MarfaLibrary` through `FakeItemSource` or the sample's fake copy (`WorkingCopy.fake`). Only the `Live` plan reaches a server, and only a test instance.
+Under the unit test host, previews, and the sample library, `Libraries.standard()` uses `ScriptedSignIns` and a temporary store. In the unit test host each `Browser` has its own defaults. Use `ThrowawayDefaults.make(name)` to create a test domain and keep the returned object alive while the test uses it. A unit test drives `MarfaLibrary` through `FakeItemSource` or the sample's fake copy (`WorkingCopy.fake`). Only the `Live` plan reaches a server, and only a test instance.
 
 ## Code Review Rules
 
 - **Tests touch real data.** Flag a test that reaches the Keychain, the default store location, or a server, and a UI test run without `-MarfaMacSampleLibrary`.
-- **Defaults left behind.** Flag `UserDefaults(suiteName:)` or `removePersistentDomain` in a test or the test host: a named domain leaves a `.plist` in `~/Library/Preferences` on every run. Safe path: `ThrowawayDefaults.make`.
+- **Defaults left behind.** Flag a test or test host that creates or clears a named preferences domain. Named domains leave plists in `~/Library/Preferences`. Create test domains with `ThrowawayDefaults.make`. To read the same domain from another thread, open its `suite` while the original object is still alive.
 - **Sleep instead of waiting.** Flag a loop of short sleeps, an `async` suite without `.hangLimit`, or a fixed sleep with no comment saying what it waits for.
