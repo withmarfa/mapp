@@ -15,8 +15,8 @@ struct MainView: View {
     @AppStorage(IncludedSubtypes.key) private var includedSubtypes = IncludedSubtypes()
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
-    /// Kept with the window for the next launch, as the selection and the details are.
     @AppStorage(InterfaceKey.showsSidebarHistory) private var showsSidebarHistory = true
+    /// Kept with the window for the next launch, as the selection and the details are.
     @SceneStorage("sidebarHidden") private var isSidebarHidden = false
     @State private var snapshotSaver = DelayedAction()
     @State private var measuredWidths = ColumnWidthTracker()
@@ -229,7 +229,7 @@ struct MainView: View {
                             .filterChips(browser)
                             .viewCorner(browser)
                         } else {
-                            // The page has no title of the window's own to show beside Back, which is the arrow alone.
+                            // The page has no title of the window's own to show.
                             fullPage.toolbar(removing: .title)
                         }
                     }
