@@ -158,13 +158,14 @@ private struct IndexTypesCell: View {
     }
 }
 
-/// When a container's latest item changed, as the system words a time before now.
+/// When a container's latest item changed, as the system words a time before now. The text keeps itself current as the
+/// minutes pass, so a row never says "4 sec ago" for minutes, and no view is redrawn for it.
 struct IndexLatest: View {
     let date: Date?
 
     var body: some View {
         if let date {
-            Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+            Text(.currentDate, format: .reference(to: date))
         } else {
             Text("No Items")
         }

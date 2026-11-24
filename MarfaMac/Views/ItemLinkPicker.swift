@@ -79,19 +79,17 @@ struct ItemLinkPicker: View {
 
     private func row(_ item: Item, isHighlighted: Bool) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "note.text")
-                .frame(width: 20)
-                .foregroundStyle(isHighlighted ? .white : .secondary)
+            TypeMark(icon: library.catalogue.icon(for: item.type), size: .row)
             Text(item.displayTitle).lineLimit(1)
             Spacer(minLength: 8)
             Text(library.placeLabel(of: item))
-                .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
-        .foregroundStyle(isHighlighted ? .white : .primary)
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(isHighlighted ? Color.accentColor : .clear, in: .rect(cornerRadius: 6))
+        // The soft gray a chosen row has everywhere else (`SoftSelection`), never the accent color.
+        .background(isHighlighted ? Color.primary.opacity(0.08) : .clear, in: .rect(cornerRadius: 6, style: .continuous))
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)

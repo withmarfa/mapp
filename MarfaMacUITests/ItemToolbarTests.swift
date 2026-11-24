@@ -176,9 +176,9 @@ final class ItemToolbarTests: XCTestCase {
 
     func testViewMenuOffersTheThreeViewsAndHistoryShortcuts() {
         app.menuBars.menuBarItems["View"].click()
-        XCTAssertTrue(app.menuBars.menuItems["as List"].exists)
-        XCTAssertTrue(app.menuBars.menuItems["as Gallery"].exists)
-        XCTAssertTrue(app.menuBars.menuItems["as Table"].exists)
+        XCTAssertTrue(app.menuBars.menuItems["View as List"].exists)
+        XCTAssertTrue(app.menuBars.menuItems["View as Gallery"].exists)
+        XCTAssertTrue(app.menuBars.menuItems["View as Table"].exists)
         XCTAssertTrue(app.menuBars.menuItems["Back"].exists)
         XCTAssertTrue(app.menuBars.menuItems["Forward"].exists)
         app.typeKey(.escape, modifierFlags: [])

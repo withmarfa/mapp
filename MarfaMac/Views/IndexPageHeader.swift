@@ -26,7 +26,7 @@ struct IndexPageTop: View {
     }
 }
 
-/// Search, Filter and New as plain symbol buttons at the tabs' trailing end. Search opens into a field in place, which
+/// Search, Filter and New as plain symbol buttons at the tabs' trailing end. Search opens into the system's search field in place, which
 /// filters the page as it is typed in and closes on Escape or when it is cleared. Filter shows or hides the filter row,
 /// and is drawn gray while it is on, never in the accent color.
 struct IndexTools: View {
@@ -39,16 +39,15 @@ struct IndexTools: View {
     var body: some View {
         HStack(spacing: 4) {
             if browser.isSearchExpanded, !browser.isIndexHeaderAway {
-                ColumnSearchField(
+                IndexSearchField(
                     text: $browser.searchText, prompt: String(localized: "Search"), focusRequests: browser.searchFocusRequests,
-                    trailingPadding: 8, onSubmit: {}, onDown: { browser.focusRequest = .list },
-                    restoresTitle: false
-                ) {
-                    browser.searchText = ""
-                    browser.isSearchExpanded = false
-                }
-                .frame(width: Self.fieldWidth, height: 28)
-                .background(Color.primary.opacity(0.065), in: .rect(cornerRadius: 9, style: .continuous))
+                    onDown: { browser.focusRequest = .list },
+                    onEnd: {
+                        browser.searchText = ""
+                        browser.isSearchExpanded = false
+                    }
+                )
+                .frame(width: Self.fieldWidth)
             } else {
                 symbol("Search", "magnifyingglass", id: "IndexSearch") { browser.showSearchField() }
             }

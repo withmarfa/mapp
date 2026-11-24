@@ -2392,9 +2392,6 @@
     "Apps" : {
 
     },
-    "as Calendar" : {
-      "extractionState" : "manual"
-    },
     "Calendar" : {
       "extractionState" : "manual"
     },
@@ -3841,23 +3838,8 @@
     "Arrange" : {
 
     },
-    "as Board" : {
-      "extractionState" : "manual"
-    },
-    "as Gallery" : {
-      "extractionState" : "manual"
-    },
     "As in Settings" : {
 
-    },
-    "as List" : {
-      "extractionState" : "manual"
-    },
-    "as Table" : {
-      "extractionState" : "manual"
-    },
-    "as Timeline" : {
-      "extractionState" : "manual"
     },
     "Ascending" : {
 
@@ -5856,9 +5838,6 @@
     "Remove from Sidebar" : {
 
     },
-    "Remove Link" : {
-
-    },
     "Remove Mark" : {
       "extractionState" : "manual"
     },
@@ -5984,7 +5963,7 @@
     "Search Commands and Items" : {
 
     },
-    "Search for Actions…" : {
+    "Search for Actions" : {
 
     },
     "Search Icons" : {
@@ -6554,9 +6533,6 @@
     },
     "The value could not be saved." : {
       "extractionState" : "manual"
-    },
-    "The value could not be saved. Please try again." : {
-
     },
     "The value could not be saved. Your input has been kept." : {
       "extractionState" : "manual"

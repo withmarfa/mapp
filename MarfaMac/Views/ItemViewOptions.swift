@@ -11,12 +11,12 @@ struct ItemViewOptions: View {
 
     var body: some View {
         Group {
-            choice("as List", systemImage: ItemViewMode.list.symbol, .list, command: .viewAsList)
-            choice("as Gallery", systemImage: ItemViewMode.gallery.symbol, .gallery, command: .viewAsGallery)
-            choice("as Table", systemImage: ItemViewMode.table.symbol, .table, command: .viewAsTable)
-            choice("as Board", systemImage: ItemViewMode.board.symbol, .board, command: .viewAsBoard)
-            choice("as Timeline", systemImage: ItemViewMode.timeline.symbol, .timeline, command: .viewAsTimeline)
-            choice("as Calendar", systemImage: ItemViewMode.calendar.symbol, .calendar, command: .viewAsCalendar)
+            choice("View as List", systemImage: ItemViewMode.list.symbol, .list, command: .viewAsList)
+            choice("View as Gallery", systemImage: ItemViewMode.gallery.symbol, .gallery, command: .viewAsGallery)
+            choice("View as Table", systemImage: ItemViewMode.table.symbol, .table, command: .viewAsTable)
+            choice("View as Board", systemImage: ItemViewMode.board.symbol, .board, command: .viewAsBoard)
+            choice("View as Timeline", systemImage: ItemViewMode.timeline.symbol, .timeline, command: .viewAsTimeline)
+            choice("View as Calendar", systemImage: ItemViewMode.calendar.symbol, .calendar, command: .viewAsCalendar)
         }
         .disabled(browser == nil)
     }

@@ -135,7 +135,7 @@ struct QuickAddPanel: View {
         } label: {
             if let chosen { kindLabel(chosen) } else { Text("Kind") }
         }
-        .appMenu()
+        .appMenu(.value)
         .help("Kind of Item")
         .accessibilityLabel("Kind of Item")
         .accessibilityIdentifier("QuickAddType")

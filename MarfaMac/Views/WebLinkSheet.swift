@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Asks for the address the Link command sets on the selection. Return adds or changes it; Cancel or Escape leaves the text
-/// as it was. When the caret is in a link, Remove Link takes it off.
+/// as it was. When the caret is in a link, Delete takes it off.
 struct WebLinkSheet: View {
     let editor: EditorController
     let request: EditorController.WebLinkRequest
@@ -32,7 +32,7 @@ struct WebLinkSheet: View {
             }
             HStack {
                 if request.removable {
-                    Button("Remove Link", action: editor.removeWebLink)
+                    Button("Delete", action: editor.removeWebLink)
                         .appButton(.destructive)
                         .accessibilityIdentifier("WebLinkRemove")
                 }
