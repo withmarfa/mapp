@@ -3,13 +3,18 @@ import Marfa
 import Testing
 @testable import MarfaMac
 
-/// What a sign-in asks the owner to approve for the app's own settings. The vendor scope is unavailable before its first
-/// type exists (`keys-and-oauth/app-vendor-not-named`), and discovery never lists it afterward.
+/// What a sign-in asks the owner to approve: every owner permission, and what the app's own settings need. The vendor
+/// scope is unavailable before its first type exists (`keys-and-oauth/app-vendor-not-named`), and discovery never lists it
+/// afterward.
 @Suite(.hangLimit)
 struct SignInScopesTests {
-    nonisolated private static let common = [
-        "*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write", "profile.name:read",
+    /// Every permission in the contract's table (`keys-and-oauth`, "The fifteen permissions") but `connectors.host`, which
+    /// only a connector host's own key holds. Written out, so a change to the package's list is seen here.
+    nonisolated private static let ownerPermissions = [
+        "audit.read", "backups.manage", "blobs.manage", "config.manage", "connectors.manage", "grants.manage", "instance.maintain",
+        "instance.read", "items.purge", "keys.manage", "keys.mint", "schema.write", "sign_ins.manage", "webhooks.manage",
     ]
+    nonisolated private static let common = ["*:read", "*:write", "edge.*:read", "edge.*:write"] + ownerPermissions + ["profile.name:read"]
     nonisolated private static let vendor = "app.marfa-mac.*:write"
     nonisolated private static let root = "app.*:write"
     nonisolated private static let registering = "metadata.types:write"
@@ -20,23 +25,28 @@ struct SignInScopesTests {
         #expect(SystemSignIns.scopes.filter { $0.hasPrefix("app.") } == [Self.root])
     }
 
+    /// Full Access on the approval page then gives every Settings page what it needs. `connectors.host` is never asked:
+    /// the server refuses a sign-in that asks for it.
+    @Test func aSignInAsksForEveryOwnerPermissionButTheConnectorHosts() {
+        #expect(SystemSignIns.askedAtSignIn.map(\.rawValue).sorted() == Self.ownerPermissions)
+        #expect(SystemSignIns.scopes.filter { InstancePermission(rawValue: $0) != nil } == Self.ownerPermissions)
+        #expect(!SystemSignIns.scopes.contains("connectors.host"))
+        #expect(SystemSignIns.askedAtSignIn.isSuperset(of: MarfaSettingsPage.allCases.compactMap(\.permission)))
+    }
+
     /// A browser sign-in, a code sign-in, Sign In Again and Allow More… all ask through the same list.
     @Test func aSignInHandsThePackageTheSameList() throws {
         let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa.debug", anchor: { nil })
         let connection = try MarfaConnection(address: "https://marfa.example")
-        for permissions in [Set<InstancePermission>(), SystemSignIns.askedAtSignIn, Set(InstancePermission.allCases)] {
-            let asked = try signIns.authorization(for: connection, asking: permissions).client.scopes
-            // The package adds the scopes of the permissions asked for after the app's list.
-            #expect(Array(asked.prefix(SystemSignIns.scopes.count)) == SystemSignIns.scopes)
-            #expect(asked.filter { $0.hasPrefix("app.") } == [Self.root])
-        }
+        #expect(try signIns.authorization(for: connection).client.scopes == SystemSignIns.scopes)
     }
 
     @Test func theScriptedSignInRecordsTheList() async throws {
         let signIns = ScriptedSignIns()
         signIns.script(codeKey: "scripted")
-        _ = try await signIns.startCodeSignIn(to: try MarfaConnection(address: "https://one.example"), asking: [])
+        _ = try await signIns.startCodeSignIn(to: try MarfaConnection(address: "https://one.example"))
         #expect(signIns.askedScopes == [SystemSignIns.scopes])
+        #expect(signIns.asked == [SystemSignIns.askedAtSignIn])
     }
 
     /// The slice includes existing settings with the app root, and a missing settings type with registration permission.

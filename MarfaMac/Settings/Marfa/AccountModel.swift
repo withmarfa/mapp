@@ -3,8 +3,8 @@ import Marfa
 import Observation
 
 /// The Account page: the owner's profile as the server holds it, the password, the passkeys and the browsers signed in.
-/// The sign-ins need `sign_ins.manage`, which is asked for the first time the owner chooses Change Password, never at
-/// sign-in. A refused write keeps what was typed.
+/// The sign-ins need `sign_ins.manage`, which every sign-in asks for; where the owner did not approve it, Change Password
+/// asks again for everything the sign-in lacks. A refused write keeps what was typed.
 @Observable @MainActor final class AccountModel: OwnerDraftHolding {
     enum Sheet: Equatable {
         case password
@@ -82,7 +82,7 @@ import Observation
 
     // MARK: Password
 
-    /// Asks for `sign_ins.manage` from the page's own row, never at sign-in. Cancelled, or approved without it, the page says so.
+    /// Asks for everything the sign-in lacks, `sign_ins.manage` among it. Cancelled, or approved without it, the page says so.
     @discardableResult func allowSignIns() async -> Bool {
         note = nil
         let outcome = await context.allowMore([.signInsManage])
@@ -90,8 +90,8 @@ import Observation
         return outcome == .allowed
     }
 
-    /// Opens the sheet that changes the password, asking first for `sign_ins.manage` where the app lacks it. Cancelled, or
-    /// approved without it, nothing opens and the page says so.
+    /// Opens the sheet that changes the password, asking first for everything the sign-in lacks where it lacks
+    /// `sign_ins.manage`. Cancelled, or approved without it, nothing opens and the page says so.
     func beginChangePassword() async {
         note = nil
         if !canManageSignIns {

@@ -361,18 +361,18 @@ import os
     /// cancels changes nothing. An open copy is given the new sign-in where it is (`ItemSource.use(_:)`): it is never
     /// closed or replaced, the writes in it wait there, and the package sends them with the next drain. Called after
     /// the sign-in ended, it brings the copy back even though the credential kept is the one it had.
-    func signInAgain(via method: SignInMethod, asking permissions: Set<InstancePermission> = []) async throws(Problem) {
+    func signInAgain(via method: SignInMethod) async throws(Problem) {
         guard let connection else { throw .notConnected }
         try begin()
         defer { isBusy = false }
         await dropPendingSignIn()
         // Nothing the sign-in or the copy's change can do may close the library over edits still being typed.
         if source != nil { try await handOver() }
-        // A sign-in again asks for what the owner already allowed, so signing in to change the account never takes it
-        // back. Where the Keychain cannot say what is held, it asks for everything the pages use, which the owner may untick.
+        // Every sign-in asks for every owner permission (`SystemSignIns.scopes`), so what the owner allowed before is asked
+        // again and one approval gives everything the sign-in lacked.
         await refreshGrants()
         let held = grantsRead ? grants : nil
-        try await signIn(to: connection, via: method, asking: permissions.union(held ?? Self.usedPermissions))
+        try await signIn(to: connection, via: method)
         await refreshGrants()
         // The owner may approve fewer than the app held, and that stands, but never silently.
         if let held, grantsRead {
@@ -547,16 +547,16 @@ import os
     }
 
     /// Signs in as the person chose. Nothing is kept unless it finishes.
-    private func signIn(to connection: MarfaConnection, via method: SignInMethod, asking permissions: Set<InstancePermission> = []) async throws(Problem) {
+    private func signIn(to connection: MarfaConnection, via method: SignInMethod) async throws(Problem) {
         isSigningIn = true
         defer { isSigningIn = false }
         let signedIn: SignedIn
         do {
             switch method {
             case .browser:
-                signedIn = try await signIns.signInWithBrowser(to: connection, asking: permissions)
+                signedIn = try await signIns.signInWithBrowser(to: connection)
             case .code(let shown):
-                let code = try await signIns.startCodeSignIn(to: connection, asking: permissions)
+                let code = try await signIns.startCodeSignIn(to: connection)
                 shown(code)
                 signedIn = try await code.finish()
             }
@@ -668,10 +668,6 @@ import os
     /// Whether the kept sign-in may read the owner's name, once `grantsRead`: a sign-in made before the app asked for it
     /// cannot, and Allow More… or signing in again gives it.
     private(set) var readsProfile = false
-
-    /// Every permission the Settings pages and the features behind them use: what a sign-in asks for where what it holds
-    /// cannot be read.
-    nonisolated static let usedPermissions = SystemSignIns.askedAtSignIn.union(MarfaSettingsPage.allCases.compactMap(\.permission))
 
     /// Reads what the kept sign-in holds, where the main actor never waits on the Keychain. A sign-in the Keychain
     /// cannot give is not read: the grants last read stand and `grantsRead` is false, so nothing reads as holding none.

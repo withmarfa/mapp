@@ -46,12 +46,9 @@ import Testing
         let bench = try HostBench()
         let (adapter, _, _) = try await connected(bench)
         #expect(adapter.grants == SystemSignIns.askedAtSignIn)
-        #expect(adapter.grants.contains(.configManage))
-        #expect(!adapter.grants.contains(.backupsManage))
+        #expect(adapter.grants.isSuperset(of: [.configManage, .backupsManage, .signInsManage]))
     }
 
-    /// `GET /profile` answers a field only to a credential holding its profile read scope, so Signed In As needs it at
-    /// sign-in. It is a scope, not an owner permission.
     @Test func aSignInAsksForTheReadOfTheOwnersNameAndItIsNoOwnerPermission() async throws {
         #expect(SystemSignIns.scopes.contains("profile.name:read"))
         #expect(SystemSignIns.profileScopes.allSatisfy { InstancePermission(rawValue: $0) == nil })
@@ -100,69 +97,83 @@ import Testing
         #expect(libraries.host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty)
     }
 
+    /// What a sign-in made before the app asked for every owner permission holds.
+    private static let older: Set<InstancePermission> = [.itemsPurge, .configManage, .schemaWrite]
+
+    /// Keeps a sign-in that holds `older` in place of the one `connected` made, as one made before this app version.
+    private func holdingOlder(_ bench: HostBench, _ libraries: Libraries) async {
+        bench.signIns.save("older", for: first.address, permissions: Self.older)
+        await libraries.host.refreshGrants()
+    }
+
     @Test func allowMoreCancelledChangesNothingAndLeavesThePageMissingIt() async throws {
         let bench = try HostBench()
         let (adapter, libraries, _) = try await connected(bench)
+        await holdingOlder(bench, libraries)
         bench.signIns.script(browser: [.failure(SignInError.canceled)])
         let outcome = await adapter.allowMore([.backupsManage])
         #expect(outcome == .cancelled)
-        #expect(adapter.grants == SystemSignIns.askedAtSignIn)
+        #expect(adapter.grants == Self.older)
         #expect(libraries.host.notices.waiting.isEmpty, "a sign-in the person stopped needs no telling")
-        #expect(bench.signIns.asked.last == SystemSignIns.askedAtSignIn.union([.backupsManage]), "it asked for what was held and the page's own")
+    }
+
+    /// One page's Allow More… asks for everything the sign-in lacks, so one approval opens every page.
+    @Test func aPagesAllowMoreAsksForEveryPermissionTheSignInLacks() async throws {
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        await holdingOlder(bench, libraries)
+        bench.signIns.script(browser: [.success("again")])
+        #expect(await adapter.allowMore([.keysMint]) == .allowed)
+        #expect(bench.signIns.asked.last == SystemSignIns.askedAtSignIn)
+        #expect(adapter.grants == SystemSignIns.askedAtSignIn, "every page now opens")
+        #expect(!adapter.isAllowingMore)
     }
 
     @Test func allowMoreApprovedWithFewerChangesNothingTheOwnerWithheld() async throws {
         let bench = try HostBench()
-        let (adapter, _, _) = try await connected(bench)
-        bench.signIns.script(approving: [SystemSignIns.askedAtSignIn])
+        let (adapter, libraries, _) = try await connected(bench)
+        await holdingOlder(bench, libraries)
+        bench.signIns.script(approving: [Self.older])
         bench.signIns.script(browser: [.success("again")])
-        let outcome = await adapter.allowMore([.backupsManage])
-        #expect(outcome == .approvedFewer)
+        #expect(await adapter.allowMore([.backupsManage]) == .approvedFewer)
+        #expect(adapter.grants == Self.older)
+        #expect(libraries.host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty)
+    }
+
+    /// Limited gives `instance.read`, `blobs.manage` and `audit.read` of what is asked (`keys-and-oauth/approval-admin-grants`):
+    /// a page that needs one of them opens, and one that needs more still says what is missing.
+    @Test func allowMoreApprovedAtLimitedOpensOnlyThePagesItCovers() async throws {
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        await holdingOlder(bench, libraries)
+        bench.signIns.script(approving: [Self.older.union([.instanceRead, .blobsManage, .auditRead])])
+        bench.signIns.script(browser: [.success("limited")])
+        #expect(await adapter.allowMore([.instanceRead]) == .allowed)
+        #expect(adapter.grants.contains(.auditRead))
         #expect(!adapter.grants.contains(.backupsManage))
-        #expect(adapter.grants == SystemSignIns.askedAtSignIn)
+        bench.signIns.script(approving: [])
+        bench.signIns.script(browser: [.success("full")])
+        #expect(await adapter.allowMore([.backupsManage]) == .allowed)
+        #expect(bench.signIns.asked.last == SystemSignIns.askedAtSignIn, "the next Allow More… asks for the rest again")
     }
 
-    @Test func allowMoreApprovedInFullOpensThePage() async throws {
-        let bench = try HostBench()
-        let (adapter, _, _) = try await connected(bench)
-        bench.signIns.script(browser: [.success("again")])
-        let outcome = await adapter.allowMore([.backupsManage])
-        #expect(outcome == .allowed)
-        #expect(adapter.grants == SystemSignIns.askedAtSignIn.union([.backupsManage]))
-        #expect(!adapter.isAllowingMore)
-    }
-
-    @Test func signingInAgainKeepsWhatWasAllowedBefore() async throws {
+    @Test func signingInAgainWithACodeAsksForWhatTheBrowserAsksFor() async throws {
         let bench = try HostBench()
         let (adapter, libraries, _) = try await connected(bench)
-        bench.signIns.script(browser: [.success("again")])
-        _ = await adapter.allowMore([.backupsManage])
-        await libraries.marfaSettings.start(.signInAgain(usingCode: false)).value
-        #expect(bench.signIns.asked.last?.contains(.backupsManage) == true)
-        #expect(adapter.grants.contains(.backupsManage))
-    }
-
-    @Test func signingInAgainWithACodeKeepsWhatWasAllowedBefore() async throws {
-        let bench = try HostBench()
-        let (adapter, libraries, _) = try await connected(bench)
-        bench.signIns.script(browser: [.success("again")])
-        _ = await adapter.allowMore([.backupsManage])
+        await holdingOlder(bench, libraries)
         bench.signIns.script(codeKey: "by-code")
         await libraries.marfaSettings.start(.signInAgain(usingCode: true)).value
         #expect(bench.signIns.calls.last == "code http://first.test:8210")
-        #expect(bench.signIns.asked.last?.contains(.backupsManage) == true, "the code asks for what the browser asks for")
-        #expect(adapter.grants == SystemSignIns.askedAtSignIn.union([.backupsManage]))
+        #expect(bench.signIns.askedScopes.last == SystemSignIns.scopes)
+        #expect(adapter.grants == SystemSignIns.askedAtSignIn)
         #expect(try bench.signIns.key(for: first.address) == "by-code")
-        #expect(libraries.host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty)
     }
 
     @Test func anApprovalThatDropsAPermissionHeldIsToldAndTheNeedingPageAsksAgain() async throws {
         let bench = try HostBench()
         let (adapter, libraries, _) = try await connected(bench)
-        bench.signIns.script(browser: [.success("again")])
-        #expect(await adapter.allowMore([.backupsManage]) == .allowed)
         // The owner unticks Backups on the approval page of a later sign-in.
-        bench.signIns.script(approving: [SystemSignIns.askedAtSignIn])
+        bench.signIns.script(approving: [SystemSignIns.askedAtSignIn.subtracting([.backupsManage])])
         bench.signIns.script(browser: [.success("narrower")])
         await libraries.marfaSettings.start(.signInAgain(usingCode: false)).value
         let notice = try #require(libraries.host.notices.waiting.first { $0.title == Words.permissionsLostTitle })
@@ -174,6 +185,7 @@ import Testing
     @Test func anAllowMoreApprovedWithFewerThanHeldNamesEveryPermissionLost() async throws {
         let bench = try HostBench()
         let (adapter, libraries, _) = try await connected(bench)
+        await holdingOlder(bench, libraries)
         bench.signIns.script(approving: [[.itemsPurge]])
         bench.signIns.script(browser: [.success("narrower")])
         #expect(await adapter.allowMore([.backupsManage]) == .approvedFewer)
@@ -184,28 +196,11 @@ import Testing
         #expect(adapter.grants == [.itemsPurge])
     }
 
-    @Test func anApprovalOfFewerThanAskedThatKeepsEverythingHeldTellsNothing() async throws {
-        let bench = try HostBench()
-        let (adapter, libraries, _) = try await connected(bench)
-        bench.signIns.script(approving: [SystemSignIns.askedAtSignIn])
-        bench.signIns.script(browser: [.success("again")])
-        #expect(await adapter.allowMore([.backupsManage]) == .approvedFewer)
-        #expect(adapter.grants == SystemSignIns.askedAtSignIn)
-        #expect(libraries.host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty)
-    }
-
     @Test func aReadRefusedForThePagesOwnPermissionSaysTheSameAsItsGateAndAnotherOneSaysItsOwn() {
         #expect(OwnerWording.permissionLine("keys.manage", on: .sources) == MarfaSettingsPage.sources.permissionLine)
         #expect(OwnerWording.permissionLine(nil, on: .keys) == MarfaSettingsPage.keys.permissionLine)
         #expect(OwnerWording.permissionLine("backups.manage", on: .sources) == OwnerWording.permissionLine("backups.manage"))
         #expect(OwnerWording.permissionLine("config.manage", on: .account) == OwnerWording.permissionLine("config.manage"))
-    }
-
-    @Test func allowMoreNeverAsksForSignInsManageAtSignIn() async throws {
-        let bench = try HostBench()
-        let (_, _, _) = try await connected(bench)
-        #expect(!SystemSignIns.askedAtSignIn.contains(.signInsManage))
-        #expect(!SystemSignIns.scopes.contains(InstancePermission.signInsManage.rawValue))
     }
 
     @Test func closingSettingsHandsAnUnsavedDraftToTheNoticesAndDropsIt() async throws {
