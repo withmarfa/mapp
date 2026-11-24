@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "An earlier change to this item hasn’t reached the server yet." : {
+      "extractionState" : "manual"
+    },
     "As in Layouts" : {
 
     },
@@ -168,6 +171,15 @@
     },
     "Show Property" : {
 
+    },
+    "The server’s answer to an earlier change to this item couldn’t be read." : {
+      "extractionState" : "manual"
+    },
+    "This item has changed since, so this change can’t be redone." : {
+      "extractionState" : "manual"
+    },
+    "This item has changed since, so this change can’t be undone." : {
+      "extractionState" : "manual"
     },
     "Try new versions before they’re released." : {
 
@@ -917,9 +929,6 @@
     },
     "Always kept, so they open offline." : {
 
-    },
-    "An earlier change to this item wasn’t saved, so the change wasn’t made." : {
-      "extractionState" : "manual"
     },
     "An archive %@, or any Marfa, can restore." : {
 

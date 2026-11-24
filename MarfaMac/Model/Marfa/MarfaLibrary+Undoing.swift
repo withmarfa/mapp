@@ -66,11 +66,12 @@ extension MarfaLibrary {
         action()
     }
 
-    /// The engine did not make a step's writes: what a held step touches changed or the copy was not brought up to date
-    /// in time, or an earlier edit an undo was built on was not made. An undo goes back on the undo stack, and
-    /// registering outside an undo or redo empties the whole redo stack, the step it had registered included; a redo
-    /// cannot go back, so the undo it registered does nothing and says so. A redo's write that carried the person's text
-    /// is the only copy of it, so `text` is kept where they can get it back, as for a library that closed.
+    /// A step's writes were not made: the engine did not make a held step's, because what they touch changed or the copy
+    /// was not brought up to date in time, or a property step could not wait for an earlier answer it is built on
+    /// (`MarfaLibrary+PropertyEdits`). An undo goes back on the undo stack, and registering outside an undo or redo
+    /// empties the whole redo stack, the step it had registered included; a redo cannot go back, so the undo it
+    /// registered does nothing and says so. A redo's write that carried the person's text is the only copy of it, so
+    /// `text` is kept where they can get it back, as for a library that closed.
     func giveBack(_ run: UndoRun, _ problem: SyncProblem, title: String?, text: String?) {
         let first = !run.told
         run.told = true

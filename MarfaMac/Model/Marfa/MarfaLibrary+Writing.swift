@@ -116,9 +116,7 @@ extension MarfaLibrary {
         // A value equal to the stored one still goes while an edit of the item is on its way, since it reverses that
         // edit: skipping it would leave the edit in flight as the value stored.
         if item.value(of: key) != value || isWritingProperties(of: id) {
-            editProperties(
-                id, to: [key: value], from: propertiesBefore([key], of: item), actionName: String(localized: "Edit Property"),
-                undoManager: undoManager)
+            editProperties(id, to: [key: value], actionName: String(localized: "Edit Property"), undoManager: undoManager)
         }
         return true
     }
@@ -137,31 +135,70 @@ extension MarfaLibrary {
         // edit: leaving it out would let the edit in flight land as the value kept.
         let sent = isWritingProperties(of: id) ? changes : changes.filter { item.value(of: $0.key) != $0.value }
         guard !sent.isEmpty else { return true }
-        editProperties(id, to: sent, from: propertiesBefore(sent.keys, of: item), actionName: actionName, undoManager: undoManager)
+        editProperties(id, to: sent, actionName: actionName, undoManager: undoManager)
         return true
     }
 
-    /// Made at the version held when it runs, so an undo goes on top of whatever came after the edit. A redo runs this
-    /// again, writing the person's own values.
-    private func editProperties(
-        _ id: ItemID, to changes: [String: PropertyValue?], from before: PropertiesBefore, actionName: String, undoManager: UndoManager?
-    ) {
-        guard let version = item(id)?.version else { return }
-        submitPropertyEdit(id, changes, base: version, failing: String(localized: "Can’t Edit This Property"))
+    /// Made at the version held when it runs, so an undo goes on top of whatever came after the edit.
+    private func editProperties(_ id: ItemID, to changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) {
+        guard let version = item(id)?.version,
+            let edit = submitPropertyEdit(id, changes, base: version, failing: String(localized: "Can’t Edit This Property"))
+        else { return }
+        let made = MadeEdit(edit)
         registerUndo(undoManager, name: actionName) { [weak undoManager] library in
-            library.undoProperties(id, back: before, from: changes, actionName: actionName, undoManager: undoManager)
+            library.undoProperties(made, id, changes, actionName: actionName, undoManager: undoManager)
         }
     }
 
-    /// The values are read as the person chooses Undo, so an earlier edit refused since the edit was made is left out.
+    /// Puts back what the server's answers say the keys held before the edit (`MarfaLibrary+PropertyEdits`). The Redo
+    /// is registered at once, since the undo manager takes it only while this step runs.
     private func undoProperties(
-        _ id: ItemID, back before: PropertiesBefore, from changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?
+        _ made: MadeEdit, _ id: ItemID, _ changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?
     ) {
-        guard let version = item(id)?.version else { return }
-        let (values, assuming) = before.resolved()
-        submitPropertyEdit(id, values, base: version, assuming: assuming, failing: String(localized: "Can’t Edit This Property"))
+        let keys = Set(changes.keys)
+        if case .failure(let refused) = replayBase(id, keys, undoing: true) { return notices.tell(actionName, refused.reason) }
         registerUndo(undoManager, name: actionName) { [weak undoManager] library in
-            library.editProperties(id, to: changes, from: before, actionName: actionName, undoManager: undoManager)
+            library.redoProperties(id, changes, actionName: actionName, undoManager: undoManager)
+        }
+        replay(id, keys: keys, text: nil) { library in
+            let version: ItemVersion
+            switch library.replayBase(id, keys, undoing: true) {
+            case .success(let base): version = base
+            case .failure(let refused): return .refused(refused.reason)
+            }
+            guard let edit = made.edit else {
+                return .refused(String(localized: "That change wasn’t made, so there is nothing to undo here."))
+            }
+            var values: [String: PropertyValue?] = [:]
+            for key in keys {
+                switch edit.before(key) {
+                case .value(let value): values.updateValue(value, forKey: key)
+                case .waiting: return .waiting
+                case .unknown: return .unknown
+                }
+            }
+            library.submitPropertyEdit(id, values, base: version, failing: String(localized: "Can’t Edit This Property"))
+            return .made
+        }
+    }
+
+    /// Writes the person's own values again. Its Undo is built on what the item held when the Redo is made, never on
+    /// what it held before the first edit.
+    private func redoProperties(_ id: ItemID, _ changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) {
+        let keys = Set(changes.keys)
+        if case .failure(let refused) = replayBase(id, keys, undoing: false) { return notices.tell(actionName, refused.reason) }
+        let made = MadeEdit()
+        registerUndo(undoManager, name: actionName) { [weak undoManager] library in
+            library.undoProperties(made, id, changes, actionName: actionName, undoManager: undoManager)
+        }
+        replay(id, keys: keys, text: Self.typedText(changes)) { library in
+            switch library.replayBase(id, keys, undoing: false) {
+            case .success(let version):
+                made.edit = library.submitPropertyEdit(id, changes, base: version, failing: String(localized: "Can’t Edit This Property"))
+                return .made
+            case .failure(let refused):
+                return .refused(refused.reason)
+            }
         }
     }
 

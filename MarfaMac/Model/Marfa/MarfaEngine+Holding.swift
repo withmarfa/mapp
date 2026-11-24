@@ -76,6 +76,34 @@ extension MarfaEngine {
         held.removeAll { $0.group == group }
     }
 
+    /// A held step made after a newer edit of what it sets would write over that edit. The stand cannot always tell,
+    /// since newer edits can put the item back as it was when the person pressed Undo, so the step is given back whole
+    /// as soon as such an edit is queued.
+    func giveBackHeld(overtakenBy write: ItemWrite) {
+        let groups = Set(held.filter { Self.sets(write, sameAs: $0.write) }.map(\.group))
+        for group in groups { refuse(group, code: Self.heldChangedCode, message: Self.heldChanged) }
+    }
+
+    private nonisolated static func sets(_ newer: ItemWrite, sameAs older: ItemWrite) -> Bool {
+        enum Part {
+            case keys(Set<String>), text, all
+        }
+        func part(_ write: ItemWrite) -> (item: ItemID, part: Part)? {
+            switch write {
+            case .editProperties(let id, let changes, _): (id, .keys(Set(changes.keys)))
+            case .editBody(let id, _, _, _): (id, .text)
+            case .retype(let id, _, _, _): (id, .all)
+            default: nil
+            }
+        }
+        guard let newer = part(newer), let older = part(older), newer.item == older.item else { return false }
+        switch (newer.part, older.part) {
+        case (.all, _), (_, .all), (.text, .text): return true
+        case (.keys(let new), .keys(let old)): return !new.isDisjoint(with: old)
+        case (.keys, .text), (.text, .keys): return false
+        }
+    }
+
     /// Called once a whole read or a read of what changed found the copy whole. Every held write is judged against
     /// what was just read before any is made, so one that follows another (an undo and its redo) is judged as the
     /// person saw it, not as the one before it leaves things. A group with any write whose items changed is given back whole.
@@ -105,8 +133,8 @@ extension MarfaEngine {
     private func rebased(_ write: ItemWrite) -> ItemWrite {
         func current(_ id: ItemID, or base: ItemVersion) -> ItemVersion { rows[id.rawValue].map { ItemVersion($0.version) } ?? base }
         switch write {
-        case .editProperties(let id, let changes, let base, let assuming):
-            return .editProperties(id, changes, base: current(id, or: base), assuming: assuming)
+        case .editProperties(let id, let changes, let base):
+            return .editProperties(id, changes, base: current(id, or: base))
         case .editBody(let id, let text, let base, let merge):
             return .editBody(id, text, base: current(id, or: base), merge: merge)
         case .retype(let id, let type, let changes, let base):
@@ -139,7 +167,7 @@ extension MarfaEngine {
             stand.faces["edge \(id)"] = .edge(edge)
         }
         switch write {
-        case .editProperties(let id, _, _, _), .retype(let id, _, _, _), .retier(let id, _, _), .editBody(let id, _, _, _):
+        case .editProperties(let id, _, _), .retype(let id, _, _, _), .retier(let id, _, _), .editBody(let id, _, _, _):
             item(id)
         case .transition(let id, _), .tag(let id, _, _):
             place(id.rawValue)

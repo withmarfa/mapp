@@ -71,17 +71,13 @@ actor MarfaEngine {
     nonisolated static let heldChangedCode = "undo_changed"
     nonisolated static let heldTimeoutCode = "undo_timeout"
 
-    /// The code of an undo refused because an earlier edit it was built on was not made (`ItemWrite.editProperties`).
-    nonisolated static let earlierNotMadeCode = "undo_earlier_not_made"
-
-    /// An undo or a redo the engine did not make, which the library gives back to the person.
-    nonisolated static func isUndoNotMade(_ code: String) -> Bool {
-        code == heldChangedCode || code == heldTimeoutCode || code == earlierNotMadeCode
+    nonisolated static func isHeldRefusal(_ code: String) -> Bool {
+        code == heldChangedCode || code == heldTimeoutCode
     }
 
-    nonisolated static var earlierNotMade: String {
-        String(localized: "An earlier change to this item wasn’t saved, so the change wasn’t made.")
-    }
+    /// How long an undo waits before it is given back, whether for the copy to be brought up to date or for the
+    /// server to answer an earlier edit it is built on (`MarfaLibrary.answerWait`).
+    nonisolated static let standardHoldLimit = Duration.seconds(30)
 
     nonisolated static var heldChanged: String {
         String(localized: "This changed while the library was being brought up to date, so the change wasn’t made.")
@@ -172,16 +168,12 @@ actor MarfaEngine {
     /// Writes of an undo or a redo that the copy refused while it was brought up to date, in the order they were
     /// made, until the copy is whole.
     var held: [Held] = []
-    /// The property edits made lately, so an undo built on one still on its way is refused if that one was not
-    /// (`ItemWrite.editProperties`). Only the latest are kept: an undo names only edits on their way when it was
-    /// pressed, which the engine made just before it.
-    var madeEdits: [WriteID] = []
     /// How long a held undo waits for a copy that is not catching up before it is given back.
     var holdLimit: Duration {
         #if DEBUG
         if let limit = hooks.holdLimit.current { return limit }
         #endif
-        return .seconds(30)
+        return Self.standardHoldLimit
     }
 
     /// Edits queued as read on a version older than the copy held, whose answer lands on whatever the server held.

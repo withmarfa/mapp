@@ -229,7 +229,7 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         again.undo()
         // The title is still what the restore made it, so it alone is put back; the typed text is left, and told.
         try #require(await eventuallyAsking {
-            other.writes.dropFirst(before).contains { if case .editProperties(_, let changes, _, _) = $0 { changes["title"] == .string("Launch") } else { false } }
+            other.writes.dropFirst(before).contains { if case .editProperties(_, let changes, _) = $0 { changes["title"] == .string("Launch") } else { false } }
         })
         #expect(!other.writes.dropFirst(before).contains { if case .editBody = $0 { true } else { false } })
         #expect(second.notices.waiting.last?.title == String(localized: "Can’t Restore Version"))

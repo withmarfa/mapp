@@ -55,13 +55,13 @@ extension MarfaEngine {
             // finds it again.
             if case .refused = verdict { refusals[answer.id] = answer }
             let outcome = MarfaMapping.outcome(
-                verdict, afterRefusal: MarfaProblems.waitsOnStopped(answer, among: { answeredNow[$0] ?? refusals[$0] }))
+                verdict, answer: answer.answer, afterRefusal: MarfaProblems.waitsOnStopped(answer, among: { answeredNow[$0] ?? refusals[$0] }))
             ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
             if let itemID = answer.itemId {
                 ids.insert(itemID)
                 remember(outcome, of: answer.kind, for: ItemID(itemID))
             }
-            if case .conflicted(let sibling, _) = outcome {
+            if case .conflicted(let sibling, _, _) = outcome {
                 ids.insert(sibling.rawValue)
                 if let itemID = answer.itemId { originals[sibling.rawValue] = itemID }
             }

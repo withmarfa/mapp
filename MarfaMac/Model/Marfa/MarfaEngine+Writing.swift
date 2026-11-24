@@ -19,9 +19,6 @@ extension MarfaEngine {
             return true
         }
         do {
-            if case .editProperties(_, _, _, let assuming) = write, !assuming.allSatisfy(madeEdits.contains) {
-                throw Refused(problem: SyncProblem(code: Self.earlierNotMadeCode, message: Self.earlierNotMade))
-            }
             #if DEBUG
             if let error = hooks.refusing.current?(write) { throw error }
             #endif
@@ -48,7 +45,7 @@ extension MarfaEngine {
                 }
                 let queued = try await Self.asking { try await queue(write) }
                 record(id, queued)
-                if case .editProperties = write { made(id) }
+                if group == nil { giveBackHeld(overtakenBy: write) }
                 if case .moveEdge = write { for written in queued { movedEnds[written.id] = ends } }
                 touched = ends.union(queued.flatMap { [$0.itemId, $0.toId].compactMap(\.self) })
             }
@@ -116,11 +113,6 @@ extension MarfaEngine {
         }
     }
 
-    private func made(_ edit: WriteID) {
-        madeEdits.append(edit)
-        if madeEdits.count > 256 { madeEdits.removeFirst() }
-    }
-
     /// A write that needed nothing queued, such as a move to the end the edge already holds, is taken at once.
     private func record(_ id: WriteID, _ queued: [Marfa.QueuedWrite]) {
         guard !queued.isEmpty else { return hub.publish(.answered(id, .accepted)) }
@@ -152,7 +144,7 @@ extension MarfaEngine {
             // A following edit counted the answers it saw as it chose its version (`followingVersion`).
             counted.formUnion(answeredBefore)
             return [queued]
-        case .editProperties(let id, let changes, let base, _):
+        case .editProperties(let id, let changes, let base):
             let (properties, clearing) = Self.propertyEdit(changes)
             return [try await send(id, properties, clearing: clearing) { base.rawValue }]
         case .retype(let id, let type, let changes, let base):
