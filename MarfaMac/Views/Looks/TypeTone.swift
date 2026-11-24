@@ -41,6 +41,22 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
         "lucide:disc-3": .pink,
     ]
 
+    /// The tone's name, which Settings > Layouts says a type's color is.
+    var title: String {
+        switch self {
+        case .blue: String(localized: "Blue")
+        case .green: String(localized: "Green")
+        case .orange: String(localized: "Orange")
+        case .red: String(localized: "Red")
+        case .purple: String(localized: "Purple")
+        case .teal: String(localized: "Teal")
+        case .yellow: String(localized: "Yellow")
+        case .pink: String(localized: "Pink")
+        case .indigo: String(localized: "Indigo")
+        case .gray: String(localized: "Gray")
+        }
+    }
+
     init(icon id: String?) {
         self = id.flatMap { Self.table[$0] } ?? Self.neutral
     }
