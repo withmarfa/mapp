@@ -19,6 +19,7 @@ This builds the app and runs the unit tests. To run the app, open `MarfaMac.xcod
 
 A checkout builds without a developer account and signs to run locally. `Config/Signing.xcconfig`, the project's base configuration, leaves each of the settings below empty and includes the ignored `Config/Local.xcconfig`.
 
+- The Debug configurations leave the hardened runtime off and Release keeps it. Under the hardened runtime, an app signed to run locally refuses to load Sparkle, which is signed the same way, because library validation accepts no locally signed library. Xcode turns the runtime off for such a build itself only when it is not optimized.
 - To sign with a team, write `DEVELOPMENT_TEAM = <team ID>` into `Config/Local.xcconfig`. The repository holds no tool for keeping that line.
 - To send errors and timings (`MarfaMac/Model/Telemetry/Reporting.swift`), write `MARFA_MAC_POSTHOG_HOST` and `MARFA_MAC_POSTHOG_PROJECT_TOKEN` into `Config/Local.xcconfig` the same way. `Info.plist` carries them into the build; a build without both sends nothing.
 - To make a build that updates itself, write `MARFA_MAC_UPDATE_FEED_URL` (the address of the appcast) and `MARFA_MAC_UPDATE_PUBLIC_KEY` (the public half of the Sparkle signing key) the same way. A build without both has no updater, no **Check for Updates…** and no Updates section in Settings, so a local build never offers to replace itself. In an xcconfig file, write the `://` of an address as `:/$()/`, since `//` starts a comment.
