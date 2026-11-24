@@ -533,7 +533,10 @@ final class ValueEditModel {
     func activate(_ id: String) {
         guard isEditable else {
             // A new word, tag or person typed in the search field has nowhere to go, so it goes back to the person.
-            if id == "create" { handBack(query.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            if id == "create" {
+                handBack(query.trimmingCharacters(in: .whitespacesAndNewlines))
+                query = ""
+            }
             close()
             return
         }
@@ -859,6 +862,9 @@ final class ValueEditModel {
             return
         }
         commitTime(isEnding: true)
+        // A new tag, word or person the list refused stays in the search field with its notice, so ending the panel
+        // gives it back.
+        if takesNewEntries, notice != nil { handBack(query.trimmingCharacters(in: .whitespacesAndNewlines), reason: notice) }
         guard kind.isTyped, let field = kind.field else { return }
         draft.handOff(
             label: field.label, as: field.kind, rule: field.numberRule, current: currentText, isEditable: isEditable,
@@ -882,7 +888,12 @@ final class ValueEditModel {
     }
 
     /// What the time field is showing while the person types in it, nil while it shows the value's own time.
-    var timeDraft: String?
+    var timeDraft: String? {
+        didSet { if oldValue == nil, timeDraft != nil { timeBase = value } }
+    }
+
+    /// What the value held when the person began typing a time, so a time that arrived elsewhere since is never written over.
+    @ObservationIgnored private var timeBase: PropertyValue?
 
     /// The value's time as the person's locale writes it, or empty where the value holds none.
     var timeText: String {
@@ -891,27 +902,38 @@ final class ValueEditModel {
     }
 
     /// Writes what was typed in the time field: a time sets it on the day the value holds (today where it holds none),
-    /// and nothing takes it away, leaving the day.
-    /// Ending the panel, a time that can't be read is reported where the person will see it, since the panel's own
-    /// notice goes with it.
+    /// and nothing takes it away, leaving the day. A time that can't be read stays in the field with its notice, and
+    /// as the panel ends it goes back to the person, as does a time the value can no longer take: the item can't be
+    /// edited, the library refused it, or the value changed elsewhere since it was typed.
     func commitTime(isEnding: Bool = false) {
         guard let draft = timeDraft else { return }
         timeDraft = nil
         guard allowsTime else { return }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let time = TimeOfDay.parse(text)
+        // A time the value already holds, saved from another device for one, is not lost.
+        if let time, hasTime, let date = storedDate?.date {
+            let held = request.calendar.dateComponents([.hour, .minute], from: date)
+            if held.hour == time.hour, held.minute == time.minute { return }
+        }
         guard isEditable else {
             handBack(text)
+            return
+        }
+        guard value == timeBase else {
+            handBack(text, reason: String(localized: "This value changed while you were editing. Your edit hasn’t been saved."))
             return
         }
         if text.isEmpty {
             if hasTime, let date = storedDate?.date { write(date, withTime: false) }
             return
         }
-        guard let time = TimeOfDay.parse(text) else {
+        guard let time else {
             if isEnding {
-                library.notices.tell(String(localized: "Time Not Saved"), String(localized: "“\(text)” isn’t a time, so the time wasn’t changed."))
+                handBack(text, reason: String(localized: "“\(text)” isn’t a time, so the time wasn’t changed."))
             } else {
                 notice = String(localized: "Enter a time such as 9:30.")
+                timeDraft = draft
             }
             return
         }
@@ -924,16 +946,27 @@ final class ValueEditModel {
     }
 
     /// Gives the person text this panel cannot keep through the notices, which put it on the clipboard.
-    private func handBack(_ text: String) {
+    private func handBack(_ text: String, reason: String? = nil) {
         guard !text.isEmpty else { return }
         let typed = kind.field.map { "\($0.label): \(text)" } ?? text
-        library.notices.notKept(String(localized: "Property Not Saved"), text: typed, reason: refusalReason(String(localized: "The value could not be saved.")))
+        library.notices.notKept(String(localized: "Property Not Saved"), text: typed, reason: reason ?? refusalReason(String(localized: "The value could not be saved.")))
+    }
+
+    /// Whether the panel has a search field that takes a new tag, word or person.
+    private var takesNewEntries: Bool {
+        switch kind {
+        case .tags, .words, .people: true
+        default: false
+        }
     }
 
     @discardableResult
     private func write(_ date: Date, withTime: Bool) -> Bool {
         let text = withTime ? ItemDate.instant(date) : ItemDate.day(date, calendar: request.calendar)
-        return commit(.string(text), failure: String(localized: "The date couldn’t be saved."))
+        let taken = commit(.string(text), failure: String(localized: "The date couldn’t be saved."))
+        // A day chosen while a time is being typed is the person's own change, not one from elsewhere.
+        if taken, timeDraft != nil { timeBase = value }
+        return taken
     }
 
     func clearDate() {

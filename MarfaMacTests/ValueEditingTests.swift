@@ -546,6 +546,65 @@ struct ValueEditingTests {
         #expect(library.notices.waiting.first?.text?.contains("Sam") == true)
     }
 
+    @Test func aNewTagTheItemCanNoLongerTakeIsHandedBackOnceWhenTheTagsBoxEnds() {
+        let item = Self.item()
+        let library = Self.library([item])
+        let model = ValueEditModel(Self.request(.tags, item: item, in: library))
+        model.query = "fresh"
+        library.items[0].readOnly = true
+        model.finishTagField()
+        #expect(library.notices.told == 1 && library.notices.waiting.first?.text == "fresh")
+    }
+
+    @Test func aTimeAlreadySavedFromElsewhereIsNotHandedBackWhenTheItemBecomesReadOnly() {
+        let item = Self.item(["due": .string("2026-11-07T09:30:00Z")])
+        let library = Self.library([item])
+        var request = Self.request(.date(Self.due), item: item, in: library, write: { _ in true })
+        request.calendar = Self.utc
+        let model = ValueEditModel(request)
+        model.timeDraft = "2:45 pm"
+        var arrived = Self.item(["due": .string("2026-11-07T14:45:00Z")])
+        arrived.readOnly = true
+        library.items[0] = arrived
+        model.commitTime()
+        #expect(library.notices.told == 0)
+    }
+
+    @Test func aTimeIsNotWrittenOverOneThatArrivedFromElsewhereAndIsHandedBackInstead() {
+        let written = Written()
+        let item = Self.item(["due": .string("2026-11-07T09:30:00Z")])
+        let library = Self.library([item])
+        var request = Self.request(.date(Self.due), item: item, in: library, write: { written.all.append($0); return true })
+        request.calendar = Self.utc
+        let model = ValueEditModel(request)
+        model.timeDraft = "14:45"
+        library.items[0] = Self.item(["due": .string("2026-11-07T16:00:00Z")])
+        model.finish(cancelled: false)
+        #expect(written.all.isEmpty)
+        #expect(library.notices.waiting.first?.text == "Due: 14:45")
+    }
+
+    @Test func aTimeThatIsNotOneStaysInTheFieldOnFocusLossAndIsHandedBackWhenThePanelEnds() {
+        let written = Written()
+        let model = datePanel(Self.due, holding: "2026-11-07", written: written)
+        model.timeDraft = "later"
+        model.commitTime()
+        #expect(model.timeDraft == "later" && model.notice != nil)
+        model.finish(cancelled: false)
+        #expect(written.all.isEmpty)
+        #expect((model.request.library as? FakeItemLibrary)?.notices.waiting.first?.text == "Due: later")
+    }
+
+    @Test func aWordTheListRefusedIsHandedBackWhenThePanelEnds() {
+        let (library, written) = (Self.library([]), Written())
+        let model = wordsPanel(["a", "b"], limit: 2, in: library, written: written)
+        add("c", to: model)
+        #expect(model.notice != nil && model.query == "c")
+        model.finish(cancelled: false)
+        #expect(written.all.isEmpty)
+        #expect(library.notices.waiting.first?.text == "Labels: c")
+    }
+
     @Test func timesAreReadAsPeopleTypeThem() {
         #expect(TimeOfDay.parse("9")?.hour == 9)
         #expect(TimeOfDay.parse("930").map { [$0.hour, $0.minute] } == [9, 30])
