@@ -24,10 +24,12 @@ nonisolated enum PreferencesType {
     /// The namespace the type is under, which one app holds for every Mac that connects.
     static let vendor = "app.marfa-mac"
 
-    /// The scope that reaches the item from a sign-in other than the one that registered the type.
+    /// The scope that names the app's vendor and reaches the item. A sign-in does not ask for it: discovery never lists it.
     static let vendorScope = "\(vendor).*:write"
+    /// The scope a sign-in asks for, which reaches every app's types, the app's own among them.
+    static let rootScope = "app.*:write"
     /// The scopes that reach the item whoever holds the vendor.
-    static let reachingScopes: Set<String> = [vendorScope, "app.*:write"]
+    static let reachingScopes: Set<String> = [vendorScope, rootScope]
     /// What registering the type needs, as the first Mac's hydration does.
     static let registeringScope = "metadata.types:write"
 

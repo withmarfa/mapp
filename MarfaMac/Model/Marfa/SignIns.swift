@@ -172,11 +172,13 @@ nonisolated struct SystemSignIns: SignIns {
     /// features use: Permanently Delete (`items.purge`), This Marfa (`config.manage`) and a type's icon
     /// (`schema.write`), and the read of the owner's own name for Signed In As, which `GET /profile` gives a credential
     /// only with its profile read scope. That read is no owner permission. The app's own settings (`PreferencesType`) need
-    /// the scope that names its vendor, which `*:write` never reaches, and registering the type where the Marfa holds
-    /// none (`metadata.types:write`); the server drops the vendor's scope while no type sits under it. The owner may
-    /// approve less, and what is missing is told where it is needed.
+    /// a scope that reaches the type, which `*:write` never does, and registering the type where the Marfa holds none
+    /// (`metadata.types:write`). The app asks for `app.*:write`: the vendor scope is unavailable before its first type
+    /// exists (`keys-and-oauth/app-vendor-not-named`), and discovery never lists it afterward. This reaches every app's
+    /// types; withmarfa/marfa#3522 would let the app ask for its vendor alone. The owner
+    /// may approve less, and what is missing is told where it is needed.
     static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write"]
-        + profileScopes + [PreferencesType.vendorScope, PreferencesType.registeringScope]
+        + profileScopes + [PreferencesType.rootScope, PreferencesType.registeringScope]
 
     /// What Signed In As needs: the owner's name (`instance-claim/profile-read`).
     static let profileScopes = ["profile.name:read"]
