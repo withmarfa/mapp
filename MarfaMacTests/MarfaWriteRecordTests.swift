@@ -34,8 +34,9 @@ struct MarfaWriteRecordTests {
         let id = WriteID()
         record.record(id, queued: ["a", "b"])
 
-        #expect(record.answer("a", .refused(SyncProblem(code: "validation_error"))) == nil)
-        #expect(record.answer("b", .dead)?.outcome == .refused(SyncProblem(code: "validation_error")))
+        // The blocked answer comes first, so the refusal must outweigh it rather than merely arrive first.
+        #expect(record.answer("a", .blocked(.keySpent, nil)) == nil)
+        #expect(record.answer("b", .refused(SyncProblem(code: "validation_error")))?.outcome == .refused(SyncProblem(code: "validation_error")))
     }
 
     /// A blocked write is sent again once released, so what it was waiting for hears its final answer too.
