@@ -69,7 +69,7 @@ extension EditorTests {
         page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
         page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
         #expect(page.editor.pageNavigation === reload, "not loaded again")
-        #expect(notices.waiting.count <= 2)
+        #expect(notices.waiting.count == 2, "told it is coming back, then that it cannot")
         Self.answerAll(notices)
         #expect(await Self.flushed(page, leaving: true))
     }
