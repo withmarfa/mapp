@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 /// A window's quick-add panel: the kind of item being made, what the person typed, and where it goes. The draft
 /// outlives the panel being put away, so nothing typed is lost until it is added or handed to the clipboard.
+/// Draft editing and saving stay together so the panel can keep everything the library has yet to take.
 @Observable
 final class QuickAdd {
     /// A file the person chose, dropped or pasted, read from where it is when the item is added rather than held

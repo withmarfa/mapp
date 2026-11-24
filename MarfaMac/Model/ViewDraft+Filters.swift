@@ -9,6 +9,7 @@ import Marfa
 /// says Any. Marfa's grammar has no parenthesis, so a combination that needs both joins is not held (`Unkept.mixedFilters`),
 /// except where the chip can be said the other way: "is" several words of a closed field is saved as "is not" its other
 /// words, which joins by AND.
+/// Reading and writing stay together so both directions can be checked against the same grammar.
 nonisolated extension ViewDraft {
     /// The field the row stores the Type filter under, which a view also holds as its listed types.
     static let typeFieldID = ItemTableColumn.type.id
