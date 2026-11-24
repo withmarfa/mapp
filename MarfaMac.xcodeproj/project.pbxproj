@@ -249,7 +249,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */,
-				3310001B3066ED47005D07A2 /* XCRemoteSwiftPackageReference "app-telemetry" */,
+				3310001B3066ED47005D07A2 /* XCRemoteSwiftPackageReference "app-telemetry-swift" */,
 				331000283066ED47005D07A2 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
 				3310002D3066ED47005D07A2 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
@@ -742,9 +742,9 @@
 				minimumVersion = 0.0.93;
 			};
 		};
-		3310001B3066ED47005D07A2 /* XCRemoteSwiftPackageReference "app-telemetry" */ = {
+		3310001B3066ED47005D07A2 /* XCRemoteSwiftPackageReference "app-telemetry-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/withmarfa/app-telemetry";
+			repositoryURL = "https://github.com/withmarfa/app-telemetry-swift";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.0.1;
@@ -791,7 +791,7 @@
 		};
 		3310000E3066ED47005D07A2 /* WithMarfaTelemetry */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 3310001B3066ED47005D07A2 /* XCRemoteSwiftPackageReference "app-telemetry" */;
+			package = 3310001B3066ED47005D07A2 /* XCRemoteSwiftPackageReference "app-telemetry-swift" */;
 			productName = WithMarfaTelemetry;
 		};
 		331000083066ED47005D07A2 /* MarfaTesting */ = {

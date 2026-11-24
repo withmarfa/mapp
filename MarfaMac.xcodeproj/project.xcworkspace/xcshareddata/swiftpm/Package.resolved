@@ -2,9 +2,9 @@
   "originHash" : "8abff0f9d14310a465dcc18f5740ebbe7650f4f342bb38e3e5a18753f21096a4",
   "pins" : [
     {
-      "identity" : "app-telemetry",
+      "identity" : "app-telemetry-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/withmarfa/app-telemetry",
+      "location" : "https://github.com/withmarfa/app-telemetry-swift",
       "state" : {
         "revision" : "d8349fec06fb6af635bbda7d776019e7371fdee2",
         "version" : "0.0.1"
