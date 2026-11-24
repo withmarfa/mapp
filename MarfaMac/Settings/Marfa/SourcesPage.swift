@@ -10,7 +10,7 @@ struct SourcesPage: View {
     let subpage: SettingsSubpage?
     @State private var model: SourcesModel
     @State private var limit: SourceLimitModel
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -89,7 +89,7 @@ struct SourcesPage: View {
             SettingsLinkRow(
                 verbatim: String(localized: "Limit Sources"), line: String(localized: "Only items from the sources you name are read."),
                 value: limitValue
-            ) { push(Self.limitSources) }
+            ) { navigation?.push(Self.limitSources) }
         }
     }
 

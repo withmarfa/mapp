@@ -31,9 +31,9 @@ Marfa stores no color per type, status or option, no per-field icon or order, an
 
 The app keeps all of this as its own settings, in one hidden item in the Marfa so every Mac uses them, not in any item's data. [Settings storage](settings-storage.md) says where each setting lives.
 
-## The app names no type
+## How the app uses types
 
-Code never tests for a type by its identifier. A type's label, fields, parent, status words and icon come from the catalogue, so a type that a person or an app creates works with no change to the app.
+A type's label, fields, parent, status words and icon come from the catalogue, so a type that a person or an app creates works with no change to the app.
 
 Three places read a type's ancestry because the page needs a starting point:
 
@@ -42,6 +42,8 @@ Three places read a type's ancestry because the page needs a starting point:
 - `LookPreset.suggested` reads a type's fields, and walks up the parents for the highlight type, to choose a type's starting look.
 
 A type that nobody at WithMarfa defined takes the nearest built-in type above it through the `parent` chain.
+
+The New row has a starting set of types, and Quick Add can default to Note. Both use only types the library offers.
 
 ## What decides how an item shows
 

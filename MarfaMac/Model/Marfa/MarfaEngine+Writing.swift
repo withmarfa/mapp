@@ -138,10 +138,10 @@ extension MarfaEngine {
             switch merge {
             case .ifUnchanged:
                 queued = try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: base.rawValue))
-            case .asRead, .following where !follows:
-                queued = try await send(id, properties) { base.rawValue }
-            case .following:
+            case .following where follows:
                 queued = try await send(id, properties) { try await self.followingVersion(id, otherwise: base) }
+            case .asRead, .following:
+                queued = try await send(id, properties) { base.rawValue }
             }
             var on = queued.baseVersion ?? base.rawValue
             // An answer counted while the save was sent proves a version of the person's text this save follows too.

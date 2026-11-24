@@ -43,6 +43,19 @@ struct WindowRestorationTests {
 }
 
 struct WindowBringBackTests {
+    @Test func anUnencodableSnapshotKeepsTheStoredWindow() throws {
+        let browser = Browser()
+        browser.listMemory.scrollOffset = 420
+        var stored: Data?
+        browser.saveSnapshot { stored = $0 }
+        let previous = try #require(stored)
+
+        browser.listMemory.scrollOffset = .nan
+        browser.saveSnapshot { stored = $0 }
+
+        #expect(stored == previous)
+    }
+
     @Test func aRestoredPositionSurvivesRestoringThePlaceAndLayoutItBelongsTo() throws {
         let (library, _, _, _) = BrowserTests().makeFakeLibrary()
         let saved = Browser()

@@ -178,7 +178,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     /// What is wrong with what was typed, before it is sent: the line to show under the title.
     func line(_ limit: LimitSetting) -> String? {
-        if case .invalid(let line)? = drafts[limit.key].map { limit.entry(from: $0) } { return line }
+        if let draft = drafts[limit.key], case .invalid(let line) = limit.entry(from: draft) { return line }
         return lines[limit.key]
     }
 

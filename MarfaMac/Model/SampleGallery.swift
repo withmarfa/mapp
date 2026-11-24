@@ -2,6 +2,7 @@
 import AppKit
 import AVFoundation
 import CoreGraphics
+import CoreVideo
 import CryptoKit
 import Foundation
 import Marfa
@@ -59,23 +60,27 @@ nonisolated enum SampleGallery {
     ]
 
     /// Four photographs' worth of color, a PDF, a bookmark's saved cover, and the bookmarks themselves.
-    static let files: [File] = [
-        File(id: "pic-beds", title: "Raised beds in the evening", type: "core.file.image", mime: "image/png",
-             data: picture(top: (0.72, 0.36, 0.25), bottom: (0.26, 0.4, 0.22)), favorite: true, daysAgo: 0, attachedTo: nil),
-        File(id: "pic-path", title: "The path above Durdle Door", type: "core.file.image", mime: "image/png",
-             data: picture(top: (0.93, 0.62, 0.5), bottom: (0.2, 0.4, 0.42)), favorite: false, daysAgo: 1, attachedTo: nil),
-        File(id: "pic-quinces", title: "Quinces from the Ashley Vale plot", type: "core.file.image", mime: "image/png",
-             data: picture(top: (0.9, 0.82, 0.4), bottom: (0.55, 0.38, 0.2)), favorite: false, daysAgo: 2, attachedTo: nil),
-        File(id: "pdf-quotation", title: "Kitchen quotation, Harbour Joinery", type: "core.file", mime: "application/pdf",
-             data: document(title: "Kitchen quotation", lines: ["Harbour Joinery", "Worktops, units and fitting", "Total: 14,200", "Lead time: eight weeks"]),
-             favorite: false, daysAgo: 3, attachedTo: nil),
-        File(id: "video-resize", title: "Live resize at 120 Hz", type: "core.file", mime: "video/mp4",
-             data: video(top: (0.2, 0.35, 0.55), bottom: (0.85, 0.6, 0.35)), favorite: false, daysAgo: 4, attachedTo: nil),
-        File(id: "cover-bm", title: "cover.png", type: "core.file.image", mime: "image/png",
-             data: picture(top: (0.35, 0.5, 0.75), bottom: (0.12, 0.2, 0.4)), favorite: false, daysAgo: 4, attachedTo: "bm-desk"),
-    ]
+    static let files = Task { await makeFiles() }
 
-    static func rows(now: Date) -> [Marfa.Item] {
+    private static func makeFiles() async -> [File] {
+        [
+            File(id: "pic-beds", title: "Raised beds in the evening", type: "core.file.image", mime: "image/png",
+                 data: picture(top: (0.72, 0.36, 0.25), bottom: (0.26, 0.4, 0.22)), favorite: true, daysAgo: 0, attachedTo: nil),
+            File(id: "pic-path", title: "The path above Durdle Door", type: "core.file.image", mime: "image/png",
+                 data: picture(top: (0.93, 0.62, 0.5), bottom: (0.2, 0.4, 0.42)), favorite: false, daysAgo: 1, attachedTo: nil),
+            File(id: "pic-quinces", title: "Quinces from the Ashley Vale plot", type: "core.file.image", mime: "image/png",
+                 data: picture(top: (0.9, 0.82, 0.4), bottom: (0.55, 0.38, 0.2)), favorite: false, daysAgo: 2, attachedTo: nil),
+            File(id: "pdf-quotation", title: "Kitchen quotation, Harbour Joinery", type: "core.file", mime: "application/pdf",
+                 data: document(title: "Kitchen quotation", lines: ["Harbour Joinery", "Worktops, units and fitting", "Total: 14,200", "Lead time: eight weeks"]),
+                 favorite: false, daysAgo: 3, attachedTo: nil),
+            File(id: "video-resize", title: "Live resize at 120 Hz", type: "core.file", mime: "video/mp4",
+                 data: await video(top: (0.2, 0.35, 0.55), bottom: (0.85, 0.6, 0.35)), favorite: false, daysAgo: 4, attachedTo: nil),
+            File(id: "cover-bm", title: "cover.png", type: "core.file.image", mime: "image/png",
+                 data: picture(top: (0.35, 0.5, 0.75), bottom: (0.12, 0.2, 0.4)), favorite: false, daysAgo: 4, attachedTo: "bm-desk"),
+        ]
+    }
+
+    static func rows(now: Date, files: [File]) -> [Marfa.Item] {
         var rows = files.map { file -> Marfa.Item in
             let at = SampleLibrary.stamp(now.addingTimeInterval(-Double(file.daysAgo) * 86_400 - 3_600))
             return Marfa.Item(
@@ -94,7 +99,7 @@ nonisolated enum SampleGallery {
         return rows
     }
 
-    static func edges(now: Date) -> [Marfa.Edge] {
+    static func edges(now: Date, files: [File]) -> [Marfa.Edge] {
         files.compactMap { file in
             file.attachedTo.map {
                 Marfa.Edge(
@@ -107,14 +112,14 @@ nonisolated enum SampleGallery {
     static var directory: URL { AppPaths.temporary("marfa-mac-gallery-sample") }
 
     /// Writes each file's bytes where `url(forBlob:)` finds them: the fake working copy has no blobs to fetch.
-    static func writeFiles() {
+    static func writeFiles(_ files: [File]) {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for file in files { try? file.data.write(to: directory.appending(path: file.fileName)) }
     }
 
     /// The generated file whose blob hash is `hash`, when the gallery sample is on.
-    static func url(forBlob hash: String) -> URL? {
-        guard isRequested, let file = files.first(where: { $0.hash == hash }) else { return nil }
+    static func url(forBlob hash: String) async -> URL? {
+        guard isRequested, let file = await files.value.first(where: { $0.hash == hash }) else { return nil }
         return directory.appending(path: file.fileName)
     }
 
@@ -132,43 +137,41 @@ nonisolated enum SampleGallery {
     }
 
     /// A one-second clip of a single gradient, written to a temporary file and read back.
-    private static func video(top: (Double, Double, Double), bottom: (Double, Double, Double)) -> Data {
+    private static func video(top: (Double, Double, Double), bottom: (Double, Double, Double)) async -> Data {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appending(path: "clip-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: url) }
         guard let writer = try? AVAssetWriter(outputURL: url, fileType: .mp4) else { return Data() }
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 640, AVVideoHeightKey: 480])
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB, kCVPixelBufferWidthKey as String: 640, kCVPixelBufferHeightKey as String: 480])
-        writer.add(input)
-        writer.startWriting()
-        writer.startSession(atSourceTime: .zero)
-        var buffer: CVPixelBuffer?
-        CVPixelBufferCreate(nil, 640, 480, kCVPixelFormatType_32ARGB, nil, &buffer)
-        guard let buffer else { return Data() }
-        CVPixelBufferLockBaseAddress(buffer, [])
-        if let base = CVPixelBufferGetBaseAddress(buffer) {
-            let bytes = base.assumingMemoryBound(to: UInt8.self)
-            let rowBytes = CVPixelBufferGetBytesPerRow(buffer)
+        let attributes = CVPixelBufferCreationAttributes(
+            pixelFormatType: CVPixelFormatType(rawValue: kCVPixelFormatType_32ARGB), size: CVImageSize(width: 640, height: 480))
+        guard var buffer = try? CVMutablePixelBuffer(attributes) else { return Data() }
+        buffer.accessUnsafeMutableRawPlaneBytes { planes in
+            let (properties, bytes) = planes[0]
             for y in 0..<480 {
                 let t = Double(y) / 479
                 let color = [top.0 + (bottom.0 - top.0) * t, top.1 + (bottom.1 - top.1) * t, top.2 + (bottom.2 - top.2) * t].map { UInt8($0 * 255) }
                 for x in 0..<640 {
-                    let at = y * rowBytes + x * 4
+                    let at = y * properties.bytesPerRow + x * 4
                     bytes[at] = 255; bytes[at + 1] = color[0]; bytes[at + 2] = color[1]; bytes[at + 3] = color[2]
                 }
             }
         }
-        CVPixelBufferUnlockBaseAddress(buffer, [])
-        for frame in 0..<30 {
-            while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.01) }
-            adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: 30))
+        let pixels = CVReadOnlyPixelBuffer(buffer)
+        let receiver = writer.inputPixelBufferReceiver(for: input, pixelBufferAttributes: attributes)
+        do {
+            try writer.start()
+            writer.startSession(atSourceTime: .zero)
+            for frame in 0..<30 {
+                try await receiver.append(pixels, with: CMTime(value: CMTimeValue(frame), timescale: 30))
+            }
+        } catch {
+            writer.cancelWriting()
+            return Data()
         }
-        input.markAsFinished()
-        let done = DispatchSemaphore(value: 0)
-        writer.finishWriting { done.signal() }
-        done.wait()
+        receiver.finish()
+        await writer.finishWriting()
         return (try? Data(contentsOf: url)) ?? Data()
     }
 

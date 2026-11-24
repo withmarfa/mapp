@@ -78,7 +78,7 @@ struct WindowToolbar: CustomizableToolbarContent {
         if let browser, !browser.showsSidebarIndex, !hasListColumn {
             ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
         }
-        if let browser, !hasListColumn {
+        if browser != nil, !hasListColumn {
             if showsViewTools && showsAfterViewTools { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         }
         if let browser {

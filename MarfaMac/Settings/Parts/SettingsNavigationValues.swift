@@ -13,10 +13,8 @@ struct SettingsSubpage: Hashable, Sendable {
 }
 
 extension EnvironmentValues {
-    /// Pushes a sub-page on the window's history; Back returns to the page that pushed it.
-    @Entry var settingsPush: (SettingsSubpage) -> Void = { _ in }
-    /// Goes back one place, as Back does, such as when the thing a sub-page shows has gone.
-    @Entry var settingsBack: () -> Void = {}
+    /// The window's history, shared by pages that open or leave a sub-page.
+    @Entry var settingsNavigation: SettingsNavigation?
     /// The sub-page the window shows, or nil where the page shows itself.
     @Entry var settingsSubpage: SettingsSubpage?
 }

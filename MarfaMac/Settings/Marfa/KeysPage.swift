@@ -8,8 +8,7 @@ struct KeysPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: KeysModel
-    @Environment(\.settingsPush) private var push
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -42,7 +41,7 @@ struct KeysPage: View {
             } message: { asked in
                 Text(verbatim: asked.message)
             }
-            .onChange(of: model.revoked) { if $1 != nil { back() } }
+            .onChange(of: model.revoked) { if $1 != nil { navigation?.back() } }
             .accessibilityIdentifier("KeysPage")
     }
 
@@ -61,7 +60,7 @@ struct KeysPage: View {
             } else {
                 SettingsPageState(
                     symbol: "key", title: Text("This Key Is Gone"), line: Text("It was revoked, or it expired, somewhere else."),
-                    action: ("Back", back))
+                    action: ("Back", { navigation?.back() }))
             }
         } else {
             list
@@ -99,7 +98,7 @@ struct KeysPage: View {
         SettingsLinkRow(
             verbatim: key.label, line: Self.line(key, names: model.typeNames), lead: .tile("key.fill", .amber),
             value: OwnerWording.used(key.lastUsed)
-        ) { push(Self.subpage(for: key)) }
+        ) { navigation?.push(Self.subpage(for: key)) }
     }
 
     /// What the key reaches, then when it ends.
@@ -124,7 +123,7 @@ private struct KeyDetail: View {
     let model: KeysModel
     let key: KeyInfo
     let host: any MarfaSettingsHost
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
 
     private var parsed: AccessScopes.Parsed { KeyAccess.parsed(key) }
 
@@ -201,7 +200,7 @@ private struct KeyDetail: View {
 
     private var ownerPermissions: some View {
         OwnerPermissionsRow(held: parsed.permissions.count, line: String(localized: "The owner’s permissions. Most keys need none.")) {
-            push(OwnerPermissions.subpage(of: KeysPage.subpage(for: key)))
+            navigation?.push(OwnerPermissions.subpage(of: KeysPage.subpage(for: key)))
         }
     }
 

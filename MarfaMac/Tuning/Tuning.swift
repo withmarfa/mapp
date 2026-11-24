@@ -149,9 +149,7 @@ extension Tuning {
         }
 
         static let fields: [Field] = [
-            size("Height", \.height, in: 16...32),
             size("Corner radius", \.cornerRadius, in: 0...16, step: 0.5),
-            size("Text size", \.textSize, in: 9...16, step: 0.5),
             size("Padding", \.padding, in: 0...16, step: 0.5),
             size("Gap", \.gap, in: 0...12, step: 0.5),
             size("Type chip mark", \.chipMarkSize, in: 8...20),

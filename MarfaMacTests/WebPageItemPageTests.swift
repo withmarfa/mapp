@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import SwiftUI
 import Testing
 import UniformTypeIdentifiers
@@ -64,8 +65,10 @@ struct WebPageItemPageTests {
     /// assistive client is attached, which also slows the analysis of a large page, so a test that reads only what the
     /// page presents hosts it with no client.
     private func host(_ visit: Visit, in library: FakeItemLibrary, assistive: Bool = true) -> (NSWindow, NSView) {
-        NSApplication.shared.accessibilitySetValue(assistive, forAttribute: NSAccessibility.Attribute(rawValue: "AXManualAccessibility"))
-        NSApplication.shared.accessibilitySetValue(assistive, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
+        let app = AXUIElementCreateApplication(getpid())
+        let enabled = NSNumber(value: assistive)
+        AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, enabled)
+        AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, enabled)
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 700), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         let view = NSHostingView(rootView: Host(visit: visit).environment(\.library, library))

@@ -131,7 +131,7 @@ struct Arrangeable: ViewModifier {
         if isOn {
             content
                 .draggable(LayoutRowDrag(id: id))
-                .dropDestination(for: LayoutRowDrag.self) { drops, _ in
+                .dropDestination(for: LayoutRowDrag.self) { (drops: [LayoutRowDrag], _: CGPoint) -> Bool in
                     drops.first.map { move($0.id) } ?? false
                 }
         } else {

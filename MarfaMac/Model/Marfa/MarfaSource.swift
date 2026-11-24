@@ -262,7 +262,7 @@ nonisolated final class MarfaSource: ItemSource {
         }
         let name = Self.keptName(title: row.title, mimeType: row.properties[MarfaMapping.mimeTypeField]?.string)
         #if DEBUG
-        if let url = SampleGallery.url(forBlob: hash) { return url }
+        if let url = await SampleGallery.url(forBlob: hash) { return url }
         #endif
         do {
             return try await MarfaEngine.asking {

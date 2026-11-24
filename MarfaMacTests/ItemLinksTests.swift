@@ -56,7 +56,9 @@ struct ItemLinksTests {
         let aliased = try #require(ItemLink(linkText: "[[Plan|Plan]]"))
         #expect(plain != aliased)
         #expect(plain == ItemLink(linkText: "[[Plan]]"))
-        #expect(try #require(ItemLink(linkText: "[[Cafe\u{301}]]")) != ItemLink(linkText: "[[Café]]"))
+        let decomposed = try #require(ItemLink(linkText: "[[Cafe\u{301}]]"))
+        let composed = try #require(ItemLink(linkText: "[[Café]]"))
+        #expect(decomposed != composed)
     }
 
     @Test func aLargeLibraryIsReadOnceAndAKeystrokeFoldsNothingAgain() async {
@@ -155,7 +157,7 @@ struct ItemLinksTests {
 }
 
 extension ItemLinks.Index {
-    func titles(matching text: String, among items: [MarfaMac.Item], limit: Int) async -> [String] {
-        await matches(for: text, among: items, limit: limit).map(\.title)
+    func titles(matching text: String, among items: [MarfaMac.Item], limit: Int) -> [String] {
+        matches(for: text, among: items, limit: limit).map(\.title)
     }
 }

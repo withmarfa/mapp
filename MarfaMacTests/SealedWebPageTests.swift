@@ -271,7 +271,7 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
             channel.port2.postMessage(0);
             </script></body></html>
             """.utf8))
-        weak var navigating = page.page
+        weak let navigating = page.page
         for n in 1...5 {
             try await page.show(Data("<html><body><script>window.results = {n: '\(n)'}; window.done = true;</script></body></html>".utf8))
         }

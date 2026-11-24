@@ -3,24 +3,23 @@ import XCTest
 /// The Marfa server section of Settings > Connection, starting as a first launch does. The sample's app has a host of its own, with
 /// sign-ins held in memory, so nothing here reaches the person's saved server or sign-in; the steps used need no server and open no browser,
 /// since an address that is no server is refused before anything is asked of the network.
-@MainActor
-final class MarfaSettingsTests: XCTestCase {
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
-    private var settings: XCUIElement { app.descendants(matching: .any).matching(identifier: "SettingsSidebar").element(boundBy: 0) }
+nonisolated final class MarfaSettingsTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
+    @MainActor private var window: XCUIElement { app.windows.firstMatch }
+    @MainActor private var settings: XCUIElement { app.descendants(matching: .any).matching(identifier: "SettingsSidebar").element(boundBy: 0) }
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample(flags: ["-MarfaMacSampleUnconfigured"])
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() async throws {
+    @MainActor override func tearDown() async throws {
         app.terminate()
     }
 
-    private func openLibraryPage() {
+    @MainActor private func openLibraryPage() {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
         let page = app.descendants(matching: .any).matching(identifier: "SettingsPage-connection").element(boundBy: 0)
@@ -28,11 +27,11 @@ final class MarfaSettingsTests: XCTestCase {
         page.click()
     }
 
-    private var address: XCUIElement { app.textFields["MarfaAddress"] }
-    private var connect: XCUIElement { app.buttons["MarfaConnect"] }
-    private var connectWithCode: XCUIElement { app.buttons["MarfaConnectCode"] }
+    @MainActor private var address: XCUIElement { app.textFields["MarfaAddress"] }
+    @MainActor private var connect: XCUIElement { app.buttons["MarfaConnect"] }
+    @MainActor private var connectWithCode: XCUIElement { app.buttons["MarfaConnectCode"] }
 
-    func testTheLibraryPageAsksForAnAddressAndOffersTwoWaysToSignIn() {
+    @MainActor func testTheLibraryPageAsksForAnAddressAndOffersTwoWaysToSignIn() {
         openLibraryPage()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         XCTAssertFalse(app.secureTextFields.firstMatch.exists, "no key is typed into the app")
@@ -43,7 +42,7 @@ final class MarfaSettingsTests: XCTestCase {
         attachScreenshot("SettingsMarfaDisconnected")
     }
 
-    func testSigningInWaitsForAnAddress() {
+    @MainActor func testSigningInWaitsForAnAddress() {
         openLibraryPage()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         XCTAssertFalse(connect.isEnabled)
@@ -54,7 +53,7 @@ final class MarfaSettingsTests: XCTestCase {
         XCTAssertTrue(connectWithCode.isEnabled)
     }
 
-    func testAnAddressThatIsNoServerIsToldInPlainWords() {
+    @MainActor func testAnAddressThatIsNoServerIsToldInPlainWords() {
         openLibraryPage()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         address.click()
@@ -68,7 +67,7 @@ final class MarfaSettingsTests: XCTestCase {
         attachScreenshot("SettingsMarfaNotAServer")
     }
 
-    func testWithNoServerTheWindowAsksToConnectAndShowsNoSync() {
+    @MainActor func testWithNoServerTheWindowAsksToConnectAndShowsNoSync() {
         let welcome = window.descendants(matching: .any)["Welcome"].firstMatch
         XCTAssertTrue(welcome.waitForExistence(timeout: 3))
         XCTAssertFalse(window.outlines["Sidebar"].exists)
@@ -79,7 +78,7 @@ final class MarfaSettingsTests: XCTestCase {
         attachScreenshot("WelcomeConnect")
     }
 
-    private func attachScreenshot(_ name: String) {
+    @MainActor private func attachScreenshot(_ name: String) {
         let attachment = XCTAttachment(screenshot: window.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways

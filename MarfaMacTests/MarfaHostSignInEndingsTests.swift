@@ -56,7 +56,7 @@ import Testing
         await host.launch()
         let source = try #require(bench.servers.last)
 
-        let helper = try await problem { () throws(MarfaHost.Problem) in try await host.changeAddress(to: typed, via: host.scripted("new")) }
+        let helper = await problem { () throws(MarfaHost.Problem) in try await host.changeAddress(to: typed, via: host.scripted("new")) }
         #expect(helper == nil)
         #expect(host.source === source)
         #expect(bench.servers.opened.count == 1)

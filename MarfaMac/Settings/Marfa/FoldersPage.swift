@@ -6,8 +6,7 @@ struct FoldersPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: FoldersModel
-    @Environment(\.settingsPush) private var push
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -41,7 +40,7 @@ struct FoldersPage: View {
             } else {
                 SettingsPageState(
                     symbol: "folder", title: Text("This Folder Is Gone"),
-                    line: Text("It was stopped, here or somewhere else."), action: ("Back", back))
+                    line: Text("It was stopped, here or somewhere else."), action: ("Back", { navigation?.back() }))
             }
         } else {
             list
@@ -65,7 +64,7 @@ struct FoldersPage: View {
                     SettingsLinkRow(
                         verbatim: folder.title, line: report.map { FoldersModel.copies($0.copies.count) },
                         lead: .tile("folder.fill", .blue), value: condition?.title, dot: condition.map(Self.dot)
-                    ) { push(Self.subpage(for: folder)) }
+                    ) { navigation?.push(Self.subpage(for: folder)) }
                 }
             }
             if let cut = model.cutLine { SettingsNote(verbatim: cut) }

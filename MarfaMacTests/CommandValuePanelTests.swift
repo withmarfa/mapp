@@ -42,7 +42,7 @@ struct CommandValuePanelTests {
 
     @Test func aCollectionOnlySomeOfTheItemsAreInIsNotShownAsHeldAndCanBeChosenForTheRest() {
         let world = world()
-        world.library.addToCollection([world.first.id], world.reading.id, undoManager: nil)
+        #expect(world.library.addToCollection([world.first.id], world.reading.id, undoManager: nil))
         let model = model(.collections, over: [world.first.id, world.second.id], in: world.library)
         #expect(model.chips.isEmpty)
         #expect(model.rows.map(\.title) == ["Reading", "Work"])
@@ -53,8 +53,8 @@ struct CommandValuePanelTests {
 
     @Test func takingAChipAwayRemovesTheItemsFromThatCollectionOnly() throws {
         let world = world()
-        world.library.addToCollection([world.first.id], world.reading.id, undoManager: nil)
-        world.library.addToCollection([world.first.id], world.work.id, undoManager: nil)
+        try #require(world.library.addToCollection([world.first.id], world.reading.id, undoManager: nil))
+        try #require(world.library.addToCollection([world.first.id], world.work.id, undoManager: nil))
         let model = model(.collections, over: [world.first.id], in: world.library)
         let chip = try #require(model.chips.first { $0.title == "Reading" })
         model.remove(chip)

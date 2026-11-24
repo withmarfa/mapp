@@ -1,21 +1,20 @@
 import XCTest
 
-@MainActor
-final class QuickLookTests: XCTestCase {
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
-    private var list: XCUIElement { window.outlines["ItemList"] }
+nonisolated final class QuickLookTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
+    @MainActor private var window: XCUIElement { app.windows.firstMatch }
+    @MainActor private var list: XCUIElement { window.outlines["ItemList"] }
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(list.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() async throws { app.terminate() }
+    @MainActor override func tearDown() async throws { app.terminate() }
 
-    func testSpaceOnASelectedItemShowsItInQuickLookAndSpaceClosesIt() throws {
+    @MainActor func testSpaceOnASelectedItemShowsItInQuickLookAndSpaceClosesIt() throws {
         let row = list.cells.firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()

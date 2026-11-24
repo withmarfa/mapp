@@ -1,12 +1,11 @@
 import AppKit
 import XCTest
 
-@MainActor
-final class ItemToolbarTests: XCTestCase {
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
+nonisolated final class ItemToolbarTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
+    @MainActor private var window: XCUIElement { app.windows.firstMatch }
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
         app.launch()
@@ -15,9 +14,9 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(app.itemPageBody.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() async throws { app.terminate() }
+    @MainActor override func tearDown() async throws { app.terminate() }
 
-    func testTheSidebarFootOffersNewItemAndThePageToolbarHoldsViewAsShareMoreAndDetails() {
+    @MainActor func testTheSidebarFootOffersNewItemAndThePageToolbarHoldsViewAsShareMoreAndDetails() {
         let viewMode = control("ViewModeMenu")
         let viewOptions = control("ViewOptionsToolbar")
         let newItem = control("SidebarNew")
@@ -44,7 +43,7 @@ final class ItemToolbarTests: XCTestCase {
         capture("List and page toolbars")
     }
 
-    func testOnlyDetailsMovesAboveTheInspectorWhileItIsOpen() {
+    @MainActor func testOnlyDetailsMovesAboveTheInspectorWhileItIsOpen() {
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
         let share = control("ShareToolbar")
@@ -70,7 +69,7 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertEqual(count("ShareToolbar"), 1)
     }
 
-    func testCustomizeToolbarIsAvailableInEveryView() {
+    @MainActor func testCustomizeToolbarIsAvailableInEveryView() {
         let customize = app.menuBars.menuItems["Customize Toolbar…"]
         XCTAssertTrue(customize.isEnabled, "one plain toolbar in the window would dim it")
         app.typeKey("2", modifierFlags: .command)
@@ -81,7 +80,7 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(customize.isEnabled)
     }
 
-    func testChangingViewUnderTheOpenTrayWaitsForItToClose() {
+    @MainActor func testChangingViewUnderTheOpenTrayWaitsForItToClose() {
         app.menuBars.menuItems["Customize Toolbar…"].click()
         let done = window.sheets.buttons["Done"]
         XCTAssertTrue(done.waitForExistence(timeout: 3))
@@ -91,17 +90,17 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 3))
     }
 
-    func testVersionHistoryUnderTheOpenTrayWaitsForItToClose() {
+    @MainActor func testVersionHistoryUnderTheOpenTrayWaitsForItToClose() {
         assertVersionHistoryWaitsForTheTray()
     }
 
-    func testVersionHistoryUnderTheOpenTrayOfAnItemWindowWaitsForItToClose() {
+    @MainActor func testVersionHistoryUnderTheOpenTrayOfAnItemWindowWaitsForItToClose() {
         app.menuBars.menuItems["Open in New Window"].click()
         XCTAssertTrue(app.windows.element(boundBy: 1).waitForExistence(timeout: 5))
         assertVersionHistoryWaitsForTheTray()
     }
 
-    private func assertVersionHistoryWaitsForTheTray() {
+    @MainActor private func assertVersionHistoryWaitsForTheTray() {
         app.menuBars.menuItems["Customize Toolbar…"].click()
         let done = window.sheets.buttons["Done"]
         XCTAssertTrue(done.waitForExistence(timeout: 3))
@@ -112,7 +111,7 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(exit.waitForExistence(timeout: 3))
     }
 
-    func testViewOptionsOffersSortByAndGroupBy() {
+    @MainActor func testViewOptionsOffersSortByAndGroupBy() {
         control("ViewOptionsToolbar").click()
         let sortBy = window.menuItems["Sort by"].firstMatch
         let groupBy = window.menuItems["Group by"].firstMatch
@@ -131,7 +130,7 @@ final class ItemToolbarTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    func testMoreHoldsTheItemActionsInOrder() {
+    @MainActor func testMoreHoldsTheItemActionsInOrder() {
         control("MoreToolbar").click()
         let titles = ["Quick Look", "Open in New Window", "Open Original", "Open in Browser", "Share…", "Remove from Favorites", "Add Tag…",
                       "Change Type…", "Customize Layout…", "Version History…", "Add to Collection…", "Add Attachment…",
@@ -149,7 +148,7 @@ final class ItemToolbarTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    func testANewItemHasTheItemActionsOfAnyOther() {
+    @MainActor func testANewItemHasTheItemActionsOfAnyOther() {
         window.quickAdd(type: "Note", title: "Toolbar item")
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCTAssertTrue(control("DetailsToggle").isEnabled)
@@ -157,8 +156,7 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(control("MoreToolbar").isEnabled)
     }
 
-    func testMovedAttachmentAndFormattingActionsStillWork() {
-        let page = window.webViews.firstMatch
+    @MainActor func testMovedAttachmentAndFormattingActionsStillWork() {
         let editor = app.itemPageBody
         editor.click()
         app.typeKey(.downArrow, modifierFlags: .command)
@@ -174,7 +172,7 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(cancel.waitForNonExistence(timeout: 3))
     }
 
-    func testViewMenuOffersTheThreeViewsAndHistoryShortcuts() {
+    @MainActor func testViewMenuOffersTheThreeViewsAndHistoryShortcuts() {
         app.menuBars.menuBarItems["View"].click()
         XCTAssertTrue(app.menuBars.menuItems["as List"].exists)
         XCTAssertTrue(app.menuBars.menuItems["as Gallery"].exists)
@@ -187,7 +185,7 @@ final class ItemToolbarTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    func testCommandOneAndTwoSwitchBetweenTheListAndTheGallery() {
+    @MainActor func testCommandOneAndTwoSwitchBetweenTheListAndTheGallery() {
         app.typeKey("2", modifierFlags: .command)
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 3))
         let viewOptions = control("ViewOptionsToolbar")
@@ -222,7 +220,7 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForNonExistence(timeout: 3))
     }
 
-    func testViewAsShowsTheTableWithItsViewOptions() {
+    @MainActor func testViewAsShowsTheTableWithItsViewOptions() {
         show("as Table")
         let table = control("ItemTable")
         XCTAssertTrue(table.waitForExistence(timeout: 3))
@@ -245,7 +243,7 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(table.waitForNonExistence(timeout: 3))
     }
 
-    func testViewOptionsHoldShowFiltersInEveryLayout() {
+    @MainActor func testViewOptionsHoldShowFiltersInEveryLayout() {
         for title in ["as List", "as Gallery", "as Table", "as Board"] {
             show(title)
             control("ViewOptionsToolbar").click()
@@ -255,7 +253,7 @@ final class ItemToolbarTests: XCTestCase {
     }
 
     /// Chooses a view from the toolbar's View As pop-up.
-    private func show(_ title: String) {
+    @MainActor private func show(_ title: String) {
         let menu = control("ViewModeMenu")
         XCTAssertTrue(menu.waitForExistence(timeout: 3))
         menu.click()
@@ -264,15 +262,15 @@ final class ItemToolbarTests: XCTestCase {
         item.click()
     }
 
-    private func control(_ identifier: String) -> XCUIElement {
+    @MainActor private func control(_ identifier: String) -> XCUIElement {
         window.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
     }
 
-    private func count(_ identifier: String) -> Int {
+    @MainActor private func count(_ identifier: String) -> Int {
         window.descendants(matching: .any).matching(identifier: identifier).count
     }
 
-    private func capture(_ name: String) {
+    @MainActor private func capture(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways

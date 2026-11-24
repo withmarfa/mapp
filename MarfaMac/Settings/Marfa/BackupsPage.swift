@@ -11,7 +11,7 @@ struct BackupsPage: View {
     let showsAll: Bool
     @State private var model: BackupsModel
     @State private var selection: Set<String> = []
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
 
     /// `model` is the page's own unless a render brings one that holds a state the page cannot be driven into offscreen.
     init(host: any MarfaSettingsHost, showsAll: Bool, model: BackupsModel? = nil) {
@@ -207,7 +207,7 @@ struct BackupsPage: View {
                 SettingsSectionTable(
                     rows: Array(model.backups.prefix(Self.pageSize)), columns: columns,
                     action: SettingsRowAction(title: "Restore…") { model.beginRestore($0) }, total: model.backups.count,
-                    showAll: model.backups.count > Self.pageSize ? { push(Self.allBackups) } : nil)
+                    showAll: model.backups.count > Self.pageSize ? { navigation?.push(Self.allBackups) } : nil)
             }
         }
     }
