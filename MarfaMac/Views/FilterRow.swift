@@ -145,16 +145,6 @@ struct FilterRow: View {
         if !FilterPanelPresenter.shared.isOpen(for: key) { openIndex = nil }
     }
 
-    /// Opens a clause's panel once its chip has a view in the window to open under, which the row makes on a later turn of
-    /// the run loop: the view exists before it has a window, and a panel asked for then does not open.
-    private func openValuesWhenShown(_ id: String, attempts: Int = 20) {
-        if anchors.view(for: id)?.window != nil || attempts == 0 {
-            openValues(of: id)
-            return
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(25)) { openValuesWhenShown(id, attempts: attempts - 1) }
-    }
-
     private func openFields() {
         let content = browser.tableContent(in: library)
         let offer = content.filterOffer
@@ -177,7 +167,8 @@ struct FilterRow: View {
                 // The new chip is in the row, and has a view, before its panel opens under it.
                 let index = browser.addFilter(on: target)
                 openIndex = index
-                openValuesWhenShown(Self.chipPrefix + "\(index)")
+                let key = Self.chipPrefix + "\(index)"
+                anchors.whenShown(key) { openValues(of: key) }
             }
         }
     }
