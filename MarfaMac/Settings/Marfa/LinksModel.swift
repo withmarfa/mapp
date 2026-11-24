@@ -77,11 +77,17 @@ import Observation
     /// Whether the owner may delete it here: their own, which no plugin brought.
     func isYours(_ type: OwnerLinkType) -> Bool { !type.shipped && type.plugin == nil }
 
-    /// "From a job to a person. Many to one."
     func line(of type: OwnerLinkType) -> String {
-        let ends = String(localized: "From \(Self.phrase(type.fromTypes, names: typeNames)) to \(Self.phrase(type.toTypes, names: typeNames)).")
-        if let plugin = type.plugin { return String(localized: "From \(plugin).") + " " + ends + " " + type.cardinality.sentence }
-        return ends + " " + type.cardinality.sentence
+        let from = Self.endpointNames(type.fromTypes, names: typeNames)
+        let to = Self.endpointNames(type.toTypes, names: typeNames)
+        if let plugin = type.plugin {
+            return String(
+                localized: "From \(plugin). From \(from) to \(to). \(type.cardinality.sentence)",
+                comment: "Link type row. The placeholders are the plugin name, source type names, destination type names, and a sentence describing the link cardinality.")
+        }
+        return String(
+            localized: "From \(from) to \(to). \(type.cardinality.sentence)",
+            comment: "Link type row. The placeholders are the source type names, destination type names, and a sentence describing the link cardinality.")
     }
 
     /// What the Types page's row says: the first two link types and how many more.
@@ -89,34 +95,20 @@ import Observation
         let names = (builtIn + yours + fromPlugins).map(\.label)
         guard let first = names.first else { return nil }
         guard names.count > 1 else { return first }
-        let second = Self.lowered(names[1])
+        let second = names[1]
         if names.count == 2 { return String(localized: "\(first) and \(second).") }
         return String(localized: "\(first), \(second), and \(names.count - 2) more.")
     }
 
-    /// One end's item types in words: "any item", "a job" or "a job or a task".
-    static func phrase(_ constraints: [String], names: [String: String]) -> String {
-        if constraints.isEmpty || constraints.contains("*") { return String(localized: "any item") }
+    private static func endpointNames(_ constraints: [String], names: [String: String]) -> String {
+        if constraints.isEmpty || constraints.contains("*") { return String(localized: "Any Type") }
         let parts = constraints.map { constraint in
             if constraint.hasPrefix("role:") {
-                return String(localized: "any \(lowered(String(constraint.dropFirst(5))))")
+                return String(localized: "Role \(String(constraint.dropFirst(5)))")
             }
-            return article(lowered(names[constraint] ?? constraint))
+            return names[constraint] ?? constraint
         }
         return parts.formatted(.list(type: .or))
-    }
-
-    /// A name as it reads inside a sentence: a word whose only capital is its first is lowered, so "Pull Request" reads
-    /// "pull request" and "GitHub Issue" reads "GitHub issue".
-    static func lowered(_ name: String) -> String {
-        name.split(separator: " ", omittingEmptySubsequences: false).map { word in
-            word.dropFirst().contains(where: \.isUppercase) ? String(word) : word.lowercased()
-        }.joined(separator: " ")
-    }
-
-    private static func article(_ noun: String) -> String {
-        guard let first = noun.first?.lowercased() else { return noun }
-        return "aeiou".contains(first) ? String(localized: "an \(noun)") : String(localized: "a \(noun)")
     }
 
     // MARK: New Link Type…

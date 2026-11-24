@@ -1,6 +1,30 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Any Type" : {
+
+    },
+    "From %@ to %@. %@" : {
+      "comment" : "Link type row. The placeholders are the source type names, destination type names, and a sentence describing the link cardinality."
+    },
+    "From %@. From %@ to %@. %@" : {
+      "comment" : "Link type row. The placeholders are the plugin name, source type names, destination type names, and a sentence describing the link cardinality."
+    },
+    "Many to many." : {
+
+    },
+    "Many to one." : {
+
+    },
+    "One to many." : {
+
+    },
+    "One to one." : {
+
+    },
+    "Role %@" : {
+
+    },
     "Apps and keys will read items from every source for the types you limited." : {
 
     },
