@@ -51,6 +51,9 @@ import MarfaTesting
     /// The shortcuts that work in any app, off until the person sets one.
     let anyAppShortcuts: AnyAppShortcuts
 
+    /// Export Automatically, checked at launch and about every hour while the app runs.
+    @ObservationIgnored let automaticExport: AutomaticExport
+
     /// The app's own settings, kept in the connected Marfa so every Mac that connects to it uses them.
     let preferences: PreferencesSync
 
@@ -80,18 +83,32 @@ import MarfaTesting
         searchLeaveOuts = SearchLeaveOuts(defaults: defaults)
         shortcuts = ShortcutBindings(defaults: defaults)
         anyAppShortcuts = AnyAppShortcuts(defaults: defaults, registrar: hotKeys)
+        automaticExport = AutomaticExport(
+            defaults: defaults,
+            marfa: { [host] in
+                guard let connection = host.configuredConnection else { return nil }
+                // The copy's own server, since a switch opens the new copy before the host keeps its address.
+                let library = host.library.flatMap { ($0.source as? MarfaSource)?.connection.sameServer(as: connection) == true ? $0 : nil }
+                return AutomaticExport.Marfa(
+                    address: connection.address.absoluteString, name: LibraryDescription.name(of: host),
+                    instance: { await library?.instanceID() },
+                    source: host.state == .online
+                        ? MarfaArchiveSource(calls: MarfaServerCalls(connection: connection, signIns: host.signIns)) : nil)
+            },
+            tell: { [host] title, message in host.notices.tell(title, message) })
         // The standard defaults write the app's own domain; another's is named by the caller, as `UserDefaults` does not say.
         let domain = defaultsDomain ?? (defaults === UserDefaults.standard ? Bundle.main.bundleIdentifier : nil)
         preferences = PreferencesSync(
             defaults: defaults, domain: domain, enabled: syncsPreferences, restorePoints: restorePoints,
             library: { [host] in Libraries.libraryKey(for: host.configuredConnection?.address) },
             refusedShortcuts: { [anyAppShortcuts] in Set(anyAppShortcuts.refused.map(\.rawValue)) },
-            reload: { [sidebarLayouts, typeLooks, searchLeaveOuts, shortcuts, anyAppShortcuts] in
+            reload: { [sidebarLayouts, typeLooks, searchLeaveOuts, shortcuts, anyAppShortcuts, automaticExport] in
                 sidebarLayouts.reload()
                 typeLooks.reload()
                 searchLeaveOuts.reload()
                 shortcuts.reload()
                 anyAppShortcuts.reload()
+                automaticExport.reload()
             })
         marfaSettings = MarfaSettingsModel(host: host)
         marfaSettings.settingsKept = .over(preferences)
@@ -115,11 +132,12 @@ import MarfaTesting
     /// the one under way ends, so no step writes what it read before over the defaults. `then` runs once the settings
     /// are reset, and never where they are not, so what follows Reset outside the defaults never runs without it.
     func resetMacSettings(then done: @escaping @MainActor () -> Void = {}) {
-        preferences.resetBetweenSteps { [preferences, shortcuts, anyAppShortcuts, defaults] () throws(RestorePoints.Failure) in
+        preferences.resetBetweenSteps { [preferences, shortcuts, anyAppShortcuts, defaults, automaticExport] () throws(RestorePoints.Failure) in
             try preferences.saveRestorePoint(.reset)
             shortcuts.restoreDefaults()
             anyAppShortcuts.clearAll()
             MacSettings.reset(in: defaults)
+            automaticExport.reset()
             preferences.replaced(PreferencesMap.synced)
             done()
         } notSaved: { [notices = host.notices] in
@@ -254,7 +272,7 @@ import MarfaTesting
     }
 
     /// Resumes once, with whichever answer comes first.
-    private final class FirstOf {
+    final class FirstOf {
         private var done = false
 
         /// Whether this answer was the first.

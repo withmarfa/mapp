@@ -160,6 +160,79 @@ struct OnThisMacPage: View {
                 }
             }
             .accessibilityIdentifier("ExportRow")
+            automaticRows
+        }
+    }
+
+    // MARK: Export Automatically
+
+    @ViewBuilder private var automaticRows: some View {
+        let automatic = libraries.automaticExport
+        let instance = automatic.openInstance
+        let plan = automatic.current
+        let schedule = plan?.schedule ?? .never
+        SettingsRow(title: Text("Export Automatically"), line: Text(verbatim: automaticLine(plan))) {
+            SettingsPopUp(
+                title: "Export Automatically",
+                selection: Binding(get: { schedule }, set: { new in if let instance { choose(new, plan: plan, for: instance) } })
+            ) {
+                Text("Never").tag(ExportSchedule.never)
+                Text("Every Day").tag(ExportSchedule.daily)
+                Text("Every Week").tag(ExportSchedule.weekly)
+            }
+            // A plan belongs to a Marfa by its instance id, so it can be set once the copy knows it.
+            .disabled(instance == nil)
+            .accessibilityIdentifier("ExportAutomatically")
+        }
+        .accessibilityIdentifier("ExportAutomaticallyRow")
+        .task(id: host.configuredConnection) { await automatic.learn() }
+        if schedule != .never, let folder = plan?.folderURL, let instance {
+            SettingsRow(title: Text("Export Folder"), line: Text(verbatim: (folder.path as NSString).abbreviatingWithTildeInPath)) {
+                SettingsButton("Choose…") {
+                    chooseAutomaticFolder { chosen in
+                        automatic.set(schedule, folder: chosen, for: instance)
+                        automatic.checkSoon()
+                    }
+                }
+                .accessibilityIdentifier("ExportFolder")
+            }
+        }
+    }
+
+    private func automaticLine(_ plan: ExportPlan?) -> String {
+        guard let plan, plan.schedule != .never, let folder = plan.folderURL else { return String(localized: "To a folder you choose.") }
+        let to = String(localized: "To “\(folder.lastPathComponent)”.")
+        guard let last = plan.last else { return to }
+        return to + " " + String(localized: "Last saved \(last.formatted(.dateTime.day().month().year())).")
+    }
+
+    /// A schedule is turned on only with a folder, asked for the first time for this Marfa; a cancelled chooser leaves it as
+    /// it was, and a folder chosen after another Marfa opened is not kept.
+    private func choose(_ new: ExportSchedule, plan: ExportPlan?, for instance: String) {
+        let automatic = libraries.automaticExport
+        guard new != .never, plan?.folder == nil else {
+            automatic.set(new, for: instance)
+            automatic.checkSoon()
+            return
+        }
+        chooseAutomaticFolder { folder in
+            automatic.set(new, folder: folder, for: instance)
+            automatic.checkSoon()
+        }
+    }
+
+    /// Asks for the folder, and calls `done` only with one chosen.
+    private func chooseAutomaticFolder(then done: @escaping (URL) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = String(localized: "Choose")
+        panel.message = String(localized: "Choose where the app saves the archive.")
+        panel.begin { response in
+            guard response == .OK, let folder = panel.url else { return }
+            done(folder)
         }
     }
 
@@ -187,8 +260,9 @@ struct OnThisMacPage: View {
         Task {
             defer { isExporting = false }
             do {
-                let file = try await LibraryExport.export(from: source, serverName: server, to: folder)
-                exported = String(localized: "Saved as “\(file.lastPathComponent)”.")
+                let export = try await LibraryExport.export(from: source, serverName: server, to: folder)
+                let saved = String(localized: "Saved as “\(export.file.lastPathComponent)”.")
+                exported = LibraryExport.lacking(export, serverName: server).map { "\(saved) \($0)" } ?? saved
             } catch let failure as LibraryExport.Failure {
                 exportFailure = failure.message
             } catch {

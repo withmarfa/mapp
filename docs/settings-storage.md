@@ -51,6 +51,8 @@ Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `in
 
 The shortcuts that work in any app are not synced, but a settings file and a restore point carry them. A Marfa that holds them from an earlier version keeps those rows, and the sync neither reads nor deletes them.
 
+On This Mac keeps Export Automatically in local defaults (`automaticExportPlans`): one plan for each Marfa it was set for, by its instance id, holding the schedule, the folder and when its last export was made.
+
 ## The first launch
 
 Nothing is decided until the hydration is complete, the sign-in reaches the type and every table is held whole; until then the defaults stay as they are and Connection says the settings are not ready.

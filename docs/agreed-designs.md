@@ -52,7 +52,7 @@ Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Lay
 - **General and Appearance** are built: see [Settings pages](settings.md).
 - **Keyboard** is built: see [Keyboard shortcuts](keyboard-shortcuts.md).
 - **Editor, Lists and Layouts** are built: see [Settings pages](settings.md).
-- **Search, On This Mac and Connection** are built: see [Settings pages](settings.md). Agreed but not built: On This Mac's **Export Automatically** ("To a folder you choose", with Never as the default), a row in the Export section under Export Everything. The app has no scheduler, and keeping a chosen folder across launches needs a saved folder permission that the app does not keep yet. Connection gets the "This app's Settings" section described under sync below once that is built.
+- **Search, On This Mac and Connection** are built: see [Settings pages](settings.md). On This Mac's **Export Automatically** ("To a folder you choose", with Never as the default) is built too. Connection gets the "This app's Settings" section described under sync below once that is built.
 
 ### The Marfa's pages
 
