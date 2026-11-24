@@ -35,8 +35,8 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
 /// there, and an archive of another Marfa is never saved under it. It is checked at launch and then about every hour while
 /// the app runs, with no background agent, so a Mac that is off or an app that is closed exports at its next launch; until
 /// the copy knows its instance id or the server answers, it checks again within a minute. Each kind of failure is told
-/// once until an export succeeds. Reset, Quit and a new choice close the running export's gate, after which it publishes
-/// nothing.
+/// once until an export succeeds. Reset, Quit and a new choice close the running export's gate without waiting on the
+/// disk, after which it begins no move into the folder and writes nothing back.
 @Observable @MainActor final class AutomaticExport {
     /// The Marfa that is open.
     struct Marfa {
@@ -202,8 +202,9 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
         if let running { stop(running) }
     }
 
-    /// Stops the checks for good and the export that is running, as the app quits: it publishes nothing once this begins.
-    /// Waits up to `limit` for the export to remove its private directory, and removes it itself after that.
+    /// Stops the checks for good and the export that is running, as the app quits: it begins no move into the folder once
+    /// this begins. Waits up to `limit` for the export to remove its own file; past that the app quits, and an export that
+    /// later ends touches only what it holds by descriptor.
     func stop(within limit: Duration) async {
         stopped = true
         loop?.cancel()
@@ -211,7 +212,7 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
         guard let running else { return }
         stop(running)
         let task = running.task
-        let ended = await withCheckedContinuation { continuation in
+        _ = await withCheckedContinuation { continuation in
             let first = Libraries.FirstOf()
             Task {
                 _ = await task.value
@@ -222,7 +223,6 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
                 first.resume(continuation, with: false)
             }
         }
-        if !ended { running.gate.removeWorkspace() }
     }
 
     private func stop(_ running: Running) {
