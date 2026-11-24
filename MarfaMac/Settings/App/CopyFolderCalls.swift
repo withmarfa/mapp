@@ -5,15 +5,14 @@ import Marfa
 /// folder it holds, sends it at once and queues nothing. A folder is held by a pin, as the copy's slice leaves every
 /// `system.*` type out; the engine keeps it out of the library.
 ///
-/// A pin is taken only to show a folder, one at a time, since a pin made while another read runs ends that read. A folder
-/// the copy already holds is read as held. The pins this made are let go by `release()`, never one something else made.
+/// A pin is taken only to show a folder the copy does not hold yet, one at a time, since a pin made while another read
+/// runs ends that read. A pin stays until Stop Syncing: each is one record and its edges, so they are bounded by the
+/// number of folders.
 actor CopyFolderCalls: FolderCalls {
     /// Nil where no copy of a Marfa server is open, as with the sample library.
     nonisolated let copy: WorkingCopy?
-    /// The folders this pinned that the copy did not hold before.
-    private var pinned: Set<String> = []
-    /// The folders stopped here, which are never pinned again.
-    private var stopped: Set<String> = []
+    /// The folders seen revoked, which are never pinned again.
+    private var revoked: Set<String> = []
     private var busy = false
     private var waiting: [CheckedContinuation<Void, Never>] = []
 
@@ -25,19 +24,16 @@ actor CopyFolderCalls: FolderCalls {
         let copy = try held()
         await enter()
         defer { leave() }
-        guard !stopped.contains(id) else { throw .notFound }
+        guard !revoked.contains(id) else { throw .notFound }
         return try await run {
-            // A read Folders gave up on, as when it was left, pins nothing after its pins were let go.
-            try Task.checkCancellation()
-            if !pinned.contains(id), try await Self.retrying({ try await copy.items.folder(id) }) == nil {
-                let report = try await Self.retrying { try await copy.pin(id) }
-                if !report.wasPinned { pinned.insert(id) }
+            if try await Self.retrying({ try await copy.items.folder(id) }) == nil {
+                _ = try await Self.retrying { try await copy.pin(id) }
             }
             guard let folder = try await Self.retrying({ try await copy.items.folder(id) }) else {
                 throw MarfaError.notFound(code: "not_held", message: "", server: nil)
             }
             let reading = FolderSettingsReading(folder)
-            if reading.isStopped { await letGo(id, in: copy) }
+            if reading.isStopped { revoked.insert(id) }
             return reading
         }
     }
@@ -55,22 +51,10 @@ actor CopyFolderCalls: FolderCalls {
         defer { leave() }
         try await run {
             _ = try await MarfaEngine.asking { try await copy.revokeFolder(id) }
-            stopped.insert(id)
-            // A stopped folder is not followed, so the copy need not hold it.
-            await letGo(id, in: copy)
+            revoked.insert(id)
+            // A revoked folder is not followed, so the copy need not hold it.
+            _ = try? await copy.unpin(id)
         }
-    }
-
-    func release() async {
-        guard let copy else { return }
-        await enter()
-        defer { leave() }
-        for id in pinned { await letGo(id, in: copy) }
-    }
-
-    private func letGo(_ id: String, in copy: WorkingCopy) async {
-        guard pinned.remove(id) != nil else { return }
-        _ = try? await copy.unpin(id)
     }
 
     private func held() throws(OwnerFailure) -> WorkingCopy {
@@ -78,7 +62,7 @@ actor CopyFolderCalls: FolderCalls {
         return copy
     }
 
-    /// Lets one read or pin run at a time.
+    /// Lets one read, pin or stop run at a time.
     private func enter() async {
         guard busy else {
             busy = true
