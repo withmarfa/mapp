@@ -111,7 +111,7 @@ struct PluginsAccess {
             installed = try await calls.installed()
         }, secondary: [
             .quiet { [self] () throws(OwnerFailure) in typeInfo = try await calls.typeInfo() },
-        ], after: {
+        ], showBeforeFinishing: true, after: {
             await readRelease()
         })
     }

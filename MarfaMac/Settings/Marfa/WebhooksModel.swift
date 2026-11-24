@@ -257,10 +257,10 @@ import Observation
             .required(keysRead) { [self] () throws(OwnerFailure) in
                 if listedEvery { keys = try await context.calls.keys() }
             },
-        ], after: {
-            if readsDeliveries { await loadSending() }
+        ], showBeforeFinishing: true, after: {
+            if readsDeliveries, seesEvery == listedEvery { await loadSending() }
         })
-        if scopeChangedWhileLoading, !isLoading {
+        if !isLoading, scopeChangedWhileLoading || (failure == nil && seesEvery != listedEvery) {
             scopeChangedWhileLoading = false
             await readAgainIfScopeChanged()
         }

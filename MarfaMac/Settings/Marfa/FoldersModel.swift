@@ -38,7 +38,7 @@ import Observation
             let listing = try await context.calls.folders()
             folders = listing.folders
             total = listing.total
-        }, after: {
+        }, showBeforeFinishing: true, after: {
             let calls = context.calls
             await readEach(
                 of: folders.map(\.id),

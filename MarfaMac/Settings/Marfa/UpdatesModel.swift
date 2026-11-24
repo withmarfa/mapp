@@ -83,7 +83,7 @@ import Observation
                     throw UpkeepWording.owned(error)
                 }
             },
-        ], after: {
+        ], showBeforeFinishing: true, after: {
             if status?.progress != nil { await follow() }
         })
     }

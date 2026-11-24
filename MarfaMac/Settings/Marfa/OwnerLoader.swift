@@ -23,7 +23,7 @@ import Observation
 
     func load(
         in context: OwnerContext, waitForPrevious: Bool = false, primary: Read, secondary: [Secondary] = [],
-        after: () async -> Void = {}
+        showBeforeFinishing: Bool = false, after: () async -> Void = {}
     ) async {
         while isLoading {
             guard waitForPrevious else { return }
@@ -47,8 +47,9 @@ import Observation
             return
         }
         for read in secondary { await self.read(read, in: context) }
-        hasLoaded = true
+        if showBeforeFinishing { hasLoaded = true }
         await after()
+        if !hasLoaded { hasLoaded = true }
     }
 
     func read(_ secondary: Secondary, in context: OwnerContext) async {

@@ -25,7 +25,7 @@ extension LiveMarfaTests {
             let update = try await calls.updateStatus()
             let profile = try await calls.profile()
             #expect(!update.running.isEmpty)
-            #expect(!profile.username.isEmpty)
+            #expect(profile.username?.isEmpty == false)
             let stores = try await calls.fileStores()
             #expect(stores.stores.contains { $0.kind == .disk })
             let limit = try await calls.sourceLimit()
