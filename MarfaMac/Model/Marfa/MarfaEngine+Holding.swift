@@ -106,12 +106,13 @@ extension MarfaEngine {
 
     /// Called once a whole read or a read of what changed found the copy whole. Every held write is judged against
     /// what was just read before any is made, so one that follows another (an undo and its redo) is judged as the
-    /// person saw it, not as the one before it leaves things. A group with any write whose items changed is given back whole.
+    /// person saw it, not as the one before it leaves things. A group with any write whose items changed, or that
+    /// would set an item's text as a property, is given back whole.
     func releaseHeld() async {
         guard !held.isEmpty else { return }
         let waiting = held
         held = []
-        let changed = Set(waiting.filter { stand(for: $0.write) != $0.stand }.map(\.group))
+        let changed = Set(waiting.filter { stand(for: $0.write) != $0.stand || setsText(as: $0.write) }.map(\.group))
         var stopped = false
         var behind: [Held] = []
         for entry in waiting {
@@ -126,6 +127,15 @@ extension MarfaEngine {
             }
         }
         held += behind
+    }
+
+    /// A property edit of the key that holds the item's text, as when its type has taken that key for its text since
+    /// the write was held, which the stand does not show, since it reads the row and not the catalogue.
+    private func setsText(as write: ItemWrite) -> Bool {
+        guard case .editProperties(let id, let changes, _) = write, let row = rows[id.rawValue],
+            let text = MarfaMapping.bodyField(of: catalogue.itemTypes[TypeID(row.type)])
+        else { return false }
+        return changes.keys.contains(text)
     }
 
     /// The write on the version the engine holds now, since an item with the content the person saw may be on a later
