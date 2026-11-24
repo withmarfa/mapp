@@ -307,7 +307,6 @@ nonisolated protocol OwnerCalls: Sendable {
     func createConnectorHost(named name: String) async throws(OwnerFailure) -> ConnectorHostLink
     /// A new one-time link for a machine, which ends the one it had.
     func linkConnectorHost(_ id: String) async throws(OwnerFailure) -> ConnectorHostLink
-    func removeConnectorHost(_ id: String) async throws(OwnerFailure)
     func connectorSettings(of plugin: String) async throws(OwnerFailure) -> ConnectorSettingsReading
     /// Sends only the settings `changes` names, and answers every setting as the server now holds it.
     func changeConnectorSettings(of plugin: String, _ changes: [String: ConnectorSettingChange]) async throws(OwnerFailure) -> ConnectorSettingsReading

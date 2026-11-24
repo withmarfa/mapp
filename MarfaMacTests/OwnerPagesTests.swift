@@ -96,9 +96,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var connectorSettingsSent: [(plugin: String, changes: [String: ConnectorSettingChange])] = []
         /// The machine each assignment named.
         var connectorAssigned: [(plugin: String, host: String?)] = []
-        /// The machines made and removed, and the links answered, in order.
+        /// The machines made, and the links answered, in order.
         var hostsMade: [String] = []
-        var hostsRemoved: [String] = []
         var linksMade = 0
         /// The next assignment holds on the server, but its answer is lost as this failure.
         var assignAnswerLost: OwnerFailure?
@@ -636,14 +635,6 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             guard let host = state.connectorHosts.first(where: { $0.id == id }) else { throw .notFound }
             state.linksMade += 1
             return Self.link(for: host, state.linksMade)
-        }
-    }
-
-    func removeConnectorHost(_ id: String) async throws(OwnerFailure) {
-        try enter("removeConnectorHost")
-        state.withLock { state in
-            state.hostsRemoved.append(id)
-            state.connectorHosts.removeAll { $0.id == id }
         }
     }
 

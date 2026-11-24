@@ -430,7 +430,8 @@ struct AddConnectorSheet: View {
     let serverName: String
     let close: () -> Void
 
-    private var isPlaced: Bool { model.placed != nil }
+    /// The connector was put on a machine, or the machine made for it was kept with nothing on it.
+    private var isPlaced: Bool { model.placed != nil || model.kept != nil }
 
     var body: some View {
         SettingsSheet(title: Text("Add a Connector"), line: Text("From a plugin you’ve installed.")) {
@@ -453,6 +454,16 @@ struct AddConnectorSheet: View {
                     if model.place == .newMachine && !isPlaced {
                         SettingsRow("Machine Name", line: "What \(serverName) calls it.", error: model.error, lines: nil) {
                             SettingsField(title: "Machine Name", text: $model.machineName, isError: model.error != nil, onSubmit: add)
+                        }
+                    }
+                }
+                if let kept = model.kept {
+                    SettingsSection(name: Text("On That Machine")) {
+                        SettingsRow(
+                            "“\(kept.name)” was added but runs nothing yet.",
+                            line: "Choose it in Runs next time, or remove it in Terminal with \(AddConnectorModel.removeCommand(kept)).", lines: nil
+                        ) {
+                            SettingsButton("Copy") { OwnerClipboard.copyText(AddConnectorModel.removeCommand(kept)) }
                         }
                     }
                 }
@@ -485,8 +496,10 @@ struct AddConnectorSheet: View {
                 }
             }
         } buttons: {
-            if isPlaced {
+            if model.placed != nil {
                 CopyCommandButton(model: model)
+                SettingsButton("Done", role: .confirm, action: close)
+            } else if model.kept != nil {
                 SettingsButton("Done", role: .confirm, action: close)
             } else {
                 SettingsButton("Cancel", action: close).disabled(model.isWorking)

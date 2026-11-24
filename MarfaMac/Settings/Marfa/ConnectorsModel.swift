@@ -302,7 +302,7 @@ import Observation
         adding = AddConnectorModel(context: context, candidates: unplaced, hosts: hosts) { [weak self] plugin in
             guard let self else { return }
             // A connector put on a machine already linked needs nothing more, so the sheet closes.
-            if let adding = self.adding, adding.placed == nil { self.adding = nil }
+            if let adding = self.adding, adding.placed == nil, adding.kept == nil { self.adding = nil }
             await self.reload(plugin)
         }
     }

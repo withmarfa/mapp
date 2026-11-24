@@ -247,22 +247,26 @@ import Testing
         #expect(model.adding == nil)
     }
 
-    @Test func aMachineMadeForAConnectorThatCouldNotBePlacedIsRemovedAndNoLinkShown() async throws {
-        let bench = OwnerBench(grants: [.connectorsManage])
-        let model = unplacedRSS(bench)
-        await model.load()
-        model.beginAdding()
-        let adding = try #require(model.adding)
-        adding.machineName = "Studio Mac"
-        bench.calls.fail("assignConnector", with: .notFound)
-        await adding.add()
-        #expect(bench.calls.state.withLock { $0.hostsRemoved } == ["host-1"])
-        #expect(adding.placed == nil)
-        #expect(adding.error != nil)
-        #expect(adding.machineName == "Studio Mac")
+    @Test func aMachineMadeForAConnectorThatCouldNotBePlacedIsKeptAndNeverRemoved() async throws {
+        for failure: OwnerFailure in [.notFound, .unreachable] {
+            let bench = OwnerBench(grants: [.connectorsManage])
+            let model = unplacedRSS(bench)
+            await model.load()
+            model.beginAdding()
+            let adding = try #require(model.adding)
+            adding.machineName = "Studio Mac"
+            bench.calls.fail("assignConnector", with: failure)
+            await adding.add()
+            #expect(bench.calls.state.withLock { $0.connectorHosts.map(\.id) } == ["h1", "host-1"])
+            #expect(adding.kept?.id == "host-1")
+            #expect(adding.placed == nil && !adding.canAdd)
+            #expect(model.adding != nil)
+            #expect(model.hosts.map(\.id) == ["h1", "host-1"], "the machine kept can be chosen in Runs next time")
+            #expect(model.takeDrafts().isEmpty, "the Machine Name was used")
+        }
     }
 
-    @Test func aLostAnswerToAnAssignmentThatHeldNeverRemovesTheMachine() async throws {
+    @Test func aLostAnswerToAnAssignmentThatHeldShowsTheCommand() async throws {
         let bench = OwnerBench(grants: [.connectorsManage])
         let model = unplacedRSS(bench)
         await model.load()
@@ -271,24 +275,10 @@ import Testing
         adding.machineName = "Studio Mac"
         bench.calls.state.withLock { $0.assignAnswerLost = .unreachable }
         await adding.add()
-        #expect(bench.calls.state.withLock { $0.hostsRemoved }.isEmpty)
+        #expect(adding.kept == nil)
         #expect(adding.error == nil)
         #expect(adding.command != nil)
         #expect(bench.calls.state.withLock { $0.connectorControls["rss"]?.host } == "host-1")
-    }
-
-    @Test func aMachineIsKeptAndNamedWhenItCannotBeToldWhetherTheAssignmentHeld() async throws {
-        let bench = OwnerBench(grants: [.connectorsManage])
-        let model = unplacedRSS(bench)
-        await model.load()
-        model.beginAdding()
-        let adding = try #require(model.adding)
-        adding.machineName = "Studio Mac"
-        bench.calls.fail("assignConnector", with: .unreachable)
-        await adding.add()
-        #expect(bench.calls.state.withLock { $0.hostsRemoved }.isEmpty)
-        #expect(adding.placed == nil)
-        #expect(try #require(adding.error).contains("marfa hosts remove host-1"))
     }
 
     @Test func aKnownMachineIsOnlyAssignedSoTheLinkItWaitsOnStands() async throws {
@@ -342,6 +332,31 @@ import Testing
         #expect(adding.error != nil)
         #expect(adding.machineName == "Studio Mac")
         #expect(model.takeDrafts() == [.typed(title: String(localized: "Connector Not Added"), text: "Studio Mac")])
+
+        // Typed, then Runs moved to a machine Marfa knows: still handed back.
+        model.beginAdding()
+        let again = try #require(model.adding)
+        again.machineName = "Atlas"
+        again.place = .host("h1")
+        #expect(model.takeDrafts() == [.typed(title: String(localized: "Connector Not Added"), text: "Atlas")])
+    }
+
+    @Test func aMachineNameEditedWhileACallIsUnderWayIsHandedBackAsItIsNow() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = unplacedRSS(bench)
+        await model.load()
+        model.beginAdding()
+        let adding = try #require(model.adding)
+        adding.machineName = "Studio"
+        bench.calls.fail("createConnectorHost", with: .refused("No."))
+        let gate = bench.calls.hold("createConnectorHost")
+        let call = Task { await adding.add() }
+        #expect(await eventually { bench.calls.state.withLock { $0.waiting["createConnectorHost"] ?? 0 } >= 1 })
+        adding.machineName = "Studio Mac"
+        #expect(model.takeDrafts().isEmpty)
+        gate.open()
+        await call.value
+        #expect(bench.late == [.typed(title: String(localized: "Connector Not Added"), text: "Studio Mac")])
     }
 
     @Test func aLinkThatTheShellWouldSplitIsNeverMadeIntoACommand() {

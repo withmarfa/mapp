@@ -29,22 +29,28 @@ import Observation
     /// The connectors no machine runs, which the sheet offers.
     let candidates: [PluginConnectorSummary]
     let hosts: [ConnectorHostInfo]
-    private let placedOne: (String) async -> Void
+    private let changed: (String) async -> Void
     var plugin: String
     var place: Place = .newMachine
     var machineName = ""
     private(set) var error: String?
     private(set) var isWorking = false
     private(set) var placed: Placed?
+    /// A machine this sheet made that runs nothing, because its connector couldn't be put on it. The sheet never removes a
+    /// machine: it says how to, and the machine can be chosen in Runs next time.
+    private(set) var kept: ConnectorHostInfo?
+    /// The name of the machine this sheet made, so a Machine Name that made one is not handed back.
+    private var madeName: String?
     /// Set when Settings closes while a call is under way, so what it made is told about when it ends.
     private var closedWhileWorking = false
 
-    /// `placedOne` is told the plugin whose connector now has a machine, so the page reads it again.
-    init(context: OwnerContext, candidates: [PluginConnectorSummary], hosts: [ConnectorHostInfo], placedOne: @escaping (String) async -> Void) {
+    /// `changed` is told the plugin when the sheet put its connector on a machine or made a machine, so the page reads the
+    /// connector and the machines again.
+    init(context: OwnerContext, candidates: [PluginConnectorSummary], hosts: [ConnectorHostInfo], changed: @escaping (String) async -> Void) {
         self.context = context
         self.candidates = candidates
         self.hosts = hosts
-        self.placedOne = placedOne
+        self.changed = changed
         plugin = candidates.first?.name ?? ""
     }
 
@@ -52,7 +58,7 @@ import Observation
 
     /// The server takes a name of 1 to 100 characters.
     var canAdd: Bool {
-        guard !isWorking, placed == nil, candidates.contains(where: { $0.name == plugin }) else { return false }
+        guard !isWorking, placed == nil, kept == nil, candidates.contains(where: { $0.name == plugin }) else { return false }
         switch place {
         case .newMachine: return (1...100).contains(trimmedName.count)
         case .host(let id): return hosts.contains { $0.id == id }
@@ -93,8 +99,6 @@ import Observation
         error = nil
         let place = place
         let name = trimmedName
-        // A machine made here that couldn’t be removed after the connector wasn’t placed on it.
-        var kept: ConnectorHostInfo?
         do throws(OwnerFailure) {
             switch place {
             case .host(let id):
@@ -103,78 +107,75 @@ import Observation
                 if let host = hosts.first(where: { $0.id == id }), !host.linked {
                     show(Placed(plugin: summary.name, title: summary.title, host: host, link: nil, madeLink: false))
                 } else {
-                    isWorking = false
-                    closedWhileWorking = false
+                    finishWorking()
                 }
             case .newMachine:
                 let link = try await context.calls.createConnectorHost(named: name)
+                madeName = name
                 do throws(OwnerFailure) {
                     try await context.calls.assignConnector(summary.name, toHost: link.host.id)
                 } catch {
-                    switch await settle(summary.name, on: link.host, after: error) {
-                    case .held: break
-                    case .removed: throw error
-                    case .kept:
-                        kept = link.host
-                        throw error
+                    // A lost answer can hide an assignment that held, so the machine is read again; otherwise it is kept.
+                    let held = (try? await context.calls.connectorHost(link.host.id))?.connectors.contains(summary.name) ?? false
+                    if !held {
+                        keep(link.host)
+                        await context.learn(from: error)
+                        await changed(summary.name)
+                        return
                     }
                 }
                 show(Placed(plugin: summary.name, title: summary.title, host: link.host, link: link, madeLink: true))
             }
         } catch {
             isWorking = false
-            let keptLine = kept.map { Self.keptLine($0, connector: summary.title) }
             if closedWhileWorking {
                 closedWhileWorking = false
-                if let keptLine { context.lateDraft(.told(title: String(localized: "Connector Machine Kept"), message: keptLine)) }
-                if place == .newMachine, !name.isEmpty { context.lateDraft(Self.notAdded(name)) }
+                lateNameDraft()
             } else {
-                // A machine kept is all the owner needs: the failure's own words would say nothing was changed.
-                self.error = keptLine ?? OwnerWording.line(error)
+                self.error = OwnerWording.line(error)
             }
             await context.learn(from: error)
             return
         }
-        await placedOne(summary.name)
+        await changed(summary.name)
     }
 
-    private enum Settled {
-        /// The connector is on the machine after all: the failure hid an assignment that held.
-        case held
-        case removed
-        /// The machine stands, and the owner is told how to remove it.
-        case kept
-    }
-
-    /// After the assignment to the machine just made failed. A failure with no answer, or one that can't be read, may hide an
-    /// assignment that held, so the machine is read again before anything. It is removed only when the server refused and
-    /// the fresh read shows no connector on it; no other machine is ever removed.
-    private func settle(_ plugin: String, on host: ConnectorHostInfo, after failure: OwnerFailure) async -> Settled {
-        guard let fresh = try? await context.calls.connectorHost(host.id) else { return .kept }
-        if fresh.connectors.contains(plugin) { return .held }
-        guard Self.isRefusal(failure), fresh.connectors.isEmpty else { return .kept }
-        do {
-            try await context.calls.removeConnectorHost(host.id)
-            return .removed
-        } catch {
-            return .kept
+    /// Ends a call that leaves nothing to show, handing back a Machine Name it did not use if Settings closed meanwhile.
+    private func finishWorking() {
+        isWorking = false
+        if closedWhileWorking {
+            closedWhileWorking = false
+            lateNameDraft()
         }
     }
 
-    /// Whether the server answered and turned the call down, so nothing it was asked happened.
-    static func isRefusal(_ failure: OwnerFailure) -> Bool {
-        switch failure {
-        case .unreachable, .failed: false
-        default: true
+    private func lateNameDraft() {
+        if let draft = nameDraft { context.lateDraft(draft) }
+    }
+
+    /// Keeps the machine made here whose connector couldn't be put on it, and says so.
+    private func keep(_ host: ConnectorHostInfo) {
+        isWorking = false
+        if closedWhileWorking {
+            closedWhileWorking = false
+            context.lateDraft(.told(title: String(localized: "Connector Machine Kept"), message: Self.keptLine(host)))
+            lateNameDraft()
+        } else {
+            kept = host
         }
     }
 
-    private static func keptLine(_ host: ConnectorHostInfo, connector: String) -> String {
-        String(localized: "“\(host.name)” was made, but the app couldn’t put \(connector) on it. If no connector runs on it, remove it in Terminal with marfa hosts remove \(host.id).")
+    private static func keptLine(_ host: ConnectorHostInfo) -> String {
+        String(localized: "“\(host.name)” was added but runs nothing yet. Choose it in Runs next time, or remove it in Terminal with marfa hosts remove \(host.id).")
     }
 
-    private static func notAdded(_ name: String) -> OwnerDraft {
-        .typed(title: String(localized: "Connector Not Added"), text: name)
+    static func removeCommand(_ host: ConnectorHostInfo) -> String { "marfa hosts remove \(host.id)" }
+
+    /// The Machine Name as typed now, unless a machine was made with it.
+    private var nameDraft: OwnerDraft? {
+        let name = trimmedName
+        guard !name.isEmpty, name != madeName else { return nil }
+        return .typed(title: String(localized: "Connector Not Added"), text: name)
     }
 
     /// Shows the command, or, where Settings closed while the call was under way, tells that the link can't be shown again.
@@ -183,6 +184,7 @@ import Observation
         if closedWhileWorking {
             closedWhileWorking = false
             if made.link != nil { context.lateDraft(Self.notShown(made)) }
+            lateNameDraft()
         } else {
             placed = made
         }
@@ -211,28 +213,39 @@ import Observation
             if closedWhileWorking {
                 closedWhileWorking = false
                 context.lateDraft(Self.notShown(made))
+                lateNameDraft()
             } else {
                 placed?.link = link
                 placed?.madeLink = true
             }
         } catch {
             isWorking = false
-            closedWhileWorking = false
-            self.error = OwnerWording.line(error)
+            if closedWhileWorking {
+                closedWhileWorking = false
+                lateNameDraft()
+            } else {
+                self.error = OwnerWording.line(error)
+            }
             await context.learn(from: error)
         }
     }
 
     /// What Settings closing tells about: a link on show is not handed over, only that it can't be shown again; a Machine
-    /// Name typed for a connector not added is handed back. A call under way is told about when it ends.
+    /// Name typed and not used to make a machine is handed back, whatever Runs shows. A call under way is told about when it
+    /// ends, with the name as it is then.
     func takeDrafts() -> [OwnerDraft] {
         if isWorking {
             closedWhileWorking = true
             return []
         }
-        defer { placed = nil }
-        if let placed { return placed.link != nil ? [Self.notShown(placed)] : [] }
-        return place == .newMachine && !trimmedName.isEmpty ? [Self.notAdded(trimmedName)] : []
+        defer {
+            placed = nil
+            kept = nil
+        }
+        var drafts: [OwnerDraft] = []
+        if let placed, placed.link != nil { drafts.append(Self.notShown(placed)) }
+        if let nameDraft { drafts.append(nameDraft) }
+        return drafts
     }
 
     private static func notShown(_ placed: Placed) -> OwnerDraft {
@@ -244,6 +257,7 @@ import Observation
     /// Drops the link, which nothing keeps.
     func close() {
         placed = nil
+        kept = nil
         error = nil
     }
 }

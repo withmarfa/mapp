@@ -283,10 +283,6 @@ extension ClientOwnerCalls {
         try await run { client in Self.link(try await client.createConnectorHostLink(path: .init(id: id)).ok.body.json) }
     }
 
-    func removeConnectorHost(_ id: String) async throws(OwnerFailure) {
-        try await run { client in _ = try await client.deleteConnectorHost(path: .init(id: id)).ok }
-    }
-
     func connectorSettings(of plugin: String) async throws(OwnerFailure) -> ConnectorSettingsReading {
         try await run { client in Self.reading(try await client.getPluginConnectorSettings(path: .init(name: plugin)).ok.body.json) }
     }
