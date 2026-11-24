@@ -7,7 +7,9 @@ The Swift side of the item editor: the web view, the controller that drives the 
 - Use AppKit's `WKWebView` in an `NSViewRepresentable`, not SwiftUI's `WebView` and `WebPage`, which lack printing, menu filtering, Undo routing, dropped files and focus. Revisit only when Apple makes editing, printing, and the scroll edge public in them.
 - A private WebKit setting is allowed only when Apple's own `WebView` uses it, it is set only while WebKit responds to its selector, and the page still works without it (`WebViewChrome.swift`).
 - The system's scroll edge never reaches the page, and the window's toolbar draws no background, so the app draws its own band under the toolbar (`ToolbarBand`, `bandsToolbar()`, `bandsFoot`). Do not rely on the system's edge for any view in this window.
-- The navigation delegate allows only the page itself and `marfa-embed:` requests. Keep every other navigation cancelled.
+- The bridge's messages, requests and page functions are listed once in `editor/bridge-messages.json`, which `MarfaMacTests/EditorBridgeTests.swift` checks against `EditorMessages.swift`, `ItemRequests.swift`, `PictureRequests.swift` and the page calls; keep the decoding hand-written.
+- A script error the page reports is logged, never shown as the notice's words (`EditorController.tellPageFault`).
+- The navigation delegate (`EditorController+Navigation.swift`) allows only the page itself and `marfa-embed:` requests. Keep every other navigation cancelled.
 - A window makes its editor once, in an `EditorSlot` held in `@State`. An editor made in a view's initializer builds a web view and loads the page in a process of its own each time SwiftUI makes the view's value again.
 - Inkkit owns selection painting. The bridge only reports whether the web view has the keyboard in the key window (`window.editor.setHostActive`) and never changes focus or history to recolor a selection.
 

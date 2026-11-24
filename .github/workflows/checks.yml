@@ -56,7 +56,7 @@ jobs:
           if echo "$files" | grep -qE '^(editor/|MarfaMac/Editor/Page/|\.github/workflows/checks\.yml$)'; then
             echo "editor=true" >> "$GITHUB_OUTPUT"
           fi
-          app=$(echo "$files" | grep -vE '\.md$' | grep -E '^(MarfaMac/|MarfaMacTests/|MarfaMacUITests/|MarfaMac\.xcodeproj/|TestPlans/|Config/|\.github/workflows/checks\.yml$|\.github/scripts/)' || true)
+          app=$(echo "$files" | grep -vE '\.md$' | grep -E '^(MarfaMac/|MarfaMacTests/|MarfaMacUITests/|MarfaMac\.xcodeproj/|TestPlans/|Config/|editor/bridge-messages\.json$|\.github/workflows/checks\.yml$|\.github/scripts/)' || true)
           if [ -n "$app" ]; then
             echo "swift=true" >> "$GITHUB_OUTPUT"
           fi

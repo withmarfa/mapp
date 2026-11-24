@@ -12,7 +12,7 @@ nonisolated enum PictureAnswer: Equatable, Sendable {
 }
 
 /// How the page came to ask for a picture.
-nonisolated enum PictureAsk: String, Sendable {
+nonisolated enum PictureAsk: String, CaseIterable, Sendable {
     /// The page is drawing the picture and the person has said nothing about it.
     case drawing
     /// The person chose to load it, one picture or all those waiting.
