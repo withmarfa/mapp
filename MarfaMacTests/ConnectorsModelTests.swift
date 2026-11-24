@@ -247,6 +247,88 @@ import Testing
         #expect(adding.machineName == "Studio Mac")
     }
 
+    @Test func aLostAnswerToAnAssignmentThatHeldNeverRemovesTheMachine() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = unplacedRSS(bench)
+        await model.load()
+        model.beginAdding()
+        let adding = try #require(model.adding)
+        adding.machineName = "Studio Mac"
+        bench.calls.state.withLock { $0.assignAnswerLost = .unreachable }
+        await adding.add()
+        #expect(bench.calls.state.withLock { $0.hostsRemoved }.isEmpty)
+        #expect(adding.error == nil)
+        #expect(adding.command != nil)
+        #expect(bench.calls.state.withLock { $0.connectorControls["rss"]?.host } == "host-1")
+    }
+
+    @Test func aMachineIsKeptAndNamedWhenItCannotBeToldWhetherTheAssignmentHeld() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = unplacedRSS(bench)
+        await model.load()
+        model.beginAdding()
+        let adding = try #require(model.adding)
+        adding.machineName = "Studio Mac"
+        bench.calls.fail("assignConnector", with: .unreachable)
+        await adding.add()
+        #expect(bench.calls.state.withLock { $0.hostsRemoved }.isEmpty)
+        #expect(adding.placed == nil)
+        #expect(try #require(adding.error).contains("marfa hosts remove host-1"))
+    }
+
+    @Test func aKnownMachineIsOnlyAssignedSoTheLinkItWaitsOnStands() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = unplacedRSS(bench)
+        bench.calls.state.withLock { $0.connectorHosts.append(ConnectorHostInfo(id: "h2", name: "Studio Mac", lastSeen: nil, linked: false)) }
+        await model.load()
+        model.beginAdding()
+        let adding = try #require(model.adding)
+        adding.place = .host("h2")
+        await adding.add()
+        #expect(bench.calls.state.withLock { ($0.linksMade, $0.connectorAssigned.map(\.host)) } == (0, ["h2"]))
+        let placed = try #require(adding.placed)
+        #expect(placed.link == nil && !placed.madeLink)
+        #expect(adding.command == nil)
+
+        // Only New Link makes one.
+        await adding.renewLink()
+        #expect(bench.calls.state.withLock { $0.linksMade } == 1)
+        #expect(adding.command != nil)
+    }
+
+    @Test func anEndedLinkIsNeverShownOrCopied() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = unplacedRSS(bench)
+        await model.load()
+        model.beginAdding()
+        let adding = try #require(model.adding)
+        adding.machineName = "Studio Mac"
+        await adding.add()
+        let expires = try #require(adding.placed?.link?.expires)
+        var copied: [String] = []
+        let didCopy = adding.copyCommand(at: expires.addingTimeInterval(1)) { copied.append($0) }
+        #expect(!didCopy)
+        #expect(copied.isEmpty)
+        #expect(adding.liveLink(at: expires) == nil)
+        // The ended link is dropped, so the sheet offers New Link.
+        #expect(adding.placed?.link == nil)
+        #expect(adding.command == nil)
+    }
+
+    @Test func aMachineNameTypedForAConnectorNotAddedIsHandedBack() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = unplacedRSS(bench)
+        await model.load()
+        model.beginAdding()
+        let adding = try #require(model.adding)
+        adding.machineName = "Studio Mac"
+        bench.calls.fail("createConnectorHost", with: .refused("No."))
+        await adding.add()
+        #expect(adding.error != nil)
+        #expect(adding.machineName == "Studio Mac")
+        #expect(model.takeDrafts() == [.typed(title: String(localized: "Connector Not Added"), text: "Studio Mac")])
+    }
+
     @Test func aLinkThatTheShellWouldSplitIsNeverMadeIntoACommand() {
         #expect(AddConnectorModel.command(for: "https://m.example/connect#a'; rm -rf ~ #") == nil)
         #expect(AddConnectorModel.command(for: "https://m.example/connect#a b") == nil)

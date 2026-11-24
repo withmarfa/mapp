@@ -451,26 +451,34 @@ struct AddConnectorSheet: View {
                         .disabled(isPlaced || model.isWorking)
                     }
                     if model.place == .newMachine && !isPlaced {
-                        SettingsRow("Machine Name", line: "What \(serverName) calls it.", error: model.error) {
+                        SettingsRow("Machine Name", line: "What \(serverName) calls it.", error: model.error, lines: nil) {
                             SettingsField(title: "Machine Name", text: $model.machineName, isError: model.error != nil, onSubmit: add)
                         }
                     }
                 }
                 if let placed = model.placed {
                     SettingsSection(name: Text("On That Machine"), footer: Text("The link works once and gives this machine its own key.")) {
-                        if let command = model.command {
-                            SettingsStackRow(title: Text("Command to Paste There")) {
-                                SettingsReadOnlyValue(text: command)
-                                    .lineLimit(1)
-                                    .truncationMode(.head)
-                                    .accessibilityLabel(Text("Command to Paste There"))
+                        if let link = model.liveLink() {
+                            if let command = AddConnectorModel.command(for: link.link) {
+                                // Copy Command is the only way out: the text can't be selected, and the accessibility tree
+                                // names it without reading it out.
+                                SettingsStackRow(title: Text("Command to Paste There")) {
+                                    SettingsReadOnlyValue(text: command, isSelectable: false)
+                                        .lineLimit(1)
+                                        .truncationMode(.head)
+                                        .accessibilityElement(children: .ignore)
+                                        .accessibilityLabel(Text("Command to Paste There"))
+                                }
+                            } else {
+                                SettingsRow("Command to Paste There", line: "\(serverName) answered a link that can’t be pasted safely.") { EmptyView() }
                             }
-                        } else if placed.link == nil {
-                            SettingsRow("Command to Paste There", line: "Its link has ended.", error: model.error) {
-                                SettingsButton("New Link") { Task { await model.renewLink() } }.disabled(model.isWorking)
-                            }
+                        } else if placed.madeLink {
+                            SettingsRow("Command to Paste There", line: "Its link has ended.", error: model.error) { newLink }
                         } else {
-                            SettingsRow("Command to Paste There", line: "\(serverName) answered a link that can’t be pasted safely.") { EmptyView() }
+                            SettingsRow(
+                                "Command to Paste There", line: "“\(placed.host.name)” isn’t linked yet. A new link ends the one it was given.",
+                                error: model.error
+                            ) { newLink }
                         }
                     }
                     .task(id: placed.link?.expires) { await model.endLinkWhenDue() }
@@ -478,7 +486,7 @@ struct AddConnectorSheet: View {
             }
         } buttons: {
             if isPlaced {
-                CopyCommandButton(command: model.command)
+                CopyCommandButton(model: model)
                 SettingsButton("Done", role: .confirm, action: close)
             } else {
                 SettingsButton("Cancel", action: close).disabled(model.isWorking)
@@ -487,20 +495,20 @@ struct AddConnectorSheet: View {
         }
     }
 
+    private var newLink: some View {
+        SettingsButton("New Link") { Task { await model.renewLink() } }.disabled(model.isWorking)
+    }
+
     private func add() { Task { await model.add() } }
 }
 
-/// Copies the command, concealed from clipboard managers and taken off the clipboard after a minute.
+/// Copies the command while its link works, concealed from clipboard managers and taken off the clipboard after a minute.
 private struct CopyCommandButton: View {
-    let command: String?
+    let model: AddConnectorModel
     @State private var copied = false
 
     var body: some View {
-        SettingsButton(copied ? "Copied" : "Copy Command") {
-            guard let command else { return }
-            OwnerClipboard.copySecret(command)
-            copied = true
-        }
-        .disabled(command == nil)
+        SettingsButton(copied ? "Copied" : "Copy Command") { copied = model.copyCommand() }
+            .disabled(model.command == nil)
     }
 }

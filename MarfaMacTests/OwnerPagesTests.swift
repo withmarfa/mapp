@@ -100,6 +100,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var hostsMade: [String] = []
         var hostsRemoved: [String] = []
         var linksMade = 0
+        /// The next assignment holds on the server, but its answer is lost as this failure.
+        var assignAnswerLost: OwnerFailure?
         /// What the sign-in start answers, and the address the browser was asked to return to.
         var signInStart = ConnectorSignInStart(id: "sign-in-1", address: URL(string: "https://accounts.example.com/sign-in")!, expires: .now.addingTimeInterval(600))
         var signInReturnedTo: [String] = []
@@ -602,6 +604,15 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return state.withLock { $0.connectorHosts }
     }
 
+    func connectorHost(_ id: String) async throws(OwnerFailure) -> ConnectorHostInfo {
+        try enter("connectorHost")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard var host = state.connectorHosts.first(where: { $0.id == id }) else { throw .notFound }
+            host.connectors = state.connectorControls.filter { $0.value.host == id }.keys.sorted()
+            return host
+        }
+    }
+
     private static func link(for host: ConnectorHostInfo, _ count: Int) -> ConnectorHostLink {
         ConnectorHostLink(host: host, link: "https://marfa.castell.studio/connect#code-\(count)", expires: .now.addingTimeInterval(900))
     }
@@ -703,6 +714,10 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             state.connectorAssigned.append((plugin, host))
             control.host = host
             state.connectorControls[plugin] = control
+            if let lost = state.assignAnswerLost {
+                state.assignAnswerLost = nil
+                throw lost
+            }
         }
     }
 

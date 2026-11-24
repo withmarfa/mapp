@@ -79,6 +79,8 @@ nonisolated struct ConnectorHostInfo: Identifiable, Hashable, Sendable {
     var lastSeen: Date?
     /// Whether the machine has used its one-time link and holds a key of its own.
     var linked: Bool
+    /// The plugins whose connectors are assigned to it.
+    var connectors: [String] = []
 }
 
 /// A machine's one-time link, which the server answers once. It gives the machine a key, so it is shown only in the sheet
@@ -258,7 +260,7 @@ extension ClientOwnerCalls {
     }
 
     private static func host(_ host: Components.Schemas.ConnectorHost) -> ConnectorHostInfo {
-        ConnectorHostInfo(id: host.id, name: host.name, lastSeen: host.lastSeenAt, linked: host.linked)
+        ConnectorHostInfo(id: host.id, name: host.name, lastSeen: host.lastSeenAt, linked: host.linked, connectors: host.connectors.map(\.plugin))
     }
 
     private static func link(_ answer: Components.Schemas.ConnectorHostLink) -> ConnectorHostLink {
@@ -267,6 +269,10 @@ extension ClientOwnerCalls {
 
     func connectorHosts() async throws(OwnerFailure) -> [ConnectorHostInfo] {
         try await run { client in try await client.listConnectorHosts().ok.body.json.data.map(Self.host) }
+    }
+
+    func connectorHost(_ id: String) async throws(OwnerFailure) -> ConnectorHostInfo {
+        try await run { client in Self.host(try await client.getConnectorHost(path: .init(id: id)).ok.body.json) }
     }
 
     func createConnectorHost(named name: String) async throws(OwnerFailure) -> ConnectorHostLink {

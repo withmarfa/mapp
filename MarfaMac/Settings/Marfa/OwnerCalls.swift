@@ -301,6 +301,8 @@ nonisolated protocol OwnerCalls: Sendable {
     /// What the connector registered under `id` has reported itself.
     func connectorRegistration(_ id: String) async throws(OwnerFailure) -> ConnectorRegistration
     func connectorHosts() async throws(OwnerFailure) -> [ConnectorHostInfo]
+    /// One machine, read again, with the connectors on it.
+    func connectorHost(_ id: String) async throws(OwnerFailure) -> ConnectorHostInfo
     /// Makes a machine that runs connectors, with its one-time link, which the server answers only this once.
     func createConnectorHost(named name: String) async throws(OwnerFailure) -> ConnectorHostLink
     /// A new one-time link for a machine, which ends the one it had.
