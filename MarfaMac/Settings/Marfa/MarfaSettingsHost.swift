@@ -126,6 +126,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     var overview: OverviewModel { get }
     /// The one reader of the server's health, which Overview, Backups and Housekeeping all read.
     var health: ServerHealthModel { get }
+    /// The one model of the server's updates, which Overview and Updates both read, so one update is started and followed.
+    var updates: UpdatesModel { get }
     /// Opens another of the Marfa's pages in this window, at one of its own pages where `subpage` names it.
     func show(_ page: MarfaSettingsPage, subpage: SettingsSubpage?)
 

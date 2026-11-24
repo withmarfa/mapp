@@ -2,9 +2,10 @@ import Foundation
 import Marfa
 import Observation
 
-/// The Account page: the owner's profile as the server holds it, the password, the passkeys and the browsers signed in.
-/// The sign-ins need `sign_ins.manage`, which every sign-in asks for; where the owner did not approve it, Change Password
-/// asks again for everything the sign-in lacks. A refused write keeps what was typed.
+/// The Account page: the owner's profile as the server holds it, with the name and picture to change, the password, the
+/// passkeys and the browsers signed in. The sign-ins need `sign_ins.manage`, which every sign-in asks for; where the owner did
+/// not approve it, Change Password asks again for everything the sign-in lacks. The name and picture need the profile's own
+/// scopes, which every sign-in asks for too. A refused write keeps what was typed.
 @Observable @MainActor final class AccountModel: OwnerDraftHolding {
     enum Sheet: Equatable {
         case password
@@ -30,6 +31,20 @@ import Observation
     private let context: OwnerContext
 
     private(set) var profile: OwnerProfile?
+    /// What the sign-in may change of the profile.
+    private(set) var changeable: Set<ProfileField> = []
+    /// The name as typed, sent on Return or when the field is left. A reply never changes it while Settings is open.
+    var nameDraft = ""
+    private(set) var nameError: String?
+    /// Whether the name is being sent, or the grants read again after a refusal: the field takes no typing meanwhile, so
+    /// one name is sent at a time.
+    private(set) var isSavingName = false
+    /// Counts each time Settings closes, so a send that fails after it hands back what was typed instead of showing it.
+    private var closings = 0
+    /// A small copy of the picture for its row, where there is one the sign-in may read. Nothing larger is kept.
+    private(set) var picture: Data?
+    private(set) var pictureError: String?
+    private(set) var isSendingPicture = false
     private(set) var passkeys: [OwnerPasskey] = []
     private(set) var browsers: [BrowserSignIn] = []
     /// Why the page can't be shown at all.
@@ -66,8 +81,23 @@ import Observation
 
     func load() async {
         await loader.load(in: context, primary: { () throws(OwnerFailure) in
-            profile = try await context.calls.profile()
+            let typed = isNameEdited
+            let read = try await context.calls.profile()
+            profile = read
+            changeable = context.calls.changeableProfile()
+            if !typed {
+                nameDraft = read.name ?? ""
+                nameError = nil
+            }
         }, secondary: [
+            .quiet { [self] () throws(OwnerFailure) in
+                guard profile?.hasPicture == true else {
+                    picture = nil
+                    return
+                }
+                let read = try await context.calls.profilePicture()
+                picture = await Task.detached(priority: .utility) { read.flatMap(ProfilePicture.thumbnail) }.value
+            },
             .required(signInsRead) { [self] () throws(OwnerFailure) in
                 guard canManageSignIns else {
                     passkeys = []
@@ -78,6 +108,100 @@ import Observation
                 browsers = try await context.calls.browserSignIns()
             },
         ])
+    }
+
+    // MARK: Name and picture
+
+    /// What of the profile the page shows locked, since the sign-in may not change it, or may not read it at all.
+    var lockedProfile: Set<ProfileField> {
+        guard let profile else { return [] }
+        var locked: Set<ProfileField> = []
+        if profile.name == nil || !changeable.contains(.name) { locked.insert(.name) }
+        if !profile.pictureIsReadable || !changeable.contains(.avatar) { locked.insert(.avatar) }
+        return locked
+    }
+
+    /// Asks again for everything, the profile's scopes among them, and reads what the new sign-in may do.
+    func allowProfileChanges() async {
+        _ = await context.allowMore([])
+        await load()
+    }
+
+    /// Whether the name typed differs from the one the server holds.
+    var isNameEdited: Bool {
+        guard let held = profile?.name else { return false }
+        return nameDraft.trimmingCharacters(in: .whitespacesAndNewlines) != held
+    }
+
+    /// Sends the name typed, checked as the server checks it. A refusal keeps what was typed, with its line.
+    func saveName() async {
+        guard changeable.contains(.name), let held = profile?.name, !isSavingName else { return }
+        let typed = nameDraft
+        let name: String
+        switch ProfileName.checked(typed) {
+        case .failure(let problem):
+            nameError = problem.line
+            return
+        case .success(let checked):
+            name = checked
+        }
+        nameError = nil
+        guard name != held else { return }
+        isSavingName = true
+        defer { isSavingName = false }
+        let closings = closings
+        do {
+            profile = try await context.calls.setProfileName(name)
+        } catch {
+            await context.learn(from: error)
+            if case .notPermitted = error { changeable = context.calls.changeableProfile() }
+            if closings == self.closings {
+                nameError = OwnerWording.line(error, on: .account)
+            } else {
+                context.lateDraft(Self.nameNotChanged(typed))
+                nameDraft = profile?.name ?? ""
+            }
+        }
+    }
+
+    private static func nameNotChanged(_ name: String) -> OwnerDraft {
+        .typed(title: String(localized: "Name Not Changed"), text: name)
+    }
+
+    /// Sends the picture in `file` as the owner's picture: as it is where the server would take it, and drawn again where
+    /// not. The row keeps only a small copy.
+    func setPicture(from file: URL) async {
+        guard changeable.contains(.avatar), !isSendingPicture else { return }
+        isSendingPicture = true
+        pictureError = nil
+        defer { isSendingPicture = false }
+        do throws(OwnerFailure) {
+            if !(try await sendPicture(in: file)) { pictureError = String(localized: "That file isn’t a picture the app can use.") }
+        } catch {
+            pictureError = OwnerWording.line(error, on: .account)
+            await context.learn(from: error)
+            if case .notPermitted = error { changeable = context.calls.changeableProfile() }
+        }
+    }
+
+    /// Sends the picture in `file`, or answers false where it is no picture. The bytes sent end with this call, before any
+    /// later wait.
+    private func sendPicture(in file: URL) async throws(OwnerFailure) -> Bool {
+        let prepared = await Task.detached(priority: .userInitiated) { () -> (sent: Data, shown: Data?)? in
+            let scoped = file.startAccessingSecurityScopedResource()
+            defer { if scoped { file.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: file, options: .mappedIfSafe), let sent = ProfilePicture.prepared(data) else { return nil }
+            return (sent, ProfilePicture.thumbnail(sent))
+        }.value
+        guard let prepared else { return false }
+        profile = try await context.calls.setProfilePicture(prepared.sent)
+        picture = prepared.shown
+        return true
+    }
+
+    /// Says why a chosen file could not be read.
+    func pictureNotChosen() {
+        pictureError = String(localized: "That file couldn’t be opened.")
     }
 
     // MARK: Password
@@ -252,9 +376,23 @@ import Observation
 
     // MARK: Closing
 
-    /// The name typed for a passkey, which the app gives back when Settings closes. A password is dropped and never
-    /// handed over.
+    /// The owner's name and the name typed for a passkey, which the app gives back when Settings closes. A password is
+    /// dropped and never handed over.
     func takeDrafts() -> [OwnerDraft] {
+        var drafts: [OwnerDraft] = []
+        closings += 1
+        // A name still being sent is handed back only if its send fails.
+        if !isSavingName, let held = profile?.name {
+            if !nameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, nameDraft != held {
+                drafts.append(Self.nameNotChanged(nameDraft))
+            }
+            nameDraft = held
+        }
+        nameError = nil
+        return drafts + takeSheetDrafts()
+    }
+
+    private func takeSheetDrafts() -> [OwnerDraft] {
         switch sheet {
         case .password?:
             closePasswordSheet()

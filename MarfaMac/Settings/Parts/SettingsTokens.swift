@@ -45,6 +45,7 @@ enum SettingsTokens {
     static let secondaryText = Color(nsColor: .secondaryLabelColor)
     static let tertiaryText = Color(nsColor: .tertiaryLabelColor)
     static let primaryText = Color(nsColor: .labelColor)
+    static let tileForeground = Color.white
     /// The swatch of a color the person makes, before they have made one.
     static let rainbow = AngularGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple, .red], center: .center)
     /// The accent the Mac is set to, which the first swatch of a color choice shows.

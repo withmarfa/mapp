@@ -82,10 +82,11 @@ struct SettingsWindowView: View {
         .accessibilityIdentifier("SettingsWindow")
     }
 
-    /// Closing Settings hands over what was typed and not saved, and drops a question about changes that wait, which is
-    /// put again when Settings is next opened.
+    /// Closing Settings hands over what was typed and not saved, stops following an update (the server carries on), and drops
+    /// a question about changes that wait, which is put again when Settings is next opened.
     private func closed() {
         host.handOverDrafts()
+        host.updates.stop()
         libraries.marfaSettings.cancelDeparture()
     }
 }
