@@ -203,8 +203,7 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
         #expect(probe.count == 0)
     }
 
-    /// The one control for the routes above: a link no seal covers does reach the server, so a count of nothing there
-    /// means the seal held, not that the harness cannot see a connection.
+    /// Checks that the probe sees a connection when an unsealed link is clicked.
     @Test func aLinkConnectsWithoutTheSeal() async throws {
         let probe = try await Probe()
         let page = WebPage()

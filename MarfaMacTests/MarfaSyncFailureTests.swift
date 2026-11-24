@@ -94,7 +94,8 @@ struct MarfaSyncFailureTests {
         // The package says it again and a server event arrives: neither shows the library online or tells again.
         fake.sendUpdate(stopped)
         await source.hear(Change(origin: .server(event: "item.updated", cursor: "c"), itemId: nil, edgeId: nil))
-        #expect(!(await waitForConnection(source) { $0 == .online }), "a stopped library was shown online")
+        #expect(!(await eventually(within: .seconds(1)) { source.connectionState == .online }),
+                "a stopped library was shown online")
         #expect(unavailable(log.current) == 1)
 
         fake.sendUpdate(update(.following))

@@ -93,9 +93,7 @@ import WebKit
         #expect(datagrams == 0, "\(escape.rawValue) sent \(datagrams) datagrams (\(outcome))")
     }
 
-    /// The one control for the escapes above: an ordinary page does send a datagram, so a count of nothing there means
-    /// the seal held, not that the listener cannot hear one. WebKit exposes no peer connection in a worker, so only a
-    /// frame can be the control.
+    /// Checks that the probe receives a datagram from an unsealed frame.
     @Test func aFrameSendsADatagramWithoutTheSeal() async throws {
         let (outcome, probe) = try await run(.blankFrameAtOnce, sealed: false)
         let sent = await eventually(within: .seconds(20)) { probe.count > 0 }
