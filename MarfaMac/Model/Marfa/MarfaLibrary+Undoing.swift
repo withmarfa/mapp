@@ -107,6 +107,13 @@ extension MarfaLibrary {
         notices.tell(run.step.name, reason + " " + String(localized: "Choose Undo again to try it as things are now."))
         guard let manager = run.step.manager else { return }
         let step = UndoStep(manager: manager, name: run.step.name, handler: run.step.handler, counterpartOf: run.step.counterpartOf)
-        Task { [weak self] in self?.register(step) }
+        Task { [weak self] in
+            guard let self else { return }
+            // A manager that does not group by event takes a step only inside a group it was asked to open.
+            let opens = !manager.groupsByEvent && manager.groupingLevel == 0
+            if opens { manager.beginUndoGrouping() }
+            register(step)
+            if opens { manager.endUndoGrouping() }
+        }
     }
 }
