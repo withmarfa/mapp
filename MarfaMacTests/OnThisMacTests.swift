@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Marfa
 import MarfaTesting
@@ -43,18 +44,33 @@ nonisolated func gzip(_ bytes: [UInt8]) -> [UInt8] {
     return Array(output.prefix(Int(stream.total_out)))
 }
 
-/// The blob entry name of carried file `number`, as the server names one: the hex of a SHA-256 hash.
+/// The blob entry name of carried file `number`, whose bytes are `[number]`, as the server names one: the hex of the
+/// SHA-256 of its bytes.
 nonisolated func blobName(_ number: Int) -> String {
-    let hex = String(number, radix: 16)
-    return "blobs/" + String(repeating: "0", count: 64 - hex.count) + hex
+    "blobs/" + SHA256.hash(data: [UInt8(number)]).map { String(format: "%02x", $0) }.joined()
+}
+
+/// The lines in `bytes`, counted as the server's restore counts them: runs of bytes other than a newline.
+nonisolated func lineCount(_ bytes: [UInt8]) -> Int {
+    bytes.split(separator: UInt8(ascii: "\n")).count
+}
+
+/// A manifest of the Marfa `instance` naming `files` files, of which it carries `carried`, and `items` items.
+nonisolated func manifest(instance: String = "instance-one", files: Int, carried: Int, items: Int = 0) -> [UInt8] {
+    Array(
+        #"{"version":4,"format":"marfa-archive","instance_id":"\#(instance)","file_count":\#(files),"item_count":\#(items),"version_count":0,"edge_count":0,"row_count":0,"blob_count":\#(carried)}"#
+            .utf8)
 }
 
 /// A whole archive of the Marfa `instance`: its manifest naming `files` files of which it carries `carried`, the line
-/// files a restore requires (`payload` as the items), a blob for each carried file, and the end of the tar.
+/// files a restore requires (a line for each file, and `payload` as the items), a blob for each carried file, and the
+/// end of the tar.
 nonisolated func archiveBytes(instance: String = "instance-one", files: Int = 0, carried: Int = 0, payload: [UInt8] = []) -> [UInt8] {
-    let manifest = #"{"version":4,"format":"marfa-archive","instance_id":"\#(instance)","file_count":\#(files),"blob_count":\#(carried)}"#
-    var bytes = tarEntry("manifest.json", Array(manifest.utf8))
-    for name in ArchiveCheck.lineFiles { bytes += tarEntry(name, gzip(name == "items.ndjson.gz" ? payload : [])) }
+    var bytes = tarEntry("manifest.json", manifest(instance: instance, files: files, carried: carried, items: lineCount(payload)))
+    let fileLines = Array((0..<files).map { #"{"file":\#($0)}"# + "\n" }.joined().utf8)
+    for name in ArchiveCheck.lineFiles {
+        bytes += tarEntry(name, gzip(name == "items.ndjson.gz" ? payload : name == "files.ndjson.gz" ? fileLines : []))
+    }
     for blob in 0..<carried { bytes += tarEntry(blobName(blob), [UInt8(blob)]) }
     return bytes + [UInt8](repeating: 0, count: 1024)
 }
@@ -182,6 +198,7 @@ private struct FakeArchive: ArchiveSource {
     nonisolated enum Short: CaseIterable, Sendable {
         case noManifest, endsAfterTheManifest, endsInsideAnEntry, noEnd, lacksAnEntry, lacksABlob, damagedHeader, notAMarfaArchive
         case damagedGzip, cutGzip, emptyLineFile, wronglyNamedBlob, blobTwice, sizePastTheFile, countsThatDoNotAdd
+        case fewerItemsThanCounted, blobBytesThatDoNotMatchItsName
 
         var bytes: [UInt8] {
             let whole = archiveBytes(files: 2, carried: 2)
@@ -192,8 +209,8 @@ private struct FakeArchive: ArchiveSource {
             case .endsInsideAnEntry: return Array(whole[..<(whole.count - 1024 - 300)])
             case .noEnd: return Array(whole[..<(whole.count - 1024)])
             case .lacksAnEntry:
-                return tarEntry("manifest.json", Array(#"{"format":"marfa-archive","instance_id":"instance-one","file_count":0,"blob_count":0}"#.utf8))
-                    + tarEntry("items.ndjson.gz", []) + [UInt8](repeating: 0, count: 1024)
+                return tarEntry("manifest.json", manifest(files: 0, carried: 0)) + tarEntry("items.ndjson.gz", [])
+                    + [UInt8](repeating: 0, count: 1024)
             case .lacksABlob: return Array(whole[..<(whole.count - 1024 - 1024)]) + [UInt8](repeating: 0, count: 1024)
             case .damagedHeader:
                 var damaged = whole
@@ -218,8 +235,13 @@ private struct FakeArchive: ArchiveSource {
             case .sizePastTheFile:
                 return whole.replacing(tarEntry(blobName(1), [1]), with: tarEntry(blobName(1), [1], size: 0o77_777_777_777))
             case .countsThatDoNotAdd:
-                let manifest = #"{"format":"marfa-archive","instance_id":"instance-one","file_count":1,"blob_count":2}"#
-                return tarEntry("manifest.json", Array(manifest.utf8)) + Array(whole[1024...])
+                return tarEntry("manifest.json", manifest(files: 1, carried: 2)) + Array(whole[1024...])
+            case .fewerItemsThanCounted:
+                let items = Array("{\"id\":\"one\"}\n{\"id\":\"two\"}\n".utf8)
+                return archiveBytes(payload: items)
+                    .replacing(tarEntry("items.ndjson.gz", gzip(items)), with: tarEntry("items.ndjson.gz", gzip(Array(items[..<13]))))
+            case .blobBytesThatDoNotMatchItsName:
+                return whole.replacing(tarEntry(blobName(1), [1]), with: tarEntry(blobName(1), [2]))
             }
         }
     }
@@ -362,7 +384,7 @@ private struct FakeArchive: ArchiveSource {
         }
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let other = folder.appending(path: ".Marfa export.partial")
+        let other = folder.appending(path: "another app.partial")
         try Data([9]).write(to: other)
         let gate = ExportGate()
         let export = Task { try await LibraryExport.export(from: Endless(), serverName: "Marfa", to: folder, gate: gate) }
@@ -392,20 +414,63 @@ private struct FakeArchive: ArchiveSource {
         #expect(LibraryExport.failure(MarfaServerCalls.Ending.notPermitted, serverName: "X").message.contains("isn’t allowed"))
     }
 
-    @Test func exportEverythingRefusesAnotherMarfaAndAnUnknownOne() async throws {
-        struct Unasked: ArchiveSource {
-            func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws { Issue.record("the server is not asked") }
-        }
+    @Test @MainActor func exportEverythingChecksTheMarfaOpenWhenExportWasPressed() async throws {
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let other = await OnThisMacPage.exportEverything(
-            from: FakeArchive(bytes: archiveBytes(instance: "instance-two")), serverName: "Marfa", to: folder, instance: "instance-one")
-        #expect((try? other.get()) == nil && other.failureMessage?.contains("another Marfa") == true)
-        let unknown = await OnThisMacPage.exportEverything(from: Unasked(), serverName: "Marfa", to: folder, instance: nil)
-        #expect((try? unknown.get()) == nil)
+        var open: String? = "instance-one"
+        /// Exports `archive` while the chooser is up as another Marfa opens.
+        func export(_ archive: String) async -> Result<String, LibraryExport.Failure>? {
+            open = "instance-one"
+            return await OnThisMacPage.exportEverything(
+                from: FakeArchive(bytes: archiveBytes(instance: archive)), serverName: "Marfa", instance: { open },
+                folder: {
+                    open = "instance-two"
+                    return folder
+                })
+        }
+        let other = await export("instance-two")
+        #expect(other?.failureMessage?.contains("another Marfa") == true, "the archive is checked against the Marfa open at Export…")
         #expect(try contents(folder).isEmpty)
-        let saved = await OnThisMacPage.exportEverything(from: FakeArchive(), serverName: "Marfa", to: folder, instance: "instance-one")
-        #expect((try? saved.get())?.hasPrefix("Saved as") == true)
+        let saved = await export("instance-one")
+        #expect((try? saved?.get())?.hasPrefix("Saved as") == true)
+
+        open = nil
+        let unknown = await OnThisMacPage.exportEverything(
+            from: FakeArchive(), serverName: "Marfa", instance: { open },
+            folder: {
+                Issue.record("no folder is asked for")
+                return folder
+            })
+        #expect(unknown?.failureMessage?.contains("can’t yet tell") == true)
+        let cancelled = await OnThisMacPage.exportEverything(
+            from: FakeArchive(), serverName: "Marfa", instance: { "instance-one" }, folder: { nil })
+        #expect(cancelled == nil)
+    }
+
+    /// Volumes an export refuses: FAT, a network share, and a local volume that can't refuse a name that is taken.
+    nonisolated enum OffThisMac: CaseIterable, Sendable {
+        case fat, network, noExclusiveMove
+
+        var volume: ExportVolume {
+            switch self {
+            case .fat: ExportVolume(format: "msdos", isLocal: true, supportsExclusiveRenaming: false, uuid: "one")
+            case .network: ExportVolume(format: "smbfs", isLocal: false, supportsExclusiveRenaming: true, uuid: "one")
+            case .noExclusiveMove: ExportVolume(format: "apfs", isLocal: true, supportsExclusiveRenaming: false, uuid: "one")
+            }
+        }
+    }
+
+    @Test(arguments: OffThisMac.allCases) func aFolderOffThisMacsOwnDiskIsRefused(_ off: OffThisMac) async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let volume = off.volume
+        let refused = await #expect(throws: LibraryExport.Failure.self) {
+            try await LibraryExport.export(from: FakeArchive(), serverName: "Marfa", to: folder, volume: { _ in volume })
+        }
+        #expect(refused?.message == "Choose a folder on this Mac’s own disk.")
+        #expect(await LibraryExport.choose(folder, volume: { _ in volume }) == .failure(.notOwnDisk))
+        #expect(try contents(folder).isEmpty)
+        #expect(ExportVolume(format: "apfs", isLocal: true, supportsExclusiveRenaming: true, uuid: "one").isAccepted)
     }
 
     @Test func aFolderThatCannotBeWrittenToIsTold() async throws {

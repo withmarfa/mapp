@@ -78,6 +78,11 @@ import Testing
         return folder
     }
 
+    /// `folder` as Settings records it when chosen.
+    private func chosen(_ folder: URL) async throws -> ExportFolder {
+        try await LibraryExport.choose(folder).get()
+    }
+
     private func defaults() -> UserDefaults {
         ThrowawayDefaults.make("AutomaticExportTests")
     }
@@ -90,10 +95,10 @@ import Testing
     private func export(
         _ open: Open, defaults: UserDefaults? = nil, folder: URL, schedule: ExportSchedule = .daily,
         tell: @escaping (String, String) -> Void = { _, _ in }, now: @escaping () -> Date = { .now }
-    ) async -> AutomaticExport {
+    ) async throws -> AutomaticExport {
         let export = AutomaticExport(defaults: defaults ?? self.defaults(), marfa: { open.marfa }, tell: tell, now: now)
         await export.learn()
-        export.set(schedule, folder: folder, for: "instance-one")
+        export.set(schedule, folder: try await chosen(folder), for: "instance-one")
         return export
     }
 
@@ -101,7 +106,7 @@ import Testing
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
         var clock = Date(timeIntervalSince1970: 1_795_000_000)
-        let export = await export(Open(), folder: folder, now: { clock })
+        let export = try await export(Open(), folder: folder, now: { clock })
 
         #expect(await export.check())
         #expect(try files(in: folder) == ["Marfa 2026-11-18.tar"], "none was made yet, so one is due at once")
@@ -119,7 +124,7 @@ import Testing
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let defaults = defaults()
-        _ = await export(Open(), defaults: defaults, folder: folder)
+        _ = try await export(Open(), defaults: defaults, folder: folder)
         let open = Open()
         open.instance = nil
         let launched = AutomaticExport(defaults: defaults, marfa: { open.marfa }, tell: { _, _ in })
@@ -139,7 +144,7 @@ import Testing
         defer { try? FileManager.default.removeItem(at: first) }
         let defaults = defaults()
         let open = Open()
-        let export = await export(open, defaults: defaults, folder: first)
+        let export = try await export(open, defaults: defaults, folder: first)
 
         open.address = "https://two.test"
         open.instance = "instance-two"
@@ -155,7 +160,7 @@ import Testing
         open.source = Archive()
         let reopened = AutomaticExport(defaults: defaults, marfa: { open.marfa }, tell: { _, _ in })
         await reopened.check()
-        #expect(reopened.current?.folder == first.path, "the first Marfa keeps its plan at a new address and after a relaunch")
+        #expect(reopened.current?.folder?.path == first.path, "the first Marfa keeps its plan at a new address and after a relaunch")
         #expect(try files(in: first).count == 1)
     }
 
@@ -165,7 +170,7 @@ import Testing
         let open = Open()
         open.source = Archive(instance: "instance-two")
         var told: [String] = []
-        let export = await export(open, folder: folder, tell: { told.append($1) })
+        let export = try await export(open, folder: folder, tell: { told.append($1) })
         await export.check()
         #expect(try files(in: folder).isEmpty)
         #expect(told.count == 1 && told.first?.contains("another Marfa") == true)
@@ -179,7 +184,7 @@ import Testing
         let open = Open()
         var told: [String] = []
         var clock = Date(timeIntervalSince1970: 1_795_000_000)
-        let export = await export(open, folder: folder, tell: { told.append($1) }, now: { clock })
+        let export = try await export(open, folder: folder, tell: { told.append($1) }, now: { clock })
 
         for _ in 0..<2 {
             open.source = Down()
@@ -211,7 +216,7 @@ import Testing
         let open = Open()
         let held = Held()
         open.source = held
-        let export = await export(open, defaults: defaults, folder: folder, tell: { _, _ in Issue.record("nothing is told") })
+        let export = try await export(open, defaults: defaults, folder: folder, tell: { _, _ in Issue.record("nothing is told") })
         let check = Task { await export.check() }
         #expect(await eventually { held.begun.withLock { $0 } })
 
@@ -227,14 +232,14 @@ import Testing
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let open = Open()
-        let export = await export(open, folder: folder, tell: { _, _ in Issue.record("nothing is told") })
+        let export = try await export(open, folder: folder, tell: { _, _ in Issue.record("nothing is told") })
         let latch = Latch()
         open.latch = latch
         let check = Task { await export.check() }
         #expect(await eventually { latch.isWaiting })
         export.reset()
         open.latch = nil
-        export.set(.daily, folder: folder, for: "instance-one")
+        export.set(.daily, folder: try await chosen(folder), for: "instance-one")
         latch.open()
         _ = await check.value
         #expect(try files(in: folder).isEmpty, "the check begun before the reset exports nothing under the new plan")
@@ -251,10 +256,10 @@ import Testing
         let open = Open()
         let held = Held()
         open.source = held
-        let export = await export(open, folder: first)
+        let export = try await export(open, folder: first)
         let check = Task { await export.check() }
         #expect(await eventually { held.begun.withLock { $0 } })
-        export.set(.daily, folder: second, for: "instance-one")
+        export.set(.daily, folder: try await chosen(second), for: "instance-one")
         _ = await check.value
         #expect(export.current?.last == nil, "the export under the earlier choice counts for nothing")
 
@@ -275,11 +280,11 @@ import Testing
         let open = Open()
         let held = Held()
         open.source = held
-        let export = await export(open, defaults: defaults, folder: first)
+        let export = try await export(open, defaults: defaults, folder: first)
         let check = Task { await export.check() }
         #expect(await eventually { held.begun.withLock { $0 } })
 
-        let restored = [ExportPlan(instance: "instance-one", schedule: .weekly, folder: second.path)]
+        let restored = [ExportPlan(instance: "instance-one", schedule: .weekly, folder: try await chosen(second))]
         defaults.set(try JSONEncoder().encode(restored), forKey: AutomaticExport.plansKey)
         export.reload()
         _ = await check.value
@@ -290,7 +295,7 @@ import Testing
         #expect(try files(in: first).isEmpty)
         #expect(try files(in: second).count == 1)
         let kept = try JSONDecoder().decode([ExportPlan].self, from: try #require(defaults.data(forKey: AutomaticExport.plansKey)))
-        #expect(kept.map(\.folder) == [second.path], "saving the export's time keeps the restored plan")
+        #expect(kept.map(\.folder?.path) == [second.path], "saving the export's time keeps the restored plan")
     }
 
     @Test func aRestoreOfThePlanStopsARunningExportSoItsTimeIsNotWrittenOverIt() async throws {
@@ -300,7 +305,7 @@ import Testing
         let open = Open()
         let gated = Gated()
         open.source = gated
-        let export = await export(open, defaults: defaults, folder: folder)
+        let export = try await export(open, defaults: defaults, folder: folder)
         let check = Task { await export.check() }
         #expect(await eventually { gated.latch.isWaiting })
 
@@ -322,7 +327,7 @@ import Testing
         let open = Open()
         let gated = Gated()
         open.source = gated
-        let export = await export(open, folder: folder)
+        let export = try await export(open, folder: folder)
         let check = Task { await export.check() }
         #expect(await eventually { gated.latch.isWaiting })
         export.reload()
@@ -338,7 +343,7 @@ import Testing
         let open = Open()
         let held = Held()
         open.source = held
-        let export = await export(open, folder: folder)
+        let export = try await export(open, folder: folder)
         let check = Task { await export.check() }
         #expect(await eventually { held.begun.withLock { $0 } })
 
@@ -348,5 +353,32 @@ import Testing
         await export.check()
         #expect(try files(in: folder).isEmpty, "nothing is published and no check runs after a quit")
         #expect(export.current?.last == nil)
+    }
+
+    @Test func aFolderMovedOrReplacedSinceItWasChosenReceivesNothing() async throws {
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (folder, moved, elsewhere) = (root.appending(path: "chosen"), root.appending(path: "moved"), root.appending(path: "elsewhere"))
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: false)
+        var told: [String] = []
+        var clock = Date(timeIntervalSince1970: 1_795_000_000)
+        let export = try await export(Open(), folder: folder, tell: { told.append($1) }, now: { clock })
+
+        try FileManager.default.moveItem(at: folder, to: moved)
+        try FileManager.default.createSymbolicLink(at: folder, withDestinationURL: elsewhere)
+        await export.check()
+        #expect(told == ["The export folder was moved or replaced. Choose it again."])
+        #expect(export.current?.last == nil)
+
+        try FileManager.default.removeItem(at: folder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        clock.addTimeInterval(24 * 3600)
+        await export.check()
+        #expect(try files(in: folder).isEmpty && files(in: moved).isEmpty && files(in: elsewhere).isEmpty, "no folder receives the archive")
+
+        export.set(.daily, folder: try await chosen(folder), for: "instance-one")
+        await export.check()
+        #expect(try files(in: folder).count == 1, "the folder chosen again receives it")
     }
 }
