@@ -37,7 +37,7 @@ struct FoldersPage: View {
             } message: { asked in
                 Text(verbatim: asked.message)
             }
-            .onChange(of: model.stopped) { if $1 != nil { back() } }
+            .onChange(of: model.stopped) { if $1 != nil { navigation?.back() } }
             .accessibilityIdentifier("FoldersPage")
     }
 
@@ -238,8 +238,7 @@ private struct FolderDetail: View {
             ForEach(report.copies) { copy in
                 let condition = FoldersModel.condition(of: copy)
                 SettingsRow(verbatim: copy.signIn, line: FoldersModel.reported(ageSeconds: copy.ageSeconds)) {
-                    // A copy under Needs Attention is not told again here.
-                    if !FoldersModel.needsAttention(copy) { SettingsValue(verbatim: condition.title, dot: FoldersPage.dot(condition)) }
+                    SettingsValue(verbatim: condition.title, dot: FoldersPage.dot(condition))
                 }
             }
         }

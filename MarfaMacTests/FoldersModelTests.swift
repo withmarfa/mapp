@@ -15,14 +15,19 @@ import Testing
             firstSyncWaiting: waiting, problems: problems, ageSeconds: age)
     }
 
-    private func model(
-        _ bench: OwnerBench, folders: [(OwnerFolder, FolderReport)], calls: FakeFolderCalls = FakeFolderCalls()
-    ) -> FoldersModel {
+    /// The folders listed, each with its report and, through the copy, its settings.
+    private func model(_ bench: OwnerBench, folders: [(OwnerFolder, FolderReport)], calls: FakeFolderCalls? = nil) -> FoldersModel {
         bench.calls.state.withLock { state in
             state.folders = folders.map(\.0)
             state.reports = Dictionary(uniqueKeysWithValues: folders.map { ($0.0.id, $0.1) })
         }
-        return FoldersModel(context: bench.context, folderCalls: calls)
+        let held = calls ?? FakeFolderCalls()
+        held.state.withLock { state in
+            for (folder, _) in folders where state.folders[folder.id] == nil {
+                state.folders[folder.id] = FakeFolderCalls.folder(folder.id, folder.title)
+            }
+        }
+        return FoldersModel(context: bench.context, folderCalls: held)
     }
 
     @Test func stopSyncingIsSentOnlyOnceTheOwnerAgrees() async throws {
