@@ -348,7 +348,6 @@ import Testing
         model.beginAdding()
         let adding = try #require(model.adding)
         adding.machineName = "Studio"
-        bench.calls.fail("createConnectorHost", with: .refused("No."))
         let gate = bench.calls.hold("createConnectorHost")
         let call = Task { await adding.add() }
         #expect(await eventually { bench.calls.state.withLock { $0.waiting["createConnectorHost"] ?? 0 } >= 1 })
@@ -356,7 +355,10 @@ import Testing
         #expect(model.takeDrafts().isEmpty)
         gate.open()
         await call.value
-        #expect(bench.late == [.typed(title: String(localized: "Connector Not Added"), text: "Studio Mac")])
+        // The machine was made as "Studio", so the name as it is now is not one that made a machine.
+        #expect(bench.calls.state.withLock { $0.hostsMade } == ["Studio"])
+        #expect(bench.late.count == 2)
+        #expect(bench.late.last == .typed(title: String(localized: "Connector Not Added"), text: "Studio Mac"))
     }
 
     @Test func aLinkThatTheShellWouldSplitIsNeverMadeIntoACommand() {
