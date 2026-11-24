@@ -76,7 +76,7 @@ import Testing
 
     /// A sign-in made before the app asked to register link types holds all 14 owner permissions and lacks only that scope.
     @Test func aSignInHoldingEveryPermissionButAScopeAskedSinceIsOfferedAllowMoreOnBothPages() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         #expect(!adapter.lacksAsked, "a sign-in approved in full lacks nothing")
         bench.signIns.save(
@@ -138,7 +138,9 @@ import Testing
         let outcome = await adapter.allowMore([.backupsManage])
         #expect(outcome == .cancelled)
         #expect(adapter.grants == Self.older)
-        #expect(libraries.host.notices.waiting.isEmpty, "a sign-in the person stopped needs no telling")
+        // The plain-HTTP notice is told once per address per process, to whichever test connects first.
+        let told = libraries.host.notices.waiting.filter { $0.title != Words.plainHTTPTitle }
+        #expect(told.isEmpty, "a sign-in the person stopped needs no telling")
     }
 
     /// One page's Allow More… asks for everything the sign-in lacks, so one approval opens every page.
