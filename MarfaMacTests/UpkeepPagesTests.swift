@@ -293,6 +293,31 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(after.undone == nil)
     }
 
+    @Test func twoConfirmsStartOneUpdateAndNoSecondAfterItWasPutBack() async {
+        let bench = bench(ready())
+        let model = UpdatesModel(context: bench.context, pause: .zero)
+        await model.load()
+        var putBack = ready()
+        putBack.last = UpdateOutcome(result: .putBack, release: "0.0.85", finished: someday)
+        bench.calls.state.withLock { $0.updateReads = [putBack] }
+        let gate = bench.calls.hold("updateStatus")
+        let first = Task { await model.confirmUpdate() }
+        #expect(await eventually { bench.calls.state.withLock { $0.waiting["updateStatus"] == 1 } })
+        let second = Task { await model.confirmUpdate() }
+        await Task.yield()
+        bench.calls.state.withLock { $0.gates["updateStatus"] = nil }
+        while bench.calls.state.withLock({ $0.waiting["updateStatus", default: 0] }) > 0 {
+            gate.open()
+            await Task.yield()
+        }
+        await first.value
+        await second.value
+        #expect(bench.calls.state.withLock { $0.updatesStarted } == 1)
+        #expect(model.undone?.release == "0.0.85")
+        await model.confirmUpdate()
+        #expect(bench.calls.state.withLock { $0.updatesStarted } == 2, "Try Again, confirmed once more, starts it again")
+    }
+
     @Test func anUpdateRefusedForWantOfAPermissionNamesItAndReadsTheGrantsAgain() async {
         let bench = bench(ready())
         bench.calls.fail("startUpdate", with: .notPermitted("instance.maintain"))

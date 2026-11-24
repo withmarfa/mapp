@@ -6,16 +6,15 @@ import SwiftUI
 /// Attention, with Allow More….
 struct OverviewPage: View {
     let host: any MarfaSettingsHost
-    /// Starts and follows an update as the Updates page does.
-    @State private var updates: UpdatesModel
     @State private var asksToUpdate = false
 
     init(host: any MarfaSettingsHost) {
         self.host = host
-        _updates = State(initialValue: UpdatesModel(context: OwnerContext(host: host)))
     }
 
     private var model: OverviewModel { host.overview }
+    /// The host's one updates model, which the Updates page reads too, so one update is started and followed.
+    private var updates: UpdatesModel { host.updates }
     private var settings: InstanceSettingsModel { host.instanceSettings }
     private var canChangeSettings: Bool { host.grants.contains(.configManage) }
     private var metrics: InstanceMetricsReading? { model.metricsFailure == nil ? model.metrics : nil }
@@ -24,14 +23,12 @@ struct OverviewPage: View {
         content
             .task(id: host.serverAddress) {
                 async let overview: Void = model.load()
+                async let release: Void = updates.load()
                 if canChangeSettings { await settings.load() }
                 await overview
-                if model.update?.progress != nil {
-                    await updates.load()
-                    await model.load()
-                }
+                await release
+                if model.update?.progress != nil { await model.load() }
             }
-            .onDisappear { updates.stop() }
             .alert("Update \(host.serverName)?", isPresented: $asksToUpdate) {
                 Button("Cancel", role: .cancel) {}
                 Button("Update") { startUpdate() }
@@ -124,7 +121,7 @@ struct OverviewPage: View {
     /// takes a section of its own below (F12).
     @ViewBuilder private var thisMarfa: some View {
         let showsName = canChangeSettings && (settings.isAvailable || settings.isLoading)
-        let showsRelease = updates.isUpdating || model.releaseVersion != nil || model.updateReady != nil
+        let showsRelease = updates.isUpdating || model.releaseVersion != nil || offeredUpdate != nil
         if showsName || showsRelease {
             SettingsSection("This Marfa") {
                 if showsName { nameRow }
@@ -133,7 +130,9 @@ struct OverviewPage: View {
         }
         let settingsFailure = canChangeSettings && !showsName ? settings.failure : nil
         let updateFailure = updates.error ?? updates.failure
-        if settingsFailure != nil || model.releaseFailure != nil || updateFailure != nil {
+        let undone = updates.isUpdating ? nil : updates.undone
+        let lostTrack = !updates.isUpdating && updates.lostTrack
+        if settingsFailure != nil || model.releaseFailure != nil || updateFailure != nil || undone != nil || lostTrack {
             SettingsSection(name: nil) {
                 if let failure = settingsFailure {
                     OwnerProblemRow(
@@ -142,6 +141,21 @@ struct OverviewPage: View {
                 }
                 if let failure = model.releaseFailure {
                     readProblem("Couldn’t Check for Updates", failure: failure)
+                }
+                if let undone, let running = updates.status?.running {
+                    SettingsProblemRow(
+                        title: Text("The Update to \(undone.release) Didn’t Work"),
+                        line: Text(
+                            undone.result == .putBack
+                                ? "\(host.serverName) is back on \(running), as before. Nothing was lost."
+                                : "\(host.serverName) runs \(running)."),
+                        actions: updates.canUpdate ? [SettingsProblemAction("Try Again") { asksToUpdate = true }] : [])
+                }
+                if lostTrack {
+                    SettingsProblemRow(
+                        title: Text("\(host.serverName) Hasn’t Come Back Yet"),
+                        line: Text("The app stopped waiting. Check again to see where it stands."),
+                        actions: [SettingsProblemAction("Check Again") { checkAgain() }])
                 }
                 if let failure = updateFailure {
                     OwnerProblemRow(title: "Couldn’t Update", failure: failure, page: .overview, host: host)
@@ -173,13 +187,20 @@ struct OverviewPage: View {
             updatingRow
         } else if let version = model.releaseVersion {
             SettingsRow(title: Text("Marfa \(version)"), line: readyLine) { updateButton }
-        } else if let ready = model.updateReady {
+        } else if let ready = offeredUpdate {
             SettingsRow(title: Text("Marfa \(ready) is ready")) { updateButton }
         }
     }
 
+    /// The release the row offers, as the Updates page offers it: none while one runs, after one did not take, or once the
+    /// app lost track of one, where Try Again or Check Again stands instead.
+    private var offeredUpdate: String? {
+        guard !updates.isUpdating, updates.undone == nil, !updates.lostTrack else { return nil }
+        return model.updateReady
+    }
+
     private var readyLine: Text? {
-        guard let ready = model.updateReady else { return nil }
+        guard let ready = offeredUpdate else { return nil }
         guard let published = OwnerWording.when(model.update?.latest?.published) else { return Text("\(ready) is ready.") }
         return Text("\(ready) is ready. Published \(published).")
     }
@@ -203,7 +224,7 @@ struct OverviewPage: View {
     /// Update where a release is ready: Allow More… where the sign-in may not update, and Show Updates where the server is
     /// updated where it runs, since the Updates page holds its steps.
     @ViewBuilder private var updateButton: some View {
-        if model.updateReady != nil {
+        if offeredUpdate != nil {
             if !host.grants.contains(.instanceMaintain) {
                 SettingsButton("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
                     .disabled(host.isAllowingMore)
@@ -216,13 +237,21 @@ struct OverviewPage: View {
         }
     }
 
-    /// Reads the update as the Updates page does, starts it and follows it to its end, then reads the Overview again.
+    /// Starts the update through the host's one updates model and follows it to its end, then reads the Overview again.
     private func startUpdate() {
         let updates = updates
         let model = model
         Task {
+            await updates.confirmUpdate()
+            await model.load()
+        }
+    }
+
+    private func checkAgain() {
+        let updates = updates
+        let model = model
+        Task {
             await updates.load()
-            await updates.update()
             await model.load()
         }
     }

@@ -28,7 +28,9 @@ import Observation
     /// Whether the update was lost track of: the server did not come back in the time the app waits. Until a read of the status
     /// shows where it stands, the server may still be updating, so Update is not offered again.
     private(set) var lostTrack = false
-    /// The one task that follows an update, held so it ends with the page.
+    /// How many updates this model has started, so a confirm that read the status first starts none where one began meanwhile.
+    private var starts = 0
+    /// The one task that follows an update, held so it ends when Settings closes.
     private var follower: Task<Void, Never>?
     private var stopGeneration = 0
     private(set) var isSwitching = false
@@ -131,9 +133,22 @@ import Observation
         return status.available && status.updatesItself && !isUpdating && !isChecking && !lostTrack
     }
 
+    /// Starts the update the owner confirmed on Overview or Updates. Where the status was not read yet, it is read first, and
+    /// the update starts only if a release is still ready and no start began while it was read.
+    func confirmUpdate() async {
+        let started = starts
+        if status == nil {
+            await load()
+            guard ready != nil else { return }
+        }
+        guard started == starts else { return }
+        await update()
+    }
+
     func update() async {
         guard canUpdate, !Task.isCancelled else { return }
         let generation = stopGeneration
+        starts += 1
         isStarting = true
         error = nil
         lostTrack = false
@@ -173,7 +188,7 @@ import Observation
         }
     }
 
-    /// Ends the follower, as when the page goes. The update itself carries on at the server.
+    /// Ends the follower, as when Settings closes. The update itself carries on at the server.
     func stop() {
         stopGeneration += 1
         follower?.cancel()
