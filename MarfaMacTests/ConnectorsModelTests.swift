@@ -38,7 +38,9 @@ import Testing
             $0.connectorPlugins = [Self.summary("rss", host: "h1")]
             $0.connectorControls["rss"] = ConnectorControl(host: "h1", registration: "reg-rss", paused: paused, runRequested: nil)
             $0.connectorRegistrations["reg-rss"] = Self.registration()
-            $0.connectorHosts = [ConnectorHostInfo(id: "h1", name: "Mac mini", lastSeen: nil), ConnectorHostInfo(id: "h2", name: "Studio Mac", lastSeen: nil)]
+            $0.connectorHosts = [
+                ConnectorHostInfo(id: "h1", name: "Mac mini", lastSeen: nil, linked: true), ConnectorHostInfo(id: "h2", name: "Studio Mac", lastSeen: nil, linked: true),
+            ]
             $0.connectorSettings["rss"] = ConnectorSettingsReading(
                 settings: [Self.setting("rss_feeds", "Feeds", secret: true, required: true, isSet: true)], missing: [])
         }
@@ -128,6 +130,116 @@ import Testing
         #expect(bench.calls.state.withLock { $0.connectorAssigned.count } == 1)
     }
 
+    @Test func noMachineIsSentAsNullOnlyAfterTheOwnerAgreesWhileTheConnectorRuns() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = rss(bench)
+        await model.load()
+        await model.chooseNoMachine(for: "rss")
+        #expect(bench.calls.state.withLock { $0.connectorAssigned.isEmpty })
+        let asked = try #require(model.question)
+        #expect(asked.change == .noMachine)
+        model.cancelQuestion()
+        #expect(bench.calls.state.withLock { $0.connectorAssigned.isEmpty })
+        #expect(model.entry("rss")?.control?.host == "h1")
+
+        await model.chooseNoMachine(for: "rss")
+        await model.confirm(try #require(model.question))
+        #expect(bench.calls.state.withLock { $0.connectorAssigned.map(\.host) } == [nil])
+        #expect(model.entry("rss")?.control?.host == nil)
+    }
+
+    @Test func noMachineOnAPausedConnectorIsSentWithoutAsking() async {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = rss(bench, paused: true)
+        await model.load()
+        await model.chooseNoMachine(for: "rss")
+        #expect(model.question == nil)
+        #expect(bench.calls.state.withLock { $0.connectorAssigned.map(\.host) } == [nil])
+    }
+
+    // MARK: Add a Connector
+
+    /// RSS on no machine, and one machine already linked.
+    private func unplacedRSS(_ bench: OwnerBench) -> ConnectorsModel {
+        let model = rss(bench)
+        bench.calls.state.withLock {
+            $0.connectorPlugins = [Self.summary("rss")]
+            $0.connectorControls["rss"]?.host = nil
+            $0.connectorHosts = [ConnectorHostInfo(id: "h1", name: "Mac mini", lastSeen: nil, linked: true)]
+        }
+        return model
+    }
+
+    @Test func aNewMachinesLinkIsShownOnceAndNotKeptOrHandedOverOnceTheSheetCloses() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = unplacedRSS(bench)
+        await model.load()
+        model.beginAdding()
+        let adding = try #require(model.adding)
+        #expect(adding.candidates.map(\.name) == ["rss"])
+        adding.machineName = "  Studio Mac "
+        await adding.add()
+        #expect(bench.calls.state.withLock { $0.hostsMade } == ["Studio Mac"])
+        #expect(bench.calls.state.withLock { $0.connectorAssigned.map(\.host) } == ["host-1"])
+        let command = try #require(adding.command)
+        #expect(command.hasSuffix("| sh -s -- 'https://marfa.castell.studio/connect#code-1'"))
+        #expect(!String(describing: try #require(adding.placed?.link)).contains("code-1"))
+        #expect(model.entry("rss")?.control?.host == "host-1")
+
+        model.closeAdding()
+        #expect(model.adding == nil)
+        #expect(adding.placed == nil)
+        #expect(adding.command == nil)
+
+        // Closing Settings with the link on show tells that it can't be shown again, and hands over no link.
+        bench.calls.state.withLock { $0.connectorControls["rss"]?.host = nil }
+        await model.reload("rss")
+        model.beginAdding()
+        let again = try #require(model.adding)
+        again.machineName = "Atlas"
+        await again.add()
+        #expect(again.command != nil)
+        let told = model.takeDrafts()
+        #expect(told.count == 1)
+        if case .told(_, let message)? = told.first { #expect(!message.contains("code-")) } else { Issue.record("Expected a notice") }
+        #expect(model.adding == nil)
+        #expect(again.placed == nil)
+    }
+
+    @Test func aMachineAlreadyLinkedIsAssignedAndTheSheetClosesWithNoLink() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = unplacedRSS(bench)
+        await model.load()
+        model.beginAdding()
+        let adding = try #require(model.adding)
+        adding.place = .host("h1")
+        await adding.add()
+        #expect(bench.calls.state.withLock { ($0.linksMade, $0.connectorAssigned.map(\.host)) } == (0, ["h1"]))
+        #expect(model.adding == nil)
+    }
+
+    @Test func aMachineMadeForAConnectorThatCouldNotBePlacedIsRemovedAndNoLinkShown() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = unplacedRSS(bench)
+        await model.load()
+        model.beginAdding()
+        let adding = try #require(model.adding)
+        adding.machineName = "Studio Mac"
+        bench.calls.fail("assignConnector", with: .notFound)
+        await adding.add()
+        #expect(bench.calls.state.withLock { $0.hostsRemoved } == ["host-1"])
+        #expect(adding.placed == nil)
+        #expect(adding.error != nil)
+        #expect(adding.machineName == "Studio Mac")
+    }
+
+    @Test func aLinkThatTheShellWouldSplitIsNeverMadeIntoACommand() {
+        #expect(AddConnectorModel.command(for: "https://m.example/connect#a'; rm -rf ~ #") == nil)
+        #expect(AddConnectorModel.command(for: "https://m.example/connect#a b") == nil)
+        #expect(AddConnectorModel.command(for: "file:///connect#abc") == nil)
+        #expect(AddConnectorModel.command(for: "https://m.example/connect#abc") != nil)
+    }
+
     // MARK: Settings
 
     @Test func aSecretIsSetThroughItsSheetAndIsNeverReadBackHeldOrHandedOver() async throws {
@@ -158,7 +270,10 @@ import Testing
         let model = rss(bench)
         await model.load()
         let feeds = try #require(model.entry("rss")?.settings?.settings.first)
-        model.askToRemoveSecret(feeds, in: "rss")
+        model.beginSecret(feeds, in: "rss")
+        model.askToRemoveSecret()
+        #expect(model.sheet == nil)
+        #expect(bench.calls.state.withLock { $0.connectorSettingsSent.isEmpty })
         await model.confirm(try #require(model.question))
         #expect(bench.calls.state.withLock { $0.connectorSettingsSent.last?.changes["rss_feeds"] } == .clear)
         #expect(model.entry("rss")?.settings?.missing == ["rss_feeds"])

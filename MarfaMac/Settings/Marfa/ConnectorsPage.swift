@@ -2,8 +2,8 @@ import Marfa
 import SwiftUI
 
 /// The Connectors page: the connector of each installed plugin, with how it stands, each opening a page of its own with Pause,
-/// Run Now, its settings, what it brings and, for one that declares it, its vendor sign-in. Installing a plugin and adding a
-/// machine are other pages' work, so this page offers neither.
+/// Run Now, its settings, what it brings and, for one that declares it, its vendor sign-in. Add a Connector… puts a connector
+/// no machine runs on one, making the machine's one-time link where it is new. Installing a plugin is the Plugins page's work.
 struct ConnectorsPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
@@ -44,8 +44,12 @@ struct ConnectorsPage: View {
         content
             .task(id: host.serverAddress) { await model.load() }
             .onAppear { host.ownerDrafts.register(model) }
-            .settingsSheet(presenting: model.sheet != nil, dismiss: { model.closeSheet() }) {
-                ConnectorSecretSheet(model: model)
+            .settingsSheet(presenting: model.sheet != nil || model.adding != nil, dismiss: dismissSheet) {
+                if let adding = model.adding {
+                    AddConnectorSheet(model: adding, serverName: host.serverName, close: { model.closeAdding() })
+                } else {
+                    ConnectorSecretSheet(model: model)
+                }
             }
             .alert(
                 model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
@@ -57,6 +61,10 @@ struct ConnectorsPage: View {
                 Text(verbatim: asked.message)
             }
             .accessibilityIdentifier("ConnectorsPage")
+    }
+
+    private func dismissSheet() {
+        if model.adding != nil { model.closeAdding() } else { model.closeSheet() }
     }
 
     @ViewBuilder private var content: some View {
@@ -112,6 +120,13 @@ struct ConnectorsPage: View {
                             verbatim: entry.summary.title, line: line(of: entry), lead: .well(host.markGlyph(entry.summary.mark)),
                             value: ConnectorWording.title(health), dot: Self.dot(health), lines: 1
                         ) { navigation?.push(Self.subpage(for: entry.summary)) }
+                    }
+                    if model.unplaced.isEmpty {
+                        SettingsAddRow(
+                            off: "Add a Connector…", line: "Every installed connector has a machine. A new one comes with its plugin.",
+                            remedy: ("Show Plugins", { host.show(.plugins, subpage: nil) }))
+                    } else {
+                        SettingsAddRow("Add a Connector…") { model.beginAdding() }
                     }
                 }
             }
@@ -229,22 +244,27 @@ private struct ConnectorDetail: View {
                 title: "Couldn’t Read Connector Machines", failure: failure, page: .connectors, host: host,
                 retry: { Task { await model.reload(summary.name) } })
         }
-        if model.hosts.isEmpty {
+        let held = model.hostID(of: entry)
+        if model.hosts.isEmpty && held == nil {
             if model.hostsFailure == nil {
-                SettingsRow("Runs On", line: "No machine is linked to run connectors yet.") { SettingsValue("No Machine") }
+                SettingsRow("Runs On", line: "No machine runs connectors yet. Add a Connector… on Connectors links one.") { SettingsValue("No Machine") }
             }
         } else {
             SettingsRow("Runs On") {
                 SettingsPopUp(
-                    title: "Runs On", selection: Binding<String?> { entry.control?.host } set: { id in
-                        if let id { Task { await model.assign(summary.name, toHost: id) } }
+                    title: "Runs On", selection: Binding<String?> { held } set: { id in
+                        if let id {
+                            Task { await model.assign(summary.name, toHost: id) }
+                        } else {
+                            Task { await model.chooseNoMachine(for: summary.name) }
+                        }
                     }
                 ) {
-                    if entry.control?.host == nil { Text("No Machine").tag(String?.none) }
-                    if let held = entry.control?.host, model.host(held) == nil {
+                    Text("No Machine").tag(String?.none)
+                    if let held, model.host(held) == nil {
                         Text("Another Machine").tag(String?.some(held))
                     }
-                    if entry.control?.host == nil || !model.hosts.isEmpty { Divider() }
+                    if !model.hosts.isEmpty { Divider() }
                     ForEach(model.hosts) { Text(verbatim: $0.name).tag(String?.some($0.id)) }
                 }
                 .disabled(isWorking || model.hostsFailure != nil)
@@ -289,14 +309,7 @@ private struct ConnectorDetail: View {
         let error = model.settingErrors[key] ?? (missing ? String(localized: "Needed before it can run.") : nil)
         if setting.secret {
             SettingsRow(verbatim: setting.label, line: secretLine(setting), error: error) {
-                HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                    SettingsButton(setting.isSet || setting.unreadable ? "Change…" : "Set…") { model.beginSecret(setting, in: summary.name) }
-                    if setting.isSet || setting.unreadable {
-                        SettingsMoreMenu {
-                            Button("Remove…", role: .destructive) { model.askToRemoveSecret(setting, in: summary.name) }
-                        }
-                    }
-                }
+                SettingsButton(setting.isSet || setting.unreadable ? "Change…" : "Set…") { model.beginSecret(setting, in: summary.name) }
             }
         } else {
             switch setting.kind {
@@ -378,22 +391,27 @@ private struct ConnectorDetail: View {
     }
 }
 
-/// The sheet that sets or changes a secret. Its field is secure, and nothing typed outlives the sheet.
-private struct ConnectorSecretSheet: View {
+/// The sheet that sets or changes a secret. Its field is secure, and nothing typed outlives the sheet. A secret held can be
+/// removed from here, after the owner is asked.
+struct ConnectorSecretSheet: View {
     @Bindable var model: ConnectorsModel
 
     var body: some View {
         if let sheet = model.sheet {
             SettingsSheet(
-                title: sheet.isSet ? Text("Change \(sheet.label)") : Text("Set \(sheet.label)"),
+                title: sheet.hasValue ? Text("Change \(sheet.label)") : Text("Set \(sheet.label)"),
                 line: Text("The new value is never shown again.")
             ) {
                 SettingsSheetField(verbatim: sheet.label, error: model.secretError) {
                     SettingsField(
                         verbatim: sheet.label, text: $model.secretDraft,
-                        prompt: sheet.isSet ? String(localized: "Type it again to change it") : nil,
+                        prompt: sheet.hasValue ? String(localized: "Type it again to change it") : nil,
                         isError: model.secretError != nil, isSecure: true, width: nil, onSubmit: { Task { await model.saveSecret() } })
                     .accessibilityIdentifier("ConnectorSecretField")
+                }
+            } leading: {
+                if sheet.hasValue {
+                    SettingsButton("Remove…", role: .destructive) { model.askToRemoveSecret() }.disabled(model.isSavingSecret)
                 }
             } buttons: {
                 SettingsButton("Cancel") { model.closeSheet() }
@@ -402,5 +420,87 @@ private struct ConnectorSecretSheet: View {
                     .accessibilityIdentifier("ConnectorSecretSave")
             }
         }
+    }
+}
+
+/// Add a Connector: which connector and where it runs, then, for a machine not linked yet, the command to paste there with
+/// its one-time link. The link is shown only here: it is never kept, and closing the sheet drops it.
+struct AddConnectorSheet: View {
+    @Bindable var model: AddConnectorModel
+    let serverName: String
+    let close: () -> Void
+
+    private var isPlaced: Bool { model.placed != nil }
+
+    var body: some View {
+        SettingsSheet(title: Text("Add a Connector"), line: Text("From a plugin you’ve installed.")) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
+                SettingsSection("Which and Where") {
+                    SettingsRow("Connector") {
+                        SettingsPopUp(title: "Connector", selection: $model.plugin) {
+                            ForEach(model.candidates) { Text(verbatim: $0.title).tag($0.name) }
+                        }
+                        .disabled(isPlaced || model.isWorking)
+                    }
+                    SettingsRow("Runs", line: "Where it can reach what it reads.", error: model.place == .newMachine ? nil : model.error) {
+                        SettingsPopUp(title: "Runs", selection: $model.place) {
+                            ForEach(model.hosts) { Text("On \($0.name)").tag(AddConnectorModel.Place.host($0.id)) }
+                            if !model.hosts.isEmpty { Divider() }
+                            Text("On Another Machine").tag(AddConnectorModel.Place.newMachine)
+                        }
+                        .disabled(isPlaced || model.isWorking)
+                    }
+                    if model.place == .newMachine && !isPlaced {
+                        SettingsRow("Machine Name", line: "What \(serverName) calls it.", error: model.error) {
+                            SettingsField(title: "Machine Name", text: $model.machineName, isError: model.error != nil, onSubmit: add)
+                        }
+                    }
+                }
+                if let placed = model.placed {
+                    SettingsSection(name: Text("On That Machine"), footer: Text("Its link works once and gives the connector its own key.")) {
+                        if let command = model.command {
+                            SettingsStackRow(title: Text("Command to Paste There")) {
+                                SettingsReadOnlyValue(text: command)
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
+                                    .accessibilityLabel(Text("Command to Paste There"))
+                            }
+                        } else if placed.link == nil {
+                            SettingsRow("Command to Paste There", line: "Its link has ended.", error: model.error) {
+                                SettingsButton("New Link") { Task { await model.renewLink() } }.disabled(model.isWorking)
+                            }
+                        } else {
+                            SettingsRow("Command to Paste There", line: "\(serverName) answered a link that can’t be pasted safely.") { EmptyView() }
+                        }
+                    }
+                    .task(id: placed.link?.expires) { await model.endLinkWhenDue() }
+                }
+            }
+        } buttons: {
+            if isPlaced {
+                CopyCommandButton(command: model.command)
+                SettingsButton("Done", role: .confirm, action: close)
+            } else {
+                SettingsButton("Cancel", action: close).disabled(model.isWorking)
+                SettingsButton("Add Connector", role: .confirm, action: add).disabled(!model.canAdd)
+            }
+        }
+    }
+
+    private func add() { Task { await model.add() } }
+}
+
+/// Copies the command, concealed from clipboard managers and taken off the clipboard after a minute.
+private struct CopyCommandButton: View {
+    let command: String?
+    @State private var copied = false
+
+    var body: some View {
+        SettingsButton(copied ? "Copied" : "Copy Command") {
+            guard let command else { return }
+            OwnerClipboard.copySecret(command)
+            copied = true
+        }
+        .disabled(command == nil)
     }
 }
