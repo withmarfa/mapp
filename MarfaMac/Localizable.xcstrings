@@ -3888,6 +3888,9 @@
     "Can’t Preview This PDF" : {
 
     },
+    "Can’t Put Item Under Its Parent" : {
+      "extractionState" : "manual"
+    },
     "Can’t Quick Look" : {
       "extractionState" : "manual"
     },

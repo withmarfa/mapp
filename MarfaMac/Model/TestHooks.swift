@@ -46,6 +46,11 @@ extension MarfaEngine {
         let naming = TestHook<@Sendable ([String]) -> MarfaError?>()
         /// The ids of each name lookup asked, in order.
         let namesAsked = TestTally<[[String]]>([])
+        /// How many times a save that follows the person's last one waited for an answer or a read-back.
+        let followWaits = TestTally(0)
+        /// Answers read with the queue as if the copy held them, naming the version and item the server answered,
+        /// which a fake copy never records.
+        let answers = TestHook<[Marfa.QueuedWrite]>()
     }
 }
 

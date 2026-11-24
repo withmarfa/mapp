@@ -36,6 +36,8 @@ nonisolated struct SourceFailure: LocalizedError, Hashable, Sendable {
 
     var kind: Kind
     var message: String
+    /// The notice's title where the library can still be read, as for a link that could not be made.
+    var title: String?
 
     /// The message is already in the person's words, so it is what any alert shows.
     var errorDescription: String? { message }
