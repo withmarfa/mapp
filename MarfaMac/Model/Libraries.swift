@@ -51,21 +51,6 @@ import MarfaTesting
     /// The shortcuts that work in any app, off until the person sets one.
     let anyAppShortcuts: AnyAppShortcuts
 
-    /// Export Automatically, checked at launch and about every hour while the app runs.
-    @ObservationIgnored private(set) lazy var automaticExport = AutomaticExport(
-        defaults: defaults,
-        marfa: { [unowned self] in
-            guard let connection = host.configuredConnection else { return nil }
-            // The copy's own server, since a switch opens the new copy before the host keeps its address.
-            let library = host.library.flatMap { ($0.source as? MarfaSource)?.connection.sameServer(as: connection) == true ? $0 : nil }
-            return AutomaticExport.Marfa(
-                address: connection.address.absoluteString, name: LibraryDescription.name(self),
-                instance: { await library?.instanceID() },
-                source: host.state == .online
-                    ? MarfaArchiveSource(calls: MarfaServerCalls(connection: connection, signIns: host.signIns)) : nil)
-        },
-        tell: { [unowned self] title, message in host.notices.tell(title, message) })
-
     /// The app's own settings, kept in the connected Marfa so every Mac that connects to it uses them.
     let preferences: PreferencesSync
 
@@ -123,7 +108,6 @@ import MarfaTesting
         shortcuts.restoreDefaults()
         anyAppShortcuts.clearAll()
         MacSettings.reset(in: defaults)
-        automaticExport.reset()
         Task { await preferences.flush() }
     }
 
@@ -252,7 +236,7 @@ import MarfaTesting
     }
 
     /// Resumes once, with whichever answer comes first.
-    final class FirstOf {
+    private final class FirstOf {
         private var done = false
 
         /// Whether this answer was the first.
