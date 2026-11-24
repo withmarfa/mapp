@@ -12,7 +12,9 @@ import Observation
     private let pause: Duration
     private let patience: Int
 
-    private(set) var status: UpdateStatus?
+    private(set) var status: UpdateStatus? { didSet { statusWrites += 1 } }
+    /// Counts each time `status` is set, so a read that began before a newer state was recorded is dropped.
+    @ObservationIgnored private var statusWrites = 0
     private let loader = OwnerLoader()
     var failure: OwnerFailure? { loader.failure }
     private let settingsRead = OwnerLoader.ReadStatus()
@@ -28,9 +30,7 @@ import Observation
     /// Whether the update was lost track of: the server did not come back in the time the app waits. Until a read of the status
     /// shows where it stands, the server may still be updating, so Update is not offered again.
     private(set) var lostTrack = false
-    /// How many updates this model has started, so a confirm that read the status first starts none where one began meanwhile.
-    private var starts = 0
-    /// The one task that follows an update, held so it ends when Settings closes.
+    /// The one task that follows an update. It is the model's own: a page that goes does not end it, only Settings closing.
     private var follower: Task<Void, Never>?
     private var stopGeneration = 0
     private(set) var isSwitching = false
@@ -70,9 +70,10 @@ import Observation
         let generation = stopGeneration
         await loader.load(in: context, waitForPrevious: true, primary: { () throws(OwnerFailure) in
             guard generation == stopGeneration, !Task.isCancelled else { return }
+            let writes = statusWrites
             do throws(OwnerFailure) {
                 let reading = try await context.calls.updateStatus()
-                guard generation == stopGeneration, !Task.isCancelled else { return }
+                guard generation == stopGeneration, !Task.isCancelled, writes == statusWrites else { return }
                 status = reading
                 lostTrack = false
             } catch {
@@ -80,8 +81,6 @@ import Observation
                 throw UpkeepWording.owned(error)
             }
         }, showBeforeFinishing: true, after: {
-            guard generation == stopGeneration, !Task.isCancelled else { return }
-            if status?.progress != nil { await follow() }
             guard generation == stopGeneration, !Task.isCancelled else { return }
             await loader.read(.required(settingsRead) { [self] () throws(OwnerFailure) in
                 guard canChangeSettings else {
@@ -98,6 +97,8 @@ import Observation
                 }
             }, in: context)
         })
+        guard generation == stopGeneration, !Task.isCancelled, status?.progress != nil else { return }
+        await follow()
     }
 
     // MARK: Check and update
@@ -133,22 +134,19 @@ import Observation
         return status.available && status.updatesItself && !isUpdating && !isChecking && !lostTrack
     }
 
-    /// Starts the update the owner confirmed on Overview or Updates. Where the status was not read yet, it is read first, and
-    /// the update starts only if a release is still ready and no start began while it was read.
+    /// Starts the update the owner confirmed on Overview or Updates. Where the status was not read yet, it is read first (and
+    /// an update that runs is followed to its end), and the update starts only if a release is still ready.
     func confirmUpdate() async {
-        let started = starts
         if status == nil {
             await load()
             guard ready != nil else { return }
         }
-        guard started == starts else { return }
         await update()
     }
 
     func update() async {
         guard canUpdate, !Task.isCancelled else { return }
         let generation = stopGeneration
-        starts += 1
         isStarting = true
         error = nil
         lostTrack = false
@@ -168,20 +166,16 @@ import Observation
 
     var isFollowing: Bool { follower != nil }
 
-    /// Follows the update to its end, as the one follower there is: a second call waits for the first.
+    /// Waits for the update's end, starting the one follower where none runs. A caller that is cancelled leaves it running.
     private func follow() async {
-        guard !Task.isCancelled else { return }
+        let task: Task<Void, Never>
         if let follower {
-            await follower.value
-            return
+            task = follower
+        } else {
+            task = Task { await read() }
+            follower = task
         }
-        let task = Task { await read() }
-        follower = task
-        await withTaskCancellationHandler {
-            await task.value
-        } onCancel: {
-            task.cancel()
-        }
+        await task.value
         if follower == task {
             follower = nil
             isRestarting = false

@@ -293,29 +293,31 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(after.undone == nil)
     }
 
-    @Test func twoConfirmsStartOneUpdateAndNoSecondAfterItWasPutBack() async {
+    @Test func aStaleReadAfterAnUpdateWasPutBackLeavesTryAgainOnlyAndNoSecondStart() async {
         let bench = bench(ready())
         let model = UpdatesModel(context: bench.context, pause: .zero)
         await model.load()
+        let gate = bench.calls.hold("updateStatus")
+        let stale = Task { await model.load() }
+        #expect(await eventually { bench.calls.state.withLock { $0.waiting["updateStatus"] == 1 } })
         var putBack = ready()
         putBack.last = UpdateOutcome(result: .putBack, release: "0.0.85", finished: someday)
-        bench.calls.state.withLock { $0.updateReads = [putBack] }
-        let gate = bench.calls.hold("updateStatus")
-        let first = Task { await model.confirmUpdate() }
-        #expect(await eventually { bench.calls.state.withLock { $0.waiting["updateStatus"] == 1 } })
-        let second = Task { await model.confirmUpdate() }
-        await Task.yield()
-        bench.calls.state.withLock { $0.gates["updateStatus"] = nil }
-        while bench.calls.state.withLock({ $0.waiting["updateStatus", default: 0] }) > 0 {
-            gate.open()
-            await Task.yield()
+        bench.calls.state.withLock {
+            $0.gates["updateStatus"] = nil
+            $0.updateReads = [putBack]
         }
-        await first.value
-        await second.value
+        async let first: Void = model.confirmUpdate()
+        async let second: Void = model.confirmUpdate()
+        _ = await (first, second)
         #expect(bench.calls.state.withLock { $0.updatesStarted } == 1)
         #expect(model.undone?.release == "0.0.85")
-        await model.confirmUpdate()
-        #expect(bench.calls.state.withLock { $0.updatesStarted } == 2, "Try Again, confirmed once more, starts it again")
+        bench.calls.state.withLock { $0.updateReads = [ready()] }
+        gate.open()
+        await stale.value
+        #expect(model.undone?.release == "0.0.85", "the read that began before the update was put back is dropped")
+        #expect(model.ready == nil, "so no second Update is offered")
+        #expect(model.canUpdate, "only Try Again")
+        #expect(bench.calls.state.withLock { $0.updatesStarted } == 1)
     }
 
     @Test func anUpdateRefusedForWantOfAPermissionNamesItAndReadsTheGrantsAgain() async {
@@ -537,7 +539,7 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(!model.needsMaintain)
     }
 
-    @Test func theFollowerEndsWithThePage() async {
+    @Test func theFollowerOutlivesThePageAndEndsWhenSettingsCloses() async {
         let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain, .configManage])
         var running = ready()
         running.progress = UpdateProgress(stage: .swapping, release: "0.0.85")
@@ -545,6 +547,9 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         let model = UpdatesModel(context: bench.context, pause: .milliseconds(5))
         let loading = Task { await model.load() }
         #expect(await eventually { bench.calls.calls.filter { $0 == "updateStatus" }.count >= 3 })
+        loading.cancel()
+        let read = bench.calls.calls.filter { $0 == "updateStatus" }.count
+        #expect(await eventually { bench.calls.calls.filter { $0 == "updateStatus" }.count > read }, "a page that goes leaves it following")
         #expect(model.isFollowing)
         model.stop()
         await loading.value
@@ -569,7 +574,6 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
 
         #expect(await eventually { bench.calls.state.withLock { $0.waiting["upkeepSettings"] == 1 } })
         #expect(model.hasLoaded)
-        #expect(model.status?.running == "0.0.85", "the update is followed before reading settings")
         model.stop()
         loading.cancel()
         let reads = bench.calls.calls.filter { $0 == "updateStatus" }.count
