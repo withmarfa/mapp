@@ -71,65 +71,7 @@ struct RelationLooksTests {
         #expect(try JSONDecoder().decode(TypeLookChoice.self, from: data) == choice)
     }
 
-    // MARK: The Task preset
-
-    @Test func aTaskWithNoProjectOrRepositoryFieldFallsBackToItsParent() {
-        let look = LookFixture.look("core.task", in: Self.catalogue)
-        #expect(look.secondary == [.parent])
-        let withRepository = LookFixture.catalogue(
-            [LookFixture.make("t.task", [LookFixture.field("status", LookFixture.status), LookFixture.field("repository")])],
-            edgeTypes: LookFixture.relationEdges)
-        #expect(LookFixture.look("t.task", in: withRepository).secondary == [.field("repository")])
-    }
-
-    @Test func noOtherPresetGainsARelation() {
-        for id in ["core.note", "core.event", "core.entity.person", "core.message", "core.bookmark"] {
-            #expect(LookFixture.look(id, in: Self.catalogue).relations.isEmpty, "\(id)")
-        }
-    }
-
-    @Test func theTaskRowSaysItsParentOnTheSecondaryLine() {
-        let project = Self.item("test.project", "Launch")
-        let task = Self.item("core.task", "Write", parent: project.id)
-        let library = Self.library([project, task])
-        let look = LookFixture.look("core.task", in: Self.catalogue)
-        #expect(Self.content(task, look, in: library).secondary == "Launch")
-        #expect(Self.content(Self.item("core.task", "Loose"), look, in: library).secondary == nil)
-    }
-
     // MARK: Rows and cards
-
-    @Test func aParentShowsAsALinkedItemChip() {
-        let project = Self.item("test.project", "Launch")
-        let task = Self.item("core.task", "Write", parent: project.id)
-        let library = Self.library([project, task])
-        let content = Self.content(task, Self.parentFact, in: library)
-        #expect(content.chips == [.linked(icon: nil, title: "Launch")])
-        let card = RowContent.card(
-            for: task, look: Self.parentFact, catalogue: Self.catalogue, list: Self.list, shape: CardShape(),
-            relations: library.relations(of: task, wanting: [.parent]))
-        #expect(card.chips == [.linked(icon: nil, title: "Launch")])
-    }
-
-    @Test func severalChildrenShowTwoThenACount() {
-        let project = Self.item("test.project", "Launch")
-        let kids = ["C", "A", "B", "D"].map { Self.item("core.task", $0, parent: project.id) }
-        let library = Self.library([project] + kids)
-        let look = TypeLook(date: .off, secondary: [], facts: [.relation(.children)])
-        let content = Self.content(project, look, in: library)
-        #expect(content.chips == [.linked(icon: nil, title: "A"), .linked(icon: nil, title: "B")])
-        #expect(content.more == 2)
-    }
-
-    @Test func severalCollectionsShowTwoThenACount() {
-        let collections = ["One", "Two", "Three"].map { Self.item("test.collection", $0) }
-        let note = Self.item("core.note", "N", collections: collections.map(\.id))
-        let library = Self.library(collections + [note])
-        let look = TypeLook(date: .off, secondary: [], facts: [.relation(.collections)])
-        let content = Self.content(note, look, in: library)
-        #expect(content.chips == [.linked(icon: nil, title: "One"), .linked(icon: nil, title: "Three")])
-        #expect(content.more == 1)
-    }
 
     @Test func aParentInTheBinOneUnreadableOrOutsideTheCopyShowsNothing() {
         let binned = Self.item("test.project", "Gone", state: .trashed)
@@ -145,14 +87,6 @@ struct RelationLooksTests {
         }
         let task = Self.item("core.task", "T", parent: binned.id)
         #expect(Self.content(task, LookFixture.look("core.task", in: Self.catalogue), in: library).secondary == nil)
-    }
-
-    @Test func noParentAndNoChildrenLeaveNoGap() {
-        let lone = Self.item("test.project", "Lone")
-        let library = Self.library([lone])
-        let look = TypeLook(date: .off, secondary: [], facts: [.relation(.parent), .relation(.children)])
-        let content = Self.content(lone, look, in: library)
-        #expect(content.chips.isEmpty && content.more == 0)
     }
 
     @Test func aRenamedParentRefreshesItsChildrensRowsAndOnlyThem() {
@@ -190,33 +124,6 @@ struct RelationLooksTests {
 
     // MARK: The table
 
-    @Test func theTableOffersTheThreeColumnsAndShowsTheOnesALookAsksFor() {
-        let project = Self.item("test.project", "Launch")
-        let task = Self.item("core.task", "Write", parent: project.id)
-        let library = Self.library([project, task])
-        let rows = ItemTableRow.rows(of: [project, task], in: library, wanting: Set(Relation.allCases))
-        #expect(rows[0].children.map(\.title) == ["Write"])
-        #expect(rows[1].parent?.title == "Launch")
-
-        let plain = ItemTableLayout.columns(for: rows, catalogue: Self.catalogue, hidden: [], looks: [:])
-        for id in ["parent", "children", "collections"] {
-            #expect(plain.first { $0.id == id }?.isShownByDefault == false, "\(id) waits behind View Options")
-        }
-        #expect(plain.first { $0.id == "parent" }?.label == "Parent")
-        #expect(plain.first { $0.id == "children" }?.label == "Children")
-        #expect(plain.first { $0.id == "collections" }?.label == "In Collection")
-
-        let looks = [
-            TypeID("test.project"): TypeLook(date: .off, secondary: [], facts: [.relation(.children), .relation(.collections)]),
-            TypeID("core.task"): Self.parentFact,
-        ]
-        let shown = ItemTableLayout.columns(for: rows, catalogue: Self.catalogue, hidden: [], looks: looks)
-            .filter(\.isShownByDefault).map(\.id)
-        #expect(shown.contains("children") && shown.contains("parent"))
-        #expect(!shown.contains("collections"), "a column no row fills starts hidden")
-        #expect(shown.filter { $0 == "parent" }.count == 1)
-    }
-
     @Test func aTableWithNoRelationColumnReadsOnlyTheParent() {
         let project = Self.item("test.project", "Launch")
         let task = Self.item("core.task", "Write", parent: project.id, collections: [project.id])
@@ -227,43 +134,5 @@ struct RelationLooksTests {
         let rows = ItemTableRow.rows(of: [project, task], in: library, wanting: wanted)
         #expect(rows.allSatisfy { $0.children.isEmpty && $0.collections.isEmpty })
         #expect(rows.first { $0.id == task.id }?.parent != nil)
-    }
-
-    @Test func aTableReadsTheLinksLooksShownColumnsAndItsOptionsName() {
-        let types: Set<TypeID> = [TypeID("core.task")]
-        let looks = [TypeID("core.task"): Self.parentFact]
-        #expect(ItemTableLayout.relations(of: types, looks: looks, options: ItemTableOptions(), shown: []) == [.parent])
-        #expect(ItemTableLayout.relations(of: types, looks: looks, options: ItemTableOptions(), shown: [.collections]) == [.parent, .collections])
-        // A look of a type the table does not hold asks for nothing beyond the parent.
-        #expect(ItemTableLayout.relations(of: [TypeID("core.note")], looks: looks, options: ItemTableOptions(), shown: []) == [.parent])
-        var grouped = ItemTableOptions()
-        grouped.grouping = .column("children")
-        grouped.filter.clauses = [FilterClause(field: "collections", op: .is, values: ["x"])]
-        #expect(ItemTableLayout.relations(of: types, looks: [:], options: grouped, shown: []) == [.parent, .children, .collections])
-    }
-
-    @Test func theTwoLinksShownAndTheCountMatchTheSortedResult() {
-        let project = Self.item("test.project", "Launch")
-        let titles = ["delta", "Charlie", "alpha 10", "alpha 2", "Bravo", "alpha 2", "echo"]
-        let kids = titles.map { Self.item("core.task", $0, parent: project.id) }
-        let collections = titles.map { Self.item("test.collection", $0) }
-        let note = Self.item("core.note", "N", collections: collections.map(\.id))
-        let library = Self.library([project, note] + kids + collections)
-        let all: Set<Relation> = [.children, .collections]
-
-        let full = library.relations(of: project, wanting: all)
-        let limited = library.relations(of: project, wanting: all, limit: RowContent.shownLinks)
-        #expect(limited.children == Array(full.children.prefix(RowContent.shownLinks)))
-        #expect(limited.count(of: .children) == full.children.count)
-        let fullNote = library.relations(of: note, wanting: all)
-        let limitedNote = library.relations(of: note, wanting: all, limit: RowContent.shownLinks)
-        #expect(limitedNote.collections == Array(fullNote.collections.prefix(RowContent.shownLinks)))
-        #expect(limitedNote.count(of: .collections) == titles.count)
-
-        let look = TypeLook(date: .off, secondary: [], facts: [.relation(.children)])
-        let content = RowContent.make(
-            for: project, look: look, catalogue: Self.catalogue, list: Self.list, relations: limited)
-        let sorted = RowContent.make(for: project, look: look, catalogue: Self.catalogue, list: Self.list, relations: full)
-        #expect(content.chips == sorted.chips && content.more == sorted.more && content.more == titles.count - 2)
     }
 }

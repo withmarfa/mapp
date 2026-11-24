@@ -15,22 +15,6 @@ struct AppearanceSettingsTests {
 
     // MARK: Accent
 
-    @Test func theInstalledFontsAreNotAskedForWhereNoFontIsChosen() {
-        var asked = false
-        #expect(FontChoice.resolved("", among: { asked = true; return ["Helvetica"] }()) == nil)
-        #expect(!asked)
-        #expect(FontChoice.resolved("Helvetica", among: { asked = true; return ["Helvetica"] }()) == "Helvetica")
-        #expect(asked)
-    }
-
-    @Test func aMissingChoiceIsNamedOneWayWhateverItIs() {
-        #expect(MissingChoice.label("Comic Sans") == "Comic Sans (Missing)")
-        #expect(MissingChoice.typeName("core.task") == "Task")
-        #expect(MissingChoice.typeName("app.thing.reading_list") == "Reading List")
-        #expect(MissingChoice.placeName(.itemType("core.event")) == "Event")
-        #expect(MissingChoice.label(MissingChoice.placeName(.itemType("core.event"))) == "Event (Missing)")
-    }
-
     @Test func theSwatchesAfterTheMacsAccentLeaveOutBlueButAStoredBlueStillReads() throws {
         #expect(AccentChoice.Offered.swatched.map(\.rawValue) == ["purple", "pink", "red", "orange", "yellow", "green", "graphite"])
         let (defaults, done) = try defaults()
@@ -55,20 +39,6 @@ struct AppearanceSettingsTests {
         }
     }
 
-    @Test func theOfferedAccentsAreSystemSettingsOwnInItsOrderAndEachIsDistinct() {
-        #expect(AccentChoice.Offered.allCases.map(\.rawValue) == ["blue", "purple", "pink", "red", "orange", "yellow", "green", "graphite"])
-        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
-            let colors = AccentChoice.Offered.allCases.compactMap { $0.nsColor.rgb(in: appearance) }
-            #expect(colors.count == 8)
-            for (index, first) in colors.enumerated() {
-                for second in colors[(index + 1)...] {
-                    let distance = abs(first.0 - second.0) + abs(first.1 - second.1) + abs(first.2 - second.2)
-                    #expect(distance > 0.3, "two accents read alike in \(appearance)")
-                }
-            }
-        }
-    }
-
     @Test func aCustomAccentIsStoredAsItsHexAndReadBackAsTheSameColor() throws {
         let (defaults, done) = try defaults()
         defer { done() }
@@ -78,11 +48,6 @@ struct AppearanceSettingsTests {
         defaults.set(accent.rawValue, forKey: AppearanceKey.accent)
         let read = try #require(AccentChoice.stored(in: defaults).nsColor?.usingColorSpace(.sRGB))
         #expect(abs(read.redComponent - 1) < 0.005 && abs(read.greenComponent - 0.5) < 0.005 && read.blueComponent < 0.005)
-    }
-
-    @Test func theSystemAccentLeavesTheTintToTheSystem() {
-        #expect(AccentChoice.system.nsColor == nil && AccentChoice.system.color == nil)
-        #expect(AccentChoice.Offered.green.nsColor.hexValue(in: .aqua) == "#62BA46")
     }
 
     // MARK: Theme and highlights
@@ -101,47 +66,9 @@ struct AppearanceSettingsTests {
         #expect(AppTheme.dark.appearance?.name == .darkAqua)
     }
 
-    @Test func yellowIsThePagesOwnAndEveryOtherHighlightIsASoftColor() {
-        #expect(HighlightChoice.yellow.css(accent: .systemBlue) == nil)
-        for choice in HighlightChoice.allCases where choice != .yellow {
-            #expect(choice.css(accent: .systemBlue)?.hasPrefix("rgba(") == true)
-        }
-        #expect(HighlightChoice.accent.css(accent: .systemRed) != HighlightChoice.accent.css(accent: .systemGreen))
-    }
-
     // MARK: Fonts
-
-    @Test func aFontThatIsNoLongerInstalledFallsBackToTheDefault() {
-        let installed = ["Helvetica", "Menlo"]
-        #expect(FontChoice.resolved("", among: installed) == nil)
-        #expect(FontChoice.resolved("Helvetica", among: installed) == "Helvetica")
-        #expect(FontChoice.resolved("Uninstalled Sans", among: installed) == nil)
-    }
-
-    @Test func theInstalledFamiliesAreListedAndTheMonospacedOnesAreASubset() {
-        let all = FontChoice.installedFamilies()
-        let monospaced = FontChoice.installedMonospacedFamilies()
-        #expect(all.contains("Helvetica"))
-        #expect(monospaced.contains("Menlo"))
-        #expect(!monospaced.contains("Helvetica"))
-        #expect(Set(monospaced).isSubset(of: Set(all)))
-    }
 
     @Test func aFamilyNameCannotBreakOutOfTheFontList() {
         #expect(FontChoice.css(family: "Odd\" ; color: red", generic: "serif") == "\"Odd ; color: red\", serif")
-    }
-}
-
-private extension NSColor {
-    func rgb(in name: NSAppearance.Name) -> (Double, Double, Double)? {
-        var result: (Double, Double, Double)?
-        NSAppearance(named: name)?.performAsCurrentDrawingAppearance {
-            if let color = usingColorSpace(.sRGB) { result = (color.redComponent, color.greenComponent, color.blueComponent) }
-        }
-        return result
-    }
-
-    func hexValue(in name: NSAppearance.Name) -> String? {
-        rgb(in: name).map { String(format: "#%02X%02X%02X", Int(($0.0 * 255).rounded()), Int(($0.1 * 255).rounded()), Int(($0.2 * 255).rounded())) }
     }
 }

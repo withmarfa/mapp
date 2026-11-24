@@ -97,6 +97,12 @@ import Observation
     var downloadedFiles: (any DownloadedFiles)? { source.downloadedFiles }
     func downloadEverythingAgain() { source.downloadEverythingAgain() }
     func instanceID() async -> String? { await source.instanceID() }
+    /// The server's `https` link for the item, which is the one to share, or the `marfa://` link where the server gives
+    /// none: it can't be reached, answers an error (an item it doesn't hold yet) or there is no server to ask.
+    func itemLink(_ id: ItemID) async -> ItemLinkCopy? {
+        if let links, let web = try? await links.webLink(of: id) { return ItemLinkCopy(url: web) }
+        return await appLink(id)
+    }
     /// How the server stands, for the app to show beside the library. The library is the one subscriber to the
     /// source's states; the host reads this while the copy is open.
     private(set) var connection: MarfaConnectionState
@@ -126,6 +132,9 @@ import Observation
     /// Reads and changes the names, marks and counts of sources, which only the server holds. Nil where there is no
     /// server to ask, as in the sample.
     @ObservationIgnored let sourceNames: (any SourceNameSource)?
+    /// Reads an item's `https` link from the server, which only it can give. Nil where there is no server to ask, as
+    /// in the sample.
+    @ObservationIgnored let links: (any ItemLinkSource)?
     /// The icon each type last showed after the person chose one, until the working copy's own catalogue shows the type
     /// with another icon than it had when the person chose, since the copy takes a schema change only when its stream
     /// reopens. `before` is the icon the copy showed then.
@@ -354,7 +363,7 @@ import Observation
     init(
         source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil,
         typeIcons: (any TypeIconSource)? = nil, typeSchemas: (any TypeSchemaSource)? = nil, config: (any InstanceConfigSource)? = nil,
-        sourceNames: (any SourceNameSource)? = nil,
+        sourceNames: (any SourceNameSource)? = nil, links: (any ItemLinkSource)? = nil,
         now: @escaping () -> Date = Date.init,
         textPause: TextPause = .typing,
         cameOnline: @escaping () -> Void = {}) {
@@ -366,6 +375,7 @@ import Observation
         self.typeSchemas = typeSchemas
         self.config = config
         self.sourceNames = sourceNames
+        self.links = links
         self.notices = notices
         self.now = now
         syncReport = source.syncReport

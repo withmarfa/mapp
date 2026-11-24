@@ -69,13 +69,13 @@ A link only opens. It never creates, changes, deletes or restores an item, never
 - The copy holds the item. If it doesn't, the app says that the item can't be found in this Mac's copy.
 - The item is outside Recently Deleted. For an item in Recently Deleted, the app shows a message. Choose **Open Settings…** in the message to see Recently Deleted.
 
-**Copy Link** puts the item's `marfa://` link on the pasteboard as text and as a URL. It uses the instance ID in the working copy. If the copy hasn't read the ID yet, the app asks you to try again after syncing. In the command palette, choose **Copy Wiki Link** to copy a `[[...]]` link for pasting into an item's text.
+**Copy Link** puts the item's link on the pasteboard as text and as a URL. It copies the item's `https` link from the server, the one to share, which the server gives for an item in any place, Recently Deleted included. When the server can't be reached, doesn't answer in a few seconds, or gives no link (as for an item it doesn't hold yet), it copies the item's `marfa://` link instead, with no notice. That link uses the instance ID in the working copy. If the copy hasn't read the ID yet, the app asks you to try again after syncing. In the command palette, choose **Copy Wiki Link** to copy a `[[...]]` link for pasting into an item's text.
 
 The Debug and Release builds register the `marfa` scheme through the `ITEM_LINK_SCHEME` build setting. The Debug Tests build, which hosts the unit tests, registers a scheme no link uses, so it never becomes the app that opens links. macOS keeps the default app for `marfa://` links on each Mac, and Settings > Apps > Open Marfa Links In sets it.
 
 If no Marfa is connected, or its library can't be opened, the app says so and offers Settings. When a link opens nothing, the app shows why in a main window, and opens one if none is open. While the library is still opening, as at launch, the link waits for it for a short time. Only the newest link counts: it replaces a link that is still waiting or that no window has opened yet.
 
-Where it lives: `AppDelegate` receives the URL. In `MarfaMac/Model/`, `ItemAppLink` parses it, `ItemLinkRoute` checks it against the working copy, and `ItemLinkOpener` handles the result. `Browser.open(itemLink:in:order:defaults:)` opens the item in the window. `ItemLibrary.copyLink(of:to:)` writes the link to the pasteboard.
+Where it lives: `AppDelegate` receives the URL. In `MarfaMac/Model/`, `ItemAppLink` parses it, `ItemLinkRoute` checks it against the working copy, and `ItemLinkOpener` handles the result. `Browser.open(itemLink:in:order:defaults:)` opens the item in the window. `ItemLibrary.copyLink(of:to:)` writes the link to the pasteboard. For a Marfa library, `MarfaLibrary.itemLink(_:)` reads the `https` link through `MarfaServerCalls.webLink(of:)`.
 
 ## Related pages
 

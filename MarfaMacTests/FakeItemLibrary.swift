@@ -37,8 +37,6 @@ final class FakeItemLibrary: ItemLibrary {
         if instanceIDDelay > .zero { try? await Task.sleep(for: instanceIDDelay) }
         return heldInstanceID
     }
-    /// Whether counts cannot be answered, as when the copy cannot be sure and the server is out of reach.
-    var countsUnavailable = false
     /// The counts the library works out from its items the way Marfa does: only active items, the groups of each child's
     /// own type, an item with no status in the total alone.
     @ObservationIgnored lazy var counts: ItemCounts = makeCounts()
@@ -776,7 +774,6 @@ extension FakeItemLibrary {
     }
 
     func countAnswers(_ ids: [ItemID], _ query: CountQuery) throws -> [ItemID: ItemCountAnswer] {
-        guard !countsUnavailable else { throw ItemCountUnavailable() }
         var answers: [ItemID: ItemCountAnswer] = [:]
         for id in ids {
             let counted: [Item]

@@ -24,6 +24,8 @@ import os
     /// Makes the keeper of changes to a type's fields for a connection, or nil where there is no server to ask.
     typealias SchemaKeeper = @Sendable (MarfaConnection, any SignIns) -> (any TypeSchemaSource)?
     typealias SourceNamer = @Sendable (MarfaConnection, any SignIns) -> (any SourceNameSource)?
+    /// Makes the reader of items' `https` links for a connection, or nil where there is no server to ask.
+    typealias LinkReader = @Sendable (MarfaConnection, any SignIns) -> (any ItemLinkSource)?
     /// Makes the reader and writer of the server's own settings for a connection, or nil where there is no server to
     /// ask, as in the sample.
     typealias Configurer = @Sendable (MarfaConnection, any SignIns) -> (any InstanceConfigSource)?
@@ -133,6 +135,7 @@ import os
     private let iconKeeper: IconKeeper
     private let schemaKeeper: SchemaKeeper
     private let sourceNamer: SourceNamer
+    private let linkReader: LinkReader
 
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a sign-in for it.
     private(set) var connection: MarfaConnection? {
@@ -187,7 +190,8 @@ import os
         configurer: @escaping Configurer = { MarfaServerCalls(connection: $0, signIns: $1) },
         iconKeeper: @escaping IconKeeper = { MarfaServerCalls(connection: $0, signIns: $1) },
         schemaKeeper: @escaping SchemaKeeper = { MarfaServerCalls(connection: $0, signIns: $1) },
-        sourceNamer: @escaping SourceNamer = { MarfaServerCalls(connection: $0, signIns: $1) }
+        sourceNamer: @escaping SourceNamer = { MarfaServerCalls(connection: $0, signIns: $1) },
+        linkReader: @escaping LinkReader = { MarfaServerCalls(connection: $0, signIns: $1) }
     ) {
         self.defaults = defaults
         self.signIns = signIns
@@ -201,6 +205,7 @@ import os
         self.iconKeeper = iconKeeper
         self.schemaKeeper = schemaKeeper
         self.sourceNamer = sourceNamer
+        self.linkReader = linkReader
         instanceNames = defaults.dictionary(forKey: Self.namesKey) as? [String: String] ?? [:]
     }
 
@@ -702,6 +707,7 @@ import os
             source: source, notices: notices, history: historian(connection, signIns), typeIcons: iconKeeper(connection, signIns),
             typeSchemas: schemaKeeper(connection, signIns),
             config: configurer(connection, signIns), sourceNames: sourceNamer(connection, signIns),
+            links: linkReader(connection, signIns),
             // Each return to the server may find it renamed. A library the host has left may still be told once more.
             cameOnline: { [weak self] in
                 guard let self, self.connection == connection else { return }

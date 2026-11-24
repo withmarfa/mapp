@@ -36,8 +36,32 @@ struct ValueEditRequest {
 @MainActor @Observable
 final class ValueEditModel {
     let request: ValueEditRequest
-    var query = ""
+    var query = "" {
+        // A refused entry stays the person's while they go on typing it, and goes once the field is emptied.
+        didSet {
+            guard takesNewEntries, unsaved != nil else { return }
+            if query.isEmpty { unsaved = nil } else { unsaved?.text = query }
+        }
+    }
     var notice: String?
+    /// What the person typed that is not saved yet: a time, or a tag, word or person typed in full that the list
+    /// refused. It is cleared only when that input is written, when the person cancels with Escape or empties the
+    /// search field, or when it is handed back, so ending the panel any other way never loses it, and a search that
+    /// only finds a held value is never kept.
+    struct UnsavedInput {
+        var text: String
+        /// The value the time field showed when the person began typing (`shownValue`). The time is written only
+        /// while the value still holds it, so a change the person did not see is never written over.
+        var base: PropertyValue?
+        /// Why the list refused the entry.
+        var reason: String?
+    }
+    var unsaved: UnsavedInput? {
+        didSet { if isDate, unsaved == nil { shownValue = value } }
+    }
+    /// The value the time field last showed as stored: when the panel opened, when the field took focus, or when
+    /// what was typed in it was settled. A field being typed in may not show a change that arrives meanwhile.
+    @ObservationIgnored var shownValue: PropertyValue?
     var highlight: String?
     /// Whether the highlighted row was reached with the keyboard, which the list then scrolls to.
     private(set) var viaKeyboard = false
@@ -94,6 +118,7 @@ final class ValueEditModel {
             draft.text = Self.text(of: request.item.flatMap(request.library.item)?.value(of: field.key) ?? request.heldValue)
             draft.base = draft.text
         }
+        if isDate { shownValue = value }
     }
 
     var kind: ValueEditKind { request.kind }
@@ -391,7 +416,14 @@ final class ValueEditModel {
     // MARK: Choosing
 
     func activate(_ id: String) {
-        guard isEditable else { close(); return }
+        guard isEditable else {
+            // What was typed has nowhere to go now, so it goes back to the person before the panel ends.
+            if unsaved == nil, isTypedEntry(id) { unsaved = UnsavedInput(text: query) }
+            handBackUnsaved()
+            query = ""
+            close()
+            return
+        }
         switch kind {
         case .status, .choice:
             guard let word = ValueEditOptions.word(of: id), commit(.string(word)), kind.closesOnChoice else { return }
@@ -541,10 +573,11 @@ final class ValueEditModel {
         location?.finish(cancelled: cancelled)
         guard !cancelled else {
             // The time field loses focus as the panel goes, which would otherwise write what was cancelled.
-            timeDraft = nil
+            unsaved = nil
             return
         }
         commitTime(isEnding: true)
+        handBackUnsaved()
         guard kind.isTyped, let field = kind.field else { return }
         draft.handOff(
             label: field.label, as: field.kind, rule: field.numberRule, current: currentText, isEditable: isEditable,
@@ -552,7 +585,13 @@ final class ValueEditModel {
     }
 
     /// What the time field is showing while the person types in it, nil while it shows the value's own time.
-    var timeDraft: String?
+    var timeDraft: String? {
+        get { isDate ? unsaved?.text : nil }
+        set {
+            guard let newValue else { return unsaved = nil }
+            if unsaved == nil { unsaved = UnsavedInput(text: newValue, base: shownValue) } else { unsaved?.text = newValue }
+        }
+    }
 
     // MARK: Writing
 

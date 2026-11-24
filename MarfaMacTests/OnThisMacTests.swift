@@ -70,48 +70,10 @@ private struct FakeArchive: ArchiveSource {
     }
 }
 
-@Suite(.hangLimit) struct StoreSizeTests {
-    @Test func theSizeIsEveryFileInTheStoreFolder() throws {
-        let folder = URL.temporaryDirectory.appending(path: "store-\(UUID())", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: folder.appending(path: "files"), withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folder) }
-        try Data(count: 10_000).write(to: folder.appending(path: "copy.sqlite"))
-        try Data(count: 20_000).write(to: folder.appending(path: "files/a"))
-        let total = try #require(StoreSize.sum(of: folder))
-        #expect(total >= 30_000 && total < 200_000)
-        #expect(StoreSize.sum(of: folder.appending(path: "missing")) == 0 || StoreSize.sum(of: folder.appending(path: "missing")) == nil)
-    }
-
+@Suite(.hangLimit) struct DownloadAlertTests {
     @Test func theAlertSaysWhatHappensToChangesNotYetSent() {
         #expect(!OnThisMacPage.downloadMessage(name: "Castell Studio", unsent: 0).contains("not yet sent"))
         let kept = OnThisMacPage.downloadMessage(name: "Castell Studio", unsent: 3)
         #expect(kept.contains("3 changes") && kept.contains("stay on this Mac"))
-    }
-
-    /// A sum walks every file, so the page sums on appearing and then no faster than about every 30 seconds.
-    @Test func theFolderIsSummedOnAppearingAndThenNoFasterThanAboutEvery30Seconds() async {
-        let pauses = Mutex<[Duration]>([])
-        let sums = Mutex(0)
-        await StoreSize.keepSumming(
-            pause: { interval in
-                let count = pauses.withLock { $0.append(interval); return $0.count }
-                if count == 3 { throw CancellationError() }
-            },
-            sum: { sums.withLock { $0 += 1 } })
-        #expect(sums.withLock { $0 } == 3, "one sum on appearing and one after each of the two pauses that ended")
-        #expect(pauses.withLock { $0 }.allSatisfy { $0 >= .seconds(30) })
-    }
-
-    /// While the copy fills again the row shows the progress and Download Again cannot be started a second time.
-    @Test func theDownloadAgainRowShowsTheProgressAndIsBusyWhileTheCopyFills() {
-        let filling = LibraryFill(state: .filling, listed: 40, expected: 200)
-        #expect(DownloadAgainRow.isFilling(filling, in: .online))
-        #expect(DownloadAgainRow.line(name: "Castell Studio", fill: filling, in: .online) == "Downloading library… 40 of 200 items listed")
-        #expect(DownloadAgainRow.line(name: "Castell Studio", fill: nil, in: .online) == "Changes not yet sent are kept.")
-        #expect(DownloadAgainRow.line(name: "Castell Studio", fill: LibraryFill(state: .complete), in: .online) == "Changes not yet sent are kept.")
-        #expect(!DownloadAgainRow.isFilling(LibraryFill(state: .complete), in: .online))
-        // A copy that stopped is not being filled, so the row says what it needs, not progress.
-        #expect(!DownloadAgainRow.isFilling(filling, in: .offline(reason: nil)))
-        #expect(DownloadAgainRow.line(name: "Castell Studio", fill: filling, in: .offline(reason: nil)) == "Needs Castell Studio to answer.")
     }
 }

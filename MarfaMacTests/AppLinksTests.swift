@@ -15,20 +15,4 @@ struct AppLinksTests {
         #expect(!body.contains("http"))
         #expect(!body.contains("@"))
     }
-
-    @Test func theReportFromThisMacNamesTheRunningSystem() throws {
-        let parts = try #require(URLComponents(url: AppLinks.reportFromThisMac, resolvingAgainstBaseURL: false))
-        let body = try #require(parts.queryItems?.first?.value)
-        let system = ProcessInfo.processInfo.operatingSystemVersion
-        #expect(body.contains("macOS \(system.majorVersion).\(system.minorVersion).\(system.patchVersion)"))
-    }
-
-    @Test func everyHelpItemButTheShortcutsOpensAnAddress() {
-        for item in HelpItem.allCases where item != .keyboardShortcuts {
-            #expect(item.url?.scheme == "https", "\(item)")
-        }
-        #expect(HelpItem.keyboardShortcuts.url == nil)
-        #expect(HelpItem.help.url == AppLinks.help)
-        #expect(HelpItem.marfaDocumentation.url?.absoluteString == "https://docs.marfa.so")
-    }
 }

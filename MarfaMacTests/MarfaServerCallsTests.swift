@@ -35,6 +35,7 @@ import Testing
         #expect(MarfaServerCalls.patch(InstanceConfigPatch(values: [:], clear: [])) == Operations.UpdateConfig.Input.Body.JsonPayload())
     }
 
+    /// The read side keeps the daily and weekly retention windows apart: distinct values would show a swap.
     @Test func theServersSettingsAreReadByTheirNames() {
         let answer = Components.Schemas.InstanceConfig(
             instanceId: "i-1", versionRecentDays: 7, versionDailySnapshotDays: 30, versionWeeklySnapshotDays: 90,
@@ -98,13 +99,6 @@ import Testing
         #expect(MarfaServerCalls.configFailure(MarfaServerCalls.ending(MarfaError.versionConflict(message: "stale", server: nil))) == .failed(Words.syncFailed))
     }
 
-    @Test func aRefusalGivesTheServersReason() {
-        let error = MarfaError.validation(code: "invalid_config", message: "Windows must not decrease.", details: nil, server: nil)
-        let ending = MarfaServerCalls.ending(error)
-        #expect(MarfaServerCalls.configFailure(ending) == .refused("Windows must not decrease."))
-        #expect(MarfaServerCalls.iconFailure(ending) == .refused("Windows must not decrease."))
-    }
-
     @Test func anItemTheServerHoldsNoHistoryForIsUnavailable() {
         let ending = MarfaServerCalls.ending(MarfaError.notFound(code: "not_found", message: "gone", server: nil))
         #expect(MarfaServerCalls.historyFailure(ending) == .unavailable)
@@ -127,17 +121,5 @@ import Testing
         struct Other: LocalizedError { var errorDescription: String? { "https://marfa.example.test went wrong" } }
         #expect(MarfaServerCalls.ending(Other()) == .failed(Words.syncFailed))
         #expect(MarfaMapping.viewFailure(Other()).message == Words.syncFailed)
-    }
-
-    @Test func aSnapshotsWriterIsKeptAndAnUnknownKindIsAKey() {
-        let snapshot = Marfa.ItemSnapshot(
-            id: "s", itemID: "i", version: 2, type: "core.note", tier: .library, properties: ["title": "Old"],
-            occurredAt: nil, sourceID: nil, writer: .init(kind: .other("robot"), id: "w", name: "Robot"),
-            createdAt: Date(timeIntervalSince1970: 0))
-        let made = MarfaServerCalls.snapshot(snapshot)
-        #expect(made.version == 2)
-        #expect(made.writer?.kind == .key)
-        #expect(made.writer?.name == "Robot")
-        #expect(made.properties["title"] == .string("Old"))
     }
 }

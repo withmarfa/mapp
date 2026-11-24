@@ -39,7 +39,7 @@ extension ValueEditModel {
         }
         guard let entry else { return }
         if let refusal = shape.refusal(of: entry) {
-            notice = refusal
+            refuse(refusal, typed: isTypedEntry(id))
             return
         }
         // A tap on a row that was held by the last one is not a second person.
@@ -48,12 +48,14 @@ extension ValueEditModel {
             return
         }
         if let reason = limitReason(holding: ListEntries.entries(of: value).count + 1) {
-            notice = reason
+            refuse(reason, typed: isTypedEntry(id))
             return
         }
         if commit(ListEntries.appending(entry, to: value), failure: String(localized: "The list could not be saved.")) {
             query = ""
             highlight = nil
+        } else {
+            refuse(notice, typed: isTypedEntry(id))
         }
     }
 }

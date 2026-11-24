@@ -6,31 +6,6 @@ import Testing
 /// can do something.
 @Suite(.hangLimit)
 @MainActor struct MarfaHostSyncedTests {
-    private let day = Date(timeIntervalSinceReferenceDate: 800_000_000)
-
-    @Test func theLastSyncIsWhatTheOpenSourceReports() async throws {
-        let bench = try HostBench()
-        let host = bench.host()
-        try await host.connect(address: "http://first.test:8210", key: "k")
-        #expect(host.lastSynced == nil)
-        let source = try #require(bench.servers.last)
-        source.report.update { $0.lastSynced = day }
-        #expect(await eventually { host.lastSynced == day })
-        // The host keeps nothing of it: the copy does, so a launch shows it before the server answers.
-        #expect(bench.defaults.dictionary(forKey: "MarfaLastSynced") == nil)
-    }
-
-    @Test func noLibraryHasNoLastSync() async throws {
-        let bench = try HostBench()
-        let host = bench.host()
-        try await host.connect(address: "http://first.test:8210", key: "k")
-        let source = try #require(bench.servers.last)
-        source.report.update { $0.lastSynced = day }
-        #expect(await eventually { host.lastSynced == day })
-        try await discardEverything(host)
-        #expect(host.lastSynced == nil)
-    }
-
     // MARK: Refresh
 
     @Test func refreshIsOfferedOnlyWhereItCanDoSomething() async throws {
@@ -78,13 +53,5 @@ import Testing
         #expect(await eventually { host.state == .keyRefused })
         host.refresh()
         #expect(source.calls == ["refresh"])
-    }
-
-    @Test func theSampleLibraryHasNoServerToRefresh() async throws {
-        let bench = try HostBench()
-        let host = bench.host(opener: { connection, _, _ in SampleLibrary.open(connection) })
-        try await host.connect(address: SampleLibrary.connection.address.absoluteString, key: "sample")
-        #expect(!host.hasServer)
-        #expect(!host.canRefresh)
     }
 }

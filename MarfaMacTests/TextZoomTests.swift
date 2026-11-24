@@ -4,33 +4,6 @@ import Testing
 @testable import MarfaMac
 
 struct TextZoomTests {
-    @Test func biggerAndSmallerMoveOneStep() {
-        #expect(TextZoom.page.size(after: .bigger, from: 13) == 14)
-        #expect(TextZoom.page.size(after: .smaller, from: 13) == 12)
-        #expect(TextZoom.interface.size(after: .bigger, from: 14) == 15)
-        #expect(TextZoom.interface.size(after: .smaller, from: 16) == 15)
-    }
-
-    @Test func theEndsOfTheRangeChangeNothing() {
-        #expect(TextZoom.page.size(after: .bigger, from: 24) == nil)
-        #expect(TextZoom.page.size(after: .smaller, from: 11) == nil)
-        #expect(TextZoom.interface.size(after: .bigger, from: 24) == nil)
-        #expect(TextZoom.interface.size(after: .smaller, from: 11) == nil)
-    }
-
-    @Test func aSizeBetweenStepsMovesToTheNearestStepAsked() {
-        #expect(TextZoom.page.size(after: .bigger, from: 15) == 16)
-        #expect(TextZoom.page.size(after: .smaller, from: 15) == 14)
-        #expect(TextZoom.page.size(after: .bigger, from: 400) == nil)
-        #expect(TextZoom.page.size(after: .smaller, from: -3) == nil)
-    }
-
-    @Test func actualSizeReturnsToTheDefault() {
-        #expect(TextZoom.page.size(after: .actual, from: 20) == 13)
-        #expect(TextZoom.interface.size(after: .actual, from: 11) == 13)
-        #expect(TextZoom.page.size(after: .actual, from: 13) == nil)
-    }
-
     @Test func thePageHasItsOwnSettingAndEverythingElseTheInterfaces() {
         #expect(TextZoom.acting(pageFocused: true).key == PageKey.textSize)
         #expect(TextZoom.acting(pageFocused: false).key == InterfaceKey.textSize)

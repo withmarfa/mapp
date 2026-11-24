@@ -46,6 +46,8 @@ nonisolated final class FakeItemSource: ItemSource {
     /// What `search` answers for each query; any other finds nothing.
     let hits = Mutex<[String: [ItemID]]>([:])
     let searches = Mutex(0)
+    /// The instance id `instanceID()` answers; nil answers none, as a copy that has not read it yet.
+    let heldInstanceID = Mutex<String?>(nil)
     /// The refusal for each edge a test names; any other is taken.
     let refusals = Mutex<[EdgeDraft: String]>([:])
     /// The refusal for each edge a test names that is asked of as a move; any other move is taken.
@@ -155,6 +157,8 @@ nonisolated final class FakeItemSource: ItemSource {
         let held = heldPreviews.withLock { waiting in defer { waiting = [] }; return waiting }
         for continuation in held { continuation.resume() }
     }
+
+    func instanceID() async -> String? { heldInstanceID.withLock { $0 } }
 
     func moreItemsTaken(with ids: [ItemID]) async -> Int? {
         previewsAsked.withLock { $0.append(ids) }

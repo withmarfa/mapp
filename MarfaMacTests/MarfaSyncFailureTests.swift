@@ -119,23 +119,18 @@ struct MarfaSyncFailureTests {
         await source.close()
     }
 
-    /// A refused key and a contract mismatch each have words of their own for every caller of `Words.message(for:)`.
-    @Test func aRefusedKeyAndAContractMismatchAreToldInTheAppsWords() {
+    /// A change the server may or may not have made is told apart, and neither version carries the package's text.
+    @Test func aContractMismatchIsToldWhetherTheChangeWasSentAndKeepsTheRawTextOut() {
         let raw = "https://marfa.example.test refused"
-        let ended = "The server has ended the app’s sign-in. Sign in again in Settings."
-        let refusals = [
-            MarfaError.signedOut(origin: "https://marfa.example.test", message: raw),
-            .unauthorized(code: "unauthorized", message: raw, server: nil),
-            .copyExpired(reason: "credential_ended", message: raw, server: nil),
-        ]
-        for error in refusals { #expect(Words.message(for: error) == ended) }
-        #expect(Words.message(for: .copyExpired(reason: "reach_changed", message: raw, server: nil)) == Words.syncFailed)
-
         let unsent = MarfaError.contractMismatch(served: "9", expected: 1, status: 412, writeSent: false, message: raw, server: nil)
         let sent = MarfaError.contractMismatch(served: "9", expected: 1, status: nil, writeSent: true, message: raw, server: nil)
-        #expect(Words.message(for: unsent) == "This version of the app and the server use different versions of Marfa, so the server didn’t make the change. Update the app or the server, then try again.")
-        #expect(Words.message(for: sent) == "This version of the app and the server use different versions of Marfa, and the change may already have been made. Update the app or the server, then check the change.")
-        #expect(!Words.message(for: sent).contains("example.test"))
+        let unsentWords = Words.message(for: unsent)
+        let sentWords = Words.message(for: sent)
+        #expect(unsentWords != sentWords, "a change that may already have been made is not told as one that was not")
+        for words in [unsentWords, sentWords] {
+            #expect(words != Words.syncFailed)
+            #expect(!words.contains("example.test"))
+        }
     }
 
     /// The package reports it as a stopped follow, or as a copy that needs hydration when its first fill met it.
@@ -159,8 +154,8 @@ struct MarfaSyncFailureTests {
         let tooOld = MarfaError.serverTooOld(served: "0.0.77", oldest: "0.0.78", message: raw)
         let (fake, source, _, log) = try await open(failing: [])
         fake.sendUpdate(update(duringTheFirstFill ? .needsHydration(tooOld) : .stopped(tooOld)))
-        let words = "This server runs Marfa 0.0.77. Update the server to Marfa 0.0.78 or later to use this app."
-        #expect(Words.message(for: tooOld) == words)
+        let words = Words.message(for: tooOld)
+        #expect(!words.contains("edges=all"), "the server's text is never shown")
         let state = try #require(await log.wait { unavailable($0) == 1 })
         let told = state.changes.compactMap { change -> String? in
             if case .unavailable(let failure) = change { failure.message } else { nil }

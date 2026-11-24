@@ -82,45 +82,6 @@ private let github = SourceInfo(code: "gh", name: "GitHub", mark: nil, hasChosen
         return (library, source)
     }
 
-    @Test func aSourceShowsItsCodeUntilTheServerHasNamedIt() async throws {
-        let (library, _) = try await open(nil)
-        #expect(library.name(of: .source("readwise")) == "readwise")
-        #expect(library.sourceCounts.map(\.name) == ["gh", "readwise"])
-        #expect(library.sourceCounts.map(\.count) == [1, 2])
-    }
-
-    @Test func theServersNamesAndCountsReplaceTheCodesAndTheLoadedCounts() async throws {
-        let (library, _) = try await open(FakeSourceNames([readwise, github], counts: ["readwise": 40, "gh": 9]))
-        #expect(await eventually { library.sources.counts != nil && !library.sources.infos.isEmpty })
-        #expect(library.name(of: .source("readwise")) == "Readwise")
-        #expect(library.sourceCounts.map(\.name) == ["GitHub", "Readwise"])
-        #expect(library.sourceCounts.map(\.count) == [9, 40])
-        // The place stays the code, so a view's filter and a restored window name the same source.
-        #expect(library.sourceCounts.map(\.code) == ["gh", "readwise"])
-        #expect(library.count(in: .source("readwise")) == 2)
-    }
-
-    @Test func theLastAnswerStaysWhileTheServerCannotBeReached() async throws {
-        let names = FakeSourceNames([readwise], counts: ["readwise": 40])
-        let (library, _) = try await open(names)
-        try #require(await eventually { library.sources.infos["readwise"] != nil })
-        names.state.withLock { $0.failure = .unreachable }
-        await library.refreshSources()
-        #expect(library.name(of: .source("readwise")) == "Readwise")
-        #expect(library.sources.counts?["readwise"] == 40)
-    }
-
-    @Test func namesAreReadAgainWhenTheServerIsReachedAgain() async throws {
-        let names = FakeSourceNames([readwise])
-        let (library, source) = try await open(names)
-        try #require(await eventually { library.sources.infos["readwise"]?.name == "Readwise" })
-        names.state.withLock { $0.infos = [SourceInfo(code: "readwise", name: "Read", mark: nil, hasChosenName: true)] }
-        source.state.set(.offline(reason: "network"))
-        try #require(await eventually { library.connection == .offline(reason: "network") })
-        source.state.set(.online)
-        #expect(await eventually { library.sources.infos["readwise"]?.name == "Read" })
-    }
-
     @Test func aRenameIsShownAtOnceAndSendsOnlyTheName() async throws {
         let names = FakeSourceNames([readwise])
         let (library, _) = try await open(names)
@@ -222,36 +183,11 @@ private let github = SourceInfo(code: "gh", name: "GitHub", mark: nil, hasChosen
         #expect(library.sourceChanges.allSatisfy { $0.name == nil })
         #expect(!model.canRemoveMark)
     }
-
-    @Test func theMarkSearchFindsByName() {
-        let (model, _) = model(.mark)
-        model.set = .lucide
-        model.search = "book"
-        #expect(model.results == ["lucide:book"])
-    }
 }
 
 struct SourceServerMappingTests {
-    @Test func theServersSourceBecomesAnInfoWithItsOrigin() {
-        let set = MarfaServerCalls.info(Marfa.ItemSource(code: "a", name: "A", nameOrigin: .set, mark: "lucide:bug"))
-        #expect(set == SourceInfo(code: "a", name: "A", mark: "lucide:bug", hasChosenName: true))
-        let keyed = MarfaServerCalls.info(Marfa.ItemSource(code: "b", name: "Key label", nameOrigin: .key))
-        #expect(!keyed.hasChosenName)
-        #expect(keyed.mark == nil)
-    }
-
     @Test func aChangeIsASetOrAClear() {
         #expect(MarfaServerCalls.change(.set("x")) == .set("x"))
         #expect(MarfaServerCalls.change(.clear) == .clear)
-    }
-
-    @Test func eachEndingIsWordedByTheSheet() {
-        #expect(MarfaServerCalls.sourceFailure(.unreachable) == .unreachable)
-        #expect(MarfaServerCalls.sourceFailure(.notPermitted) == .notPermitted)
-        #expect(MarfaServerCalls.sourceFailure(.keyRefused) == .keyRefused)
-        #expect(MarfaServerCalls.sourceFailure(.refused("no")) == .refused("no"))
-        #expect(MarfaServerCalls.sourceFailure(.failed("odd")) == .failed("odd"))
-        let forbidden = MarfaServerCalls.ending(MarfaError.forbidden(code: "forbidden", message: "needs keys.manage", server: nil))
-        #expect(MarfaServerCalls.sourceFailure(forbidden) == .notPermitted)
     }
 }

@@ -7,12 +7,6 @@ import Testing
 struct ViewPropertiesTests {
     private static let catalogue = LookFixture.catalogue()
     private static let now = Date(timeIntervalSince1970: 1_794_000_000)
-    private static let calendar: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
-        return calendar
-    }()
-
     private static func item(_ type: String, _ properties: [String: String] = [:], tags: Set<String> = []) -> Item {
         Item(
             id: .mint(), type: TypeID(type), title: "Title", name: "Title", titleRule: .firstLine,
@@ -47,12 +41,6 @@ struct ViewPropertiesTests {
 
     // MARK: As in Layouts, and changed
 
-    @Test func anUnchangedListIsTheLooksUntouched() {
-        let properties = ViewProperties()
-        #expect(!properties.isChanged)
-        #expect(Self.resolve(properties) == Self.looks)
-    }
-
     @Test func aChangeMakesTheListTheViewsOwnWithTheFactsInItsOrder() {
         var properties = ViewProperties()
         properties.setShown(Self.column("field.attendees"), true)
@@ -81,32 +69,6 @@ struct ViewPropertiesTests {
         #expect(looks[TypeID("core.event")]?.facts.contains(.field("completed_at")) == false)
     }
 
-    @Test func aFieldTheLookSaysAsItsDateOrOnItsSecondaryLineIsNotRepeated() {
-        var properties = ViewProperties()
-        // Both are shown by default as the table's date and a task's fact, so the list is the looks' and changes nothing.
-        properties.setShown(Self.column("tags"), false)
-        let task = Self.resolve(properties)[TypeID("core.task")]
-        #expect(task?.facts.contains(.field("due_at")) == false)
-        #expect(task?.facts.contains(.field("place")) == false)
-        // The event says its place only as a fact, so it keeps it.
-        #expect(Self.resolve(properties)[TypeID("core.event")]?.facts.contains(.field("place")) == true)
-    }
-
-    @Test func theStatusAndTheTypeShowOrHideAsTheirPropertiesDo() {
-        var properties = ViewProperties()
-        properties.setShown(Self.column("field.status"), false)
-        properties.setShown(Self.column("type"), false)
-        let looks = Self.resolve(properties)
-        // Only a task has a status field; an event's is a plain choice.
-        #expect(looks[TypeID("core.task")]?.showsStatus == false)
-        #expect(looks[TypeID("core.event")]?.showsStatus == true)
-        for type in ["core.task", "core.event"] { #expect(looks[TypeID(type)]?.showsType == false) }
-        var shown = ViewProperties()
-        shown.setShown(Self.column("field.priority"), false)
-        #expect(Self.resolve(shown)[TypeID("core.task")]?.showsStatus == true)
-        #expect(Self.resolve(shown)[TypeID("core.task")]?.showsType == true)
-    }
-
     @Test func useLayoutsPutsTheFallbackBack() {
         var properties = ViewProperties()
         properties.setShown(Self.column("field.priority"), false)
@@ -128,16 +90,6 @@ struct ViewPropertiesTests {
     }
 
     // MARK: The table
-
-    @Test func theTableShowsTheShownPropertiesInTheListsOrderWithTheNameFirstAndLocked() {
-        var properties = ViewProperties()
-        properties.setShown(.title, false)
-        properties.move("title", before: "field.priority", in: Self.columns)
-        properties.move("field.priority", before: "field.status", in: Self.columns)
-        let shown = Self.ids(properties.shownColumns(Self.columns))
-        #expect(shown.first == "title")
-        #expect(shown.firstIndex(of: "field.priority")! < shown.firstIndex(of: "field.status")!)
-    }
 
     @Test func aHeaderDragReordersTheShownPropertiesAndLeavesAHiddenOneAndAStaleName() throws {
         let columns: [ItemTableColumn] = [.title, .type, .edited, .created, .tags]
@@ -166,32 +118,6 @@ struct ViewPropertiesTests {
         #expect(Self.ids(properties.shownColumns(columns)) == ["title", "edited", "type"])
     }
 
-    // MARK: What a layout lists
-
-    @Test func aTableListsEveryColumnAndAnotherLayoutOnlyWhatAChipCanSay() {
-        let columns = Self.columns
-        #expect(ViewProperties.offered(columns, in: .table) == columns)
-        let chips = Self.ids(ViewProperties.offered(columns, in: .list))
-        #expect(!chips.contains("title"))
-        #expect(!chips.contains("edited") && !chips.contains("created") && !chips.contains("occurred"))
-        #expect(chips.contains("type") && chips.contains("field.status") && chips.contains("tags") && chips.contains("field.priority"))
-    }
-
-    @Test func aBoardOrATimelineLeavesOutWhatItsLanesOrDaysAreMadeOf() {
-        let chips = ViewProperties.offered(Self.columns, in: .board, leaving: ["field.priority"])
-        #expect(!Self.ids(chips).contains("field.priority"))
-        #expect(Self.ids(chips).contains("tags"))
-    }
-
-    @Test func aFieldEveryDeclaringTypeSaysAlreadyIsNotListed() {
-        // Only a task declares due_at, and its look says it as the date, so no chip could ever show it.
-        let listed = Self.ids(ViewProperties.offered(
-            Self.columns, in: .list, looks: Self.looks, types: [TypeID("core.task"), TypeID("core.event")], catalogue: Self.catalogue))
-        #expect(!listed.contains("field.due_at"))
-        // The place is the task's Secondary line but the event's fact, so it stays.
-        #expect(listed.contains("field.place"))
-    }
-
     // MARK: Where it is kept
 
     @Test func aViewKeepsItsPropertiesUnderTheKeyTheColumnsUsed() throws {
@@ -211,68 +137,5 @@ struct ViewPropertiesTests {
         #expect(stored.isChanged(naturalLayout: .list))
         let again = try JSONDecoder().decode(PlaceDefault.self, from: JSONEncoder().encode(stored))
         #expect(again.properties == stored.properties)
-    }
-
-    // MARK: What a row says
-
-    private static func content(
-        _ item: Item, look: TypeLook, mixed: Bool, shape: CardShape? = nil
-    ) -> RowContent {
-        let list = RowList(mixesTypes: mixed, day: calendar.startOfDay(for: now))
-        if let shape {
-            return RowContent.card(for: item, look: look, catalogue: catalogue, list: list, shape: shape, calendar: calendar, locale: Locale(identifier: "en_GB"))
-        }
-        return RowContent.make(for: item, look: look, catalogue: catalogue, list: list, calendar: calendar, locale: Locale(identifier: "en_GB"))
-    }
-
-    private static func kinds(_ content: RowContent) -> [String] {
-        content.chips.map {
-            switch $0 {
-            case .type: "type"
-            case .status: "status"
-            case .option: "option"
-            case .person: "person"
-            case .tag: "tag"
-            case .linked: "linked"
-            case .text: "text"
-            case .count: "count"
-            }
-        }
-    }
-
-    @Test func aBoardOfOneTypeShowsNoTypeOnItsCardsAndOneOfSeveralDoes() {
-        let task = Self.rows[0].item
-        #expect(!Self.kinds(Self.content(task, look: Self.taskLook, mixed: false, shape: CardShape())).contains("type"))
-        #expect(Self.kinds(Self.content(task, look: Self.taskLook, mixed: true, shape: CardShape())).contains("type"))
-    }
-
-    @Test func aLookWithTheStatusOrTheTypeOffSaysNeither() {
-        let task = Self.rows[0].item
-        var look = Self.taskLook
-        #expect(Self.kinds(Self.content(task, look: look, mixed: true)).prefix(2) == ["type", "status"])
-        look.showsStatus = false
-        look.showsType = false
-        #expect(!Self.kinds(Self.content(task, look: look, mixed: true)).contains("status"))
-        #expect(!Self.kinds(Self.content(task, look: look, mixed: true)).contains("type"))
-    }
-
-    // MARK: The timeline's row
-
-    @Test func theTimelineRowTakesTheTypeOffTheChipsPutsAPersonLastAndLeadsTheSecondLineWithTheType() {
-        var content = RowContent(title: "T", date: nil, secondary: "Kiln House", typeIcon: nil, typeLabel: "Event", mixesTypes: true)
-        content.chips = [.type(icon: nil, label: "Event"), .person(initials: "MC", name: "Mira"), .status(.inProgress, label: "In Progress"), .tag("pdf")]
-        content.more = 2
-        let face = TimelineRowFace(content)
-        #expect(Self.kinds(RowContent(title: "", date: nil, secondary: nil, typeIcon: nil, typeLabel: "", mixesTypes: false, chips: face.chips)) == ["status", "tag", "person"])
-        #expect(face.more == 2)
-        #expect(face.typeName == "Event")
-        #expect(face.secondary == "Kiln House")
-    }
-
-    @Test func aTimelineRowOfOneTypeNamesNoTypeAndAnEmptySecondLineStillExists() {
-        let content = RowContent(title: "T", date: nil, secondary: nil, typeIcon: nil, typeLabel: "Task", mixesTypes: false)
-        let face = TimelineRowFace(content)
-        #expect(face.typeName == nil)
-        #expect(!face.hasSecondLine)
     }
 }

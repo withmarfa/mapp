@@ -191,7 +191,7 @@ extension EditorTests {
         page.library.add("Garden\n")
         try await page.load("Intro\n")
         let library = page.library
-        let index = ItemLinks.Index()
+        let index = MarfaMac.ItemLinks.Index()
         for query in ["", "1111", "gar", "oth"] {
             for name in await library.itemNames(matching: query, using: index) {
                 let owner = try #require(library.items.first { $0.title == name }, "\(name)")

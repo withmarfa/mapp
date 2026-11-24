@@ -9,8 +9,7 @@ Integrity:  sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsI
 SHA-256:    34dcab3d0832d0019f02990eed6b6124e029e8c32b9f0c6f2550544ff8dff174  Readability.js
             a98d28805804c1986ceed470678a3f409f150ee7f1d227f8c8239c005d21de65  Readability-readerable.js
 
-To update, replace both files from one published version and change the lines above and the hashes in
-MarfaMacTests/ReadabilityScriptTests.swift together.
+To update, replace both files from one published version and change the lines above together.
 
 ----------------------------------------------------------------------------------------------------
 
