@@ -203,8 +203,9 @@ extension MarfaLibrary {
         registerUndo(of: edit, name: name, undoManager: undoManager)
     }
 
-    /// The version to write the step on, where the item can be changed, still holds exactly what `edit` left, the
-    /// server has not answered otherwise, and each key is still a field of the item's type that does not hold its text.
+    /// Go, on the item's version, where the item can be changed, still holds exactly what `edit` left, the server has
+    /// not answered otherwise, and each key is still a field of the item's type that does not hold its text; otherwise
+    /// refused, saying why. Never `later`: only the earlier edits a step is built on make it wait.
     private func stepVerdict(of edit: PropertyEdit, undoing: Bool) -> StepVerdict {
         guard let item = item(edit.item) else { return .refused(BatchSkips.sentence(.gone, count: 1)) }
         guard item.isEditable else {
@@ -225,8 +226,8 @@ extension MarfaLibrary {
         return unread ? .refused(Self.answerUnread(undoing: undoing)) : .go(item.version)
     }
 
-    /// Each value as the app shows it, so a Redo that can't be made gives back all the person set, numbers and
-    /// entries as well as text.
+    /// Each value as plain text (`ItemValueText.string`), so a Redo that can't be made gives back all the person set,
+    /// numbers and entries as well as text.
     static func valuesText(_ changes: [String: PropertyValue?]) -> String? {
         let texts = changes.sorted { $0.key < $1.key }.compactMap { $0.value.map(ItemValueText.string) }.filter { !$0.isEmpty }
         return texts.isEmpty ? nil : texts.joined(separator: "\n\n")

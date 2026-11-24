@@ -7,8 +7,8 @@ nonisolated struct MarfaWriteRecord {
     nonisolated struct Answer: Equatable {
         let id: WriteID
         let outcome: WriteOutcome
-        /// What the answers say the item holds of each property, the later answer's over the earlier's; nil where
-        /// none says.
+        /// What the answers say the item holds of each property, an answer to a write first answered later over one to
+        /// a write first answered earlier; nil where none says.
         let holding: [String: PropertyValue]?
     }
 
