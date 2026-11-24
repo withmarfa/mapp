@@ -839,6 +839,17 @@ struct MarfaSourceOfflineTests {
         #expect(try await Self.following([same], text: decomposed, held: 4) == 4)
     }
 
+    /// A type change can carry text the app put together, such as the title as a first line, so its answer proves
+    /// its version only where it holds the person's own text.
+    @Test func aTypeChangeProvesOnlyThePersonsOwnText() async throws {
+        var retype = Self.answered("retype", .accepted, carrying: "Item\n\nMine", made: 4, holding: "Item\n\nMine")
+        retype.body["retype"] = .bool(true)
+        #expect(try await Self.following([retype], text: "Mine", held: 4) == 3)
+        var kept = Self.answered("retype", .accepted, made: 4, holding: "Mine")
+        kept.body["retype"] = .bool(true)
+        #expect(try await Self.following([kept], text: "Mine", held: 4) == 4)
+    }
+
     private static func edge(of type: String, from id: ItemID, in source: MarfaSource) async -> Marfa.Edge? {
         _ = await LiveMarfa.until { ((try? await source.copy.edges.from(id.rawValue)) ?? []).contains { $0.edgeType == type } }
         return try? await source.copy.edges.from(id.rawValue).first { $0.edgeType == type }

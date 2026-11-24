@@ -50,7 +50,9 @@ extension MarfaEngine {
         func unsettled(_ queue: [Marfa.QueuedWrite]) async throws -> Bool {
             guard let own = ownText[id] else { return false }
             let writes = queue.filter { $0.itemId == id.rawValue && [.createItem, .updateItem].contains($0.kind) }
-            if writes.contains(where: { $0.verdict != nil && !counted.contains($0.id) }) { return true }
+            if writes.contains(where: { $0.verdict != nil && !counted.contains($0.id) && !waitedForReadBack.contains($0.id) }) {
+                return true
+            }
             guard writes.contains(where: { $0.verdict == nil }) else { return false }
             return try await heldVersion(id) > own.on
         }
@@ -66,6 +68,11 @@ extension MarfaEngine {
             queue = try await queueWithAnswers()
             try await count(answers: queue, for: id)
         }
+        // A read-back still owed after the wait is not waited for again: the drain that brings it starts only once
+        // this edit is queued, and the engine handles nothing else meanwhile.
+        let answered = Set(queue.filter { $0.verdict != nil }.map(\.id))
+        waitedForReadBack = waitedForReadBack.intersection(answered)
+            .union(queue.filter { $0.itemId == id.rawValue && $0.verdict != nil && !counted.contains($0.id) }.map(\.id))
         return ownText[id]?.on ?? base.rawValue
     }
 
@@ -133,8 +140,12 @@ extension MarfaEngine {
         guard let item = write.answer?.object?["item"]?.object, let version = item["version"]?.integer,
             let properties = item["properties"]?.object, let held = text(properties[own.field])
         else { return nil }
+        // A type change can carry text the app put together (the title as a first line, or text the new type held),
+        // so it proves only the person's own text, never what it carried.
         let carried: String? =
-            if write.body["clear_properties"]?.array?.contains(.string(own.field)) == true {
+            if write.body["retype"] == .bool(true) {
+                own.text
+            } else if write.body["clear_properties"]?.array?.contains(.string(own.field)) == true {
                 ""
             } else if let sent = write.body["properties"]?.object?[own.field] {
                 text(sent)

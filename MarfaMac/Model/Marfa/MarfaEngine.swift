@@ -163,6 +163,9 @@ actor MarfaEngine {
     var ownText: [ItemID: OwnText] = [:]
     /// Answered writes already taken into `ownText`, so none is counted twice.
     var counted: Set<String> = []
+    /// Answered writes whose read-back a following edit has already waited for once, so a read-back that does not
+    /// come holds up no later edit (`followingVersion`).
+    var waitedForReadBack: Set<String> = []
     /// Answers to the person's creates and updates that the copy has cleared (`Queue.takeAnswered`) and the text of
     /// their item has not yet been counted past, so the queue is read with them (`queueWithAnswers`).
     var answeredHeld: [String: Marfa.QueuedWrite] = [:]

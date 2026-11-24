@@ -811,6 +811,27 @@ import Testing
         await scene.close()
     }
 
+    /// A read-back that does not come, as when the read after the answer failed, is waited for once: the drain that
+    /// brings it starts only after the save is queued, and the engine handles nothing else while it waits.
+    @Test func aReadBackThatDoesNotComeIsWaitedForOnce() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("note", title: "Note", body: "Base")]))
+        let id = ItemID("note")
+        scene.source.submit(.editBody(id, "A", base: ItemVersion(1), merge: .asRead), as: WriteID())
+        await scene.source.queueSubmitted()
+        scene.source.engine.hooks.answers.set([Self.answer(
+            "answered", to: "note", carrying: "A", made: 2, holding: ["title": .string("Note"), "body": .string("A")],
+            type: "core.note")])
+        scene.source.submit(.editBody(id, "AB", base: ItemVersion(1), merge: .following), as: WriteID())
+        await scene.source.queueSubmitted()
+        let waits = scene.source.engine.hooks.followWaits.current
+        try #require(waits > 0, "the first save did not wait for the read-back")
+
+        scene.source.submit(.editBody(id, "ABC", base: ItemVersion(1), merge: .following), as: WriteID())
+        await scene.source.queueSubmitted()
+        #expect(scene.source.engine.hooks.followWaits.current == waits, "a later save waited again")
+        await scene.close()
+    }
+
     /// Attaching a large file takes as long as the copy takes to read it. A save of the item's text made meanwhile
     /// is kept at once, and the attach's answer leaves it as it is.
     @Test @MainActor func aTextSaveIsKeptWhileALargeFileIsAttached() async throws {
