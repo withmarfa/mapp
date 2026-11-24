@@ -19,7 +19,7 @@
 			<string>Viewer</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>marfa</string>
+				<string>$(ITEM_LINK_SCHEME)</string>
 			</array>
 		</dict>
 	</array>
