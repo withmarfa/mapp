@@ -85,7 +85,7 @@ struct ItemLinkRouteTests {
         var current: ItemLinkOpener.Standing { .init(mode: mode, library: mode == .marfa ? library : nil) }
     }
 
-    /// A main window a test opens, closes and minimizes as a person would.
+    /// Records requests to bring the test window forward.
     @MainActor final class FakeWindow: ItemLinkWindow {
         var isOpen = true
         private(set) var broughtForward = 0

@@ -324,10 +324,7 @@ final class Browser {
         open([item.id], as: staysInModal ? .modal : nil, defaults: defaults)
     }
 
-    /// Opens the item a `marfa://` link names in this window, never a window of its own: as a full page where Settings >
-    /// General > Open Items says Full Page and over the list otherwise, New Window included. An open modal shows it in
-    /// place of its item. The item is selected where the window lists it, as `follow(link:)` does; the opener has
-    /// refused an item in Recently Deleted, which would take the window to Settings.
+    /// External links stay in this window even when Open Items is set to New Window.
     func open(itemLink item: Item, in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
         let way: ItemOpening = !isModalPresented && ItemOpening.stored(in: defaults) == .fullPage ? .fullPage : .modal
         select(item, in: library, order: order)

@@ -9281,7 +9281,7 @@
     "Your Marfa library can’t be opened right now. Check the connection in Settings, then open the link again." : {
 
     },
-    "Your Marfa library is still opening. Open the link again in a moment." : {
+    "Marfa for Mac couldn’t check this link in time. Try opening it again." : {
 
     },
     "This item can’t be found in this Mac’s copy of your Marfa. It may have been deleted, or it may not have synced to this Mac yet." : {

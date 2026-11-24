@@ -65,7 +65,7 @@ A link only opens. It never creates, changes, deletes or restores an item, never
 - The URL macOS delivers has exactly that form. A query, fragment, port, percent-encoded digit, trailing slash, or uppercase ID makes it invalid.
 - The instance ID matches the one held by the copy of the connected Marfa. A link to another Marfa opens nothing and says only that it is to another Marfa. If the copy doesn't know its instance ID yet, the app says it can't check the link yet.
 - The copy holds the item. If it doesn't, the app says that the item can't be found in this Mac's copy.
-- The item isn't in Recently Deleted. If it is, the app says so and offers to open Settings > Recently Deleted. Nothing opens unless you choose that.
+- The item is outside Recently Deleted. For an item in Recently Deleted, the app shows a message. Choose **Open Settings…** in the message to see Recently Deleted.
 
 If no Marfa is connected, or its library can't be opened, the app says so and offers Settings. When a link opens nothing, the app shows why in a main window, and opens one if none is open. While the library is still opening, as at launch, the link waits for it for a short time. Only the newest link counts: it replaces a link that is still waiting or that no window has opened yet.
 

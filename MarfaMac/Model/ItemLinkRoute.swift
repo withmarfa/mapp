@@ -57,7 +57,7 @@ nonisolated enum ItemLinkRefusal: Equatable, Sendable, CaseIterable {
         case .otherMarfa: String(localized: "This link is to an item in another Marfa.")
         case .notConnected: String(localized: "This Mac isn’t connected to a Marfa. Connect to your Marfa in Settings, then open the link again.")
         case .unavailable: String(localized: "Your Marfa library can’t be opened right now. Check the connection in Settings, then open the link again.")
-        case .stillOpening: String(localized: "Your Marfa library is still opening. Open the link again in a moment.")
+        case .stillOpening: String(localized: "Marfa for Mac couldn’t check this link in time. Try opening it again.")
         case .notFound: String(localized: "This item can’t be found in this Mac’s copy of your Marfa. It may have been deleted, or it may not have synced to this Mac yet.")
         case .instanceUnknown: String(localized: "Marfa for Mac can’t check this link yet. Try again once your Marfa has finished syncing.")
         case .inRecentlyDeleted: String(localized: "This item is in Recently Deleted.")

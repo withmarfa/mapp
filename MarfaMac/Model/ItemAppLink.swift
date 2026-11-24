@@ -17,8 +17,7 @@ nonisolated struct ItemAppLink: Hashable, Sendable {
         self.item = item
     }
 
-    /// Judges the text as delivered (`absoluteString`), which Foundation may already have normalized; whatever it
-    /// folds yields only ids that are still checked.
+    /// Foundation may normalize the URL before delivery. The route checks the IDs from the delivered text.
     init?(_ url: URL) {
         self.init(parsing: url.absoluteString)
     }

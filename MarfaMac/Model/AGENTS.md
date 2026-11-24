@@ -1,6 +1,6 @@
 # Model
 
-The model has no SwiftUI dependency. `MarfaLibrary` implements `ItemLibrary` over the working copy.
+Keep SwiftUI out. `MarfaLibrary` exposes the working copy through `ItemLibrary`.
 
 ## Items and types
 
