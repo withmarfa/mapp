@@ -4,6 +4,9 @@
     "An earlier change to this item hasn’t reached the server yet." : {
       "extractionState" : "manual"
     },
+    "An earlier change to this item wasn’t made, so this change can’t be undone." : {
+      "extractionState" : "manual"
+    },
     "As in Layouts" : {
 
     },
@@ -172,7 +175,7 @@
     "Show Property" : {
 
     },
-    "The server’s answer to an earlier change to this item couldn’t be read." : {
+    "The server’s answer to an earlier change to this item couldn’t be read, so this change can’t be undone." : {
       "extractionState" : "manual"
     },
     "This item has changed since, so this change can’t be redone." : {

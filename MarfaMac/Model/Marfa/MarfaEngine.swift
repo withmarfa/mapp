@@ -77,10 +77,6 @@ actor MarfaEngine {
         code == heldChangedCode || code == heldTimeoutCode
     }
 
-    /// How long an undo waits before it is given back, whether for the copy to be brought up to date or for the
-    /// server to answer an earlier edit it is built on (`MarfaLibrary.answerWait`).
-    nonisolated static let standardHoldLimit = Duration.seconds(30)
-
     nonisolated static var heldChanged: String {
         String(localized: "This changed while the library was being brought up to date, so the change wasn’t made.")
     }
@@ -177,7 +173,7 @@ actor MarfaEngine {
         #if DEBUG
         if let limit = hooks.holdLimit.current { return limit }
         #endif
-        return Self.standardHoldLimit
+        return .seconds(30)
     }
 
     /// Edits queued as read on a version older than the copy held, whose answer lands on whatever the server held.

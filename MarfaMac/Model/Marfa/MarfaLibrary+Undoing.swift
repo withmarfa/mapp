@@ -75,7 +75,7 @@ extension MarfaLibrary {
     }
 
     /// A step's writes were not made: the engine did not make a held step's, because what they touch changed or the copy
-    /// was not brought up to date in time, or a property step could not wait for an earlier answer it is built on
+    /// was not brought up to date in time, or a property Undo is built on an earlier edit the server has not answered
     /// (`MarfaLibrary+PropertyEdits`). An undo goes back on the undo stack, and registering outside an undo or redo
     /// empties the whole redo stack, the step it had registered included; a redo cannot go back, so the undo it
     /// registered does nothing and says so. A redo's write that carried the person's text is the only copy of it, so

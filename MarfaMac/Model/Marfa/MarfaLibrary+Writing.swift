@@ -146,62 +146,7 @@ extension MarfaLibrary {
         guard let version = item(id)?.version,
             let edit = submitPropertyEdit(id, changes, base: version, failing: String(localized: "Can’t Edit This Property"))
         else { return }
-        let made = MadeEdit(edit)
-        registerUndo(undoManager, name: actionName) { [weak undoManager] library in
-            library.undoProperties(made, id, changes, actionName: actionName, undoManager: undoManager)
-        }
-    }
-
-    /// Puts back what the server's answers say the keys held before the edit (`MarfaLibrary+PropertyEdits`). The Redo
-    /// is registered at once, since the undo manager takes it only while this step runs.
-    private func undoProperties(
-        _ made: MadeEdit, _ id: ItemID, _ changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?
-    ) {
-        let keys = Set(changes.keys)
-        if case .failure(let refused) = replayBase(id, keys, undoing: true) { return notices.tell(actionName, refused.reason) }
-        registerUndo(undoManager, name: actionName) { [weak undoManager] library in
-            library.redoProperties(id, changes, actionName: actionName, undoManager: undoManager)
-        }
-        replay(id, keys: keys, text: nil) { library in
-            let version: ItemVersion
-            switch library.replayBase(id, keys, undoing: true) {
-            case .success(let base): version = base
-            case .failure(let refused): return .refused(refused.reason)
-            }
-            guard let edit = made.edit else {
-                return .refused(String(localized: "That change wasn’t made, so there is nothing to undo here."))
-            }
-            var values: [String: PropertyValue?] = [:]
-            for key in keys {
-                switch edit.before(key) {
-                case .value(let value): values.updateValue(value, forKey: key)
-                case .waiting: return .waiting
-                case .unknown: return .unknown
-                }
-            }
-            library.submitPropertyEdit(id, values, base: version, failing: String(localized: "Can’t Edit This Property"))
-            return .made
-        }
-    }
-
-    /// Writes the person's own values again. Its Undo is built on what the item held when the Redo is made, never on
-    /// what it held before the first edit.
-    private func redoProperties(_ id: ItemID, _ changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) {
-        let keys = Set(changes.keys)
-        if case .failure(let refused) = replayBase(id, keys, undoing: false) { return notices.tell(actionName, refused.reason) }
-        let made = MadeEdit()
-        registerUndo(undoManager, name: actionName) { [weak undoManager] library in
-            library.undoProperties(made, id, changes, actionName: actionName, undoManager: undoManager)
-        }
-        replay(id, keys: keys, text: Self.typedText(changes)) { library in
-            switch library.replayBase(id, keys, undoing: false) {
-            case .success(let version):
-                made.edit = library.submitPropertyEdit(id, changes, base: version, failing: String(localized: "Can’t Edit This Property"))
-                return .made
-            case .failure(let refused):
-                return .refused(refused.reason)
-            }
-        }
+        registerUndo(of: edit, name: actionName, undoManager: undoManager)
     }
 
     // MARK: Types

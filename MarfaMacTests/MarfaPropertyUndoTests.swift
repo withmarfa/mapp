@@ -2,8 +2,9 @@ import Foundation
 import Testing
 @testable import MarfaMac
 
-/// An Undo of a property edit writes what the server's answers say the item held before it, never what the copy showed
-/// while an earlier edit had no answer.
+/// An Undo or Redo of a property edit is made only while the item holds exactly what the step before it left, and an
+/// Undo puts back what the person had on screen, once any earlier edit of this Mac's it came from is known to be made
+/// (`MarfaLibrary+PropertyEdits`).
 @MainActor
 @Suite(.hangLimit) struct MarfaPropertyUndoTests {
     typealias F = LibraryFixture
@@ -22,157 +23,233 @@ import Testing
         return catalogue
     }
 
-    private func loaded(waiting limit: Duration = .seconds(30)) async throws -> (MarfaLibrary, FakeItemSource, UndoManager) {
+    private struct Scene {
+        let library: MarfaLibrary
+        let source: FakeItemSource
+        let undo: UndoManager
+
+        var notices: Notices { library.notices }
+
+        /// Names en1 `name`, as an undo step of its own unless `undoable` is false, and gives the edit's write.
+        @discardableResult
+        func set(_ name: String, undoable: Bool = true) throws -> WriteID {
+            if undoable { undo.beginUndoGrouping() }
+            defer { if undoable { undo.endUndoGrouping() } }
+            try #require(library.setItemProperties(
+                F.en1, changes: ["name": .string(name)], actionName: "Edit", undoManager: undoable ? undo : nil))
+            return try #require(source.submitted.last?.id)
+        }
+
+        /// The copy shows en1 named `name` at `version`, as the engine publishes a row it read.
+        func show(_ name: String, version: Int64) async throws {
+            var item = try #require(library.item(F.en1))
+            item.properties = [Property(key: "name", value: .string(name))]
+            item.version = ItemVersion(version)
+            source.send(.upserted([item]))
+            try #require(await eventually { library.item(F.en1)?.version == ItemVersion(version) })
+        }
+
+        /// The copy takes the write: the engine publishes the row, then says it took it.
+        func take(_ write: WriteID, showing name: String, version: Int64) async throws {
+            try await show(name, version: version)
+            source.send(.taken(write))
+        }
+
+        /// The server answers the write, and the engine reads the item again.
+        func answer(_ write: WriteID, _ outcome: WriteOutcome, showing name: String, version: Int64) async throws {
+            source.send(.answered(write, outcome))
+            try await show(name, version: version)
+        }
+
+        /// The write each step made last, as the item edit it is.
+        var lastWrite: ItemWrite? { source.writes.last }
+        var lastID: WriteID? { source.submitted.last?.id }
+        var lastMessage: String? { notices.waiting.last?.message }
+    }
+
+    private func loaded() async throws -> Scene {
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source, notices: Notices(), answerWait: limit)
+        let library = MarfaLibrary(source: source, notices: Notices())
         let card = F.item(Self.c1, Self.card, "Card", age: 10, properties: [Property(key: "summary", value: .string("Old"))])
         source.send(.loaded(SourceSnapshot(items: F.items + [card], catalogue: Self.catalogue)))
         try #require(await eventually { library.isLoaded })
         let undo = UndoManager()
         undo.groupsByEvent = false
-        return (library, source, undo)
-    }
-
-    /// Makes `changes` as an undo step of its own, and gives the edit's write.
-    @discardableResult
-    private func set(
-        _ changes: [String: PropertyValue?], of id: ItemID = F.en1, _ library: MarfaLibrary, _ source: FakeItemSource, _ undo: UndoManager
-    ) throws -> WriteID {
-        undo.beginUndoGrouping()
-        defer { undo.endUndoGrouping() }
-        try #require(library.setItemProperties(id, changes: changes, actionName: "Edit", undoManager: undo))
-        return try #require(source.submitted.last?.id)
-    }
-
-    /// The copy shows en1 named `name` at `version`.
-    private func show(_ name: String, version: Int64, _ library: MarfaLibrary, _ source: FakeItemSource) async throws {
-        var item = try #require(library.item(F.en1))
-        item.properties = [Property(key: "name", value: .string(name))]
-        item.version = ItemVersion(version)
-        source.send(.upserted([item]))
-        try #require(await eventually { library.item(F.en1)?.version == ItemVersion(version) })
+        return Scene(library: library, source: source, undo: undo)
     }
 
     private func name(_ name: String, base: Int64) -> ItemWrite {
         .editProperties(F.en1, ["name": .string(name)], base: ItemVersion(base))
     }
 
-    @Test func anUndoWaitsForAnEarlierEditAndPutsBackWhatItSet() async throws {
-        let (library, source, undo) = try await loaded()
-        let earlier = try set(["name": .string("Ada L")], library, source, undo)
-        try set(["name": .string("Ada K")], library, source, undo)
-        undo.undo()
-        #expect(source.submitted.count == 2, "nothing is written while the earlier edit has no answer")
+    /// #386: the copy had not yet shown the earlier edit when the later one was made.
+    @Test func anUndoPutsBackAnEarlierEditTheCopyHadNotShownYet() async throws {
+        let scene = try await loaded()
+        let earlier = try scene.set("Ada L")
+        let later = try scene.set("Ada K")
+        try await scene.take(earlier, showing: "Ada L", version: 2)
+        try await scene.take(later, showing: "Ada K", version: 3)
+        try await scene.answer(earlier, .accepted, showing: "Ada K", version: 4)
 
-        source.send(.answered(earlier, .accepted))
-        #expect(await eventually { source.submitted.count == 3 })
-        #expect(source.writes.last == name("Ada L", base: 1))
+        scene.undo.undo()
+        #expect(scene.source.writes.count == 3)
+        #expect(scene.lastWrite == name("Ada L", base: 4))
     }
 
-    @Test func anUndoLeavesOutAnEarlierEditRefusedAfterTheCopyShowedIt() async throws {
-        let (library, source, undo) = try await loaded()
-        let earlier = try set(["name": .string("Ada L")], library, source, undo)
-        source.send(.taken(earlier))
-        try await show("Ada L", version: 2, library, source)
-        let later = try set(["name": .string("Ada K")], library, source, undo)
-        source.send(.taken(later))
-        try await show("Ada K", version: 3, library, source)
-        source.send(.answered(earlier, .refused(SyncProblem(code: "validation_error", message: "Not allowed."))))
-        source.send(.answered(later, .accepted))
-        try #require(await eventually { library.notices.told == 1 })
+    @Test func anUndoBuiltOnAnEarlierEditThatWasRefusedIsNotMade() async throws {
+        let scene = try await loaded()
+        let earlier = try scene.set("Ada L", undoable: false)
+        try await scene.take(earlier, showing: "Ada L", version: 2)
+        let later = try scene.set("Ada K")
+        try await scene.take(later, showing: "Ada K", version: 3)
+        try await scene.answer(earlier, .refused(SyncProblem(code: "validation_error", message: "Not allowed.")), showing: "Ada K", version: 4)
+        try await scene.answer(later, .accepted, showing: "Ada K", version: 5)
+        let told = scene.notices.told
 
-        undo.undo()
-        #expect(source.writes.last == name("Ada", base: 3))
+        scene.undo.undo()
+        #expect(scene.source.writes.count == 2, "nothing is written")
+        #expect(scene.notices.told == told + 1)
+        #expect(scene.lastMessage == MarfaLibrary.earlierNotMade)
+        // Long enough for a step put back to have been registered again.
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(!scene.undo.canUndo, "a step that can't be made is not put back")
     }
 
-    @Test func anUndoWaitingForAnEarlierEditThatIsRefusedPutsBackTheValueBeforeIt() async throws {
-        let (library, source, undo) = try await loaded()
-        let earlier = try set(["name": .string("Ada L")], library, source, undo)
-        try set(["name": .string("Ada K")], library, source, undo)
-        undo.undo()
-        #expect(source.submitted.count == 2)
+    @Test func anUndoBuiltOnAnEarlierEditWithNoAnswerIsPutBackUntilItIsAnswered() async throws {
+        let scene = try await loaded()
+        let earlier = try scene.set("Ada L", undoable: false)
+        try await scene.take(earlier, showing: "Ada L", version: 2)
+        let later = try scene.set("Ada K")
+        try await scene.take(later, showing: "Ada K", version: 3)
+        // A step put back is registered outside any undo, which only a manager grouping by event takes.
+        scene.undo.groupsByEvent = true
 
-        source.send(.answered(earlier, .refused(SyncProblem(code: "validation_error", message: "Not allowed.", notQueued: true))))
-        #expect(await eventually { source.submitted.count == 3 })
-        #expect(source.writes.last == name("Ada", base: 1))
+        scene.undo.undo()
+        try #require(await eventually { scene.notices.told == 1 })
+        #expect(scene.source.writes.count == 2, "nothing is written")
+        #expect(scene.lastMessage?.hasPrefix(MarfaLibrary.earlierNotAnswered) == true)
+        #expect(scene.undo.canUndo)
+
+        try await scene.answer(earlier, .accepted, showing: "Ada K", version: 4)
+        scene.undo.undo()
+        #expect(scene.lastWrite == name("Ada L", base: 4))
     }
 
-    /// Never answered, or changed again by the person while it waits: the step goes back on the stack and is told once.
-    @Test(arguments: [false, true]) func anUndoThatCannotWaitIsGivenBack(editedAgain: Bool) async throws {
-        let (library, source, undo) = try await loaded(waiting: .milliseconds(300))
-        try set(["name": .string("Ada L")], library, source, undo)
-        try set(["name": .string("Ada K")], library, source, undo)
-        // A step given back is registered outside any undo, which only a manager grouping by event takes.
-        undo.groupsByEvent = true
-        undo.undo()
-        if editedAgain {
-            #expect(library.setItemProperties(F.en1, changes: ["name": .string("Ada J")], actionName: "Edit", undoManager: nil))
+    /// The server kept another value over the edit; before the item is read again, its answer alone says so.
+    @Test(arguments: [true, false]) func anUndoOfAnEditThatLostAConflictIsNotMade(readAgain: Bool) async throws {
+        let scene = try await loaded()
+        let edit = try scene.set("Ada L")
+        try await scene.take(edit, showing: "Ada L", version: 2)
+        let conflict = WriteOutcome.conflicted(sibling: ItemID("copy"), fields: ["name"], resolved: ["name": .string("Ada E")])
+        if readAgain {
+            try await scene.answer(edit, conflict, showing: "Ada E", version: 3)
+        } else {
+            scene.source.send(.answered(edit, conflict))
+            // Another item's change follows the answer on the one stream, so once it shows, the answer has been taken.
+            var other = try #require(scene.library.item(Self.c1))
+            other.version = ItemVersion(20)
+            scene.source.send(.upserted([other]))
+            try #require(await eventually { scene.library.item(Self.c1)?.version == ItemVersion(20) })
+            #expect(scene.library.item(F.en1)?.value(of: "name") == .string("Ada L"), "the copy still shows the edit")
         }
-        try #require(await eventually { library.notices.told == 1 })
-        #expect(source.writes.count == (editedAgain ? 3 : 2), "the Undo writes nothing")
-        #expect(library.notices.waiting.last?.message.hasPrefix(MarfaLibrary.earlierNotAnswered) == true)
-        #expect(undo.canUndo)
-        // Long enough for the wait to have ended had it not already.
-        try await Task.sleep(for: .milliseconds(600))
-        #expect(library.notices.told == 1)
-        #expect(source.writes.count == (editedAgain ? 3 : 2))
+
+        scene.undo.undo()
+        #expect(scene.source.writes.count == 1, "the server's value is not written over")
+        #expect(scene.lastMessage == MarfaLibrary.changedSince(undoing: true))
+    }
+
+    @Test func anUndoAfterAnotherDeviceChangedTheKeyIsNotMade() async throws {
+        let scene = try await loaded()
+        let edit = try scene.set("Ada L")
+        try await scene.take(edit, showing: "Ada L", version: 2)
+        try await scene.answer(edit, .accepted, showing: "Ada L", version: 3)
+        try await scene.show("Ada E", version: 4)
+
+        scene.undo.undo()
+        #expect(scene.source.writes.count == 1)
+        #expect(scene.lastMessage == MarfaLibrary.changedSince(undoing: true))
+    }
+
+    @Test func aRedoAfterAnotherDeviceChangedTheKeyIsNotMade() async throws {
+        let scene = try await loaded()
+        let edit = try scene.set("Ada L")
+        try await scene.take(edit, showing: "Ada L", version: 2)
+        try await scene.answer(edit, .accepted, showing: "Ada L", version: 3)
+        scene.undo.undo()
+        #expect(scene.lastWrite == name("Ada", base: 3))
+        let undone = try #require(scene.lastID)
+        try await scene.take(undone, showing: "Ada", version: 4)
+        try await scene.answer(undone, .accepted, showing: "Ada", version: 5)
+        try await scene.show("Ada E", version: 6)
+
+        scene.undo.redo()
+        #expect(scene.source.writes.count == 2)
+        let notice = try #require(scene.notices.waiting.last)
+        #expect(notice.text == "Ada L", "what the person typed is given back")
+        #expect(notice.message.contains(MarfaLibrary.changedSince(undoing: false)))
     }
 
     @Test func anUndoAfterARedoPutsBackWhatTheItemHeldWhenTheRedoRan() async throws {
-        let (library, source, undo) = try await loaded()
-        func answer(version: Int64, showing name: String) async throws {
-            let id = try #require(source.submitted.last?.id)
-            source.send(.taken(id))
-            try await show(name, version: version, library, source)
-            source.send(.answered(id, .accepted))
-        }
-        try set(["name": .string("Ada L")], library, source, undo)
-        try await answer(version: 2, showing: "Ada L")
-        undo.undo()
-        try await answer(version: 3, showing: "Ada")
-        // Another device names it.
-        try await show("Ada E", version: 4, library, source)
-        undo.redo()
-        #expect(source.writes.last == name("Ada L", base: 4))
-        try await answer(version: 5, showing: "Ada L")
+        let scene = try await loaded()
+        let edit = try scene.set("Ada L")
+        try await scene.take(edit, showing: "Ada L", version: 2)
+        try await scene.answer(edit, .accepted, showing: "Ada L", version: 3)
+        scene.undo.undo()
+        let undone = try #require(scene.lastID)
+        // Redo runs before the server answers the Undo, so the Redo's own Undo is built on the Undo's write.
+        try await scene.take(undone, showing: "Ada", version: 4)
+        scene.undo.redo()
+        #expect(scene.lastWrite == name("Ada L", base: 4))
+        let redone = try #require(scene.lastID)
+        try await scene.take(redone, showing: "Ada L", version: 5)
+        scene.undo.groupsByEvent = true
 
-        undo.undo()
-        #expect(await eventually { source.writes.count == 4 })
-        #expect(source.writes.last == name("Ada E", base: 5))
+        scene.undo.undo()
+        try #require(await eventually { scene.notices.told == 1 })
+        #expect(scene.source.writes.count == 3, "nothing is written while the Undo's write has no answer")
+        #expect(scene.lastMessage?.hasPrefix(MarfaLibrary.earlierNotAnswered) == true)
+
+        try await scene.answer(undone, .accepted, showing: "Ada L", version: 6)
+        scene.undo.undo()
+        #expect(scene.source.writes.count == 4)
+        #expect(scene.lastWrite == name("Ada", base: 6))
     }
 
-    /// A key whose value lost on the original item holds what the server kept, which only its answer says.
-    @Test(arguments: [true, false]) func anUndoAfterAConflictPutsBackWhatTheServerKept(answerRead: Bool) async throws {
-        let (library, source, undo) = try await loaded()
-        let earlier = try set(["status": .string("done"), "due": .string("2026-10-06")], of: F.t1, library, source, undo)
-        try set(["status": .string("open"), "due": .string("2026-12-01")], of: F.t1, library, source, undo)
-        undo.groupsByEvent = true
-        undo.undo()
-        let held: [String: PropertyValue?]? = answerRead ? ["status": .string("done"), "due": .string("2026-11-01")] : nil
-        source.send(.answered(earlier, .conflicted(sibling: ItemID("copy"), fields: ["status", "due"], resolved: held)))
-        if answerRead {
-            #expect(await eventually { source.writes.count == 3 })
-            #expect(source.writes.last == .editProperties(
-                F.t1, ["status": .string("done"), "due": .string("2026-11-01")], base: ItemVersion(1)))
-        } else {
-            try #require(await eventually { library.notices.told == 1 })
-            #expect(source.writes.count == 2)
-            #expect(undo.canUndo)
-        }
+    /// The person withdrew the earlier edit from the queue, so the server will never answer it.
+    @Test func anUndoBuiltOnAWithdrawnEditIsNotMade() async throws {
+        let scene = try await loaded()
+        let earlier = try scene.set("Ada L", undoable: false)
+        try await scene.take(earlier, showing: "Ada L", version: 2)
+        let later = try scene.set("Ada K")
+        try await scene.take(later, showing: "Ada K", version: 3)
+        try await scene.answer(earlier, .blocked(.failingAlone, nil), showing: "Ada K", version: 4)
+        try await scene.answer(earlier, .refused(SyncProblem(code: MarfaEngine.withdrawnCode)), showing: "Ada K", version: 5)
+        #expect(scene.notices.told == 0, "the person withdrew it, so nothing is told")
+
+        scene.undo.undo()
+        #expect(scene.source.writes.count == 2)
+        #expect(scene.lastMessage == MarfaLibrary.earlierNotMade)
+        // Long enough for a step put back to have been registered again.
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(!scene.undo.canUndo)
     }
 
-    @Test func anUndoOfAKeyThatIsNowTheItemsTextIsRefused() async throws {
-        let (library, source, undo) = try await loaded()
-        try set(["summary": .string("New")], of: Self.c1, library, source, undo)
+    @Test func anUndoOfAKeyThatIsNowTheItemsTextIsNotMade() async throws {
+        let scene = try await loaded()
+        scene.undo.beginUndoGrouping()
+        try #require(scene.library.setItemProperties(
+            Self.c1, changes: ["summary": .string("New")], actionName: "Edit", undoManager: scene.undo))
+        scene.undo.endUndoGrouping()
         // Elsewhere, the item becomes a type that keeps its text in that key.
-        var moved = try #require(library.item(Self.c1))
+        var moved = try #require(scene.library.item(Self.c1))
         moved.type = Self.memo
+        moved.properties = [Property(key: "summary", value: .string("New"))]
         moved.version = ItemVersion(2)
-        source.send(.upserted([moved]))
-        try #require(await eventually { library.item(Self.c1)?.type == Self.memo })
+        scene.source.send(.upserted([moved]))
+        try #require(await eventually { scene.library.item(Self.c1)?.type == Self.memo })
 
-        undo.undo()
-        try #require(await eventually { library.notices.told == 1 })
-        #expect(source.writes.count == 1, "the text is never written as a property")
+        scene.undo.undo()
+        #expect(scene.notices.told == 1)
+        #expect(scene.source.writes.count == 1, "the text is never written as a property")
     }
 }
