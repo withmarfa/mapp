@@ -1,14 +1,11 @@
 name: Checks
 
-# Changes selects jobs by path. An unmatched path selects all regular checks, including the Swift unit tests.
-# On a ready pull request, a change to this workflow or to the change classifier selects every job.
-# A draft runs only Linux checks.
-# Swift starts on ready pull requests after any selected Instructions and Editor checks pass.
-# Changes limited to the String Catalog, Assets.xcassets or UI tests select the build.
-# CI builds UI tests when their files, test plans, the Xcode project or this workflow change.
-# Unit tests run serially with a 12-minute limit and upload diagnostics on a stall. CI retries nothing.
+# A pull request runs no Mac job: GitHub lets the organization run only 5 macOS jobs at once, shared by three
+# repositories. The Unit tests and the Release compile run after a merge (main.yml), and the UI tests before a tag
+# publishes (release.yml). Sessions run the Mac builds and tests locally before an admin merge.
+# Changes selects jobs by path. An unmatched path selects all of them.
+# On a pull request, a change to this workflow or to the change classifier selects every job.
 # Checks is the required roll-up. A superseded run reports cancellation unless a job failed.
-# Release build and publishing run in release-build.yml and release.yml.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -27,9 +24,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       editor: ${{ steps.filter.outputs.editor }}
-      swift: ${{ steps.filter.outputs.swift }}
-      logic: ${{ steps.filter.outputs.logic }}
-      uitests: ${{ steps.filter.outputs.uitests }}
       scripts: ${{ steps.filter.outputs.scripts }}
       classifier: ${{ steps.filter.outputs.classifier }}
       workflows: ${{ steps.filter.outputs.workflows }}
@@ -124,67 +118,9 @@ jobs:
         if: needs.changes.outputs.classifier == 'true'
         run: python3 -m unittest discover -s .github/scripts -v
 
-  swift:
-    name: Unit tests
-    needs: [changes, instructions, editor]
-    if: >-
-      !cancelled() &&
-      needs.changes.result == 'success' &&
-      (needs.instructions.result == 'success' || needs.instructions.result == 'skipped') &&
-      (needs.editor.result == 'success' || needs.editor.result == 'skipped') &&
-      needs.changes.outputs.swift == 'true' &&
-      github.event.pull_request.draft == false
-    # The hosted image with Xcode 27 (a public preview at the time of writing).
-    runs-on: xcode-27
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
-      # The build and the tests are separate steps, so the tests get a limit of their own: a stall then ends
-      # in minutes, with a sample of the blocked process, instead of at the job's limit.
-      - name: Build the app and unit tests
-        run: >
-          xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -testPlan Unit -destination 'platform=macOS'
-          -derivedDataPath build build-for-testing
-      - name: Run the unit tests
-        if: needs.changes.outputs.logic == 'true'
-        run: .github/scripts/run-unit-tests.sh 720 diagnostics
-      - name: Upload the stall diagnostics
-        if: failure() && hashFiles('diagnostics/**') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: unit-test-diagnostics
-          path: diagnostics
-      # The UI tests take over the keyboard and mouse, so they run locally when a change needs them; here they
-      # are only built, so a change that breaks them is seen.
-      - name: Build the UI tests
-        if: needs.changes.outputs.uitests == 'true'
-        run: >
-          xcodebuild -project MarfaMac.xcodeproj -scheme 'MarfaMac UI Tests' -destination 'platform=macOS'
-          -derivedDataPath build build-for-testing
-      - name: Show failures
-        if: failure() && hashFiles('TestResults.xcresult/**') != ''
-        run: |
-          xcrun xcresulttool get test-results tests --path TestResults.xcresult --compact \
-            | python3 -c "
-          import collections, json, sys
-          seen = collections.Counter()
-          def walk(n):
-              if n.get('nodeType') == 'Failure Message':
-                  seen[n.get('name', '')[:300]] += 1
-              for c in n.get('children', []):
-                  walk(c)
-          for n in json.load(sys.stdin)['testNodes']:
-              walk(n)
-          for message, count in seen.most_common(15):
-              print('::warning::%dx %s' % (count, message))
-          "
-
   checks:
     name: Checks
-    needs: [changes, editor, actionlint, instructions, release-scripts, swift]
+    needs: [changes, editor, actionlint, instructions, release-scripts]
     if: ${{ !cancelled() || contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
