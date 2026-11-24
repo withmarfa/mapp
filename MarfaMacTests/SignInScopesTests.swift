@@ -3,9 +3,8 @@ import Marfa
 import Testing
 @testable import MarfaMac
 
-/// What a sign-in asks the owner to approve for the app's own settings. Discovery never lists an app's vendor scope, and a
-/// first type is registered only while holding `app.*:write` (`keys-and-oauth/app-vendor-not-named`), so every sign-in asks
-/// for `app.*:write` and never the scope that names the vendor.
+/// What a sign-in asks the owner to approve for the app's own settings. The vendor scope is unavailable before its first
+/// type exists (`keys-and-oauth/app-vendor-not-named`), and discovery never lists it afterward.
 @Suite(.hangLimit)
 struct SignInScopesTests {
     nonisolated private static let common = [
@@ -40,8 +39,7 @@ struct SignInScopesTests {
         #expect(signIns.askedScopes == [SystemSignIns.scopes])
     }
 
-    /// The settings sync reaches the item with the app root alone, and the first Mac registers the type with it and
-    /// `metadata.types:write`.
+    /// The slice includes existing settings with the app root, and a missing settings type with registration permission.
     @Test func aSignInHoldingTheAppRootReachesTheSettings() {
         #expect(PreferencesType.reachingScopes == [Self.vendor, Self.root])
         #expect(PreferencesReach.includes(.init(typeHeld: true, scopes: [Self.root]), holdsTypeNow: false))

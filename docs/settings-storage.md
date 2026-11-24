@@ -43,7 +43,7 @@ Every Mac is another OAuth client to the server, and only the client that regist
 
 ### The scope the app asks for
 
-Every sign-in asks for `app.*:write`, never `app.marfa-mac.*:write`, and never both. Discovery never lists an app's vendor scope, and a first type is registered only while holding `app.*:write`. withmarfa/marfa#3522 would let the app ask for its vendor alone.
+Every sign-in asks for `app.*:write`, never `app.marfa-mac.*:write`, and never both. This grants read and write access to every app's types. The vendor scope is unavailable before its first type exists, and discovery never lists it afterward. Together with `metadata.types:write`, the app root lets the first Mac register its settings type and later Macs reach its items. withmarfa/marfa#3522 would let the app ask for its vendor alone.
 
 ## What stays on this Mac
 

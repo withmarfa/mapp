@@ -11,7 +11,7 @@ import Foundation
 ///   vendor; or the copy already holds the type, as the sign-in that registered it does, since the vendor's holder
 ///   reaches it without naming it (`keys-and-oauth/app-reaches-own-vendor`).
 /// - The server holds no type yet: the sign-in may register it (`PreferencesType.registeringScope`), which it may do
-///   while holding `app.*:write` (`keys-and-oauth/app-vendor-not-named`); registering makes it the vendor's holder.
+///   while holding `app.*:write`; registering makes it the vendor's holder (`types/app-vendor-bound`).
 nonisolated enum PreferencesReach {
     /// What a sign-in and its server say, read just before a hydration.
     struct Evidence: Equatable, Sendable {
