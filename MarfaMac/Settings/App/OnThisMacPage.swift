@@ -17,8 +17,6 @@ struct OnThisMacPage: View {
     @State private var exportFailure: String?
     @State private var exported: String?
     @State private var isConfirmingDownload = false
-    @AppStorage(AutomaticExport.scheduleKey) private var schedule = ExportSchedule.never
-    @AppStorage(AutomaticExport.folderKey) private var folderPath = ""
 
     private static let sizes: [UInt64] = [1, 5, 10, 25, 100].map { $0 * 1_000_000_000 }
 
@@ -169,9 +167,11 @@ struct OnThisMacPage: View {
     // MARK: Export Automatically
 
     @ViewBuilder private var automaticRows: some View {
-        let folder = folderPath.isEmpty ? nil : URL(filePath: folderPath, directoryHint: .isDirectory)
-        SettingsRow(title: Text("Export Automatically"), line: Text(verbatim: automaticLine(folder: folder))) {
-            SettingsPopUp(title: "Export Automatically", selection: Binding(get: { schedule }, set: { choose($0) })) {
+        let automatic = libraries.automaticExport
+        let plan = automatic.current
+        let schedule = plan?.schedule ?? .never
+        SettingsRow(title: Text("Export Automatically"), line: Text(verbatim: automaticLine(plan))) {
+            SettingsPopUp(title: "Export Automatically", selection: Binding(get: { schedule }, set: { choose($0, plan: plan) })) {
                 Text("Never").tag(ExportSchedule.never)
                 Text("Every Day").tag(ExportSchedule.daily)
                 Text("Every Week").tag(ExportSchedule.weekly)
@@ -179,36 +179,44 @@ struct OnThisMacPage: View {
             .accessibilityIdentifier("ExportAutomatically")
         }
         .accessibilityIdentifier("ExportAutomaticallyRow")
-        if schedule != .never, let folder {
+        .task(id: host.configuredConnection) { await automatic.learn() }
+        if schedule != .never, let folder = plan?.folderURL {
             SettingsRow(title: Text("Export Folder"), line: Text(verbatim: (folder.path as NSString).abbreviatingWithTildeInPath)) {
-                SettingsButton("Choose…") { chooseAutomaticFolder { chosen in if chosen { libraries.automaticExport.checkSoon() } } }
-                    .accessibilityIdentifier("ExportFolder")
+                SettingsButton("Choose…") {
+                    chooseAutomaticFolder { chosen in
+                        automatic.set(schedule, folder: chosen)
+                        automatic.checkSoon()
+                    }
+                }
+                .accessibilityIdentifier("ExportFolder")
             }
         }
     }
 
-    private func automaticLine(folder: URL?) -> String {
-        guard schedule != .never, let folder else { return String(localized: "To a folder you choose.") }
+    private func automaticLine(_ plan: ExportPlan?) -> String {
+        guard let plan, plan.schedule != .never, let folder = plan.folderURL else { return String(localized: "To a folder you choose.") }
         let to = String(localized: "To “\(folder.lastPathComponent)”.")
-        guard let last = libraries.automaticExport.saved[host.configuredConnection?.address.absoluteString ?? ""] else { return to }
+        guard let last = plan.last else { return to }
         return to + " " + String(localized: "Last saved \(last.formatted(.dateTime.day().month().year())).")
     }
 
-    /// A schedule is turned on only with a folder, asked for the first time; a cancelled chooser leaves it as it was.
-    private func choose(_ new: ExportSchedule) {
-        guard new != .never, folderPath.isEmpty else {
-            schedule = new
-            libraries.automaticExport.checkSoon()
+    /// A schedule is turned on only with a folder, asked for the first time for this Marfa; a cancelled chooser leaves it as
+    /// it was.
+    private func choose(_ new: ExportSchedule, plan: ExportPlan?) {
+        let automatic = libraries.automaticExport
+        guard new != .never, plan?.folder == nil else {
+            automatic.set(new)
+            automatic.checkSoon()
             return
         }
-        chooseAutomaticFolder { chosen in
-            guard chosen else { return }
-            schedule = new
-            libraries.automaticExport.checkSoon()
+        chooseAutomaticFolder { folder in
+            automatic.set(new, folder: folder)
+            automatic.checkSoon()
         }
     }
 
-    private func chooseAutomaticFolder(then done: @escaping (Bool) -> Void) {
+    /// Asks for the folder, and calls `done` only with one chosen.
+    private func chooseAutomaticFolder(then done: @escaping (URL) -> Void) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -217,9 +225,8 @@ struct OnThisMacPage: View {
         panel.prompt = String(localized: "Choose")
         panel.message = String(localized: "Choose where the app saves the archive.")
         panel.begin { response in
-            guard response == .OK, let folder = panel.url else { return done(false) }
-            folderPath = folder.path
-            done(true)
+            guard response == .OK, let folder = panel.url else { return }
+            done(folder)
         }
     }
 

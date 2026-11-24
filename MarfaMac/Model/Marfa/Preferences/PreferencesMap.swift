@@ -112,7 +112,7 @@ enum PreferencesMap {
         InterfaceKey.inspectorRelationshipsOpen, InterfaceKey.inspectorLinksInPageOpen, InterfaceKey.inspectorLinkedFromOpen,
         InterfaceKey.inspectorTagsOpen, InterfaceKey.inspectorOutlineOpen, InterfaceKey.inspectorAttachmentsOpen,
         InterfaceKey.inspectorCollectionsOpen, InterfaceKey.inspectorAppOpen, PreferencesSync.beforeSyncKey,
-        AutomaticExport.scheduleKey, AutomaticExport.folderKey, AutomaticExport.lastKey,
+        AutomaticExport.plansKey,
     ] + ColumnWidth.allCases.map(\.key)
 
     /// Every defaults key a synced setting reads or writes.

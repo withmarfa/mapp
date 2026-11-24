@@ -49,7 +49,7 @@ Every sign-in asks for `app.*:write`, never `app.marfa-mac.*:write`, and never b
 
 Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `inspector*Open` keys, `inspectorAppOpen.*`, window scene storage), a table's column widths (`itemTableColumns`), `startLastPlace`, `quickAddLastType`, `sendErrorReports`, `betaVersions`, `NSQuitAlwaysKeepsWindows`, everything on On This Mac, the `Marfa*` connection keys and the sync's own keys: `preferencesBeforeSync` and `preferencesSync`.
 
-On This Mac keeps the automatic export schedule (`automaticExportSchedule`), destination (`automaticExportFolder`), and last successful export times (`automaticExportLast`) in local defaults.
+On This Mac keeps Export Automatically in local defaults (`automaticExportPlans`): one plan for each Marfa it was set for, by instance id once the app has learnt it and otherwise by address, holding the schedule, the folder and when its last export was made.
 
 ## The first launch
 

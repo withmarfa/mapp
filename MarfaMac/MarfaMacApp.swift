@@ -230,6 +230,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if told { await Reporting.shared.flush() }
             // The pages are still up and may have reported while the reports went out: that text joins the queue too.
             if told { await libraries.current?.finish() }
+            // An automatic export still running is stopped and leaves no half file.
+            if told { await libraries.automaticExport.stop(within: .seconds(2)) }
             NSApp.reply(toApplicationShouldTerminate: told)
         }
         return .terminateLater
