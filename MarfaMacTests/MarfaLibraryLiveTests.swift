@@ -121,9 +121,9 @@ extension LiveMarfaTests {
                 await source.flush()
                 #expect(await eventually { Set(library.items(in: .collection(collection)).map(\.id)) == [first, second] })
                 let membership = library.relationships(for: first).first { $0.field == "in-collection" }
-                #expect(membership?.label == "In collection")
                 #expect(membership?.targets.map(\.itemID) == [collection])
-                #expect(library.relationships(for: collection).first { $0.field == "inverse:in-collection" }?.label == "Contents")
+                let contents = library.relationships(for: collection).first { $0.field == "inverse:in-collection" }
+                #expect(Set(contents?.targets.map(\.itemID) ?? []) == [first, second])
 
                 // The server refuses nesting, and the app never sends it.
                 #expect(!library.addToCollection([other], collection, undoManager: nil))

@@ -13,22 +13,12 @@ extension ClientOwnerCalls {
         }
     }
 
-    func reading() async throws(OwnerFailure) -> InstanceReading {
+    func instanceMetrics() async throws(OwnerFailure) -> InstanceMetricsReading {
         try await run { client in
-            var reading = InstanceReading()
-            if let metrics = try? await client.getInstanceMetrics().ok.body.json {
-                reading.version = metrics.process.version
-                reading.databaseBytes = metrics.storage.databaseBytes.map { Int($0) }
-                reading.fileBytes = Int(metrics.blobs.totalBytes)
-            }
-            if let update = try? await client.getUpdate().ok.body.json {
-                if update.available, let latest = update.latest.value { reading.updateReady = latest.release }
-                if reading.version == nil { reading.version = update.release }
-            }
-            // Reading backups needs `backups.manage`, which the sign-in may not hold: then no time is shown.
-            reading.lastBackup = (try? await client.listBackups().ok.body.json.data)?.map(\.createdAt).max()
-            reading.owner = try? await client.getProfile().ok.body.json.username
-            return reading
+            let metrics = try await client.getInstanceMetrics().ok.body.json
+            return InstanceMetricsReading(
+                version: metrics.process.version, databaseBytes: metrics.storage.databaseBytes.map { Int($0) },
+                fileBytes: Int(metrics.blobs.totalBytes))
         }
     }
 
@@ -50,8 +40,7 @@ extension ClientOwnerCalls {
             let bytes = orphans.data.reduce(0) { $0 + $1.sizeBytes }
             let first = orphans.data.first.flatMap { Self.date($0.reportedAt) }
             let complete = orphans.nextCursor == nil
-            let total = (try? await client.getInstanceMetrics().ok.body.json.blobs.totalBytes).map { Int($0) }
-            return FileStores(stores: stores, fileBytes: total, orphanCount: count, orphanBytes: bytes, firstFound: first, orphansComplete: complete)
+            return FileStores(stores: stores, orphanCount: count, orphanBytes: bytes, firstFound: first, orphansComplete: complete)
         }
     }
 

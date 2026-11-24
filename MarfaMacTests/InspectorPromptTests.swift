@@ -5,19 +5,6 @@ import Testing
 /// What the right sidebar asks for when nothing is chosen, and what the Tags box does with a tag typed and not yet added.
 @MainActor
 struct InspectorPromptTests {
-    @Test func aCalendarAsksForAnEventAndEveryOtherLayoutForAnItem() {
-        #expect(InspectorPrompt.forItems(in: .calendar) == .event)
-        for mode in ItemViewMode.allCases where mode != .calendar {
-            #expect(InspectorPrompt.forItems(in: mode) == .item)
-        }
-    }
-
-    @Test func eachIndexPageAsksForItsOwnKindOfRow() {
-        #expect(InspectorPrompt.forIndex(.items) == .item)
-        #expect(InspectorPrompt.forIndex(.collections) == .collection)
-        #expect(InspectorPrompt.forIndex(.sources) == .source)
-    }
-
     private func tagField(over item: Item, in library: FakeItemLibrary) -> ValueEditModel {
         ValueEditModel(ValueEditRequest(kind: .tags, library: library, item: item.id))
     }

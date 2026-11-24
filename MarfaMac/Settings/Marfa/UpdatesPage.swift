@@ -7,6 +7,12 @@ struct UpdatesPage: View {
     let host: any MarfaSettingsHost
     @State private var model: UpdatesModel
     @State private var copied = false
+    @State private var asksToUpdate = false
+
+    private struct LoadID: Equatable {
+        let address: String?
+        let canChangeSettings: Bool
+    }
 
     init(host: any MarfaSettingsHost) {
         self.host = host
@@ -15,17 +21,21 @@ struct UpdatesPage: View {
 
     var body: some View {
         content
-            .task(id: host.serverAddress) { await model.load() }
+            .task(id: LoadID(address: host.serverAddress, canChangeSettings: model.canChangeSettings)) { await model.load() }
             .onDisappear { model.stop() }
+            .alert("Update \(host.serverName)?", isPresented: $asksToUpdate) {
+                Button("Cancel", role: .cancel) {}
+                Button("Update") { Task { await model.update() } }
+            } message: {
+                Text("\(host.serverName) restarts to finish the update. The app reconnects when it’s back.")
+            }
             .accessibilityIdentifier("UpdatesPage")
     }
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
             OwnerFailureState(page: .updates, failure: failure, host: host) { Task { await model.load() } }
-        } else if !model.hasLoaded {
-            OwnerLoading()
-        } else if let status = model.status {
+        } else if model.hasLoaded, let status = model.status {
             SettingsPageColumn {
                 if model.isUpdating {
                     updating(status)
@@ -35,6 +45,8 @@ struct UpdatesPage: View {
                     lastUpdate(status)
                 }
             }
+        } else {
+            OwnerLoading()
         }
     }
 
@@ -82,7 +94,7 @@ struct UpdatesPage: View {
                             undone.result == .putBack
                                 ? "\(host.serverName) is back on \(status.running), as before. Nothing was lost."
                                 : "\(host.serverName) runs \(status.running)."),
-                        actions: model.canUpdate ? [SettingsProblemAction("Try Again") { Task { await model.update() } }] : [])
+                        actions: model.canUpdate ? [SettingsProblemAction("Try Again") { asksToUpdate = true }] : [])
                 }
                 if model.lostTrack {
                     SettingsProblemRow(
@@ -115,7 +127,7 @@ struct UpdatesPage: View {
                             copied = true
                         }
                     } else if model.ready != nil, !model.needsMaintain {
-                        SettingsButton("Update", role: .update) { Task { await model.update() } }
+                        SettingsButton("Update", role: .update) { asksToUpdate = true }
                             .disabled(!model.canUpdate)
                     }
                 }
@@ -134,7 +146,16 @@ struct UpdatesPage: View {
                     title: "Check Automatically",
                     isOn: Binding { status.checksAutomatically } set: { on in Task { await model.setChecksAutomatically(on) } }
                 )
-                .disabled(model.settings == nil || model.isSwitching)
+                .disabled(!model.canChangeSettings || model.settings == nil || model.settingsFailure != nil || model.isSwitching)
+            }
+            if let failure = model.settingsFailure {
+                OwnerProblemRow(
+                    title: "Couldn’t Read Automatic Update Settings", failure: failure, page: .updates, host: host,
+                    retry: { Task { await model.load() } })
+            } else if !model.canChangeSettings {
+                OwnerProblemRow(
+                    title: "Can’t Change Automatic Update Settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
+                    page: .updates, host: host)
             }
         }
     }

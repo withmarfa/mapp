@@ -44,12 +44,17 @@ struct FileStoragePage: View {
 
     @ViewBuilder private var whereFilesAre: some View {
         SettingsSection("Where Files Are") {
-            if let stores = storage.stores {
-                ForEach(stores.stores) { store in storeRow(store, in: stores) }
-            } else if let failure = storage.failure {
+            if let failure = storage.failure {
                 OwnerProblemRow(
                     title: "Couldn’t Read Where Files Are", failure: failure, page: .fileStorage, host: host,
                     retry: { Task { await storage.load() } })
+            } else if let stores = storage.stores {
+                ForEach(stores.stores) { store in storeRow(store) }
+                if let failure = storage.fileBytesFailure {
+                    OwnerProblemRow(
+                        title: "Couldn’t Read the Total File Size", failure: failure, page: .fileStorage, host: host,
+                        retry: { Task { await storage.load() } })
+                }
             } else {
                 SettingsRow("Reading Where Files Are…") { ProgressView().controlSize(.small) }
             }
@@ -58,7 +63,7 @@ struct FileStoragePage: View {
         }
     }
 
-    private func storeRow(_ store: FileStoreRow, in stores: FileStores) -> some View {
+    private func storeRow(_ store: FileStoreRow) -> some View {
         let title: String =
             switch store.kind {
             case .disk: String(localized: "\(host.serverName)’s Disk")
@@ -70,7 +75,7 @@ struct FileStoragePage: View {
             lead: .symbol(store.kind == .objectStore ? "externaldrive.connected.to.line.below" : "externaldrive")
         ) {
             if store.kind == .disk {
-                if let bytes = stores.fileBytes { SettingsValue(verbatim: Int64(bytes).formatted(.byteCount(style: .file))) }
+                if let bytes = storage.fileBytes { SettingsValue(verbatim: Int64(bytes).formatted(.byteCount(style: .file))) }
             } else {
                 SettingsValue("A copy of each file")
             }
@@ -80,7 +85,7 @@ struct FileStoragePage: View {
     // MARK: Unused files
 
     @ViewBuilder private var unused: some View {
-        if let stores = storage.stores {
+        if storage.failure == nil, let stores = storage.stores {
             if stores.orphanCount == 0 {
                 SettingsRow("No unused files", line: "Nothing is waiting to be removed.")
             } else {

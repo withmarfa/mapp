@@ -39,9 +39,11 @@ import Observation
     private(set) var entries: [Entry] = []
     private(set) var hosts: [ConnectorHostInfo] = []
     private(set) var typeNames: [String: String] = [:]
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    private let hostsRead = OwnerLoader.ReadStatus()
+    var hostsFailure: OwnerFailure? { hostsRead.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
     /// One line under a connector's rows whose change was refused, by the plugin's name.
     private(set) var rowErrors: [String: OwnerFailure] = [:]
     /// One line under a setting whose change was refused, by `plugin/setting`.
@@ -76,7 +78,8 @@ import Observation
     func hostName(of entry: Entry) -> String? { host(entry.control?.host ?? entry.summary.hostID)?.name }
 
     func health(of entry: Entry, now: Date = .now) -> ConnectorHealth {
-        ConnectorHealth.of(
+        if entry.control?.host != nil, hostsFailure != nil { return .unread }
+        return ConnectorHealth.of(
             control: entry.control, registration: entry.registration, settings: entry.settings,
             host: host(entry.control?.host), now: now)
     }
@@ -93,36 +96,34 @@ import Observation
 
     /// Reads the list, which the page shows at once, then each connector's own state, a few at a time.
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer { isLoading = false; hasLoaded = true }
-        do {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
             let found = try await context.calls.connectorPlugins()
             entries = found.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }.map { summary in
                 let held = entry(summary.name)
                 return Entry(summary: summary, control: held?.control, registration: held?.registration, settings: held?.settings)
             }
             gone = gone.filter { name in entries.contains { $0.id == name } }
-            failure = nil
-        } catch {
-            failure = error
-            await context.learn(from: error)
-            return
-        }
-        hosts = (try? await context.calls.connectorHosts()) ?? hosts
-        typeNames = (try? await context.calls.typeNames()) ?? typeNames
-        let calls = context.calls
-        await readEach(
-            of: entries.map(\.id),
-            read: { name in await Self.read(name, with: calls) },
-            take: { name, read in take(read, for: name) })
+        }, secondary: [
+            readHosts,
+            .quiet { [self] () throws(OwnerFailure) in typeNames = try await context.calls.typeNames() },
+        ], after: {
+            let calls = context.calls
+            await readEach(
+                of: entries.map(\.id),
+                read: { name in await Self.read(name, with: calls) },
+                take: { name, read in take(read, for: name) })
+        })
+    }
+
+    private var readHosts: OwnerLoader.Secondary {
+        .required(hostsRead) { () throws(OwnerFailure) in self.hosts = try await self.context.calls.connectorHosts() }
     }
 
     /// Reads one connector again, such as after a change or when its page opens.
     func reload(_ plugin: String) async {
         let calls = context.calls
         take(await Self.read(plugin, with: calls), for: plugin)
-        hosts = (try? await context.calls.connectorHosts()) ?? hosts
+        await loader.read(readHosts, in: context)
     }
 
     private struct Read: Sendable {
@@ -185,10 +186,10 @@ import Observation
         }
     }
 
-    /// Asks for a run. The server refuses while the connector is paused, which the page shows as it says.
+    /// Re-reads after a paused refusal so the owner can resume a connector that was paused elsewhere.
     func runNow(_ plugin: String) async {
         await change(plugin) { calls throws(OwnerFailure) in try await calls.runConnector(plugin) }
-        if rowErrors[plugin] == nil { await reload(plugin) }
+        if rowErrors[plugin] == nil || rowErrors[plugin] == .connectorPaused { await reload(plugin) }
     }
 
     /// While a run is asked for, reads the connector again until the server clears the request, which it does when the

@@ -13,9 +13,12 @@ import Observation
     private let patience: Int
 
     private(set) var status: UpdateStatus?
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    private let settingsRead = OwnerLoader.ReadStatus()
+    var settingsFailure: OwnerFailure? { settingsRead.failure }
+    var canChangeSettings: Bool { context.grants().contains(.configManage) }
+    var hasLoaded: Bool { loader.hasLoaded }
     private(set) var isChecking = false
     private(set) var isStarting = false
     /// Whether the server stopped answering while an update ran, which is how it restarts.
@@ -27,6 +30,7 @@ import Observation
     private(set) var lostTrack = false
     /// The one task that follows an update, held so it ends with the page.
     private var follower: Task<Void, Never>?
+    private var stopGeneration = 0
     private(set) var isSwitching = false
     /// Where Check Automatically is held, which needs `config.manage` to change.
     private(set) var settings: UpkeepSettings?
@@ -61,30 +65,37 @@ import Observation
     }
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
-            status = try await context.calls.updateStatus()
-            failure = nil
-            lostTrack = false
-        } catch {
-            let error = UpkeepWording.owned(error)
-            failure = error
-            await context.learn(from: error)
-            return
-        }
-        // An update already under way is shown at once, then followed to its end.
-        hasLoaded = true
-        if status?.progress != nil { await follow() }
-        guard context.grants().contains(.configManage) else {
-            settings = nil
-            return
-        }
-        settings = try? await context.calls.upkeepSettings()
+        let generation = stopGeneration
+        await loader.load(in: context, waitForPrevious: true, primary: { () throws(OwnerFailure) in
+            guard generation == stopGeneration, !Task.isCancelled else { return }
+            do throws(OwnerFailure) {
+                let reading = try await context.calls.updateStatus()
+                guard generation == stopGeneration, !Task.isCancelled else { return }
+                status = reading
+                lostTrack = false
+            } catch {
+                guard generation == stopGeneration, !Task.isCancelled else { return }
+                throw UpkeepWording.owned(error)
+            }
+        }, showBeforeFinishing: true, after: {
+            guard generation == stopGeneration, !Task.isCancelled else { return }
+            if status?.progress != nil { await follow() }
+            guard generation == stopGeneration, !Task.isCancelled else { return }
+            await loader.read(.required(settingsRead) { [self] () throws(OwnerFailure) in
+                guard canChangeSettings else {
+                    settings = nil
+                    return
+                }
+                do throws(OwnerFailure) {
+                    let reading = try await context.calls.upkeepSettings()
+                    guard generation == stopGeneration, !Task.isCancelled, canChangeSettings else { return }
+                    settings = reading
+                } catch {
+                    guard generation == stopGeneration, !Task.isCancelled else { return }
+                    throw error
+                }
+            }, in: context)
+        })
     }
 
     // MARK: Check and update
@@ -121,7 +132,8 @@ import Observation
     }
 
     func update() async {
-        guard canUpdate else { return }
+        guard canUpdate, !Task.isCancelled else { return }
+        let generation = stopGeneration
         isStarting = true
         error = nil
         lostTrack = false
@@ -135,25 +147,35 @@ import Observation
             return
         }
         isStarting = false
+        guard generation == stopGeneration, !Task.isCancelled else { return }
         await follow()
     }
 
     var isFollowing: Bool { follower != nil }
 
     /// Follows the update to its end, as the one follower there is: a second call waits for the first.
-    func follow() async {
+    private func follow() async {
+        guard !Task.isCancelled else { return }
         if let follower {
             await follower.value
             return
         }
         let task = Task { await read() }
         follower = task
-        await task.value
-        if follower == task { follower = nil }
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        if follower == task {
+            follower = nil
+            isRestarting = false
+        }
     }
 
     /// Ends the follower, as when the page goes. The update itself carries on at the server.
     func stop() {
+        stopGeneration += 1
         follower?.cancel()
         follower = nil
         isRestarting = false
@@ -168,10 +190,13 @@ import Observation
             try? await Task.sleep(for: pause)
             if Task.isCancelled { return }
             do {
-                status = try await context.calls.updateStatus()
+                let reading = try await context.calls.updateStatus()
+                if Task.isCancelled { return }
+                status = reading
                 isRestarting = false
                 unanswered = 0
             } catch {
+                if Task.isCancelled { return }
                 let error = UpkeepWording.owned(error)
                 if case .notPermitted = error {
                     self.error = error
@@ -194,7 +219,7 @@ import Observation
     // MARK: Check Automatically
 
     func setChecksAutomatically(_ on: Bool) async {
-        guard let settings, !isSwitching, settings.checksForUpdates != on else { return }
+        guard canChangeSettings, settingsFailure == nil, let settings, !isSwitching, settings.checksForUpdates != on else { return }
         isSwitching = true
         error = nil
         defer { isSwitching = false }

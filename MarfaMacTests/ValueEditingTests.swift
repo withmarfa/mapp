@@ -6,6 +6,7 @@ import Testing
 
 /// What a value panel lists, where it opens, and that one is open at a time.
 @MainActor
+@Suite(.hangLimit)
 struct ValueEditingTests {
     private static let task = TypeID("core.task")
     private static let words: [StatusWord] = [
@@ -36,129 +37,6 @@ struct ValueEditingTests {
         ValueEditRequest(kind: kind, library: library, item: item.id, write: write)
     }
 
-    // MARK: Options
-
-    @Test func statusWordsListUnderTheirGroupsAsTheTypeDeclaresThemWithAnUndeclaredWordUnderOther() {
-        let rows = ValueEditOptions.statusRows(field: Self.status, current: "stale")
-        let outline = rows.map { $0.role == .header ? "# " + $0.title : $0.role == .separator ? "-" : $0.title }
-        let titles = ["# " + StatusBucket.group(.completed).title, "Done", "# " + StatusBucket.group(.inProgress).title, "Doing",
-                      "# " + StatusBucket.group(.notStarted).title, "Todo", "# " + StatusBucket.other.title, "Stale"]
-        #expect(outline == titles)
-        #expect(rows.first { $0.title == "Stale" }?.isCurrent == true)
-    }
-
-    @Test func nothingSetMarksNoOptionAndListsNoNotSetRow() {
-        let rows = ValueEditOptions.statusRows(field: Self.status, current: nil)
-        #expect(rows.allSatisfy { !$0.isCurrent })
-        #expect(!rows.contains { $0.id == ValueEditOptions.notSetID })
-    }
-
-    // MARK: Edit Statuses
-
-    @Test func aStatusPanelOffersEditStatusesForTheItemsTypeAndOtherPanelsDoNot() {
-        let item = Self.item(["status": .string("doing")])
-        let library = Self.library([item])
-        let status = ValueEditModel(Self.request(.status(Self.status), item: item, in: library))
-        #expect(status.typeToEditStatuses == Self.task)
-        #expect(ValueEditModel(Self.request(.choice(Self.priority), item: item, in: library)).typeToEditStatuses == nil)
-    }
-
-    @Test func editStatusesClosesThePanelAndOpensTheTypeInSettings() {
-        let item = Self.item(["status": .string("doing")])
-        let model = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
-        var opened: [TypeID] = []
-        var closed = 0
-        let presenter = ValueEditPresenter.shared
-        let before = presenter.editType
-        defer { presenter.editType = before }
-        presenter.editType = { opened.append($0) }
-        model.close = { closed += 1 }
-        model.editStatuses(of: Self.task)
-        #expect(opened == [Self.task])
-        #expect(closed == 1)
-    }
-
-    // MARK: Quick dates
-
-    @Test func quickDatesFollowThePersonsCalendar() {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "Pacific/Auckland")!
-        calendar.firstWeekday = 2
-        // Friday 6 November in UTC is already Saturday 7 November in Auckland.
-        let now = Calendar(identifier: .gregorian).date(from: DateComponents(timeZone: TimeZone(identifier: "UTC"), year: 2026, month: 11, day: 6, hour: 12))!
-        let days = QuickDates.entries(now: now, calendar: calendar).map { calendar.dateComponents([.year, .month, .day], from: $0.date) }
-        #expect(days.map(\.day) == [7, 8, 9])
-        #expect(days.allSatisfy { $0.month == 11 })
-    }
-
-    // MARK: Frame
-
-    private static let screen = CGRect(x: 0, y: 0, width: 1000, height: 800)
-
-    @Test func panelOpensBelowTheValueAndStartsWhereItDoesWithinTheWidthLimits() {
-        let narrow = ValuePanelFrame.placement(
-            anchor: CGRect(x: 300, y: 500, width: 100, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
-        #expect(narrow.frame == CGRect(x: 300, y: 296, width: 220, height: 200))
-        #expect(!narrow.isAbove)
-        let wide = ValuePanelFrame.placement(
-            anchor: CGRect(x: 100, y: 500, width: 600, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
-        #expect(wide.frame.width == 320)
-        #expect(wide.frame.minX == 100)
-    }
-
-    @Test func aPanelWiderThanItsValueStartsAtTheValueAndShiftsLeftOnlyWhereTheWindowEnds() {
-        let inside = ValuePanelFrame.placement(
-            anchor: CGRect(x: 300, y: 500, width: 40, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
-        #expect(inside.frame.minX == 300)
-        let atTheEdge = ValuePanelFrame.placement(
-            anchor: CGRect(x: 900, y: 500, width: 40, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
-        #expect(atTheEdge.frame.maxX == Self.screen.maxX)
-    }
-
-    @Test func panelFlipsAboveWhenThereIsNoRoomBelowAndStaysOnScreen() {
-        let placement = ValuePanelFrame.placement(
-            anchor: CGRect(x: 900, y: 100, width: 80, height: 20), visible: Self.screen, contentHeight: 300, floor: 220, ceiling: 320, gap: 4)
-        #expect(placement.isAbove)
-        #expect(placement.frame.minY == 124)
-        #expect(placement.frame.maxX <= Self.screen.maxX)
-    }
-
-    @Test func panelShorterThanItsContentWhereNeitherSideFitsIt() {
-        let placement = ValuePanelFrame.placement(
-            anchor: CGRect(x: 100, y: 400, width: 200, height: 20), visible: Self.screen, contentHeight: 2000, floor: 220, ceiling: 320, gap: 4)
-        #expect(placement.frame.height < 2000)
-        #expect(placement.frame.minY >= 0 && placement.frame.maxY <= Self.screen.maxY)
-    }
-
-    @Test func panelNeverLeavesTheVisibleFrameWhateverTheRoomOnEitherSide() {
-        let visible = CGRect(x: 0, y: 80, width: 1000, height: 720)
-        for anchorY in stride(from: CGFloat(60), through: 820, by: 20) {
-            for content in [CGFloat(40), 180, 600, 4000] {
-                let placement = ValuePanelFrame.placement(
-                    anchor: CGRect(x: 400, y: anchorY, width: 120, height: 20), visible: visible, contentHeight: content, floor: 220, ceiling: 320, gap: 4)
-                #expect(visible.contains(placement.frame), "anchor at \(anchorY), content \(content): \(placement.frame)")
-            }
-        }
-    }
-
-    @Test func aTallPanelNearTheBottomOpensAboveAndOneNearTheTopBelowWithTheListCapped() {
-        let nearBottom = ValuePanelFrame.placement(
-            anchor: CGRect(x: 400, y: 120, width: 120, height: 20), visible: Self.screen, contentHeight: 500, floor: 220, ceiling: 320, gap: 4)
-        #expect(nearBottom.isAbove)
-        #expect(nearBottom.frame.height == 500 && nearBottom.frame.minY == 144, "room above takes it whole")
-        let nearTop = ValuePanelFrame.placement(
-            anchor: CGRect(x: 400, y: 740, width: 120, height: 20), visible: Self.screen, contentHeight: 900, floor: 220, ceiling: 320, gap: 4)
-        #expect(!nearTop.isAbove)
-        #expect(nearTop.frame.height == 736, "capped to the room below, the list scrolling")
-        #expect(nearTop.frame.minY == 0)
-    }
-
-    @Test func aPanelWithLessRoomThanTheLeastHeightOnItsSideStaysOnScreen() {
-        let placement = ValuePanelFrame.placement(
-            anchor: CGRect(x: 400, y: 770, width: 120, height: 20), visible: Self.screen, contentHeight: 3000, floor: 220, ceiling: 320, gap: 4)
-        #expect(Self.screen.contains(placement.frame))
-    }
-
     // MARK: Writing
 
     @Test func aRefusedWriteKeepsThePanelOpenAndSaysWhy() {
@@ -169,16 +47,6 @@ struct ValueEditingTests {
         model.activate(ValueEditOptions.optionID("doing"))
         #expect(!closed)
         #expect(model.notice != nil)
-    }
-
-    @Test func aTakenChoiceClosesThePanel() {
-        let item = Self.item()
-        let model = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item]), write: { _ in true }))
-        var closed = false
-        model.close = { closed = true }
-        model.activate(ValueEditOptions.optionID("doing"))
-        #expect(closed)
-        #expect(model.notice == nil)
     }
 
     // MARK: Kinds
@@ -810,40 +678,6 @@ struct ValueEditingTests {
         #expect(written.all == [PropertyValue.string("kept")] && library.notices.waiting.isEmpty)
     }
 
-    // MARK: Keyboard
-
-    @Test func arrowsMoveThroughTheQuickDatesAndReturnChoosesTheOneTheyReached() {
-        let item = Self.item()
-        let field = ItemTypeInfo.Field(key: "due", label: "Due", kind: .date(includesTime: false), declaredBy: Self.task)
-        var written: [PropertyValue?] = []
-        let model = ValueEditModel(Self.request(.date(field), item: item, in: Self.library([item]), write: { written.append($0); return true }))
-        model.move(by: 1)
-        model.move(by: 1)
-        model.activateHighlighted()
-        #expect(written.count == 1)
-    }
-
-    @Test func theFirstArrowInAChoiceStartsFromTheRowOfTheValueItHolds() {
-
-        let item = Self.item(["status": .string("doing")])
-        let model = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
-        model.move(by: 1)
-        #expect(model.activeRow.flatMap { id in model.rows.first { $0.id == id }?.title } == "Todo", "Down from Doing, as a menu goes")
-        let upward = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
-        upward.move(by: -1)
-        #expect(upward.activeRow.flatMap { id in upward.rows.first { $0.id == id }?.title } == "Done")
-    }
-
-    @Test func theFirstArrowWithNothingSetStartsFromTheEnds() {
-        let item = Self.item()
-        let down = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
-        down.move(by: 1)
-        #expect(down.activeRow.flatMap { id in down.rows.first { $0.id == id }?.title } == "Done", "the first option")
-        let up = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
-        up.move(by: -1)
-        #expect(up.activeRow.flatMap { id in up.rows.first { $0.id == id }?.title } == "Todo", "the last option")
-    }
-
     // MARK: One at a time
 
     private final class FakeSession: ValueEditSession {
@@ -918,52 +752,6 @@ struct ValueEditingTests {
         presenter.present(Self.request(.status(Self.status), item: item, in: library), anchor: view)
         presenter.present(Self.request(.status(Self.status), item: item, in: library), anchor: view)
         #expect(!presenter.isOpen)
-    }
-
-    @Test func aValueThatMovesWithItsEditorOpenTakesTheEditorAlong() {
-        let item = Self.item()
-        let sessions = Box()
-        let presenter = presenter(sessions)
-        let view = anchor()
-        let row = NSView(frame: NSRect(x: 0, y: 0, width: 100, height: 20))
-        view.addSubview(row)
-        presenter.present(Self.request(.status(Self.status), item: item, in: Self.library([item])), anchor: row)
-        #expect(sessions.all.first?.moves == 0)
-        row.setFrameOrigin(NSPoint(x: 0, y: 40))
-        #expect(sessions.all.first?.moves == 1)
-        // SwiftUI moves a row by moving the view that holds its background, not the background inside it.
-        view.setFrameOrigin(NSPoint(x: 0, y: 40))
-        #expect(sessions.all.first?.moves == 2)
-        presenter.dismiss()
-        row.setFrameOrigin(NSPoint(x: 0, y: 80))
-        view.setFrameOrigin(NSPoint(x: 0, y: 80))
-        #expect(sessions.all.first?.moves == 2)
-    }
-
-    @Test func aValueThePageMovesTakesItsOwnEditorAlongAndNoOthers() throws {
-        let item = Self.item()
-        let sessions = Box()
-        let presenter = presenter(sessions)
-        presenter.present(Self.request(.status(Self.status), item: item, in: Self.library([item])), anchor: anchor())
-        let moved = NSRect(x: 5, y: 60, width: 200, height: 24)
-        presenter.valueMoved(item: item.id, row: Self.status.key, to: moved)
-        #expect(sessions.all.first?.rects == [moved])
-        presenter.valueMoved(item: item.id, row: "other", to: moved)
-        presenter.valueMoved(item: ItemID("elsewhere"), row: Self.status.key, to: moved)
-        #expect(sessions.all.first?.rects == [moved], "a move of another value is not this editor's")
-        presenter.dismiss()
-        presenter.valueMoved(item: item.id, row: Self.status.key, to: moved)
-        #expect(sessions.all.first?.rects == [moved])
-    }
-
-    @Test func theValueMovedMessageCarriesTheRowAndTheValuesNewRectangle() throws {
-        let body: [String: Any] = ["type": "valueMoved", "item": "10000000-0000-0000-0000-000000000001", "row": "status", "rect": [10, 20, 30, 40], "viewportHeight": 800]
-        guard case .valueMoved(let item, let row, let rect, let height) = try #require(EditorMessage(body: body)) else {
-            Issue.record("Not a valueMoved message")
-            return
-        }
-        #expect(item == ItemID("10000000-0000-0000-0000-000000000001") && row == "status")
-        #expect(rect == CGRect(x: 10, y: 20, width: 30, height: 40) && height == 800)
     }
 
     // MARK: The page

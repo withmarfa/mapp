@@ -4,13 +4,15 @@ import Observation
 
 /// The Webhooks page: each webhook with its address, the events it sends, its deliveries and Delete. A sign-in holding
 /// Manage Webhooks and Manage Keys sees every app's and key's webhooks, grouped by who made them, and may delete any;
-/// only the maker changes one or sends a delivery again. Any other sign-in sees only its own.
+/// only the maker changes one or sends a delivery again. The model keeps the list, edits, delivery actions and secret
+/// sheet together so they use the same ownership and scope checks.
 @Observable @MainActor final class WebhooksModel: OwnerDraftHolding {
     /// Whether a maker still stands.
     enum Standing: Equatable {
         case standing
         /// A key past its expiry.
         case expired
+        case unread
         /// A key that is gone, or an app that is no longer connected: the server has no name for it.
         case gone
 
@@ -19,7 +21,7 @@ import Observation
             switch self {
             case .standing: 0
             case .expired: 1
-            case .gone: 2
+            case .gone, .unread: 2
             }
         }
     }
@@ -36,10 +38,9 @@ import Observation
 
     /// Whether a webhook is sending, as the list says it.
     enum Sending: Equatable {
-        case sending, off, failing
+        case sending, off, failing, unread
     }
 
-    /// What the New Webhook sheet holds.
     struct Draft: Equatable {
         var address = ""
         var events: Set<String> = Self.starting
@@ -51,7 +52,6 @@ import Observation
         ]
     }
 
-    /// A change waiting on the owner's answer.
     struct Question: Identifiable, Equatable {
         enum Action: Equatable {
             case turnOff(String)
@@ -71,7 +71,6 @@ import Observation
         case address(String)
     }
 
-    /// How many webhooks one credential may hold, which the server refuses to pass.
     static let cap = 100
 
     private let context: OwnerContext
@@ -87,9 +86,14 @@ import Observation
     /// The keys, which tell an expired maker from one that stands. Read only where the list holds others'.
     private var keys: [KeyInfo] = []
     private(set) var typeNames: [String: String] = [:]
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    private var isReadingDetails = false
+    private let keysRead = OwnerLoader.ReadStatus()
+    var keysFailure: OwnerFailure? { listedEvery ? keysRead.failure : nil }
+    var failure: OwnerFailure? { loader.failure }
+    private var isLoading: Bool { loader.isLoading || isReadingDetails }
+    var hasLoaded: Bool { loader.hasLoaded }
+    private(set) var sendingFailures: [String: OwnerFailure] = [:]
     /// Whether each webhook is sending, read from its latest delivery after the list shows.
     private(set) var sending: [String: Sending] = [:]
     /// One line under a webhook's rows whose change was refused, by the webhook's id.
@@ -142,7 +146,13 @@ import Observation
     private func standing(of maker: OwnerWebhook.Maker?) -> Standing {
         guard let maker else { return .standing }
         guard maker.name != nil else { return .gone }
-        if maker.kind == .key, let key = keys.first(where: { $0.id == maker.id }), let ends = key.expires, ends <= .now { return .expired }
+        if maker.kind == .key {
+            if let key = keys.first(where: { $0.id == maker.id }) {
+                if let ends = key.expires, ends <= .now { return .expired }
+            } else if keysFailure != nil {
+                return .unread
+            }
+        }
         return .standing
     }
 
@@ -186,6 +196,7 @@ import Observation
         case (.key, nil, _): String(localized: "a revoked key")
         case (.app, nil, _): String(localized: "an app that’s no longer connected")
         case (.key, let name?, .expired): String(localized: "the key \(name) (expired)")
+        case (.key, let name?, .unread): String(localized: "the key \(name) (status unknown)")
         case (.key, let name?, _): String(localized: "the key \(name)")
         case (.app, let name?, _): name
         }
@@ -224,60 +235,51 @@ import Observation
 
     func isSending(_ webhook: OwnerWebhook) -> Sending {
         guard webhook.active else { return .off }
+        if sendingFailures[webhook.id] != nil { return .unread }
         return sending[webhook.id] ?? .sending
     }
 
     // MARK: Reading
 
-    /// Reads the list, which the page shows at once, then what each webhook says about itself.
+    /// The list is available while the app reads type names and checks the latest deliveries.
     func load() async {
         guard !isLoading else { return }
-        isLoading = true
-        if await readList() {
-            typeNames = (try? await context.calls.typeNames()) ?? typeNames
-            await loadSending()
+        isReadingDetails = true
+        await readList()
+        if failure == nil, seesEvery == listedEvery, !Task.isCancelled {
+            await loader.read(.quiet { [self] () throws(OwnerFailure) in
+                typeNames = try await context.calls.typeNames()
+            }, in: context)
+            if seesEvery == listedEvery, !Task.isCancelled { await loadSending() }
         }
-        isLoading = false
-        if scopeChangedWhileLoading {
-            scopeChangedWhileLoading = false
-            await readAgainIfScopeChanged()
-        }
+        isReadingDetails = false
+        await reloadIfScopeChanged()
     }
 
-    /// Reads only the list, and answers whether it could. Where the list holds every maker's, who the app is is read first: with
-    /// no answer the page shows the failure and Try Again, never a list in which the app's own look like another's.
-    private func readList() async -> Bool {
-        defer { hasLoaded = true }
-        let every = seesEvery
-        if every {
-            do {
-                try await readMakers()
-            } catch {
-                failure = error
-                await context.learn(from: error)
-                return false
+    /// A create can refresh the list while an earlier load still reads its details.
+    private func readList(waitForPrevious: Bool = false) async {
+        await loader.load(in: context, waitForPrevious: waitForPrevious, primary: { () throws(OwnerFailure) in
+            let every = seesEvery
+            if every {
+                if identity == nil { identity = try await context.calls.identity() }
+            } else {
+                (identity, keys) = (nil, [])
             }
-        } else {
-            (identity, keys) = (nil, [])
-        }
-        do {
             webhooks = try await context.calls.webhooks()
             listedEvery = every
             gone = gone.filter { id in !webhooks.contains { $0.id == id } }
-            failure = nil
-            return true
-        } catch {
-            failure = error
-            await context.learn(from: error)
-            return false
-        }
+        }, secondary: [
+            .required(keysRead) { [self] () throws(OwnerFailure) in
+                if listedEvery { keys = try await context.calls.keys() }
+            },
+        ], showBeforeFinishing: true)
     }
 
-    /// Reads who the app is signed in as, and the keys, so the others' webhooks are told from the app's own and an expired maker from
-    /// one that stands. The keys only tell an expired maker from one that stands, so a read that fails keeps what was known.
-    private func readMakers() async throws(OwnerFailure) {
-        if identity == nil { identity = try await context.calls.identity() }
-        keys = (try? await context.calls.keys()) ?? keys
+    private func reloadIfScopeChanged() async {
+        if !isLoading, scopeChangedWhileLoading || (failure == nil && seesEvery != listedEvery) {
+            scopeChangedWhileLoading = false
+            await readAgainIfScopeChanged()
+        }
     }
 
     /// Reads the list again where the permissions changed what it holds, such as Manage Keys lost or gained: the list read
@@ -290,22 +292,31 @@ import Observation
         }
         webhooks = []
         sending = [:]
+        sendingFailures = [:]
         await load()
     }
 
-    /// Whether `id` is a webhook this sign-in may change: its own, or one not read yet.
     private func mayChange(_ id: String) -> Bool { webhook(id).map(isOwn) ?? true }
 
-    /// Reads each active webhook's latest delivery, a few at a time, so the list can say which are failing. A webhook whose
-    /// deliveries can't be read keeps saying it is sending.
+    /// Checks the latest deliveries a few at a time, after the list is available.
     private func loadSending() async {
         let calls = context.calls
+        let every = listedEvery
         await readEach(
             of: webhooks.filter(\.active).map(\.id),
-            read: { id in try? await calls.deliveries(of: id).first },
-            take: { id, latest in
-                guard let latest else { return }
-                sending[id] = latest.status == .failed ? .failing : .sending
+            read: { id -> Result<WebhookDeliveryInfo?, OwnerFailure> in
+                do throws(OwnerFailure) { return .success(try await calls.deliveries(of: id).first) } catch { return .failure(error) }
+            },
+            take: { id, answer in
+                guard seesEvery == every, listedEvery == every, webhook(id)?.active == true else { return }
+                switch answer {
+                case .success(let latest):
+                    sendingFailures[id] = nil
+                    sending[id] = latest?.status == .failed ? .failing : .sending
+                case .failure(let failure):
+                    sendingFailures[id] = failure
+                    await context.learn(from: failure)
+                }
             })
     }
 
@@ -355,17 +366,21 @@ import Observation
     /// Sends a change and takes the webhook as the server answers it. A webhook that is gone is told so.
     private func apply(_ id: String, _ change: WebhookChange) async throws(OwnerFailure) {
         do {
-            var updated = try await context.calls.change(webhook: id, change)
-            if let index = webhooks.firstIndex(where: { $0.id == id }) {
-                updated.maker = webhooks[index].maker
-                webhooks[index] = updated
-            }
-            sending[id] = nil
+            take(try await context.calls.change(webhook: id, change))
         } catch {
             if error == .notFound { markGone(id) }
             await context.learn(from: error)
             throw error
         }
+    }
+
+    private func take(_ webhook: OwnerWebhook) {
+        if let index = webhooks.firstIndex(where: { $0.id == webhook.id }) {
+            var updated = webhook
+            updated.maker = webhooks[index].maker
+            webhooks[index] = updated
+        }
+        sending[webhook.id] = nil
     }
 
     private func markGone(_ id: String) {
@@ -504,6 +519,9 @@ import Observation
             deliveryErrors[webhook.id] = error
             if error == .notFound { markGone(webhook.id) }
             await context.learn(from: error)
+            if error == .redeliveryRefused(.webhookInactive), let current = try? await context.calls.webhook(webhook.id) {
+                take(current)
+            }
             await loadDeliveries(of: webhook.id)
         }
     }
@@ -551,7 +569,8 @@ import Observation
             created = made
             sheet = .secret
         }
-        _ = await readList()
+        await readList(waitForPrevious: true)
+        await reloadIfScopeChanged()
     }
 
     /// The notice for a webhook made whose signing secret was never copied: it can't be shown again.

@@ -333,15 +333,6 @@ struct PaletteFilterRow: View {
         if !FilterPanelPresenter.shared.isOpen(for: field.rawValue) { state.openField = nil }
     }
 
-    /// Opens a field's panel once its chip has a view in the window to open under, which the row makes on a later turn of the run loop.
-    private func openValuesWhenShown(_ field: PaletteFilters.Field, attempts: Int = 20) {
-        if anchors.view(for: field.rawValue)?.window != nil || attempts == 0 {
-            openValues(field)
-            return
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(25)) { openValuesWhenShown(field, attempts: attempts - 1) }
-    }
-
     private func openFields() {
         let fields = PaletteFilters.Field.allCases.filter { !state.filters.isSet($0) && state.openField != $0 }.map {
             FilterFieldOption(id: $0.rawValue, title: $0.title, symbol: $0.symbol)
@@ -351,7 +342,7 @@ struct PaletteFilterRow: View {
                 FilterPanelPresenter.shared.dismiss(restoringFocus: false)
                 guard let field = PaletteFilters.Field(rawValue: id) else { return }
                 state.openField = field
-                openValuesWhenShown(field)
+                anchors.whenShown(field.rawValue) { openValues(field) }
             }
         }
     }

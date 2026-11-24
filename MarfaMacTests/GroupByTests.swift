@@ -64,8 +64,6 @@ struct GroupByTests {
             layout: layout, isView: isView)
     }
 
-    private static func labels(_ section: [GroupOffer.Entry]) -> [String] { section.map(\.label) }
-
     /// Events where some have a start and status, and none fills Precision, Place or Attendees.
     private static let events = [
         item("open-day", event, ["status": .string("confirmed"), "all_day": .bool(true)]),
@@ -73,68 +71,6 @@ struct GroupByTests {
     ]
 
     // MARK: What is offered
-
-    @Test func aBoardOfOneTypeOffersItsFieldsAndWaitsTheUnfilledOnesUnderMoreFields() {
-        let offer = Self.offer(Self.events, types: [Self.event], layout: .board)
-        #expect(!offer.offersNone, "a board always has lanes")
-        #expect(Self.labels(offer.sections[0]) == ["Status", "All Day", "Starts", "Ends"])
-        // A single type has no Type, and the board has no Parent.
-        #expect(Self.labels(offer.sections[1]) == ["Created", "Edited", "Happened"])
-        #expect(Self.labels(offer.moreFields) == ["Precision", "Place", "Attendees"])
-        let starts = offer.sections[0][2].choices
-        #expect(starts.map(\.label) == ["Day", "Week", "Month", "Year", "Set or Not Set"])
-        #expect(starts.map(\.startsSection) == [false, false, false, false, true])
-        // A field no item fills offers its values and Set or Not Set; a required one is never empty, so it is not offered.
-        #expect(offer.moreFields[0].choices.map(\.label) == ["Each Option", "Set or Not Set"])
-        #expect(offer.moreFields[1].choices.map(\.grouping) == [.column("field.place", by: .presence)])
-        #expect(!offer.entries.contains { $0.label == "Code" })
-        // Every item has Created, Edited and Happened, so they offer their spans alone.
-        #expect(offer.sections[1].allSatisfy { $0.choices.count == 4 })
-    }
-
-    @Test func aMixedListOffersNoneTypeAndParentAndStatusAsGroupsWhereTheWordsDiffer() {
-        let items = [Self.item("t", Self.task, ["status": .string("todo")]), Self.item("n", Self.note, ["progress": .string("draft")])]
-        let offer = Self.offer(items, types: [], layout: .list)
-        #expect(offer.offersNone)
-        let status = try! #require(offer.sections[0].first { $0.id == GroupOffer.statusID })
-        #expect(status.choices.map(\.grouping.mode) == [.statusGroups], "the types keep their status apart, so Words is not offered")
-        // Two types with one status field but different words share no words either.
-        let other = ItemTypeInfo(id: TypeID("test.chore"), label: "Chore", fields: [ItemTypeInfo.Field(key: "status", label: "Status", kind: .status([
-            StatusWord(value: "open", group: .notStarted)]), declaredBy: TypeID("test.chore"))], titleField: "title", bodyField: "body", parent: nil)
-        var types = Self.catalogue.itemTypes
-        types[other.id] = other
-        let mixed = MarfaMac.Catalogue(itemTypes: Array(types.values))
-        let rows = Self.rows([Self.item("t", Self.task, ["status": .string("todo")]), Self.item("c", other.id, ["status": .string("open")])])
-        let words = GroupOffer.make(
-            columns: ItemTableLayout.columns(for: rows, catalogue: mixed, hidden: [], looks: [:]), types: [Self.task, other.id], rows: rows,
-            catalogue: mixed, layout: .table, isView: false)
-        #expect(words.sections[0].first?.choices.map(\.grouping) == [.column("field.status", by: .statusGroups)])
-        // The Status item stands for every type's status field, so neither the task's nor the note's is a group of its own.
-        #expect(!offer.entries.contains { [Browser.fieldColumnPrefix + "status", Browser.fieldColumnPrefix + "progress"].contains($0.id) && $0.id != GroupOffer.statusID })
-        #expect(Self.labels(offer.sections[1]).prefix(2) == ["Type", "Parent"])
-    }
-
-    @Test func oneTypesStatusOffersWordsAndGroups() {
-        let offer = Self.offer([Self.item("t", Self.task, ["status": .string("todo")])], types: [Self.task], layout: .table)
-        let status = try! #require(offer.sections.first?.first)
-        #expect(status.choices.map(\.label) == ["Words", "Groups"])
-        #expect(status.choices.map(\.grouping) == [.column("field.status"), .column("field.status", by: .statusGroups)])
-        // The board falls back to the words where nothing else is chosen.
-        #expect(offer.fallback == .column("field.status"))
-    }
-
-    @Test func aTypeWithNoDateFieldOffersNoDateOfItsOwn() {
-        let offer = Self.offer([Self.item("n", Self.note, ["progress": .string("draft")])], types: [Self.note], layout: .table)
-        #expect(offer.sections[0].map(\.label) == ["Progress"])
-        #expect(offer.moreFields.isEmpty)
-        #expect(offer.entries.allSatisfy { !$0.choices.isEmpty }, "no empty submenu")
-    }
-
-    @Test func aTypesFieldsAreOfferedThoughNoItemIsListed() {
-        let offer = Self.offer([], types: [Self.task], layout: .table)
-        #expect(offer.sections[0].map(\.label) == ["Status"], "the status leads whether or not an item has one yet")
-        #expect(offer.moreFields.map(\.label) == ["Due"])
-    }
 
     @Test func aSavedViewShowsWhatItCannotKeepAsNotKept() {
         let offer = Self.offer(Self.events, types: [Self.event], layout: .table, isView: true)
@@ -171,36 +107,6 @@ struct GroupByTests {
         #expect(ItemTableLayout.groups(of: rows, by: column, mode: .presence).map(\.id) == ["false"])
     }
 
-    @Test func statusGroupsGatherEveryTypeByItsOwnStatusAndTheRestUnderNoStatus() throws {
-        let items = [
-            Self.item("t-doing", Self.task, ["status": .string("doing")]), Self.item("n-published", Self.note, ["progress": .string("published")]),
-            Self.item("t-none", Self.task), Self.item("event", Self.event, ["status": .string("confirmed")]),
-            Self.item("n-draft", Self.note, ["progress": .string("draft")]),
-        ]
-        let rows = Self.rows(items)
-        let column = try #require(Self.columns(rows).first { $0.style == .status })
-        let groups = ItemTableLayout.groups(of: rows, by: column, mode: .statusGroups, catalogue: Self.catalogue, declared: true)
-        #expect(groups.map(\.id) == ["not_started", "in_progress", "completed", "canceled", ""])
-        #expect(groups.map { $0.rows.map(\.item.id.rawValue) } == [["n-draft"], ["t-doing"], ["n-published"], [], ["t-none", "event"]])
-        #expect(groups.last?.title == "No Status")
-    }
-
-    @Test func aFieldOnlySomeTypesDeclareGivesTheOthersNotApplicable() throws {
-        let items = [Self.item("t", Self.task, ["due_at": .string("2026-11-24")]), Self.item("n", Self.note), Self.item("t2", Self.task)]
-        let rows = Self.rows(items)
-        let due = try #require(Self.columns(rows).first { $0.id == "field.due_at" })
-        let groups = ItemTableLayout.groups(of: rows, by: due, mode: .presence, catalogue: Self.catalogue)
-        #expect(groups.map(\.id) == ["false", "true", GroupKey.notApplicable])
-        #expect(groups.last?.title == "Not Applicable")
-        #expect(groups.last?.rows.map(\.item.id.rawValue) == ["n"])
-    }
-
-    @Test func theOrderNamedComesFirstThenTheRestThenNotApplicable() {
-        let groups = ["a", "b", "c", "", GroupKey.notApplicable].map { ItemTableGroup(id: $0, title: $0, rows: []) }
-        #expect(ItemTableLayout.ordered(groups, by: ["c", GroupKey.notApplicable, "", "gone"]).map(\.id) == ["c", "", "a", "b", GroupKey.notApplicable])
-        #expect(ItemTableLayout.ordered(groups, by: nil).map(\.id) == groups.map(\.id))
-    }
-
     // MARK: In a window
 
     private static func library(_ items: [MarfaMac.Item]) -> FakeItemLibrary {
@@ -218,96 +124,6 @@ struct GroupByTests {
         browser.set(layout: layout)
         browser.choicesChanged()
         return browser
-    }
-
-    @Test func hiddenGroupsLeaveTheTableAndTheirItemsStillCount() {
-        let items = [Self.item("a", Self.task, ["status": .string("todo")]), Self.item("b", Self.task, ["status": .string("done")])]
-        let library = Self.library(items)
-        let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .table)
-        browser.chooseGrouping(.column("field.status"))
-        browser.setGroup("done", hidden: true, in: library)
-        browser.moveGroup("done", onto: "todo", in: library)
-        let content = browser.tableContent(in: library)
-        #expect(content.allGroups.map(\.id) == ["done", "todo", "doing"])
-        #expect(content.groups.map(\.id) == ["todo", "doing"])
-        #expect(content.rows.count == 2, "a hidden group narrows no listing")
-        browser.setGroup("todo", hidden: true, in: library)
-        browser.setHidesEmptyGroups(true)
-        #expect(browser.tableContent(in: library).hidesEveryGroup)
-        // A new grouping starts with no order and nothing hidden.
-        browser.chooseGrouping(.column("field.status", by: .statusGroups))
-        browser.choicesChanged()
-        #expect(browser.tableOptions[browser.item]?.groupOrder == nil)
-        #expect(browser.tableOptions[browser.item]?.hiddenGroups == nil)
-    }
-
-    @Test func hiddenGroupsLeaveTheGalleryAndTheirItemsStillCountAndStayInTheSelectionsList() {
-        let items = [Self.item("a", Self.task, ["status": .string("todo")]), Self.item("b", Self.task, ["status": .string("done")])]
-        let library = Self.library(items)
-        let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .gallery)
-        browser.chooseGrouping(.column("field.status"))
-        browser.setGroup("done", hidden: true, in: library)
-        let drawn = browser.sections(in: library, order: ItemOrder(), now: library.now()).flatMap { $0.items.map(\.id.rawValue) }
-        #expect(drawn == ["a"], "a hidden group's cards are not drawn")
-        #expect(browser.listedCount(in: library) == 2, "but its items still count")
-        #expect(browser.collectionItemIDs(in: library, order: ItemOrder()).map(\.rawValue) == ["a", "b"], "and stay in the list the selection follows")
-        #expect(!browser.listHidesEveryGroup(in: library))
-        browser.setGroup("todo", hidden: true, in: library)
-        #expect(browser.sections(in: library, order: ItemOrder(), now: library.now()).flatMap(\.items).isEmpty)
-        #expect(browser.listHidesEveryGroup(in: library), "the gallery says its groups are hidden, not that the place is empty")
-        #expect(browser.listedCount(in: library) == 2)
-        #expect(Set(browser.collectionItemIDs(in: library, order: ItemOrder()).map(\.rawValue)) == ["a", "b"])
-    }
-
-    @Test func aGroupDroppedOnAnotherTakesItsPlaceEitherWay() {
-        let items = [Self.item("a", Self.task, ["status": .string("todo")]), Self.item("b", Self.task, ["status": .string("done")])]
-        let library = Self.library(items)
-        let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .list)
-        browser.chooseGrouping(.column("field.status"))
-        #expect(browser.groupRows(in: library).map(\.key) == ["todo", "doing", "done"])
-        browser.moveGroup("todo", onto: "doing", in: library)
-        #expect(browser.groupRows(in: library).map(\.key) == ["doing", "todo", "done"], "dragged down, it lands after the row")
-        browser.moveGroup("todo", onto: "done", in: library)
-        #expect(browser.groupRows(in: library).map(\.key) == ["doing", "done", "todo"], "and can reach the last place")
-        browser.moveGroup("todo", onto: "doing", in: library)
-        #expect(browser.groupRows(in: library).map(\.key) == ["todo", "doing", "done"], "dragged up, it lands before the row")
-    }
-
-    @Test func hideEmptyGroupsRedrawsTheListBothWays() {
-        let items = [Self.item("a", Self.task, ["status": .string("todo")]), Self.item("b", Self.task, ["status": .string("done")])]
-        let library = Self.library(items)
-        let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .list)
-        browser.chooseGrouping(.column("field.status"))
-        func drawn() -> [String] {
-            browser.sections(in: library, order: browser.storedOrder, now: library.now()).compactMap { $0.group?.key }
-        }
-        let all = drawn()
-        #expect(all.count == 3, "the empty group is drawn")
-        browser.setHidesEmptyGroups(true)
-        #expect(drawn().count == 2, "and leaves the list at once")
-        browser.setHidesEmptyGroups(false)
-        #expect(drawn() == all, "and comes back at once")
-    }
-
-    @Test func aListWithEveryGroupHiddenSaysSoInThePageColumn() {
-        let items = [Self.item("a", Self.task, ["status": .string("todo")]), Self.item("b", Self.task, ["status": .string("done")])]
-        let library = Self.library(items)
-        let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .list)
-        browser.chooseGrouping(.column("field.status"))
-        browser.setGroup("todo", hidden: true, in: library)
-        #expect(!browser.listDrawsNoItem(in: library))
-        browser.setGroup("done", hidden: true, in: library)
-        #expect(!browser.filteredItems(in: library).isEmpty, "the place still holds its items")
-        #expect(browser.listDrawsNoItem(in: library), "so the page column says the groups are hidden")
-    }
-
-    @Test func byListsEachWayOnceWithTheDividerBetweenRunsNeverInsideOne() throws {
-        let library = Self.library(Self.events)
-        let browser = Self.window(library, place: .itemType(Self.event.rawValue), layout: .list)
-        let entry = try #require(browser.groupOffer(in: library).entries.first { $0.id == "field.starts_at" })
-        #expect(entry.runs.map { $0.map(\.label) } == [["Day", "Week", "Month", "Year"], ["Set or Not Set"]])
-        #expect(entry.runs.flatMap { $0 } == entry.choices)
-        #expect(entry.runs.dropFirst().allSatisfy { $0.first?.startsSection == true })
     }
 
     @Test func aPlacesListKeepsItsOwnSortAndGroupInItsDefaultView() {

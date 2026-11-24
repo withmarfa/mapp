@@ -131,6 +131,7 @@ nonisolated struct PluginRemoval: Hashable, Sendable {
 /// Why a call about a plugin did not do what was asked.
 nonisolated enum PluginFailure: Error, Hashable, Sendable {
     case owner(OwnerFailure)
+    case bundleFileUnreadable(name: String)
     /// The plugins release could not be read, in one line that does not name an address with a credential.
     case releaseUnreadable(String)
     /// A bundle's bytes are not the ones the release lists, so nothing was used.

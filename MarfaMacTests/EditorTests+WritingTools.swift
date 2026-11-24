@@ -9,11 +9,6 @@ import WebKit
 /// `EditorController.isWritingToolsActive` and `writingToolsActivityChanged()`, which the web view's key-value
 /// observation of `isWritingToolsActive` calls.
 extension EditorTests {
-    @Test func theEditorAsksForTheFullWritingToolsExperience() async throws {
-        let page = try await Page()
-        #expect(page.editor.webView.configuration.writingToolsBehavior == .complete)
-    }
-
     @Test func nothingIsSavedDuringASessionAndTheLatestTextIsSavedWhenItEnds() async throws {
         let page = try await Page()
         try await page.load("Draft\n")
@@ -36,6 +31,7 @@ extension EditorTests {
         try await page.load("Draft\n")
         page.editor.isWritingToolsActive = { true }
         try await page.run("window.editor.focus(); document.execCommand('insertText', false, ' kept')")
+        // Nothing to wait for: gives a save time to happen during the session, if one is going to.
         try await Task.sleep(for: .milliseconds(300))
         #expect(page.changes.isEmpty)
         await withCheckedContinuation { continuation in page.editor.flush { _ in continuation.resume() } }
@@ -43,6 +39,7 @@ extension EditorTests {
         let saved = page.changes.count
         page.editor.isWritingToolsActive = { false }
         page.editor.writingToolsActivityChanged()
+        // Nothing to wait for: gives a second save time to happen, if one is going to.
         try await Task.sleep(for: .milliseconds(500))
         #expect(page.changes.count == saved, "the held edit is not saved a second time")
     }

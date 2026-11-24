@@ -70,6 +70,8 @@ nonisolated enum StartUpWording {
         "MARFA_CONTROL_ONLY": String(localized: "Starts only the command line’s way in, for recovery."),
         "MARFA_CLAIM_ADDRESS": String(localized: "The sign-in address a new Marfa starts with."),
         "MARFA_OWNER_RECOVERY": String(localized: "Prints a recovery code at each start."),
+        "MARFA_CLOUD_URL": String(localized: "The address used to connect to Marfa Cloud."),
+        "MARFA_CLOUDFLARED": String(localized: "The location of the tunnel connector for Marfa Cloud."),
         "MARFA_KEY_SALT": String(localized: "Seals stored keys. Never shown."),
         "MARFA_AUTH_SECRET": String(localized: "Signs sign-ins. Never shown."),
     ]

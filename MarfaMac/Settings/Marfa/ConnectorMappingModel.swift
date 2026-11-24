@@ -44,9 +44,11 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
     private(set) var rewrites: [PendingRewrite] = []
     private(set) var options: [MappingTypeOption] = []
     private(set) var types: [String: MappingTypeInfo] = [:]
-    private(set) var failure: OwnerFailure?
-    private(set) var hasLoaded = false
-    private(set) var isLoading = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    private let optionsRead = OwnerLoader.ReadStatus()
+    var optionsFailure: OwnerFailure? { optionsRead.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
     private(set) var isSaving = false
     /// A save that failed for want of the server, a permission or the like, not one the server judged.
     private(set) var saveFailure: OwnerFailure?
@@ -79,26 +81,18 @@ nonisolated enum MappingPreviewState: Hashable, Sendable {
     // MARK: Reading
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer { isLoading = false; hasLoaded = true }
-        let reading: ConnectorMappingReading
-        do {
-            reading = try await context.calls.connectorMapping(of: plugin.name)
-            failure = nil
-        } catch {
-            failure = error
-            await context.learn(from: error)
-            return
-        }
-        options = (try? await context.calls.mappingTypeOptions()) ?? options
-        take(reading)
-        for entry in kinds.values { await ensureType(entry.saved.targetType) }
-        for kind in plugin.kinds { await ensureType(kind.type) }
-        for name in kinds.keys {
-            previewRuns[name, default: 0] += 1
-            await count(name)
-        }
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+            take(try await context.calls.connectorMapping(of: plugin.name))
+        }, secondary: [
+            .required(optionsRead) { [self] () throws(OwnerFailure) in options = try await context.calls.mappingTypeOptions() },
+        ], after: {
+            for entry in kinds.values { await ensureType(entry.saved.targetType) }
+            for kind in plugin.kinds { await ensureType(kind.type) }
+            for name in kinds.keys {
+                previewRuns[name, default: 0] += 1
+                await count(name)
+            }
+        })
     }
 
     /// Takes what the server holds, where that reading is at least as new as the one held and no save is in flight. A kind

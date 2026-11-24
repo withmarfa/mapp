@@ -48,8 +48,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var websitesSent: [[String]] = []
         var gates: [String: OwnerCallGate] = [:]
         var concerns: [AttentionConcern] = []
-        var reading = InstanceReading()
-        var fileStores = FileStores(stores: [], fileBytes: nil, orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
+        var metrics = InstanceMetricsReading(version: "0.0.84", databaseBytes: nil, fileBytes: 0)
+        var fileStores = FileStores(stores: [], orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
         var sourceLimit = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: nil)
         /// What each source limit write sent: the filter, or nil for turning it off.
         var limitsSent: [(types: [String], sources: [String])?] = []
@@ -359,9 +359,9 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return state.withLock { $0.concerns }
     }
 
-    func reading() async throws(OwnerFailure) -> InstanceReading {
-        try enter("reading")
-        return state.withLock { $0.reading }
+    func instanceMetrics() async throws(OwnerFailure) -> InstanceMetricsReading {
+        try enter("instanceMetrics")
+        return state.withLock { $0.metrics }
     }
 
     func fileStores() async throws(OwnerFailure) -> FileStores {
@@ -452,8 +452,10 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo {
         try enter("redeliver")
         return try state.withLock { state throws(OwnerFailure) in
+            guard let hook = state.webhooks.first(where: { $0.id == webhook }) else { throw .notFound }
             guard let index = state.deliveries[webhook]?.firstIndex(where: { $0.id == delivery }) else { throw .notFound }
-            guard state.deliveries[webhook]?[index].status == .failed else { throw .refused("Only a failed delivery can be sent again.") }
+            guard hook.active else { throw .redeliveryRefused(.webhookInactive) }
+            guard state.deliveries[webhook]?[index].status == .failed else { throw .redeliveryRefused(.deliveryNotFailed) }
             state.redelivered.append(delivery)
             state.deliveries[webhook]?[index].status = .pending
             return state.deliveries[webhook]![index]
@@ -468,6 +470,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func upkeepSettings() async throws(OwnerFailure) -> UpkeepSettings {
         try enter("upkeepSettings")
+        await held("upkeepSettings")
         return state.withLock { $0.upkeep }
     }
 
@@ -510,6 +513,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     func updateStatus() async throws(OwnerFailure) -> UpdateStatus {
+        await held("updateStatus")
         try enter("updateStatus")
         return state.withLock { state in
             if !state.updateReads.isEmpty { state.update = state.updateReads.count > 1 ? state.updateReads.removeFirst() : state.updateReads[0] }
@@ -645,7 +649,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func runConnector(_ plugin: String) async throws(OwnerFailure) -> ConnectorControl {
         try await controlled(plugin, "runConnector") { control throws(OwnerFailure) in
-            if control.paused { throw .refused("The connector is paused. Resume it to run it.") }
+            if control.paused { throw .connectorPaused }
             control.runRequested = .now
         }
     }
@@ -1348,6 +1352,29 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         bench.grants = [.grantsManage]
         await model.load()
         #expect(model.keysMade.isEmpty)
+    }
+
+    @Test func aFailedKeysReadIsToldAndKeepsTheKeysAlreadyRead() async {
+        let bench = bench(app())
+        let key = KeyInfo(id: "k", label: "Raycast capture", source: "raycast", permissions: [], tier: .feed, types: [:], appClientID: "raycast")
+        bench.calls.state.withLock { $0.keys = [key] }
+        let model = AppsModel(context: bench.context)
+        bench.calls.fail("keys", with: .unreachable)
+        await model.load()
+        #expect(model.failure == nil)
+        #expect(model.keysFailure == .unreachable)
+        #expect(model.apps.count == 1)
+
+        bench.calls.fail("keys", with: nil)
+        await model.load()
+        #expect(model.keysFailure == nil)
+        #expect(model.keysMade["raycast"] == [key])
+
+        bench.calls.fail("keys", with: .notPermitted("keys.manage"))
+        await model.load()
+        #expect(model.keysFailure == .notPermitted("keys.manage"))
+        #expect(model.keysMade["raycast"] == [key])
+        #expect(bench.refreshed == 1)
     }
 
     @Test func scopesAreNarrowedAndNeverWidened() {
@@ -2182,7 +2209,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 }
 
 @MainActor
-@Suite struct OwnerWordingTests {
+@Suite(.hangLimit) struct OwnerWordingTests {
     @Test func everyFailureSaysSomethingInOneLine() {
         let failures: [OwnerFailure] = [
             .unreachable, .signedOut, .notPermitted("grants.manage"), .notPermitted(nil), .notPermitted("odd.scope"), .notFound,
@@ -2220,6 +2247,26 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(OwnerWording.line(.notPermitted("webhooks.manage"), on: .webhooks) == MarfaSettingsPage.webhooks.permissionLine)
         #expect(OwnerWording.line(.notPermitted("keys.manage"), on: .webhooks) == OwnerWording.permissionLine("keys.manage"))
         #expect(OwnerWording.line(.unreachable, on: .webhooks) == OwnerWording.line(.unreachable))
+    }
+
+    @Test(arguments: [
+        ("webhook_inactive", "Turn on Sending to send this delivery again."),
+        ("credential_unavailable", "The key or app that created this webhook no longer has access. Create a new webhook for future deliveries."),
+        ("delivery_not_failed", "Only failed deliveries can be sent again."),
+        ("delivery_expired", "This delivery expired and can’t be sent again."),
+        ("unknown", "The server couldn’t do that."),
+    ])
+    func aRedeliveryRefusalUsesTheAppWording(reason: String, wording: String) {
+        let error = MarfaError.server(
+            status: 409, code: "conflict", message: "The server’s words.", details: .object(["reason": .string(reason)]), server: nil)
+        #expect(OwnerWording.problemLine(ClientOwnerCalls.failure(error), on: .webhooks, canRetry: false) == wording)
+    }
+
+    @Test func aPausedConnectorRefusalTellsTheOwnerToResumeIt() {
+        let error = MarfaError.server(status: 409, code: "connector_paused", message: "The server’s words.", details: nil, server: nil)
+        let failure = ClientOwnerCalls.failure(error)
+        #expect(failure == .connectorPaused)
+        #expect(OwnerWording.problemLine(failure, on: .connectors, canRetry: false) == "The connector is paused. Resume it, then choose Run Now.")
     }
 
     @Test func anotherMarfaAnsweringIsItsOwnFailureWithTheWordsOfTheSettingsPage() {

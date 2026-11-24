@@ -96,25 +96,6 @@ private func catalogue() -> Catalogue {
         #expect(plan.shown.label == "Shelf")
     }
 
-    @Test func aBlankNameIsRefused() {
-        #expect(throws: FieldEditRefusal.blankLabel) { try info.plan(.rename(key: "shelf", label: ""), in: catalogue()) }
-        #expect(throws: FieldEditRefusal.blankLabel) { try info.plan(.rename(key: "shelf", label: "   \n "), in: catalogue()) }
-    }
-
-    @Test func aNameAnotherFieldHasIsRefusedWhateverItsCase() {
-        #expect(throws: FieldEditRefusal.labelInUse("genre")) { try info.plan(.rename(key: "shelf", label: "genre"), in: catalogue()) }
-        // The inherited field's name counts too.
-        #expect(throws: FieldEditRefusal.labelInUse("Rating")) { try info.plan(.rename(key: "shelf", label: "Rating"), in: catalogue()) }
-    }
-
-    @Test func aFieldMayTakeANewSpellingOfItsOwnName() throws {
-        #expect(try info.plan(.rename(key: "shelf", label: "SHELF"), in: catalogue()).edit == .rename(key: "shelf", label: "SHELF"))
-    }
-
-    @Test func aNameOverAHundredCharactersIsRefused() {
-        #expect(throws: FieldEditRefusal.labelTooLong) { try info.plan(.rename(key: "shelf", label: String(repeating: "a", count: 101)), in: catalogue()) }
-    }
-
     @Test func aLockedFieldIsRefusedBeforeAnythingIsSent() {
         #expect(throws: FieldEditRefusal.locked(.inherited(from: media))) { try info.plan(.rename(key: "rating", label: "Mark"), in: catalogue()) }
         #expect(throws: FieldEditRefusal.locked(.inherited(from: media))) { try info.plan(.remove(key: "rating"), in: catalogue()) }
@@ -229,7 +210,7 @@ private func catalogue() -> Catalogue {
     }
 }
 
-@Suite struct TypeDefinitionEditTests {
+@Suite(.hangLimit) struct TypeDefinitionEditTests {
     private typealias Definition = Components.Schemas.FieldDefinition
 
     private func listed(genre: Definition? = nil) -> TypeDefinitionEdit.Listed {

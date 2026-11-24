@@ -45,7 +45,7 @@ final class Browser {
     /// life of the window, not across launches.
     private(set) var history = SelectionHistory()
     @ObservationIgnored private var isMovingThroughHistory = false
-    @ObservationIgnored private var isSelectingAutomatically = false
+    @ObservationIgnored var isSelectingAutomatically = false
     var viewMode: ItemViewMode = .list {
         didSet {
             if viewMode != oldValue {
@@ -156,8 +156,8 @@ final class Browser {
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
-    @ObservationIgnored private var tableMemo: (key: TableKey, content: ItemTableContent)?
-    @ObservationIgnored private var sectionsMemo: (key: SectionsKey, sections: [ItemSection])?
+    @ObservationIgnored var tableMemo: (key: TableKey, content: ItemTableContent)?
+    @ObservationIgnored var sectionsMemo: (key: SectionsKey, sections: [ItemSection])?
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
     /// The last Group by offer, while the table's content and the layout it was made for stand (`Browser+Grouping`).
@@ -169,7 +169,7 @@ final class Browser {
     /// choice works each out again.
     var lookChoices: [TypeID: TypeLookChoice] = [:]
     @ObservationIgnored var looksMemo: (key: LooksKey, looks: [TypeID: TypeLook])?
-    @ObservationIgnored private var stackableMemo: (key: StackableKey, type: String?)?
+    @ObservationIgnored var stackableMemo: (key: StackableKey, type: String?)?
     /// Held by `paletteIndex(in:)`.
     @ObservationIgnored var paletteMemo: (key: PaletteIndexKey, index: PaletteIndex)?
     var compactBoards: [SidebarItem: Bool] = [:]
@@ -365,78 +365,9 @@ final class Browser {
         focusRequest = .list
     }
 
-    func searchScope(in library: any ItemLibrary) -> SearchScope {
-        guard searchesPlace, SearchScope.narrows(item) else { return .everywhere }
-        // A type's place lists its subtypes' items too while it includes them, and the search follows the list.
-        if case .itemType(let type) = item, stacksSubtypes(in: library) { return .typeWithSubtypes(TypeID(type)) }
-        return .place(item)
-    }
-
-    /// What the search finds, or nil while the window is not searching.
-    func searchResults(in library: any ItemLibrary) -> SearchResults? {
-        isSearching ? library.search(searchText, in: searchScope(in: library)) : nil
-    }
-
-    /// The items the list shows: the search results while searching, the sidebar item's items otherwise.
-    func items(in library: any ItemLibrary) -> [Item] {
-        Cost.measure(.items) { searchResults(in: library)?.items ?? placeItems(in: library) }
-    }
-
-    /// Whether the open place lists anything, without copying its items.
-    /// A search, or a saved view's list, is the copy's answer, filters included. No index count matches it.
-    /// Chip filters narrow a layout after the list is made. They are not part of what `items(in:)` answered.
-    func listsAnything(in library: any ItemLibrary) -> Bool {
-        if isSearching || isViewPlace {
-            return !items(in: library).isEmpty
-        }
-        // Include Subtypes lists a subtype's items. This is true only when one of those subtypes holds an item,
-        // so the place lists something even when the type itself does not.
-        if stacksSubtypes(in: library) { return true }
-        // Recents' count does not read `membershipRevision` itself. The rest do. Either way the answer follows
-        // membership, which is what moves an item into or out of the place, and not a keystroke.
-        _ = library.membershipRevision
-        return library.count(in: item) > 0
-    }
-
     /// The types whose list also shows their subtypes' items, kept in the defaults and mirrored here so the views
     /// that list items follow a change (`IncludedSubtypes`).
     var stackedTypes: Set<String> = []
-
-    /// The type whose list could also show its subtypes: the open place when it is a type that has subtypes holding
-    /// items.
-    func stackableType(in library: any ItemLibrary) -> String? {
-        guard case .itemType(let type) = item else { return nil }
-        let key = StackableKey(library: ObjectIdentifier(library), membership: library.membershipRevision, type: type)
-        if let held = stackableMemo, held.key == key { return held.type }
-        let stackable = library.subtypesHoldingItems(of: type).isEmpty ? nil : type
-        stackableMemo = (key, stackable)
-        return stackable
-    }
-
-    private struct StackableKey: Equatable {
-        let library: ObjectIdentifier
-        let membership: Int
-        let type: String
-    }
-
-    /// Whether the open place lists its subtypes' items with its own.
-    func stacksSubtypes(in library: any ItemLibrary) -> Bool {
-        stackableType(in: library).map(stackedTypes.contains) ?? false
-    }
-
-    /// What the open place lists. A type lists its own items, and its subtypes' too while it is stacked.
-    func placeItems(in library: any ItemLibrary) -> [Item] {
-        if let preview = viewPreview { return library.previewItems(ofView: preview.view, query: preview.query) }
-        guard stacksSubtypes(in: library), case .itemType(let type) = item else { return library.items(in: item) }
-        return library.items(inTypeAndSubtypes: type)
-    }
-
-    /// The items in the order the window last drew them: the table's rows in the table, else the list's or gallery's
-    /// sections, with whatever the place lists after them (a board, a timeline) in its own order.
-    func onScreenOrder(in library: any ItemLibrary) -> [ItemID] {
-        let drawn = viewMode == .table ? tableMemo?.content.rows.map(\.item.id) : sectionsMemo?.sections.flatMap { $0.items.map(\.id) }
-        return (drawn ?? []) + placeItems(in: library).map(\.id)
-    }
 
     /// The selected items that still exist.
     func selectedItems(in library: any ItemLibrary) -> [Item] {
@@ -447,197 +378,6 @@ final class Browser {
     /// preview, sync or embeds, is not a change it shows.
     func selectedHeaderItems(in library: any ItemLibrary) -> [Item] {
         selection.compactMap { library.headerItem($0) }
-    }
-
-    /// Whether the list shows its place's own order rather than the chosen sort: a collection lists its members in
-    /// the order Marfa keeps for them, until a search lists results instead.
-    var keepsPlaceOrder: Bool {
-        guard !isSearching, case .collection = item else { return false }
-        return true
-    }
-
-    /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
-    /// item is one, nor in search results. A place that keeps its own order, and a search ordered by relevance, are
-    /// one section, in the order given. The filters apply, and a sort or group the person set, or a saved view
-    /// has, orders and groups the items in place of the list's own order. The window's views ask for them as often
-    /// as they are drawn, so the last answer stands until the items, the order, the filters, Hide Empty Groups, the day
-    /// or the place change.
-    func sections(in library: any ItemLibrary, order: ItemOrder, now: Date) -> [ItemSection] {
-        let derived = derivedKey(in: library)
-        let shape = listShape
-        let key = SectionsKey(
-            derived: derived.key, order: order, day: Calendar.current.startOfDay(for: now), shape: shape,
-            hidesEmpty: shape != nil && hidesEmptyGroups)
-        if let held = sectionsMemo, held.key == key { return held.sections }
-        let sections = Cost.measure(.sections) {
-            if let shape { return shapedSections(shape, in: library, order: order, now: now) }
-            return sectionsUnmeasured(of: derived.items ?? items(in: library), order: order, now: now)
-        }
-        sectionsMemo = (key, sections)
-        return sections
-    }
-
-    private func sectionsUnmeasured(of items: [Item], order: ItemOrder, now: Date) -> [ItemSection] {
-        if keepsPlaceOrder || ordersByRelevance {
-            return items.isEmpty ? [] : [ItemSection(group: nil, items: items)]
-        }
-        return ItemGroup.sections(
-            of: items,
-            sort: order.sort,
-            favoritesFirst: !isSearching && !showsOnlyFavorites,
-            groupsByDate: order.groupsByDate,
-            now: now
-        )
-    }
-
-    /// What the list's sections depend on besides the items: the filters, and the sort and grouping where they are
-    /// set. Nil where the place is neither filtered nor arranged, so the table's other choices (a folded group, a
-    /// page) never make the sections again.
-    struct ListShape: Equatable {
-        var options: ItemTableOptions
-        /// Whether the table's sort and grouping order the list.
-        var arranged: Bool
-    }
-
-    var listShape: ListShape? {
-        guard let options = tableOptions[item] else { return nil }
-        var grouped = false
-        if options.grouping.columnID != nil { grouped = true }
-        let arranged = options.sort != nil || grouped
-        guard arranged || options.isFiltering else { return nil }
-        var shape = options.settled
-        if !arranged {
-            shape.collapsed = nil
-            shape.sort = nil
-            shape.grouping = .automatic
-        }
-        return ListShape(options: shape, arranged: arranged)
-    }
-
-    /// The sections of a place that is filtered or arranged, worked out from the table's content, which the table
-    /// shares and a click on another item never makes again.
-    private func shapedSections(_ shape: ListShape, in library: any ItemLibrary, order: ItemOrder, now: Date) -> [ItemSection] {
-        let content = tableContent(in: library)
-        guard shape.arranged, !ordersByRelevance else {
-            return sectionsUnmeasured(of: content.kept.map(\.item), order: order, now: now)
-        }
-        // The table groups a place by status on its own; the list does only what a view or the person asked for.
-        guard shape.options.grouping.columnID != nil, let column = content.grouping else {
-            return content.rows.isEmpty ? [] : [ItemSection(group: nil, items: content.rows.map(\.item))]
-        }
-        let collapsed = content.collapsed
-        // An item's own date by day reads in a list as the list's sections always have: Today, Yesterday, Previous 7
-        // Days, Previous 30 Days, then months and years.
-        if content.groupMode == .bucket(.day), [ItemTableColumn.created.id, ItemTableColumn.edited.id, ItemTableColumn.occurred.id].contains(column.id) {
-            var sections: [ItemSection] = []
-            for row in content.groups.flatMap(\.rows) {
-                let group = column.date(of: row, calendar: .current).map { ItemGroup.group(for: $0, now: now) }
-                if let last = sections.last, last.group == group {
-                    sections[sections.count - 1].items.append(row.item)
-                } else {
-                    sections.append(ItemSection(group: group, items: [row.item]))
-                }
-            }
-            return sections.map { section in
-                var section = section
-                section.isCollapsed = section.group.map { collapsed.contains($0.key) } ?? false
-                return section
-            }
-        }
-        return content.groups.map {
-            ItemSection(group: .custom(id: $0.id, title: $0.title), items: $0.rows.map(\.item), isCollapsed: collapsed.contains($0.id))
-        }
-    }
-
-    /// The items the open place shows in the layouts that arrange them themselves (the board, the timeline): the
-    /// place's items, less those the filters hide. `items(in:)` stays whole, for whatever needs every item.
-    func filteredItems(in library: any ItemLibrary) -> [Item] {
-        guard tableOptions[item]?.isFiltering == true else { return items(in: library) }
-        return tableContent(in: library).kept.map(\.item)
-    }
-
-    /// Whether the open place has filters that hide everything it lists.
-    func filtersHideEverything(in library: any ItemLibrary) -> Bool {
-        guard tableOptions[item]?.isFiltering == true else { return false }
-        let content = tableContent(in: library)
-        return content.kept.isEmpty && !content.allRows.isEmpty
-    }
-
-    /// Whether the table has been worked out for the window, which a list or a gallery that is neither filtered nor
-    /// arranged never does.
-    var holdsTableContent: Bool { tableMemo != nil }
-
-    /// What the place's table shows, worked out once and shared by everything that draws the table, its controls or
-    /// a command about it, until the items, the place's options or the search change. Reading it does not depend on
-    /// the selection, so a selection never makes it again.
-    func tableContent(in library: any ItemLibrary) -> ItemTableContent {
-        let keyed = (tableOptions[item] ?? ItemTableOptions()).settled
-        let derived = derivedKey(in: library)
-        let key = TableKey(
-            derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, counts: library.counts.revision,
-            hidesEmpty: hidesEmptyGroups,
-            relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()))
-        if let held = tableMemo, held.key == key { return held.content }
-        let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
-        tableMemo = (key, content)
-        return content
-    }
-
-    /// What everything worked out from a place's items depends on: which library and how often it changed, the
-    /// place and how the window orders them. The items themselves are listed only where they can change without the
-    /// library's revisions doing so, which is a search answering and a saved view's list arriving, and are handed
-    /// back so the caller does not list them twice. Reading it observes the library's revisions, so a view that asks
-    /// is told of the next change.
-    private func derivedKey(in library: any ItemLibrary) -> (key: DerivedKey, items: [Item]?) {
-        let listed = isSearching || isViewPlace ? items(in: library) : nil
-        let key = DerivedKey(
-            library: ObjectIdentifier(library), content: library.contentRevision, membership: library.membershipRevision,
-            place: item, stacked: stacksType, ids: listed?.map(\.id), byRelevance: ordersByRelevance,
-            keepsPlaceOrder: keepsPlaceOrder, favoritesFirst: !isSearching && !showsOnlyFavorites)
-        return (key, listed)
-    }
-
-    /// Whether the open place is a saved view, whose sort and group the list and the gallery take.
-    var isViewPlace: Bool {
-        if case .view = item { true } else { false }
-    }
-
-    /// Whether the open place is a type the person has stacked, which lists its subtypes' items too.
-    private var stacksType: Bool {
-        if case .itemType(let type) = item { stackedTypes.contains(type) } else { false }
-    }
-
-    private struct DerivedKey: Equatable {
-        let library: ObjectIdentifier
-        let content: Int
-        let membership: Int
-        let place: SidebarItem
-        let stacked: Bool
-        let ids: [ItemID]?
-        let byRelevance: Bool
-        let keepsPlaceOrder: Bool
-        let favoritesFirst: Bool
-    }
-
-    private struct SectionsKey: Equatable {
-        let derived: DerivedKey
-        let order: ItemOrder
-        let day: Date
-        let shape: ListShape?
-        /// Hide Empty Groups, which only an arranged list's groups read and which is kept apart from the place's options.
-        let hidesEmpty: Bool
-    }
-
-    private struct TableKey: Equatable {
-        let derived: DerivedKey
-        let options: ItemTableOptions
-        let choices: [TypeID: TypeLookChoice]
-        let shownRelations: Set<Relation>
-        /// A changed or evicted answer invalidates the cached table rows.
-        let counts: Int
-        let hidesEmpty: Bool
-        /// The day a filter relative to the day is worked out for, so the table is made again when it changes.
-        let relativeDay: Date?
     }
 
     /// The links the table's shown columns hold, which its rows read besides those the looks and the options name.
@@ -653,103 +393,8 @@ final class Browser {
         return true
     }
 
-    private var showsOnlyFavorites: Bool {
-        if case .favoriteItem = item { return true }
-        return item == .favorites
-    }
-
-    /// Shows a sidebar item as a person picks it in the sidebar, the menus or the palette: any search is cleared and the
-    /// list's first item is selected, where the place is not an index, which chooses nothing until the person does.
-    func show(_ item: SidebarItem, in library: any ItemLibrary, order: ItemOrder) {
-        let interval = Telemetry.begin(.navigation, "place.choose")
-        defer { interval.end() }
-        isCollectionItemPresented = false
-        modalItem = nil
-        searchText = ""
-        isSearchExpanded = false
-        sidebarItem = item
-        fallBackToListIfUnavailable(in: library)
-        selectFirstItem(in: library, order: order)
-    }
-
-    func selectFirstItem(in library: any ItemLibrary, order: ItemOrder) {
-        // An index chooses nothing until the person does, and ordering every item for a first one would hold the window.
-        guard !showsSidebarIndex else { return selectAutomatically([]) }
-        let first = sections(in: library, order: order, now: library.now()).first?.items.first
-        selectAutomatically(first.map { [$0.id] } ?? [])
-    }
-
-    /// Moves the selection as the app does, not as the person chose, so Back does not stop there.
-    func selectAutomatically(_ ids: Set<ItemID>) {
-        isSelectingAutomatically = true
-        defer { isSelectingAutomatically = false }
-        selection = ids
-    }
-
-    /// Whether the selection follows the items the window's layout holds as they change: a layout that spans the window
-    /// has no list to do it, and nor has a full page opened from the list, which takes the list's place.
-    var followsCollection: Bool { usesCollection || isCollectionItemPresented }
-
-    /// Keeps the selection true as the items the window holds change (`collectionItemIDs`), while it follows them.
-    func collectionItemsChanged(from old: [ItemID], to new: [ItemID]) {
-        guard followsCollection else { return }
-        keepSelection(from: old, to: new)
-    }
-
-    /// The items the layout that spans the window holds, which its selection follows as they change (`keepSelection`):
-    /// the table's in the order it shows them, then those its filters hide, and the gallery's, the board's and the
-    /// timeline's in the list's order, which is also the order of a full page opened from the list. The table's come from
-    /// its own content, so a move between its places sorts no list. Items' are its table's (`itemIndexIDs`).
-    func collectionItemIDs(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
-        guard followsCollection else { return [] }
-        // Items has no layout: a full page opened from it follows the rows of its table.
-        if item == .allItems { return itemIndexIDs(in: library) }
-        guard !showsSidebarIndex else { return [] }
-        guard viewMode == .table else {
-            let shown = sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
-            // The items the filters and the hidden groups leave out stay in the selection's reach, as the table's do.
-            let rest: [ItemID]
-            if listShape?.arranged == true, !ordersByRelevance {
-                rest = tableContent(in: library).allRows.map(\.id)
-            } else if tableOptions[item]?.isFiltering == true {
-                rest = items(in: library).map(\.id)
-            } else {
-                return shown
-            }
-            let isShown = Set(shown)
-            return shown + rest.filter { !isShown.contains($0) }
-        }
-        let content = tableContent(in: library)
-        // A grouped table shows its rows group by group, not in the sort's order across groups.
-        let shown = (content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)).map(\.id)
-        let isShown = Set(shown)
-        return shown + content.allRows.map(\.id).filter { !isShown.contains($0) }
-    }
-
-    /// Keeps the selection in the list after items leave it or the search changes it (see `selection(_:keptFrom:in:)`).
-    ///
-    /// A search not yet answered shows nothing, which says nothing about the selection: it is held, and the answer is
-    /// compared with the list as it stood before the search.
-    func keepSelection(from old: [ItemID], to new: [ItemID], isPending: Bool = false) {
-        if isPending {
-            listBeforePendingSearch = listBeforePendingSearch ?? old
-            return
-        }
-        let before = listBeforePendingSearch ?? old
-        listBeforePendingSearch = nil
-        let kept = Self.selection(selection, keptFrom: before, in: new)
-        if kept != selection { selectAutomatically(kept) }
-    }
-
-    /// Compares the answer of a search with the list before it, when the answer arrives without changing the list,
-    /// as one that finds nothing does after a list that showed nothing while it waited.
-    func keepHeldSelection(in list: [ItemID]) {
-        guard listBeforePendingSearch != nil else { return }
-        keepSelection(from: list, to: list)
-    }
-
     /// The list a search that has not yet answered replaced, for the answer to be compared with.
-    @ObservationIgnored private var listBeforePendingSearch: [ItemID]?
+    @ObservationIgnored var listBeforePendingSearch: [ItemID]?
 
     /// Whether the window still shows `library`, which a long task checks after each wait, since the person may have
     /// changed library meanwhile.
@@ -823,86 +468,6 @@ final class Browser {
     /// Where an item's file is, for sharing: the file the window fetched to show.
     func fileURL(of id: ItemID) -> URL? {
         fetchedFile.flatMap { $0.id == id ? $0.url : nil }
-    }
-
-    /// Moves the live items among `ids` to Recently Deleted, which undoes; more than one is handed to `confirm`
-    /// where there is one, which asks the person first and then moves them. A selection with a live item in it never
-    /// erases anything: the items already in Recently Deleted stay there, since erasing cannot be undone and a
-    /// command that also moves other items must not do it. Only a selection made entirely of items already there
-    /// asks to erase them for good, and only where the library can; otherwise the person is told why not.
-    static func delete(
-        _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?, toasts: ToastPresenter? = nil,
-        naming title: String? = nil, asking confirm: ((Set<ItemID>) -> Void)? = nil
-    ) {
-        let binned = Set(ids.filter { library.item($0)?.state == .trashed })
-        // Told here, before anything asks the person to confirm items that would be left alone.
-        let plan = library.deletePlan(ids.subtracting(binned))
-        let moving = plan.moving
-        library.tellSkipped(plan.skips, didChange: !moving.isEmpty || !binned.isEmpty, failing: String(localized: "Can’t Delete"))
-        if !moving.isEmpty {
-            if moving.count > 1, let confirm {
-                confirm(moving)
-            } else {
-                moveToRecentlyDeleted(moving, in: library, undoManager: undoManager, toasts: toasts, naming: title)
-            }
-        } else if !binned.isEmpty, ids.subtracting(binned).isEmpty {
-            if library.reachesServer { library.itemsToPurge = binned } else { library.tellCannotPurge() }
-        }
-    }
-
-    /// Moves `ids` to Recently Deleted, then says so in the window's toast with an Undo that takes back that move.
-    /// The toast's Undo is bound to the step (`StepUndo`), not to its name: any step registered, undone or redone
-    /// after it takes the toast away. It is offered only where no undo group was open before the move, since the move
-    /// would then share that group and `undo()` would take back the other steps in it too. A manager that does not
-    /// group by event has none open, so the move gets a group of its own, closed at once. A `title` names the one item
-    /// moved, for an item the library may no longer return once moved.
-    static func moveToRecentlyDeleted(
-        _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?, toasts: ToastPresenter?, naming title: String? = nil
-    ) {
-        let moving = library.deletePlan(ids).moving
-        let name = moving.count == 1 ? title ?? moving.first.flatMap { library.item($0)?.name } : nil
-        let startsGroup = undoManager?.groupingLevel == 0
-        let opensGroup = startsGroup && undoManager?.groupsByEvent == false
-        if opensGroup { undoManager?.beginUndoGrouping() }
-        library.delete(ids, undoManager: undoManager)
-        if opensGroup { undoManager?.endUndoGrouping() }
-        guard !moving.isEmpty, let toasts else { return }
-        let message = DeletionWords.movedMessage(count: moving.count, title: name)
-        guard startsGroup, let undoManager, undoManager.canUndo else {
-            toasts.show(message, symbol: "trash")
-            return
-        }
-        let step = StepUndo(undoManager: undoManager)
-        let id = toasts.show(message, symbol: "trash", undo: { step.perform() })
-        step.onLapse = { [weak toasts] in toasts?.dismiss(ifShowing: id) }
-    }
-
-    /// A place that is gone can no longer be shown, so the window moves to where `placeFallback(in:)` says.
-    func placeRemoved(in library: any ItemLibrary, order: ItemOrder) {
-        if let place = placeFallback(in: library) { show(place, in: library, order: order) }
-    }
-
-    /// Where the window should go instead, when the place it shows has gone; nil while the place stands. Reading it
-    /// observes what a place's existence depends on (membership and the saved views), so a view that only asks this
-    /// is told when the answer may have changed, and reads no list of the library's items to find out.
-    func placeFallback(in library: any ItemLibrary) -> SidebarItem? {
-        guard library.isLoaded else { return nil }
-        switch sidebarItem {
-        case .collection(let id):
-            // A collection's state is part of membership, which `item(_:)` follows only once the item is missing.
-            _ = library.membershipRevision
-            return library.item(id)?.state != .active ? .allItems : nil
-        // A type is in the sidebar while it holds an item, so one whose last item went has no row to stay on.
-        case .itemType(let type):
-            return library.count(in: .itemType(type)) == 0 ? .allItems : nil
-        case .view(let id):
-            return library.views.contains { $0.id == id } ? nil : .allItems
-        case .favoriteItem(let id):
-            _ = library.membershipRevision
-            return library.item(id).map({ $0.state == .active && $0.isFavorite }) == true ? nil : .favorites
-        default:
-            return nil
-        }
     }
 
     // MARK: Saved views
@@ -982,29 +547,10 @@ final class Browser {
     /// one test leaves in a place's default view never reaches another's.
     @ObservationIgnored var defaults: UserDefaults = Browser.initialDefaults
 
-    private static var initialDefaults: UserDefaults {
-        #if DEBUG
-        if TestHost.isRequested, let suite = UserDefaults(suiteName: "MarfaMac.Browser.\(UUID().uuidString)") { return suite }
-        #endif
-        return .standard
-    }
     /// What `isDefaultViewChanged` last worked out, and the stored data it worked it out from (`Browser+PlaceDefaults`).
     @ObservationIgnored var changedMemo: (place: SidebarItem, inputs: [Data?], changed: Bool)?
     @ObservationIgnored var isApplyingLayout = false
 
     /// The order and grouping each view opened with (`Browser+SavedViews`).
     var viewSeeds: [ItemID: ViewSeed] = [:]
-
-    // MARK: Keeping the selection in the list
-
-    /// When selected items leave the list (deleted, moved elsewhere, filtered out by a search), the selection
-    /// keeps whichever are still there. If none are, it moves to the item that followed them, or failing that
-    /// the one before, as Notes and Mail do.
-    static func selection(_ selection: Set<ItemID>, keptFrom old: [ItemID], in new: [ItemID]) -> Set<ItemID> {
-        let visible = Set(new)
-        let kept = selection.intersection(visible)
-        guard kept.isEmpty, let first = old.firstIndex(where: selection.contains) else { return kept }
-        let candidates = old[first...].dropFirst() + old[..<first].reversed()
-        return candidates.first { visible.contains($0) && !selection.contains($0) }.map { [$0] } ?? []
-    }
 }

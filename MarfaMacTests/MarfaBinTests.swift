@@ -22,8 +22,10 @@ struct MarfaBinTests {
         try #require(await eventually { library.isLoaded && library.item(ids["third"]!) != nil })
         library.delete([ids["first"]!], undoManager: nil)
         try #require(await eventually { library.item(ids["first"]!)?.state == .trashed })
+        // The server dates a binned item to the second, so each delete waits for the next second to be told apart.
         try await Task.sleep(for: .milliseconds(1_100))
         _ = try await fake.copy.items.delete(ids["second"]!.rawValue)
+        // The server dates a binned item to the second, so each delete waits for the next second to be told apart.
         try await Task.sleep(for: .milliseconds(1_100))
         _ = try await fake.copy.items.delete(ids["third"]!.rawValue)
         try #require(await eventually { library.deletedItems.count == 3 })

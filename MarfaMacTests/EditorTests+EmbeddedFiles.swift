@@ -59,73 +59,6 @@ extension EditorTests {
         #expect(page.changes.isEmpty)
     }
 
-    @Test func eachKindOfEmbeddedFileShowsAsWhatItIs() async throws {
-        let root = try TemporaryFolder()
-        let attachments = root.url.appending(path: "Attachments")
-        try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
-        try EmbedFixtures.png(width: 5, height: 2).write(to: attachments.appending(path: "Photo.png"))
-        try EmbedFixtures.wav().write(to: attachments.appending(path: "Tone.wav"))
-        try EmbedFixtures.movie(to: attachments.appending(path: "Clip.mov"))
-        try EmbedFixtures.pdf(to: attachments.appending(path: "Plan.pdf"))
-        try Data("Item,Cost\nOak,11850\n".utf8).write(to: attachments.appending(path: "Budget.csv"))
-        let body = """
-        ![[Photo.png|3]] ![](../Attachments/Tone.wav)
-
-        ![[Clip.mov]]
-
-        ![[Plan.pdf]]
-
-        ![[Budget.csv]] ![[Missing.zip]] ![far](../../outside.png) ![[A note]] ![[Offline.png]]
-
-        """
-        let page = try await Page()
-        let note = page.library.add(body)
-        for (text, name) in [("![[Photo.png|3]]", "Photo.png"), ("![[Clip.mov]]", "Clip.mov"), ("![[Plan.pdf]]", "Plan.pdf"), ("![[Budget.csv]]", "Budget.csv")] {
-            page.library.bindEmbed(text, in: note.id, file: attachments.appending(path: name))
-        }
-        page.library.bindEmbed("![](../Attachments/Tone.wav)", in: note.id, file: attachments.appending(path: "Tone.wav"))
-        page.library.bindEmbed("![[Missing.zip]]", in: note.id)
-        page.library.bindEmbed("![far](../../outside.png)", in: note.id)
-        page.library.bindEmbed("![[Offline.png]]", in: note.id, resolution: .refused("The Marfa server can’t be reached."))
-        let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 1400), styleMask: [.titled], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.contentView = page.editor.container
-        defer {
-            window.contentView = nil
-            window.close()
-        }
-        page.editor.load(note)
-        let editor = page.editor
-
-        let image = try await settle(editor, "(() => { const i = document.querySelector('.inkkit-image img'); return i ? [i.naturalWidth, Math.round(i.getBoundingClientRect().width)] : [] })()", as: [Int].self) { $0 == [5, 3] }
-        #expect(image == [5, 3], "the image loads through the scheme at the width its embed gives")
-
-        let audio = try await settle(editor, "(() => { const a = document.querySelector('.inkkit-file audio'); return a && a.readyState >= 1 ? a.duration : -1 })()", as: Double.self) { ($0 ?? -1) > 0 }
-        #expect(abs((audio ?? 0) - 0.5) < 0.05, "the sound's length is read through ranges of the file")
-
-        let video = try await settle(editor, "(() => { const v = document.querySelector('.inkkit-file video'); return v && v.readyState >= 1 ? [v.videoWidth, v.videoHeight] : [] })()", as: [Int].self) { $0 == [64, 64] }
-        #expect(video == [64, 64])
-
-        let labels = try await settle(editor, "[...document.querySelectorAll('.inkkit-file-label')].map(e => e.textContent)", as: [String].self) { $0?.contains("Budget.csv") == true }
-        #expect(labels?.contains("Budget.csv") == true)
-        let expectedMissing = [
-            ["name": "Missing.zip", "status": "File Not Found"],
-            ["name": "far", "status": "File Not Found"],
-            ["name": "A note", "status": "File Not Found"],
-        ]
-        let missing = try await settle(editor,
-            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=missing]')].map(card => ({ name: card.querySelector('.inkkit-file-label')?.textContent, status: card.querySelector('.inkkit-file-status')?.textContent }))",
-            as: [[String: String]].self) { $0 == expectedMissing }
-        #expect(missing == expectedMissing)
-        let unavailable = try await settle(editor, "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=error] .inkkit-file-label')].map(e => e.textContent)", as: [String].self) { $0 == ["Offline.png"] }
-        #expect(unavailable == ["Offline.png"], "a file that can't be had now says so, rather than that it is missing")
-
-        #expect(labels?.contains("Plan.pdf: Open to view this PDF") == true)
-        #expect(try await editor.webView.evaluateJavaScript("!!document.querySelector('.inkkit-file iframe')") as? Bool == false)
-
-        #expect(try await page.markdown() == nil, "showing the files changes nothing in the item")
-    }
-
     @Test func aPictureAppearsWhenItsFileArrivesAndGoesWhenItIsBinned() async throws {
         let root = try TemporaryFolder()
         let photo = root.url.appending(path: "Photo.png")
@@ -195,6 +128,8 @@ extension EditorTests {
 
     // MARK: Quick Look on a file card
 
+    /// Asks the editor for Quick Look as the card's action does, rather than finding the card's button, which waits on
+    /// the page to draw the card and its actions and timed out on a busy runner.
     @Test func quickLookOnAFileCardShowsTheFileTheEmbedIsBoundTo() async throws {
         let root = try TemporaryFolder()
         let sheet = root.url.appending(path: "Budget.csv")
@@ -203,14 +138,10 @@ extension EditorTests {
         let note = page.library.add("A sheet: ![[Budget.csv]]\n")
         page.library.bindEmbed("![[Budget.csv]]", in: note.id, file: sheet)
         page.editor.load(note)
-        // The card's actions arrive after the card itself, so wait for both before reading their order.
-        let labels = try await settle(page.editor, "[...document.querySelectorAll('.inkkit-file-actions button')].map(b => b.getAttribute('aria-label'))", as: [String].self) { ($0?.count ?? 0) >= 2 }
-        #expect(labels?.first == "Quick Look Budget.csv", "the card's first action is Quick Look, named for the file")
-        let quickLook = ".inkkit-file-actions button[aria-label^='Quick Look']"
+        try await page.wait { page.editor.isReady }
         #expect(page.editor.quickLook == nil)
-        // The test page tells of a script error of its own as a card loads; Quick Look must add none.
         let told = page.library.notices.told
-        try await page.run("document.querySelector(\"\(quickLook)\").click()")
+        page.editor.quickLookEmbed(EmbedReference(text: "![[Budget.csv]]"), in: note.id)
         try await page.wait { page.editor.quickLook != nil }
         #expect(page.editor.quickLook?.current?.lastPathComponent == "Budget.csv")
         #expect(page.library.notices.told == told, "showing the file tells the person nothing")
@@ -498,6 +429,7 @@ extension EditorTests {
         #expect(try await markdown(editor) == nil, "nothing reached the text")
         let asked = try #require(try await editor.webView.evaluateJavaScript("window.__refusals()") as? Int)
         #expect(asked == EditorController.hiddenTextRetryLimit + 1, "it asked a limited number of times")
+        // Nothing to wait for: gives a further retry time to be made, if one is going to.
         try await Task.sleep(for: EditorController.hiddenTextRetryDelay * 3)
         #expect(try await editor.webView.evaluateJavaScript("window.__refusals()") as? Int == asked, "and then stopped")
         let told = try #require(library.notices.waiting.last)

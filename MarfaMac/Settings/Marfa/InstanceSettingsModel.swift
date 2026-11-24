@@ -92,6 +92,10 @@ import Observation
             failure = nil
         } catch {
             guard generation == self.generation else { return }
+            switch error {
+            case .failed(let detail), .refused(let detail): OwnerSettingsLog.failure(detail)
+            default: break
+            }
             fail(error)
         }
     }

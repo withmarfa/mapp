@@ -1,4 +1,5 @@
 import AppKit
+import Marfa
 import SwiftUI
 
 /// The Apps page: the apps the owner approved, each opening a page of its own with what it may reach, which can only be
@@ -170,8 +171,14 @@ private struct AppDetail: View {
                     push(OwnerPermissions.subpage(of: AppsPage.subpage(for: app)))
                 }
             }
-            if let keys = model.keysMade[app.clientID], !keys.isEmpty {
+            let keys = host.grants.contains(.keysManage) ? model.keysMade[app.clientID] ?? [] : []
+            if !keys.isEmpty || model.keysFailure != nil {
                 SettingsSection(name: Text("Keys It Made"), line: Text("They keep working when \(name) is disconnected.")) {
+                    if let failure = model.keysFailure {
+                        OwnerProblemRow(
+                            title: "Couldn’t Read the Keys This App Made", failure: failure, page: .apps, host: host,
+                            retry: { Task { await model.load() } })
+                    }
                     ForEach(keys.sorted { ($0.lastUsed ?? .distantPast) > ($1.lastUsed ?? .distantPast) }) { key in
                         SettingsRow(verbatim: key.label, line: OwnerWording.used(key.lastUsed) + ".", lead: .tile("key.fill", .amber))
                     }

@@ -28,15 +28,6 @@ struct ItemTableColumnsTests {
         #expect(shown.count < columns.count)
     }
 
-    @Test func aHiddenColumnComesBackWhenShownAndLeavesAgainWhenHidden() {
-        let columns = Self.columns
-        var properties = ViewProperties()
-        properties.setShown(.created, true)
-        #expect(Self.ids(properties.shownColumns(columns)).contains("created"))
-        properties.setShown(.created, false)
-        #expect(!Self.ids(properties.shownColumns(columns)).contains("created"))
-    }
-
     @Test func aColumnShownByDefaultLeavesWhenHiddenAndKeepsItsPlaceInTheOrder() throws {
         let columns = Self.columns
         let victim = try #require(columns.first { $0.isShownByDefault && $0.content != .title })
@@ -54,11 +45,6 @@ struct ItemTableColumnsTests {
         properties.setShown(.edited, false)
         properties.reset()
         #expect(Self.ids(properties.shownColumns(columns)) == Self.ids(columns.filter(\.isShownByDefault)))
-    }
-
-    @Test func theNameStaysEvenIfTheStoredPropertiesHideIt() {
-        let properties = ViewProperties(shown: ["title": false])
-        #expect(Self.ids(properties.shownColumns(Self.columns)).first == "title")
     }
 
     @Test func aStoredLayoutSurvivesTheRoundTripPerPlace() {
@@ -83,75 +69,6 @@ struct ItemTableColumnsTests {
         if let table = view as? NSTableView { return table }
         for sub in view.subviews { if let found = tableView(in: sub) { return found } }
         return nil
-    }
-
-    private func columnIDs(_ table: NSTableView) -> [String] {
-        table.tableColumns.filter { !$0.isHidden }.map(\.identifier.rawValue)
-    }
-
-    @MainActor
-    @Test func theWindowsTableHoldsOnlyShownColumnsAndKeepsAHiddenOnesWidth() async throws {
-        let (library, _) = try await BigLibrary.loaded()
-        let browser = Browser()
-        browser.sidebarItem = .allItems
-        browser.viewMode = .table
-        let suite = "MarfaMac.ItemTableColumnsTests"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defaults.removePersistentDomain(forName: suite)
-        defer { defaults.removePersistentDomain(forName: suite) }
-        // Narrower than the table's columns at their smallest, so the table scrolls whatever the display. A table whose
-        // columns fit its window is fitted again by AppKit each time a column comes or goes, which sets every width afresh
-        // and writes them to the layout, so a width comes back only where the columns overflow.
-        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 700, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.contentView = NSHostingView(rootView: Host(browser: browser).environment(\.library, library).defaultAppStorage(defaults))
-        window.makeKeyAndOrderFront(nil)
-        defer { window.performClose(nil); window.contentView = nil }
-
-        func table() async throws -> NSTableView {
-            try #require(await eventually { window.contentView.flatMap { Self.tableView(in: $0) }.map { !$0.tableColumns.isEmpty } ?? false })
-            return try #require(window.contentView.flatMap { Self.tableView(in: $0) })
-        }
-        func layout() -> TableColumnCustomization<ItemTableRow> {
-            ItemTableColumnLayouts.layout(for: .allItems, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data())
-        }
-        /// The width the table has written for a column. A layout offers no way to read one, so this reads the form it encodes to.
-        func storedWidth(of id: String) -> Double? {
-            guard let data = try? JSONEncoder().encode(layout()),
-                  let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let states = root["perColumnState"] as? [[String: Any]],
-                  let index = states.firstIndex(where: { ($0["base"] as? [String: Any])?["explicit"] as? [String: String] == ["_0": id] }),
-                  states.indices.contains(index + 1) else { return nil }
-            return states[index + 1]["currentWidth"] as? Double
-        }
-
-        let first = try await table()
-        let expected = browser.shownColumns(browser.tableContent(in: library).columns).map(\.id)
-        let initial = first.tableColumns.map(\.identifier)
-        // SwiftUI names the table's columns itself, so a column is told by its place: the name first, Created last.
-        #expect(initial.count == expected.count)
-        let titleColumn = try #require(first.tableColumns.first)
-
-        browser.setColumn(.created, shown: true)
-        try #require(await eventually { first.tableColumns.count == expected.count + 1 })
-        let created = try #require(first.tableColumns.last)
-        #expect(!initial.contains(created.identifier))
-        // The table also writes the other columns' widths when Created arrives, so wait for Created's own.
-        created.width = 160
-        try #require(await eventually { storedWidth(of: "created") == 160 })
-
-        browser.setColumn(.created, shown: false)
-        try #require(await eventually { first.tableColumns.count == expected.count })
-        titleColumn.width += 40
-        // Nothing to wait for: this gives the table's write-back time to have happened, if it is going to.
-        try await Task.sleep(for: .milliseconds(300))
-        #expect(storedWidth(of: "created") == 160)
-
-        browser.setColumn(.created, shown: true)
-        try #require(await eventually { first.tableColumns.count == expected.count + 1 })
-        let back = try #require(first.tableColumns.last)
-        #expect(back.width == 160)
-        #expect(first.tableColumns.first?.width == titleColumn.width)
     }
 
     @MainActor

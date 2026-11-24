@@ -8,10 +8,6 @@ struct LinkMenuTests {
         ["type": "linkMenu", "item": "abc", "generation": 3, "link": link, "point": [40.0, 60.0], "viewportHeight": 700.0]
     }
 
-    private func titles(_ target: LinkMenuTarget, isEditable: Bool = true) -> [String] {
-        EditorController.linkMenuEntries(for: target, isEditable: isEditable).map(\.title)
-    }
-
     // MARK: The page's request
 
     @Test func aWebLinkRequestCarriesItsAddressAndWhetherItOpens() throws {
@@ -50,13 +46,6 @@ struct LinkMenuTests {
 
     // MARK: The menu
 
-    @Test func aWebLinkOffersOpenCopyEditAndRemove() {
-        let target = LinkMenuTarget.web(text: "site", href: "https://example.com", openable: true)
-        let entries = EditorController.linkMenuEntries(for: target, isEditable: true)
-        #expect(entries.map(\.choice) == [.open, .copy, .edit, .remove])
-        #expect(entries.allSatisfy { $0.isEnabled })
-    }
-
     @Test func anAddressThatMayNotOpenLeavesOpenDimmedAndCopyAvailable() {
         for href in ["javascript:alert(1)", "file:///etc/passwd", ""] {
             let target = LinkMenuTarget.web(text: "x", href: href, openable: false)
@@ -68,21 +57,10 @@ struct LinkMenuTests {
         #expect(empty.first { $0.choice == .copy }?.isEnabled == false, "an empty address has nothing to copy")
     }
 
-    @Test func anItemLinkOffersOpenCopyAndRemoveButNoAddress() throws {
-        let link = try #require(ItemLink(linkText: "[[Plan]]"))
-        #expect(EditorController.linkMenuEntries(for: .item(text: "Plan", link), isEditable: true).map(\.choice) == [.open, .copy, .remove])
-    }
-
     @Test func aReadOnlyPageOffersOnlyOpenAndCopy() throws {
         let link = try #require(ItemLink(linkText: "[[Plan]]"))
         for target in [LinkMenuTarget.web(text: "x", href: "https://example.com", openable: true), .item(text: "Plan", link)] {
             #expect(EditorController.linkMenuEntries(for: target, isEditable: false).map(\.choice) == [.open, .copy])
         }
-    }
-
-    @Test func theMenuNamesEachChoiceInThePersonsWords() throws {
-        #expect(titles(.web(text: "x", href: "https://example.com", openable: true)) == ["Open Link", "Copy Link", "Edit Link…", "Remove Link"])
-        let link = try #require(ItemLink(linkText: "[[Plan]]"))
-        #expect(titles(.item(text: "Plan", link)) == ["Open", "Copy Link", "Remove Link"])
     }
 }

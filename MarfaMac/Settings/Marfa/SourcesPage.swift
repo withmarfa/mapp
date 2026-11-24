@@ -74,18 +74,28 @@ struct SourcesPage: View {
                     Button("Use Default Name") { Task { await model.useDefaultName(row.code) } }.disabled(!row.hasChosenName)
                     Button("Remove Mark") { Task { await model.removeMark(row.code) } }.disabled(row.mark == nil)
                 }
-                .disabled(!host.canChangeSources)
+                .disabled(!host.canChangeSources || model.isWorking)
             }
         }
     }
 
     private var rules: some View {
         SettingsSection("Rules for Every App and Key", line: "A key can set its own instead.") {
+            if let failure = limit.failure {
+                OwnerProblemRow(title: "Couldn’t Read Limit Sources", failure: failure, page: .sources, host: host) {
+                    Task { await limit.load() }
+                }
+            }
             SettingsLinkRow(
                 verbatim: String(localized: "Limit Sources"), line: String(localized: "Only items from the sources you name are read."),
-                value: limit.isOn ? String(localized: "On") : String(localized: "Not Set")
+                value: limitValue
             ) { push(Self.limitSources) }
         }
+    }
+
+    private var limitValue: String? {
+        guard let reading = limit.limit else { return nil }
+        return reading.isOn ? String(localized: "On") : String(localized: "Not Set")
     }
 
     /// How a source got its name, in a line.
@@ -172,6 +182,7 @@ private struct SourceSheet: View {
 private struct LimitSourcesPage: View {
     let model: SourceLimitModel
     let host: any MarfaSettingsHost
+    @State private var asksToTurnOff = false
 
     var body: some View {
         @Bindable var model = model
@@ -181,10 +192,20 @@ private struct LimitSourcesPage: View {
             OwnerLoading()
         } else {
             SettingsPageColumn {
+                if let failure = model.failure {
+                    OwnerProblem(title: "Couldn’t Read Limit Sources", failure: failure, page: .sources, host: host) {
+                        Task { await model.load() }
+                    }
+                }
                 Text("For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. The app too.")
                     .settingsFont(.sectionLine).foregroundStyle(SettingsTokens.secondaryText)
                     .padding(.horizontal, SettingsTokens.Metric.inset)
                 SettingsSection("Types", line: "Types with no limit read every source.") {
+                    if let failure = model.typesFailure {
+                        OwnerProblemRow(title: "Couldn’t Read Available Types", failure: failure, page: .sources, host: host) {
+                            Task { await model.load() }
+                        }
+                    }
                     ForEach(model.typeChoices) { choice in checkRow(choice, in: $model.types, id: "LimitType") }
                 }
                 SettingsSection("Sources", line: "A new source is left out until you check it.") {
@@ -203,10 +224,16 @@ private struct LimitSourcesPage: View {
                 if model.isOn {
                     SettingsSection("Turn Off") {
                         SettingsRow("Turn Off Limit Sources", line: "Every source is read again.") {
-                            SettingsButton("Turn Off", role: .destructive) { Task { await model.turnOff() } }.disabled(model.isSaving)
+                            SettingsButton("Turn Off", role: .destructive) { asksToTurnOff = true }.disabled(model.isSaving)
                         }
                     }
                 }
+            }
+            .alert("Turn Off Limit Sources?", isPresented: $asksToTurnOff) {
+                Button("Cancel", role: .cancel) {}
+                Button("Turn Off", role: .destructive) { Task { await model.turnOff() } }
+            } message: {
+                Text("Apps and keys will read items from every source for the types you limited.")
             }
             .accessibilityIdentifier("LimitSourcesPage")
         }

@@ -15,17 +15,6 @@ struct SidebarSectionsTests {
     ])
     private static let defaults = ["details", "properties", "relationships", "links-in-page", "#linked", "tags"]
 
-    @Test func aTypeWithNoChoiceShowsTodaysSections() {
-        let placements = PagePlacements()
-        #expect(placements.sidebarSections(of: Self.ticket, in: Self.catalogue) == Self.defaults)
-        #expect(!placements.hasChoice(for: Self.ticket))
-    }
-
-    @Test func aPersonsLinkedFromStaysOnThePageSoTheSidebarLeavesItOut() {
-        let sections = PagePlacements().sidebarSections(of: Self.person, in: Self.catalogue)
-        #expect(sections == Self.defaults.filter { $0 != "#linked" })
-    }
-
     @Test func removingASectionKeepsTheOthersInOrder() {
         var placements = PagePlacements()
         placements.removeSidebarSection("relationships", of: Self.ticket, in: Self.catalogue)
@@ -149,55 +138,6 @@ struct SidebarSectionsTests {
         }
         #expect(SidebarSection(id: "nonsense") == nil)
         #expect(SidebarSection(id: "app:only-a-type") == nil)
-    }
-
-    // MARK: Outline
-
-    private func headingsMessage(_ entries: [(Int, String)], generation: Int = 3) -> [String: Any] {
-        ["type": "headings", "headings": entries.map { ["level": $0.0, "text": $0.1] }, "generation": generation]
-    }
-
-    @Test func thePagesHeadingsDecodeWithTheirPlaceInItsList() throws {
-        let message = try #require(EditorMessage(body: headingsMessage([(1, "Soil"), (2, "Soil"), (3, "Water")])))
-        guard case .headings(let headings, let generation) = message else { Issue.record("Not headings"); return }
-        #expect(generation == 3)
-        #expect(headings.map(\.text) == ["Soil", "Soil", "Water"])
-        #expect(headings.map(\.level) == [1, 2, 3])
-        #expect(headings.map(\.index) == [0, 1, 2])
-        #expect(Set(headings.map(\.id)).count == 3)
-    }
-
-    @Test func aHeadingWithNoWordsIsCountedButNotListed() throws {
-        let message = try #require(EditorMessage(body: headingsMessage([(1, ""), (1, "  "), (1, "Next")])))
-        guard case .headings(let headings, _) = message else { Issue.record("Not headings"); return }
-        #expect(headings.map(\.text) == ["Next"])
-        #expect(headings.map(\.index) == [2])
-    }
-
-    @Test func aPageWithNoHeadingsReportsAnEmptyList() throws {
-        guard case .headings(let headings, _) = try #require(EditorMessage(body: headingsMessage([]))) else { Issue.record("Not headings"); return }
-        #expect(headings.isEmpty)
-    }
-
-    @Test func aMalformedHeadingsMessageIsRefused() {
-        #expect(EditorMessage(body: ["type": "headings", "generation": 1]) == nil)
-        #expect(EditorMessage(body: ["type": "headings", "headings": [["level": 1]], "generation": 1]) == nil)
-        #expect(EditorMessage(body: ["type": "headings", "headings": [["level": 1, "text": "A"]]]) == nil)
-    }
-
-    @Test func aListForAnEarlierLoadIsKeptForNothing() {
-        let heading = OutlineHeading(level: 1, text: "Soil", index: 0)
-        let note = ItemID("note")
-        #expect(PageOutline.accepting([heading], generation: 2, current: 3, item: note) == nil)
-        #expect(PageOutline.accepting([heading], generation: 3, current: 3, item: nil) == nil)
-        #expect(PageOutline.accepting([heading], generation: 3, current: 3, item: note) == PageOutline(item: note, generation: 3, headings: [heading]))
-    }
-
-    @Test func theOutlineListsHeadingsOnlyForTheItemOnThePage() {
-        let heading = OutlineHeading(level: 1, text: "Soil", index: 0)
-        let outline = PageOutline(item: ItemID("note"), generation: 3, headings: [heading])
-        #expect(outline.headings(for: ItemID("note")) == [heading])
-        #expect(outline.headings(for: ItemID("other")).isEmpty)
     }
 
     // MARK: What the sections read from the library

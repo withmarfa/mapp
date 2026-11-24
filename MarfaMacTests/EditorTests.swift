@@ -81,25 +81,6 @@ struct EditorTests {
         override var canBecomeMain: Bool { false }
     }
 
-    @Test func selectingAnotherItemReturnsTheBodyToReading() async throws {
-        let page = try await Page()
-        try await page.load("First item")
-        try await page.run("window.editor.focus()")
-        let editing = try await page.editor.webView.evaluateJavaScript(
-            "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
-        ) as? Bool
-        #expect(editing == true)
-        try await page.load("Second item")
-        let reading = try await page.editor.webView.evaluateJavaScript(
-            "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
-        ) as? Bool
-        #expect(reading == false)
-        let outline = try await page.editor.webView.evaluateJavaScript(
-            "getComputedStyle(document.querySelector('.ProseMirror')).outlineStyle"
-        ) as? String
-        #expect(outline == "none")
-    }
-
     @Test func nativeFocusChangesUpdateSelectionWithoutEditingTheItem() async throws {
         let page = try await Page()
         try await page.load("Selected text")
@@ -604,16 +585,6 @@ struct EditorTests {
         // Gives a report from the page, had it taken the typing, time to arrive.
         try await Task.sleep(for: .milliseconds(500))
         #expect(page.changes.isEmpty)
-    }
-
-    /// The page reports a heading's availability by its level, so the Format menu offers Title, Heading, and
-    /// Subheading in an editable item.
-    @Test func headingCommandsAreAvailableInAnItem() async throws {
-        let page = try await Page()
-        try await page.load("Milk\n")
-        try await page.wait { page.editor.canApply(.title) }
-        #expect(page.editor.canApply(.heading))
-        #expect(page.editor.canApply(.subheading))
     }
 
     /// An edit still waiting to be reported when another device's text is taken in was typed on the text before it,

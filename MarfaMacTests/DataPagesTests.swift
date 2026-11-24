@@ -143,7 +143,8 @@ import Testing
     }
 
     @Test func noConcernsLeavesTheSectionToGoAndTheBadgeEmpty() async {
-        let model = OverviewModel(context: bench().context)
+        let bench = bench()
+        let model = OverviewModel(context: bench.context)
         await model.load()
         #expect(model.concerns.isEmpty)
         #expect(model.attentionCount == 0)
@@ -247,23 +248,99 @@ import Testing
     @Test func whatTheServerSaysOfItselfIsKeptButNeverRequired() async {
         let bench = bench()
         bench.calls.state.withLock {
-            $0.reading = InstanceReading(version: "0.0.89", updateReady: "0.0.90", databaseBytes: 214_000_000, fileBytes: 3_400_000_000, owner: "mira")
+            $0.metrics = InstanceMetricsReading(version: "0.0.89", databaseBytes: 214_000_000, fileBytes: 3_400_000_000)
+            $0.update.running = "0.0.89"
+            $0.update.available = true
+            $0.update.latest = UpdateRelease(version: "0.0.90")
         }
         let model = OverviewModel(context: bench.context)
         await model.load()
-        #expect(model.reading?.updateReady == "0.0.90")
-        #expect(model.reading?.owner == "mira")
+        #expect(model.updateReady == "0.0.90")
+        #expect(model.owner == "mira")
     }
 
     @Test func aDevelopmentBuildHasNoVersionToShow() async {
         let bench = bench()
-        bench.calls.state.withLock { $0.reading = InstanceReading(version: "0.0.0", updateReady: "0.0.90") }
+        bench.calls.state.withLock { $0.update.running = "0.0.0" }
         let model = OverviewModel(context: bench.context)
         await model.load()
         #expect(model.releaseVersion == nil)
-        bench.calls.state.withLock { $0.reading = InstanceReading(version: "0.0.89") }
+        bench.calls.state.withLock { $0.update.running = "0.0.89" }
         await model.load()
         #expect(model.releaseVersion == "0.0.89")
+    }
+
+    @Test(arguments: ["0.0.90", "0.0.100"])
+    func anUpdateReadDoesNotOfferAReleaseAlreadyReachedByMetrics(installed: String) async {
+        let bench = bench()
+        bench.calls.state.withLock {
+            $0.update.running = "0.0.89"
+            $0.update.available = true
+            $0.update.latest = UpdateRelease(version: "0.0.90")
+        }
+        let model = OverviewModel(context: bench.context)
+        await model.load()
+        #expect(model.updateReady == "0.0.90")
+
+        bench.calls.state.withLock {
+            $0.metrics = InstanceMetricsReading(version: installed, databaseBytes: nil, fileBytes: 0)
+        }
+        let gate = bench.calls.hold("updateStatus")
+        let loading = Task { await model.load() }
+        #expect(await eventually { bench.calls.state.withLock { $0.waiting["updateStatus"] == 1 } })
+        #expect(model.metrics?.version == installed)
+        #expect(model.releaseFailure == nil)
+        #expect(model.updateReady == nil)
+
+        bench.calls.fail("updateStatus", with: .unreachable)
+        bench.calls.state.withLock { $0.gates["updateStatus"] = nil }
+        gate.open()
+        await loading.value
+
+        #expect(model.releaseFailure == .unreachable)
+        #expect(model.releaseVersion == installed)
+        #expect(model.updateReady == nil)
+
+        bench.calls.fail("updateStatus", with: nil)
+        await model.load()
+        #expect(model.releaseFailure == nil)
+        #expect(model.updateReady == nil)
+    }
+
+    @Test func aFailedReleaseReadIsToldAndKeepsTheLastRelease() async {
+        let bench = bench()
+        let metrics = InstanceMetricsReading(version: "0.0.89", databaseBytes: 214_000_000, fileBytes: 3_400_000_000)
+        bench.calls.state.withLock {
+            $0.metrics = metrics
+            $0.update.running = "0.0.89"
+            $0.update.available = true
+            $0.update.latest = UpdateRelease(version: "0.0.90")
+        }
+        let model = OverviewModel(context: bench.context)
+        bench.calls.fail("instanceMetrics", with: .unreachable)
+        bench.calls.fail("updateStatus", with: .unreachable)
+        await model.load()
+        #expect(model.failure == nil)
+        #expect(model.releaseVersion == nil)
+        #expect(model.releaseFailure == .unreachable)
+        #expect(model.metricsFailure == .unreachable)
+
+        bench.calls.fail("instanceMetrics", with: nil)
+        bench.calls.fail("updateStatus", with: nil)
+        await model.load()
+        #expect(model.releaseFailure == nil)
+        #expect(model.metricsFailure == nil)
+        #expect(model.releaseVersion == "0.0.89")
+        #expect(model.updateReady == "0.0.90")
+
+        bench.calls.fail("instanceMetrics", with: .unreachable)
+        bench.calls.fail("updateStatus", with: .unreachable)
+        await model.load()
+        #expect(model.releaseFailure == .unreachable)
+        #expect(model.metricsFailure == .unreachable)
+        #expect(model.releaseVersion == "0.0.89")
+        #expect(model.updateReady == nil)
+        #expect(model.metrics == metrics)
     }
 
     @Test func aConcernIsToldByItsTitleAndALineTheAppWordsNeverTheServersMessage() {
@@ -323,8 +400,9 @@ import Testing
         let bench = OwnerBench(grants: [.instanceRead, .configManage])
         bench.calls.state.withLock {
             $0.fileStores = FileStores(
-                stores: [FileStoreRow(id: "a", kind: .disk, locator: "/var/lib/marfa/files", error: nil)], fileBytes: 3_400_000_000,
+                stores: [FileStoreRow(id: "a", kind: .disk, locator: "/var/lib/marfa/files", error: nil)],
                 orphanCount: 3, orphanBytes: 12_000_000, firstFound: nil, orphansComplete: true)
+            $0.metrics.fileBytes = 3_400_000_000
         }
         let model = FileStorageModel(context: bench.context)
         await model.load()

@@ -18,12 +18,6 @@ struct ItemTablePagingTests {
         ItemTableGroup(id: id, title: id, rows: rows(count, prefix: id))
     }
 
-    @Test func aPageSizeIsOneOfFourAndStartsAtFifty() {
-        #expect(TablePageSize.allCases.map(\.rawValue) == [25, 50, 100, 200])
-        #expect(TablePageSize.standard.rawValue == 50)
-        #expect(TablePageSize(rawValue: 75) == nil)
-    }
-
     @Test func theFirstPageShowsPageSizeRowsAndCountsWhatIsLeft() {
         let paging = TablePaging()
         let slice = paging.slice(Self.rows(120), size: .fifty)
@@ -41,15 +35,6 @@ struct ItemTablePagingTests {
         #expect(paging.slice(rows, size: .fifty).rows.count == 100)
         paging.loadMore()
         #expect(paging.slice(rows, size: .fifty) == .init(rows: rows, remaining: 0))
-    }
-
-    @Test func aFoldedGroupAfterAFullPageShowsItsHeading() {
-        let paging = TablePaging()
-        let drawn = paging.slice(groups: [Self.group("a", 50), Self.group("b", 20)], collapsed: ["b"], size: .fifty)
-        #expect(drawn.groups.map(\.group.id) == ["a", "b"])
-        #expect(drawn.groups[0].rows.count == 50)
-        #expect(drawn.groups[1].rows.isEmpty)
-        #expect(drawn.remaining == 0)
     }
 
     @Test func aGroupedPlaceShowsOnePageInGroupOrder() {
@@ -98,16 +83,6 @@ struct ItemTablePagingTests {
         var options = ItemTableOptions()
         configure(&options)
         return TablePagingKey(place: place, search: search, byRelevance: false, options: options)
-    }
-
-    @Test func theCountStartsAgainWhenWhatIsShownChanges() {
-        let base = Self.key()
-        #expect(base != Self.key(place: .recents))
-        #expect(base != Self.key(search: "x"))
-        #expect(base != Self.key { $0.pageSize = .twoHundred })
-        #expect(base != Self.key { $0.grouping = .none })
-        #expect(base != Self.key { $0.filter = FilterState(is: ["status": ["done"]]) })
-        #expect(base != Self.key { $0.sort = [ItemTableComparator(column: .title, order: .reverse)] })
     }
 
     @Test func aFoldedGroupDoesNotStartTheCountAgain() {

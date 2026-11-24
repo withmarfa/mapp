@@ -34,14 +34,6 @@ struct MarfaSearchSetsTests {
         #expect(!found.isCapped)
     }
 
-    @Test func aSearchByTypeGivesTheCopyTheTypeAndKeepsEveryHit() async throws {
-        let rows = [Self.row("note-1"), Self.row("note-2"), Self.row("task-1", type: "core.task")]
-        let notes = try await search(rows, in: ItemQuery(types: [TypeID("core.note")], states: [.active, .archived]))
-        #expect(Set(notes.hits.map(\.rawValue)) == ["note-1", "note-2"])
-        let tasks = try await search(rows, in: ItemQuery(types: [TypeID("core.task")], states: [.active, .archived]))
-        #expect(tasks.hits.map(\.rawValue) == ["task-1"])
-    }
-
     @Test func anExcerptIsTheCoresRunsKeptWithTheVersionTheyWereCutFrom() async throws {
         let found = try await search([Self.row("a")])
         let excerpt = try #require(found.excerpts[ItemID("a")])

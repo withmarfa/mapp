@@ -1,6 +1,9 @@
 import AppKit
+import OSLog
 import UniformTypeIdentifiers
 import WebKit
+
+private let log = Telemetry.logger(.editor)
 
 /// Printing the item and exporting it as a PDF.
 extension EditorController {
@@ -44,13 +47,15 @@ extension EditorController {
             do {
                 guard pageItemID == id, self.generation == generation else { return }
                 let value = try await webView.callAsyncJavaScript("return await window.editor.printable(expected)", arguments: ["expected": generation], in: nil, contentWorld: .page)
-                if let result = value as? [String: Any], result["snapshotError"] != nil, let message = result["message"] as? String {
-                    throw NSError(domain: "MarfaMac.Print", code: 2, userInfo: [NSLocalizedDescriptionKey: message])
+                let unprepared = NSError(domain: "MarfaMac.Print", code: 1, userInfo: [
+                    NSLocalizedDescriptionKey: String(localized: "The item couldn’t be prepared for printing. Open the item again, then try again."),
+                ])
+                if let result = value as? [String: Any], let code = result["snapshotError"] {
+                    log.error("the page could not prepare the item for printing: \(String(describing: code), privacy: .public)")
+                    throw unprepared
                 }
                 guard let result = value as? [String: Any], let html = result["html"] as? String,
-                      let revision = result["revision"] as? Int else {
-                    throw NSError(domain: "MarfaMac.Print", code: 1, userInfo: [NSLocalizedDescriptionKey: String(localized: "The item could not be prepared for printing.")])
-                }
+                      let revision = result["revision"] as? Int else { throw unprepared }
                 guard pageItemID == id, self.generation == generation else { return }
                 try await renderer.load(html, textSize: CGFloat(style.textSize))
                 guard pageItemID == id, self.generation == generation, webView.window === window,
@@ -60,7 +65,13 @@ extension EditorController {
                 else { _ = await renderer.printDocument(in: window, title: title) }
             } catch {
                 guard pageItemID == id, self.generation == generation else { return }
-                library?.notices.tell(String(localized: "Couldn’t Print Item"), error.localizedDescription)
+                // WebKit's own words for a failed script say nothing the person can act on.
+                let fromThePage = (error as NSError).domain == WKError.errorDomain
+                if fromThePage { log.error("the page failed while preparing the item for printing: \(error, privacy: .public)") }
+                let message = fromThePage
+                    ? String(localized: "The item couldn’t be prepared for printing. Open the item again, then try again.")
+                    : error.localizedDescription
+                library?.notices.tell(String(localized: "Couldn’t Print Item"), message)
             }
         }
     }

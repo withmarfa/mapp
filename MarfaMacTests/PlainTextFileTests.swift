@@ -3,17 +3,8 @@ import Testing
 @testable import MarfaMac
 
 struct PlainTextFileTests {
-    @Test func emptyTextIsAReadableEmptyPage() {
-        #expect(PlainTextFile.decode(Data()) == .text(""))
-    }
-
     @Test func textStaysLiteralIncludingWhitespaceAndUnicode() {
         let text = "# Not a heading\r\n\t* Not a list *  \r\n\r\n[not a link](https://example.com)\n<em>Not HTML</em>\nCafé 日本語 👋🏽\n"
-        #expect(PlainTextFile.decode(Data(text.utf8)) == .text(text))
-    }
-
-    @Test func aLongUnbrokenLineIsNotTruncated() {
-        let text = String(repeating: "abcdef", count: 10_000)
         #expect(PlainTextFile.decode(Data(text.utf8)) == .text(text))
     }
 

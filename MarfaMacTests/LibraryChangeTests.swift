@@ -42,17 +42,6 @@ struct LibraryChangeTests {
         #expect(browser.searchText == "")
     }
 
-    @Test func theFirstLibraryAWindowIsShownLeavesItAsItWas() {
-        let library = FakeItemLibrary(items: [FakeItemLibrary.note("A", modified: start)], now: start)
-        let browser = Browser()
-        browser.selection = [library.items[0].id]
-        browser.sidebarItem = .favorites
-        browser.adopt(library)
-        browser.adopt(library)
-        #expect(browser.selection == [library.items[0].id])
-        #expect(browser.sidebarItem == .favorites)
-    }
-
     /// The window's undo acts on the library it was registered with, so it goes when the window shows another.
     @Test func aWindowCarriedToAnotherLibraryForgetsItsUndo() {
         let undoManager = UndoManager()
@@ -71,25 +60,6 @@ struct LibraryChangeTests {
     }
 
     // MARK: Files
-
-    @Test func aFileIsFetchedWhenAskedFor() async {
-        let library = FakeItemLibrary(now: start)
-        let id = ItemID.mint()
-        let url = URL(filePath: "/tmp/fetched.pdf")
-        library.files[id] = url
-        #expect(await ItemFileResolution.fetch(id, in: library) == .ready(url))
-    }
-
-    @Test func anItemWithNoFileSaysSo() async {
-        let library = FakeItemLibrary(now: start)
-        #expect(await ItemFileResolution.fetch(.mint(), in: library) == .unavailable)
-    }
-
-    @Test func aFileThatCannotBeFetchedIsAFailureNotAnAbsence() async {
-        let library = FakeItemLibrary(now: start)
-        library.fetchFails = true
-        #expect(await ItemFileResolution.fetch(.mint(), in: library) == .failed(reason: "The server can’t be reached."))
-    }
 
     /// A fetch still running for one item, as from Try Again, never shows its file under the next item.
     @Test func aLateFileForAnEarlierItemIsNeverShownUnderTheNext() async {

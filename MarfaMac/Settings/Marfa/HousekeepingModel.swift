@@ -9,9 +9,9 @@ import Observation
     private let context: OwnerContext
 
     private(set) var jobs: [HousekeepingJob] = []
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
     /// The date the server's clock reads, which the owner is asked to confirm; set while the alert is up.
     private(set) var confirming: Date?
     private(set) var isConfirming = false
@@ -24,20 +24,13 @@ import Observation
     }
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
-            jobs = try await context.calls.housekeepingJobs()
-            failure = nil
-        } catch {
-            let error = UpkeepWording.owned(error)
-            failure = error
-            await context.learn(from: error)
-        }
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+            do throws(OwnerFailure) {
+                jobs = try await context.calls.housekeepingJobs()
+            } catch {
+                throw UpkeepWording.owned(error)
+            }
+        })
     }
 
     /// The jobs the page lists, in its order, with the rest left out.

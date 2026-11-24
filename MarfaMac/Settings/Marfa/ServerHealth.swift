@@ -141,34 +141,27 @@ nonisolated struct ServerHealth: Hashable, Sendable {
     private let context: OwnerContext
 
     private(set) var health: ServerHealth?
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
 
     init(context: OwnerContext) {
         self.context = context
     }
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
-            health = try await context.calls.health()
-            failure = nil
-        } catch {
-            health = nil
-            failure = error
-            await context.learn(from: error)
-        }
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+            do throws(OwnerFailure) {
+                health = try await context.calls.health()
+            } catch {
+                health = nil
+                throw error
+            }
+        })
     }
 
     func reset() {
         health = nil
-        failure = nil
-        hasLoaded = false
+        loader.reset()
     }
 }

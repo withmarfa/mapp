@@ -132,6 +132,7 @@ struct PluginsPage: View {
                 }
             }
             SettingsAddRow("Install From a File…") { Task { await model.installFile() } }
+                .disabled(model.isInstallingFile)
         }
     }
 }
@@ -172,13 +173,17 @@ private struct PluginProblem: View {
 
     var body: some View {
         if case .owner(let failure) = problem.failure {
-            OwnerProblem(title: LocalizedStringKey(problem.title), failure: failure, page: .plugins, host: host)
+            SettingsSection(name: nil) {
+                OwnerProblemRow(
+                    title: LocalizedStringKey(problem.title), failure: failure, page: .plugins, host: host,
+                    additionalActions: [SettingsProblemAction("Close", perform: model.closeProblem)])
+            }
         } else {
             let title = problem.plugin.flatMap { model.plugin($0)?.title ?? model.entry($0)?.title }
             SettingsSection(name: nil) {
                 SettingsProblemRow(
                     title: Text(verbatim: problem.title), line: Text(verbatim: PluginWording.line(problem.failure, title: title)),
-                    actions: [])
+                    actions: [SettingsProblemAction("Close", perform: model.closeProblem)])
             }
         }
     }

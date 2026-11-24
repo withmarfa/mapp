@@ -56,7 +56,8 @@ struct OwnerFailureState: View {
             SettingsPageState(symbol: "gearshape", title: Text("No Server Settings"), line: Text(verbatim: OwnerWording.line(failure)))
         default:
             SettingsPageState(
-                symbol: "exclamationmark.triangle", title: Text("Couldn’t Read This Page"), line: Text(verbatim: OwnerWording.line(failure)),
+                symbol: "exclamationmark.triangle", title: Text("Couldn’t Read This Page"),
+                line: Text(verbatim: OwnerWording.problemLine(failure, on: page, canRetry: true)),
                 action: ("Try Again", retry))
         }
     }
@@ -69,9 +70,7 @@ struct OwnerLoading: View {
     }
 }
 
-/// A problem row for a call that failed, in a section already on the page: what went wrong in the page's words, and the one
-/// action that helps. A refusal for want of a permission offers Allow More…; anything else offers Try Again where the page
-/// has something to read again.
+/// A problem row in the page's words. A missing permission offers Allow More…, and a failed read with a retry offers Try Again.
 struct OwnerProblemRow: View {
     let title: LocalizedStringKey
     let failure: OwnerFailure
@@ -79,11 +78,12 @@ struct OwnerProblemRow: View {
     var line: String?
     let page: MarfaSettingsPage
     let host: any MarfaSettingsHost
+    var additionalActions: [SettingsProblemAction] = []
     var retry: (() -> Void)?
 
     var body: some View {
         SettingsProblemRow(
-            title: Text(title), line: Text(verbatim: line ?? OwnerWording.line(failure, on: page)),
+            title: Text(title), line: Text(verbatim: line ?? OwnerWording.problemLine(failure, on: page, canRetry: retry != nil)),
             symbol: isRefusal ? "lock" : "exclamationmark.triangle", tone: isRefusal ? nil : .orange, actions: actions
         )
         .disabled(isWaiting)
@@ -114,7 +114,7 @@ struct OwnerProblemRow: View {
     }
 
     private var actions: [SettingsProblemAction] {
-        switch offer {
+        let offered: [SettingsProblemAction] = switch offer {
         case .allowMore(let scope):
             [SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { host.askForMore(naming: scope) }]
         case .tryAgain:
@@ -122,6 +122,7 @@ struct OwnerProblemRow: View {
         case .nothing:
             []
         }
+        return offered + additionalActions
     }
 }
 

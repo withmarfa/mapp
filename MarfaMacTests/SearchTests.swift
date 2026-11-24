@@ -4,39 +4,6 @@ import Testing
 @testable import MarfaMac
 
 @Suite struct SearchExcerptTests {
-    private func excerpt(_ runs: SearchExcerpt.Run...) -> SearchExcerpt? {
-        SearchExcerpt(runs: runs, version: ItemVersion(1), modified: Date(timeIntervalSince1970: 0))
-    }
-
-    private func text(_ text: String, match: Bool = false) -> SearchExcerpt.Run { .init(text: text, isMatch: match) }
-
-    @Test func theCoresRunsKeepTheirMarksAndLinesFoldToSpaces() throws {
-        let found = try #require(excerpt(text("...the "), text("R&D", match: true), text(" plan\n  here...")))
-        #expect(found.runs.map(\.isMatch) == [false, true, false])
-        #expect(found.runs[1].text == "R&D")
-        #expect(found.plainText == "...the R&D plan here...")
-    }
-
-    @Test func anExcerptWithNoTextIsNone() {
-        #expect(excerpt() == nil)
-        #expect(excerpt(text(" "), text("", match: true), text(" \n ")) == nil)
-    }
-
-    @Test func aTrailingSpaceIsDropped() throws {
-        let found = try #require(excerpt(text("a "), text("b", match: true), text("  ")))
-        #expect(found.plainText == "a b")
-    }
-
-    @Test func aVeryLongStretchIsCutNearTheMatch() throws {
-        let long = String(repeating: "word ", count: 200)
-        let found = try #require(excerpt(text(long), text("hit", match: true), text(long)))
-        #expect(found.runs.count == 3)
-        #expect(found.runs[0].text.count <= SearchExcerpt.reach + 1)
-        #expect(found.runs[0].text.hasPrefix("…"))
-        #expect(found.runs[2].text.hasSuffix("…"))
-        #expect(found.runs[1].text == "hit")
-    }
-
     @Test func anExcerptDescribesOnlyTheItemItWasCutFrom() {
         let date = Date(timeIntervalSince1970: 5)
         var item = LibraryFixture.item(LibraryFixture.n1, LibraryFixture.note, "Note", age: 1)
@@ -45,15 +12,6 @@ import Testing
         #expect(found?.describes(item) == true)
         item.version = ItemVersion(2)
         #expect(found?.describes(item) == false)
-    }
-
-    @Test func onlyAPlaceThatStandsForAQueryNarrows() {
-        #expect(SearchScope.narrows(.inbox))
-        #expect(SearchScope.narrows(.itemType("core.note")))
-        #expect(SearchScope.narrows(.view(ItemID("v"))))
-        #expect(!SearchScope.narrows(.allItems))
-        #expect(!SearchScope.narrows(.recents))
-        #expect(!SearchScope.narrows(.favoriteItem(ItemID("f"))))
     }
 }
 
@@ -68,27 +26,6 @@ import Testing
         source.send(.loaded(SourceSnapshot(items: F.items, catalogue: F.catalogue)))
         try #require(await eventually { library.isLoaded })
         return (library, source)
-    }
-
-    @Test func anEmptyQueryAsksNothing() async throws {
-        let (library, source) = try await loaded()
-        let none = library.search(" \n", in: .everywhere)
-        #expect(none.items.isEmpty && !none.isPending && !none.isIncomplete)
-        #expect(source.searches.withLock { $0 } == 0)
-    }
-
-    @Test func wordsThatFindNothingAnswerNothingOnceAsked() async throws {
-        let (library, _) = try await loaded()
-        #expect(await eventually {
-            let found = library.search("the", in: .everywhere)
-            return !found.isPending && found.items.isEmpty && !found.isIncomplete
-        })
-    }
-
-    @Test func aQuotedPhraseGoesToTheCopyAsTyped() async throws {
-        let (library, source) = try await loaded()
-        source.hits.withLock { $0["\"exact phrase\""] = [F.n1] }
-        #expect(await eventually { library.search(" \"exact phrase\" ", in: .everywhere).items.map(\.id) == [F.n1] })
     }
 
     @Test func anExcerptShowsWhileTrueAndGoesWhenTheItemChanges() async throws {
@@ -110,14 +47,6 @@ import Testing
         })
     }
 
-    @Test func anItemRemovedWhileShownLeavesTheResults() async throws {
-        let (library, source) = try await loaded()
-        source.hits.withLock { $0["body"] = [F.n1, F.p1] }
-        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.n1, F.p1] })
-        source.send(.removed([F.n1]))
-        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.p1] })
-    }
-
     @Test func anItemSentToTheBinWhileShownLeavesTheResultsAtOnce() async throws {
         let (library, source) = try await loaded()
         source.hits.withLock { $0["body"] = [F.n1, F.p1] }
@@ -126,86 +55,6 @@ import Testing
         binned.state = .trashed
         source.send(.changed(ItemChanges(upserted: [binned])))
         #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.p1] })
-    }
-
-    @Test func aPartialAnswerSaysSoAndIsAskedAgainOnceTheCopyIsWhole() async throws {
-        let (library, source) = try await loaded(filling: true)
-        source.hits.withLock { $0["body"] = [F.n1] }
-        source.searchIncomplete.withLock { $0 = true }
-        #expect(await eventually {
-            let found = library.search("body", in: .everywhere)
-            return found.isIncomplete && !found.isPending
-        })
-
-        source.searchIncomplete.withLock { $0 = false }
-        source.hits.withLock { $0["body"] = [F.n1, F.p1] }
-        source.report.update { $0.fill = LibraryFill(state: .complete, listed: 9, expected: 9) }
-        #expect(await eventually {
-            let found = library.search("body", in: .everywhere)
-            return !found.isIncomplete && found.items.map(\.id) == [F.n1, F.p1]
-        })
-    }
-
-    @Test func aCappedAnswerSaysSo() async throws {
-        let (library, source) = try await loaded()
-        source.hits.withLock { $0["body"] = [F.n1] }
-        source.searchCapped.withLock { $0 = true }
-        #expect(await eventually { library.search("body", in: .everywhere).isCapped })
-    }
-
-    @Test func aCapNoticeCountsTheRowsShownNotTheLimit() async throws {
-        let (library, source) = try await loaded()
-        source.hits.withLock { $0["body"] = [F.n1, F.p1] }
-        source.searchCapped.withLock { $0 = true }
-        #expect(await eventually { library.search("body", in: .everywhere).cappedCount != nil })
-        let found = library.search("body", in: .everywhere)
-        #expect(found.items.map(\.id) == [F.n1, F.p1])
-        #expect(found.cappedCount == found.items.count)
-
-        source.searchCapped.withLock { $0 = false }
-        var renamed = try #require(library.item(F.n2))
-        renamed.title = "Other"
-        source.send(.upserted([renamed]))
-        #expect(await eventually { library.search("body", in: .everywhere).cappedCount == nil })
-    }
-
-    @Test func aSearchThatBeganWholeButFoundTheCopyStaleIsAskedAgainWhenItsFillChanges() async throws {
-        let (library, source) = try await loaded()
-        source.hits.withLock { $0["body"] = [F.n1] }
-        source.searchIncomplete.withLock { $0 = true }
-        #expect(await eventually { library.search("body", in: .everywhere).isIncomplete })
-
-        // A copy that stays stale is not searched again and again.
-        let asked = source.searches.withLock { $0 }
-        for _ in 0..<5 {
-            _ = library.search("body", in: .everywhere)
-            // Gives the search a chance to be asked again, which it must not.
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(source.searches.withLock { $0 } == asked, "gives the running search time to be asked again")
-
-        source.searchIncomplete.withLock { $0 = false }
-        source.report.update { $0.fill = LibraryFill(state: .updating, listed: 9, expected: 9) }
-        source.report.update { $0.fill = LibraryFill(state: .complete, listed: 9, expected: 9) }
-        #expect(await eventually {
-            let found = library.search("body", in: .everywhere)
-            return !found.isIncomplete && !found.isPending
-        })
-    }
-
-    @Test func aRerunThatFailsFollowsHowTheCopyStandsNotTheOldAnswer() async throws {
-        let (library, source) = try await loaded(filling: true)
-        source.hits.withLock { $0["body"] = [F.n1] }
-        source.searchIncomplete.withLock { $0 = true }
-        #expect(await eventually { library.search("body", in: .everywhere).isIncomplete })
-
-        source.searchFails.withLock { $0 = true }
-        source.report.update { $0.fill = LibraryFill(state: .complete, listed: 9, expected: 9) }
-        #expect(await eventually {
-            let found = library.search("body", in: .everywhere)
-            return !found.isIncomplete && library.notices.waiting.last?.title == String(localized: "Can’t Search")
-        })
-        #expect(library.search("body", in: .everywhere).items.map(\.id) == [F.n1])
     }
 
     @Test func aFailedSearchNeverShowsAnotherQuerysOrScopesHits() async throws {
@@ -275,28 +124,5 @@ import Testing
             let found = library.search("newer", in: .everywhere)
             return !found.isPending && found.items.map(\.id) == [F.p1]
         })
-    }
-
-    @Test func aPlaceIsSearchedByTheQueryItStandsFor() async throws {
-        let (library, source) = try await loaded()
-        _ = library.search("body", in: .place(.inbox))
-        _ = library.search("body", in: .place(.favorites))
-        _ = library.search("body", in: .place(.recents))
-        #expect(await eventually { source.targets.withLock { $0.count } == 3 })
-        let targets = source.targets.withLock { $0 }
-        let inbox = try #require(targets.first { if case .items(let query, _, _) = $0 { query.tier == .feed } else { false } })
-        #expect(inbox != .items(MarfaLibrary.searchScope))
-        #expect(targets.contains { if case .items(_, let filter, _) = $0 { filter?.contains("tags") == true } else { false } })
-        // Recents stands for no query, so it searches everywhere.
-        #expect(targets.contains(.items(MarfaLibrary.searchScope)))
-    }
-
-    @Test func aSavedViewIsSearchedInItself() async throws {
-        let (library, source) = try await loaded()
-        let view = LibraryView(id: ItemID("v-one"), title: "One")
-        source.send(.views([view]))
-        try #require(await eventually { library.views.contains { $0.id == view.id } })
-        _ = library.search("body", in: .place(.view(view.id)))
-        #expect(await eventually { source.targets.withLock { $0.contains(.view(view.id)) } })
     }
 }

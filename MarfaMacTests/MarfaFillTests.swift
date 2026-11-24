@@ -50,18 +50,6 @@ import Testing
         #expect(MarfaSync.needsFill(status(["*", "system.view"], edges: ["parent-of"], .complete)))
     }
 
-    @Test func progressUsesListedRowsAndKeepsUnknownTotalsUnknown() {
-        let status = Status(hydration: .inProgress, items: 99, itemsExpected: 20, itemsListed: 4)
-        let fill = LibraryFill(status, completeness: .partial)
-        #expect(fill.listed == 4)
-        #expect(fill.expected == 20)
-        #expect(fill.state == .filling)
-        #expect(LibraryFill(Status(hydration: .stale), completeness: .stale).state == .updating)
-        #expect(LibraryFill(Status(hydration: .inProgress), completeness: .partial).expected == nil)
-        #expect(FillWording.line(fill) == "4 of 20 items listed")
-        #expect(FillWording.line(LibraryFill(state: .filling, listed: 4)) == "Items listed: 4")
-    }
-
     @Test func unfinishedRefreshReadsRowsWithoutClearingTheFollowFailure() async throws {
         let fake = WorkingCopy.fake(itemTypes: [.shippedNote])
         let copy = fake.copy

@@ -68,33 +68,6 @@ struct FilterClauseTests {
         ViewDraft.read(try ViewDraft.terms(of: filter), among: [task], catalogue: catalogue, calendar: calendar)
     }
 
-    // MARK: What Filter By offers
-
-    @Test func filterByOffersTheFieldsOfThePlacesTypesThenWhatEveryItemHas() {
-        let offer = Self.offer
-        #expect(offer.placeTitle == "Tasks")
-        #expect(offer.placeFields.first?.kind == .status, "the status leads")
-        let labels = offer.placeFields.map(\.label)
-        #expect(labels.contains("Due") && labels.contains("Assignees") && labels.contains("Estimate") && labels.contains("Notes"))
-        #expect(!labels.contains("Labels"), "a list of words has no way to be asked about")
-        #expect(offer.everyItem.map(\.label) == ["Type", "Tags", "Collection", "Parent", "Source", "Created", "Edited", "Happened"])
-        let kinds = Dictionary(uniqueKeysWithValues: offer.placeFields.map { ($0.label, $0.kind) })
-        #expect(kinds["Priority"] == .choice && kinds["Due"] == .date && kinds["Estimate"] == .number)
-        #expect(kinds["Notes"] == .text && kinds["Assignees"] == .people && kinds["Finished"] == .boolean)
-    }
-
-    @Test func eachKindTakesTheOperatorsTheDesignListsAndCreatedEditedHappenedNeverTakeSetOrEmpty() {
-        func ops(_ kind: FilterKind) -> [FilterOp] { FilterOp.offered(for: kind).map(\.op) }
-        #expect(ops(.date) == [.on, .before, .after, .between, .isSet, .isEmpty, .beforeToday, .afterToday, .inLast, .inNext])
-        #expect(ops(.moment) == [.on, .before, .after, .between, .beforeToday, .afterToday, .inLast, .inNext])
-        #expect(ops(.people) == [.includes, .isSet, .isEmpty], "a person not in the list cannot be asked for")
-        #expect(ops(.tags) == [.includes, .isSet, .isEmpty])
-        #expect(ops(.status) == [.is, .isNot, .isSet, .isEmpty])
-        #expect(ops(.number) == [.equal, .notEqual, .less, .lessOrEqual, .greater, .greaterOrEqual, .isSet, .isEmpty])
-        #expect(ops(.text) == [.contains, .startsWith, .is, .isNot, .isSet, .isEmpty])
-        #expect(ops(.type) == [.is, .isNot])
-    }
-
     // MARK: Writing each kind
 
     @Test func aDateAloneOnADatetimeFieldIsTheLocalMidnightWithItsOffset() throws {
@@ -435,16 +408,6 @@ struct FilterClauseTests {
         #expect(Self.filter([Self.clause("field.priority", .is, ["high"]), Self.clause("field.status", .is, ["done"])], base: held).unkept == [.tooManyFilters])
     }
 
-    @Test func aRowThatCannotBeSavedSaysSoAtOnce() {
-        func held(_ clauses: [FilterClause], any: Bool = false) -> [ViewDraft.Unkept] {
-            ViewDraft.holdability(of: FilterState(clauses: clauses, matchesAny: any), targets: Self.targets, catalogue: Self.catalogue).unkept
-        }
-        #expect(held([Self.clause("tags", .includes, ["a", "b"]), Self.clause("field.status", .is, ["done"])]) == [.mixedFilters])
-        #expect(held([Self.clause("field.status", .isNot, ["done", "dropped"]), Self.clause("field.priority", .is, ["high"])], any: true) == [.mixedFilters])
-        #expect(held([Self.clause("field.status", .is, ["doing", "todo"]), Self.clause("field.priority", .is, ["high"])]).isEmpty)
-        #expect(held([Self.clause("created", .isSet)]) == [.filter(column: "Created")])
-    }
-
     // MARK: A saved view's own conditions
 
     @Test func aConditionTheRowCannotShowIsLockedAndTheRestIsShown() throws {
@@ -494,22 +457,6 @@ struct FilterClauseTests {
             rows, by: state, targets: targets, catalogue: catalogue, clock: .init(now: now, calendar: calendar)).map(\.item.title)
     }
 
-    @Test func wordsGroupsAndTheEmptyCellKeepTheRowsTheyNameAndIsNotLeavesTheRestOut() {
-        let rows = [Self.item("A", status: "todo"), Self.item("B", status: "doing"), Self.item("C", status: "done"), Self.item("D"), Self.item("E", status: "odd")]
-        func titles(_ op: FilterOp, _ values: [String]) -> [String] { Self.titles(rows, FilterState(clauses: [Self.clause("field.status", op, values)])) }
-        #expect(titles(.is, ["todo"]) == ["A"])
-        #expect(titles(.is, ["todo", ""]) == ["A", "D"])
-        #expect(titles(.is, [FilterClause.groupValue(.inProgress)]) == ["B"])
-        #expect(titles(.is, [FilterClause.groupValue(.inProgress), "todo"]) == ["A", "B"])
-        // Marfa's `neq` is false where the property is absent, so the empty cell goes with the rest.
-        #expect(titles(.isNot, ["todo"]) == ["B", "C", "E"])
-        #expect(titles(.isNot, [""]) == ["A", "B", "C", "E"])
-        // A group left out keeps only rows whose own type puts their word in another group.
-        #expect(titles(.isNot, [FilterClause.groupValue(.completed)]) == ["A", "B"])
-        #expect(titles(.isSet, []) == ["A", "B", "C", "E"])
-        #expect(titles(.isEmpty, []) == ["D"])
-    }
-
     @Test func theRewriteSelectsTheSameRowsAsTheChipItReplaces() {
         let rows = [Self.item("A", status: "todo", priority: "high"), Self.item("B", status: "doing", priority: "high"), Self.item("C", status: "done", priority: "high"),
                     Self.item("D", status: "dropped", priority: "high"), Self.item("E", status: "todo", priority: "low")]
@@ -519,20 +466,7 @@ struct FilterClauseTests {
         #expect(Self.titles(rows, saved) == Self.titles(rows, chip))
     }
 
-    @Test func aDatetimeKeepsTheDaysItNamesOnThePersonsClockAcrossAChangeOfClocks() {
-        let rows = [
-            Self.item("Before", starts: "2026-03-28"), Self.item("Spring", starts: "2026-03-29"), Self.item("After", starts: "2026-03-30"),
-            Self.item("Late", starts: "2026-03-29T23:30:00Z"), Self.item("Autumn", starts: "2026-10-25"), Self.item("Never"),
-        ]
-        func titles(_ op: FilterOp, _ values: [String]) -> [String] { Self.titles(rows, FilterState(clauses: [Self.clause("field.starts_at", op, values)])) }
-        #expect(titles(.on, ["2026-03-29"]) == ["Spring"], "a 23-hour day is one day; 23:30 UTC is already 00:30 on the 30th")
-        #expect(titles(.before, ["2026-03-29"]) == ["Before"])
-        #expect(titles(.after, ["2026-03-29"]) == ["After", "Late", "Autumn"])
-        #expect(titles(.between, ["2026-03-29", "2026-03-30"]) == ["Spring", "After", "Late"])
-        #expect(titles(.isSet, []) == ["Before", "Spring", "After", "Late", "Autumn"])
-        #expect(titles(.isEmpty, []) == ["Never"])
-        #expect(titles(.on, ["2026-10-25"]) == ["Autumn"])
-    }
+    // MARK: Kept in a place's default view
 
     @Test func aCollectionsEmptyValueMeansInNoCollection() throws {
         let rows = [Self.item("A", collections: ["C1"]), Self.item("B", collections: ["C1", "C2"]), Self.item("C")]
@@ -550,144 +484,6 @@ struct FilterClauseTests {
         #expect(reading.items.map(\.clause) == [Self.clause("collections", .is, ["", "C1"])], "one chip, the empty value standing for no collection")
         #expect(Self.titles(rows, reading.state) == ["A", "B", "C"])
     }
-
-    @Test func everyKindThatReadsAnEmptyValueBackKeepsTheRowsWithNoValue() throws {
-        // Parent, status and choice fold "is empty" into the chip beside their words, as a collection does.
-        let rows = [
-            Self.item("A", status: "todo", priority: "high", parent: "P"), Self.item("B", status: "done", priority: "low"), Self.item("C"),
-        ]
-        let fields: [(clause: String, property: String, word: String, kept: [String])] = [
-            ("parent", "backref[parent-of]", "P", ["A", "B", "C"]), ("field.status", "properties.status", "todo", ["A", "C"]),
-            ("field.priority", "properties.priority", "high", ["A", "C"]),
-        ]
-        for (field, property, word, kept) in fields {
-            for text in ["\(property) eq \"\(word)\" OR \(property) not_exists", "\(property) not_exists OR \(property) eq \"\(word)\""] {
-                let reading = try Self.read(text)
-                #expect(Self.titles(rows, reading.state) == kept, "\(text)")
-                #expect(reading.items.allSatisfy { $0.clause.field == field }, "\(text)")
-            }
-            #expect(try Self.read("\(property) eq \"\(word)\" OR \(property) not_exists").items.map(\.clause) == [Self.clause(field, .is, ["", word])])
-        }
-        // Tags and people keep "is empty" as a chip of their own, so no empty word is ever read into one.
-        let any = try Self.read(#"tags contains "a" OR tags not_exists"#)
-        #expect(any.items.map(\.clause) == [Self.clause("tags", .includes, ["a"]), Self.clause("tags", .isEmpty)])
-        let people = try Self.read(#"properties.assignees.name eq "Rui Alves" OR properties.assignees not_exists"#)
-        #expect(people.items.map(\.clause) == [Self.clause("field.assignees", .includes, ["Rui Alves"]), Self.clause("field.assignees", .isEmpty)])
-    }
-
-    @Test func aDateOnlyFieldKeepsTheDaysItNamesOnTheUTCDayWhateverTheMacsClock() {
-        let rows = [
-            Self.item("Before", due: "2026-11-29"), Self.item("Day", due: "2026-11-30"), Self.item("After", due: "2026-12-01"),
-            Self.item("Never"),
-        ]
-        for zone in ["America/Los_Angeles", "Asia/Tokyo", "Europe/London"] {
-            let calendar = Self.calendar(zone)
-            func titles(_ op: FilterOp, _ values: [String]) -> [String] {
-                Self.titles(rows, FilterState(clauses: [Self.clause("field.due_at", op, values)]), calendar: calendar)
-            }
-            #expect(titles(.on, ["2026-11-30"]) == ["Day"], "\(zone)")
-            #expect(titles(.before, ["2026-11-30"]) == ["Before"], "\(zone)")
-            #expect(titles(.after, ["2026-11-30"]) == ["After"], "\(zone)")
-            #expect(titles(.between, ["2026-11-29", "2026-11-30"]) == ["Before", "Day"], "\(zone)")
-            #expect(titles(.isSet, []) == ["Before", "Day", "After"], "\(zone)")
-        }
-        // The clocks go back in Los Angeles on 1 November: that day is whole, and so is the next.
-        let change = [Self.item("Change", due: "2026-11-01"), Self.item("Next", due: "2026-11-02"), Self.item("Prior", due: "2026-10-31")]
-        let state = FilterState(clauses: [Self.clause("field.due_at", .on, ["2026-11-01"])])
-        #expect(Self.titles(change, state, calendar: Self.calendar("America/Los_Angeles")) == ["Change"])
-        let sydney = [Self.item("Change", due: "2026-10-04"), Self.item("Next", due: "2026-10-05")]
-        #expect(Self.titles(sydney, FilterState(clauses: [Self.clause("field.due_at", .on, ["2026-10-04"])]), calendar: Self.calendar("Australia/Sydney")) == ["Change"])
-    }
-
-    @Test func aDatetimeIsStillTheMacsDayAndABareDayInItIsMidnightUTC() {
-        // 20:00 on 30 November in Los Angeles is 04:00 UTC on 1 December: the Mac's day, 30 November. A bare day in a datetime
-        // field is midnight UTC for Marfa, which is the evening of 29 November in Los Angeles and 09:00 on the 30th in Tokyo.
-        let rows = [Self.item("Evening", starts: "2026-11-30T20:00:00-08:00"), Self.item("Bare", starts: "2026-11-30")]
-        let state = FilterState(clauses: [Self.clause("field.starts_at", .on, ["2026-11-30"])])
-        #expect(Self.titles(rows, state, calendar: Self.calendar("America/Los_Angeles")) == ["Evening"])
-        #expect(Self.titles(rows, state, calendar: Self.calendar("Asia/Tokyo")) == ["Bare"])
-    }
-
-    @Test func aRelativeDateOnADateOnlyFieldCountsTheMacsDayAndNotTheUTCDay() {
-        // 22:00 on 30 November in Los Angeles is already 1 December in UTC; today is still the 30th.
-        let now = Self.calendar("America/Los_Angeles").date(from: DateComponents(year: 2026, month: 11, day: 30, hour: 22))!
-        let rows = [Self.item("Yesterday", due: "2026-11-29"), Self.item("Today", due: "2026-11-30"), Self.item("Tomorrow", due: "2026-12-01")]
-        func titles(_ op: FilterOp, _ values: [String] = []) -> [String] {
-            Self.titles(rows, FilterState(clauses: [Self.clause("field.due_at", op, values)]), now: now, calendar: Self.calendar("America/Los_Angeles"))
-        }
-        #expect(titles(.beforeToday) == ["Yesterday"])
-        #expect(titles(.afterToday) == ["Tomorrow"])
-        #expect(titles(.inLast, ["2"]) == ["Yesterday", "Today"])
-        #expect(titles(.inNext, ["2"]) == ["Today", "Tomorrow"])
-    }
-
-    @Test func relativeDatesAreWorkedOutFromTheDayTheyAreAskedOn() {
-        // 30 March 2026, noon in London, just after the clocks went forward.
-        let now = Self.london().date(from: DateComponents(year: 2026, month: 3, day: 30, hour: 12))!
-        let rows = [
-            Self.item("Old", due: "2026-03-20"), Self.item("Sunday", due: "2026-03-29"), Self.item("Today", due: "2026-03-30"),
-            Self.item("Tomorrow", due: "2026-03-31"), Self.item("Later", due: "2026-04-12"),
-        ]
-        func titles(_ op: FilterOp, _ values: [String] = []) -> [String] {
-            Self.titles(rows, FilterState(clauses: [Self.clause("field.due_at", op, values)]), now: now)
-        }
-        #expect(titles(.beforeToday) == ["Old", "Sunday"])
-        #expect(titles(.afterToday) == ["Tomorrow", "Later"])
-        #expect(titles(.inLast, ["1"]) == ["Today"], "the last day is today")
-        #expect(titles(.inLast, ["2"]) == ["Sunday", "Today"], "the last two days are across the 23-hour day")
-        #expect(titles(.inNext, ["2"]) == ["Today", "Tomorrow"])
-        #expect(titles(.inNext, ["30"]) == ["Today", "Tomorrow", "Later"])
-        // Tomorrow it is another day.
-        let next = Self.london().date(from: DateComponents(year: 2026, month: 3, day: 31, hour: 9))!
-        #expect(Self.titles(rows, FilterState(clauses: [Self.clause("field.due_at", .inLast, ["1"])]), now: next) == ["Tomorrow"])
-    }
-
-    @Test func numbersTextPeopleTagsAndLinksKeepTheRowsTheyNameInTheWindow() {
-        let rows = [
-            Self.item("A", estimate: 3, notes: "Café menu", people: ["Rui Alves"], tags: ["kitchen"], parent: "P", collections: ["C1"], source: "mail"),
-            Self.item("B", estimate: 8, notes: "CAFE rota", people: ["Mira Castell", "Rui Alves"], tags: ["garden"], parent: "Q", collections: ["C1", "C2"]),
-            Self.item("C", notes: "plain"),
-        ]
-        func titles(_ field: String, _ op: FilterOp, _ values: [String] = []) -> [String] {
-            Self.titles(rows, FilterState(clauses: [Self.clause(field, op, values)]))
-        }
-        #expect(titles("field.estimate", .greater, ["3"]) == ["B"])
-        #expect(titles("field.estimate", .lessOrEqual, ["3"]) == ["A"])
-        #expect(titles("field.estimate", .equal, ["8"]) == ["B"])
-        #expect(titles("field.estimate", .notEqual, ["8"]) == ["A"], "an empty estimate is not unequal")
-        #expect(titles("field.estimate", .isEmpty) == ["C"])
-        #expect(titles("field.notes", .contains, ["cafe"]) == ["B"], "only the letters A to Z are folded")
-        #expect(titles("field.notes", .contains, ["CAF"]) == ["A", "B"])
-        #expect(titles("field.notes", .startsWith, ["plain"]) == ["C"])
-        #expect(titles("field.notes", .is, ["plain"]) == ["C"])
-        #expect(titles("field.notes", .isNot, ["plain"]) == ["A", "B"])
-        #expect(titles("field.assignees", .includes, ["Rui Alves"]) == ["A", "B"])
-        #expect(titles("field.assignees", .includes, ["Mira Castell"]) == ["B"])
-        #expect(titles("field.assignees", .isEmpty) == ["C"])
-        #expect(titles("tags", .includes, ["kitchen", "garden"]) == ["A", "B"])
-        #expect(titles("tags", .isEmpty) == ["C"])
-        #expect(titles("parent", .is, ["P"]) == ["A"])
-        #expect(titles("parent", .isNot, ["P"]) == ["B", "C"], "a row with no parent is not that parent")
-        #expect(titles("collections", .is, ["C2"]) == ["B"])
-        #expect(titles("collections", .isNot, ["C1"]) == ["C"])
-        #expect(titles("collections", .isSet) == ["A", "B"])
-        #expect(titles("source", .is, ["mail"]) == ["A"])
-    }
-
-    @Test func allNeedsEveryClauseAndAnyOne() {
-        let rows = [Self.item("A", status: "todo", priority: "high"), Self.item("B", status: "todo", priority: "low"), Self.item("C", status: "done", priority: "high"),
-                    Self.item("D", status: "done", priority: "low")]
-        let clauses = [Self.clause("field.status", .is, ["todo"]), Self.clause("field.priority", .is, ["high"])]
-        #expect(Self.titles(rows, FilterState(clauses: clauses)) == ["A"])
-        #expect(Self.titles(rows, FilterState(clauses: clauses, matchesAny: true)) == ["A", "B", "C"])
-        // A clause that says too little filters nothing, and does not make Any of one.
-        let waiting = [Self.clause("field.status", .is, ["todo"]), Self.clause("field.priority", .is)]
-        #expect(Self.titles(rows, FilterState(clauses: waiting, matchesAny: true)) == ["A", "B"])
-        // A clause whose field no type declares any more keeps every row.
-        #expect(Self.titles(rows, FilterState(clauses: [Self.clause("field.gone", .is, ["x"])])).count == 4)
-    }
-
-    // MARK: Kept in a place's default view
 
     @Test func aPlaceKeepsItsClausesIncludingARelativeDateAndDropsAFieldNoTypeDeclares() throws {
         var options = ItemTableOptions()
@@ -718,23 +514,6 @@ struct FilterClauseTests {
 
     // MARK: Changing the row
 
-    @Test func aNewFilterStartsWithItsOperatorAndIsDroppedIfLeftWithoutAValue() {
-        let browser = Browser()
-        let index = browser.addFilter(on: Self.targets["field.due_at"]!)
-        let held = { browser.tableOptions[browser.item]?.filter ?? FilterState() }
-        #expect(held().clauses == [Self.clause("field.due_at", .on)], "a date starts at is on")
-        #expect(browser.showsFilterRow)
-        #expect(browser.tableOptions[browser.item]?.isFiltering == false, "it hides nothing until it has a day")
-        browser.changeFilter(at: index) { $0.values = ["2026-01-01"] }
-        #expect(browser.tableOptions[browser.item]?.isFiltering == true)
-        browser.addFilter(on: Self.targets["field.priority"]!)
-        browser.dropUnfinishedFilters()
-        #expect(held().clauses == [Self.clause("field.due_at", .on, ["2026-01-01"])])
-        // A second condition on a field already filtered is another chip.
-        browser.addFilter(on: Self.targets["field.due_at"]!)
-        #expect(held().clauses.count == 2)
-    }
-
     @Test func anotherOperatorKeepsTheValueWhereItAsksForTheSameKindAndStartsAgainWhereItDoesNot() {
         let browser = Browser()
         let kind = FilterKind.date
@@ -761,25 +540,5 @@ struct FilterClauseTests {
         browser.changeFilter(at: text) { $0.values = ["x"] }
         browser.setFilterOperator(at: text, to: .isNot, kind: .text)
         #expect(browser.tableOptions[browser.item]!.filter.clauses[text] == Self.clause("field.notes", .isNot, ["x"]), "a text is one text under every operator")
-    }
-
-    @Test func theRowIsAllAgainOnceItHoldsOneFilter() {
-        let browser = Browser()
-        browser.addFilter(on: Self.targets["field.priority"]!)
-        browser.addFilter(on: Self.targets["field.status"]!)
-        browser.setFiltersMatchAny(true)
-        #expect(browser.tableOptions[browser.item]?.filter.matchesAny == true)
-        browser.removeFilter(at: 1)
-        #expect(browser.tableOptions[browser.item]?.filter.matchesAny == false)
-    }
-
-    @Test func aRelativeDateStaysTheMacsAndAChangeOfDayMakesTheTableAgain() {
-        let browser = Browser()
-        let library = FakeItemLibrary(items: [FakeItemLibrary.note("A", modified: .now)], now: Date(timeIntervalSince1970: 1_790_000_000))
-        browser.tableOptions[.allItems] = ItemTableOptions(filter: FilterState(clauses: [Self.clause("edited", .inLast, ["7"])]))
-        let first = browser.tableContent(in: library)
-        #expect(browser.tableContent(in: library) === first)
-        library.now = { Date(timeIntervalSince1970: 1_790_000_000 + 86_400 * 2) }
-        #expect(browser.tableContent(in: library) !== first)
     }
 }

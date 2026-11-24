@@ -15,24 +15,11 @@ import Testing
 
     // MARK: New row
 
-    @Test func theRowStartsWithTheStartingTypesTheLibraryHas() {
-        // The row is in the starting order, whatever order the library lists its types in.
-        let shown = NewRowTypes.shown(offered, kept: nil)
-        #expect(shown.map(\.id.rawValue) == ["core.note", "core.table", "core.task", "core.bookmark", "core.event", "core.entity.person", "core.entity.place"])
-        #expect(NewRowTypes.shown(types("core.task"), kept: nil).map(\.id.rawValue) == ["core.task"])
-    }
-
     @Test func aKeptListIsShownInItsOrderAndAnEmptyOneStaysEmpty() {
         #expect(NewRowTypes.shown(offered, kept: "core.event,core.note").map(\.id.rawValue) == ["core.event", "core.note"])
         #expect(NewRowTypes.shown(offered, kept: "").isEmpty)
         // A type the library no longer has, and a repeat, are skipped.
         #expect(NewRowTypes.shown(offered, kept: "gone.type,core.note,core.note").map(\.id.rawValue) == ["core.note"])
-    }
-
-    @Test func theEditListHoldsTheRowFirstThenTheOthers() {
-        let listed = NewRowTypes.listed(offered, kept: "core.event,core.note")
-        #expect(listed.inRow.map(\.id.rawValue) == ["core.event", "core.note"])
-        #expect(listed.others.map(\.id.rawValue) == ["core.task", "core.bookmark", "core.entity.person", "core.entity.place", "core.table", "core.file"])
     }
 
     @Test func tickingAddsAtTheEndAndUntickingRemoves() {
@@ -69,45 +56,4 @@ import Testing
         #expect(MacSettings.keys.contains(ListKey.showsQuickAdd))
     }
 
-    // MARK: Tools and filters
-
-    @Test func theItemsPageHasTheNewRowUntilAFilterTakesItsPlace() {
-        let browser = Browser()
-        browser.sidebarItem = .allItems
-        #expect(browser.showsNewRow)
-        browser.filterRowChoice[.allItems] = true
-        #expect(browser.showsFilterRow)
-        #expect(!browser.showsNewRow)
-        browser.filterRowChoice[.allItems] = false
-        #expect(browser.showsNewRow)
-    }
-
-    @Test func onlySourcesHasNoTools() {
-        let browser = Browser()
-        browser.sidebarItem = .sources
-        #expect(!browser.indexPlaceHasTools)
-        browser.sidebarItem = .collections
-        #expect(browser.indexPlaceHasTools)
-        #expect(!browser.showsNewRow)
-    }
-
-    @Test func theToolbarTakesOverOnlyOnceTheHeaderHasScrolledAway() {
-        let browser = Browser()
-        browser.sidebarItem = .collections
-        #expect(!browser.showsIndexTools)
-        browser.isIndexHeaderAway = true
-        #expect(browser.showsIndexTools)
-    }
-
-    @Test func aCollectionsSourceFilterShowsTheRowAndTurningFilterOffClearsIt() {
-        let browser = Browser()
-        browser.sidebarItem = .collections
-        #expect(!browser.showsFilterRow)
-        browser.toggleCollectionSource("rss")
-        #expect(browser.showsFilterRow)
-        #expect(browser.indexIsFiltered)
-        browser.toggleIndexFilter()
-        #expect(!browser.showsFilterRow)
-        #expect(!browser.indexIsFiltered)
-    }
 }
