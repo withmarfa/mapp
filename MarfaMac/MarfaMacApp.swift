@@ -92,7 +92,7 @@ struct MarfaMacApp: App {
         }
 
         Window("Settings", id: SettingsLauncher.windowID) {
-            SettingsWindowView(launcher: settingsLauncher, libraries: libraries)
+            SettingsWindowView(launcher: settingsLauncher, libraries: libraries, mainWindows: delegate.itemLinks)
                 .environment(\.appUpdater, delegate.updater)
                 .opensItemLinks(delegate.itemLinks)
         }

@@ -420,14 +420,18 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit {
         try enter("setSourceLimit")
+        await held("setSourceLimit")
         state.withLock { $0.beforeLimitWrite }?()
         return try state.withLock { state throws(OwnerFailure) in
             guard state.sourceLimit.instanceID == limit.instanceID else { throw .instanceChanged }
             state.limitsSent.append(filter)
-            state.sourceLimit.isOn = filter != nil
-            state.sourceLimit.types = filter?.types ?? []
-            state.sourceLimit.sources = filter?.sources ?? []
-            return state.sourceLimit
+            // The server replaces the enforcement whole, so every lever becomes what was sent.
+            var written = limit
+            written.isOn = filter != nil
+            written.types = filter?.types ?? []
+            written.sources = filter?.sources ?? []
+            state.sourceLimit = written
+            return written
         }
     }
 

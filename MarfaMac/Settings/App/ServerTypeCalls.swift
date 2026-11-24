@@ -34,18 +34,80 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         }
     }
 
-    func addChild(id: String, label: String, below parent: String) async throws(TypeFailure) {
+    func addType(_ type: NewTypeRecord) async throws(TypeFailure) {
         try await run { client in
-            // A child inherits its parent's fields, so it declares none of its own (`types/register-no-fields`
-            // asks only for a `fields` object).
-            let definition = Components.Schemas.TypeDefinitionInput(
-                fields: .init(additionalProperties: [:]), parent: parent, label: label, id: id)
+            // A new type declares no field of its own, with a parent or without (`types/register-no-fields` asks only
+            // for a `fields` object). The icon is the type's own, as its author's.
+            var definition = Components.Schemas.TypeDefinitionInput(
+                fields: .init(additionalProperties: [:]), parent: type.parent, label: type.label,
+                plural: type.plural.isEmpty ? nil : type.plural, id: type.id)
+            if let icon = type.icon { definition.displayHints = .init(icon: icon) }
             _ = try await client.register(itemType: definition)
         }
     }
 
-    func delete(_ type: String) async throws(TypeFailure) {
-        try await run { client in try await client.delete(itemType: type) }
+    func delete(_ type: String, force: Bool) async throws(TypeFailure) {
+        try await run { client in try await client.delete(itemType: type, force: force) }
+    }
+
+    func previewMove(of type: String, to target: String) async throws(TypeFailure) -> TypeMovePreview {
+        try await run { client in
+            let preview = try await client.previewMove(ofType: type, to: target)
+            return TypeMovePreview(items: preview.matched, ids: preview.ids, settings: preview.settings.map(Self.setting))
+        }
+    }
+
+    func move(_ type: String, to target: String) async throws(TypeFailure) -> TypeMoveResult {
+        try await run { client in
+            let started = try await client.startMove(ofType: type, to: target)
+            let job = try await client.follow(moveJob: started.id)
+            let result = job.result
+            var problem: String?
+            switch job.status {
+            case .completed: problem = result?.settingsError?.message
+            case .failed, .canceled: problem = job.error ?? String(localized: "The move stopped before it finished.")
+            case .queued, .inProgress: problem = String(localized: "The move stopped before it finished.")
+            }
+            return TypeMoveResult(
+                moved: job.succeeded, failed: job.errored, remaining: result?.remaining ?? 0, remainingHidden: result?.remainingHidden ?? false,
+                problem: problem)
+        }
+    }
+
+    static func setting(_ setting: Components.Schemas.TypeSetting) -> TypeSettingRecord {
+        let kind: TypeSettingRecord.Kind =
+            switch setting.kind {
+            case .folder: .folder
+            case .view: .view
+            case .webhook: .webhook
+            }
+        return TypeSettingRecord(
+            kind: kind, id: setting.id, field: setting.field,
+            blocked: setting.reason.map { block($0.rawValue, message: setting.message) })
+    }
+
+    /// A setting as a `type_move_blocked` refusal names it in `details.settings`.
+    static func setting(_ object: JSONObject) -> TypeSettingRecord? {
+        let kind: TypeSettingRecord.Kind
+        switch object["kind"]?.string {
+        case "folder": kind = .folder
+        case "view": kind = .view
+        case "webhook": kind = .webhook
+        default: return nil
+        }
+        return TypeSettingRecord(
+            kind: kind, id: object["id"]?.string, field: object["field"]?.string ?? "",
+            blocked: object["reason"]?.string.map { block($0, message: object["message"]?.string) })
+    }
+
+    private static func block(_ reason: String, message: String?) -> TypeSettingRecord.Block {
+        switch reason {
+        case "not_permitted": .notPermitted
+        case "filter_term": .filterTerm
+        case "placement_conflict": .placementConflict
+        case "subtypes": .subtypes
+        default: .other(message ?? reason)
+        }
     }
 
     // MARK: Reading
@@ -73,7 +135,16 @@ nonisolated struct ServerTypeCalls: TypeCalls {
             plugin: listed.value2.provenance.plugin.map { .init(name: $0.name, version: $0.version) },
             icon: own.displayHints?.icon, fields: Dictionary(uniqueKeysWithValues: fields.map { ($0.key, $0) }),
             feedWindow: own.retentionPolicy?.feedDays.map { $0.value.map { .days(Int($0)) } ?? .never },
-            mergeStrategy: own.mergePolicy?._default?.rawValue)
+            mergeStrategy: own.mergePolicy?._default?.rawValue, versionWindow: versionWindow(own.versionPolicy))
+    }
+
+    /// The windows a type declares: one length for all three, which is what the page sets, or another shape it only shows.
+    static func versionWindow(_ policy: Components.Schemas.VersionPolicy?) -> VersionWindow? {
+        guard let policy else { return nil }
+        let windows = [policy.recentDays, policy.dailySnapshotDays, policy.weeklySnapshotDays]
+        if windows.allSatisfy({ $0 == nil }) { return nil }
+        if let days = policy.recentDays, days > 0, windows.allSatisfy({ $0 == days }) { return .days(days) }
+        return .custom
     }
 
     static func change(_ edit: TypeEdit) -> TypeDefinitionEdit.TypeChange {
@@ -85,11 +156,12 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         case .parent(let id): .parent(id)
         case .addWord(let group, let value): .addWord(group: group, value: value)
         case .wordMeaning(let value, let text): .wordMeaning(value: value, text: text)
-        case .addField(let key, let label, let kind, let choices): .addField(key: key, label: label, kind: kind, choices: choices)
+        case .addField(let new): .addField(new)
         case .field(let key, let change): .field(key: key, change)
         case .removeField(let key): .removeField(key: key)
         case .feedWindow(let window): .feedWindow(window)
         case .mergeStrategy(let name): .mergeStrategy(name)
+        case .versionWindow(let days): .versionWindow(days)
         }
     }
 
@@ -130,6 +202,10 @@ nonisolated struct ServerTypeCalls: TypeCalls {
             case .server(let status, let code, _, let details, let server) where status == 409 && code == "type_in_use":
                 let object = (details ?? server?.details)?.object
                 return .inUse(items: object?["item_count"]?.number.map { Int($0) }, settings: object?["settings"]?.array?.count ?? 0)
+            case .server(let status, let code, _, let details, let server) where status == 409 && code == "type_move_blocked":
+                let object = (details ?? server?.details)?.object
+                let settings = object?["settings"]?.array?.compactMap { $0.object.flatMap(Self.setting) } ?? []
+                return .moveBlocked(settings: settings, tables: object?["tables"]?.array?.compactMap(\.string) ?? [])
             case .server(let status, let code, _, let details, let server) where status == 409 && code == "type_has_subtypes":
                 return .hasSubtypes((details ?? server?.details)?.object?["subtype_ids"]?.array?.compactMap(\.string) ?? [])
             case .forbidden(_, _, let server):

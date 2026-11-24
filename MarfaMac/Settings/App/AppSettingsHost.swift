@@ -23,12 +23,17 @@ enum LibraryDescription {
     private(set) var isAllowingMore = false
     let instanceSettings: InstanceSettingsModel
     var ownerDrafts: OwnerDrafts { libraries.ownerDrafts }
+    /// The main windows open, which `openInApp` shows a place in; without it Settings offers none.
+    private let mainWindows: ItemLinkOpener?
 
     /// `instanceSettings` is the model the app keeps for This Marfa's fields, unless a test brings its own.
-    init(libraries: Libraries, launcher: SettingsLauncher, instanceSettings: InstanceSettingsModel? = nil) {
+    init(
+        libraries: Libraries, launcher: SettingsLauncher, instanceSettings: InstanceSettingsModel? = nil, mainWindows: ItemLinkOpener? = nil
+    ) {
         self.libraries = libraries
         self.launcher = launcher
         self.instanceSettings = instanceSettings ?? libraries.instanceSettings
+        self.mainWindows = mainWindows
     }
 
     private var host: MarfaHost { libraries.host }
@@ -281,7 +286,14 @@ enum LibraryDescription {
         }
     }
 
-    var openInApp: ((String) -> Void)? { nil }
+    /// Shows the type's items in the main window last in front, as the Go menu does; offered only while a main window is open.
+    var openInApp: ((String) -> Void)? {
+        guard let mainWindows, mainWindows.hasMainWindow, libraries.current != nil else { return nil }
+        return { [libraries] id in
+            guard let library = libraries.current, let browser = mainWindows.mainWindowForward() else { return }
+            browser.show(.itemType(id), in: library, order: browser.storedOrder)
+        }
+    }
 
     var ownAppVendor: String? { PreferencesType.vendor }
 

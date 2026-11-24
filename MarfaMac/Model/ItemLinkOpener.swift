@@ -40,6 +40,9 @@ protocol ItemLinkWindow: AnyObject {
     /// The item waiting for a window to open it.
     private(set) var request: Request?
 
+    /// Whether a main window is open, so Settings can offer to show a place in one.
+    private(set) var hasMainWindow = false
+
     /// Opens a main window, for a link that comes while none is open. A window sets it, as only a view can open one.
     /// The first scene to set it serves an ask made before any scene had appeared.
     @ObservationIgnored var openMainWindow: (() -> Void)? {
@@ -119,6 +122,16 @@ protocol ItemLinkWindow: AnyObject {
             closed(window)
         }
         mainWindowAsk = nil
+        hasMainWindow = true
+    }
+
+    /// Brings the main window last in front forward and answers its browser, for Settings to show a place in through the
+    /// browser's own `show`; nil with no main window open.
+    func mainWindowForward() -> Browser? {
+        guard let front = frontWindow() else { return nil }
+        activate()
+        front.window.bringForward()
+        return front.browser
     }
 
     /// The item `browser`'s open main window is to open, once, while it shows `library`: nil where the request is
@@ -225,6 +238,7 @@ protocol ItemLinkWindow: AnyObject {
     /// Offers again a request left for `window`, which has closed, so another window takes it or one is asked for.
     private func closed(_ window: any ItemLinkWindow) {
         windows.removeAll { $0.window === window }
+        hasMainWindow = !openWindows().isEmpty
         guard let request, let library = request.library else { return }
         if let target = request.target, self.window(of: target) != nil { return }
         offer(request.link, in: library)

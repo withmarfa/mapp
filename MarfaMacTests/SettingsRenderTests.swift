@@ -25,7 +25,7 @@ import Testing
     var deletedCount = 0
     var deletedRetentionDays: Int? = 60
     var canDeletePermanently = true
-    var openInApp: ((String) -> Void)? { nil }
+    var openInApp: ((String) -> Void)?
     var ownAppVendor: String? { "app.marfa-mac" }
 
     var webSignInReturn: String { "com.withmarfa.marfa.test:/signed-in" }

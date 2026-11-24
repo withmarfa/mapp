@@ -1,14 +1,19 @@
 import Marfa
 import SwiftUI
 
-/// The one sheet over a type's page: its icon, a new type, or what a word means.
+/// The one sheet over a type's page: its icon, a new type, a field, what a word means, or deleting a type in use.
 struct TypeSheet: View {
     let model: TypesModel
     let host: any MarfaSettingsHost
 
+    /// The open type's plural as a sentence says it: "Only for jobs."
+    private var lowercasePlural: String { model.openID.map { model.title(of: $0).localizedLowercase } ?? "" }
+
     var body: some View {
-        if model.iconTarget != nil {
+        if model.iconTarget != nil || model.isChoosingChildIcon {
             iconSheet
+        } else if model.isConfirmingDelete {
+            TypeDeleteSheet(model: model, host: host)
         } else if model.isMakingChild {
             childSheet
         } else if model.isAddingField {
@@ -22,27 +27,31 @@ struct TypeSheet: View {
 
     private var fieldSheet: some View {
         @Bindable var model = model
-        return SettingsSheet(title: Text("New Field"), line: Text("Every item of this type, and of any type based on it, can hold it.")) {
-            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
+        return SettingsSheet(title: Text("Add Field"), line: Text("Only for \(lowercasePlural).")) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
                 SettingsSheetField(label: "Name", error: model.fieldErrors[.newField]) {
                     SettingsField(
                         title: "Name", text: $model.newFieldName, isError: model.fieldErrors[.newField] != nil, width: nil,
                         onSubmit: { Task { await model.makeField() } })
                 }
-                SettingsSheetField(label: "Kind") {
-                    SettingsPopUp(title: "Kind", selection: $model.newFieldKind) {
-                        ForEach(FieldKind.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
+                SettingsSection("Field") {
+                    SettingsRow("Kind") {
+                        SettingsPopUp(title: "Kind", selection: $model.newFieldKind) {
+                            ForEach(FieldKind.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
+                        }
                     }
-                }
-                if model.newFieldKind == .choice {
-                    SettingsSheetField(label: "Choices") {
-                        SettingsField(title: "Choices", text: $model.newFieldChoices, prompt: "Separated by commas", width: nil)
+                    if model.newFieldKind == .choice {
+                        SettingsStackRow(title: Text("Choices")) {
+                            SettingsField(title: "Choices", text: $model.newFieldChoices, prompt: "Separated by commas", width: nil)
+                        }
                     }
+                    SettingsRow("Required") { SettingsToggle(title: "Required", isOn: $model.newFieldRequired) }
+                    SettingsRow("Searchable") { SettingsToggle(title: "Searchable", isOn: $model.newFieldSearchable) }
                 }
             }
         } buttons: {
             SettingsButton("Cancel") { model.cancelField() }.disabled(model.isWorking)
-            SettingsButton("Add", role: .confirm) { Task { await model.makeField() } }.disabled(!model.canMakeField)
+            SettingsButton("Add Field", role: .confirm) { Task { await model.makeField() } }.disabled(!model.canMakeField)
         }
     }
 
@@ -62,25 +71,46 @@ struct TypeSheet: View {
 
     private var childSheet: some View {
         @Bindable var model = model
-        return SettingsSheet(
-            title: Text("New Type"), line: Text("It starts with the words and fields of the type it is based on, and adds its own.")
-        ) {
-            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
-                SettingsSheetField(label: "Name", error: model.fieldErrors[.newType]) {
-                    SettingsField(
-                        title: "Name", text: $model.childName, isError: model.fieldErrors[.newType] != nil, width: nil,
-                        onSubmit: { Task { await model.makeChild() } })
+        let name = model.trimmedChildName
+        return SettingsSheet(title: Text("New Type"), line: Text("A kind of item, with fields of its own.")) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
+                VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
+                    SettingsSheetField(label: "Name", error: model.fieldErrors[.newType]) {
+                        SettingsField(
+                            title: "Name", text: $model.childName, isError: model.fieldErrors[.newType] != nil, width: nil,
+                            onSubmit: { Task { await model.makeChild() } })
+                    }
+                    SettingsSheetField(label: "Plural") {
+                        SettingsField(
+                            title: "Plural", text: $model.childPlural, prompt: name.isEmpty ? nil : TypesModel.regularPlural(of: name), width: nil,
+                            onSubmit: { Task { await model.makeChild() } })
+                    }
                 }
-                SettingsSheetField(label: "Based On") {
-                    SettingsPopUp(title: "Based On", selection: $model.childParent) {
-                        ForEach(model.basedOnChoices(for: "")) { Text(verbatim: model.title(of: $0)).tag(Optional($0.id)) }
+                SettingsSection("Type") {
+                    SettingsRow("Based On", line: "It keeps that type’s statuses and fields.") {
+                        SettingsPopUp(title: "Based On", selection: $model.childParent) {
+                            Text("Nothing").tag(String?.none)
+                            Divider()
+                            ForEach(model.basedOnChoices(for: "")) { Text(verbatim: model.title(of: $0)).tag(Optional($0.id)) }
+                        }
+                    }
+                    SettingsRow(title: Text("Icon"), lead: .custom(childIconGlyph)) {
+                        SettingsButton("Choose…") { model.beginChildIcon() }
                     }
                 }
             }
         } buttons: {
             SettingsButton("Cancel") { model.cancelChild() }.disabled(model.isWorking)
-            SettingsButton("Add", role: .confirm) { Task { await model.makeChild() } }.disabled(!model.canMakeChild)
+            SettingsButton("Create Type", role: .confirm) { Task { await model.makeChild() } }.disabled(!model.canMakeChild)
         }
+    }
+
+    /// The icon the new type will show: the one chosen, else the one of the type it is based on.
+    private var childIconGlyph: AnyView {
+        if let icon = model.childIcon {
+            return AnyView(host.markGlyph(icon).frame(width: SettingsTokens.Metric.tile, height: SettingsTokens.Metric.tile))
+        }
+        return host.typeMark(for: model.childParent ?? "")
     }
 
     private var meaningSheet: some View {
@@ -138,6 +168,148 @@ struct TypeSheet: View {
             SettingsButton("Use Default") { Task { await model.chooseIcon(nil) } }.disabled(model.isChangingIcon)
         } buttons: {
             SettingsButton("Cancel") { model.closeIcon() }.disabled(model.isChangingIcon)
+        }
+    }
+}
+
+/// What happens to the items and settings that use a type being deleted: they move to another type first, or stay as they
+/// are, naming a type that is gone. The delete is the sheet's own, so it stands alone at the leading edge.
+struct TypeDeleteSheet: View {
+    let model: TypesModel
+    let host: any MarfaSettingsHost
+
+    private var id: String { model.openID ?? "" }
+    private var plural: String { model.title(of: id) }
+    private var singular: String { model.record(id)?.label ?? plural }
+
+    /// How many items use the type: the move's count once read, else the server's refusal or the library's own count.
+    private var items: Int {
+        model.movePreview?.items ?? model.refusedUse?.items ?? model.ownItemCount(of: id)
+    }
+
+    private func counted(_ count: Int) -> String {
+        String(localized: "\(count.formatted()) \(count == 1 ? singular.localizedLowercase : plural.localizedLowercase)")
+    }
+
+    /// "18 jobs, a view and a webhook use it."
+    private var line: String {
+        var parts: [String] = []
+        if items > 0 { parts.append(counted(items)) }
+        let settings = model.movePreview?.settings ?? []
+        for (kind, one, many) in [
+            (TypeSettingRecord.Kind.folder, String(localized: "a folder"), String(localized: "folders")),
+            (.view, String(localized: "a view"), String(localized: "views")),
+            (.webhook, String(localized: "a webhook"), String(localized: "webhooks")),
+        ] {
+            let count = settings.filter { $0.kind == kind }.count
+            if count == 1 { parts.append(one) } else if count > 1 { parts.append("\(count.formatted()) \(many)") }
+        }
+        if parts.isEmpty, let settings = model.refusedUse?.settings, settings > 0 {
+            return String(AttributedString(localized: "^[\(settings) setting](inflect: true) use it.").characters)
+        }
+        guard !parts.isEmpty else { return String(localized: "Something uses it.") }
+        let list = parts.formatted(.list(type: .and))
+        let one = parts.count == 1 && (items == 1 || items == 0)
+        let sentence = one ? String(localized: "\(list) uses it.") : String(localized: "\(list) use it.")
+        return sentence.prefix(1).uppercased() + sentence.dropFirst()
+    }
+
+    var body: some View {
+        SettingsSheet(title: Text("Delete \(plural)"), line: Text(verbatim: line), isWide: true) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
+                SettingsSection(name: items > 0 ? Text("Its \(items.formatted()) \(items == 1 ? singular : plural)") : nil) {
+                    SettingsRadioRow(
+                        title: Text("Move Them to Another Type"), line: Text("Their own fields stay on each item."),
+                        isOn: model.deleteChoice == .move, choose: { model.deleteChoice = .move }
+                    ) {
+                        SettingsPopUp(
+                            title: "Move To", selection: Binding<String?> { model.moveTarget } set: { target in
+                                model.deleteChoice = .move
+                                model.setMoveTarget(target)
+                            }
+                        ) {
+                            ForEach(model.moveChoices(for: id)) { Text(verbatim: model.title(of: $0)).tag(Optional($0.id)) }
+                        }
+                    }
+                    SettingsRadioRow(
+                        title: Text("Leave Them As They Are"), line: Text("Their fields stay read-only until \(plural) exists again."),
+                        isOn: model.deleteChoice == .leave, choose: { model.deleteChoice = .leave })
+                }
+                if model.deleteChoice == .move { alsoChanges }
+                if let failure = model.deleteSheetFailure ?? model.movePreviewFailure {
+                    Text(verbatim: failure).settingsFont(.line).foregroundStyle(SettingsTokens.errorRed)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if model.isDeleting, model.deleteChoice == .move {
+                    SettingsSheetStatus(text: Text("Moving \(counted(items)) to \(model.moveTarget.map { model.title(of: $0) } ?? "")…"), isMet: false)
+                }
+            }
+        } leading: {
+            SettingsButton("Delete", role: .destructive) { Task { await model.confirmDelete() } }.disabled(!model.canConfirmDelete)
+        } buttons: {
+            SettingsButton("Cancel") { model.cancelDelete() }.disabled(model.isDeleting)
+        }
+    }
+
+    /// The folders, views and webhooks a move changes to name the new type, and any it can't change, with what to change
+    /// first, and the tables that stop it.
+    @ViewBuilder private var alsoChanges: some View {
+        let settings = model.movePreview?.settings ?? []
+        let tables = model.movePreview?.tables ?? []
+        if !settings.isEmpty || !tables.isEmpty {
+            let target = model.moveTarget.map { model.title(of: $0) } ?? ""
+            SettingsSection("Also Changes") {
+                ForEach(Array(settings.enumerated()), id: \.offset) { _, setting in
+                    SettingsRow(
+                        title: Text(verbatim: Self.title(of: setting.kind)),
+                        line: Text(verbatim: setting.blocked.map { Self.line(of: $0, kind: setting.kind) } ?? Self.line(of: setting.kind, target: target.localizedLowercase)),
+                        error: nil, lead: .symbol(Self.symbol(of: setting.kind)), lines: nil)
+                }
+                if !tables.isEmpty {
+                    SettingsRow(
+                        title: Text("Tables"),
+                        line: Text("Items hold rows in \(tables.formatted(.list(type: .and))), which \(target) doesn’t have. Add them to \(target) first."),
+                        error: nil, lead: .symbol("tablecells"), lines: nil)
+                }
+            }
+        }
+    }
+
+    /// Why a move can't change a setting, and what to change first.
+    private static func line(of block: TypeSettingRecord.Block, kind: TypeSettingRecord.Kind) -> String {
+        switch block {
+        case .notPermitted:
+            switch kind {
+            case .webhook: String(localized: "This app can’t change it: another app or key made it, or this app isn’t allowed to. Change or remove it in Webhooks first.")
+            case .folder, .view: String(localized: "This app isn’t allowed to change it. Allow more, or change it where it was made, first.")
+            }
+        case .filterTerm: String(localized: "Its filter uses this type in a way a move can’t rewrite. Change its filter first.")
+        case .placementConflict: String(localized: "It places the two types in different folders. Change where it places them first.")
+        case .subtypes: String(localized: "It sends events for this type and the types based on it. Change its type filter first.")
+        case .other(let message): message
+        }
+    }
+
+    private static func title(of kind: TypeSettingRecord.Kind) -> String {
+        switch kind {
+        case .folder: String(localized: "A Folder")
+        case .view: String(localized: "A View")
+        case .webhook: String(localized: "A Webhook")
+        }
+    }
+
+    private static func line(of kind: TypeSettingRecord.Kind, target: String) -> String {
+        switch kind {
+        case .folder: String(localized: "Its settings will use \(target).")
+        case .view: String(localized: "Its type filter will use \(target).")
+        case .webhook: String(localized: "It will send events for \(target).")
+        }
+    }
+
+    private static func symbol(of kind: TypeSettingRecord.Kind) -> String {
+        switch kind {
+        case .folder: "folder"
+        case .view: "line.3.horizontal.decrease"
+        case .webhook: "dot.radiowaves.up.forward"
         }
     }
 }
