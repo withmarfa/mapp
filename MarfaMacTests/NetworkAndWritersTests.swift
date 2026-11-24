@@ -15,8 +15,10 @@ import Testing
         instanceID: "instance-1", isOn: true, types: ["core.highlight"], sources: ["readwise"], strictTypes: ["core.task"],
         allowlist: (["core.note"], ["rss"]))
 
-    private static func key(_ source: String, claims: [String] = [], expires: Date? = nil) -> KeyInfo {
-        KeyInfo(id: "key-" + source, label: source, source: source, permissions: [], tier: .library, types: [:], expires: expires, claims: claims)
+    private static func key(
+        _ source: String, claims: [String] = [], expires: Date? = nil, types: [String: AccessLevel] = ["*": .write]
+    ) -> KeyInfo {
+        KeyInfo(id: "key-" + source, label: source, source: source, permissions: [], tier: .library, types: types, expires: expires, claims: claims)
     }
 
     private func model(_ bench: OwnerBench) -> SourceLimitModel {
@@ -153,6 +155,70 @@ import Testing
         #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
         #expect(model.line != nil)
         #expect(model.checkedSources == ["readwise"])
+    }
+
+    /// A source held only by credentials that may read a type, not write it, would let nothing add items of that type.
+    @Test func aSourceHeldOnlyByAReadOnlyKeyIsRefusedNamingTheType() async {
+        let bench = OwnerBench(grants: [.configManage])
+        let model = model(bench)
+        bench.calls.state.withLock {
+            $0.keys = [
+                Self.key("rss", types: ["*": .read]), Self.key("readwise", types: ["core.*": .write, "core.note": .read]),
+            ]
+            $0.apps = [AppAccess(id: "grant-1", clientID: "client-1", kind: .app, name: "Sketches", origins: [], scopes: ["content:read"])]
+        }
+        await model.load()
+        model.types = ["core.note"]
+        model.checkedSources = ["rss", "readwise", "oauth:client-1"]
+        #expect(model.waitsFor?.contains("core.note") == true)
+        #expect(!model.canSave)
+
+        // Saving reads the writers again and still refuses.
+        model.types = ["core.note", "core.bookmark"]
+        model.checkedSources = ["rss", "readwise"]
+        await model.save()
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
+
+        // A grant that may write the type is a writer.
+        bench.calls.state.withLock {
+            $0.apps = [AppAccess(id: "grant-1", clientID: "client-1", kind: .app, name: "Sketches", origins: [], scopes: ["content:write"])]
+        }
+        await model.load()
+        model.types = ["core.note"]
+        model.checkedSources = ["oauth:client-1"]
+        #expect(model.waitsFor == nil)
+        await model.save()
+        #expect(bench.calls.state.withLock { $0.allowlistsSent } == [SourceRuleValue(types: ["core.note"], sources: ["oauth:client-1"])])
+    }
+
+    /// Without `grants.manage` the apps can't be checked: a list a key writes under is still saved, and one only an app might
+    /// write under is refused with the reason.
+    @Test func withoutReadingAppsAListAKeyWritesUnderIsStillSaved() async {
+        let bench = OwnerBench(grants: [.configManage])
+        let model = model(bench)
+        bench.calls.fail("apps", with: .notPermitted("grants.manage"))
+        await model.load()
+        #expect(model.appsFailure == .notPermitted("grants.manage"))
+        #expect(model.sourcesFailure == nil)
+        model.types = ["core.note"]
+        model.checkedSources = ["oauth:client-1"]
+        #expect(model.waitsFor?.contains("can’t check your apps") == true)
+        model.checkedSources = ["readwise"]
+        #expect(model.canSave)
+        await model.save()
+        #expect(bench.calls.state.withLock { $0.allowlistsSent } == [SourceRuleValue(types: ["core.note"], sources: ["readwise"])])
+    }
+
+    /// Limit Sources reads no keys or apps, so it never needs `grants.manage`.
+    @Test func limitSourcesReadsNoKeysOrApps() async {
+        let bench = OwnerBench(grants: [.configManage])
+        bench.calls.fail("apps", with: .notPermitted("grants.manage"))
+        let limit = SourceLimitModel(rule: .filter, context: bench.context)
+        await limit.load()
+        #expect(!bench.calls.calls.contains("apps"))
+        #expect(!bench.calls.calls.contains("keys"))
+        #expect(limit.sourcesFailure == nil)
+        #expect(limit.appsFailure == nil)
     }
 
     @Test func aListThatWouldLetNoSourceWriteIsRefusedWithAReason() async {

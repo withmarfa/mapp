@@ -251,6 +251,13 @@ private struct SourceRulePage: View {
                             Task { await model.load() }
                         }
                     }
+                    if let failure = model.appsFailure {
+                        OwnerProblemRow(
+                            title: "Can’t Check Apps That Write", failure: failure,
+                            line: String(localized: "The app isn’t allowed to read your apps, so only keys are checked before you save."),
+                            page: .sources, host: host
+                        ) { Task { await model.load() } }
+                    }
                     if model.sourceChoices.isEmpty { SettingsRow("No Sources", look: .off) }
                     ForEach(model.sourceChoices) { choice in checkRow(choice, in: $model.checkedSources, id: words.id + "Source") }
                 }

@@ -1006,7 +1006,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let owner = FakeOwnerCalls()
         owner.state.withLock {
             $0.sources = [OwnerSource(code: "rss", name: "RSS")]
-            $0.keys = [KeyInfo(id: "key-rss", label: "RSS", source: "rss", permissions: [], tier: .library, types: [:], expires: nil, claims: [])]
+            $0.keys = [KeyInfo(id: "key-rss", label: "RSS", source: "rss", permissions: [], tier: .library, types: ["*": .write], expires: nil, claims: [])]
         }
         let access = TypeAccess(
             ownItems: { _ in 0 }, currentIcon: { _ in nil }, setIcon: { _, _ in nil }, markSets: [], marks: { _, _ in [] }, plural: { _ in nil })

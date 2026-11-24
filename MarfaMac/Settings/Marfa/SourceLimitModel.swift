@@ -26,23 +26,84 @@ nonisolated enum SourceRule: Hashable, Sendable {
 }
 
 /// The sources a current key or app can write under (`items/source-own`, `items/source-claimed`,
-/// `keys-and-oauth/app-source-code`), each with the name of what writes it. A connector host's key holds no access to any
-/// type, and a `restored:` source can belong to no credential (`keys-and-oauth/claims-reserved`), so neither is here.
+/// `keys-and-oauth/app-source-code`), each with the name of what writes it and the types each credential under it may write. A
+/// connector host's key holds no access to any type, and a `restored:` source can belong to no credential
+/// (`keys-and-oauth/claims-reserved`), so neither is here.
 nonisolated struct SourceWriters: Hashable, Sendable {
+    /// What one key or app may write, read as the server reads its type map or its grant's scopes.
+    enum Access: Hashable, Sendable {
+        case key(types: [String: AccessLevel], madeByApp: Bool)
+        case app(scopes: [String], vendors: [String])
+
+        func writes(_ type: String) -> Bool {
+            switch self {
+            case .key(let map, let madeByApp): Self.level(of: type, in: map, madeByApp: madeByApp) == .write
+            case .app(let scopes, let vendors): Self.grantWrites(type, scopes: scopes, vendors: vendors)
+            }
+        }
+
+        /// The exact entry, else the wildcard with the longest root, else `*` (`keys-and-oauth/map-exact-first`,
+        /// `map-longest-wildcard`, `map-global-last`, `map-wildcard-root`). A key an app made reaches `app.*` only through
+        /// entries under it (`keys-and-oauth/app-key-own-vendor`).
+        private static func level(of type: String, in map: [String: AccessLevel], madeByApp: Bool) -> AccessLevel {
+            if let exact = map[type] { return exact }
+            let wildcard = map.filter { $0.key.hasSuffix(".*") && covers(String($0.key.dropLast(2)), type) }
+                .max { $0.key.count < $1.key.count }
+            if let wildcard { return wildcard.value }
+            if madeByApp, type.hasPrefix("app.") { return .none }
+            return map["*"] ?? .none
+        }
+
+        /// A `<pattern>:write` scope: `*` is all data and `content` all but `system`, `marfa` and `app`, neither reaching
+        /// `app.*` (`keys-and-oauth/content-excludes-app`); an app reaches its own vendors with any type write scope
+        /// (`keys-and-oauth/app-reaches-own-vendor`).
+        private static func grantWrites(_ type: String, scopes: [String], vendors: [String]) -> Bool {
+            let patterns = scopes.filter { $0.hasSuffix(":write") }.map { String($0.dropLast(":write".count)) }
+            let root = type.split(separator: ".").first.map(String.init) ?? type
+            let typePatterns = patterns.filter { !["edge", "metadata", "profile"].contains($0.split(separator: ".").first.map(String.init)) }
+            if vendors.contains(where: { type.hasPrefix($0 + ".") }), !typePatterns.isEmpty { return true }
+            return patterns.contains { pattern in
+                switch pattern {
+                case "*": root != "app"
+                case "content": !["system", "marfa", "app"].contains(root)
+                default: pattern.hasSuffix(".*") ? covers(String(pattern.dropLast(2)), type) : pattern == type
+                }
+            }
+        }
+
+        private static func covers(_ wildcardRoot: String, _ type: String) -> Bool {
+            type == wildcardRoot || type.hasPrefix(wildcardRoot + ".")
+        }
+    }
+
     let names: [String: String]
+    let access: [String: [Access]]
 
     init(keys: [KeyInfo], apps: [AppAccess], now: Date = .now) {
         var names: [String: String] = [:]
-        for app in apps { names["oauth:" + app.clientID] = app.name ?? app.clientID }
+        var access: [String: [Access]] = [:]
+        for app in apps {
+            names["oauth:" + app.clientID] = app.name ?? app.clientID
+            access["oauth:" + app.clientID, default: []].append(.app(scopes: app.scopes, vendors: app.vendors))
+        }
         for key in keys where key.expires.map({ $0 > now }) ?? true {
             guard !key.source.lowercased().hasPrefix("connector-host:") else { continue }
             names[key.source] = names[key.source] ?? key.label
-            for claim in key.claims where names[claim] == nil { names[claim] = claim }
+            let keyAccess = Access.key(types: key.types, madeByApp: key.appClientID != nil)
+            access[key.source, default: []].append(keyAccess)
+            for claim in key.claims {
+                if names[claim] == nil { names[claim] = claim }
+                access[claim, default: []].append(keyAccess)
+            }
         }
         self.names = names
+        self.access = access
     }
 
-    func canWrite(underAnyOf sources: Set<String>) -> Bool { sources.contains { names[$0] != nil } }
+    /// The first of `types` that no current key or app may write under any of `sources`, or nil where each has a writer.
+    func unwritable(_ types: [String], underAnyOf sources: Set<String>) -> String? {
+        types.first { type in !sources.contains { access[$0]?.contains { $0.writes(type) } == true } }
+    }
 }
 
 nonisolated struct SourceRuleValue: Hashable, Sendable {
@@ -74,8 +135,8 @@ nonisolated extension SourceLimit {
 
 /// A source rule's page: Limit Sources, for the types checked every app and key reads only items from the sources checked, in
 /// lists, search, exports and webhooks; Who May Write, for exactly the types checked every app and key adds items only under
-/// the sources checked. Its sources are every one the instance holds and those of every current key and app, so a source a
-/// filter hides can be checked again, and Who May Write refuses a list no current key or app could write under. Each is
+/// the sources checked. Its sources are every one the instance holds, so a source a filter hides can be checked again, and for
+/// Who May Write those of every current key and app, refusing a list under which none may write a type it names. Each is
 /// written through `EnforcementSettings`: a change made elsewhere to the rule since the page read it is told and not written
 /// over, and the other levers go back as the server then holds them. Another Marfa answering at the address is told in the
 /// settings page's words and the draft starts again from it, so what was chosen for one Marfa is never written to another.
@@ -94,8 +155,10 @@ nonisolated extension SourceLimit {
     private(set) var typeNames: [String: String] = [:]
     /// Every source the instance holds, read from the server, not from the items a source filter lets the app count.
     private(set) var known: [OwnerSource] = []
-    /// Nil until the keys and apps are read.
+    /// Who May Write's keys and apps; nil until read, and never read for Limit Sources.
     private(set) var writers: SourceWriters?
+    /// Why the apps couldn't be read for Who May Write's check, which then holds only keys.
+    private(set) var appsFailure: OwnerFailure?
     var types: Set<String> = []
     var checkedSources: Set<String> = []
     private let loader = OwnerLoader()
@@ -155,14 +218,19 @@ nonisolated extension SourceLimit {
         guard rule == .allowlist else { return nil }
         guard let writers else {
             return sourcesFailure == nil
-                ? nil : String(localized: "The app couldn’t read your keys and apps, so it can’t check that one of them could still add these types.")
+                ? nil : String(localized: "The app couldn’t read your keys, so it can’t check that one of them could still add these types.")
         }
-        return Self.lockout(writers, checkedSources)
+        return lockout(writers, types, checkedSources)
     }
 
-    private static func lockout(_ writers: SourceWriters, _ sources: Set<String>) -> String? {
-        writers.canWrite(underAnyOf: sources)
-            ? nil : String(localized: "No key or app writes under the checked sources, so nothing could add items of these types. Check one that does.")
+    /// Why no checked source could add one of `types`, naming the type, or nil where each has a writer. Where the apps
+    /// couldn't be read, only keys were checked, and the line says so.
+    private func lockout(_ writers: SourceWriters, _ types: Set<String>, _ sources: Set<String>) -> String? {
+        guard let type = writers.unwritable(types.sorted(), underAnyOf: sources) else { return nil }
+        let name = typeChoices.first { $0.code == type }?.title ?? type
+        return appsFailure == nil
+            ? String(localized: "No key or app that writes under the checked sources may add \(name) items, so nothing could. Check a source that can.")
+            : String(localized: "No key that writes under the checked sources may add \(name) items, and the app can’t check your apps. Check a source a key can add them under, or allow the app to read your apps.")
     }
 
     /// Whether Save would turn the rule off, every type being unchecked, which asks first as Turn Off does.
@@ -174,8 +242,8 @@ nonisolated extension SourceLimit {
         return waitsFor == nil && (rule == .filter || writers != nil)
     }
 
-    /// Reads the rule; with `choices`, also the types, sources, keys and apps its page offers, waiting for a read already under
-    /// way so they are never skipped. The Sources list needs only the rule.
+    /// Reads the rule; with `choices`, also the types and sources its page offers, and for Who May Write the keys and apps that
+    /// could write, waiting for a read already under way so they are never skipped. The Sources list needs only the rule.
     func load(choices: Bool = true) async {
         await loader.load(in: context, waitForPrevious: choices, primary: { () throws(OwnerFailure) in
             let read = try await context.calls.sourceLimit()
@@ -190,13 +258,24 @@ nonisolated extension SourceLimit {
             .required(typesRead) { [self] () throws(OwnerFailure) in typeNames = try await context.calls.typeNames() },
             .required(sourcesRead) { [self] () throws(OwnerFailure) in
                 known = try await context.calls.sources()
-                writers = try await readWriters()
+                if rule == .allowlist { writers = try await readWriters() }
             },
         ] : [])
     }
 
+    /// The keys, and the apps where the sign-in may read them. Without `grants.manage` the apps are left out and
+    /// `appsFailure` says so, so a list a key writes under can still be saved.
     private func readWriters() async throws(OwnerFailure) -> SourceWriters {
-        SourceWriters(keys: try await context.calls.keys(), apps: try await context.calls.apps())
+        let keys = try await context.calls.keys()
+        do {
+            let apps = try await context.calls.apps()
+            appsFailure = nil
+            return SourceWriters(keys: keys, apps: apps)
+        } catch {
+            guard case .notPermitted = error else { throw error }
+            appsFailure = error
+            return SourceWriters(keys: keys, apps: [])
+        }
     }
 
     func revert() {
@@ -226,7 +305,7 @@ nonisolated extension SourceLimit {
             do {
                 let now = try await readWriters()
                 writers = now
-                if let lockout = Self.lockout(now, Set(value.sources)) {
+                if let lockout = lockout(now, Set(value.types), Set(value.sources)) {
                     line = lockout
                     return
                 }
@@ -278,6 +357,7 @@ nonisolated extension SourceLimit {
         typeNames = [:]
         known = []
         writers = nil
+        appsFailure = nil
         types = []
         checkedSources = []
         await load()
