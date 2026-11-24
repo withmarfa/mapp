@@ -15,7 +15,7 @@ final class EditorController: NSObject {
     /// The load whose page stopped answering a flush and was given up on, so the next flush goes ahead without it.
     @ObservationIgnored var abandonedGeneration: Int?
     /// The page went down after it had been ready, holding an item the person could edit (`pageWentDown`). Cleared once
-    /// the page has shown the item again (`pageWorks`).
+    /// the page has shown the item again (`pageWorks`), or has stayed up for `settleTime` after it was ready.
     @ObservationIgnored var pageLoss: PageLoss?
     /// How many losses were recorded, so a flush under way when the page goes down fails even if the page is back.
     @ObservationIgnored var pageLosses = 0
@@ -24,10 +24,14 @@ final class EditorController: NSObject {
     /// How long a page coming back after its process ended has to be ready again before it counts as unable to come
     /// back (`pageWentDown`). Only a test changes it.
     @ObservationIgnored var reloadLimit = Duration.seconds(10)
+    /// How long a page that came back after a loss has to stay up before a later end is a loss of its own, where it
+    /// never says it showed the item, as in a hidden window, which draws no frames. Only a test changes it.
+    @ObservationIgnored var settleTime = Duration.seconds(10)
     /// Whether a flush has its turn with the page, and the flushes waiting for theirs (`flush`).
     @ObservationIgnored var isFlushing = false
     @ObservationIgnored var waitingFlushes: [(leaving: Bool, done: (Bool) -> Void)] = []
-    /// Gives up on a page coming back that is not ready within `reloadLimit`.
+    /// Gives up on a page coming back that is not ready within `reloadLimit`, and, once it is ready, ends the loss
+    /// after `settleTime`.
     @ObservationIgnored var reloadWatch: Task<Void, Never>?
     private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
@@ -682,6 +686,7 @@ final class EditorController: NSObject {
             }
             // A page that ends again before it has shown the item cannot come back: the item may be what ends it.
             if pageItemID == nil { pageLoss = nil } else { pageLoss?.loadedAgain = generation }
+            if pageLoss != nil { watchSettling() }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
             appendPendingEmbeds()
         case .headings(let headings, let generation):
@@ -828,6 +833,18 @@ extension EditorController: WKNavigationDelegate {
             try? await Task.sleep(for: reloadLimit)
             guard let self, !Task.isCancelled, !isReady, pageLosses == losses else { return }
             pageWentDown(comingBack: false)
+        }
+    }
+
+    /// A page that came back may never say it showed the item: a hidden window draws no frames, and outside text
+    /// loaded before it painted gives it another generation, for which it posts no `painted`. One that has stayed up
+    /// this long has come back, so only a page that goes down again soon after it came back cannot come back.
+    private func watchSettling() {
+        let losses = pageLosses
+        reloadWatch = Task { [weak self, settleTime] in
+            try? await Task.sleep(for: settleTime)
+            guard let self, !Task.isCancelled, isReady, pageLosses == losses else { return }
+            pageLoss = nil
         }
     }
 

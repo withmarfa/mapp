@@ -209,7 +209,8 @@ extension EditorController {
     }
 
     /// The page went down after it had been ready, holding an item the person could edit, so what they typed last may
-    /// not have reached the app. It lasts until the page has shown the item again (`pageWorks`).
+    /// not have reached the app. It lasts until the page has shown the item again (`pageWorks`), or has stayed up for
+    /// `settleTime` after it was ready.
     struct PageLoss {
         /// The notice that tells the person, as it was told.
         let title: String

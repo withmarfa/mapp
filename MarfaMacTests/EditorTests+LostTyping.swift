@@ -88,6 +88,22 @@ extension EditorTests {
         try await page.wait { page.editor.isReady }
     }
 
+    /// A page in a hidden window draws no frames, and one given outside text before it painted never says it painted,
+    /// so a page that stays up after coming back has come back.
+    @Test func aPageThatStaysUpAfterComingBackComesBackFromAnotherEnd() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        page.editor.settleTime = .milliseconds(10)
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        try await page.wait { page.editor.isReady }
+        try await page.wait { page.editor.pageLoss == nil }
+        let reload = page.editor.pageNavigation
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        #expect(page.editor.pageNavigation !== reload, "loaded again")
+        #expect(page.editor.pageLoss?.comingBack == true)
+        try await page.wait { page.editor.isReady }
+    }
+
     @Test func aWindowThatGoesStopsWatchingItsPageComeBack() async throws {
         let page = try await Page()
         try await page.load("Original\n")
