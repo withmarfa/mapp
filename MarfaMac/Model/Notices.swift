@@ -100,6 +100,13 @@ import Observation
         if index == 0 { shownIn = nil }
     }
 
+    /// Takes back a waiting notice that is no longer true, unless a window has shown it: the person may be reading it,
+    /// or have its text on the clipboard.
+    func withdraw(_ id: Notice.ID) {
+        guard !shown.contains(id) else { return }
+        waiting.removeAll { $0.id == id }
+    }
+
     /// Whether a change not kept waits that no window has shown, so the person has not been told and its text is
     /// not on the clipboard.
     var holdsQuit: Bool {

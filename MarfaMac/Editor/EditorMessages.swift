@@ -94,6 +94,12 @@ nonisolated enum EditorMessage: Sendable {
     case hiddenText
     case error(String)
 
+    /// The text of a `changed` that did not decode, as when its generation is missing, so it can be handed back.
+    static func unreadableChange(_ body: Any) -> String? {
+        guard let dict = body as? [String: Any], dict["type"] as? String == "changed" else { return nil }
+        return dict["markdown"] as? String
+    }
+
     init?(body: Any) {
         guard let dict = body as? [String: Any], let type = dict["type"] as? String else { return nil }
         switch type {

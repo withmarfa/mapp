@@ -201,6 +201,20 @@ import Testing
         #expect(!notices.holdsQuit)
         #expect(notices.tellBeforeQuitting(copying: clipboard.write) { _ in Issue.record("nothing is left to tell") })
     }
+
+    @Test func aWithdrawnNoticeIsNotToldUnlessAWindowShowedIt() throws {
+        let notices = Notices()
+        notices.notKept("Typing Might Be Missing", text: nil, reason: "Check it when it shows again.", standsAlone: true)
+        notices.notKept("Typing Might Be Missing", text: nil, reason: "Close the window and open it again.", standsAlone: true)
+        notices.withdraw(try #require(notices.waiting.first).id)
+        #expect(notices.waiting.map(\.message) == ["Close the window and open it again."])
+
+        let window = UUID()
+        let shown = try #require(notices.show(in: window) { _ in })
+        notices.withdraw(shown.id)
+        #expect(notices.waiting.map(\.id) == [shown.id], "the person may be reading it")
+        #expect(notices.shownIn == window)
+    }
 }
 
 extension Notices {
