@@ -96,13 +96,13 @@ struct OnThisMacPage: View {
                         .accessibilityIdentifier("KeepOpenedFiles")
                     }
                     attachments(state)
-                    SettingsRow("Opened Files", line: "Fetched again when you open them.") {
-                        HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                            SettingsValue(verbatim: state.bytes.map(StoreSize.text) ?? String(localized: "Unavailable"))
-                            SettingsButton("Clear") { change { try await source.removeDownloadedFiles() } }
-                                .disabled(isWorking)
-                                .accessibilityIdentifier("RemoveDownloadedFiles")
-                        }
+                    SettingsRow(
+                        title: Text("Opened Files"),
+                        line: Text("\(state.bytes.map(StoreSize.text) ?? String(localized: "Unavailable")), fetched again when you open them.")
+                    ) {
+                        SettingsButton("Clear") { change { try await source.removeDownloadedFiles() } }
+                            .disabled(isWorking)
+                            .accessibilityIdentifier("RemoveDownloadedFiles")
                     }
                 } else if !readFailed {
                     SettingsRow("Reading Downloaded Files…") { ProgressView().controlSize(.small) }

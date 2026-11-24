@@ -388,10 +388,9 @@ private struct NewWebhookSheet: View {
                 }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Create Webhook") { Task { await model.make() } }
-                .disabled(!model.canMakeDraft).keyboardShortcut(.defaultAction)
+            SettingsButton("Create Webhook", role: .confirm) { Task { await model.make() } }
+                .disabled(!model.canMakeDraft)
         }
     }
 }
@@ -408,13 +407,12 @@ private struct SecretSheet: View {
                 SettingsSheetField(verbatim: WebhooksModel.display(created.webhook.url)) { SettingsReadOnlyValue(text: created.secret) }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton(copied ? "Copied" : "Copy") {
                 guard let secret = model.created?.secret else { return }
                 OwnerClipboard.copySecret(secret)
                 copied = true
             }
-            SettingsButton("Done") { model.closeSheet() }.keyboardShortcut(.defaultAction)
+            SettingsButton("Done", role: .confirm) { model.closeSheet() }
         }
     }
 }
@@ -430,10 +428,9 @@ private struct AddressChangeSheet: View {
                     width: nil, onSubmit: { Task { await model.saveAddress() } })
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Change Address") { Task { await model.saveAddress() } }
-                .disabled(!model.canSaveAddress).keyboardShortcut(.defaultAction)
+            SettingsButton("Change Address", role: .confirm) { Task { await model.saveAddress() } }
+                .disabled(!model.canSaveAddress)
         }
     }
 }

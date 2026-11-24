@@ -27,9 +27,9 @@ Agreed with August on 21 November 2026, drawn as the Next boards of Marfa for Ma
 
 ## Buttons
 
-Agreed with August on 22 November 2026 (Marfa for Mac Pages, Foundations F7 to F10; the design system's Button, PopUp and Settings components). The rule is in [Components](components.md#buttons); the main window is built, and this is what Settings still changes.
+Agreed with August on 22 November 2026 (Marfa for Mac Pages, Foundations F7 to F10; the design system's Button, PopUp and Settings components). The rule is in [Components](components.md#buttons); the main window and Settings' shared controls are built, and this is what is left.
 
-- **Settings:** a section's filter pop-up and search are 28 points, the filter plain. Inputs at a row's end are 160 points wide. A row's trailing edge holds one control, except a problem row's two buttons; a value it acts on goes in the row's line. A number's unit sits after its field. Rows with a mark get their own section. Show All in a table's footer has no fill. A sheet's confirm button is blue.
+- **Settings:** rows with a mark get their own section, and the rows that still hold two controls where the boards draw them (Updates' Check for Updates beside Update, a secret's button beside its menu) get one each.
 
 ## Pages
 

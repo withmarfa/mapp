@@ -41,9 +41,8 @@ struct TypeSheet: View {
                 }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.cancelField() }.disabled(model.isWorking)
-            SettingsButton("Add") { Task { await model.makeField() } }.disabled(!model.canMakeField)
+            SettingsButton("Add", role: .confirm) { Task { await model.makeField() } }.disabled(!model.canMakeField)
         }
     }
 
@@ -56,9 +55,8 @@ struct TypeSheet: View {
                     onSubmit: { Task { await model.commitRename() } })
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.cancelRename() }.disabled(model.isWorking)
-            SettingsButton("Save") { Task { await model.commitRename() } }.disabled(model.isWorking)
+            SettingsButton("Save", role: .confirm) { Task { await model.commitRename() } }.disabled(model.isWorking)
         }
     }
 
@@ -80,9 +78,8 @@ struct TypeSheet: View {
                 }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.cancelChild() }.disabled(model.isWorking)
-            SettingsButton("Add") { Task { await model.makeChild() } }.disabled(!model.canMakeChild)
+            SettingsButton("Add", role: .confirm) { Task { await model.makeChild() } }.disabled(!model.canMakeChild)
         }
     }
 
@@ -99,9 +96,8 @@ struct TypeSheet: View {
                     onSubmit: { Task { await model.saveMeaning() } })
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.cancelMeaning() }.disabled(model.isSavingMeaning)
-            SettingsButton("Save") { Task { await model.saveMeaning() } }.disabled(model.isSavingMeaning)
+            SettingsButton("Save", role: .confirm) { Task { await model.saveMeaning() } }.disabled(model.isSavingMeaning)
         }
     }
 
@@ -138,9 +134,9 @@ struct TypeSheet: View {
                     Text(verbatim: failure).settingsFont(.line).foregroundStyle(SettingsTokens.errorRed)
                 }
             }
-        } buttons: {
+        } leading: {
             SettingsButton("Use Default") { Task { await model.chooseIcon(nil) } }.disabled(model.isChangingIcon)
-            Spacer(minLength: 0)
+        } buttons: {
             SettingsButton("Cancel") { model.closeIcon() }.disabled(model.isChangingIcon)
         }
     }

@@ -1,14 +1,15 @@
 import SwiftUI
 
 // The trailing controls of a row. Every one is the system's: bordered buttons, menu pop-ups, switches and rounded text fields,
-// at the size the boards draw: 28 points tall, which the system calls large (22 inside a table, which it calls regular).
+// at the size the boards draw: 28 points tall, which the system calls large and draws as a capsule (24 inside a table, which it
+// calls regular and draws as a rounded rectangle).
 
-/// What a Settings button is for. `update` is the prominent one, filled with the accent; `destructive` is the system's
-/// destructive role, which draws red text, and is never the default.
-enum SettingsButtonRole { case normal, destructive, update }
+/// What a Settings button is for. `confirm` is a sheet's or a dialog's one main action: the accent fill and Return, so a
+/// page cannot leave it gray. `update` is the accent fill without Return. `destructive` is a pale red fill with red text, the
+/// destructive role, and never the default, so Return never takes it.
+enum SettingsButtonRole { case normal, destructive, confirm, update }
 
-/// A button at a row's trailing edge. A default action, made so with `keyboardShortcut(.defaultAction)`, takes the system's
-/// default look.
+/// A button at a row's trailing edge, a table's cell or a sheet's foot.
 struct SettingsButton: View {
     private let title: Text
     private let role: SettingsButtonRole
@@ -47,14 +48,14 @@ struct SettingsButton: View {
 
     var body: some View {
         Group {
-            if role == .update {
-                button.buttonStyle(.borderedProminent)
-            } else {
-                button.buttonStyle(.bordered)
+            switch role {
+            case .confirm, .update: button.buttonStyle(.borderedProminent)
+            case .destructive: button.buttonStyle(.bordered).foregroundStyle(SettingsTokens.errorRed)
+            case .normal: button.buttonStyle(.bordered)
             }
         }
         .controlSize(small ? .regular : .large)
-        .tint(role == .destructive ? SettingsTokens.errorRed : nil)
+        .keyboardShortcut(role == .confirm ? .defaultAction : nil)
     }
 
     private var button: some View {
@@ -85,7 +86,7 @@ struct SettingsMoreMenu<Content: View>: View {
 }
 
 extension View {
-    /// The system's menu pop-up at Settings' one input size: 200 wide, and 28 tall, which the large control size draws.
+    /// The system's menu pop-up at Settings' one input size: 160 wide, and 28 tall, which the large control size draws.
     /// Without the flexible sizing the system pop-up fits its title instead of filling the width.
     func settingsPopUpSize() -> some View {
         controlSize(.large)
@@ -224,7 +225,7 @@ extension View {
     }
 }
 
-/// A text field, 200 wide. The system draws the field, at its own height; `isError` puts the red ring round it.
+/// A text field, 160 wide. The system draws the field, at its own height; `isError` puts the red ring round it.
 struct SettingsField: View {
     private let title: Text
     @Binding var text: String
@@ -316,11 +317,12 @@ struct SettingsReadOnlyValue: View {
     }
 }
 
-/// A number: a field with its unit inside at the trailing edge, never minus and plus.
+/// A number: a narrow field with its unit after it, never inside it and never minus and plus. A number with no unit takes the
+/// row-end width.
 struct SettingsNumberField: View {
     private let title: Text
     @Binding var text: String
-    /// What the number counts, shown inside the field; nil where the server names none.
+    /// What the number counts, shown after the field; nil where the server names none.
     let unit: LocalizedStringKey?
     var prompt: String?
     var isError = false
@@ -359,31 +361,29 @@ struct SettingsNumberField: View {
     }
 
     var body: some View {
-        TextField(text: $text, prompt: Text(verbatim: prompt ?? "")) { title }
-            .labelsHidden()
-            .textFieldStyle(.roundedBorder)
-            .controlSize(.large)
-            .autocorrectionDisabled()
-            .focused($isFocused)
-            .onSubmit(onSubmit)
-            .onChange(of: isFocused) { if !$1 { onEndEditing?() } }
-            .padding(.trailing, 0)
-            .overlay(alignment: .trailing) {
-                if let unit {
-                    Text(unit)
-                        .settingsFont(.title)
-                        .foregroundStyle(SettingsTokens.secondaryText)
-                        .padding(.trailing, 8)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
+        HStack(spacing: SettingsTokens.Metric.buttonGap) {
+            TextField(text: $text, prompt: Text(verbatim: prompt ?? "")) { title }
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.large)
+                .multilineTextAlignment(unit == nil ? .leading : .trailing)
+                .autocorrectionDisabled()
+                .focused($isFocused)
+                .onSubmit(onSubmit)
+                .onChange(of: isFocused) { if !$1 { onEndEditing?() } }
+                .frame(width: unit == nil ? SettingsTokens.Metric.controlWidth : SettingsTokens.Metric.numberWidth)
+                .settingsErrorRing(isError)
+            if let unit {
+                Text(unit)
+                    .settingsFont(.title)
+                    .foregroundStyle(SettingsTokens.secondaryText)
+                    .accessibilityHidden(true)
             }
-            .frame(width: SettingsTokens.Metric.controlWidth)
-            .settingsErrorRing(isError)
+        }
     }
 }
 
-/// A slider with a small and a large "A" at its ends, 200 wide, for a size. It draws ticks only when it has a `step`, one
+/// A slider with a small and a large "A" at its ends, 160 wide, for a size. It draws ticks only when it has a `step`, one
 /// at each of the few values it can take; a size that moves smoothly has none.
 struct SettingsSizeSlider: View {
     let title: LocalizedStringKey

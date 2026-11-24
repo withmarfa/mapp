@@ -159,7 +159,7 @@ struct RenderedWindow<Detail: View>: View {
 @MainActor struct SettingsRenderTests {
     static let size = CGSize(width: SettingsTokens.Metric.windowWidth, height: SettingsTokens.Metric.windowHeight)
 
-    private func stub(_ configure: (StubMarfaHost) -> Void = { _ in }) async -> StubMarfaHost {
+    func stub(_ configure: (StubMarfaHost) -> Void = { _ in }) async -> StubMarfaHost {
         let source = FakeInstanceConfig([.name: .text("Castell Studio"), .trashRetentionDays: .number(60)])
         let settings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: source) }
         await settings.load()
@@ -168,7 +168,7 @@ struct RenderedWindow<Detail: View>: View {
         return host
     }
 
-    private func connected() async throws -> (Libraries, HostBench) {
+    func connected() async throws -> (Libraries, HostBench) {
         let bench = try HostBench()
         let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
@@ -376,7 +376,7 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     /// The host's fake server, to put concerns and readings on.
-    private func fake(_ host: StubMarfaHost) -> FakeOwnerCalls { host.ownerCalls as! FakeOwnerCalls }
+    func fake(_ host: StubMarfaHost) -> FakeOwnerCalls { host.ownerCalls as! FakeOwnerCalls }
 
     private func windowed(
         _ page: MarfaSettingsPage, host: StubMarfaHost, subpage: SettingsSubpage? = nil, sheet: AnyView? = nil, badge: Int? = nil
@@ -533,7 +533,7 @@ struct RenderedWindow<Detail: View>: View {
     private static let days: (Int) -> Date = { Date.now.addingTimeInterval(-86_400 * Double($0)) }
 
     /// The server's answers as the boards draw them, in Castell Studio.
-    private func owner(_ configure: (FakeOwnerCalls.State) -> Void = { _ in }) -> StubMarfaHost {
+    func owner(_ configure: (FakeOwnerCalls.State) -> Void = { _ in }) -> StubMarfaHost {
         let calls = FakeOwnerCalls()
         calls.state.withLock { state in
             state.profile = OwnerProfile(username: "mira", emailIsReadable: true, email: "mira@castell.studio")
@@ -596,7 +596,7 @@ struct RenderedWindow<Detail: View>: View {
         return host
     }
 
-    private func page(
+    func page(
         _ page: MarfaSettingsPage, _ host: StubMarfaHost, subpage: SettingsSubpage? = nil, sheet: AnyView? = nil, size: CGSize = Self.size,
         named: String
     ) async throws {
@@ -607,7 +607,7 @@ struct RenderedWindow<Detail: View>: View {
             size: size, named: named, settle: .milliseconds(900))
     }
 
-    private func context(_ host: StubMarfaHost) -> OwnerContext { OwnerContext(host: host) }
+    func context(_ host: StubMarfaHost) -> OwnerContext { OwnerContext(host: host) }
 
     @Test func account() async throws {
         try await page(.account, owner(), named: "Account")
