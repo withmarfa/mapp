@@ -126,6 +126,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var previewFailureAfterWait: OwnerFailure?
         /// How many calls of each name are inside `held`, waiting or about to wait.
         var waiting: [String: Int] = [:]
+        var linkTypes: [OwnerLinkType] = []
+        var linkTypeNames: [String: String] = [:]
+        var linkTypesMade: [NewLinkType] = []
+        /// The link types links still use, which a delete keeps.
+        var linkTypesInUse: Set<String> = []
     }
 
     let state = Mutex(State())
@@ -770,6 +775,34 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return try state.withLock { state throws(OwnerFailure) in
             guard let type = state.mappingTypes[id] else { throw .notFound }
             return type
+        }
+    }
+
+    func linkTypes() async throws(OwnerFailure) -> LinkTypeListing {
+        try enter("linkTypes")
+        return state.withLock { LinkTypeListing(linkTypes: $0.linkTypes, typeNames: $0.linkTypeNames) }
+    }
+
+    func register(_ linkType: NewLinkType) async throws(OwnerFailure) -> OwnerLinkType {
+        try enter("registerLinkType")
+        await held("registerLinkType")
+        return state.withLock { state in
+            state.linkTypesMade.append(linkType)
+            let made = OwnerLinkType(
+                id: linkType.id, label: linkType.label, reverseLabel: linkType.reverseLabel ?? linkType.label, cardinality: linkType.cardinality,
+                fromTypes: linkType.fromTypes, toTypes: linkType.toTypes, shipped: false)
+            state.linkTypes.append(made)
+            return made
+        }
+    }
+
+    func deleteLinkType(_ id: String) async throws(OwnerFailure) -> LinkTypeDeletion {
+        try enter("deleteLinkType")
+        return state.withLock { state in
+            guard state.linkTypes.contains(where: { $0.id == id }) else { return .gone }
+            if state.linkTypesInUse.contains(id) { return .inUse }
+            state.linkTypes.removeAll { $0.id == id }
+            return .deleted
         }
     }
 }

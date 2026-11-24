@@ -327,6 +327,13 @@ nonisolated protocol OwnerCalls: Sendable {
     /// The types a kind can land as.
     func mappingTypeOptions() async throws(OwnerFailure) -> [MappingTypeOption]
     func mappingType(_ id: String) async throws(OwnerFailure) -> MappingTypeInfo
+
+    /// The link types, the names of the item types they join and the plugins that brought them.
+    func linkTypes() async throws(OwnerFailure) -> LinkTypeListing
+    /// Registers a link type of the owner's (`metadata.edge_types:write`).
+    func register(_ linkType: NewLinkType) async throws(OwnerFailure) -> OwnerLinkType
+    /// Deletes a link type of the owner's, never forced, so a type links still use is kept (`schema.write`).
+    func deleteLinkType(_ id: String) async throws(OwnerFailure) -> LinkTypeDeletion
 }
 
 /// What changing the addresses would do, as the server said before anything was written, with the change it said it

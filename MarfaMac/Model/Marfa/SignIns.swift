@@ -174,9 +174,11 @@ nonisolated struct SystemSignIns: SignIns {
     /// never does, and registering the type where the Marfa holds none (`metadata.types:write`). The app asks for
     /// `app.*:write`: the vendor scope is unavailable before its first type exists (`keys-and-oauth/app-vendor-not-named`),
     /// and discovery never lists it afterward. This reaches every app's types; withmarfa/marfa#3522 would let the app ask
-    /// for its vendor alone. The owner may approve less, and what is missing is told where it is needed.
+    /// for its vendor alone. Settings > Types > Links registers the owner's link types (`metadata.edge_types:write`). The
+    /// owner may approve less, and what is missing is told where it is needed.
     static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write"]
         + askedAtSignIn.map(\.rawValue).sorted() + profileScopes + [PreferencesType.rootScope, PreferencesType.registeringScope]
+        + [ClientOwnerCalls.registeringLinkTypes]
 
     /// What Signed In As needs: the owner's name (`instance-claim/profile-read`).
     static let profileScopes = ["profile.name:read"]

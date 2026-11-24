@@ -3,7 +3,7 @@ import Marfa
 import Testing
 @testable import MarfaMac
 
-/// What a sign-in asks the owner to approve: every owner permission, and what the app's own settings need. The vendor
+/// What a sign-in asks the owner to approve: every owner permission, what the app's own settings need and registering link types. The vendor
 /// scope is unavailable before its first type exists (`keys-and-oauth/app-vendor-not-named`), and discovery never lists it
 /// afterward.
 @Suite(.hangLimit)
@@ -18,9 +18,10 @@ struct SignInScopesTests {
     nonisolated private static let vendor = "app.marfa-mac.*:write"
     nonisolated private static let root = "app.*:write"
     nonisolated private static let registering = "metadata.types:write"
+    nonisolated private static let linkTypes = "metadata.edge_types:write"
 
     @Test func theScopesAskForTheAppRootAndNotTheVendor() {
-        #expect(SystemSignIns.scopes == Self.common + [Self.root, Self.registering])
+        #expect(SystemSignIns.scopes == Self.common + [Self.root, Self.registering, Self.linkTypes])
         #expect(!SystemSignIns.scopes.contains(Self.vendor))
         #expect(SystemSignIns.scopes.filter { $0.hasPrefix("app.") } == [Self.root])
     }
