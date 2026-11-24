@@ -26,7 +26,7 @@ Marfa for Mac is a macOS app for a Marfa server's items, with a sidebar, a list 
 - Use American English. Put no time estimates, absolute paths, machine or account names or credentials in files. A comment says only why.
 - Use scoped lowercase Conventional Commits in the present tense: `feat(app):`, `fix(editor):`.
 - Work in `.claude/worktrees/` and merge by pull request, following `.agents/skills/land-a-pull-request/SKILL.md`.
-- GitHub lets the organization run only 5 macOS jobs at once, so a pull request runs no Mac job; `Checks`, the required check, is Linux only. `main.yml` builds Release and runs the unit tests after a merge; `release.yml` runs the UI tests before publishing.
+- GitHub lets the organization run only 5 macOS jobs at once, so a pull request runs no Mac job; `Checks`, the required check, is Linux only. `main.yml` builds Release and runs the unit tests after a merge. CI runs no UI tests: they ran past an hour on a hosted runner.
 - Merge reviewed work with `--admin` once it passes locally, without waiting on CI. `main` is not precious: fix a break forward.
 - Before an admin merge, run the Debug `build-for-testing`, the unit suites and UI class it touches, and a Release compile if it touches `#if DEBUG`, build settings, `Config/`, `Info.plist` or the project file. Commands: `MarfaMacTests/AGENTS.md`.
 - Keep no legacy: no shims, aliases or migration paths.
