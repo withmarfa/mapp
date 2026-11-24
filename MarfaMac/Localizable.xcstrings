@@ -3237,6 +3237,29 @@
         }
       }
     },
+    "%lld items will come back active, not archived, if they are recovered." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item will come back active, not archived, if it is recovered."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items will come back active, not archived, if they are recovered."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld minutes" : {
 
     },
@@ -4165,6 +4188,9 @@
       "extractionState" : "manual"
     },
     "Couldn’t change downloaded files. Check the current limit and try again." : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t Finish Undo" : {
       "extractionState" : "manual"
     },
     "Couldn’t Make This Change" : {
@@ -5639,6 +5665,9 @@
     },
     "Recover" : {
 
+    },
+    "Recovered but Not Archived" : {
+      "extractionState" : "manual"
     },
     "Redo" : {
 

@@ -94,6 +94,35 @@ import Testing
         #expect(library.notices.waiting.last?.message == String(localized: "That change wasn’t made, so there is nothing to redo here."))
     }
 
+    @Test func anUndoWhoseRestoreIsBlockedSaysTheItemComesBackActive() async throws {
+        let (library, source, undo) = try await binnedFromArchive()
+        undo.undo()
+        let restore = try #require(source.submitted.last)
+        source.send(.answered(restore.id, .blocked(.failingAlone, nil)))
+        #expect(await eventually { library.notices.waiting.last?.message == Self.comesBackActive(1) })
+        #expect(source.writes == [.transition(F.n1, .active)])
+
+        // The restore is released and lands, so Redo moves the item back to the bin.
+        try await show(F.n1, .active, in: library, source)
+        undo.redo()
+        #expect(source.writes == [.transition(F.n1, .active), .transition(F.n1, .trashed)])
+    }
+
+    @Test func closingTheLibraryBeforeTheRestoreIsAnsweredSaysTheItemComesBackActive() async throws {
+        let (library, source, undo) = try await binnedFromArchive()
+        undo.undo()
+        await library.finish()
+        #expect(library.notices.waiting.last?.message == Self.comesBackActive(1))
+
+        // Told that the item comes back active, so no archive follows a restore answered after that.
+        try await accept(F.n1, .active, in: library, source)
+        // Lets the library take the answer, which would send the archive at once.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(source.writes == [.transition(F.n1, .active)])
+        undo.redo()
+        #expect(source.writes == [.transition(F.n1, .active), .transition(F.n1, .trashed)])
+    }
+
     @Test func anUndoOfAnItemAlreadyWhereItWouldPutItIsMadeQuietly() async throws {
         let (library, source) = try await loaded()
         let undo = UndoManager()
@@ -108,6 +137,24 @@ import Testing
         #expect(library.notices.waiting.isEmpty)
         undo.redo()
         #expect(source.writes == [.transition(F.n1, .trashed)])
+    }
+
+    @Test func anArchiveGivenBackAfterTheRestoreIsToldAndNotPutBack() async throws {
+        let (library, source, undo) = try await binnedFromArchive()
+        undo.undo()
+        try await accept(F.n1, .active, in: library, source)
+        let archive = try #require(await eventually { source.writes.count == 2 } ? source.submitted.last : nil)
+        source.send(.answered(archive.id, .refused(SyncProblem(code: MarfaEngine.heldChangedCode, message: MarfaEngine.heldChanged, notQueued: true))))
+        #expect(await eventually { library.notices.waiting.last?.title == String(localized: "Recovered but Not Archived") })
+        #expect(library.notices.told == 1)
+        #expect(!undo.canUndo, "the restore was made, so the Undo is not put back")
+
+        undo.redo()
+        #expect(source.writes.last == .transition(F.n1, .trashed))
+    }
+
+    private static func comesBackActive(_ count: Int) -> String {
+        String(localized: "\(count) items will come back active, not archived, if they are recovered.")
     }
 
     @Test func aRedoAfterThatMovesTheItemToTheBinAgain() async throws {
