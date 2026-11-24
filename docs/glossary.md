@@ -8,7 +8,7 @@ What is agreed and not built yet is in [Agreed designs](agreed-designs.md). This
 
 | Term | Owner | Meaning | Read more |
 | --- | --- | --- | --- |
-| Button | The app | A rounded rectangle at 22 or 28 points with a role: primary, secondary, plain or destructive (`AppButtonStyle`). The toolbar's glass buttons are the system's. | [Components](components.md) |
+| Button | The app | A capsule at 28 or 36 points, or a rounded rectangle with 7-point corners at 24, with a role: primary, secondary, plain or destructive (`AppButtonStyle`). The toolbar's glass buttons are the system's. | [Components](components.md) |
 | Catalogue | Marfa | The server's list of types, fields and edge types. The app reads it as `Catalogue` and names no type of its own. | [Marfa and the app](marfa-and-the-mac-app.md) |
 | Chip | The app | One value drawn as a small rounded label, 22 points tall (`PageChip`). | [Value components](value-components.md) |
 | Collection | Marfa | An item of a type that plays the `container` role. Other items are filed under it with an `in-collection` edge. | [Marfa and the app](marfa-and-the-mac-app.md) |
