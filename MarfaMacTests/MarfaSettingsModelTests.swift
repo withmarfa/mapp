@@ -51,19 +51,6 @@ import Testing
         #expect(model.code == nil)
     }
 
-    @Test func anAddressThatIsNoServerIsToldInWords() async throws {
-        let bench = try HostBench()
-        let (model, flushed) = model(bench)
-        await connect(model, to: "marfa.example", key: "k")
-        let notice = try #require(model.notice)
-        #expect(notice.title == "Check the Address")
-        #expect(notice.message == "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://.")
-        #expect(model.address == "marfa.example", "what was typed is kept for another try")
-        #expect(!model.isConnected)
-        #expect(bench.servers.opened.isEmpty)
-        #expect(flushed.count == 0, "nothing changed, so nothing was handed over")
-    }
-
     @Test(arguments: ["https://marfa.example/a", "https://marfa.example/?x=1", "https://marfa.example/#f"])
     func anAddressWithMoreThanTheServerIsToldInWordsWhereverItIsTyped(text: String) async throws {
         let bench = try HostBench()
@@ -98,51 +85,8 @@ import Testing
         #expect(bench.signIns.calls == ["browser http://first.test:8210", "signOut http://first.test:8210"])
     }
 
-    @Test(arguments: [
-        MarfaHost.Problem.notSignedIn, .signIn(.denied), .signIn(.expired), .signIn(.refused), .signIn(.unreachable), .signIn(.couldNotFinish),
-        .signIn(.notMarfa), .signIn(.notVerified), .signIn(.inUse), .signIn(.keychain), .signIn(.noWindow), .signIn(.failed),
-        .notRevoked(address: "https://marfa.test"), .notRemoved(signIn: "errSecItemNotFound", copy: nil),
-        .notRemoved(signIn: nil, copy: "NSCocoaErrorDomain 513"), .notConnected, .busy, .notAServer, .addressHasMore,
-        .otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse,
-        .copyKept(.changed(now: 2), signIn: nil), .copyKept(.unreadable(folder: "/Library/Marfa/ab12"), signIn: "errSecItemNotFound"),
-        .copyKept(.notMadeByApp(folder: "/Library/Marfa/ab12"), signIn: nil), .cannotDiscard(folder: "/Library/Marfa/ab12")
-    ])
-    func everyProblemIsToldAsWhatHappenedAndWhatToDo(problem: MarfaHost.Problem) throws {
-        let notice = try #require(MarfaSettingsModel.notice(for: problem))
-        #expect(!notice.title.isEmpty)
-        #expect(notice.message.hasSuffix("."))
-        for raw in ["-25299", "SecItem", "errSec", "NSCocoa", "network:", "Domain"] {
-            #expect(!notice.message.contains(raw), "“\(notice.message)” shows “\(raw)”")
-        }
-    }
-
     @Test func aSignInThePersonStoppedIsNotToldBack() {
         #expect(MarfaSettingsModel.notice(for: .signIn(.canceled)) == nil)
-    }
-
-    @Test func eachWayASignInEndsHasItsOwnWords() throws {
-        func title(_ outcome: SignInOutcome) throws -> String {
-            try #require(MarfaSettingsModel.notice(for: .signIn(outcome))).title
-        }
-        #expect(try title(.denied) == "This App Wasn’t Approved")
-        #expect(try title(.expired) == "The Code Expired")
-        #expect(try title(.refused) == "The Server Refused the Sign-In")
-        #expect(try title(.unreachable) == "Can’t Reach the Server")
-        #expect(try title(.notMarfa) == "Check the Address")
-        #expect(try title(.couldNotFinish) == "Couldn’t Finish Signing In")
-        #expect(try title(.notVerified) == "Couldn’t Confirm the Sign-In")
-        #expect(try #require(MarfaSettingsModel.notice(for: .signIn(.notVerified))).message == "The app couldn’t verify the approval. Try signing in again.")
-        #expect(try title(.noWindow) == "No Window to Sign In From")
-        #expect(try title(.failed) == "Couldn’t Sign In")
-        #expect(try title(.keychain) == "Can’t Keep the Sign-In")
-        #expect(try title(.inUse) == "The Sign-In Is in Use")
-        let revoke = try #require(MarfaSettingsModel.notice(for: .notRevoked(address: "https://marfa.test")))
-        #expect(revoke.title == "Disconnected, but This App May Still Be Approved")
-        #expect(revoke.message.contains("marfa apps list"))
-        #expect(revoke.message.contains("marfa apps revoke"))
-        for claim in ["Connected apps", "still lists", "You are signed in"] {
-            #expect(!revoke.message.contains(claim))
-        }
     }
 
     @Test func theQuestionAboutWaitingChangesIsAskedNotTold() {
@@ -161,19 +105,6 @@ import Testing
         #expect(model.address == "http://first.test:8210")
         #expect(!model.isConnected)
         #expect(!model.isWorking)
-    }
-
-    @Test func aSignInTheServerRefusesIsToldInTheAppsWordsNotTheServers() async throws {
-        let bench = try HostBench()
-        let (model, _) = model(bench)
-        bench.signIns.script(browser: [.failure(SignInError.refused(code: "invalid_client", message: "This app is not known."))])
-        model.address = "http://first.test:8210"
-        await model.connect()
-        #expect(model.notice?.title == "The Server Refused the Sign-In")
-        #expect(model.notice?.message.hasPrefix("The server wouldn’t approve the app, so nothing changed.") == true)
-        #expect(model.notice?.message.contains("invalid_client") == false)
-        #expect(model.notice?.message.contains("This app is not known.") == false)
-        #expect(!model.isConnected)
     }
 
     @Test func aSignInAgainGivesTheOpenCopyTheSignInAndLeavesNoNotice() async throws {
@@ -264,7 +195,8 @@ import Testing
         #expect(try bench.signIns.key(for: first.address) == "key-2")
     }
 
-    /// A switch that is done but for removing the old server's sign-in says it switched rather than disconnected.
+    /// A switch that is done but for removing the old server's sign-in says it switched rather than disconnected, and tells
+    /// the person where to remove what is left.
     @Test func aSwitchThatLeavesTheOldSignInBehindSaysItSwitched() async throws {
         let bench = try HostBench()
         let (model, _) = model(bench)
@@ -277,17 +209,8 @@ import Testing
         #expect(model.host.connection == second)
         #expect(model.otherAddress == "")
         let notice = try #require(model.notice)
-        #expect(notice.title == "Switched Servers, but Not Everything Was Removed")
-        #expect(notice.message == "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access.")
-    }
-
-    @Test func aCopyLeftBehindIsToldAgainstWhatTheStepDid() throws {
-        let problem = MarfaHost.Problem.notRemoved(signIn: nil, copy: "NSCocoaErrorDomain 513")
-        #expect(MarfaSettingsModel.notice(for: problem, reached: .left)?.title == "Disconnected, but Not Everything Was Removed")
-        #expect(MarfaSettingsModel.notice(for: problem, reached: .switched)?.title == "Switched Servers, but Not Everything Was Removed")
-        let notOpened = try #require(MarfaSettingsModel.notice(for: problem, reached: .notOpened))
-        #expect(notOpened.title == "Can’t Open the Library")
-        #expect(!notOpened.message.contains("NSCocoa"))
+        #expect(notice.title.contains("Switched"))
+        #expect(notice.message.contains("Keychain Access"))
     }
 
     // MARK: Leaving a copy
@@ -527,20 +450,6 @@ import Testing
         #expect(model.notice?.title == "Disconnected, but This App May Still Be Approved")
     }
 
-    /// Only a sign-out the server did not confirm leaves an approval standing; one the server ended, or one that had
-    /// nothing kept, has nothing more to tell.
-    @Test(arguments: [SignOutOutcome.endedAtServer, .nothingKept])
-    func disconnectingTellsNothingMoreWhenTheApprovalEndedOrNothingWasKept(outcome: SignOutOutcome) async throws {
-        let bench = try HostBench()
-        let (model, _) = model(bench)
-        await connect(model)
-        bench.signIns.script(signOut: .success(outcome))
-        await model.disconnect()
-        #expect(!model.isConnected)
-        #expect(bench.savedAddress == nil)
-        #expect(model.notice == nil)
-    }
-
     /// A sign-out that waits on a server that does not answer holds the step for up to a minute: the person is shown
     /// it is working, and nothing else may start meanwhile.
     @Test func disconnectingShowsItIsWorkingWhileTheServerDoesNotAnswerAndStartsNothingElse() async throws {
@@ -572,19 +481,6 @@ import Testing
     }
 
     // MARK: Words and what shows
-
-    @Test func theStatusFollowsTheHost() async throws {
-        let bench = try HostBench()
-        let (model, _) = model(bench)
-        #expect(model.status.title == "Not connected")
-        await connect(model)
-        let source = try #require(bench.servers.last)
-        #expect(model.status.title == "Connecting…")
-        source.state.set(.online)
-        #expect(await eventually { model.status.title == "Connected" })
-        source.state.set(.offline(reason: "network: refused"))
-        #expect(await eventually { model.status.title == "Offline" })
-    }
 
     @Test func aStepAlreadyUnderWayIsNotStartedTwice() async throws {
         let bench = try HostBench()

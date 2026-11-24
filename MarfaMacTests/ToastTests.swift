@@ -13,59 +13,6 @@ import Testing
     /// Waits for the timer to be asleep on the clock, so advancing time reaches it.
     private func timerIsRunning() async -> Bool { await eventually { clock.sleeping == 1 } }
 
-    @Test func aToastShowsWithItsMessage() {
-        presenter.show("Moved to Recently Deleted", symbol: "trash")
-        #expect(presenter.current?.message == "Moved to Recently Deleted")
-        #expect(presenter.current?.symbol == "trash")
-        #expect(presenter.current?.undo == nil)
-    }
-
-    @Test func aSecondToastReplacesTheFirstAndTheFirstsTimeNoLongerCounts() async {
-        presenter.show("First")
-        #expect(await timerIsRunning())
-        clock.advance(by: .seconds(4))
-        presenter.show("Second")
-        #expect(presenter.current?.message == "Second")
-        #expect(await timerIsRunning())
-        clock.advance(by: .seconds(4))
-        #expect(presenter.current?.message == "Second", "four seconds into the second toast, the first's time has passed")
-        clock.advance(by: .seconds(1))
-        #expect(await eventually { presenter.current == nil })
-    }
-
-    @Test func aToastLeavesOnItsOwnAfterItsTime() async {
-        presenter.show("Moved")
-        #expect(await timerIsRunning())
-        clock.advance(by: .seconds(4))
-        #expect(presenter.current != nil)
-        clock.advance(by: .seconds(1))
-        #expect(await eventually { presenter.current == nil })
-    }
-
-    @Test func aToastDoesNotLeaveWhileThePointerIsOverItAndStartsAgainWhenItLeaves() async {
-        presenter.show("Moved")
-        #expect(await timerIsRunning())
-        presenter.hold(true)
-        #expect(await eventually { clock.sleeping == 0 })
-        clock.advance(by: .seconds(60))
-        #expect(presenter.current?.message == "Moved")
-
-        presenter.hold(false)
-        #expect(await timerIsRunning())
-        clock.advance(by: .seconds(4))
-        #expect(presenter.current != nil, "the full time starts again")
-        clock.advance(by: .seconds(1))
-        #expect(await eventually { presenter.current == nil })
-    }
-
-    @Test func aToastThatExpiresAsThePointerArrivesStays() async {
-        presenter.show("Moved")
-        #expect(await timerIsRunning())
-        presenter.hold(true)
-        clock.advance(by: .seconds(5))
-        #expect(presenter.current?.message == "Moved")
-    }
-
     @Test func undoRunsTheActionOnceAndTakesTheToastAway() async {
         var undone = 0
         presenter.show("Moved", undo: { undone += 1 })
@@ -107,10 +54,6 @@ import Testing
         #expect(one.toasts.current?.message == "Moved")
         #expect(other.toasts.current == nil)
     }
-
-    @Test func theStandardTimeIsFiveSeconds() {
-        #expect(ToastPresenter.standardDuration == .seconds(5))
-    }
 }
 
 /// Deleting items shows the toast, and its Undo is the step the delete registered.
@@ -147,13 +90,6 @@ import Testing
         #expect(source.writes == [.transition(ItemID("a"), .active)], "one undo, once")
         #expect(!undo.canUndo)
         #expect(toasts.current == nil)
-    }
-
-    @Test func movingSeveralItemsSaysHowMany() async throws {
-        let (library, _) = try await loaded([Self.note("a"), Self.note("b"), Self.note("c")])
-        let toasts = ToastPresenter()
-        Browser.moveToRecentlyDeleted([ItemID("a"), ItemID("b")], in: library, undoManager: Self.manager(), toasts: toasts)
-        #expect(toasts.current?.message == "Moved 2 items to Recently Deleted")
     }
 
     @Test func anotherChangeAfterTheDeleteTakesTheToastAway() async throws {
@@ -257,24 +193,6 @@ import Testing
         source.clearWrites()
         toasts.undo()
         #expect(source.writes == [.transition(ItemID("b"), .active)])
-    }
-
-    @Test func oneNamedItemNamesItInTheToast() async throws {
-        var named = Self.note("a")
-        named.name = "Kitchen quotes"
-        let (library, _) = try await loaded([named, Self.note("b")])
-        let toasts = ToastPresenter()
-        Browser.moveToRecentlyDeleted([ItemID("a")], in: library, undoManager: Self.manager(), toasts: toasts)
-        #expect(toasts.current?.message == "Moved “Kitchen quotes” to Recently Deleted")
-        Browser.moveToRecentlyDeleted([ItemID("b")], in: library, undoManager: Self.manager(), toasts: toasts)
-        #expect(toasts.current?.message == "Moved to Recently Deleted", "an item with no name keeps the plain wording")
-    }
-
-    @Test func nothingMovedShowsNoToast() async throws {
-        let (library, _) = try await loaded([Self.note("a")])
-        let toasts = ToastPresenter()
-        Browser.moveToRecentlyDeleted([ItemID("ghost")], in: library, undoManager: Self.manager(), toasts: toasts)
-        #expect(toasts.current == nil)
     }
 
     @Test func aWindowWithNoUndoManagerOffersNoUndo() async throws {

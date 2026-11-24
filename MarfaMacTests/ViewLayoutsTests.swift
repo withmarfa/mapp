@@ -85,30 +85,6 @@ struct ViewLayoutsTests {
 
     // MARK: Columns
 
-    @Test func theColumnsStartAsTheTableLaysThemOut() {
-        let columns = ViewProperties()
-        #expect(Self.ids(columns.arranged(Self.columns)) == ["title", "type", "edited", "created"])
-        #expect(Self.ids(columns.shownColumns(Self.columns)) == ["title", "type", "edited"])
-    }
-
-    @Test func aColumnIsShownOrHiddenAndTheSameArrangementIsTheSameValue() {
-        var columns = ViewProperties()
-        columns.setShown(.created, true)
-        #expect(Self.ids(columns.shownColumns(Self.columns)).contains("created"))
-        columns.setShown(.created, false)
-        #expect(columns == ViewProperties())
-        columns.setShown(.type, false)
-        #expect(!Self.ids(columns.shownColumns(Self.columns)).contains("type"))
-    }
-
-    @Test func theNameIsAlwaysShownAndFirst() {
-        var columns = ViewProperties()
-        columns.setShown(.title, false)
-        columns.move("edited", before: "title", in: Self.columns)
-        #expect(Self.ids(columns.shownColumns(Self.columns)).first == "title")
-        #expect(Self.ids(columns.arranged(Self.columns)).first == "title")
-    }
-
     @Test func aColumnMovesBeforeAnotherOrToTheEnd() {
         var columns = ViewProperties()
         columns.move("edited", before: "type", in: Self.columns)

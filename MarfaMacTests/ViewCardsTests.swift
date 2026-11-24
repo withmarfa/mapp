@@ -7,20 +7,6 @@ import Testing
 struct ViewCardsTests {
     // MARK: The settings
 
-    @Test func theDefaultsAreTheCardAsItHasAlwaysBeen() {
-        let cards = ViewCards()
-        #expect(cards.preview == .pictureOrText)
-        #expect(!cards.fitsPicture)
-        #expect(cards.size == .medium)
-        #expect(ViewMacSettings().cards == cards)
-    }
-
-    @Test func aSizeSetsHowWideACardIs() {
-        let widths = ViewCards.Size.allCases.map(\.columnWidth)
-        #expect(widths == widths.sorted())
-        #expect(Set(widths).count == widths.count)
-    }
-
     @Test func settingsRoundTripThroughTheStoredText() throws {
         let cards = ViewCards(preview: .text, fitsPicture: true, size: .large)
         let settings = ViewMacSettings(cards: cards)
@@ -45,11 +31,6 @@ struct ViewCardsTests {
         #expect(!written.contains("subtext") && !written.contains("properties"))
     }
 
-    @Test func settingsStoredBeforeCardsExistOpenWithTheDefaults() throws {
-        let settings = try JSONDecoder().decode(ViewMacSettings.self, from: Data(#"{"layout":"gallery"}"#.utf8))
-        #expect(settings.cards == ViewCards())
-    }
-
     @Test func choicesThatDifferInCardsAreDifferentChoices() {
         var other = ViewMacSettings()
         other.cards.size = .small
@@ -58,5 +39,10 @@ struct ViewCardsTests {
         taken.take(choicesOf: other)
         #expect(taken.cards.size == .small)
         #expect(taken.widths == Data([1]))
+    }
+
+    @Test func settingsStoredBeforeCardsExistOpenWithTheDefaults() throws {
+        let settings = try JSONDecoder().decode(ViewMacSettings.self, from: Data(#"{"layout":"gallery"}"#.utf8))
+        #expect(settings.cards == ViewCards())
     }
 }

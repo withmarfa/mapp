@@ -68,8 +68,7 @@ enum PageAnalyzer {
         }
     }
 
-    /// Readability and its readerable check, as Mozilla ships them, in one string to run before the analysis. Nil only if
-    /// the app was built without them, which `ReadabilityScriptTests` would show.
+    /// Loads both Mozilla scripts into one string to run before analysis. Returns nil if either script can't be read.
     nonisolated static let readability: String? = {
         let parts = ["Readability", "Readability-readerable"].map {
             Bundle.main.url(forResource: $0, withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) }

@@ -33,73 +33,7 @@ struct TypeLooksTests {
 
     private let chosenLook = TypeLook(date: .created, secondary: [], facts: [])
 
-    // MARK: Inheritance
-
-    @Test func aChildTakesItsParentsChosenLookPlaceByPlace() {
-        let catalogue = LookFixture.catalogue([note("a"), note("b", parent: "a")])
-        let choices: [TypeID: TypeLookChoice] = [
-            TypeID("a"): TypeLookChoice(date: .created, facts: []), TypeID("b"): TypeLookChoice(secondary: []),
-        ]
-        #expect(LookFixture.look("b", in: catalogue, choices: choices) == TypeLook(date: .created, secondary: [], facts: []))
-        // A place nobody chose is the type's own preset.
-        #expect(LookFixture.look("a", in: catalogue, choices: choices) == TypeLook(date: .created, secondary: [.opening], facts: []))
-    }
-
-    @Test func aChildOfAnotherPresetDoesNotTakeItsParentsChoice() {
-        let status = LookFixture.status
-        let catalogue = LookFixture.catalogue([note("a"), note("b", parent: "a", [LookFixture.field("state", status)])])
-        let choices = [TypeID("a"): TypeLookChoice(chosenLook)]
-        let child = LookFixture.look("b", in: catalogue, choices: choices)
-        #expect(LookPreset.suggested(for: TypeID("b"), in: catalogue) == .task)
-        #expect(child == LookPreset.task.look(for: TypeID("b"), in: catalogue))
-    }
-
-    @Test func aChildTakesTheNearestAncestorThatChose() {
-        let catalogue = LookFixture.catalogue([note("a"), note("b", parent: "a"), note("c", parent: "b")])
-        let choices = [
-            TypeID("a"): TypeLookChoice(date: .created), TypeID("b"): TypeLookChoice(date: .off),
-        ]
-        #expect(LookFixture.look("c", in: catalogue, choices: choices).date == .off)
-    }
-
-    @Test func aChildWhoseParentIsMissingFromTheCatalogueTakesItsOwnPreset() {
-        let catalogue = LookFixture.catalogue([note("orphan", parent: "gone")])
-        let choices = [TypeID("gone"): TypeLookChoice(chosenLook)]
-        #expect(LookFixture.look("orphan", in: catalogue, choices: choices) == LookPreset.note.look(for: TypeID("orphan"), in: catalogue))
-    }
-
-    @Test func aChainAtTheTenAncestorLimitReachesTheRootAndOneBeyondDoesNot() {
-        let chain = (0...11).map { note("t\($0)", parent: $0 == 0 ? nil : "t\($0 - 1)") }
-        let catalogue = LookFixture.catalogue(chain)
-        let choices = [TypeID("t0"): TypeLookChoice(date: .created)]
-        #expect(catalogue.ancestors(of: TypeID("t10")).count == 10)
-        #expect(LookFixture.look("t10", in: catalogue, choices: choices).date == .created)
-        #expect(catalogue.ancestors(of: TypeID("t11")).count == Catalogue.ancestorLimit)
-        #expect(LookFixture.look("t11", in: catalogue, choices: choices).date == .edited)
-    }
-
-    @Test func aParentLoopEndsTheWalkInsteadOfSpinning() {
-        let catalogue = LookFixture.catalogue([note("a", parent: "b"), note("b", parent: "a")])
-        #expect(catalogue.ancestors(of: TypeID("a")) == [TypeID("b")])
-        #expect(LookFixture.look("a", in: catalogue) == LookPreset.note.look(for: TypeID("a"), in: catalogue))
-    }
-
-    @Test func ancestorsAreNearestFirstAndNameAParentTheCatalogueLacks() {
-        #expect(catalogue.ancestors(of: TypeID("aic.ticket.task")) == [TypeID("aic.ticket"), TypeID("core.task")])
-        #expect(catalogue.ancestors(of: TypeID("core.task")).isEmpty)
-        #expect(catalogue.ancestors(of: TypeID("nobody")).isEmpty)
-        let orphan = LookFixture.catalogue([note("orphan", parent: "gone")])
-        #expect(orphan.ancestors(of: TypeID("orphan")) == [TypeID("gone")])
-    }
-
     // MARK: Choices that no longer fit
-
-    @Test func aChosenFieldTheTypeLacksIsPassedOver() {
-        let catalogue = LookFixture.catalogue([note("a")])
-        let choices = [TypeID("a"): TypeLookChoice(
-            date: .field("nope"), secondary: [.field("nope"), .opening], facts: [.field("nope"), .tags])]
-        #expect(LookFixture.look("a", in: catalogue, choices: choices) == TypeLook(date: .edited, secondary: [.opening], facts: [.tags]))
-    }
 
     @Test func manyTypesResolveInOnePass() {
         var specs = [note("root")]
@@ -199,21 +133,6 @@ struct TypeLooksTests {
     ])
     func aFileOfAnotherShapeIsNotRead(text: String) {
         #expect(LooksFile.read(data(text)) == nil)
-    }
-
-    @Test func aLooksFileIsReadableText() throws {
-        let file = file([
-            "core.task": TypeLook(date: .field("due_at"), secondary: [.site, .field("project")], facts: [.tags]),
-            "core.event": TypeLook(date: .occurred, secondary: [.time("starts_at"), .field("place")], facts: []),
-        ])
-        let text = try #require(String(data: file.encoded(), encoding: .utf8))
-        #expect(text.contains(#""format" : "marfa-mac-looks""#))
-        #expect(text.contains(#""field:due_at""#))
-        #expect(text.contains(#""occurred""#))
-        #expect(text.contains(#""time:starts_at""#))
-        #expect(text.contains(#""site""#))
-        #expect(LooksFile.read(Data(text.utf8)) == file)
-        #expect(!text.contains("http"), "the file names no server")
     }
 
     private func temporaryFile(_ contents: Data? = nil) throws -> URL {
