@@ -68,7 +68,7 @@ if command -v marfa > /dev/null && [[ -n ${TEST_RUNNER_MARFA_API_URL:-} && -n ${
   for id in ${(f)"$(for query in 'Speed measure' 'Speed open'; do
       marfa search "$query" --state any --tier all --limit 100 --json 2>/dev/null
     done | python3 "$dir/measure-ids.py")"}; do
-    marfa items delete "$id" > /dev/null 2>&1
+    marfa items trash "$id" > /dev/null 2>&1
     marfa items purge "$id" > /dev/null 2>&1 || echo "could not remove the measuring note $id" >&2
   done
 fi
