@@ -208,7 +208,7 @@ nonisolated enum Words {
     /// makes a new one, so what it never sent stays unsent.
     static func savedAddressHasMore(_ address: String) -> String {
         String(
-            localized: "The saved address, \(address), has more than the server’s address. Enter just the server’s address, such as https://marfa.example. This starts a new copy of your library on this Mac. Changes in the old copy that hadn’t reached the server stay there and aren’t sent.")
+            localized: "The saved address, \(address), has more after the server’s address, such as a path. Enter just the server’s address, such as https://marfa.example. A new address starts a new copy of your library on this Mac. Changes in the old copy that hadn’t reached the server stay there and aren’t sent.")
     }
 
     /// Another process holds the copy as its writer, which on this Mac is another copy of the app.
