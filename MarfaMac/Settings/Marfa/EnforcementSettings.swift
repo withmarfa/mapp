@@ -1,7 +1,7 @@
 import Foundation
 import Marfa
 
-/// The one way the app writes the instance's enforcement: strict mode, the source allow-list and the source filter.
+/// Shared writer for the instance's enforcement settings.
 ///
 /// `PATCH /config` replaces all three levers together and guards only which instance is written, so a page that sent
 /// back what it read earlier would undo a change made since, by another page or another device. A write through `write`

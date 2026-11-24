@@ -54,7 +54,7 @@ nonisolated enum VersionWindow: Hashable, Sendable {
 nonisolated struct VersionKeeping: Hashable, Sendable {
     var recent: Int?
     var daily: Int?
-    /// Zero keeps a weekly version for as long as the item lives.
+    /// Zero keeps every version outside the recent and daily windows, subject to the count limit.
     var weekly: Int?
     var most: Int?
 

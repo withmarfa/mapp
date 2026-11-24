@@ -960,7 +960,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     @Test func windowsThatCantBeReadAlwaysAsk() {
         let known = VersionKeeping(recent: 30, daily: 30, weekly: 30, most: nil)
         #expect(!known.keepsAll(of: VersionKeeping(recent: nil, daily: nil, weekly: nil, most: nil)))
-        #expect(!VersionKeeping(recent: 90, daily: 90, weekly: 90, most: nil).keepsAll(of: VersionKeeping(recent: 30, daily: 90, weekly: 0, most: nil)), "a weekly window of 0 keeps one a week for good")
+        #expect(!VersionKeeping(recent: 90, daily: 90, weekly: 90, most: nil).keepsAll(of: VersionKeeping(recent: 30, daily: 90, weekly: 0, most: nil)), "with a weekly window of 0, age does not expire versions past the daily window")
         #expect(VersionKeeping(recent: 90, daily: 90, weekly: 90, most: nil).keepsAll(of: known))
     }
 
@@ -1310,19 +1310,38 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(ServerTypeCalls.failure(children) == .hasSubtypes(["user.rework"]))
     }
 
-    /// A move a setting or a table stops is refused, dry run or not, naming each and why (`types/move-blocked`).
+    /// Hidden settings have no ID in the refusal (`types/move-settings-authority`).
     @Test func aBlockedMoveNamesEachSettingAndWhy() throws {
         let blocked = try answer(
-            #"{"settings":[{"kind":"view","id":"v1","field":"query.filter","reason":"filter_term","message":"Change the filter."},{"kind":"webhook","field":"type_filter","reason":"not_permitted"}],"tables":["rooms"]}"#,
+            """
+            {"settings":[
+              {"kind":"view","id":"v1","field":"query.filter","reason":"filter_term",
+               "message":"Its filter tests the type in a way a move can't rewrite. Change the filter, then move."},
+              {"kind":"webhook","field":"type_filter","reason":"not_permitted",
+               "message":"This credential can't change this setting. Change it with a credential that can, then move."}
+            ]}
+            """,
             status: 409, code: "type_move_blocked")
-        let error = MarfaError.server(status: 409, code: "type_move_blocked", message: "Blocked", details: nil, server: blocked)
+        let error = MarfaError.server(
+            status: 409, code: "type_move_blocked",
+            message: #"A folder, view or webhook names "user.job" in a way the move can't rewrite. Change each setting listed, then move."#,
+            details: nil, server: blocked)
         #expect(
             ServerTypeCalls.failure(error)
                 == .moveBlocked(
                     settings: [
                         TypeSettingRecord(kind: .view, id: "v1", field: "query.filter", blocked: .filterTerm),
                         TypeSettingRecord(kind: .webhook, id: nil, field: "type_filter", blocked: .notPermitted),
-                    ], tables: ["rooms"]))
+                    ], tables: []))
+    }
+
+    @Test func aBlockedMoveNamesTheTablesTheTargetLacks() throws {
+        let blocked = try answer(#"{"tables":["rooms"]}"#, status: 409, code: "type_move_blocked")
+        let error = MarfaError.server(
+            status: 409, code: "type_move_blocked",
+            message: "The target type does not declare rooms, which items hold rows in. Declare them on the target first.",
+            details: nil, server: blocked)
+        #expect(ServerTypeCalls.failure(error) == .moveBlocked(settings: [], tables: ["rooms"]))
     }
 }
 

@@ -300,11 +300,11 @@ struct TypeDetail: View {
     /// How long versions stay, as a phrase after "kept".
     private static func describe(_ keeping: VersionKeeping) -> String {
         guard let recent = keeping.recent, let daily = keeping.daily, let weekly = keeping.weekly else {
-            return String(localized: "as This Marfa’s History settings say")
+            return String(localized: "for an unknown length of time")
         }
         let length = { (days: Int) in Self.title(of: VersionWindow.days(days)).localizedLowercase }
         if let days = keeping.uniformDays { return String(localized: "for \(length(days))") }
-        let weeks = weekly == 0 ? String(localized: "one a week after that") : String(localized: "one a week for \(length(weekly))")
+        let weeks = weekly == 0 ? String(localized: "every older version up to the count limit") : String(localized: "one a week for \(length(weekly))")
         return String(localized: "every version for \(length(recent)), one a day for \(length(daily)) and \(weeks)")
     }
 
