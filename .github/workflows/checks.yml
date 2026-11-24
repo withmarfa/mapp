@@ -1,7 +1,8 @@
 name: Checks
 
 # Changes selects jobs by path. An unmatched path selects all regular checks, including the Swift unit tests.
-# Workflow and classifier changes get Linux checks. A draft also runs only Linux checks.
+# A change to this workflow runs every job, since it defines them; the classifier and other workflows get Linux checks.
+# A draft runs only Linux checks.
 # Swift starts on ready pull requests after any selected Instructions and Editor checks pass.
 # The String Catalog, assets and UI tests require a build only. CI builds UI tests only when their files,
 # plans or project change. Run UI tests locally with the screen free.

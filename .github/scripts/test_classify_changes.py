@@ -16,7 +16,7 @@ class ClassifyChangesTests(unittest.TestCase):
             "MarfaMac.xcodeproj/project.pbxproj": {"instructions", "swift", "logic", "uitests"},
             "editor/src/page.ts": {"editor", "instructions"},
             ".github/workflows/checks.yml": {
-                "classifier", "editor", "instructions", "scripts", "workflows",
+                "classifier", "editor", "instructions", "logic", "scripts", "swift", "uitests", "workflows",
             },
             ".github/workflows/release.yml": {"workflows"},
             ".github/scripts/classify_changes.py": {"classifier"},
