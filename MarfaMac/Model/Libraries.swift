@@ -1,8 +1,10 @@
 import Foundation
 import Marfa
-import MarfaTesting
 import Observation
 import os
+#if DEBUG
+import MarfaTesting
+#endif
 
 /// The library the windows read: the connected Marfa server's, and none until a server is set and its copy is
 /// open. The app owns one of these, with the connection under it.
@@ -314,7 +316,10 @@ import os
             let sample = SampleLibrary.connection
             let host = MarfaHost(
                 defaults: defaults, signIns: ScriptedSignIns([sample.address: "sample"]), location: location(root: root),
-                opener: { connection, _, _ in SampleLibrary.open(connection) },
+                opener: { connection, _, _ in
+                    let files = SampleGallery.isRequested ? await SampleGallery.files.value : []
+                    return SampleLibrary.open(connection, galleryFiles: files)
+                },
                 describer: { _ in SampleLibrary.name },
                 historian: { _, _ in nil }, configurer: { _, _ in nil })
             host.presetTestServer(sample)

@@ -54,17 +54,18 @@ nonisolated enum SampleLibrary {
 
     /// Opens the sample in place of a server's copy: its own items and edges, or those given, as for a preview.
     static func open(
-        _ connection: MarfaConnection, items given: [Marfa.Item]? = nil, edges: [Marfa.Edge]? = nil, now: Date = .now
+        _ connection: MarfaConnection, items given: [Marfa.Item]? = nil, edges: [Marfa.Edge]? = nil, now: Date = .now,
+        galleryFiles: [SampleGallery.File] = []
     ) -> MarfaSource {
-        let gallery = given == nil && SampleGallery.isRequested
+        let gallery = given == nil && !galleryFiles.isEmpty
         let fake = WorkingCopy.fake(
-            items: given ?? (items(now: now, tasksAndEvents: withCollections) + (gallery ? SampleGallery.rows(now: now) : [])),
+            items: given ?? (items(now: now, tasksAndEvents: withCollections) + (gallery ? SampleGallery.rows(now: now, files: galleryFiles) : [])),
             edges: edges ?? (given == nil
-                ? memberships(now: now) + (withCollections ? taskLinks(now: now) : []) + (gallery ? SampleGallery.edges(now: now) : [])
+                ? memberships(now: now) + (withCollections ? taskLinks(now: now) : []) + SampleGallery.edges(now: now, files: galleryFiles)
                 : []),
             itemTypes: itemTypes + (gallery ? SampleGallery.types : []),
             edgeTypes: edgeTypes, views: views, displays: display)
-        if gallery { SampleGallery.writeFiles() }
+        if gallery { SampleGallery.writeFiles(galleryFiles) }
         let server = SampleServer(copy: fake.copy)
         let source = MarfaSource(
             copy: fake.copy, connection: connection, reading: server, refreshing: server)

@@ -35,7 +35,7 @@ struct LayoutsPage: View {
 private struct LayoutsList: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
 
     private var types: [ItemTypeInfo] {
@@ -75,7 +75,7 @@ private struct LayoutsList: View {
         let preset = LookPreset.suggested(for: type.id, in: catalogue)
         let changes = changeCount(of: type.id)
         return Button {
-            push(LayoutsSubpage.subpage(for: type.id, label: type.plural))
+            navigation?.push(LayoutsSubpage.subpage(for: type.id, label: type.plural))
         } label: {
             SettingsRow(
                 verbatim: type.plural, line: LayoutsListWords.line(startsAs: preset.startsAs, changes: changes),

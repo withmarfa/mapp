@@ -46,6 +46,8 @@ struct IndexPage: View {
     let place: IndexPlace
     let title: String
     let browser: Browser
+    /// Where the keyboard goes when search hands it to the table.
+    var pane: FocusState<Browser.Pane?>.Binding
     /// The sources collections come from, by name, for the Collections filter.
     var sources: [String] = []
     /// The rows of the chosen tab and the search, in no order; the table orders them.
@@ -75,7 +77,7 @@ struct IndexPage: View {
             if rows.isEmpty {
                 emptyTab.padding(.top, room)
             } else {
-                IndexTable(place: place, rows: rows, choice: choice, open: open, edit: edit, delete: delete)
+                IndexTable(place: place, rows: rows, choice: choice, pane: pane, open: open, edit: edit, delete: delete)
             }
         }
         .accessibilityIdentifier("IndexPage")
@@ -158,13 +160,13 @@ private struct IndexTypesCell: View {
     }
 }
 
-/// When a container's latest item changed, as the system words a time before now.
+/// The system schedules updates to the date label without the table tracking the clock.
 struct IndexLatest: View {
     let date: Date?
 
     var body: some View {
         if let date {
-            Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+            Text(.currentDate, format: .reference(to: date))
         } else {
             Text("No Items")
         }
@@ -179,18 +181,20 @@ private struct IndexTable: View {
     let place: IndexPlace
     let rows: [IndexRow]
     let choice: IndexChoice
+    var pane: FocusState<Browser.Pane?>.Binding
     let open: (IndexRow) -> Void
     let edit: ((SourceEditRequest) -> Void)?
     let delete: ((IndexRow) -> Void)?
     @AppStorage private var sort: IndexSort
 
     init(
-        place: IndexPlace, rows: [IndexRow], choice: IndexChoice, open: @escaping (IndexRow) -> Void,
+        place: IndexPlace, rows: [IndexRow], choice: IndexChoice, pane: FocusState<Browser.Pane?>.Binding, open: @escaping (IndexRow) -> Void,
         edit: ((SourceEditRequest) -> Void)?, delete: ((IndexRow) -> Void)?
     ) {
         self.place = place
         self.rows = rows
         self.choice = choice
+        self.pane = pane
         self.open = open
         self.edit = edit
         self.delete = delete
@@ -247,6 +251,7 @@ private struct IndexTable: View {
         .quietTableHeader(backdrop: IndexMetrics.backdrop)
         .indexScrollsAway()
         .scrollContentBackground(.hidden)
+        .focused(pane, equals: .list)
         .contextMenu(forSelectionType: IndexRow.ID.self) { ids in
             if let row = ordered.first(where: { ids.contains($0.id) }), ids.count == 1 {
                 Button("Open") { open(row) }

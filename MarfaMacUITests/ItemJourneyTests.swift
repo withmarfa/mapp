@@ -1,19 +1,18 @@
 import XCTest
 
-@MainActor
-final class ItemJourneyTests: XCTestCase {
-    private var app: XCUIApplication!
+nonisolated final class ItemJourneyTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() async throws { app.terminate() }
+    @MainActor override func tearDown() async throws { app.terminate() }
 
-    func testCreateRelateEditAndReopen() {
+    @MainActor func testCreateRelateEditAndReopen() {
         create(type: "Project", title: "Interface Test Project")
         let details = app.descendants(matching: .any)["DetailsToggle"]
         XCTAssertTrue(details.waitForExistence(timeout: 3))
@@ -66,7 +65,7 @@ final class ItemJourneyTests: XCTestCase {
         XCTAssertEqual(savedDescription.value as? String, "Saved through the native inspector")
     }
 
-    func testANewItemOpensInThePageAndHeaderEditsSurviveReopening() {
+    @MainActor func testANewItemOpensInThePageAndHeaderEditsSurviveReopening() {
         app.quickAdd(type: "Task", title: "Body Focus Draft")
         let pageTitle = app.itemPageTitle
         XCTAssertTrue(pageTitle.waitForExistence(timeout: 3))
@@ -114,7 +113,7 @@ final class ItemJourneyTests: XCTestCase {
 
     /// Leaves the item for another and comes back, so the page reads it again from the library. The sample
     /// library lives only as long as the app, so a relaunch would find none of it.
-    private func reopen(_ title: String) {
+    @MainActor private func reopen(_ title: String) {
         let rows = app.outlines["ItemList"].staticTexts
         let other = rows.matching(NSPredicate(format: "NOT (value BEGINSWITH %@)", title)).firstMatch
         XCTAssertTrue(other.waitForExistence(timeout: 5))
@@ -124,7 +123,7 @@ final class ItemJourneyTests: XCTestCase {
         row.click()
     }
 
-    private func create(type: String, title: String) {
+    @MainActor private func create(type: String, title: String) {
         app.quickAdd(type: type, title: title)
         XCTAssertTrue(app.itemPageTitle.waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])

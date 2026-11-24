@@ -159,7 +159,7 @@ struct RenderedWindow<Detail: View>: View {
 @MainActor struct SettingsRenderTests {
     static let size = CGSize(width: SettingsTokens.Metric.windowWidth, height: SettingsTokens.Metric.windowHeight)
 
-    private func stub(_ configure: (StubMarfaHost) -> Void = { _ in }) async -> StubMarfaHost {
+    func stub(_ configure: (StubMarfaHost) -> Void = { _ in }) async -> StubMarfaHost {
         let source = FakeInstanceConfig([.name: .text("Castell Studio"), .trashRetentionDays: .number(60)])
         let settings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: source) }
         await settings.load()
@@ -168,7 +168,7 @@ struct RenderedWindow<Detail: View>: View {
         return host
     }
 
-    private func connected() async throws -> (Libraries, HostBench) {
+    func connected() async throws -> (Libraries, HostBench) {
         let bench = HostBench()
         let defaults = ThrowawayDefaults.make("SettingsRenderTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
@@ -282,7 +282,8 @@ struct RenderedWindow<Detail: View>: View {
     /// A page's states against boards S26 to S30: the owner's permissions held in part or in full, the server not answering,
     /// and the sign-in ended.
     private func connection(
-        named name: String, grantsAll: Bool = false, readsName: Bool = true, state: MarfaConnectionState = .online, waiting: Int = 0
+        named name: String, holding permissions: Set<InstancePermission> = SystemSignIns.askedAtSignIn, readsName: Bool = true,
+        state: MarfaConnectionState = .online, waiting: Int = 0
     ) async throws {
         let bench = HostBench()
         let defaults = ThrowawayDefaults.make("SettingsRenderTests")
@@ -290,13 +291,8 @@ struct RenderedWindow<Detail: View>: View {
         bench.servers.names.withLock { $0[try! MarfaConnection(address: "https://marfa.castell.studio")] = "Castell Studio" }
         try await libraries.host.connect(address: "https://marfa.castell.studio", key: "k")
         let source = try #require(bench.servers.last)
-        if grantsAll {
-            bench.signIns.save("k", for: URL(string: "https://marfa.castell.studio")!, permissions: Set(InstancePermission.allCases))
-        }
-        if !readsName {
-            // A sign-in made before the app asked for the owner's name.
-            bench.signIns.save("k", for: URL(string: "https://marfa.castell.studio")!, permissions: SystemSignIns.askedAtSignIn, profile: false)
-        }
+        // Without `readsName`, a sign-in made before the app asked for the owner's name.
+        bench.signIns.save("k", for: URL(string: "https://marfa.castell.studio")!, permissions: permissions, profile: readsName)
         source.report.set(SyncReport(lastSynced: .now.addingTimeInterval(-60), waiting: waiting, queueRead: true))
         source.state.set(state)
         await libraries.host.refreshGrants()
@@ -306,11 +302,13 @@ struct RenderedWindow<Detail: View>: View {
             size: Self.size, named: name, settle: .milliseconds(800))
     }
 
-    @Test func connectionWithEveryPermission() async throws { try await connection(named: "Connection", grantsAll: true) }
+    @Test func connectionWithEveryPermission() async throws { try await connection(named: "Connection") }
     @Test func connectionWithoutTheOwnersName() async throws {
         try await connection(named: "Connection, without the owner’s name", readsName: false)
     }
-    @Test func connectionWithoutTheOwnersPermissions() async throws { try await connection(named: "Connection, without the owner’s permissions") }
+    @Test func connectionWithoutTheOwnersPermissions() async throws {
+        try await connection(named: "Connection, without the owner’s permissions", holding: [.itemsPurge, .configManage, .schemaWrite])
+    }
     @Test func connectionNotAnswering() async throws {
         try await connection(named: "Connection, not answering", state: .offline(reason: "refused"), waiting: 3)
     }
@@ -378,7 +376,7 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     /// The host's fake server, to put concerns and readings on.
-    private func fake(_ host: StubMarfaHost) -> FakeOwnerCalls { host.ownerCalls as! FakeOwnerCalls }
+    func fake(_ host: StubMarfaHost) -> FakeOwnerCalls { host.ownerCalls as! FakeOwnerCalls }
 
     private func windowed(
         _ page: MarfaSettingsPage, host: StubMarfaHost, subpage: SettingsSubpage? = nil, sheet: AnyView? = nil, badge: Int? = nil
@@ -535,7 +533,7 @@ struct RenderedWindow<Detail: View>: View {
     private static let days: (Int) -> Date = { Date.now.addingTimeInterval(-86_400 * Double($0)) }
 
     /// The server's answers as the boards draw them, in Castell Studio.
-    private func owner(_ configure: (FakeOwnerCalls.State) -> Void = { _ in }) -> StubMarfaHost {
+    func owner(_ configure: (FakeOwnerCalls.State) -> Void = { _ in }) -> StubMarfaHost {
         let calls = FakeOwnerCalls()
         calls.state.withLock { state in
             state.profile = OwnerProfile(username: "mira", emailIsReadable: true, email: "mira@castell.studio")
@@ -598,7 +596,7 @@ struct RenderedWindow<Detail: View>: View {
         return host
     }
 
-    private func page(
+    func page(
         _ page: MarfaSettingsPage, _ host: StubMarfaHost, subpage: SettingsSubpage? = nil, sheet: AnyView? = nil, size: CGSize = Self.size,
         named: String
     ) async throws {
@@ -609,7 +607,7 @@ struct RenderedWindow<Detail: View>: View {
             size: size, named: named, settle: .milliseconds(900))
     }
 
-    private func context(_ host: StubMarfaHost) -> OwnerContext { OwnerContext(host: host) }
+    func context(_ host: StubMarfaHost) -> OwnerContext { OwnerContext(host: host) }
 
     @Test func account() async throws {
         try await page(.account, owner(), named: "Account")

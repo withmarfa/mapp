@@ -111,8 +111,8 @@ struct SidebarTypeRow: View {
     /// How far a name sits in from its parent's name when the parent has no mark to step by.
     static let indent: CGFloat = 12
     /// The horizontal part of a bend, and the gap it stops short of what follows.
-    static let elbow: CGFloat = 9
-    static let elbowGap: CGFloat = 3
+    nonisolated static let elbow: CGFloat = 9
+    nonisolated static let elbowGap: CGFloat = 3
 
     /// Whether a row has a mark. Subtypes lose theirs unless `subtypeIcons`; top-level types and groups keep theirs.
     static func showsIcon(_ row: SidebarPlan.TypeRow, subtypeIcons: Bool) -> Bool {

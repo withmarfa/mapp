@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Draws a view into a PNG without the screen: an `NSHostingView` in a window that is never shown, drawn with
-/// `cacheDisplay(in:to:)`, in the light appearance. It draws a page and its sidebar but cannot draw the window's own
+/// `cacheDisplay(in:to:)`, as the key window, in the light appearance unless the caller names the dark one or `MARFA_MAC_SETTINGS_APPEARANCE` is `dark`. It draws a page and its sidebar but cannot draw the window's own
 /// toolbar (the system's Back and Forward pill and the title), since there is no real window. The folder comes from the environment variable
 /// `MARFA_MAC_SETTINGS_RENDERS`, and a suite that renders is skipped by name while it is unset, as the `measure` suites are.
 @MainActor
@@ -10,19 +10,23 @@ enum SettingsRender {
     nonisolated static let folderVariable = "MARFA_MAC_SETTINGS_RENDERS"
     nonisolated static var isRequested: Bool { ProcessInfo.processInfo.environment[folderVariable] != nil }
 
+    static var isDark: Bool { ProcessInfo.processInfo.environment["MARFA_MAC_SETTINGS_APPEARANCE"] == "dark" }
+
     static var folder: URL? {
         ProcessInfo.processInfo.environment[folderVariable].map { URL(filePath: $0, directoryHint: .isDirectory) }
     }
 
     /// Writes `view` at `size` to `<folder>/<name>.png` and gives the file back.
     @discardableResult
-    static func png(_ view: some View, size: CGSize, named name: String, settle: Duration = .milliseconds(400)) async throws -> URL {
+    static func png(
+        _ view: some View, size: CGSize, named name: String, appearance: ColorScheme = isDark ? .dark : .light, settle: Duration = .milliseconds(400)
+    ) async throws -> URL {
         let folder = try #require(folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let host = NSHostingView(rootView: view.frame(width: size.width, height: size.height).environment(\.colorScheme, .light))
+        let host = NSHostingView(rootView: view.frame(width: size.width, height: size.height).environment(\.colorScheme, appearance).environment(\.controlActiveState, .key))
         host.frame = CGRect(origin: .zero, size: size)
         let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
-        window.appearance = NSAppearance(named: .aqua)
+        window.appearance = NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
         window.isReleasedWhenClosed = false
         window.contentView = host
         host.layoutSubtreeIfNeeded()

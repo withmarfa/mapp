@@ -35,8 +35,7 @@ struct IndexToolbarItems: CustomizableToolbarContent {
             prompt: String(localized: "Search"),
             layout: .item,
             focusRequests: browser.searchFocusRequests,
-            // Items' rows are items, so Down goes into its table; Collections lists places, which a search filters.
-            onDown: { if browser.showsItemsIndex { browser.focusRequest = .list } },
+            onDown: { browser.focusRequest = .list },
             restoresTitle: false
         )
         .hidden(!showsTools)

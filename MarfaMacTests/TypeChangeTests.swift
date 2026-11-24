@@ -96,7 +96,7 @@ nonisolated enum TypeChangeFixture {
     @Test func theTitleMovesToTheNewTitleKey() throws {
         let plan = try F.plan(["name": .string("Ada")], F.entity, F.note).get()
         #expect(plan.changes == ["name": F.gone, "title": .string("Ada")])
-        let highlight = try F.plan(["title": .string("Quote"), "body": .string("Why")], F.note, F.highlight, filling: ["tags": .array([])])
+        let highlight = F.plan(["title": .string("Quote"), "body": .string("Why")], F.note, F.highlight, filling: ["tags": .array([])])
         #expect(highlight == .failure(.cannotFill(F.info(F.highlight).fields[2])))
     }
 

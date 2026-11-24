@@ -1148,15 +1148,13 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(!bench.calls.calls.contains("appData"))
     }
 
-    @Test func removingDataAsksFirstSaysItIsForGoodAndShowsNothingLeft() async throws {
+    @Test func removingDataAsksFirstAndShowsNothingLeft() async throws {
         let bench = bench(keeping: ["app.raycast": kept()])
         let model = AppsModel(context: bench.context)
         await model.load()
         await model.readData(of: model.apps[0])
         model.askToRemoveData(model.apps[0], vendor: "app.raycast")
         let question = try #require(model.question)
-        #expect(question.message.contains("deletes it for good"))
-        #expect(question.message.contains("Only a backup brings it back."))
         #expect(bench.calls.state.withLock { $0.dataRemoved.isEmpty }, "nothing is deleted before the owner agrees")
         await model.confirm(question)
         #expect(bench.calls.state.withLock { $0.dataRemoved } == ["app.raycast"])

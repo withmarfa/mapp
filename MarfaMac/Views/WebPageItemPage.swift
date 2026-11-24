@@ -403,7 +403,6 @@ struct PicturesWaitingCallout: View {
                 .appButton(.secondary, size: .small)
                 Button(action: close) {
                     Image(systemName: "xmark")
-                        .font(.system(size: size * 9 / 13, weight: .bold))
                 }
                 .appButton(.plain, size: .small, icon: true)
                 .help("Close")
@@ -467,7 +466,7 @@ private struct WebPageHeader: View {
                     .padding(.top, step * 1.5)
             }
             if let statusField, drafts.draft(for: item.id, key: statusField.key).rejected {
-                Text("The value could not be saved. Please try again.")
+                Text("The value could not be saved.")
                     .font(.system(size: CGFloat(interfaceTextSize) * 10 / 13))
                     .foregroundStyle(.red)
                     .accessibilityAddTraits(.updatesFrequently)

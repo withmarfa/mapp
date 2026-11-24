@@ -76,8 +76,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// The permissions the sign-in holds (`Credential.grants`).
     var grants: Set<InstancePermission> { get }
 
-    /// Signs in again, asking for the permissions already held and `permissions`. Cancelled, or approved with fewer than
-    /// asked, nothing is added; an approval that drops a permission held before is told to the owner.
+    /// Signs in again with the full request. The new sign-in holds what the owner approves.
+    /// Returns `.allowed` when the new sign-in holds every permission in `permissions`.
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome
     /// Reads what the sign-in holds again, where the server refused for want of a permission the app thought it held.
     func refreshGrants() async
@@ -254,9 +254,9 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// The permission the page needs to open, which the owner may not have approved. Account needs none to open: its
-    /// sign-ins need `sign_ins.manage`, which it asks for from Change Password and never at sign-in. Folders needs none: a
-    /// folder is read as an item, under the access the app holds to every type.
+    /// The permission the page needs to open, which the owner may not have approved. Account needs none to open, since the
+    /// profile needs none: its sign-ins need `sign_ins.manage`, which Change Password asks for where the sign-in lacks it.
+    /// Folders needs none: a folder is read as an item, under the access the app holds to every type.
     var permission: InstancePermission? {
         switch self {
         case .overview, .updates, .housekeeping: .instanceRead

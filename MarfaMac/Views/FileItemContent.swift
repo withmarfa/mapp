@@ -359,26 +359,29 @@ private struct FileQuickLookView: NSViewRepresentable {
     }
 }
 
+#if DEBUG
 private enum FilePreviewFixtures {
-    static func url(_ name: String, extension ext: String) -> URL? {
-        Bundle.main.url(forResource: name, withExtension: ext)
+    static func url(_ name: String) -> URL {
+        URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Design/PreviewAssets/\(name)")
     }
 }
 
 #Preview("Photo item") {
-    if let url = FilePreviewFixtures.url("item-preview-photo", extension: "png") {
-        FileItemContent(url: url, title: url.lastPathComponent).frame(width: 700, height: 600)
-    }
+    let url = FilePreviewFixtures.url("item-preview-photo.png")
+    FileItemContent(url: url, title: url.lastPathComponent).frame(width: 700, height: 600)
 }
 
 #Preview("PDF item") {
-    if let url = FilePreviewFixtures.url("item-preview-brief", extension: "pdf") {
-        FileItemContent(url: url, title: url.lastPathComponent).frame(width: 700, height: 600)
-    }
+    let url = FilePreviewFixtures.url("item-preview-brief.pdf")
+    FileItemContent(url: url, title: url.lastPathComponent).frame(width: 700, height: 600)
 }
 
 #Preview("Other file item") {
-    if let url = FilePreviewFixtures.url("item-preview-file", extension: "txt") {
-        FileItemContent(url: url, title: url.lastPathComponent).frame(width: 700, height: 600)
-    }
+    let url = FilePreviewFixtures.url("item-preview-file.txt")
+    FileItemContent(url: url, title: url.lastPathComponent).frame(width: 700, height: 600)
 }
+#endif

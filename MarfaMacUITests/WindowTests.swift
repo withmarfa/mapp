@@ -1,41 +1,40 @@
 import XCTest
 
 /// Drives the real app through its accessibility tree.
-@MainActor
-final class WindowTests: XCTestCase {
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
-    private var sidebar: XCUIElement { window.outlines.matching(NSPredicate(format: "identifier == 'Sidebar'")).firstMatch }
-    private var list: XCUIElement { window.outlines["ItemList"] }
-    private var page: XCUIElement { window.webViews.firstMatch }
+nonisolated final class WindowTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
+    @MainActor private var window: XCUIElement { app.windows.firstMatch }
+    @MainActor private var sidebar: XCUIElement { window.outlines.matching(NSPredicate(format: "identifier == 'Sidebar'")).firstMatch }
+    @MainActor private var list: XCUIElement { window.outlines["ItemList"] }
+    @MainActor private var page: XCUIElement { window.webViews.firstMatch }
     /// The item's text as the page shows it: formatted, so without markdown's marks.
-    private var editor: XCUIElement { app.itemPageBody }
-    private var text: String { editor.value as? String ?? "" }
+    @MainActor private var editor: XCUIElement { app.itemPageBody }
+    @MainActor private var text: String { editor.value as? String ?? "" }
 
-    private func waitForText(_ predicate: String, _ argument: String) -> Bool {
+    @MainActor private func waitForText(_ predicate: String, _ argument: String) -> Bool {
         let format = predicate.hasPrefix("NOT ") ? "NOT (value \(predicate.dropFirst(4)) %@)" : "value \(predicate) %@"
         let expectation = expectation(for: NSPredicate(format: format, argument), evaluatedWith: editor)
         return XCTWaiter.wait(for: [expectation], timeout: 3) == .completed
     }
 
-    private func waitForItem(_ title: String, containing bodyText: String) -> Bool {
+    @MainActor private func waitForItem(_ title: String, containing bodyText: String) -> Bool {
         let titleShown = expectation(for: NSPredicate(format: "value == %@", title), evaluatedWith: window.itemPageTitle)
         let bodyShown = expectation(for: NSPredicate(format: "value CONTAINS %@", bodyText), evaluatedWith: editor)
         return XCTWaiter.wait(for: [titleShown, bodyShown], timeout: 3) == .completed
     }
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() async throws {
+    @MainActor override func tearDown() async throws {
         app.terminate()
     }
 
-    private func sidebarItem(_ name: String) -> XCUIElement {
+    @MainActor private func sidebarItem(_ name: String) -> XCUIElement {
         if let identifier = groupIdentifier(for: name) {
             // Use the full indexed query: firstMatch omitted native outline labels visible in its own snapshot.
             return sidebar.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
@@ -43,7 +42,7 @@ final class WindowTests: XCTestCase {
         return sidebar.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", name, name)).firstMatch
     }
 
-    private func groupIdentifier(for name: String) -> String? {
+    @MainActor private func groupIdentifier(for name: String) -> String? {
         switch name {
         case "Types": "SidebarTypes"
         case "Note": "SidebarType-core.note"
@@ -51,39 +50,39 @@ final class WindowTests: XCTestCase {
         }
     }
 
-    private func row(titled title: String) -> XCUIElement {
+    @MainActor private func row(titled title: String) -> XCUIElement {
         list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", title)).firstMatch
     }
 
-    private func count(of name: String) -> Int {
+    @MainActor private func count(of name: String) -> Int {
         Int(sidebarItem(name).value as? String ?? "") ?? (sidebarItem(name).value as? Int ?? -1)
     }
 
-    func testSidebarListsEverySectionWithCounts() {
+    @MainActor func testSidebarListsEverySectionWithCounts() {
         for name in ["Inbox", "Recents", "Items", "Favorites", "Types", "Note"] {
             XCTAssertTrue(sidebarItem(name).exists, "\(name) is missing")
         }
         XCTAssertGreaterThan(count(of: "Items"), 0)
     }
 
-    func testTheFirstItemIsSelectedAndShownInThePage() {
+    @MainActor func testTheFirstItemIsSelectedAndShownInThePage() {
         XCTAssertTrue(page.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForItem("Kitchen quotes", containing: "Three quotes in so far."))
     }
 
-    func testSelectingAnItemShowsIt() {
+    @MainActor func testSelectingAnItemShowsIt() {
         row(titled: "Trip to Lisbon").click()
         XCTAssertTrue(waitForItem("Trip to Lisbon", containing: "Three days in October."))
     }
 
-    private func beginNewItem(title: String = "New test note") {
+    @MainActor private func beginNewItem(title: String = "New test note") {
         window.quickAdd(type: "Note", title: title)
         XCTAssertTrue(row(titled: title).waitForExistence(timeout: 3))
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         editor.click()
     }
 
-    func testANewItemHasAnEditableTitleIndependentOfItsBody() {
+    @MainActor func testANewItemHasAnEditableTitleIndependentOfItsBody() {
         beginNewItem(title: "Groceries")
         XCTAssertTrue(row(titled: "Groceries").waitForExistence(timeout: 3))
         editor.typeText("Milk and eggs")
@@ -96,7 +95,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("CONTAINS", "Milk and eggs"))
     }
 
-    func testNewItemWithOnlyATitleIsCreatedSelectedAndHasAnEmptyBody() {
+    @MainActor func testNewItemWithOnlyATitleIsCreatedSelectedAndHasAnEmptyBody() {
         let before = count(of: "Items")
         sidebarItem("Inbox").click()
         beginNewItem(title: "Empty body note")
@@ -107,7 +106,7 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(count(of: "Items"), before + 1)
     }
 
-    func testDeletingFromTheContextMenuRemovesTheItemAndUndoes() {
+    @MainActor func testDeletingFromTheContextMenuRemovesTheItemAndUndoes() {
         let before = count(of: "Items")
         row(titled: "Bike service").rightClick()
         window.menuItems["Delete"].click()
@@ -118,7 +117,7 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(count(of: "Items"), before)
     }
 
-    func testRecentlyDeletedIsASettingsPageAndNotAMenuItem() {
+    @MainActor func testRecentlyDeletedIsASettingsPageAndNotAMenuItem() {
         app.menuBars.menuBarItems["View"].click()
         XCTAssertFalse(app.menuBars.menuItems["Recently Deleted"].firstMatch.exists, "Recently Deleted is a Settings page only")
         app.typeKey(.escape, modifierFlags: [])
@@ -130,9 +129,9 @@ final class WindowTests: XCTestCase {
     }
 
     /// The list's search, a field only once its button beside View Options is clicked.
-    private var listSearch: XCUIElement { window.textFields["ColumnSearch"] }
+    @MainActor private var listSearch: XCUIElement { window.textFields["ColumnSearch"] }
 
-    func testTheListsSearchFindsItemsAndEscapePutsItAway() {
+    @MainActor func testTheListsSearchFindsItemsAndEscapePutsItAway() {
         XCTAssertFalse(listSearch.exists, "a button until it is clicked")
         window.toolbars.buttons["Search"].firstMatch.click()
         XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
@@ -145,7 +144,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForExistence(timeout: 2), "the whole list is back")
     }
 
-    func testAddingToFavoritesFromTheContextMenuIncludesTheItem() {
+    @MainActor func testAddingToFavoritesFromTheContextMenuIncludesTheItem() {
         row(titled: "Garden ideas").rightClick()
         window.menuItems["Add to Favorites"].click()
         sidebarItem("Favorites").click()
@@ -155,7 +154,7 @@ final class WindowTests: XCTestCase {
 
     // MARK: Keyboard, menus and windows
 
-    func testReturnEntersThePageAndEscapeGoesBackToTheList() {
+    @MainActor func testReturnEntersThePageAndEscapeGoesBackToTheList() {
         row(titled: "Garden ideas").click()
         XCTAssertTrue(waitForItem("Garden ideas", containing: "Raised beds along the south fence"))
         app.typeKey(.return, modifierFlags: [])
@@ -166,7 +165,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("NOT CONTAINS", "Draft"), "Escape handed the arrows back to the list")
     }
 
-    func testCommandNOpensQuickAddAndCreatesTheTitledItem() {
+    @MainActor func testCommandNOpensQuickAddAndCreatesTheTitledItem() {
         let before = count(of: "Items")
         app.typeKey("n", modifierFlags: .command)
         XCTAssertTrue(window.descendants(matching: .any)["QuickAddTitle"].waitForExistence(timeout: 3))
@@ -182,7 +181,7 @@ final class WindowTests: XCTestCase {
 
     /// Select All in the list goes through the list's selection rather than its table (`SelectAllRoute`), from the
     /// key and from the Edit menu.
-    func testSelectAllInTheListSelectsEveryItem() {
+    @MainActor func testSelectAllInTheListSelectsEveryItem() {
         sidebarItem("Items").click()
         // Items opens in the gallery; Command-1 shows it as the list.
         app.typeKey("1", modifierFlags: .command)
@@ -200,20 +199,20 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 3), "the Edit menu's Select All selects every item in the list")
     }
 
-    func testCommandDeleteDeletesTheSelectedItem() {
+    @MainActor func testCommandDeleteDeletesTheSelectedItem() {
         row(titled: "Bike service").click()
         app.typeKey(.delete, modifierFlags: .command)
         XCTAssertTrue(row(titled: "Bike service").waitForNonExistence(timeout: 2))
         XCTAssertTrue(editor.exists, "the next item is selected")
     }
 
-    func testOptionCommandFSearchesItems() {
+    @MainActor func testOptionCommandFSearchesItems() {
         app.typeKey("f", modifierFlags: [.command, .option])
         app.typeText("ragu")
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
     }
 
-    func testTheCommandPaletteOpensAnItemAndRunsACommand() {
+    @MainActor func testTheCommandPaletteOpensAnItemAndRunsACommand() {
         app.typeKey("k", modifierFlags: .command)
         let field = window.textFields["CommandPaletteField"]
         XCTAssertTrue(field.waitForExistence(timeout: 2))
@@ -232,7 +231,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(row(titled: "Palette note").waitForExistence(timeout: 3), "the command opened quick add and its item was made")
     }
 
-    func testEscapePutsTheCommandPaletteAway() {
+    @MainActor func testEscapePutsTheCommandPaletteAway() {
         app.typeKey("k", modifierFlags: .command)
         let field = window.textFields["CommandPaletteField"]
         XCTAssertTrue(field.waitForExistence(timeout: 2))
@@ -240,7 +239,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
     }
 
-    func testCommandZInTheSearchFieldLeavesThePageAlone() {
+    @MainActor func testCommandZInTheSearchFieldLeavesThePageAlone() {
         row(titled: "Garden ideas").click()
         XCTAssertTrue(waitForItem("Garden ideas", containing: "Raised beds along the south fence"))
         app.typeKey(.return, modifierFlags: [])
@@ -253,7 +252,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("CONTAINS", "Draft"), "the item kept its typing; ⌘Z was the field's")
     }
 
-    func testOptionCommandFReturnsToAnOpenSearch() {
+    @MainActor func testOptionCommandFReturnsToAnOpenSearch() {
         app.typeKey("f", modifierFlags: [.command, .option])
         XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
         app.typeText("rag")
@@ -264,7 +263,7 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(listSearch.value as? String, "tomatoes", "the field took the keyboard again")
     }
 
-    func testShiftCommandPSearchesEveryItemsTextAndOpensTheOneChosen() {
+    @MainActor func testShiftCommandPSearchesEveryItemsTextAndOpensTheOneChosen() {
         XCTAssertTrue(waitForItem("Kitchen quotes", containing: "Three quotes in so far."))
         editor.click()
         app.typeKey("p", modifierFlags: [.command, .shift])
@@ -277,13 +276,13 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForItem("Recipes to try", containing: "Slow-roast tomatoes"))
     }
 
-    func testDoubleClickingAnItemOpensItInItsOwnWindow() {
+    @MainActor func testDoubleClickingAnItemOpensItInItsOwnWindow() {
         row(titled: "Garden ideas").doubleClick()
         let twoWindows = expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: app.windows)
         wait(for: [twoWindows], timeout: 3)
     }
 
-    func testTheListIsGroupedByDateUntilTheViewMenuOrTitleOrderDropsIt() {
+    @MainActor func testTheListIsGroupedByDateUntilTheViewMenuOrTitleOrderDropsIt() {
         XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2), "lists group by date from the start")
         sortBy("Title")
         XCTAssertTrue(list.staticTexts["Today"].waitForNonExistence(timeout: 2))
@@ -295,7 +294,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
     }
 
-    func testUndoInTheEditMenuUndoesTypingInThePage() {
+    @MainActor func testUndoInTheEditMenuUndoesTypingInThePage() {
         beginNewItem()
         app.typeText("Groceries")
         XCTAssertTrue(waitForText("==", "Groceries"))
@@ -304,7 +303,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("!=", "Groceries"))
     }
 
-    func testCommandZUndoesNewItemOnceThePageHasNoTypingToUndo() {
+    @MainActor func testCommandZUndoesNewItemOnceThePageHasNoTypingToUndo() {
         let before = count(of: "Items")
         beginNewItem()
         app.typeKey("z", modifierFlags: .command)
@@ -312,7 +311,7 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(count(of: "Items"), before)
     }
 
-    func testATableIsInsertedFromTheFormatMenu() {
+    @MainActor func testATableIsInsertedFromTheFormatMenu() {
         beginNewItem()
         app.typeText("Quotes")
         app.typeKey("t", modifierFlags: [.command, .option])
@@ -320,22 +319,22 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(table.waitForExistence(timeout: 3))
     }
 
-    private func groupBy(_ choice: String) {
+    @MainActor private func groupBy(_ choice: String) {
         chooseInViewOptions("Group by", choice)
     }
 
-    private func sortBy(_ order: String) {
+    @MainActor private func sortBy(_ order: String) {
         chooseInViewOptions("Sort by", order)
     }
 
-    private func chooseInViewOptions(_ submenu: String, _ choice: String) {
+    @MainActor private func chooseInViewOptions(_ submenu: String, _ choice: String) {
         app.menuBars.menuBarItems["View"].click()
         let row = app.menuBars.menuItems[submenu]
         row.hover()
         row.menuItems[choice].click()
     }
 
-    func testCommandFOpensTheSystemFindBarInThePage() {
+    @MainActor func testCommandFOpensTheSystemFindBarInThePage() {
         row(titled: "Kitchen quotes").click()
         XCTAssertTrue(waitForItem("Kitchen quotes", containing: "Three quotes in so far."))
         editor.click()
@@ -351,7 +350,7 @@ final class WindowTests: XCTestCase {
 
     // MARK: The page under the toolbar
 
-    func testALongItemStartsBelowTheToolbarAndScrollsSteadilyUnderIt() {
+    @MainActor func testALongItemStartsBelowTheToolbarAndScrollsSteadilyUnderIt() {
         row(titled: "The Design of Everyday Things").click()
         XCTAssertTrue(waitForItem("The Design of Everyday Things", containing: "Notes as I read."))
         // The sample alone can fit a restored, maximized window. Add enough text to overflow any
@@ -376,7 +375,7 @@ final class WindowTests: XCTestCase {
         }
     }
 
-    func testAShortItemStaysPutWhenScrolled() {
+    @MainActor func testAShortItemStaysPutWhenScrolled() {
         row(titled: "Garden ideas").click()
         XCTAssertTrue(waitForItem("Garden ideas", containing: "Raised beds along the south fence"))
         let title = window.itemPageTitle
@@ -385,7 +384,7 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(title.frame.minY, before, accuracy: 2, "an item shorter than the window has nothing to scroll")
     }
 
-    func testMoreAndDetailsSitAtTheToolbarsEnd() {
+    @MainActor func testMoreAndDetailsSitAtTheToolbarsEnd() {
         let more = window.menuButtons["More"]
         let details = window.descendants(matching: .any).matching(identifier: "DetailsToggle").element(boundBy: 0)
         XCTAssertTrue(more.waitForExistence(timeout: 2))
@@ -396,7 +395,7 @@ final class WindowTests: XCTestCase {
 
     // MARK: Back and forward
 
-    func testBackAndForwardShortcutsMoveThroughTheItemsOpened() {
+    @MainActor func testBackAndForwardShortcutsMoveThroughTheItemsOpened() {
         XCTAssertTrue(waitForItem("Kitchen quotes", containing: "Three quotes in so far."))
         row(titled: "Recipes to try").click()
         XCTAssertTrue(waitForItem("Recipes to try", containing: "Slow-roast tomatoes"))
@@ -412,7 +411,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForItem("Recipes to try", containing: "Slow-roast tomatoes"))
     }
 
-    func testBackAndForwardKeysBelongToThePageWhileItHasTheKeyboard() {
+    @MainActor func testBackAndForwardKeysBelongToThePageWhileItHasTheKeyboard() {
         XCTAssertTrue(waitForItem("Kitchen quotes", containing: "Three quotes in so far."))
         row(titled: "Recipes to try").click()
         XCTAssertTrue(waitForItem("Recipes to try", containing: "Slow-roast tomatoes"))
@@ -424,7 +423,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForItem("Kitchen quotes", containing: "Three quotes in so far."), "the list has the keyboard again, so ⌘[ goes back")
     }
 
-    func testTheMainWindowPassesTheAccessibilityAudit() throws {
+    @MainActor func testTheMainWindowPassesTheAccessibilityAudit() throws {
         // Some findings belong to the system rather than the app: List reports its section headers outside
         // their table, SwiftUI wraps columns and section headers in unlabelled groups that VoiceOver passes
         // through, and the sidebar's counts and the list's previews and dates are the system's secondary

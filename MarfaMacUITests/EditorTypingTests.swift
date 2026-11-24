@@ -2,15 +2,14 @@ import XCTest
 
 /// Types into the real page with the real keyboard: the slash menu, canceling Link to Item, the table shortcut
 /// and moving a block.
-@MainActor
-final class EditorTypingTests: XCTestCase {
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
-    private var page: XCUIElement { window.webViews.firstMatch }
-    private var editor: XCUIElement { app.itemPageBody }
-    private var text: String { editor.value as? String ?? "" }
+nonisolated final class EditorTypingTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
+    @MainActor private var window: XCUIElement { app.windows.firstMatch }
+    @MainActor private var page: XCUIElement { window.webViews.firstMatch }
+    @MainActor private var editor: XCUIElement { app.itemPageBody }
+    @MainActor private var text: String { editor.value as? String ?? "" }
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
         app.launch()
@@ -18,27 +17,27 @@ final class EditorTypingTests: XCTestCase {
         beginNewItem(title: "Typing test")
     }
 
-    override func tearDown() async throws {
+    @MainActor override func tearDown() async throws {
         app.terminate()
     }
 
-    private func beginNewItem(title: String) {
+    @MainActor private func beginNewItem(title: String) {
         window.quickAdd(type: "Note", title: title)
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         editor.click()
     }
 
-    private func waitForText(_ predicate: String, _ argument: String, timeout: TimeInterval = 4) -> Bool {
+    @MainActor private func waitForText(_ predicate: String, _ argument: String, timeout: TimeInterval = 4) -> Bool {
         let expectation = expectation(for: NSPredicate(format: "value \(predicate) %@", argument), evaluatedWith: editor)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
     /// A row of the page's own menu, which shows beside the caret while it is open.
-    private func menuRow(_ name: String) -> XCUIElement {
+    @MainActor private func menuRow(_ name: String) -> XCUIElement {
         page.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR value == %@ OR title == %@", name, name, name)).firstMatch
     }
 
-    func testTheSlashMenuListsBlocksInTheAppsWordsAndMakesATable() {
+    @MainActor func testTheSlashMenuListsBlocksInTheAppsWordsAndMakesATable() {
         app.typeText("/")
         for name in ["Heading 1", "Bulleted List", "Checklist", "Code Block", "Table", "Callout", "Diagram", "Link to Item"] {
             XCTAssertTrue(menuRow(name).waitForExistence(timeout: 3), name)
@@ -48,17 +47,18 @@ final class EditorTypingTests: XCTestCase {
         XCTAssertTrue(page.tables.firstMatch.waitForExistence(timeout: 3), "the Table command made a table")
     }
 
-    func testTypingARowAndPressingReturnMakesATable() {
+    @MainActor func testTypingARowAndPressingReturnMakesATable() {
         app.typeText("| Name | Date |")
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(page.tables.firstMatch.waitForExistence(timeout: 3))
     }
 
-    func testLinkToItemCancelledKeepsTheLineAsTyped() {
+    @MainActor func testLinkToItemCancelledKeepsTheLineAsTyped() {
         app.typeText("/link")
         XCTAssertTrue(menuRow("Link to Item").waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(app.sheets.firstMatch.textFields["ItemLinkField"].waitForExistence(timeout: 3))
+        let field = app.sheets.firstMatch.descendants(matching: .any)["ItemLinkField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
         XCTAssertTrue(waitForText("CONTAINS", "/link"))
@@ -66,7 +66,7 @@ final class EditorTypingTests: XCTestCase {
         XCTAssertTrue(waitForText("CONTAINS", "/link!"), "the page has the keyboard back")
     }
 
-    func testOptionUpAndOptionDownMoveTheBlock() {
+    @MainActor func testOptionUpAndOptionDownMoveTheBlock() {
         app.typeText("first")
         app.typeKey(.return, modifierFlags: [])
         app.typeText("second")

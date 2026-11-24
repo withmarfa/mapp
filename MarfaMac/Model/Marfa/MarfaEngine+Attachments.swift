@@ -26,7 +26,7 @@ extension MarfaEngine {
         #if DEBUG
         let replacement = hooks.attaching.current
         #endif
-        besideTheLane[token] = Task { [copy, hub, tell] in
+        besideTheLane[token] = Task { [copy, tell] in
             let result: Result<Marfa.Attached, SourceFailure>
             do {
                 result = .success(try await Self.asking {
@@ -72,7 +72,7 @@ extension MarfaEngine {
             mimeType: Self.mimeType(of: file), title: title.map(Self.embeddable), tier: tier.map(MarfaMapping.marfaTier))
         let token = UUID()
         hub.activity.setAside()
-        besideTheLane[token] = Task { [copy, hub, tell] in
+        besideTheLane[token] = Task { [copy, tell] in
             let result: Result<Marfa.Added, SourceFailure>
             do {
                 result = .success(try await Self.asking { try await copy.items.addFile(file, attachment) })

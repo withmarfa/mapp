@@ -9,8 +9,7 @@ struct ConnectorsPage: View {
     let subpage: SettingsSubpage?
     @State private var model: ConnectorsModel
     @State private var mappings = ConnectorMappingModels()
-    @Environment(\.settingsPush) private var push
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -73,7 +72,7 @@ struct ConnectorsPage: View {
             } else {
                 SettingsPageState(
                     symbol: "arrow.triangle.2.circlepath", title: Text("This Connector Is Gone"),
-                    line: Text("Its plugin was removed, here or somewhere else."), action: ("Back", back))
+                    line: Text("Its plugin was removed, here or somewhere else."), action: ("Back", { navigation?.back() }))
             }
         } else if let name = openName {
             if let entry = model.entry(name) {
@@ -83,7 +82,7 @@ struct ConnectorsPage: View {
             } else {
                 SettingsPageState(
                     symbol: "arrow.triangle.2.circlepath", title: Text("This Connector Is Gone"),
-                    line: Text("Its plugin was removed, here or somewhere else."), action: ("Back", back))
+                    line: Text("Its plugin was removed, here or somewhere else."), action: ("Back", { navigation?.back() }))
             }
         } else {
             list
@@ -112,7 +111,7 @@ struct ConnectorsPage: View {
                         SettingsLinkRow(
                             verbatim: entry.summary.title, line: line(of: entry), lead: .well(host.markGlyph(entry.summary.mark)),
                             value: ConnectorWording.title(health), dot: Self.dot(health), lines: 1
-                        ) { push(Self.subpage(for: entry.summary)) }
+                        ) { navigation?.push(Self.subpage(for: entry.summary)) }
                     }
                 }
             }
@@ -158,7 +157,7 @@ private struct ConnectorDetail: View {
     let model: ConnectorsModel
     let entry: ConnectorsModel.Entry
     let host: any MarfaSettingsHost
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
 
     private var summary: PluginConnectorSummary { entry.summary }
     private var health: ConnectorHealth { model.health(of: entry) }
@@ -372,7 +371,7 @@ private struct ConnectorDetail: View {
                     SettingsLinkRow(
                         verbatim: ConnectorWording.kindTitle(kind.name),
                         line: ConnectorWording.kindLine(kind, typeName: model.typeName(kind.type)), lines: 1
-                    ) { push(ConnectorsPage.subpage(for: kind, of: summary)) }
+                    ) { navigation?.push(ConnectorsPage.subpage(for: kind, of: summary)) }
                 }
             }
         }
@@ -397,10 +396,9 @@ private struct ConnectorSecretSheet: View {
                     .accessibilityIdentifier("ConnectorSecretField")
                 }
             } buttons: {
-                Spacer(minLength: 0)
                 SettingsButton("Cancel") { model.closeSheet() }
-                SettingsButton("Save") { Task { await model.saveSecret() } }
-                    .disabled(!model.canSaveSecret).keyboardShortcut(.defaultAction)
+                SettingsButton("Save", role: .confirm) { Task { await model.saveSecret() } }
+                    .disabled(!model.canSaveSecret)
                     .accessibilityIdentifier("ConnectorSecretSave")
             }
         }

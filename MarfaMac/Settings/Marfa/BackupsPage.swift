@@ -11,7 +11,7 @@ struct BackupsPage: View {
     let showsAll: Bool
     @State private var model: BackupsModel
     @State private var selection: Set<String> = []
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
 
     /// `model` is the page's own unless a render brings one that holds a state the page cannot be driven into offscreen.
     init(host: any MarfaSettingsHost, showsAll: Bool, model: BackupsModel? = nil) {
@@ -105,13 +105,10 @@ struct BackupsPage: View {
                 keepIn
                 if model.place == .folder, let folder = model.settings?.folder {
                     SettingsRow(
-                        verbatim: String(localized: "Folder"), line: String(localized: "On the machine \(host.serverName) runs on."),
+                        verbatim: String(localized: "Folder"), line: String(localized: "\(folder), on the machine \(host.serverName) runs on."),
                         lead: .symbol("folder")
                     ) {
-                        HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                            SettingsValue(verbatim: folder)
-                            SettingsButton("Change…") { model.beginFolder() }
-                        }
+                        SettingsButton("Change…") { model.beginFolder() }
                     }
                 }
                 if let settings = model.settings {
@@ -207,7 +204,7 @@ struct BackupsPage: View {
                 SettingsSectionTable(
                     rows: Array(model.backups.prefix(Self.pageSize)), columns: columns,
                     action: SettingsRowAction(title: "Restore…") { model.beginRestore($0) }, total: model.backups.count,
-                    showAll: model.backups.count > Self.pageSize ? { push(Self.allBackups) } : nil)
+                    showAll: model.backups.count > Self.pageSize ? { navigation?.push(Self.allBackups) } : nil)
             }
         }
     }
@@ -249,10 +246,9 @@ struct BackupSheet: View {
                     width: nil, onSubmit: { Task { await model.saveFolder() } })
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.close() }
-            SettingsButton("Use Folder") { Task { await model.saveFolder() } }
-                .disabled(!model.canSaveFolder).keyboardShortcut(.defaultAction)
+            SettingsButton("Use Folder…", role: .confirm) { Task { await model.saveFolder() } }
+                .disabled(!model.canSaveFolder)
         }
     }
 
@@ -272,10 +268,9 @@ struct BackupSheet: View {
                 }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.close() }.disabled(model.isRestoring)
-            SettingsButton(model.isRestoring ? "Restoring…" : "Restore…", reserving: "Restoring…") { Task { await model.restore() } }
-                .disabled(model.isRestoring).keyboardShortcut(.defaultAction)
+            SettingsButton(model.isRestoring ? "Restoring…" : "Restore…", role: .confirm, reserving: "Restoring…") { Task { await model.restore() } }
+                .disabled(model.isRestoring)
         }
     }
 }

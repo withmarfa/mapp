@@ -7,6 +7,7 @@ struct SidebarIndex: View {
     let browser: Browser
     let details: DetailsPresentation
     let order: ItemOrder
+    var pane: FocusState<Browser.Pane?>.Binding
     @State private var model = IndexRowsModel()
     @State private var choice = IndexChoice()
     @State private var editing: SourceEditRequest?
@@ -15,10 +16,11 @@ struct SidebarIndex: View {
     @State private var deletingTitle = ""
     @AppStorage private var tab: IndexTab
 
-    init(browser: Browser, details: DetailsPresentation, order: ItemOrder) {
+    init(browser: Browser, details: DetailsPresentation, order: ItemOrder, pane: FocusState<Browser.Pane?>.Binding) {
         self.browser = browser
         self.details = details
         self.order = order
+        self.pane = pane
         _tab = AppStorage(wrappedValue: .all, (browser.indexPlace ?? .sources).tabKey)
     }
 
@@ -27,7 +29,7 @@ struct SidebarIndex: View {
     var body: some View {
         let rows = model.rows(for: place)
         IndexContent(
-            place: place, title: library.name(of: browser.item), rows: rows, isBuilt: model.isBuilt(for: place), browser: browser, tab: tabBinding, choice: choice,
+            place: place, title: library.name(of: browser.item), rows: rows, isBuilt: model.isBuilt(for: place), browser: browser, pane: pane, tab: tabBinding, choice: choice,
             edit: place == .sources ? { editing = $0 } : nil, delete: place == .collections ? { ask($0) } : nil,
             newCollection: place == .collections ? { browser.openQuickAddFromIndex(remembered: "", in: library) } : nil
         ) { row in
@@ -122,6 +124,7 @@ private struct IndexContent: View {
     let rows: [IndexRow]
     let isBuilt: Bool
     let browser: Browser
+    var pane: FocusState<Browser.Pane?>.Binding
     @Binding var tab: IndexTab
     let choice: IndexChoice
     let edit: ((SourceEditRequest) -> Void)?
@@ -140,7 +143,7 @@ private struct IndexContent: View {
             let searched = browser.isSearching ? narrowed.filter(matches) : narrowed
             let shown = tab.rows(in: searched)
             IndexPage(
-                place: place, title: title, browser: browser,
+                place: place, title: title, browser: browser, pane: pane,
                 sources: Set(rows.map(\.sourceName)).filter { !$0.isEmpty }.sorted(), rows: shown, tabs: place.tabs.map { (tab: $0, count: $0.rows(in: searched).count) }, tab: $tab,
                 choice: choice, open: open, edit: edit, delete: delete, newCollection: newCollection, emptyTab: emptyTab)
         }

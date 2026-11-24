@@ -10,26 +10,29 @@ extension EnvironmentValues {
     @Entry var settingsSectionInset: CGFloat = SettingsTokens.Metric.inset
 }
 
-/// A sheet in the middle of the window, as an alert is, never dropping from under the toolbar: something new with
-/// several fields, before it exists. Its label sits above each field, Cancel and the confirm button are gray and at the
-/// trailing edge, and a destructive action stands alone at the leading edge. A sheet grows with what it holds up to the
-/// window's height, then its content scrolls between the title and the buttons.
-struct SettingsSheet<Content: View, Buttons: View>: View {
+/// A sheet centered in the window for a form with several fields. The leading slot holds a destructive action or reset.
+/// The trailing slot holds Cancel and any confirm button. When the sheet reaches the window's height, only the content scrolls.
+struct SettingsSheet<Content: View, Leading: View, Buttons: View>: View {
     private let title: Text
     private let line: Text?
     private let isWide: Bool
     private let content: Content
+    private let leading: Leading
     private let buttons: Buttons
     @Environment(\.settingsSheetMaxHeight) private var maxHeight
     @State private var headHeight: CGFloat = 0
     @State private var contentHeight: CGFloat = 0
     @State private var buttonsHeight: CGFloat = 0
 
-    init(title: Text, line: Text? = nil, isWide: Bool = false, @ViewBuilder content: () -> Content, @ViewBuilder buttons: () -> Buttons) {
+    init(
+        title: Text, line: Text? = nil, isWide: Bool = false, @ViewBuilder content: () -> Content, @ViewBuilder leading: () -> Leading,
+        @ViewBuilder buttons: () -> Buttons
+    ) {
         self.title = title
         self.line = line
         self.isWide = isWide
         self.content = content()
+        self.leading = leading()
         self.buttons = buttons()
     }
 
@@ -61,7 +64,11 @@ struct SettingsSheet<Content: View, Buttons: View>: View {
             .scrollBounceBehavior(.basedOnSize)
             .scrollEdgeEffectStyle(.soft, for: .vertical)
             .frame(height: scrollHeight)
-            HStack(spacing: SettingsTokens.Metric.buttonGap) { buttons }
+            HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                leading
+                Spacer(minLength: 0)
+                buttons
+            }
                 .padding(.horizontal, padding)
                 .padding(.top, SettingsTokens.Metric.sheetGap)
                 .padding(.bottom, padding)
@@ -75,6 +82,12 @@ struct SettingsSheet<Content: View, Buttons: View>: View {
         .shadow(color: SettingsTokens.sheetShadow, radius: SettingsTokens.Metric.sheetShadowRadius, y: SettingsTokens.Metric.sheetShadowDrop)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
+    }
+}
+
+extension SettingsSheet where Leading == EmptyView {
+    init(title: Text, line: Text? = nil, isWide: Bool = false, @ViewBuilder content: () -> Content, @ViewBuilder buttons: () -> Buttons) {
+        self.init(title: title, line: line, isWide: isWide, content: content, leading: { EmptyView() }, buttons: buttons)
     }
 }
 

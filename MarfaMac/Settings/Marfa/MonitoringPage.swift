@@ -118,11 +118,9 @@ struct MonitoringSecretSheetView: View {
                     }
                 }
             } buttons: {
-                Spacer(minLength: 0)
                 SettingsButton("Cancel") { model.close() }
-                SettingsButton("Save") { Task { await model.save() } }
+                SettingsButton("Save", role: .confirm) { Task { await model.save() } }
                     .disabled(!sheet.hasInput || model.isWriting)
-                    .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("MonitoringSecretSave")
             }
         }

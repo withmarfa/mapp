@@ -501,7 +501,7 @@ struct PaletteActionsPanel: View {
             }
             .padding(.horizontal, 6)
             Divider().padding(.top, 6)
-            TextField("Search for Actions…", text: $query)
+            TextField("Search for Actions", text: $query)
                 .textFieldStyle(.plain)
                 .focused(focus, equals: .actions)
                 .onSubmit(submit)

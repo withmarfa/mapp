@@ -10,8 +10,7 @@ struct AppsPage: View {
     @State private var model: AppsModel
     /// The page view's, shared with the gate's states.
     let links: OpenLinksModel
-    @Environment(\.settingsPush) private var push
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?, links: OpenLinksModel) {
         self.host = host
@@ -44,7 +43,7 @@ struct AppsPage: View {
                     Task { await model.confirm(asked, alsoRemovingData: checked) }
                 }
             }
-            .onChange(of: model.disconnected) { if $1 != nil { back() } }
+            .onChange(of: model.disconnected) { if $1 != nil { navigation?.back() } }
             .accessibilityIdentifier("AppsPage")
     }
 
@@ -63,7 +62,7 @@ struct AppsPage: View {
             } else {
                 SettingsPageState(
                     symbol: "macwindow", title: Text("This App Isn’t Connected"),
-                    line: Text("It was disconnected, here or somewhere else."), action: ("Back", back))
+                    line: Text("It was disconnected, here or somewhere else."), action: ("Back", { navigation?.back() }))
             }
         } else {
             list
@@ -91,7 +90,7 @@ struct AppsPage: View {
                         verbatim: AppsModel.name(of: app),
                         line: AccessScopes.summary(AccessScopes.parse(app.scopes), names: model.typeNames),
                         lead: .well(symbol: Self.symbol(app.kind)), value: OwnerWording.used(app.lastUsed)
-                    ) { push(Self.subpage(for: app)) }
+                    ) { navigation?.push(Self.subpage(for: app)) }
                 }
             }
         }
@@ -125,7 +124,7 @@ private struct AppDetail: View {
     let model: AppsModel
     let app: AppAccess
     let host: any MarfaSettingsHost
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
 
     private var name: String { AppsModel.name(of: app) }
     private var parsed: AccessScopes.Parsed { AccessScopes.parse(app.scopes) }
@@ -168,7 +167,7 @@ private struct AppDetail: View {
                     }
                 }
                 OwnerPermissionsRow(held: parsed.permissions.count, line: String(localized: "The owner’s permissions. Most apps need none.")) {
-                    push(OwnerPermissions.subpage(of: AppsPage.subpage(for: app)))
+                    navigation?.push(OwnerPermissions.subpage(of: AppsPage.subpage(for: app)))
                 }
             }
             let keys = host.grants.contains(.keysManage) ? model.keysMade[app.clientID] ?? [] : []

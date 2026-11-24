@@ -1,8 +1,7 @@
 import XCTest
 
-@MainActor
-final class SelectionLifetimeTests: XCTestCase {
-    func testSelectedOutlineSurvivesWorkspaceReplacement() {
+nonisolated final class SelectionLifetimeTests: XCTestCase {
+    @MainActor func testSelectedOutlineSurvivesWorkspaceReplacement() {
         continueAfterFailure = false
         let app = XCUIApplication.sample()
         app.launch()

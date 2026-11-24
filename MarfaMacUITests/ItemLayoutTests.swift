@@ -1,20 +1,19 @@
 import AppKit
 import XCTest
 
-@MainActor
-final class ItemLayoutTests: XCTestCase {
-    private var app: XCUIApplication!
+nonisolated final class ItemLayoutTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() async throws { app.terminate() }
+    @MainActor override func tearDown() async throws { app.terminate() }
 
-    func testHeaderAndBodyOccupySeparateRegions() {
+    @MainActor func testHeaderAndBodyOccupySeparateRegions() {
         app.outlines["Sidebar"].staticTexts["Items"].click()
         let row = app.outlines["ItemList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
@@ -43,7 +42,7 @@ final class ItemLayoutTests: XCTestCase {
         XCTAssertFalse(app.buttons["Back"].exists)
     }
 
-    func testSearchFieldStartsAtTheColumnAndEndsBeforeTheOptions() {
+    @MainActor func testSearchFieldStartsAtTheColumnAndEndsBeforeTheOptions() {
         app.outlines["Sidebar"].staticTexts["Items"].click()
         let list = app.outlines["ItemList"]
         app.typeKey("f", modifierFlags: [.command, .option])
@@ -62,7 +61,7 @@ final class ItemLayoutTests: XCTestCase {
         XCTAssertTrue(search.waitForNonExistence(timeout: 3))
     }
 
-    func testHeaderScrollsWithTheBodyAndTitleMovesIntoToolbar() {
+    @MainActor func testHeaderScrollsWithTheBodyAndTitleMovesIntoToolbar() {
         app.outlines["Sidebar"].staticTexts["Items"].click()
         let row = app.outlines["ItemList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "The Design of Everyday Things")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
@@ -116,7 +115,7 @@ final class ItemLayoutTests: XCTestCase {
         capture("Find bar on scrolled document")
     }
 
-    private func capture(_ name: String) {
+    @MainActor private func capture(_ name: String) {
         // AppKit's inspector animation continues after the accessibility action returns.
         Thread.sleep(forTimeInterval: 0.6)
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
@@ -125,7 +124,7 @@ final class ItemLayoutTests: XCTestCase {
         add(attachment)
     }
 
-    private func averageColor(of screenshot: XCUIScreenshot) -> [Double] {
+    @MainActor private func averageColor(of screenshot: XCUIScreenshot) -> [Double] {
         guard let data = screenshot.image.tiffRepresentation,
               let image = NSBitmapImageRep(data: data) else {
             XCTFail("the toolbar screenshot could not be read")

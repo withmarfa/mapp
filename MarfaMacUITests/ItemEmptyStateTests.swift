@@ -1,14 +1,13 @@
 import XCTest
 
-@MainActor
-final class ItemEmptyStateTests: XCTestCase {
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
-    private var sidebar: XCUIElement { window.outlines["Sidebar"] }
-    private var list: XCUIElement { window.outlines["ItemList"] }
-    private var prompt: XCUIElement { window.staticTexts["No Item Selected"] }
+nonisolated final class ItemEmptyStateTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
+    @MainActor private var window: XCUIElement { app.windows.firstMatch }
+    @MainActor private var sidebar: XCUIElement { window.outlines["Sidebar"] }
+    @MainActor private var list: XCUIElement { window.outlines["ItemList"] }
+    @MainActor private var prompt: XCUIElement { window.staticTexts["No Item Selected"] }
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
         app.launch()
@@ -16,9 +15,9 @@ final class ItemEmptyStateTests: XCTestCase {
         XCTAssertTrue(list.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() async throws { app.terminate() }
+    @MainActor override func tearDown() async throws { app.terminate() }
 
-    func testItemsWithoutSelectionShowAQuietPrompt() {
+    @MainActor func testItemsWithoutSelectionShowAQuietPrompt() {
         sidebar.staticTexts["Items"].click()
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
@@ -30,7 +29,7 @@ final class ItemEmptyStateTests: XCTestCase {
         capture("Items without selection and matching toolbar background")
     }
 
-    func testAnEmptyCollectionLeavesTheContentPaneBlank() {
+    @MainActor func testAnEmptyCollectionLeavesTheContentPaneBlank() {
         window.quickAdd(type: "Collection", title: "Empty collection check")
         sidebar.staticTexts["Collections"].click()
         let index = window.descendants(matching: .any).matching(identifier: "SidebarIndex").firstMatch
@@ -43,7 +42,7 @@ final class ItemEmptyStateTests: XCTestCase {
         capture("Empty collection and blank content pane")
     }
 
-    func testAnEmptySearchLeavesTheContentPaneBlank() {
+    @MainActor func testAnEmptySearchLeavesTheContentPaneBlank() {
         sidebar.staticTexts["Items"].click()
         app.typeKey("f", modifierFlags: [.command, .option])
         let search = window.textFields["ColumnSearch"]
@@ -57,7 +56,7 @@ final class ItemEmptyStateTests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))
     }
 
-    private func capture(_ name: String) {
+    @MainActor private func capture(_ name: String) {
         let attachment = XCTAttachment(screenshot: window.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
