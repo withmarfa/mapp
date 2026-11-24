@@ -4,8 +4,8 @@
 
 ## Running tests
 
-- Run only the tests a change touches, while working and before merging: `-only-testing:MarfaMacTests/<Suite>`. CI runs the whole `Unit` plan once the pull request is ready.
-- UI tests take over the keyboard and mouse. Run them (`-only-testing:MarfaMacUITests/<Class>`, or the whole `UI` plan) when a change needs them and the screen is free. No merge or release requires them. CI builds them when they, a test plan or the project change, so a change that breaks them is seen; app code cannot, since their target never imports the app.
+- Run only the tests a change touches, while working and before merging: `-only-testing:MarfaMacTests/<Suite>`. CI runs the whole `Unit` plan for ready pull requests with logic changes.
+- Run UI tests locally (`-only-testing:MarfaMacUITests/<Class>` or the `UI` plan) with the screen free. CI builds them when their files, a test plan, the project, or `checks.yml` change.
 - A plan given a server creates and deletes items there, so give it a test instance only. Name it with the `instance_id` that `GET <address>/` reports (`TEST_RUNNER_MARFA_TEST_INSTANCE_ID`): a run refuses an address that reports another.
 
 ## Commands
