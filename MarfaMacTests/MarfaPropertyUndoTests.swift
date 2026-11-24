@@ -340,36 +340,27 @@ import Testing
         #expect(scene.lastWrite == name("Ada L", base: 4))
     }
 
-    /// The Undo goes back on the undo stack from within its run, so another step's Redo stays.
-    @Test(arguments: [false, true]) func aStepPutBackKeepsAnotherStepsRedo(groupsByEvent: Bool) async throws {
+    /// A step put back goes on the undo stack after its run, so no other step of its group is made again (a board
+    /// drag puts each item's edit in one group).
+    @Test func aStepPutBackInAGroupMakesNothingElseAgain() async throws {
         let scene = try await loaded()
         let earlier = try scene.set("Ada L", undoable: false)
         try await scene.take(earlier, showing: "Ada L", version: 2)
+        scene.undo.beginUndoGrouping()
         try scene.set("Ada K")
         let other = try scene.edit(Self.c1, ["summary": .string("New")])
+        scene.undo.endUndoGrouping()
         try await scene.take(other, Self.c1, ["summary": .string("New")], version: 2)
         scene.answer(other, .accepted)
         try await scene.show(Self.c1, version: 3)
-        scene.undo.groupsByEvent = groupsByEvent
-        scene.undo.undo()
-        let otherUndone = try #require(scene.lastID)
-        try await scene.take(otherUndone, Self.c1, ["summary": .string("Old")], version: 4)
-        scene.answer(otherUndone, .accepted)
-        try await scene.show(Self.c1, version: 5)
-        try #require(scene.undo.canRedo)
+        let before = scene.source.writes.count
 
         scene.undo.undo()
+        try await waitForAPutBack()
         #expect(scene.lastMessage?.hasPrefix(MarfaLibrary.earlierNotAnswered) == true)
-        try #require(await eventually { scene.undo.canUndo }, "the Undo is put back")
-        #expect(scene.undo.canRedo, "the other step's Redo is kept")
-
-        scene.undo.redo()
-        #expect(scene.lastWrite == card("summary", .string("New"), base: 5), "the other step's Redo is made")
-        scene.undo.undo()
-        #expect(scene.lastWrite == card("summary", .string("Old"), base: 5))
-        try await scene.answer(earlier, .accepted, showing: "Ada K", version: 4)
-        scene.undo.undo()
-        #expect(scene.lastWrite == name("Ada L", base: 4), "the Undo put back is made once the earlier edit is answered")
+        #expect(scene.source.writes.count == before + 1, "only the other item's Undo is written")
+        #expect(scene.lastWrite == card("summary", .string("Old"), base: 3))
+        #expect(scene.undo.canUndo, "the Undo is put back")
     }
 
     @Test func anUndoAfterARedoPutsBackWhatTheItemHeldWhenTheRedoRan() async throws {

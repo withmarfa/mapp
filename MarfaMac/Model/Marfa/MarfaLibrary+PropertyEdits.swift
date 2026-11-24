@@ -226,10 +226,15 @@ extension MarfaLibrary {
         return unread ? .refused(Self.answerUnread(undoing: undoing)) : .go(item.version)
     }
 
-    /// Each value as plain text (`ItemValueText.string`), so a Redo that can't be made gives back all the person set,
-    /// numbers and entries as well as text.
+    /// Each value the person typed as plain text (`ItemValueText.string`), so a Redo that can't be made gives back
+    /// text, numbers and entries. A yes or no, or a cleared value, has nothing typed to keep.
     static func valuesText(_ changes: [String: PropertyValue?]) -> String? {
-        let texts = changes.sorted { $0.key < $1.key }.compactMap { $0.value.map(ItemValueText.string) }.filter { !$0.isEmpty }
+        let texts = changes.sorted { $0.key < $1.key }.compactMap { change -> String? in
+            switch change.value {
+            case nil, .null?, .bool?: nil
+            case let value?: ItemValueText.string(value)
+            }
+        }.filter { !$0.isEmpty }
         return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
     }
 
