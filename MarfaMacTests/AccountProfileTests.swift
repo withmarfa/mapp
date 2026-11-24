@@ -27,22 +27,20 @@ import Testing
         #expect(account.profile?.name == "Mira Castell")
     }
 
-    @Test func aNameTypedWhileOneIsSentIsSentAfterIt() async {
+    @Test func twoQuickSubmitsSendOneSave() async {
         let bench = OwnerBench()
         let account = await loaded(bench)
         let gate = bench.calls.hold("setProfileName")
-        account.nameDraft = "Mira C"
+        account.nameDraft = "Mira Castell-Owen"
         let first = Task { await account.saveName() }
         #expect(await eventually { bench.calls.state.withLock { $0.waiting["setProfileName"] == 1 } })
-        account.nameDraft = "Mira Castell-Owen"
+        #expect(account.isSavingName, "the field takes no typing while the name is sent")
         await account.saveName()
         gate.open()
-        #expect(await eventually { bench.calls.state.withLock { $0.waiting["setProfileName"] == 1 } })
-        gate.open()
         await first.value
-        #expect(bench.calls.state.withLock { $0.namesSent } == ["Mira C", "Mira Castell-Owen"])
-        #expect(account.nameDraft == "Mira Castell-Owen")
+        #expect(bench.calls.state.withLock { $0.namesSent } == ["Mira Castell-Owen"])
         #expect(account.profile?.name == "Mira Castell-Owen")
+        #expect(!account.isSavingName)
     }
 
     @Test func aNameNotSentIsHandedOverWhenSettingsCloses() async {
@@ -54,7 +52,7 @@ import Testing
         #expect(account.takeDrafts() == [.typed(title: String(localized: "Name Not Changed"), text: "Mira Castell-Owen")])
     }
 
-    @Test func aNameWithAControlCharacterIsRefusedBeforeItIsSent() async {
+    @Test func aNameWithAControlCharacterIsRefusedBeforeItIsSentAndHandedBackAsTyped() async {
         let bench = OwnerBench()
         let account = await loaded(bench)
         account.nameDraft = "Mira Castell\t"
@@ -62,23 +60,7 @@ import Testing
         #expect(account.nameError == ProfileName.Problem.hidden.line)
         #expect(account.nameDraft == "Mira Castell\t")
         #expect(!bench.calls.calls.contains("setProfileName"))
-    }
-
-    @Test func aNameTypedWhileOneIsSentIsHandedOverAtCloseAndTheOlderIsNeverSentAfterIt() async {
-        let bench = OwnerBench()
-        let account = await loaded(bench)
-        let gate = bench.calls.hold("setProfileName")
-        account.nameDraft = "Mira C"
-        let first = Task { await account.saveName() }
-        #expect(await eventually { bench.calls.state.withLock { $0.waiting["setProfileName"] == 1 } })
-        account.nameDraft = "Mira Castell-Owen"
-        await account.saveName()
-        #expect(account.takeDrafts() == [.typed(title: String(localized: "Name Not Changed"), text: "Mira Castell-Owen")])
-        gate.open()
-        await first.value
-        #expect(bench.calls.state.withLock { $0.namesSent } == ["Mira C"])
-        #expect(account.nameDraft == "Mira C")
-        #expect(bench.late.isEmpty)
+        #expect(account.takeDrafts() == [.typed(title: String(localized: "Name Not Changed"), text: "Mira Castell\t")])
     }
 
     @Test func aNameStillSentAtCloseIsHandedOverWhenItsSendFails() async {
@@ -93,26 +75,6 @@ import Testing
         gate.open()
         await first.value
         #expect(bench.late == [.typed(title: String(localized: "Name Not Changed"), text: "Mira C")])
-    }
-
-    @Test func aFailedSendGoesOnToTheNewerNameSubmittedWhileItWasSent() async {
-        let bench = OwnerBench()
-        let account = await loaded(bench)
-        let gate = bench.calls.hold("setProfileName")
-        bench.calls.state.withLock { $0.namesRefused = ["Mira C"] }
-        account.nameDraft = "Mira C"
-        let first = Task { await account.saveName() }
-        #expect(await eventually { bench.calls.state.withLock { $0.waiting["setProfileName"] == 1 } })
-        account.nameDraft = "Mira Castell-Owen"
-        await account.saveName()
-        gate.open()
-        #expect(await eventually { bench.calls.state.withLock { $0.waiting["setProfileName"] == 1 } })
-        gate.open()
-        await first.value
-        #expect(bench.calls.state.withLock { $0.namesSent } == ["Mira Castell-Owen"])
-        #expect(account.profile?.name == "Mira Castell-Owen")
-        #expect(account.nameDraft == "Mira Castell-Owen")
-        #expect(account.nameError == nil)
     }
 
     @Test func aPictureTheServerTakesIsSentByteForByteAndOnlyASmallCopyIsKept() async throws {

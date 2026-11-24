@@ -55,7 +55,7 @@ struct AccountPage: View {
             OwnerLoading()
         } else {
             SettingsPageColumn {
-                if let profile = model.profile, !profile.isEmpty { profileSection(profile) }
+                if let profile = model.profile { profileSection(profile) }
                 passwordSection
                 if model.canManageSignIns {
                     if let failure = model.listsFailure {
@@ -82,8 +82,26 @@ struct AccountPage: View {
     }
 
     /// Profile, and below it, in a section of its own since it has a mark, what the sign-in may not change, or may not read:
-    /// a picture the sign-in may not see is shown only there, locked.
+    /// a name or picture the sign-in may not see is shown only there, locked. Where it may read nothing of the profile, the
+    /// locked row stands as Profile.
     @ViewBuilder private func profileSection(_ profile: OwnerProfile) -> some View {
+        if !profile.isEmpty { profileRows(profile) }
+        let locked = model.lockedProfile
+        if !locked.isEmpty {
+            SettingsSection(name: profile.isEmpty ? Text("Profile") : nil) {
+                SettingsProblemRow(
+                    title: lockedTitle(locked), line: lockedLine(locked, of: profile), symbol: "lock", tone: nil,
+                    actions: [
+                        SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { Task { await model.allowProfileChanges() } }
+                    ]
+                )
+                .disabled(host.isAllowingMore)
+                .accessibilityIdentifier("AccountProfileLocked")
+            }
+        }
+    }
+
+    private func profileRows(_ profile: OwnerProfile) -> some View {
         SettingsSection("Profile") {
             if profile.pictureIsReadable {
                 SettingsRow(
@@ -104,6 +122,7 @@ struct AccountPage: View {
                             title: "Name", text: $model.nameDraft, isError: model.nameError != nil,
                             onSubmit: { Task { await model.saveName() } }, onEndEditing: { Task { await model.saveName() } }
                         )
+                        .disabled(model.isSavingName)
                         .accessibilityIdentifier("AccountName")
                     } else {
                         SettingsValue(verbatim: name)
@@ -119,20 +138,6 @@ struct AccountPage: View {
                 }
             }
         }
-        let locked = model.lockedProfile
-        if !locked.isEmpty {
-            SettingsSection(name: nil) {
-                SettingsProblemRow(
-                    title: lockedTitle(locked), line: lockedLine(locked, pictureIsReadable: profile.pictureIsReadable), symbol: "lock",
-                    tone: nil,
-                    actions: [
-                        SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { Task { await model.allowProfileChanges() } }
-                    ]
-                )
-                .disabled(host.isAllowingMore)
-                .accessibilityIdentifier("AccountProfileLocked")
-            }
-        }
     }
 
     private func lockedTitle(_ locked: Set<ProfileField>) -> Text {
@@ -143,13 +148,20 @@ struct AccountPage: View {
         }
     }
 
-    private func lockedLine(_ locked: Set<ProfileField>, pictureIsReadable: Bool) -> Text {
-        switch (locked.contains(.name), locked.contains(.avatar), pictureIsReadable) {
-        case (true, true, true): Text("The app isn’t allowed to change your name and picture.")
-        case (true, true, false): Text("The app isn’t allowed to change your name, or to show or change your picture.")
-        case (true, false, _): Text("The app isn’t allowed to change your name.")
-        case (false, _, true): Text("The app isn’t allowed to change your picture.")
-        case (false, _, false): Text("The app isn’t allowed to show or change your picture.")
+    /// What is locked of each: nil where it is free, false where it can be read and not changed, true where it is hidden.
+    private func lockedLine(_ locked: Set<ProfileField>, of profile: OwnerProfile) -> Text {
+        let name = locked.contains(.name) ? profile.name == nil : nil
+        let picture = locked.contains(.avatar) ? !profile.pictureIsReadable : nil
+        switch (name, picture) {
+        case (false?, nil): return Text("The app isn’t allowed to change your name.")
+        case (true?, nil): return Text("The app isn’t allowed to show or change your name.")
+        case (nil, false?): return Text("The app isn’t allowed to change your picture.")
+        case (nil, true?): return Text("The app isn’t allowed to show or change your picture.")
+        case (false?, false?): return Text("The app isn’t allowed to change your name and picture.")
+        case (true?, true?): return Text("The app isn’t allowed to show or change your name and picture.")
+        case (false?, true?): return Text("The app isn’t allowed to change your name, or to show or change your picture.")
+        case (true?, false?): return Text("The app isn’t allowed to show or change your name, or to change your picture.")
+        case (nil, nil): return Text(verbatim: "")
         }
     }
 
