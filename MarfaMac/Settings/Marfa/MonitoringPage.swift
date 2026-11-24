@@ -75,7 +75,6 @@ struct MonitoringPage: View {
         }
     }
 
-    /// A secret: whether it is set in the row's line, and one button that opens the sheet where it is typed again or removed.
     private func secretRow(_ secret: MonitoringSecret) -> some View {
         let isSet = model.isSet(secret)
         return SettingsRow(
