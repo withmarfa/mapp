@@ -24,8 +24,8 @@ import Observation
     struct Question: Identifiable, Equatable {
         enum Kind: Equatable {
             case stop
-            /// A limit raised to `files`, which pauses less.
-            case loosen(Setting, files: UInt64)
+            /// A limit raised from what `base` holds to `files`, which pauses less. It is sent on `base`'s version.
+            case loosen(Setting, files: UInt64, base: FolderSettingsReading)
         }
 
         let id = UUID()
@@ -67,6 +67,9 @@ import Observation
     private(set) var errors: [Setting: String] = [:]
     /// The settings whose change was refused, which only Return sends again.
     private var refused: Set<Setting> = []
+    /// The version a change was refused on while the copy still read it, by setting: nothing is sent again until the copy
+    /// reads past it.
+    private var catchingUp: [Setting: Int64] = [:]
     private(set) var sending: Set<Setting> = []
     private(set) var question: Question?
     /// The folder just stopped here, so its page goes back.
@@ -149,7 +152,10 @@ import Observation
             settings[id] = read
             settingsFailures[id] = nil
             if let index = folders.firstIndex(where: { $0.id == id }), !read.title.isEmpty { folders[index].title = read.title }
-            if editing == id { fillLimits(from: read) }
+            if editing == id {
+                catchUp(to: read)
+                fillLimits(from: read)
+            }
         case .failure(let error):
             settingsFailures[id] = error
             if error == .notFound { forget(id) }
@@ -173,10 +179,20 @@ import Observation
         includeDraft = nil
         errors = [:]
         refused = []
+        catchingUp = [:]
         bases = [:]
         isRenaming = false
         question = nil
         if let read = settings[id] { fillLimits(from: read) }
+    }
+
+    /// Once the copy reads past a refused version, the refusal is told with what the setting is now.
+    private func catchUp(to read: FolderSettingsReading) {
+        for (setting, version) in catchingUp where read.version > version {
+            catchingUp[setting] = nil
+            errors[setting] = Self.conflictLine(setting, now: read)
+            if bases[setting] != nil { bases[setting] = read }
+        }
     }
 
     /// Shows each limit as read, but where the person has typed one: what they typed stays, with the reading they began on.
@@ -282,6 +298,7 @@ import Observation
             return
         }
         guard explicitly || !refused.contains(setting) else { return }
+        guard catchingUp[setting] == nil else { return await readSettings(id) }
         guard let files = UInt64(limitDraft(setting).trimmingCharacters(in: .whitespaces)), files <= Self.largestLimit else {
             errors[setting] = Self.rangeLine
             return
@@ -294,8 +311,8 @@ import Observation
             return
         }
         guard files < held else {
-            let kind = Question.Kind.loosen(setting, files: files)
-            if question?.kind != kind { question = Self.loosening(setting, folder: id, from: held, to: files) }
+            // An open question keeps what it asked, whatever is read meanwhile.
+            if question == nil { question = Self.loosening(setting, to: files, on: base) }
             return
         }
         await sendLimit(setting, files: files, on: base)
@@ -318,9 +335,14 @@ import Observation
     static var rangeLine: String { String(localized: "Enter a whole number from 0 to \(largestLimit.formatted()).") }
 
     /// Sends one change on the version `base` holds and takes the answer. A change made elsewhere since is told with what
-    /// it is now, which the next send is based on, and what was typed stays to be sent again.
+    /// it is now, which the next send is based on, and what was typed stays to be sent again. Where the copy does not yet
+    /// read past the version refused, it is read again and nothing is sent.
     @discardableResult
     private func send(_ change: FolderSettingChange, in setting: Setting, on base: FolderSettingsReading) async -> Bool {
+        guard catchingUp[setting] == nil else {
+            await readSettings(base.id)
+            return false
+        }
         guard !sending.contains(setting) else { return false }
         sending.insert(setting)
         defer { sending.remove(setting) }
@@ -337,9 +359,12 @@ import Observation
             if error == .notFound { forget(base.id) }
             if error == .conflict {
                 await readSettings(base.id)
-                if let now = settings[base.id] {
+                if let now = settings[base.id], now.version > base.version {
                     errors[setting] = Self.conflictLine(setting, now: now)
                     if bases[setting] != nil { bases[setting] = now }
+                } else {
+                    errors[setting] = Self.catchingUpLine
+                    catchingUp[setting] = base.version
                 }
             }
             await context.learn(from: error)
@@ -361,9 +386,11 @@ import Observation
             button: String(localized: "Stop Syncing"))
     }
 
-    /// The question before a limit is raised, naming the limit the person saw and the one typed.
-    private static func loosening(_ setting: Setting, folder: String, from held: UInt64, to files: UInt64) -> Question {
-        let kind = Question.Kind.loosen(setting, files: files)
+    /// The question before a limit is raised, naming the limit the person saw on `base` and the one typed.
+    private static func loosening(_ setting: Setting, to files: UInt64, on base: FolderSettingsReading) -> Question {
+        let kind = Question.Kind.loosen(setting, files: files, base: base)
+        let folder = base.id
+        let held = limit(setting, of: base)
         let button = String(localized: "Raise Limit")
         return if setting == .removalLimit {
             Question(
@@ -378,22 +405,25 @@ import Observation
         }
     }
 
-    /// Keeping things as they were puts a raised limit back as it was read.
+    /// Keeping things as they were puts back the limit as last read.
     func cancelQuestion() {
         guard let asked = question else { return }
         question = nil
-        if case .loosen(let setting, _) = asked.kind, asked.folder == editing {
+        if case .loosen(let setting, _, let base) = asked.kind, asked.folder == editing {
+            let read = settings[base.id] ?? base
             errors[setting] = nil
             refused.remove(setting)
-            if let base = bases[setting] { setLimitDraft(setting, String(Self.limit(setting, of: base))) }
-            if let id = editing, let read = settings[id] { fillLimits(from: read) }
+            setLimitDraft(setting, String(Self.limit(setting, of: read)))
+            bases[setting] = read
         }
     }
 
+    /// Sends exactly what the question named, on the version it named: a change made elsewhere since is told, never
+    /// written over.
     func confirm(_ asked: Question) async {
         question = nil
-        if case .loosen(let setting, let files) = asked.kind {
-            guard asked.folder == editing, let base = bases[setting] else { return }
+        if case .loosen(let setting, let files, let base) = asked.kind {
+            guard asked.folder == editing else { return }
             return await sendLimit(setting, files: files, on: base)
         }
         guard !sending.contains(.stopSyncing) else { return }
@@ -439,6 +469,7 @@ import Observation
         question = nil
         errors = [:]
         refused = []
+        catchingUp = [:]
         bases = [:]
         fillLimits(from: read)
         return drafts
@@ -560,6 +591,11 @@ import Observation
         case .stopSyncing:
             OwnerWording.line(.conflict)
         }
+    }
+
+    /// What a change refused on a version the copy still reads says: the change made elsewhere shows once the copy has it.
+    static var catchingUpLine: String {
+        String(localized: "It was changed on another device, so yours wasn’t kept. This Mac will show the change once it catches up.")
     }
 
     /// What a folder holds, as the list and the Folder section say it: its types and its tier.

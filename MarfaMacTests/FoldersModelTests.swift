@@ -156,7 +156,7 @@ import Testing
         model.removalDraft = "40"
         await model.commitLimit(.removalLimit, explicitly: false)
         let asked = try #require(model.question)
-        #expect(asked.kind == .loosen(.removalLimit, files: 40))
+        #expect(asked.kind == .loosen(.removalLimit, files: 40, base: try #require(model.settings["a"])))
         #expect(asked.message.contains("10") && asked.message.contains("40"))
         await model.commitLimit(.removalLimit)
         #expect(calls.changes.isEmpty)
@@ -176,6 +176,52 @@ import Testing
         await model.commitLimit(.removalLimit, explicitly: false)
         #expect(model.question == nil)
         #expect(try await calls.settings(of: "a").removalThreshold.files == 4)
+    }
+
+    @Test func raiseLimitSendsWhatItAskedOnTheVersionSeenWhateverIsReadMeanwhile() async throws {
+        let bench = OwnerBench()
+        let calls = FakeFolderCalls(FakeFolderCalls.folder("a", "Studio Notes"))
+        let model = await opened(bench, calls)
+
+        model.removalDraft = "40"
+        await model.commitLimit(.removalLimit)
+        let asked = try #require(model.question)
+        calls.changeElsewhere("a", .removalThreshold(RemovalThreshold(files: 8)))
+        await model.loadFolder("a")
+        await model.commitLimit(.removalLimit, explicitly: false)
+        #expect(model.question == asked)
+
+        await model.confirm(asked)
+        #expect(calls.changes.map(\.baseVersion) == [1])
+        #expect(try await calls.settings(of: "a").removalThreshold.files == 8)
+        #expect(model.removalDraft == "40")
+        #expect(model.errors[.removalLimit]?.contains("8") == true)
+    }
+
+    @Test func aConflictTheCopyCannotShowYetSendsNothingUntilItCatchesUp() async throws {
+        let bench = OwnerBench()
+        let calls = FakeFolderCalls(FakeFolderCalls.folder("a", "Studio Notes"))
+        let model = await opened(bench, calls)
+
+        model.removalDraft = "5"
+        calls.changeElsewhere("a", .removalThreshold(RemovalThreshold(files: 8)), copyLags: true)
+        await model.commitLimit(.removalLimit)
+        #expect(calls.changes.count == 1)
+        #expect(model.errors[.removalLimit] == FoldersModel.catchingUpLine)
+        #expect(model.removalDraft == "5")
+
+        await model.commitLimit(.removalLimit)
+        #expect(calls.changes.count == 1)
+
+        calls.catchUp("a")
+        await model.commitLimit(.removalLimit)
+        #expect(calls.changes.count == 1)
+        #expect(model.errors[.removalLimit]?.contains("8") == true)
+        #expect(model.removalDraft == "5")
+
+        await model.commitLimit(.removalLimit)
+        #expect(calls.changes.last?.baseVersion == 2)
+        #expect(try await calls.settings(of: "a").removalThreshold.files == 5)
     }
 
     @Test func aLimitOutsideTheContractsRangeIsRefusedBeforeItIsSent() async {
@@ -220,12 +266,15 @@ import Testing
 }
 
 /// The working copy's folder calls, scripted: each folder is held at a version, a change based on another version is a
-/// conflict, as the server answers one to the same setting, and every change and stop is counted.
+/// conflict, as the server answers one to the same setting, and every change and stop is counted. A copy that lags reads
+/// a folder as it was until it catches up.
 nonisolated final class FakeFolderCalls: FolderCalls {
     struct State {
         var folders: [String: FolderSettingsReading] = [:]
         var changes: [(id: String, change: FolderSettingChange, baseVersion: Int64)] = []
         var stops: [String] = []
+        /// What the copy reads for a folder changed elsewhere that it has not caught up with.
+        var lagging: [String: FolderSettingsReading] = [:]
     }
 
     let state = Mutex(State())
@@ -244,16 +293,21 @@ nonisolated final class FakeFolderCalls: FolderCalls {
     var stops: [String] { state.withLock { $0.stops } }
 
     /// Changes a folder as another device would, taking it to the next version.
-    func changeElsewhere(_ id: String, _ change: FolderSettingChange) {
+    func changeElsewhere(_ id: String, _ change: FolderSettingChange, copyLags: Bool = false) {
         state.withLock { state in
             guard let folder = state.folders[id] else { return }
+            if copyLags, state.lagging[id] == nil { state.lagging[id] = folder }
             state.folders[id] = Self.applying(change, to: folder)
         }
     }
 
+    func catchUp(_ id: String) {
+        state.withLock { _ = $0.lagging.removeValue(forKey: id) }
+    }
+
     func settings(of id: String) async throws(OwnerFailure) -> FolderSettingsReading {
         try state.withLock { state throws(OwnerFailure) in
-            guard let folder = state.folders[id] else { throw .notFound }
+            guard let folder = state.lagging[id] ?? state.folders[id] else { throw .notFound }
             return folder
         }
     }
@@ -268,8 +322,6 @@ nonisolated final class FakeFolderCalls: FolderCalls {
             return changed
         }
     }
-
-    func release() async {}
 
     func stopSyncing(_ id: String) async throws(OwnerFailure) {
         try state.withLock { state throws(OwnerFailure) in
