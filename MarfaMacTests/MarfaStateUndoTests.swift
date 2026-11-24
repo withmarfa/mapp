@@ -59,6 +59,11 @@ import Testing
         #expect(source.writes.isEmpty)
         #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.changedSince, count: 1))
         #expect(library.item(F.n1)?.state == .archived)
+
+        // The Undo made nothing, so its Redo says so in its own words.
+        undo.redo()
+        #expect(source.writes.isEmpty)
+        #expect(library.notices.waiting.last?.message == String(localized: "That change wasn’t made, so there is nothing to redo here."))
     }
 
     @Test func anUndoOfBinningAnArchivedItemLeavesItArchived() async throws {
@@ -86,7 +91,7 @@ import Testing
         // Redo has nothing to put back, since the Undo made nothing.
         undo.redo()
         #expect(source.writes == [.transition(F.n1, .active)])
-        #expect(library.notices.waiting.last?.message == String(localized: "That change wasn’t made, so there is nothing to undo here."))
+        #expect(library.notices.waiting.last?.message == String(localized: "That change wasn’t made, so there is nothing to redo here."))
     }
 
     @Test func aRedoAfterThatMovesTheItemToTheBinAgain() async throws {

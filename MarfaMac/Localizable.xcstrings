@@ -6120,6 +6120,9 @@
     "That change wasn’t made, so there is nothing to undo here." : {
       "extractionState" : "manual"
     },
+    "That change wasn’t made, so there is nothing to redo here." : {
+      "extractionState" : "manual"
+    },
     "That didn’t work. Try again in a moment." : {
       "extractionState" : "manual"
     },

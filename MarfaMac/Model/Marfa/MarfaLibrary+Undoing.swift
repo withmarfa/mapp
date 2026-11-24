@@ -52,11 +52,19 @@ extension MarfaLibrary {
     }
 
     private func run(_ step: UndoStep) {
-        if step.counterpartOf?.wasMade == false {
-            return notices.tell(step.name, String(localized: "That change wasn’t made, so there is nothing to undo here."))
-        }
         // Run by the undo manager, which has already taken the step off its stack. Anything else is an undo.
-        within(UndoRun(step: step, undoing: step.manager?.isRedoing != true)) { step.handler(self) }
+        let run = UndoRun(step: step, undoing: step.manager?.isRedoing != true)
+        within(run) {
+            guard step.counterpartOf?.wasMade != false else { return notices.tell(step.name, notMade) }
+            step.handler(self)
+        }
+    }
+
+    /// Tells the person that the step run undoes or redoes a change that was not made.
+    var notMade: String {
+        undoRun?.undoing == false
+            ? String(localized: "That change wasn’t made, so there is nothing to redo here.")
+            : String(localized: "That change wasn’t made, so there is nothing to undo here.")
     }
 
     func within(_ run: UndoRun?, _ action: () -> Void) {

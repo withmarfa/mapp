@@ -428,9 +428,7 @@ extension MarfaLibrary {
         let made = StateMoves()
         for (id, change) in changes { move(id, change, recordingIn: made, name: name) }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            guard !made.moves.isEmpty else {
-                return library.notices.tell(name, String(localized: "That change wasn’t made, so there is nothing to undo here."))
-            }
+            guard !made.moves.isEmpty else { return library.notices.tell(name, library.notMade) }
             library.setStates(made.moves.mapValues { (from: $0.to, to: $0.from) }, name: name, undoManager: undoManager)
         }
     }
