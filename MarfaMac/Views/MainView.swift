@@ -411,12 +411,16 @@ struct MainView: View {
     private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }
 
     /// Opens the item a `marfa://` link named in this window (`Browser.open(itemLink:)`), once it has restored what it
-    /// showed. The opener checked the link against this window's library; this window only shows the item.
+    /// showed. The opener checks the link against this window's library; this window only shows the item.
     private func takeItemLink() {
-        guard isRestored, let itemLinks, let item = itemLinks.take(for: browser, in: library) else { return }
-        // Version History takes the whole window, which would hide the item.
-        details.leaveHistory()
-        browser.open(itemLink: item, in: library, order: order)
+        guard isRestored, let itemLinks else { return }
+        let library = library
+        Task {
+            guard let item = await itemLinks.take(for: browser, in: library), library === self.library else { return }
+            // Version History takes the whole window, which would hide the item.
+            details.leaveHistory()
+            browser.open(itemLink: item, in: library, order: order)
+        }
     }
 
     #if DEBUG

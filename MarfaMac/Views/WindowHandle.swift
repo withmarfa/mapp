@@ -10,6 +10,7 @@ import SwiftUI
 
     /// True from before the view reaches its window until the window closes.
     var isOpen: Bool { !isClosed }
+    var whenClosed: (() -> Void)?
 
     /// Shows the window in front of the app's others and makes it key, bringing it back from the Dock first.
     func bringForward() {
@@ -23,7 +24,12 @@ import SwiftUI
         self.window = window
         if let closing { NotificationCenter.default.removeObserver(closing) }
         closing = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) {
-            [weak self] _ in MainActor.assumeIsolated { self?.isClosed = true }
+            [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, !self.isClosed else { return }
+                self.isClosed = true
+                self.whenClosed?()
+            }
         }
     }
 

@@ -85,11 +85,42 @@ struct ItemLinkRouteTests {
         var current: ItemLinkOpener.Standing { .init(mode: mode, library: mode == .marfa ? library : nil) }
     }
 
-    /// Records requests to bring the test window forward.
+    /// Records requests to bring the test window forward, and closes as a window does.
     @MainActor final class FakeWindow: ItemLinkWindow {
         var isOpen = true
+        var whenClosed: (() -> Void)?
         private(set) var broughtForward = 0
         func bringForward() { broughtForward += 1 }
+
+        func close() {
+            isOpen = false
+            whenClosed?()
+        }
+    }
+
+    /// A main window as `MainView` is one: it tries to take the link each time the request changes.
+    @MainActor final class FakeMainWindow {
+        let browser = Browser()
+        let window = FakeWindow()
+        private(set) var opened: [ItemID] = []
+        private let opener: ItemLinkOpener
+        private let library: FakeItemLibrary
+
+        init(_ opener: ItemLinkOpener, showing library: FakeItemLibrary) {
+            self.opener = opener
+            self.library = library
+            opener.register(browser, window: window)
+            watch()
+        }
+
+        private func watch() {
+            withObservationTracking { _ = opener.request } onChange: {
+                Task { @MainActor in
+                    self.watch()
+                    if let item = await self.opener.take(for: self.browser, in: self.library) { self.opened.append(item.id) }
+                }
+            }
+        }
     }
 
     @MainActor private func opener(
@@ -185,8 +216,8 @@ struct ItemLinkRouteTests {
         opener.receive([link().url])
         #expect(await eventually { opener.request != nil })
         #expect(opened == 0, "a window in front opens it, so no other is asked for")
-        #expect(opener.take(for: behind, in: library) == nil, "another window leaves it")
-        let item = try #require(opener.take(for: browser, in: library))
+        #expect(await opener.take(for: behind, in: library) == nil, "another window leaves it")
+        let item = try #require(await opener.take(for: browser, in: library))
         #expect(item.id == Self.item && opener.request == nil)
         #expect(window.broughtForward == 1)
         browser.open(itemLink: item, in: library, order: ItemOrder(), defaults: defaults(opening: .modal))
@@ -206,9 +237,9 @@ struct ItemLinkRouteTests {
         #expect(opened == 1)
         let browser = Browser()
         opener.register(browser, window: FakeWindow())
-        #expect(opener.take(for: browser, in: FakeItemLibrary()) == nil, "a window still on another library leaves it")
+        #expect(await opener.take(for: browser, in: FakeItemLibrary()) == nil, "a window still on another library leaves it")
         #expect(opener.request != nil)
-        #expect(try #require(opener.take(for: browser, in: library)).id == Self.item)
+        #expect(try #require(await opener.take(for: browser, in: library)).id == Self.item)
     }
 
     @MainActor @Test func aRequestForALibraryTheWindowsHaveLeftIsDropped() async {
@@ -219,7 +250,7 @@ struct ItemLinkRouteTests {
         #expect(await eventually { opener.request != nil })
         let other = self.library()
         standing.library = other
-        #expect(opener.take(for: Browser(), in: other) == nil, "the link was checked against the library before")
+        #expect(await opener.take(for: Browser(), in: other) == nil, "the link was checked against the library before")
         #expect(opener.request == nil)
     }
 
@@ -247,7 +278,7 @@ struct ItemLinkRouteTests {
         opener.receive([link().url])
         #expect(await eventually { opener.request != nil })
         #expect(opened == 0)
-        #expect(try #require(opener.take(for: browser, in: library)).id == Self.item)
+        #expect(try #require(await opener.take(for: browser, in: library)).id == Self.item)
     }
 
     @MainActor @Test func aClosedWindowIsNeverChosen() async throws {
@@ -265,22 +296,133 @@ struct ItemLinkRouteTests {
         #expect(opened == 1, "so a main window is opened for the link")
         let fresh = Browser()
         opener.register(fresh, window: FakeWindow())
-        #expect(try #require(opener.take(for: fresh, in: library)).id == Self.item)
+        #expect(try #require(await opener.take(for: fresh, in: library)).id == Self.item)
     }
 
-    @MainActor @Test func aWindowThatClosesAfterTheLinkLeavesItToAnother() async throws {
+    @MainActor @Test func aWindowThatClosesBeforeTakingTheLinkLeavesItToAnother() async {
         let library = library()
         let target = Browser()
         let (opener, _) = opener(Standing(.marfa, library), front: target)
         let window = FakeWindow()
         opener.register(target, window: window)
+        let other = FakeMainWindow(opener, showing: library)
+        var opened = 0
+        opener.openMainWindow = { opened += 1 }
         opener.receive([link().url])
         #expect(await eventually { opener.request != nil })
-        let other = Browser()
-        opener.register(other, window: FakeWindow())
-        #expect(opener.take(for: other, in: library) == nil)
-        window.isOpen = false
-        #expect(try #require(opener.take(for: other, in: library)).id == Self.item)
+        // Lets the other window see the request, which is not its own.
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(other.opened.isEmpty && opener.request != nil)
+        window.close()
+        #expect(await eventually { other.opened == [Self.item] })
+        #expect(opened == 0)
+    }
+
+    @MainActor @Test func theLastWindowClosingBeforeTakingTheLinkAsksForAnother() async {
+        let library = library()
+        let target = Browser()
+        let (opener, _) = opener(Standing(.marfa, library), front: target)
+        let window = FakeWindow()
+        opener.register(target, window: window)
+        var opened = 0
+        opener.openMainWindow = { opened += 1 }
+        opener.receive([link().url])
+        #expect(await eventually { opener.request != nil })
+        window.close()
+        #expect(await eventually { opened == 1 })
+        let fresh = FakeMainWindow(opener, showing: library)
+        // The fresh window takes the link as it does once restored.
+        #expect(await opener.take(for: fresh.browser, in: library)?.id == Self.item)
+    }
+
+    // MARK: Delivery
+
+    @MainActor @Test func aCopyThatNowHoldsAnotherMarfaOpensNothingAtDelivery() async {
+        let library = library()
+        let browser = Browser()
+        let (opener, notices) = opener(Standing(.marfa, library), front: browser)
+        opener.register(browser, window: FakeWindow())
+        opener.receive([link().url])
+        #expect(await eventually { opener.request != nil })
+        // The copy filled from another Marfa at the same address, which holds an item with the same id.
+        library.heldInstanceID = Self.other
+        #expect(await opener.take(for: browser, in: library) == nil)
+        #expect(opener.request == nil)
+        #expect(notices.waiting.map(\.message) == [ItemLinkRefusal.otherMarfa.message])
+    }
+
+    @MainActor @Test func deliveryWaitsOnlySoLongForTheCopy() async {
+        let library = library()
+        let browser = Browser()
+        let (opener, notices) = opener(Standing(.marfa, library), limit: .milliseconds(300), front: browser)
+        opener.register(browser, window: FakeWindow())
+        opener.receive([link().url])
+        #expect(await eventually { opener.request != nil })
+        library.instanceIDDelay = .seconds(90)
+        #expect(await opener.take(for: browser, in: library) == nil)
+        #expect(notices.waiting.map(\.message) == [ItemLinkRefusal.stillOpening.message])
+    }
+
+    @MainActor @Test func aNewerLinkDuringDeliveryStopsTheOlderOne() async {
+        let library = library()
+        let browser = Browser()
+        let (opener, notices) = opener(Standing(.marfa, library), front: browser)
+        opener.register(browser, window: FakeWindow())
+        opener.receive([link().url])
+        #expect(await eventually { opener.request != nil })
+        library.instanceIDDelay = .seconds(90)
+        let older = Task { await opener.take(for: browser, in: library) }
+        // Lets the delivery start asking the copy which Marfa it is.
+        try? await Task.sleep(for: .milliseconds(100))
+        opener.receive([url("marfa://nothing")])
+        #expect(await older.value == nil)
+        #expect(notices.waiting.map(\.message) == [ItemLinkRefusal.malformed.message])
+    }
+
+    // MARK: Asking for a main window
+
+    @MainActor @Test func aMainWindowAskedForIsAskedForOnceUntilOneAppears() async {
+        let library = library()
+        let (opener, notices) = opener(Standing(.marfa, library))
+        var opened = 0
+        opener.openMainWindow = { opened += 1 }
+        opener.receive([link().url])
+        #expect(await eventually { opened == 1 })
+        opener.receive([url("marfa://nothing")])
+        opener.receive([link(Self.other).url])
+        #expect(await eventually { notices.told == 2 })
+        #expect(opened == 1, "the window asked for has yet to appear")
+        let window = FakeMainWindow(opener, showing: library)
+        window.window.close()
+        opener.receive([url("marfa://nothing")])
+        #expect(opened == 2, "the window that appeared has closed")
+    }
+
+    @MainActor @Test func aLinkBeforeAnySceneIsServedWhenTheFirstSceneAppears() async {
+        let (opener, notices) = opener(Standing(.unconfigured))
+        opener.receive([link().url])
+        #expect(await eventually { notices.told == 1 })
+        var opened = 0
+        // Settings or an item's window appears, and no main window.
+        opener.openMainWindow = { opened += 1 }
+        #expect(await eventually { opened == 1 })
+        opener.openMainWindow = { opened += 1 }
+        // Gives a second scene's appearance the chance to ask again, which it must not.
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(opened == 1)
+    }
+
+    @MainActor @Test func aMainWindowAppearingAtLaunchIsTheOnlyOneForALinkBeforeAnyScene() async {
+        let (opener, notices) = opener(Standing(.unconfigured))
+        opener.receive([url("marfa://nothing")])
+        #expect(notices.told == 1)
+        var opened = 0
+        // The main window appears by itself: it gives the way to open windows and counts itself in the same update.
+        opener.openMainWindow = { opened += 1 }
+        opener.register(Browser(), window: FakeWindow())
+        // Gives the waiting ask the chance to open a window, which it must not.
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(opened == 0)
     }
 
     @MainActor @Test func anItemInRecentlyDeletedIsRefusedBeforeAnyWindowMoves() async {
@@ -308,7 +450,7 @@ struct ItemLinkRouteTests {
         #expect(await eventually { opener.request != nil })
         let index = try #require(library.items.firstIndex { $0.id == Self.item })
         library.items[index].state = .trashed
-        #expect(opener.take(for: browser, in: library) == nil)
+        #expect(await opener.take(for: browser, in: library) == nil)
         #expect(opener.request == nil)
         #expect(notices.waiting.map(\.message) == [ItemLinkRefusal.inRecentlyDeleted.message])
     }
@@ -380,7 +522,7 @@ struct ItemLinkRouteTests {
         opener.receive([kind == "refused" ? link(Self.other).url : url("marfa://\(Self.instance)")])
         #expect(opener.request == nil, "the window must not open the older link after telling the newer one")
         #expect(await eventually { notices.told == 1 })
-        #expect(opener.take(for: browser, in: library) == nil)
+        #expect(await opener.take(for: browser, in: library) == nil)
     }
 
     @MainActor @Test func theLastOfSeveralLinksIsTheOneTaken() async {

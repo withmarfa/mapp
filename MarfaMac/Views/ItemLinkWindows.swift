@@ -2,8 +2,8 @@ import SwiftUI
 
 extension View {
     /// Gives `opener` this window's way to open a main window, for an item link that comes while none is open. Any of
-    /// the app's windows gives it, since only a view can open a window and the link may come while only Settings or an
-    /// item's window is open.
+    /// the app's windows gives it, since only a view can open a window and the link may come before any window appears
+    /// or while only Settings or an item's window is open.
     func opensItemLinks(_ opener: ItemLinkOpener) -> some View {
         modifier(ItemLinkWindows(opener: opener))
     }
