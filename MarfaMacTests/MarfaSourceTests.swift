@@ -769,8 +769,8 @@ struct MarfaSourceOfflineTests {
         #expect(try await Self.following([create, save], on: 0, held: 3) == 3)
     }
 
-    /// An answer that names no version, or an unchanged acknowledgement that made none, proves no version holds the
-    /// person's text, so the text stays where it was, whatever order the answers are read in.
+    /// An answer that names no version proves no version holds the person's text, so the text stays where it was,
+    /// whatever order the answers are read in.
     @Test func anAnswerWithNoVersionLeavesTheTextWhereItWas() async throws {
         let named = Self.answered("named", .accepted, made: 7, holding: "Mine")
         let plain = Self.answered("plain", .accepted)
