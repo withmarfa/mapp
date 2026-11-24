@@ -271,8 +271,12 @@ import os
             }
         }
         guard !isBusy, source == nil, let saved = defaults.string(forKey: Self.addressKey) else { return }
-        guard let connection = try? MarfaConnection(address: saved) else {
-            unusableAddress = saved
+        let connection: MarfaConnection
+        do {
+            connection = try MarfaConnection(address: saved)
+        } catch {
+            // Only an address with more after the server's is told: the app saves no other address that fails.
+            if error == .hasMore { unusableAddress = saved }
             return
         }
         isBusy = true
