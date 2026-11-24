@@ -51,6 +51,7 @@ The item editor's page: TypeScript on Inkkit, built by Vite into one self-contai
 ## Bridge
 
 - The bridge has two sides: `editor/src/bridge.ts` and `MarfaMac/Editor/EditorMessages.swift`. Change both in the same commit.
+- `editor/bridge-messages.json` lists every message, request and `window.editor` function; `test/bridge-messages.test.ts` and `MarfaMacTests/EditorBridgeTests.swift` read it, so edit it with the change.
 - After each `load` the page posts `painted` with its generation once the browser has drawn the document, and not if a later `load` or `reload` has given the page another generation by then. The app ends its `item.open` signpost there.
 - The page posts `headings` (Inkkit's `headings()` as `{level, text}` in document order, the ordinal being the index, a heading with no words included) with its generation after each `load` and `reload`, and after an edit only when the list differs from the last one posted for that generation. It is the only source of the sidebar's Outline.
 

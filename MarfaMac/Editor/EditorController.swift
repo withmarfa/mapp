@@ -6,12 +6,11 @@ import WebKit
 
 private let log = Telemetry.logger(.editor)
 
-/// One window's editor: a web page running the formatted markdown editor, loaded when the window opens so
-/// the first item shows without a wait, and reused for every item the window shows.
+/// One window's Markdown editor. Its web page loads when the window opens and serves every item the window shows.
 @Observable
 final class EditorController: NSObject {
-    private(set) var caret = CaretState()
-    private(set) var isReady = false
+    var caret = CaretState()
+    var isReady = false
     /// The load whose page stopped answering a flush and was given up on, so the next flush goes ahead without it.
     @ObservationIgnored var abandonedGeneration: Int?
     /// The page went down after it had been ready, holding an item the person could edit (`pageWentDown`). Cleared once
@@ -39,19 +38,19 @@ final class EditorController: NSObject {
         didSet { if isFocused != oldValue { sendHostActivation() } }
     }
     /// Whether the item's header in the page has gone under the toolbar, which then shows the title.
-    private(set) var isHeaderScrolledAway = false
+    var isHeaderScrolledAway = false
     /// Whether the page has scrolled far enough for its text to pass under the toolbar, which then gets a band of
     /// glass to read against. At the top, and on a page too short to scroll, nothing is behind the toolbar.
-    private(set) var isContentUnderToolbar = false
+    var isContentUnderToolbar = false
     /// Whether the item's title in the page has the keyboard rather than the item's text.
-    private(set) var isEditingTitle = false
+    var isEditingTitle = false
     /// The headings the page reported for the item on it, which the sidebar's Outline lists and reveals. Nil until the
     /// page has reported for the load now on it.
-    private(set) var outline: PageOutline?
+    var outline: PageOutline?
     @ObservationIgnored private(set) var header: PageHeader?
-    @ObservationIgnored private var headerIconSize: Int?
+    @ObservationIgnored var headerIconSize: Int?
     /// The types' icons the page already has, so it is sent more only when a header needs one it lacks.
-    @ObservationIgnored private var headerTypeIcons: Set<String?> = []
+    @ObservationIgnored var headerTypeIcons: Set<String?> = []
     /// What the person does in the page's item header, for the window showing it to carry out.
     @ObservationIgnored var onHeaderEvent: (PageHeaderEvent) -> Void = { _ in }
     /// The window's drafts of item titles, which are saved before the window closes or the library changes.
@@ -150,8 +149,8 @@ final class EditorController: NSObject {
     /// Whether the page is showing this item's header, which an item of a type with no text is too: it has no item on
     /// the page (`pageItemID`), only its header. What the page sends for any other item is stale.
     func isShowing(_ id: ItemID) -> Bool { requestedItemID == id }
-    @ObservationIgnored private var markdown = ""
-    @ObservationIgnored private var read = ItemVersion(0)
+    @ObservationIgnored var markdown = ""
+    @ObservationIgnored var read = ItemVersion(0)
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
     /// item still reaches that item rather than the one now showing, and an edit typed before the page took in
     /// newer text says it was typed on the older text.
@@ -160,9 +159,9 @@ final class EditorController: NSObject {
         // again) means the frame an open waits for will never be reported, so the open is dropped with no sample.
         didSet { if opening?.generation != generation { opening = nil } }
     }
-    @ObservationIgnored private var shown: [Int: Shown] = [:]
+    @ObservationIgnored var shown: [Int: Shown] = [:]
 
-    private struct Shown {
+    struct Shown {
         let id: ItemID
         /// The version of the text the page holds for this generation.
         var read: ItemVersion
@@ -170,18 +169,18 @@ final class EditorController: NSObject {
     @ObservationIgnored private var loadRequest = 0
     @ObservationIgnored private var closeDelegate: EditorCloseDelegate?
     /// Where the keyboard goes once the page shows the item: its text, after `caret` where given, or its title.
-    private struct FocusWish: Equatable {
+    struct FocusWish: Equatable {
         let id: ItemID
         let onTitle: Bool
         let caret: PageCaret?
     }
-    @ObservationIgnored private var wantsFocus: FocusWish?
+    @ObservationIgnored var wantsFocus: FocusWish?
     @ObservationIgnored var style = PageStyle()
     /// A Format command's chosen shortcut, or nothing for one the person cleared; a command not here has its default.
     @ObservationIgnored var formatShortcuts: [Format: Shortcut?] = [:]
-    @ObservationIgnored private var pageURL: URL?
+    @ObservationIgnored var pageURL: URL?
     /// The latest load of the page itself, so only its own failure counts as the page failing to load.
-    @ObservationIgnored private(set) var pageNavigation: WKNavigation?
+    @ObservationIgnored var pageNavigation: WKNavigation?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
     @ObservationIgnored var printRenderer: PrintDocumentRenderer?
 
@@ -338,7 +337,7 @@ final class EditorController: NSObject {
 
     /// The open waiting for its item's first frame, which only the page's `painted` for its generation ends. Leaving
     /// the item, or another generation on the page, drops it unended.
-    @ObservationIgnored private(set) var opening: (generation: Int, interval: Telemetry.Interval)?
+    @ObservationIgnored var opening: (generation: Int, interval: Telemetry.Interval)?
 
     @ObservationIgnored private var headerSource: () -> PageHeader? = { nil }
     /// Only the latest reading of the header follows changes, so readings never pile up.
@@ -372,7 +371,7 @@ final class EditorController: NSObject {
         if isReady { sendHeader() }
     }
 
-    private func sendHeader() {
+    func sendHeader() {
         if let size = header?.interfaceTextSize {
             let needed = header?.typeIconNames ?? []
             if size != headerIconSize || !needed.isSubset(of: headerTypeIcons) {
@@ -547,7 +546,7 @@ final class EditorController: NSObject {
         sendHostActivation()
     }
 
-    private func sendHostActivation() {
+    func sendHostActivation() {
         guard isReady else { return }
         call("setHostActive", String(isFocused && webView.window?.isKeyWindow == true))
     }
@@ -610,7 +609,7 @@ final class EditorController: NSObject {
         String(decoding: (try? JSONEncoder().encode(value)) ?? Data("null".utf8), as: UTF8.self)
     }
 
-    // MARK: Hearing from the page
+    // MARK: Reporting the page’s edits
 
     /// Hands an edit to the library with the version of the text it was typed on. Where the library still holds
     /// what the page last reported, the page's text is the library's at its version now, as after the library
@@ -637,7 +636,7 @@ final class EditorController: NSObject {
     /// Starts a generation for what the page loads next. A late report belongs to one of the last few loads, however
     /// quickly outside changes came in; one for an older load is handed back (`report`). An emptied page's generation
     /// belongs to no item.
-    private func nextGeneration(showing page: Shown?) {
+    func nextGeneration(showing page: Shown?) {
         generation += 1
         shown = shown.filter { $0.key >= generation - 8 }
         shown[generation] = page
@@ -645,220 +644,8 @@ final class EditorController: NSObject {
 
     /// An edit the app cannot place, for a load no longer kept or in a message that did not decode, may be the only
     /// copy of what the person typed, so it goes back to them. `kind` is for the log, which never carries the text.
-    private func handBack(_ markdown: String, kind: StaticString, reason: String) {
+    func handBack(_ markdown: String, kind: StaticString, reason: String) {
         log.error("handed back \(String(describing: kind), privacy: .public)")
         library?.notices.notKept(String(localized: "Couldn’t Save Your Typing"), text: markdown, reason: reason)
-    }
-
-    /// A message that did not decode. A change whose text is still readable is handed back; anything else is only logged.
-    fileprivate func receiveUnreadable(_ body: Any) {
-        // The body may hold text, which does not belong in the log; its type says what went wrong.
-        log.error("unreadable message of type \(String(describing: (body as? [String: Any])?["type"]), privacy: .public)")
-        guard let markdown = EditorMessage.unreadableChange(body) else { return }
-        handBack(markdown, kind: "an edit that did not decode", reason: String(localized: "The editor sent your typing in a form the app couldn’t read."))
-    }
-
-    fileprivate func receive(_ message: EditorMessage) {
-        switch message {
-        case .ready:
-            releaseHeldEdit()
-            outline = nil
-            isReady = true
-            reloadWatch?.cancel()
-            sendHostActivation()
-            applyAccent()
-            applyKeymap()
-            applyStyle()
-            watchLinks()
-            // A reloaded page starts at the top, and says nothing while it stays there.
-            isHeaderScrolledAway = false
-            isContentUnderToolbar = false
-            isEditingTitle = false
-            headerIconSize = nil
-            headerTypeIcons = []
-            sendHeader()
-            if let pageItemID {
-                embeds.version += 1
-                call("setItem", json(pageItemID.rawValue))
-                nextGeneration(showing: Shown(id: pageItemID, read: read))
-                call("load", json(markdown), String(generation), String(isEditable))
-                applyEditingMode()
-            }
-            // A page that ends again before it has shown the item cannot come back: the item may be what ends it.
-            if pageItemID == nil { pageLoss = nil } else { pageLoss?.loadedAgain = generation }
-            if pageLoss != nil { watchSettling() }
-            if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
-            appendPendingEmbeds()
-        case .headings(let headings, let generation):
-            let accepted = PageOutline.accepting(headings, generation: generation, current: self.generation, item: shown[generation]?.id)
-            if accepted != outline { outline = accepted }
-        case .painted(let generation):
-            pageWorks(in: generation)
-            guard let open = opening, open.generation == generation else { return }
-            open.interval.end()
-            opening = nil
-        case .changed(let markdown, let generation):
-            // A page that reports again is answering, so the next flush waits for it as before.
-            if generation == abandonedGeneration { abandonedGeneration = nil }
-            pageWorks(in: generation)
-            if isWritingToolsActive() { return holdEdit(markdown, of: generation) }
-            report(markdown, of: generation)
-        case .state(let state):
-            guard state.generation == generation else { return }
-            if state != caret { caret = state }
-            if !state.sourceMode { appendPendingEmbeds() }
-        case .headerScrolledAway(let away, let generation):
-            guard generation == self.generation, away != isHeaderScrolledAway else { return }
-            isHeaderScrolledAway = away
-        case .contentUnderToolbar(let under, let generation):
-            guard generation == self.generation, under != isContentUnderToolbar else { return }
-            isContentUnderToolbar = under
-        case .titleFocus(let focused):
-            isEditingTitle = focused
-            if focused { webView.beginEditingTitle() }
-        case .titleInput(let item, let text):
-            onHeaderEvent(.titleInput(item, text))
-        case .titleCommit(let item, let text, let startWriting):
-            onHeaderEvent(.titleCommit(item, text, startWriting: startWriting))
-        case .titleDiscard(let item):
-            onHeaderEvent(.titleDiscard(item))
-        case .headerMenu(let menu, let item, let rect, let viewportHeight):
-            onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
-        case .editValue(let item, let row, let rect, let viewportHeight):
-            onHeaderEvent(.edit(row: row, item, containerRect(rect, viewportHeight: viewportHeight)))
-        case .fieldMenu(let item, let row, let editsValue, let rect, let viewportHeight):
-            onHeaderEvent(.fieldMenu(row: row, editsValue: editsValue, item, containerRect(rect, viewportHeight: viewportHeight)))
-        case .valueMoved(let item, let row, let rect, let viewportHeight):
-            // The value's editor follows it, which is the presenter's to say whether there is one open for it.
-            ValueEditPresenter.shared.valueMoved(item: item, row: row, to: containerRect(rect, viewportHeight: viewportHeight))
-        case .moveRow(let item, let row, let order):
-            onHeaderEvent(.moveRow(row: row, order: order, item))
-        case .toggleLayout:
-            onHeaderEvent(.toggleLayout)
-        case .showLinked:
-            onHeaderEvent(.showLinked)
-        case .openLink(let href):
-            // The page has already refused what Inkkit's `canOpenLink` does not allow.
-            openAddress(href)
-        case .openItem(let id):
-            onOpenItem(id)
-        case .copy(let text):
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-        case .escape:
-            onEscape()
-        case .pasteImages:
-            insertImages(PastedImages.sources(on: .general))
-        case .openEmbed(let item, let reference):
-            openEmbed(reference, in: item)
-        case .quickLookEmbed(let item, let reference):
-            quickLookEmbed(reference, in: item)
-        case .openItemLink(let item, let link):
-            Task { await openItemLink(link, from: item) }
-        case .linkMenu(let item, let generation, let target, let point, let viewportHeight):
-            showLinkMenu(for: target, in: item, generation: generation, at: point, viewportHeight: viewportHeight)
-        case .embedMenu(let embed):
-            menuEmbed = embed
-        case .rowMenu(let row):
-            menuRow = row
-        case .find(let state):
-            guard state.generation == generation else { return }
-            pageFinder.update(state)
-        case .diagnostic(let message):
-            log.notice("preview diagnostic: \(message)")
-        case .hiddenText:
-            // Inkkit reports none of the refused input, so it can't be kept for the person: they are told it was not added.
-            library?.notices.tell(Self.hiddenTextTitle, Self.hiddenTextMessage)
-        case .error(let message):
-            log.error("page error: \(message)")
-            library?.notices.tell(String(localized: "Editor Couldn’t Complete the Action"), message)
-        }
-    }
-}
-
-private final class MessageProxy: NSObject, WKScriptMessageHandler {
-    weak var target: EditorController?
-
-    init(target: EditorController) {
-        self.target = target
-    }
-
-    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let parsed = EditorMessage(body: message.body) else {
-            target?.receiveUnreadable(message.body)
-            return
-        }
-        target?.receive(parsed)
-    }
-}
-
-extension EditorController: WKNavigationDelegate {
-    /// The page never navigates: a link opens in the browser on Command-click, and nothing else loads but the
-    /// frame a PDF the item embeds shows in.
-    func webView(
-        _ webView: WKWebView,
-        decidePolicyFor action: WKNavigationAction,
-        decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
-    ) {
-        let isEmbed = action.targetFrame?.isMainFrame == false && action.request.url?.scheme == EmbeddedFiles.scheme
-        decisionHandler(action.request.url == pageURL || isEmbed ? .allow : .cancel)
-    }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
-        log.error("navigation failed: \(error.localizedDescription)")
-        pageFailedToLoad(navigation, error)
-    }
-
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
-        log.error("load failed: \(error.localizedDescription)")
-        pageFailedToLoad(navigation, error)
-    }
-
-    /// A page that crashes after working comes back with the item it held, as last reported. One that never got
-    /// going is not retried, since it would only fail again, and neither is one that ended again before it showed the
-    /// item, since the item may be what ends it.
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        Telemetry.editorProcessEnded(wasReady: isReady)
-        guard isReady || pageLoss != nil else { return }
-        let comingBack = isReady && pageLoss == nil
-        releaseHeldEdit()
-        cancelRequests()
-        isReady = false
-        reloadWatch?.cancel()
-        pageWentDown(comingBack: comingBack)
-        guard comingBack, let pageURL else { return }
-        pageNavigation = webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL.deletingLastPathComponent())
-        let losses = pageLosses
-        reloadWatch = Task { [weak self, reloadLimit] in
-            try? await Task.sleep(for: reloadLimit)
-            guard let self, !Task.isCancelled, !isReady, pageLosses == losses else { return }
-            pageWentDown(comingBack: false)
-        }
-    }
-
-    /// A page that came back may never say it showed the item: a hidden window draws no frames, and outside text
-    /// loaded before it painted gives it another generation, for which it posts no `painted`. One that has stayed up
-    /// this long has come back, so only a page that goes down again soon after it came back cannot come back.
-    private func watchSettling() {
-        let losses = pageLosses
-        reloadWatch = Task { [weak self, settleTime] in
-            try? await Task.sleep(for: settleTime)
-            guard let self, !Task.isCancelled, isReady, pageLosses == losses else { return }
-            pageLoss = nil
-        }
-    }
-
-    /// Only the page's own load counts, and only after the page had been ready: one that never got going held nothing
-    /// typed. A load that failed because the process ended is left to `webViewWebContentProcessDidTerminate`, which
-    /// WebKit can call after it, so a page that can come back is reloaded.
-    private func pageFailedToLoad(_ navigation: WKNavigation?, _ error: any Error) {
-        let error = error as NSError
-        if error.domain == WKError.errorDomain, error.code == WKError.webContentProcessTerminated.rawValue { return }
-        guard navigation === pageNavigation, isReady || pageLoss != nil else { return }
-        releaseHeldEdit()
-        cancelRequests()
-        isReady = false
-        reloadWatch?.cancel()
-        pageWentDown(comingBack: false)
     }
 }

@@ -6234,6 +6234,9 @@
     "Some Typing Might Be Missing" : {
 
     },
+    "The editor ran into a problem. If your last change doesn’t show, open the item again." : {
+
+    },
     "The editor sent your typing in a form the app couldn’t read." : {
 
     },
@@ -6289,6 +6292,9 @@
       "extractionState" : "manual"
     },
     "The item could not be prepared for printing." : {
+
+    },
+    "The item couldn’t be prepared for printing. Open the item again, then try again." : {
 
     },
     "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back." : {

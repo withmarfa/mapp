@@ -15,6 +15,7 @@ class ClassifyChangesTests(unittest.TestCase):
             "TestPlans/Unit.xctestplan": {"swift", "logic", "uitests"},
             "MarfaMac.xcodeproj/project.pbxproj": {"instructions", "swift", "logic", "uitests"},
             "editor/src/page.ts": {"editor", "instructions"},
+            "editor/bridge-messages.json": {"editor", "logic", "swift"},
             ".github/workflows/checks.yml": {
                 "classifier", "editor", "instructions", "logic", "scripts", "swift", "uitests", "workflows",
             },

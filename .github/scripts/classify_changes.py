@@ -9,7 +9,7 @@ PATH_RULES = {
     "editor": r"^(editor/|MarfaMac/Editor/Page/|\.github/workflows/checks\.yml\Z)",
     "swift": (
         r"^(MarfaMac/|MarfaMacTests/|MarfaMacUITests/|MarfaMac\.xcodeproj/|"
-        r"TestPlans/|Config/|\.github/scripts/run-unit-tests\.sh\Z|\.github/workflows/checks\.yml\Z)"
+        r"TestPlans/|Config/|editor/bridge-messages\.json\Z|\.github/scripts/run-unit-tests\.sh\Z|\.github/workflows/checks\.yml\Z)"
     ),
     "uitests": r"^(MarfaMacUITests/|TestPlans/|MarfaMac\.xcodeproj/|\.github/workflows/checks\.yml\Z)",
     "scripts": r"^(Scripts/release/|\.github/workflows/checks\.yml\Z)",

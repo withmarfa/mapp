@@ -1,5 +1,8 @@
 import Foundation
+import OSLog
 import WebKit
+
+private let log = Telemetry.logger(.editor)
 
 /// Format > Link: a web, mail or phone address set on the selection, or taken off the link the caret is in.
 extension EditorController {
@@ -38,7 +41,8 @@ extension EditorController {
             // A fault in the page says nothing about the address, so the sheet closes instead of blaming it.
             guard webLinkRequest?.id == request.id else { return true }
             webLinkRequest = nil
-            library?.notices.tell(String(localized: "Editor Couldn’t Complete the Action"), error.localizedDescription)
+            log.error("link address check failed: \(error.localizedDescription)")
+            tellPageFault()
             return true
         }
         // The page was replaced, or the request closed, while the page was asked.
