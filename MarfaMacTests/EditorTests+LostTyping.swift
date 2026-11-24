@@ -61,6 +61,17 @@ extension EditorTests {
         #expect(await Self.flushed(page) == false)
     }
 
+    /// WebKit can fail the page's own load for its process ending before it says the process ended.
+    @Test func aLoadFailureFromTheProcessEndingIsLeftToTheProcessEnding() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        let ended = NSError(domain: WKError.errorDomain, code: WKError.webContentProcessTerminated.rawValue)
+        page.editor.webView(page.editor.webView, didFail: page.editor.pageNavigation, withError: ended)
+        #expect(page.library.notices.waiting.isEmpty)
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        try await page.wait { page.editor.isReady }
+    }
+
     @Test func anEditForALoadNoLongerKeptIsHandedBack() async throws {
         let library = FakeItemLibrary()
         let note = library.add("Original\n")

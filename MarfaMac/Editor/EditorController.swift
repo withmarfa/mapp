@@ -792,12 +792,12 @@ extension EditorController: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
         log.error("navigation failed: \(error.localizedDescription)")
-        pageFailedToLoad(navigation)
+        pageFailedToLoad(navigation, error)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
         log.error("load failed: \(error.localizedDescription)")
-        pageFailedToLoad(navigation)
+        pageFailedToLoad(navigation, error)
     }
 
     /// A page that crashes after working comes back with the item it held, as last reported. One that never got
@@ -816,8 +816,11 @@ extension EditorController: WKNavigationDelegate {
     }
 
     /// Only the page's own load counts, and only after the page had been ready: one that never got going held nothing
-    /// typed.
-    private func pageFailedToLoad(_ navigation: WKNavigation?) {
+    /// typed. A load that failed because the process ended is left to `webViewWebContentProcessDidTerminate`, which
+    /// WebKit can call after it, so a page that can come back is reloaded.
+    private func pageFailedToLoad(_ navigation: WKNavigation?, _ error: any Error) {
+        let error = error as NSError
+        if error.domain == WKError.errorDomain, error.code == WKError.webContentProcessTerminated.rawValue { return }
         guard navigation === pageNavigation, isReady || pageLoss != nil else { return }
         releaseHeldEdit()
         cancelRequests()
