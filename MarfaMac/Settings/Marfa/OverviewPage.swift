@@ -144,7 +144,7 @@ struct OverviewPage: View {
                 }
                 if let undone, let running = updates.status?.running {
                     SettingsProblemRow(
-                        title: Text("The Update to \(undone.release) Didn’t Work"),
+                        title: Text("The update to \(undone.release) didn’t work"),
                         line: Text(
                             undone.result == .putBack
                                 ? "\(host.serverName) is back on \(running), as before. Nothing was lost."
@@ -153,7 +153,7 @@ struct OverviewPage: View {
                 }
                 if lostTrack {
                     SettingsProblemRow(
-                        title: Text("\(host.serverName) Hasn’t Come Back Yet"),
+                        title: Text("\(host.serverName) hasn’t come back yet"),
                         line: Text("The app stopped waiting. Check again to see where it stands."),
                         actions: [SettingsProblemAction("Check Again") { checkAgain() }])
                 }
