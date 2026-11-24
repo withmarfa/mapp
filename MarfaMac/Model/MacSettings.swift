@@ -15,6 +15,7 @@ enum MacSettings {
                 SourceViewMode.key, PlaceDensities.key, PlaceDefaults.key, ItemTableColumnLayouts.key, ViewLayouts.key,
                 PagePlacements.key, IncludedSubtypes.key, SidebarLayouts.defaultsKey, TypeLooks.defaultsKey, SearchLeaveOuts.defaultsKey,
                 ShortcutBindings.defaultsKey, AnyAppShortcuts.defaultsKey, CalendarHourHeight.key, PreferencesSync.beforeSyncKey,
+                AutomaticExport.scheduleKey, AutomaticExport.folderKey, AutomaticExport.lastKey,
             ] + SearchOptions.keys
     }
 

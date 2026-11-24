@@ -103,7 +103,7 @@ enum PreferencesMap {
     ]
 
     /// The settings that stay on this Mac: window sizes and column widths, what is open in the right sidebar, where the
-    /// last window and quick add were, Reopen Windows (the Mac's own answer), consent to error reports, Beta Versions
+    /// last window and quick add were, Reopen Windows (the Mac's own answer), consent to error reports, Export Automatically (which folder and when, on each Mac), Beta Versions
     /// (Sparkle keeps its own keys, which are never synced either), a table's columns (mostly widths), and the copy of
     /// this Mac's settings kept from before the first sync.
     static let staysOnMac: [String] = [
@@ -112,6 +112,7 @@ enum PreferencesMap {
         InterfaceKey.inspectorRelationshipsOpen, InterfaceKey.inspectorLinksInPageOpen, InterfaceKey.inspectorLinkedFromOpen,
         InterfaceKey.inspectorTagsOpen, InterfaceKey.inspectorOutlineOpen, InterfaceKey.inspectorAttachmentsOpen,
         InterfaceKey.inspectorCollectionsOpen, InterfaceKey.inspectorAppOpen, PreferencesSync.beforeSyncKey,
+        AutomaticExport.scheduleKey, AutomaticExport.folderKey, AutomaticExport.lastKey,
     ] + ColumnWidth.allCases.map(\.key)
 
     /// Every defaults key a synced setting reads or writes.

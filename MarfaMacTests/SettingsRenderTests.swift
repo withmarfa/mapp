@@ -361,7 +361,7 @@ struct RenderedWindow<Detail: View>: View {
         library.downloadedFiles = FakeDownloads(
             state: DownloadedFileState(
                 budget: .automatic, limit: 12_000_000_000, bytes: 1_200_000_000,
-                attachments: .init(held: 53, missing: 3, reasons: [MissingAttachments(reason: .waiting, count: 3)])))
+                attachments: .init(held: 53, heldBytes: 640_000_000, missing: 3, reasons: [MissingAttachments(reason: .waiting, count: 3)])))
         let (libraries, bench) = try await connected()
         _ = bench
         try await SettingsRender.png(
