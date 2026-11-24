@@ -14,15 +14,15 @@ struct ItemLinksTests {
 
     @Test func aTitleIsSpelledAsALinkOnlyIfTheCoreReadsItBackWhole() {
         for title in ["Garden ideas", "Café", "Q3: plan", "日本語のノート", "A \"quoted\" title", "back\\slash", "😀 plans", "Plan\\", "a\\b"] {
-            #expect(ItemLinks.spells(title, as: title), "\(title)")
+            #expect(MarfaMac.ItemLinks.spells(title, as: title), "\(title)")
         }
         // Inkkit 0.7.2 and the core read a lone bracket as text, so these stand as `[[Title]]`.
         for title in ["A]B", "a[b", "[c", "[", "c[", "[ [c", "x [y] z"] {
-            #expect(ItemLinks.spells(title, as: title), "\(title.debugDescription)")
+            #expect(MarfaMac.ItemLinks.spells(title, as: title), "\(title.debugDescription)")
         }
         // The core does not read these as a link to the title, whatever the page draws.
         for title in ["", " leading", "trailing ", "A|B", "A#B", "a|b|c", "a#", "a|", "a[b]", "A [x]]", "[[c", "[[[c", "c[[", "a[[b", "a]]b", "[[", "two\nlines", "two\r\nlines"] {
-            #expect(!ItemLinks.spells(title, as: title), "\(title.debugDescription)")
+            #expect(!MarfaMac.ItemLinks.spells(title, as: title), "\(title.debugDescription)")
         }
     }
 
@@ -62,7 +62,7 @@ struct ItemLinksTests {
     @Test func aLargeLibraryIsReadOnceAndAKeystrokeFoldsNothingAgain() async {
         let titles = ["alpha", "beta", "gamma", "delta", "kitchen", "garden", "recipe", "meeting"]
         var items = (0..<20_000).map { note("\(titles[$0 % titles.count]) \($0)", minutes: $0) }
-        let index = ItemLinks.Index()
+        let index = MarfaMac.ItemLinks.Index()
         let clock = ContinuousClock()
         var names: [String] = []
         let first = await clock.measure { names = await index.titles(matching: "g", among: items, limit: 12) }
@@ -103,7 +103,7 @@ struct ItemLinksTests {
 
     @Test func aSuggestionIsATitleTheCoreBindsToItsOwnItem() async {
         let library = FakeItemLibrary(items: [note("Garden", minutes: 1), note("garden", minutes: 2), note("Gardening", minutes: 3), note("Garden | x", minutes: 4)])
-        let index = ItemLinks.Index()
+        let index = MarfaMac.ItemLinks.Index()
         #expect(await library.itemNames(matching: "gard", using: index) == ["Gardening"], "twins are ambiguous, and a title with a bar cannot be spelled")
         // The core, not the app, decides: a name it says is unresolved is not offered.
         library.linkAnswerOverrides["Gardening"] = LinkAnswer(target: "Gardening", state: .ambiguous, item: nil, candidates: [])
@@ -111,10 +111,10 @@ struct ItemLinksTests {
     }
 
     @Test func aBackslashIsLiteralInEverySpelling() {
-        #expect(ItemLinks.spells("id|Plan\\", as: "id", alias: "Plan\\"))
-        #expect(ItemLinks.spells("id|C:\\dir", as: "id", alias: "C:\\dir"))
-        #expect(ItemLinks.spells("Plan\\", as: "Plan\\"))
-        #expect(ItemLinks.spells("a\\b", as: "a\\b"))
+        #expect(MarfaMac.ItemLinks.spells("id|Plan\\", as: "id", alias: "Plan\\"))
+        #expect(MarfaMac.ItemLinks.spells("id|C:\\dir", as: "id", alias: "C:\\dir"))
+        #expect(MarfaMac.ItemLinks.spells("Plan\\", as: "Plan\\"))
+        #expect(MarfaMac.ItemLinks.spells("a\\b", as: "a\\b"))
     }
 
     @Test func eachAwkwardTitleIsLinkedWithoutAnAddedBackslash() async {
@@ -150,11 +150,11 @@ struct ItemLinksTests {
             ("a]]b", "a] ]b"), ("c]", "c"), ("back\\slash", "back\\slash"), ("Plan\\", "Plan\\"), ("A\\|B", "A\\|B"),
             ("two\nlines", "two lines"), (" padded ", "padded"), ("\n\u{0}", ""), ("]]", ""),
         ]
-        for (title, label) in cases { #expect(ItemLinks.label(title) == label, "\(title.debugDescription)") }
+        for (title, label) in cases { #expect(MarfaMac.ItemLinks.label(title) == label, "\(title.debugDescription)") }
     }
 }
 
-extension ItemLinks.Index {
+extension MarfaMac.ItemLinks.Index {
     func titles(matching text: String, among items: [MarfaMac.Item], limit: Int) async -> [String] {
         await matches(for: text, among: items, limit: limit).map(\.title)
     }
