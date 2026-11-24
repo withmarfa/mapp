@@ -87,7 +87,10 @@ import Observation
                 }
                 lastBackup = try await context.calls.backups().map(\.taken).max()
             },
-            .quiet { [self] () throws(OwnerFailure) in owner = try await context.calls.profile().username },
+            .quiet { [self] () throws(OwnerFailure) in
+                let profile = try await context.calls.profile()
+                owner = profile.name ?? profile.username
+            },
         ])
     }
 

@@ -24,11 +24,20 @@ nonisolated enum AccessLevel: Int, Comparable, CaseIterable, Hashable, Sendable 
 
 nonisolated struct OwnerProfile: Hashable, Sendable {
     /// Nil where the sign-in may not read it.
+    var name: String?
     var username: String?
     var emailIsReadable = false
     var email: String?
+    /// Whether the sign-in may read the picture, and whether there is one to read.
+    var pictureIsReadable = false
+    var hasPicture = false
 
-    var isEmpty: Bool { username == nil && !emailIsReadable }
+    var isEmpty: Bool { name == nil && username == nil && !emailIsReadable && !pictureIsReadable }
+}
+
+/// A part of the owner's profile an app may be allowed to change.
+nonisolated enum ProfileField: String, CaseIterable, Hashable, Sendable {
+    case name, avatar
 }
 
 nonisolated struct OwnerPasskey: Identifiable, Hashable, Sendable {
@@ -220,6 +229,15 @@ nonisolated protocol OwnerCalls: Sendable {
     func browserSignIns() async throws(OwnerFailure) -> [BrowserSignIn]
     func endSignIn(_ id: String) async throws(OwnerFailure)
     func changePassword(from current: String, to new: String) async throws(OwnerFailure) -> PasswordOutcome
+    /// The parts of the profile the sign-in may change, as its scopes say; every part where it holds no scopes to read, as a
+    /// key does, so the server decides.
+    func changeableProfile() -> Set<ProfileField>
+    /// Sends the owner's name alone, and answers the profile as the server then holds it.
+    func setProfileName(_ name: String) async throws(OwnerFailure) -> OwnerProfile
+    /// The picture's bytes, or nil where there is none.
+    func profilePicture() async throws(OwnerFailure) -> Data?
+    /// Stores `picture`, a PNG, JPEG or WebP within the contract's limits (`ProfilePicture.prepared`), as the owner's picture.
+    func setProfilePicture(_ picture: Data) async throws(OwnerFailure) -> OwnerProfile
 
     func typeNames() async throws(OwnerFailure) -> [String: String]
     func apps() async throws(OwnerFailure) -> [AppAccess]

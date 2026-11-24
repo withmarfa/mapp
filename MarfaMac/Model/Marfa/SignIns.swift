@@ -169,7 +169,8 @@ nonisolated struct SystemSignIns: SignIns {
 
     /// What the app asks the owner to approve: every item to read and write, and every edge (relationships, links
     /// and attachments), which the server grants apart from items (`edge.*`). Full Access grants every owner permission
-    /// the app can hold (`askedAtSignIn`). Signed In As reads the owner's name from `GET /profile` with its own scope.
+    /// the app can hold (`askedAtSignIn`). Signed In As reads the owner's name from `GET /profile` with its own scope,
+    /// and Account reads the profile and changes the name and picture (`accountScopes`).
     /// The app's own settings (`PreferencesType`) need a scope that reaches the type, which `*:write`
     /// never does, and registering the type where the Marfa holds none (`metadata.types:write`). The app asks for
     /// `app.*:write`: the vendor scope is unavailable before its first type exists (`keys-and-oauth/app-vendor-not-named`),
@@ -177,11 +178,15 @@ nonisolated struct SystemSignIns: SignIns {
     /// for its vendor alone. Settings > Types > Links registers the owner's link types (`metadata.edge_types:write`). The
     /// owner may approve less, and what is missing is told where it is needed.
     static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write"]
-        + askedAtSignIn.map(\.rawValue).sorted() + profileScopes + [PreferencesType.rootScope, PreferencesType.registeringScope]
-        + [ClientOwnerCalls.registeringLinkTypes]
+        + askedAtSignIn.map(\.rawValue).sorted() + profileScopes + accountScopes
+        + [PreferencesType.rootScope, PreferencesType.registeringScope, ClientOwnerCalls.registeringLinkTypes]
 
     /// What Signed In As needs: the owner's name (`instance-claim/profile-read`).
     static let profileScopes = ["profile.name:read"]
+
+    /// What Account shows and changes: the username and email, read only, and the name and picture, which the owner may
+    /// approve as read only. The username is never asked to change: password sign-in matches it.
+    static let accountScopes = ["profile.username:read", "profile.email:read", "profile.name:write", "profile.avatar:read", "profile.avatar:write"]
 
     /// Whether `scopes`, as a sign-in holds them, let it read the owner's name.
     static func readsProfile(_ scopes: [String]) -> Bool { profileScopes.allSatisfy(scopes.contains) }

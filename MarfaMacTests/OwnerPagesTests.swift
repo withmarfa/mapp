@@ -20,6 +20,10 @@ nonisolated final class OwnerCallGate: Sendable {
 nonisolated final class FakeOwnerCalls: OwnerCalls {
     struct State {
         var profile = OwnerProfile(username: "mira", emailIsReadable: true, email: nil)
+        var changeableProfile = Set(ProfileField.allCases)
+        var picture: Data?
+        var namesSent: [String] = []
+        var picturesSent: [Data] = []
         var passkeys: [OwnerPasskey] = []
         var browsers: [BrowserSignIn] = []
         var password = "old password"
@@ -182,6 +186,33 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     func profile() async throws(OwnerFailure) -> OwnerProfile {
         try enter("profile")
         return state.withLock { $0.profile }
+    }
+
+    func changeableProfile() -> Set<ProfileField> { state.withLock { $0.changeableProfile } }
+
+    func setProfileName(_ name: String) async throws(OwnerFailure) -> OwnerProfile {
+        try enter("setProfileName")
+        await held("setProfileName")
+        return state.withLock { state in
+            state.namesSent.append(name)
+            state.profile.name = name.trimmingCharacters(in: .whitespaces)
+            return state.profile
+        }
+    }
+
+    func profilePicture() async throws(OwnerFailure) -> Data? {
+        try enter("profilePicture")
+        return state.withLock { $0.picture }
+    }
+
+    func setProfilePicture(_ picture: Data) async throws(OwnerFailure) -> OwnerProfile {
+        try enter("setProfilePicture")
+        return state.withLock { state in
+            state.picturesSent.append(picture)
+            state.picture = picture
+            state.profile.hasPicture = true
+            return state.profile
+        }
     }
 
     func passkeys() async throws(OwnerFailure) -> [OwnerPasskey] {

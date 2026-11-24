@@ -1,10 +1,19 @@
 import Marfa
 import SwiftUI
 
-/// The Overview page: the Marfa's head card, what needs the owner's attention, its name and release, and how it stands. A part
-/// the sign-in may not read is left out, and the app says so in the first row of Needs Attention, with Allow More….
+/// The Overview page: the Marfa's head card, what needs the owner's attention, its name and release with Update where one is
+/// ready, and how it stands. A part the sign-in may not read is left out, and the app says so in the first row of Needs
+/// Attention, with Allow More….
 struct OverviewPage: View {
     let host: any MarfaSettingsHost
+    /// Starts and follows an update as the Updates page does.
+    @State private var updates: UpdatesModel
+    @State private var asksToUpdate = false
+
+    init(host: any MarfaSettingsHost) {
+        self.host = host
+        _updates = State(initialValue: UpdatesModel(context: OwnerContext(host: host)))
+    }
 
     private var model: OverviewModel { host.overview }
     private var settings: InstanceSettingsModel { host.instanceSettings }
@@ -17,6 +26,17 @@ struct OverviewPage: View {
                 async let overview: Void = model.load()
                 if canChangeSettings { await settings.load() }
                 await overview
+                if model.update?.progress != nil {
+                    await updates.load()
+                    await model.load()
+                }
+            }
+            .onDisappear { updates.stop() }
+            .alert("Update \(host.serverName)?", isPresented: $asksToUpdate) {
+                Button("Cancel", role: .cancel) {}
+                Button("Update") { startUpdate() }
+            } message: {
+                Text("\(host.serverName) restarts to finish the update. The app reconnects when it’s back.")
             }
             .accessibilityIdentifier("OverviewPage")
     }
@@ -138,14 +158,63 @@ struct OverviewPage: View {
     }
 
     /// The release and, where one is ready, the update; a development build has no release, so only the update line shows.
+    /// While an update runs, the row follows it.
     @ViewBuilder private var versionRow: some View {
-        if let version = model.releaseVersion {
-            SettingsRow(title: Text("Marfa \(version)"), line: model.updateReady.map { Text("Marfa \($0) is ready.") }) { showUpdates }
+        if updates.isUpdating {
+            updatingRow
+        } else if let version = model.releaseVersion {
+            SettingsRow(title: Text("Marfa \(version)"), line: model.updateReady.map { Text("Marfa \($0) is ready.") }) { updateButton }
         } else if let ready = model.updateReady {
-            SettingsRow(title: Text("Marfa \(ready) is ready")) { showUpdates }
+            SettingsRow(title: Text("Marfa \(ready) is ready")) { updateButton }
         }
         if let failure = model.releaseFailure {
             readProblem("Couldn’t Check for Updates", failure: failure)
+        }
+        if let failure = updates.error ?? updates.failure {
+            OwnerProblemRow(title: "Couldn’t Update", failure: failure, page: .overview, host: host)
+        }
+    }
+
+    private var updatingRow: some View {
+        let release = updates.status?.progress?.release ?? updates.status?.latest?.version
+        let stages = UpdateStage.allCases
+        let done = stages.filter { updates.standing(of: $0) == .done }.count
+        return SettingsRow(
+            title: release.map { Text("Updating to \($0)") } ?? Text("Updating"),
+            line: Text(
+                updates.standing(of: .restarting) == .now
+                    ? "Restarting. The app reconnects when it is back." : "\(host.serverName) restarts when it is done.")
+        ) {
+            ProgressView(value: Double(done) + 0.5, total: Double(stages.count))
+                .progressViewStyle(.linear)
+                .frame(width: SettingsTokens.Metric.controlWidth)
+        }
+    }
+
+    /// Update where a release is ready: Allow More… where the sign-in may not update, and Show Updates where the server is
+    /// updated where it runs, since the Updates page holds its steps.
+    @ViewBuilder private var updateButton: some View {
+        if model.updateReady != nil {
+            if !host.grants.contains(.instanceMaintain) {
+                SettingsButton("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
+                    .disabled(host.isAllowingMore)
+            } else if model.update?.updatesItself == false {
+                SettingsButton("Show Updates") { host.show(.updates) }
+            } else {
+                SettingsButton("Update…", role: .update) { asksToUpdate = true }
+                    .accessibilityIdentifier("OverviewUpdate")
+            }
+        }
+    }
+
+    /// Reads the update as the Updates page does, starts it and follows it to its end, then reads the Overview again.
+    private func startUpdate() {
+        let updates = updates
+        let model = model
+        Task {
+            await updates.load()
+            await updates.update()
+            await model.load()
         }
     }
 
@@ -195,13 +264,6 @@ struct OverviewPage: View {
             SettingsRow("Files") {
                 SettingsValue(verbatim: value, dot: Self.dot(files.condition))
             }
-        }
-    }
-
-    /// Update beside the release, where one is ready: it opens Updates, where the update is started and followed.
-    @ViewBuilder private var showUpdates: some View {
-        if model.updateReady != nil {
-            SettingsButton("Show Updates") { host.show(.updates) }
         }
     }
 

@@ -1,10 +1,12 @@
+import AppKit
 import SwiftUI
 
-/// The Account page: the owner's username and email as the server holds them, Change Password…, the passkeys with Add a
-/// Passkey…, and the browsers signed in, each with Sign Out.
+/// The Account page: the owner's picture and name, which can be changed, the username and email as the server holds them,
+/// Change Password…, the passkeys with Add a Passkey…, and the browsers signed in, each with Sign Out.
 struct AccountPage: View {
     let host: any MarfaSettingsHost
     @State private var model: AccountModel
+    @State private var choosesPicture = false
     @Environment(\.openURL) private var openURL
 
     init(host: any MarfaSettingsHost) {
@@ -17,6 +19,12 @@ struct AccountPage: View {
             .task(id: host.serverAddress) { await model.load() }
             .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: dismissSheet) { AccountSheet(model: model) }
+            .fileImporter(isPresented: $choosesPicture, allowedContentTypes: [.image]) { chosen in
+                switch chosen {
+                case .success(let file): Task { await model.setPicture(from: file) }
+                case .failure: model.pictureNotChosen()
+                }
+            }
             .alert(
                 model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
                 presenting: model.question
@@ -74,6 +82,31 @@ struct AccountPage: View {
 
     private func profileSection(_ profile: OwnerProfile) -> some View {
         SettingsSection("Profile") {
+            if profile.pictureIsReadable {
+                SettingsRow(
+                    "Picture", error: model.pictureError,
+                    lead: .custom(AnyView(ProfilePictureMark(picture: model.picture, name: profile.name ?? profile.username)))
+                ) {
+                    if model.changeable.contains(.avatar) {
+                        SettingsButton(model.isSendingPicture ? "Sending…" : "Change…", reserving: "Change…") { choosesPicture = true }
+                            .disabled(model.isSendingPicture)
+                            .accessibilityIdentifier("AccountChangePicture")
+                    }
+                }
+            }
+            if let name = profile.name {
+                SettingsRow("Name", error: model.nameError) {
+                    if model.changeable.contains(.name) {
+                        SettingsField(
+                            title: "Name", text: $model.nameDraft, isError: model.nameError != nil,
+                            onSubmit: { Task { await model.saveName() } }, onEndEditing: { Task { await model.saveName() } }
+                        )
+                        .accessibilityIdentifier("AccountName")
+                    } else {
+                        SettingsValue(verbatim: name)
+                    }
+                }
+            }
             if let username = profile.username {
                 SettingsRow("Username", line: "You sign in with it.") { SettingsValue(verbatim: username) }
             }
@@ -81,6 +114,16 @@ struct AccountPage: View {
                 SettingsRow("Email", line: "Optional. Not used to sign in.") {
                     if let email = profile.email { SettingsValue(verbatim: email) } else { SettingsValue("Not Set") }
                 }
+            }
+            if model.profileNeedsMore {
+                SettingsProblemRow(
+                    title: Text("Name and Picture"), line: Text("The app isn’t allowed to change your name and picture."), symbol: "lock",
+                    tone: nil,
+                    actions: [
+                        SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { Task { await model.allowProfileChanges() } }
+                    ]
+                )
+                .disabled(host.isAllowingMore)
             }
         }
     }
@@ -138,6 +181,36 @@ struct AccountPage: View {
         }
         parts.append(OwnerWording.used(used, now: now, calendar: calendar) + ".")
         return parts.joined(separator: " ")
+    }
+}
+
+/// The owner's picture in a circle, or the first letters of their name where there is none.
+private struct ProfilePictureMark: View {
+    let picture: Data?
+    let name: String?
+
+    private var initials: String {
+        String((name ?? "").split(separator: " ").prefix(2).compactMap(\.first)).uppercased()
+    }
+
+    var body: some View {
+        Group {
+            if let picture, let image = NSImage(data: picture) {
+                Image(nsImage: image).resizable().scaledToFill()
+            } else {
+                Circle().fill(SettingsTokens.Tone.purple.color).overlay {
+                    if initials.isEmpty {
+                        SettingsTileGlyph(symbol: "person.fill", tileSize: SettingsTokens.Metric.tile)
+                    } else {
+                        Text(verbatim: initials).settingsFont(.small)
+                    }
+                }
+                .foregroundStyle(.white)
+            }
+        }
+        .frame(width: SettingsTokens.Metric.tile, height: SettingsTokens.Metric.tile)
+        .clipShape(Circle())
+        .accessibilityHidden(true)
     }
 }
 

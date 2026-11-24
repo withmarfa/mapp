@@ -258,7 +258,8 @@ private struct NewKeySheet: View {
     }
 
     private var permissionCount: String {
-        OwnerWording.permissionCount(model.draft.permissions.count, of: model.givablePermissions.count)
+        model.draft.permissions.isEmpty
+            ? String(localized: "None yet.") : OwnerWording.permissionCount(model.draft.permissions.count, of: model.givablePermissions.count)
     }
 
     var body: some View {
@@ -311,16 +312,18 @@ private struct NewKeySheet: View {
                             }
                         }
                     }
-                    if !model.givablePermissions.isEmpty {
-                        SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: permissionCount)) {
-                            SettingsButton("Choose…") { model.isChoosingPermissions = true }
-                        }
-                    }
                     if !addable.isEmpty {
                         SettingsAddMenu("Add an Exception…") {
                             ForEach(addable, id: \.id) { type in
                                 Button(type.name) { model.draft.exceptions[type.id] = .read }
                             }
+                        }
+                    }
+                }
+                if !model.givablePermissions.isEmpty {
+                    SettingsSection("Looking After This Marfa") {
+                        SettingsRow(title: Text("Owner’s Permissions"), line: Text(verbatim: permissionCount)) {
+                            SettingsButton("Choose…") { model.isChoosingPermissions = true }
                         }
                     }
                 }
