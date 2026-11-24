@@ -121,7 +121,7 @@ struct OnThisMacPage: View {
     @ViewBuilder private func attachments(_ state: DownloadedFileState) -> some View {
         if let attachments = state.attachments {
             SettingsRow("Attachments", line: "Always kept, so they open offline.") {
-                SettingsValue(verbatim: attachments.held.formatted())
+                SettingsValue(verbatim: StoreSize.text(attachments.heldBytes))
             }
             if attachments.missing > 0 {
                 SettingsRow(

@@ -12,7 +12,9 @@ nonisolated struct MissingAttachments: Hashable, Sendable {
 
 nonisolated struct DownloadedFileState: Hashable, Sendable {
     struct Attachments: Hashable, Sendable {
+        /// How many attachments the copy holds whole, and their bytes, counted once for files that share them.
         var held: UInt64
+        var heldBytes: UInt64
         var missing: UInt64
         var reasons: [MissingAttachments]
     }
