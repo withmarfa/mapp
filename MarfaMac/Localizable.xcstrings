@@ -3226,6 +3226,52 @@
         }
       }
     },
+    "%lld items have changed since, so they were left as they are." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item has changed since, so it was left as it is."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items have changed since, so they were left as they are."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld items will come back active, not archived, if they are recovered." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item will come back active, not archived, if it is recovered."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items will come back active, not archived, if they are recovered."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld minutes" : {
 
     },
@@ -3932,6 +3978,9 @@
     "Change Layout" : {
 
     },
+    "Change the Saved Address" : {
+
+    },
     "Change Type" : {
       "extractionState" : "manual"
     },
@@ -3940,6 +3989,9 @@
       "generatesSymbol" : false
     },
     "Change View" : {
+
+    },
+    "Change Your Server Address" : {
 
     },
     "Changed" : {
@@ -4154,6 +4206,9 @@
       "extractionState" : "manual"
     },
     "Couldn’t change downloaded files. Check the current limit and try again." : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t Finish Undo" : {
       "extractionState" : "manual"
     },
     "Couldn’t Make This Change" : {
@@ -5063,6 +5118,9 @@
     "The app tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it." : {
       "extractionState" : "manual"
     },
+    "The saved address, %@, has more after the server’s address, such as a path. Enter just the server’s address, such as https://marfa.example. A new address starts a new copy of your library on this Mac. Changes in the old copy that hadn’t reached the server stay there and aren’t sent." : {
+
+    },
     "This App Wasn’t Approved" : {
       "extractionState" : "manual"
     },
@@ -5629,6 +5687,9 @@
     "Recover" : {
 
     },
+    "Recovered but Not Archived" : {
+      "extractionState" : "manual"
+    },
     "Redo" : {
 
     },
@@ -6109,6 +6170,9 @@
     "That change wasn’t made, so there is nothing to undo here." : {
       "extractionState" : "manual"
     },
+    "That change wasn’t made, so there is nothing to redo here." : {
+      "extractionState" : "manual"
+    },
     "That didn’t work. Try again in a moment." : {
       "extractionState" : "manual"
     },
@@ -6140,6 +6204,27 @@
       "extractionState" : "manual"
     },
     "The editor stopped responding, so the app couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
+
+    },
+    "Couldn’t Save Your Typing" : {
+
+    },
+    "Some Typing Might Be Missing" : {
+
+    },
+    "The editor sent your typing in a form the app couldn’t read." : {
+
+    },
+    "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close the window that shows this item, then open the item again to check it." : {
+
+    },
+    "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing." : {
+
+    },
+    "The item changed several times in quick succession, so the app couldn’t tell which version your typing belongs to." : {
+
+    },
+    "Typing in “%@” Might Be Missing" : {
 
     },
     "The entry changed or was removed while you were editing it." : {
@@ -6784,6 +6869,9 @@
     },
     "Use digits only." : {
       "extractionState" : "manual"
+    },
+    "Use only the server’s address, with nothing after it, such as https://marfa.example." : {
+
     },
     "Use Selection for Find" : {
 

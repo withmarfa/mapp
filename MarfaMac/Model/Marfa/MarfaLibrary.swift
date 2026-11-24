@@ -197,6 +197,12 @@ import Observation
     /// (`MarfaLibrary+Undoing`).
     @ObservationIgnored var undoRun: UndoRun?
     @ObservationIgnored private var undoRuns: [WriteID: UndoRun] = [:]
+    /// Where this Mac's state change on its way leaves each item, until the copy shows it (`setStates`).
+    @ObservationIgnored var movingTo: [ItemID: StateMoving] = [:]
+    /// What follows the answer to each write of a state change, told what the answer means for the move (`setStates`).
+    @ObservationIgnored var stateAnswers: [WriteID: (WriteID, StateAnswer) -> Void] = [:]
+    /// Restores answered blocked or dead whose archive will not follow, told together once no restore waits.
+    @ObservationIgnored var archivesDropped = 0
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
@@ -397,6 +403,7 @@ import Observation
                 self?.sendWaitingText()
                 // Nothing more will be taken or answered, so no change waits for it.
                 self?.endWaits()
+                self?.dropWaitingArchives()
             },
             Task { [weak self] in
                 for await report in reports { self?.syncReport = report }
@@ -647,6 +654,7 @@ import Observation
             propertyMarks[id] = nil
             read(id)
             answered(id, outcome)
+            stateWriteAnswered(id, outcome)
             settle(id)
             propertyAnswered(id, outcome)
         case .taken(let id):
@@ -654,6 +662,7 @@ import Observation
             propertyWrites[id] = nil
             if let mark = propertyMarks.removeValue(forKey: id) { remember(taken: mark) }
             took(id)
+            stateWriteTaken(id)
             read(id)
             settle(id)
         case .catalogue(let catalogue):
@@ -866,6 +875,10 @@ import Observation
 
     /// Whether the source took the write, so it will be taken or answered.
     func isFollowed(_ write: WriteID) -> Bool { refusals[write] != nil }
+
+    /// A write a step sends after its first writes were made. The engine holds it like them while the copy catches up,
+    /// but one it gives back is told as refused and puts no step back, since the step was made.
+    func leaveOutOfGiveBack(_ write: WriteID) { undoRuns[write] = nil }
 
     // MARK: Writing through the source
 

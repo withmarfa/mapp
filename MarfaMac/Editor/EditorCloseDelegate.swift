@@ -35,7 +35,7 @@ final class EditorCloseDelegate: NSObject, NSWindowDelegate {
         guard let editor, editor.hasItem || editor.isFlushing else { return true }
         guard !awaiting else { return false }
         awaiting = true
-        editor.flush { [weak self, weak sender] kept in
+        editor.flush(leaving: true) { [weak self, weak sender] kept in
             guard let self else { return }
             self.awaiting = false
             guard kept, let sender else { return }

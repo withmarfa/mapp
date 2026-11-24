@@ -8,9 +8,10 @@ name: Release
 #   image goes first and the appcast last, so the feed never names a file that is not there yet.
 # - Both run in the `release` environment, which holds every secret and admits only `v*` tags. The values are validated and
 #   never printed.
-# - A pull request that changes this workflow, `Scripts/release/` or the project, and a manual run, make a dry run: the same
-#   steps with ad hoc signing and a throwaway Sparkle key, which skip the export, notarizing and the upload, build the
-#   appcast from a fixture feed and keep the disk image and the appcast as the `dry-run` artifact. A dry run reads no secret.
+# - A pull request that changes this workflow, `Scripts/release/`, `Config/` or `Info.plist`, and a manual run, make a dry
+#   run: the same steps with ad hoc signing and a throwaway Sparkle key, which skip the export, notarizing and the upload,
+#   build the appcast from a fixture feed and keep the disk image and the appcast as the `dry-run` artifact. A dry run
+#   reads no secret. The project file is left out: most app changes touch it, and `checks.yml` builds Release for them.
 on:
   push:
     tags: ['v*']
@@ -19,7 +20,6 @@ on:
     paths:
       - .github/workflows/release.yml
       - Scripts/release/**
-      - MarfaMac.xcodeproj/**
       - MarfaMac/Info.plist
       - Config/**
   workflow_dispatch:
