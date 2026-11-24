@@ -39,3 +39,5 @@ What is agreed and not built yet is in [Agreed designs](agreed-designs.md). This
 | Type | Marfa | What an item is, with its fields, parent, status words and icon. | [Marfa and the app](marfa-and-the-mac-app.md) |
 | Type mark | The app | A type's icon in its tone on a pale rounded square (`TypeMark`). | [Value components](value-components.md) |
 | Value component | The app | One drawing for one kind of value, in a row, on the page and in an editor. Built in v0.0.44. | [Value components](value-components.md) |
+
+Throwaway link to [a missing page](no-such-page.md).
