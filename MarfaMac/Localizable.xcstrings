@@ -9266,6 +9266,27 @@
     "%@ (Not Kept)" : {
 
     },
+    "%@ (%@) in %@" : {
+
+    },
+    "%@ in %@" : {
+
+    },
+    "Couldn’t change it." : {
+
+    },
+    "Couldn’t change it. Links still open in %@." : {
+
+    },
+    "No app on this Mac opens Marfa links yet." : {
+
+    },
+    "Open Marfa Links In" : {
+
+    },
+    "Where a link to an item opens." : {
+
+    },
     "Can’t Open Link" : {
 
     },
