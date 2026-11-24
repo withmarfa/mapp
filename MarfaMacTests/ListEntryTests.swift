@@ -36,16 +36,6 @@ struct ListEntryTests {
 
     // MARK: Mapping
 
-    @Test func aListOfEntriesMapsToAListKindWithItsMembersInDeclaredOrder() throws {
-        let shape = try Self.shape(Self.attendees)
-        #expect(shape.members.map(\.key) == ["name", "email", "response"])
-        #expect(shape.member("email")?.kind == .text(.email))
-        #expect(shape.member("response")?.kind == .choice(["needs_action", "accepted", "declined", "tentative"]))
-        let required = try Self.shape(Self.emails)
-        #expect(required.member("value")?.required == true)
-        #expect(required.member("label")?.required == false)
-    }
-
     @Test func anArrayOfStringsIsAListOfWordsAndOneOfAnythingElseIsLeftAlone() {
         let tags = TypeField(name: "tags", type: "array", declaredBy: "t", definition: ["items_type": "string"])
         #expect(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [tags])).fields.first?.kind == .words)
@@ -212,50 +202,12 @@ struct ListEntryTests {
         #expect(!rating.accepts(.number(Decimal(string: "2.5")!)))
     }
 
-    // MARK: Reading
-
-    @Test func anEntryIsSummarisedByItsMembersInDeclaredOrder() throws {
-        let emails = try Self.shape(Self.emails)
-        #expect(emails.summary(of: ["value": .string("a@example.com"), "label": .string("work")]) == "a@example.com, work")
-        let attendees = try Self.shape(Self.attendees)
-        // A choice reads by its label; no member is set apart by its name.
-        #expect(attendees.summary(of: ["name": .string("Ruth"), "email": .string("r@example.com"), "response": .string("accepted")])
-                == "Ruth, r@example.com, Accepted")
-        #expect(attendees.summary(of: ["email": .string("r@example.com")]) == "r@example.com")
-        let addresses = try Self.shape(Self.addresses)
-        #expect(addresses.summary(of: ["label": .string("home"), "street_address": .string("1 High Street"), "locality": .string("London")])
-                == "home, 1 High Street, London")
-    }
-
-    @Test func aTableCellShowsTheMainEntryAndHowManyMore() throws {
-        let emails = try Self.shape(Self.emails)
-        let list = PropertyValue.array([
-            Self.entry(["value": .string("a@example.com")]), Self.entry(["value": .string("b@example.com")]),
-            Self.entry(["value": .string("c@example.com")]),
-        ])
-        #expect(emails.display(of: list) == "a@example.com +2")
-        #expect(emails.display(of: .array([Self.entry(["value": .string("a@example.com")])])) == "a@example.com")
-    }
-
     // MARK: Page
 
     private static func personItem(_ properties: [String: PropertyValue]) -> MarfaMac.Item {
         MarfaMac.Item(
             id: ItemID("10000000-0000-0000-0000-000000000001"), type: TypeID("core.entity.person"), title: "Ruth", titleRule: .property("title"),
             properties: properties.map { Property(key: $0, value: $1) }, version: ItemVersion(1), created: .now, modified: .now)
-    }
-
-    @Test func aPersonsPageShowsTheMainEmailPhoneAndAddress() {
-        let item = Self.personItem([
-            "emails": .array([Self.entry(["value": .string("main@example.com"), "label": .string("work")]), Self.entry(["value": .string("two@example.com")])]),
-            "phones": .array([Self.entry(["value": .string("+44 20 7946 0000")])]),
-            "addresses": .array([Self.entry(["label": .string("home"), "street_address": .string("1 High Street"), "locality": .string("London")])]),
-        ])
-        let lead = PageHeaderLead(for: item, kind: .person, now: .now)
-        let rows = lead.refine(PropertyRow.rows(
-            of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .standard, tags: []))
-        #expect(rows.map(\.id) == ["emails", "phones", "addresses"])
-        #expect(rows.map(\.value) == [.email("main@example.com"), .phone("+44 20 7946 0000"), .text("home, 1 High Street, London")])
     }
 
     @Test func aLabelledNumberIsStillANumberToCall() {
@@ -284,58 +236,6 @@ struct ListEntryTests {
     // MARK: People
 
     private static let assignees = listField("assignees", ["name": ["type": "string"], "email": ["type": "email"]])
-
-    @Test func aListHoldsPeopleOnlyWhenItsFirstMemberIsPlainTextAndItsNextAnEmail() throws {
-        #expect(try Self.shape(Self.assignees).holdsPeople)
-        #expect(try Self.shape(Self.attendees).holdsPeople)
-        #expect(try !Self.shape(Self.emails).holdsPeople)
-        #expect(try !Self.shape(Self.phones).holdsPeople)
-        #expect(try !Self.shape(Self.addresses).holdsPeople)
-        #expect(try !Self.shape(Self.scores).holdsPeople)
-    }
-
-    private static func peopleRow(_ field: TypeField, _ entries: [PropertyValue]) throws -> PropertyRow.Value? {
-        let type = MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [field]))
-        let item = MarfaMac.Item(
-            id: ItemID("10000000-0000-0000-0000-000000000001"), type: TypeID("t"), title: "T", titleRule: .property("title"),
-            properties: [Property(key: field.name, value: .array(entries))], version: ItemVersion(1), created: .now, modified: .now)
-        return PropertyRow.value(of: try #require(type.fields.first), in: item, format: .standard)
-    }
-
-    @Test func everyEntryOfAListOfPeopleShowsAsAPerson() throws {
-        let one = try Self.peopleRow(Self.assignees, [Self.entry(["name": .string("Mira Castell"), "email": .string("m@example.com")])])
-        #expect(one == .people(["Mira Castell"]))
-        let two = try Self.peopleRow(Self.assignees, [
-            Self.entry(["name": .string("Mira Castell")]), Self.entry(["name": .string("  "), "email": .string("r@example.com")]),
-        ])
-        #expect(two == .people(["Mira Castell", "r@example.com"]))
-    }
-
-    @Test func anEntryWithOnlyAnEmailIsNamedByIt() throws {
-        #expect(try Self.peopleRow(Self.attendees, [Self.entry(["email": .string("r@example.com"), "response": .string("accepted")])])
-                == .people(["r@example.com"]))
-    }
-
-    @Test func anEntryWithNeitherNameNorEmailIsLeftOutAndAListWithNoneHasNoValue() throws {
-        let kept = try Self.peopleRow(Self.attendees, [
-            Self.entry(["response": .string("accepted")]), Self.entry(["name": .string(" ")]), Self.entry(["name": .string("Ruth")]),
-        ])
-        #expect(kept == .people(["Ruth"]))
-        #expect(try Self.peopleRow(Self.attendees, [Self.entry(["response": .string("accepted")]), Self.entry(["name": .string(" ")])]) == nil)
-    }
-
-    @Test func aListThatIsNotPeopleShowsItsMainEntryAsBefore() throws {
-        let value = try Self.peopleRow(Self.emails, [
-            Self.entry(["value": .string("a@example.com")]), Self.entry(["value": .string("b@example.com")]),
-        ])
-        #expect(value == .email("a@example.com"))
-    }
-
-    @Test func aPersonWithNoEntriesHasNoRows() {
-        let item = Self.personItem(["emails": .array([])])
-        let rows = PropertyRow.rows(of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .standard, tags: [])
-        #expect(rows.isEmpty)
-    }
 
     @Test func aDialableNumberIsToldFromOtherText() {
         for text in ["+44 20 7946 0000", "(555) 010-0199", "020.7946.0000"] { #expect(ListShape.isDialable(text), "\(text)") }

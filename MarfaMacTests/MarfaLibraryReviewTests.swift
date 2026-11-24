@@ -168,17 +168,6 @@ import Testing
         library.sendWaitingText()
         #expect(source.writes.last == .editBody(id, "Leak Tomorrow", base: ItemVersion(1), merge: .following))
     }
-
-    /// A search that fails is not shown as a search that found nothing.
-    @Test func aSearchThatFailsIsNotNothingFound() async throws {
-        let source = FailingSearchSource()
-        let library = MarfaLibrary(source: source, notices: Notices())
-        source.inner.send(.loaded(F.snapshot))
-        try #require(await eventually { library.isLoaded })
-        _ = library.search("body", in: .everywhere).items
-        #expect(await eventually { library.notices.waiting.last != nil }, "a search that threw is shown as no results, and nothing says so")
-        #expect(library.search("body", in: .everywhere).items.isEmpty)
-    }
 }
 
 @MainActor

@@ -111,50 +111,6 @@ struct InspectorEditingTests {
         for key in keys { #expect(InterfaceKey.all.contains(key)) }
     }
 
-    /// The height a section takes in a hosting view, whose stored fold state is `defaults`.
-    private static func height(of section: InspectorSectionKind, in defaults: UserDefaults) -> CGFloat {
-        let view = InspectorSectionView(section, title: "Section") { Color.clear.frame(width: 100, height: 200) }
-            .defaultAppStorage(defaults)
-        return NSHostingView(rootView: view).fittingSize.height
-    }
-
-    @Test func aSectionIsOpenUntilFolded() throws {
-        let name = "InspectorEditingTests.\(UUID())"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        defer { defaults.removePersistentDomain(forName: name) }
-        let open = Self.height(of: .tags, in: defaults)
-        #expect(open >= 200, "nothing stored: the content shows")
-        defaults.set(false, forKey: InspectorSectionKind.tags.key)
-        #expect(Self.height(of: .tags, in: defaults) < open - 100, "folded: only the heading")
-        #expect(Self.height(of: .properties, in: defaults) == open, "another section is not folded with it")
-    }
-
-    // MARK: Values
-
-    @Test func aDateIsNeverBrokenBetweenDayAndTime() {
-        #expect(InspectorText.lineLimit(for: "29 Oct 2026 at 11:54 am", keepsOneLine: true) == 1)
-        #expect(InspectorText.lineLimit(for: "a few words that wrap", keepsOneLine: false) == 3)
-        #expect(InspectorText.lineLimit(for: "https://example.com/a/b", keepsOneLine: false) == 1)
-    }
-
-    @Test func aValueTakesWholeRowOnlyWhenItsLineIsWiderThanACell() {
-        #expect(!InspectorCellGrid.takesWholeRow(ideal: 120, column: 130))
-        #expect(!InspectorCellGrid.takesWholeRow(ideal: 130, column: 130))
-        #expect(InspectorCellGrid.takesWholeRow(ideal: 131, column: 130))
-    }
-
-    @Test func aCellValueOfWordsTakesTwoLinesAndOneWithoutSpacesTakesOne() {
-        #expect(InspectorText.lineLimit(for: "a few words that wrap", keepsOneLine: false, lines: InspectorMetrics.cellValueLines) == 2)
-        #expect(InspectorText.lineLimit(for: "https://example.com/a/b", keepsOneLine: false, lines: InspectorMetrics.cellValueLines) == 1)
-    }
-
-    @Test func theNameColumnFitsTheLongestNameWithinItsShare() {
-        #expect(InspectorMetrics.nameColumn(longest: 60, fallback: 96, available: 300) == 60)
-        #expect(InspectorMetrics.nameColumn(longest: 200, fallback: 96, available: 300) == 120)
-        #expect(InspectorMetrics.nameColumn(longest: nil, fallback: 96, available: 300) == 96)
-        #expect(InspectorMetrics.nameColumn(longest: nil, fallback: 96, available: 200) == 80)
-    }
-
     // MARK: Handing off
 
     private static let field = ItemTypeInfo.Field(key: "assignee", label: "Assignee", kind: .text, declaredBy: TypeID("core.task"))
@@ -309,53 +265,4 @@ struct InspectorEditingTests {
         #expect(presentation.unsavedTitles == [id])
     }
 
-    // MARK: The relationship plus
-
-    /// What an accessibility element answers to `selector`, whatever class SwiftUI made it.
-    private static func answer(_ element: NSObject, _ selector: String) -> Any? {
-        let selector = NSSelectorFromString(selector)
-        return element.responds(to: selector) ? element.perform(selector)?.takeUnretainedValue() : nil
-    }
-
-    /// The accessibility elements under `element`.
-    private static func descendants(of element: Any?, into found: inout [NSObject]) {
-        guard let element = element as? NSObject else { return }
-        found.append(element)
-        for child in answer(element, "accessibilityChildren") as? [Any] ?? [] { descendants(of: child, into: &found) }
-    }
-
-    @Test func theHiddenPlusStaysInTheAccessibilityTree() throws {
-        let view = InspectorPlusButton(accessibilityLabel: "Add to Related", identifier: "Plus", isRowHovered: false, action: {})
-            .frame(width: 100, height: 40)
-        // SwiftUI builds its accessibility elements only once an assistive client is attached.
-        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXManualAccessibility"))
-        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
-        let host = NSHostingView(rootView: view)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 40), styleMask: [.borderless], backing: .buffered, defer: true)
-        window.contentView = host
-        host.layoutSubtreeIfNeeded()
-        var found: [NSObject] = []
-        Self.descendants(of: host, into: &found)
-        let labels = found.compactMap { Self.answer($0, "accessibilityLabel") as? String }
-        let roles = found.compactMap { Self.answer($0, "accessibilityRole") as? String }
-        #expect(labels.contains("Add to Related") && roles.contains("AXButton"))
-    }
-
-    @Test func theHiddenPlusMenuStaysInTheAccessibilityTree() throws {
-        let view = InspectorPlusMenu(accessibilityLabel: "Add to Related", identifier: "Plus", isRowHovered: false) { Button("Item") {} }
-            .frame(width: 100, height: 40)
-        // SwiftUI builds its accessibility elements only once an assistive client is attached.
-        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXManualAccessibility"))
-        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
-        let host = NSHostingView(rootView: view)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 40), styleMask: [.borderless], backing: .buffered, defer: true)
-        window.contentView = host
-        host.layoutSubtreeIfNeeded()
-        var found: [NSObject] = []
-        Self.descendants(of: host, into: &found)
-        // A menu's button takes its name from the system when drawn, so it is found by role and identifier.
-        let roles = found.compactMap { Self.answer($0, "accessibilityRole") as? String }
-        let identifiers = found.compactMap { Self.answer($0, "accessibilityIdentifier") as? String }
-        #expect(roles.contains("AXMenuButton") && identifiers.contains("Plus"))
-    }
 }

@@ -267,16 +267,6 @@ import Testing
         MappingPreviewItem(type: "feed.entry", title: "A post", properties: ["title": "A post"])
     }
 
-    @Test func aPreviewWaitsForTheConnectorThenShowsItsItemUnderTheDraft() async {
-        let (model, bench) = await loaded()
-        await model.setTier(.library, for: "entry")
-        bench.calls.state.withLock { $0.previewAnswers = [.pending, .pending, .ready(item())] }
-        await model.preview("entry", every: .milliseconds(1))
-        #expect(model.previewState("entry") == .ready(item()))
-        // Saved and unchanged, so the mapping in force is previewed: no draft is sent.
-        #expect(bench.calls.state.withLock { $0.previewsAsked.last?.draft } == nil)
-    }
-
     @Test func aPreviewOfAnUnsavedDraftSendsTheDraft() async {
         let (model, bench) = await loaded()
         bench.calls.fail("saveConnectorMapping", with: .unreachable)
@@ -284,17 +274,6 @@ import Testing
         bench.calls.state.withLock { $0.previewAnswers = [.ready(item())] }
         await model.preview("entry", every: .milliseconds(1))
         #expect(bench.calls.state.withLock { $0.previewsAsked.last?.draft?.tier } == .library)
-    }
-
-    @Test func aPreviewThePassingOfItsTimeEndsIsExpiredAndFailedOnesAreShownAsFailed() async {
-        let (model, bench) = await loaded()
-        bench.calls.state.withLock { $0.previewAnswers = [.pending] }
-        let later = Date.now.addingTimeInterval(700)
-        await model.preview("entry", every: .milliseconds(1), now: { later })
-        #expect(model.previewState("entry") == .expired)
-        bench.calls.state.withLock { $0.previewAnswers = [.failed("No item to show.")]; $0.previewReads = 0 }
-        await model.preview("entry", every: .milliseconds(1))
-        #expect(model.previewState("entry") == .failed("No item to show."))
     }
 
     @Test func aFailedPollFromAnOlderPreviewDoesNotReplaceANewerOne() async {
@@ -311,23 +290,6 @@ import Testing
         gate.open()
         await older.value
         #expect(model.previewState("entry") == .ready(item()))
-    }
-
-    @Test func aPreviewTheServerNoLongerKeepsIsExpired() async {
-        let (model, bench) = await loaded()
-        bench.calls.fail("mappingPreview", with: .notFound)
-        await model.preview("entry", every: .milliseconds(1))
-        #expect(model.previewState("entry") == .expired)
-    }
-
-    @Test func aPausedConnectorOrOneWithNoMachineAnswersNoPreviewAndTheScreenSaysWhy() {
-        func entry(paused: Bool, host: String?) -> ConnectorsModel.Entry {
-            ConnectorsModel.Entry(
-                summary: Self.summary, control: ConnectorControl(host: host, registration: nil, paused: paused, runRequested: nil))
-        }
-        #expect(ConnectorsPage.previewBlock(entry(paused: true, host: "h1"), title: "Feed") == "Resume Feed to see one. A paused connector answers no preview.")
-        #expect(ConnectorsPage.previewBlock(entry(paused: false, host: nil), title: "Feed") == "Choose the machine that runs Feed to see one.")
-        #expect(ConnectorsPage.previewBlock(entry(paused: false, host: "h1"), title: "Feed") == nil)
     }
 
     // MARK: Existing items

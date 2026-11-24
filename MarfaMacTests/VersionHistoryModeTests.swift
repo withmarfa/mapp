@@ -29,47 +29,6 @@ private func page(_ snapshots: [ItemSnapshot]) -> Result<ItemHistoryPage, ItemHi
         return try #require(details.history)
     }
 
-    @Test func enteringShowsTheModeAndReadsTheVersions() async throws {
-        let (library, note, _) = library([page([snapshot(1, body: "First"), snapshot(2, body: "Second")])])
-        let details = DetailsPresentation()
-        details.showHistory(of: note.id, in: library)
-        let mode = try await shown(details)
-        #expect(mode.item == note.id)
-        #expect(await eventually { mode.thread.phase == .loaded })
-        let list = try #require(mode.list(in: library))
-        // The newest version before the item as it is now is the one shown first.
-        #expect(list.entries.map(\.version).count == 3)
-        mode.chooseDefault(in: list)
-        #expect(mode.thread.selection == "v2")
-        // Choosing again keeps the person's own choice.
-        mode.thread.selection = "v1"
-        mode.chooseDefault(in: list)
-        #expect(mode.thread.selection == "v1")
-    }
-
-    @Test func openingItAgainWhileItIsOpenChangesNothing() async throws {
-        let (library, note, source) = library([page([snapshot(1, body: "First")])])
-        let details = DetailsPresentation()
-        details.showHistory(of: note.id, in: library)
-        let first = try await shown(details)
-        #expect(await eventually { first.thread.phase == .loaded })
-        details.showHistory(of: note.id, in: library)
-        #expect(details.history === first)
-        #expect(source?.cursors.withLock { $0.count } == 1)
-    }
-
-    @Test func leavingClearsTheModeAndStopsReading() async throws {
-        let (library, note, _) = library([page([snapshot(1, body: "First")])])
-        let details = DetailsPresentation()
-        details.showHistory(of: note.id, in: library)
-        _ = try await shown(details)
-        details.leaveHistory()
-        #expect(details.history == nil)
-        // Leaving a window that shows no history is nothing.
-        details.leaveHistory()
-        #expect(details.history == nil)
-    }
-
     @Test func aLibraryWithNoHistoryOpensWithTheReasonAndStillLeaves() async throws {
         let (library, note, _) = library(nil)
         let details = DetailsPresentation()

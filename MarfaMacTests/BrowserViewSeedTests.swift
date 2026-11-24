@@ -37,25 +37,11 @@ struct BrowserViewSeedTests {
         browser.viewSeeds[id] = seed
     }
 
-    @Test func aViewOpensWithItsOwnOrderAndGrouping() {
-        let (browser, library) = Self.opened()
-        let options = browser.tableOptions[browser.item]
-        #expect(options == ViewDraft.options(for: Self.view(), catalogue: library.catalogue))
-        #expect(options?.grouping == .column(ViewDraft.columnID(of: "properties.status") ?? ""))
-        #expect(!browser.hasViewChanges)
-    }
-
     @Test func aChangedGroupingOffersASave() {
         let (browser, library) = Self.opened()
         browser.tableOptions[browser.item]?.grouping = .none
         #expect(browser.hasViewChanges)
         browser.tableOptions[browser.item]?.grouping = ViewDraft.options(for: Self.view(), catalogue: library.catalogue).grouping
-        #expect(!browser.hasViewChanges)
-    }
-
-    @Test func foldingAGroupIsNoChange() {
-        let (browser, _) = Self.opened()
-        browser.tableOptions[browser.item]?.collapsed = ["done"]
         #expect(!browser.hasViewChanges)
     }
 

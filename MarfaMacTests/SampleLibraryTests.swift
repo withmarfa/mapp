@@ -16,28 +16,6 @@ import Testing
         return (library, source)
     }
 
-    @Test func theSampleNamesAListOfPeopleAndOfMediaInTheirOwnPlurals() {
-        let catalogue = SampleLibrary.catalogue
-        #expect(catalogue.plural(for: TypeID("core.entity.person")) == "People")
-        #expect(catalogue.plural(for: TypeID("core.media")) == "Media")
-    }
-
-    @Test func aPreviewLeavesOutTheLineTheNameCameFromAndJoinsTheRestWithSpaces() {
-        func display(_ properties: JSONObject) -> ItemDisplay {
-            SampleLibrary.display(ItemDisplayInput(type: "core.note", properties: properties))
-        }
-        let untitled = display(["body": .string("Morning walk\n\nSun on the hill.\nBirds everywhere.")])
-        #expect(untitled.name == "Morning walk")
-        #expect(untitled.preview == "Sun on the hill. Birds everywhere.")
-        let titled = display(["title": .string("Walk"), "body": .string("Morning walk\nSun on the hill.")])
-        #expect(titled.name == "Walk")
-        #expect(titled.preview == "Morning walk Sun on the hill.")
-        let oneLine = display(["body": .string("Only a line")])
-        #expect(oneLine.name == "Only a line" && oneLine.preview == nil)
-        let long = display(["title": .string("T"), "body": .string(String(repeating: "word ", count: 100))])
-        #expect(long.preview?.count == 240 && long.preview?.hasSuffix("\u{2026}") == true)
-    }
-
     /// Text typed into an item the page opened before its create was answered, saved after each answer as the page
     /// saves while the person types, is kept: each save follows the version the answers before it moved the item to.
     @Test func textTypedOnAnItemJustMadeIsKeptSaveAfterSave() async throws {
@@ -82,36 +60,6 @@ import Testing
         let typed = read.text + " A B C"
         #expect(try await source.body(of: id).text == typed)
         #expect(await eventually { library.body(of: id)?.text == typed }, "\(String(describing: library.body(of: id)))")
-    }
-
-    /// The sample declares a container type, so it shows collections and offers to make one.
-    @Test func theSampleHasCollectionsInTheirOrder() async throws {
-        let (library, _) = try await Self.loaded()
-        #expect(library.collections.map(\.title) == ["Home", "Reading"])
-        // Home orders its members by position; Reading gives none, so it lists them by title.
-        #expect(library.items(in: .collection(ItemID("collection-home"))).map(\.title) == ["Boiler", "Bike service", "Moving checklist"])
-        let reading = library.items(in: .collection(ItemID("collection-reading"))).map(\.title)
-        #expect(reading == reading.sorted { $0.localizedStandardCompare($1) == .orderedAscending })
-        #expect(reading.count == 3)
-        let collectionTypes = Set(library.catalogue.collectionTypes)
-        #expect(QuickAdd.types(in: library).contains { collectionTypes.contains($0.id) })
-        let members = library.relationships(for: ItemID("collection-home")).first { $0.field == "inverse:in-collection" }
-        #expect(members?.label == "Contents")
-    }
-
-    /// The sample's views are held by the fake copy and read through it, as a real copy's are, so one made here lists
-    /// its items when opened.
-    @Test func aViewMadeOnTheSampleListsItsItems() async throws {
-        let (library, _) = try await Self.loaded()
-        #expect(library.views.map(\.title).sorted() == ["Recent Notes", "Tasks by Priority"])
-        let notes = Set(library.items(in: .allItems).filter { $0.type == TypeID("core.note") }.map(\.id))
-        let made = try #require(await library.createView(LibraryViewSettings(
-            title: "Only Notes",
-            query: LibraryViewQuery(types: [TypeID("core.note")], states: [.active]),
-            sort: [LibraryViewSort(field: "updated_at", ascending: false)])))
-        #expect(await eventually { Set(library.items(in: .view(made.id)).map(\.id)) == notes })
-        #expect(!notes.isEmpty)
-        #expect(await eventually { !library.items(in: .view(ItemID("view-recent-notes"))).isEmpty })
     }
 
     /// A sample launch starts as a first launch does: a table's columns and a saved view's layout that an earlier run

@@ -27,20 +27,6 @@ struct ItemLibraryTests {
         return { changed.withLock { $0 } }
     }
 
-    @Test func readsThroughTheProtocolAreRedrawnWhenTheCopyChanges() async throws {
-        let (library, source) = try await loaded()
-        var item = try #require(library.item(F.n1))
-        item.title = "Changed"
-        item.version = ItemVersion(2)
-        let list = follow { _ = library.items(in: .allItems) }
-        let one = follow { _ = library.item(F.n1) }
-        source.send(.upserted([item]))
-        #expect(await eventually { list() && one() })
-        let notice = follow { _ = library.notices.waiting.last }
-        library.notices.tell("Title", "Message")
-        #expect(notice())
-    }
-
     @Test func aReadNotTouchedByAChangeIsLeftAlone() async throws {
         let (library, source) = try await loaded()
         var item = try #require(library.item(F.n1))

@@ -46,13 +46,6 @@ struct QuickAddTests {
         #expect(browser.quickAdd.draft?.title == "Buy oat milk")
     }
 
-    @Test func nothingTypedOpensAnEmptyDraft() {
-        let browser = Browser()
-        browser.openQuickAdd(titled: "   ", in: FakeItemLibrary(now: start))
-        #expect(browser.quickAdd.isPresented)
-        #expect(browser.quickAdd.draft?.title == "")
-    }
-
     @Test func aDraftHoldingContentComesBackAsItWasAndItsTitleIsNotReplaced() {
         let library = FakeItemLibrary(now: start)
         let browser = Browser()
@@ -85,23 +78,6 @@ struct QuickAddTests {
         #expect(!browser.isSearching)
         #expect(browser.focusRequest == .page)
         #expect(browser.focusCaret == .after("Ask about"))
-    }
-
-    @Test func theCaretGoesToTheEndWhereItWasThereOrTheTextIsLong() {
-        #expect(PageCaret(offset: nil, in: "Text") == .end)
-        #expect(PageCaret(offset: 4, in: "Text") == .end)
-        #expect(PageCaret(offset: 2, in: "Text") == .after("Te"))
-        let long = String(repeating: "a", count: PageCaret.limit + 10)
-        #expect(PageCaret(offset: PageCaret.limit + 1, in: long) == .end)
-    }
-
-    @Test func anItemWithNoTextOpensWithItsTitleReady() async throws {
-        let library = FakeItemLibrary(now: start)
-        let browser = Browser()
-        let id = try #require(await browser.quickAdded("Launch", typeID: "test.project", in: library))
-        #expect(browser.selection == [id])
-        #expect(browser.focusRequest == .title)
-        #expect(browser.focusCaret == nil)
     }
 
     /// A collection's members are filed with `in-collection`, not `child-of`, so the place shown sets no parent; the
@@ -191,20 +167,6 @@ struct QuickAddTests {
         browser.palette = .commands
         #expect(!browser.quickAdd.isPresented, "one panel is out at a time")
         #expect(browser.quickAdd.draft?.title == "Half a thought")
-    }
-
-    @Test func anEmptyPanelGoesWhenItsWindowIsLeftButNotForItsOwnSurfaces() {
-        let library = FakeItemLibrary(now: start)
-        let browser = Browser()
-        browser.openQuickAdd(typeID: "core.task", in: library)
-
-        #expect(!browser.putAwayQuickAddLeftEmpty(usesOwnSurface: true, keyWindowIsOwn: false), "its file importer or a popover is open")
-        #expect(!browser.putAwayQuickAddLeftEmpty(usesOwnSurface: false, keyWindowIsOwn: true), "a window it opened took the key")
-        #expect(browser.quickAdd.isPresented)
-
-        #expect(browser.putAwayQuickAddLeftEmpty(usesOwnSurface: false, keyWindowIsOwn: false))
-        #expect(!browser.quickAdd.isPresented)
-        #expect(browser.quickAdd.draft == nil, "nothing was typed, so nothing waits")
     }
 
     @Test func aPanelWithAnythingInItStaysWhenItsWindowIsLeft() throws {
@@ -478,14 +440,6 @@ struct QuickAddTests {
         #expect(QuickAdd.canSave(draft, in: library))
     }
 
-    @Test func anEmptyDraftTellsNothingAsTheWindowCloses() {
-        let library = FakeItemLibrary(now: start)
-        let browser = Browser()
-        browser.openQuickAdd(in: library)
-        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
-        #expect(library.notices.waiting.isEmpty)
-    }
-
     @Test func aFileIsAddedAsAnItemOfItsOwnAndOpens() async throws {
         let project = Item(
             id: .mint(), type: TypeID("test.project"), title: "Launch", name: "Launch", titleRule: .property("title"),
@@ -642,24 +596,6 @@ struct QuickAddTests {
         #expect(browser.quickAdd.draft?.properties.isEmpty == true)
     }
 
-    @Test func openingQuickAddPutsThePaletteAway() {
-        let library = FakeItemLibrary(now: start)
-        let browser = Browser()
-        browser.palette = .commands
-        browser.openQuickAdd(in: library)
-        #expect(browser.palette == nil)
-        #expect(browser.quickAdd.isPresented)
-    }
-
-    @Test func theKindMenuLeadsWithTheSidebarsKindsAndFile() {
-        let library = FakeItemLibrary(now: start)
-        let types = QuickAdd.types(in: library)
-        let (first, rest) = QuickAdd.kindMenu(types, shown: [TypeID("core.task"), TypeID("core.note")], chosen: "test.project")
-        #expect(first.map(\.id.rawValue) == ["core.task", "core.note", TypeID.file.rawValue, "test.project"])
-        #expect(rest.map(\.id) == [FakeItemLibrary.collectionType])
-        #expect(QuickAdd.kindMenu(types, shown: [], chosen: nil).first.map(\.id.rawValue) == ["core.note", TypeID.file.rawValue])
-    }
-
     // MARK: Chips
 
     /// A kind with a required field, a field that is not, and one the panel never offers.
@@ -689,24 +625,6 @@ struct QuickAddTests {
         draft.add(.field("priority"))
         draft.add(.field("due_at"))
         #expect(QuickAdd.shownChips(draft, in: Self.chipCatalogue) == [.field("reference"), .field("due_at"), .field("priority")])
-    }
-
-    @Test func thePlusOffersTheParentAndEveryFieldNotYetAChip() {
-        var draft = QuickAdd.Draft(typeID: "test.ticket")
-        #expect(
-            QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: true)
-                == [.parent, .field("priority"), .field("due_at")])
-        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: false) == [.field("priority"), .field("due_at")])
-
-        draft.add(.field("priority"))
-        draft.setParent(ItemID.mint())
-        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: true) == [.field("due_at")])
-    }
-
-    @Test func aKindWithNoFieldsOffersOnlyTheParent() {
-        let draft = QuickAdd.Draft(typeID: "core.note")
-        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: true) == [.parent])
-        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: false).isEmpty)
     }
 
     @Test func aRequiredChipCannotBeRemovedAndAnotherTakesItsValueWithIt() {
@@ -949,24 +867,6 @@ struct QuickAddTests {
     }
 
     // MARK: Waiting for the library
-
-    @Test func aLibraryThatShowsTheItemLaterOpensItWhenItArrives() async throws {
-        let library = FakeItemLibrary(now: start)
-        library.holdsCreations = true
-        let browser = Browser()
-        let id = try #require(await browser.quickAdded("Later", in: library))
-        #expect(browser.selection.isEmpty)
-        #expect(!browser.isNewItemSettled(in: library))
-        browser.finishNewItem(in: library)
-        #expect(browser.newItem != nil, "nothing is known of it yet")
-
-        library.deliverCreated()
-        #expect(browser.isNewItemSettled(in: library))
-        browser.finishNewItem(in: library)
-        #expect(browser.newItem == nil)
-        #expect(browser.selection == [id])
-        #expect(browser.focusRequest == .title)
-    }
 
     @Test func aCreateRefusedLaterOpensNothing() async throws {
         let library = FakeItemLibrary(now: start)

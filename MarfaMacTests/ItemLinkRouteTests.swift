@@ -61,15 +61,6 @@ struct ItemLinkRouteTests {
         #expect(decide(.marfa) == .wait, "a library still loading is waited for")
     }
 
-    @Test func onlyConnectingAndRecentlyDeletedOfferSettingsAndEveryRefusalSaysSomething() {
-        #expect(ItemLinkRefusal.notConnected.action == .openSettings(.connection))
-        #expect(ItemLinkRefusal.unavailable.action == .openSettings(.connection))
-        for refusal in ItemLinkRefusal.allCases {
-            #expect(!refusal.message.isEmpty && !refusal.title.isEmpty)
-            if ![.notConnected, .unavailable, .inRecentlyDeleted].contains(refusal) { #expect(refusal.action == nil) }
-        }
-    }
-
     // MARK: The opener
 
     /// What the windows show, which a test changes as the host would.

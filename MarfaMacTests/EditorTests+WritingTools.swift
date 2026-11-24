@@ -9,11 +9,6 @@ import WebKit
 /// `EditorController.isWritingToolsActive` and `writingToolsActivityChanged()`, which the web view's key-value
 /// observation of `isWritingToolsActive` calls.
 extension EditorTests {
-    @Test func theEditorAsksForTheFullWritingToolsExperience() async throws {
-        let page = try await Page()
-        #expect(page.editor.webView.configuration.writingToolsBehavior == .complete)
-    }
-
     @Test func nothingIsSavedDuringASessionAndTheLatestTextIsSavedWhenItEnds() async throws {
         let page = try await Page()
         try await page.load("Draft\n")

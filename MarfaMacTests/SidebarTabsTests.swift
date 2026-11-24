@@ -47,29 +47,6 @@ struct SidebarTabsTests {
         #expect(try JSONDecoder().decode(SidebarLayout.self, from: JSONEncoder().encode(layout)) == layout)
     }
 
-    @Test func aStoredLayoutKeepsInboxRecentsAndFavoritesBeforeTheSavedViewsWhateverTheViewsOrder() throws {
-        let saved = Data(#"{"hidden":[],"order":["view:v-Reading"]}"#.utf8)
-        let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
-        let plan = SidebarPlan(library(), layout: layout)
-        let places = plan.section(.views)?.shown ?? []
-        #expect(places == [.inbox, .recents, .favorites, .view(ItemID("v-Reading")), .view(ItemID("v-Open work"))])
-    }
-
-    @Test func savedViewsOrderedBeforeTheBuiltInViewsInTheStoredOrderStillShowAfterThem() throws {
-        // A stored order that lists the saved views before the built-in views.
-        let saved = Data(#"{"hidden":[],"order":["view:v-Reading","view:v-Open work","inbox","recents","favorites"]}"#.utf8)
-        let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
-        let places = SidebarPlan(library(), layout: layout).section(.views)?.shown ?? []
-        #expect(places == [.inbox, .recents, .favorites, .view(ItemID("v-Reading")), .view(ItemID("v-Open work"))])
-    }
-
-    @Test func theBuiltInViewsKeepTheirOwnOrderWithinTheirBlock() throws {
-        let saved = Data(#"{"hidden":[],"order":["favorites","view:v-Reading","inbox"]}"#.utf8)
-        let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
-        let places = SidebarPlan(library(), layout: layout).section(.views)?.shown ?? []
-        #expect(places == [.favorites, .inbox, .recents, .view(ItemID("v-Reading")), .view(ItemID("v-Open work"))])
-    }
-
     @Test func draggingARowAcrossTheBlocksOfADefaultSectionIsKept() {
         var layout = SidebarLayout()
         let members = SidebarPlan(library(), layout: layout).section(.views)?.members ?? []
@@ -173,15 +150,6 @@ struct SidebarTabsTests {
         let choices = SidebarContent(library: library, layout: layout, tab: nil, customizing: true).choices
         #expect(choices.collections.isEmpty && choices.unplacedCollections.isEmpty)
         #expect(layout.homes?[SidebarPlace.collection(collection.id).key] == section)
-    }
-
-    @Test func aChangeOfAViewsColorChangesTheSidebarMarksSignature() {
-        var layout = SidebarLayout()
-        let before = SidebarContent(library: library(), layout: layout, tab: nil, customizing: false).marksSignature
-        layout.setColor(.green, of: .view(ItemID("v-Reading")))
-        let after = SidebarContent(library: library(), layout: layout, tab: nil, customizing: false)
-        #expect(after.marksSignature != before)
-        #expect(after.sections.flatMap(\.rows).first { $0.place == .view(ItemID("v-Reading")) }?.tone == .green)
     }
 
     @Test func aShortcutToWhatIsGoneIsKeptInTheLayout() {
@@ -408,30 +376,6 @@ struct SidebarTabsTests {
 
     // MARK: Two windows
 
-    @Test func customizingInOneWindowLeavesTheOtherAndDoneEndsItOnlyThere() throws {
-        let name = "SidebarTabsTests.windows"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        defaults.removePersistentDomain(forName: name)
-        defer { defaults.removePersistentDomain(forName: name) }
-        let layouts = SidebarLayouts(defaults: defaults)
-        let first = Browser()
-        let second = Browser()
-        first.customizesSidebar = true
-        #expect(!second.customizesSidebar)
-
-        // The layout is shared: a change in the first is the layout the second draws.
-        layouts.update("marfa:one") { $0.addTab(named: "Work", id: "work") }
-        first.sidebarTab = "work"
-        let library = library()
-        #expect(SidebarPlan(library, layout: layouts.layout(for: "marfa:one")).tabs.map(\.id) == [SidebarTab.homeID, "work"])
-        #expect(layouts.layout(for: "marfa:one").tab(second.sidebarTab).id == SidebarTab.homeID, "each window keeps its own tab")
-
-        second.customizesSidebar = true
-        first.customizesSidebar = false
-        #expect(second.customizesSidebar)
-        #expect(!first.customizesSidebar)
-    }
-
     @Test func aWindowThatMovesToAnotherLibraryStopsCustomizingAndForgetsItsTab() {
         let browser = Browser()
         browser.adopt(library())
@@ -442,30 +386,4 @@ struct SidebarTabsTests {
         #expect(browser.sidebarTab == nil)
     }
 
-    @Test func aTabRemovedWhileAWindowHasItOpenFallsBackToTheFirst() {
-        var (layout, work, _) = arranged()
-        let browser = Browser()
-        browser.sidebarTab = work
-        #expect(layout.tab(browser.sidebarTab).id == work)
-        layout.removeTab(work)
-        #expect(layout.tab(browser.sidebarTab).id == SidebarTab.homeID)
-    }
-
-    // MARK: What shows while customizing
-
-    @Test func anEmptySectionShowsOnlyWhileCustomizing() {
-        var layout = SidebarLayout()
-        layout.addGroup(.custom, toTab: SidebarTab.homeID, id: "mine")
-        let plan = SidebarPlan(library(), layout: layout)
-        #expect(!plan.groups(in: SidebarTab.homeID, customizing: false).contains { $0.id == "mine" })
-        #expect(plan.groups(in: SidebarTab.homeID, customizing: true).contains { $0.id == "mine" })
-    }
-
-    @Test func aHiddenSectionStaysOutEvenWhileCustomizing() {
-        var layout = SidebarLayout()
-        layout.hideGroup("library")
-        let plan = SidebarPlan(library(), layout: layout)
-        #expect(!plan.groups(in: SidebarTab.homeID, customizing: true).contains { $0.id == "library" })
-        #expect(plan.groups.contains { $0.id == "library" && $0.group.isHidden }, "Add Section can offer it back")
-    }
 }

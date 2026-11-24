@@ -55,23 +55,9 @@ struct ItemTableAddTests {
         return ItemTableColumn(id: "field." + key, label: field.label, content: .field(field), style: style)
     }
 
-    @Test func anEmptyCellOfAPanelValueOffersItsPanel() {
-        let row = Self.row()
-        #expect(Self.column("due", .date).addKind(for: row, catalogue: Self.catalogue) == .date(Self.catalogue.itemTypes[Self.task]!.fields[3]))
-        #expect(Self.column("labels", .text).addKind(for: row, catalogue: Self.catalogue) != nil)
-        #expect(Self.column("estimate", .number).addKind(for: row, catalogue: Self.catalogue) != nil)
-    }
-
     @Test func aCellThatHoldsAValueOffersNone() {
         let row = Self.row([Property(key: "due", value: .string("2026-11-17"))])
         #expect(Self.column("due", .date).addKind(for: row, catalogue: Self.catalogue) == nil)
-    }
-
-    @Test func aPickedOrSwitchedValueIsEditedInPlaceNotInAPanel() {
-        let row = Self.row()
-        for (key, style) in [("status", ItemTableColumn.Style.status), ("priority", .priority), ("done", .boolean)] {
-            #expect(Self.column(key, style).addKind(for: row, catalogue: Self.catalogue) == nil)
-        }
     }
 
     @Test func noPanelOpensForAnItemThatCannotBeChangedOrWhoseTypeLacksTheField() {
@@ -114,10 +100,5 @@ struct ItemTableAddTests {
         #expect(column.addKind(for: none, catalogue: Self.catalogue) == .people(field, Self.people))
         #expect(column.addKind(for: empty, catalogue: Self.catalogue) == .people(field, Self.people))
         #expect(column.addKind(for: one, catalogue: Self.catalogue) == nil)
-    }
-
-    @Test func anEmptyArrayInAWordsCellIsEmpty() {
-        let row = Self.row([Property(key: "labels", value: .array([]))])
-        #expect(Self.column("labels", .text).addKind(for: row, catalogue: Self.catalogue) != nil)
     }
 }

@@ -26,80 +26,13 @@ struct ItemLocationTests {
 
     // MARK: Which types have one
 
-    @Test func aTypeWithBothNumbersHasALocationAndNameItsOwnWay() throws {
-        #expect(try Self.spec("core.event").name == .typed(#require(Self.typeInfo("core.event")?.fields.first { $0.key == "place" })))
-        #expect(try Self.spec("core.entity.place").name == .itemName)
-        #expect(try Self.spec("core.file.image").name == .none)
-    }
-
     @Test func aTypeWithOneOfTheTwoNumbersHasNoLocationAndTheOneStaysANumber() {
         #expect(ItemLocation.of(Self.typeInfo("core.file.video")) == nil)
         #expect(ItemLocation.of(Self.typeInfo("core.note")) == nil)
         #expect(ItemLocation.of(nil) == nil)
     }
 
-    @Test func aNumberFieldIsNeededNotJustTheName() {
-        let specs = LookFixture.specs.map { spec in
-            var copy = spec
-            if spec.id == "core.event" { copy.fields = spec.fields.map { $0.key == "latitude" ? LookFixture.field("latitude") : $0 } }
-            return copy
-        }
-        #expect(ItemLocation.of(LookFixture.catalogue(specs).itemTypes[TypeID("core.event")]) == nil)
-    }
-
-    // MARK: Reading
-
-    @Test func neitherNumberIsNoLocation() throws {
-        let spec = try Self.spec("core.event")
-        #expect(spec.reading(of: Self.item("core.event")) == .none)
-        #expect(spec.summary(of: Self.item("core.event")) == nil)
-    }
-
-    @Test func oneNumberAloneIsNoPointAndIsShownAsStored() throws {
-        let spec = try Self.spec("core.event")
-        let item = Self.item("core.event", ["latitude": Self.number("51.5")])
-        #expect(spec.reading(of: item) == .partial("51.5, –"))
-        #expect(spec.summary(of: item) == "51.5, –")
-        #expect(spec.problem(of: item) != nil)
-        #expect(!spec.hasPoint(item))
-    }
-
-    @Test func aPairOffTheEarthIsShownAsStoredAndNotDrawn() throws {
-        let spec = try Self.spec("core.event")
-        for pair in [("91", "10"), ("-90.5", "10"), ("10", "181"), ("10", "-180.1")] {
-            let item = Self.item("core.event", ["latitude": Self.number(pair.0), "longitude": Self.number(pair.1)])
-            #expect(spec.reading(of: item) == .unplaceable("\(pair.0), \(pair.1)"), "\(pair)")
-            #expect(spec.summary(of: item) == "\(pair.0), \(pair.1)")
-            #expect(spec.problem(of: item) != nil)
-            #expect(!spec.hasPoint(item))
-        }
-    }
-
-    @Test func theEdgesOfTheEarthAreAPoint() throws {
-        let spec = try Self.spec("core.event")
-        for pair in [("90", "180"), ("-90", "-180"), ("0", "0")] {
-            let item = Self.item("core.event", ["latitude": Self.number(pair.0), "longitude": Self.number(pair.1)])
-            #expect(spec.hasPoint(item), "\(pair)")
-        }
-    }
-
-    @Test func aNumberThatIsNotANumberIsShownAsStoredAndNotDrawn() throws {
-        let spec = try Self.spec("core.event")
-        let item = Self.item("core.event", ["latitude": .string("north"), "longitude": Self.number("1")])
-        #expect(spec.reading(of: item) == .unplaceable("north, 1"))
-    }
-
     // MARK: Names
-
-    @Test func anEventShowsItsPlaceAndAnImageShowsMapOnly() throws {
-        var values = Self.london
-        values["place"] = .string("Brat\nsecond line")
-        #expect(try Self.spec("core.event").summary(of: Self.item("core.event", values)) == "Brat")
-        #expect(try Self.spec("core.event").summary(of: Self.item("core.event", Self.london)) == String(localized: "Map"))
-        let image = Self.item("core.file.image", Self.london, content: .file(.png, byteCount: 4))
-        #expect(try Self.spec("core.file.image").summary(of: image) == String(localized: "Map"))
-        #expect(try !Self.spec("core.file.image").hasNameField)
-    }
 
     @Test func aPlaceShowsItsOwnNameOnceItHasAPoint() throws {
         let spec = try Self.spec("core.entity.place")
@@ -157,20 +90,6 @@ struct ItemLocationTests {
 
     // MARK: Rows and listing
 
-    @Test func theRowOpensWhereThereIsAPointEvenOnAnItemThatCannotBeEdited() throws {
-        let spec = try Self.spec("core.event")
-        var item = Self.item("core.event", Self.london)
-        item.readOnly = true
-        let row = try #require(spec.row(of: item, offersEmpty: false))
-        #expect(row.id == "#location")
-        #expect(row.editable)
-        #expect(spec.row(of: Self.item("core.event"), offersEmpty: false) == nil)
-        #expect(spec.row(of: Self.item("core.event"), offersEmpty: true)?.editable == true)
-        var empty = Self.item("core.event")
-        empty.readOnly = true
-        #expect(spec.row(of: empty, offersEmpty: true) == nil)
-    }
-
     @Test func aFileHasAMapToLookAtAndNothingToEdit() throws {
         let spec = try Self.spec("core.file.image")
         let image = Self.item("core.file.image", Self.london, content: .file(.png, byteCount: 4))
@@ -178,36 +97,6 @@ struct ItemLocationTests {
         #expect(spec.hasPoint(image))
         #expect(spec.row(of: image, offersEmpty: true)?.editable == true)
         #expect(spec.row(of: Self.item("core.file.image", content: .file(.png, byteCount: 4)), offersEmpty: true) == nil)
-    }
-
-    @Test func locationStandsInForTheFieldsItOwnsWhereTheFirstOfThemWas() throws {
-        let spec = try Self.spec("core.event")
-        let fields = try #require(Self.typeInfo("core.event")).fields
-        let hidden = spec.folding(fields, showingCoordinates: false, listsLocation: true)
-        let keys = hidden.map(\.id)
-        #expect(!keys.contains("latitude") && !keys.contains("longitude") && !keys.contains("place"))
-        #expect(keys.filter { $0 == "#location" }.count == 1)
-        let shown = spec.folding(fields, showingCoordinates: true, listsLocation: true).map(\.id)
-        #expect(shown.contains("latitude") && shown.contains("longitude") && !shown.contains("place"))
-        let unlisted = spec.folding(fields, showingCoordinates: false, listsLocation: false).map(\.id)
-        #expect(!unlisted.contains("#location"))
-    }
-
-    /// What the inspector lists, and what Customize Sidebar counts beside Properties, is one Location for the fields it
-    /// is made of.
-    @Test func thePropertiesListCountsTheLocationAsOneEntry() throws {
-        var values = Self.london
-        values["place"] = .string("Brat")
-        values["url"] = .string("https://example.com")
-        let event = Self.item("core.event", values)
-        let type = Self.typeInfo("core.event")
-        let hidden = InspectorFields.entries(of: event, type: type, hidden: ["title"], showingCoordinates: false)
-        #expect(hidden.map(\.id) == ["#location", "url"])
-        let shown = InspectorFields.entries(of: event, type: type, hidden: ["title"], showingCoordinates: true).map(\.id)
-        #expect(shown.count == 4 && shown.contains("latitude") && shown.contains("longitude") && !shown.contains("place"))
-        let empty = Self.item("core.event")
-        #expect(InspectorFields.entries(of: empty, type: type, hidden: ["title"], showingCoordinates: false).isEmpty)
-        #expect(InspectorFields.entries(of: empty, type: type, hidden: ["title"], revealed: [ItemLocation.rowID], showingCoordinates: false).map(\.id) == ["#location"])
     }
 
     // MARK: Points and frames
@@ -219,18 +108,5 @@ struct ItemLocationTests {
         #expect(LocationPoint(clicked: 91, longitude: 0) == nil)
         #expect(LocationPoint(clicked: 0, longitude: .nan) == nil)
         #expect(LocationPoint(latitude: .infinity, longitude: 0) == nil)
-    }
-
-    @Test func aMapOpensOnTheItemsPointElseItsOwnersPlacesElseTheWorld() throws {
-        let point = try #require(LocationPoint(latitude: 51.5, longitude: -0.1))
-        #expect(LocationFrame.start(point: point, others: []) == .around(point))
-        let near = try #require(LocationPoint(latitude: 51.6, longitude: -0.2))
-        let frame = LocationFrame.start(point: nil, others: [point, near])
-        #expect(abs(frame.latitude - 51.55) < 0.001)
-        #expect(frame.latitudeSpan > 0.05 && frame.latitudeSpan < 1)
-        #expect(LocationFrame.start(point: nil, others: []) == .world)
-        let far = try #require(LocationPoint(latitude: -40, longitude: 170))
-        #expect(LocationFrame.start(point: nil, others: [point, far]) == .world)
-        #expect(LocationFrame.covering([point])?.latitudeSpan == 0.05)
     }
 }

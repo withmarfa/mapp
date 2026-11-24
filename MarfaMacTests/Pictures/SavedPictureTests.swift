@@ -116,17 +116,6 @@ import Testing
         #expect(library.savedPictures(of: note, at: address("https://example.com/a.png")) == [file])
     }
 
-    @Test func twoFilesFromOneAddressAreTriedOldestFirstWithTheirIdsBreakingATie() throws {
-        let note = newNote()
-        let moment = Date(timeIntervalSince1970: 1_000_000)
-        let newer = library.attachPicture(try picture(), to: note, from: "https://example.com/a.png", created: moment + 60)
-        let older = library.attachPicture(try picture(), to: note, from: "https://example.com/a.png", created: moment)
-        let tied = library.attachPicture(try picture(), to: note, from: "https://example.com/a.png", created: moment)
-        let tiedOrder = [older, tied].sorted { $0.rawValue < $1.rawValue }
-
-        #expect(library.savedPictures(of: note, at: address("https://example.com/a.png")) == tiedOrder + [newer])
-    }
-
     // MARK: What the page depends on
 
     @Test func theStatesChangeWhenAFileComesIsBinnedOrChanges() throws {

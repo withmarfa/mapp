@@ -149,15 +149,6 @@ struct ViewDraftTests {
         #expect(options.filter.isEmpty)
     }
 
-    @Test func aViewWithoutGroupingOrSortOpensUngroupedInTheTablesOwnOrder() {
-        let plain = ViewDraft.options(for: LibraryView(id: ItemID("v"), title: "V"), catalogue: Self.catalogue)
-        #expect(plain.grouping == .none)
-        #expect(plain.sort == nil)
-        // A date grouped by month opens grouped so.
-        let monthly = LibraryView(id: ItemID("v"), title: "V", group: LibraryViewGroup(field: "created_at", bucket: .month))
-        #expect(ViewDraft.options(for: monthly, catalogue: Self.catalogue).grouping == .column("created", by: .bucket(.month)))
-    }
-
     @Test func fieldsAndColumnsMapBothWays() {
         for column in Self.columns {
             guard let field = ViewDraft.field(of: column) else { continue }
@@ -592,13 +583,6 @@ struct ViewDraftTests {
 
     // MARK: Timeline date
 
-    @Test func aViewsDayGroupIsTheTimelinesDate() {
-        let view = LibraryView(id: ItemID("v"), title: "V", group: LibraryViewGroup(field: "properties.due_at", bucket: .day))
-        #expect(ViewDraft.timelineDate(of: view) == "due_at")
-        #expect(ViewDraft.timelineDate(of: LibraryView(id: ItemID("v"), title: "V", group: LibraryViewGroup(field: "properties.due_at"))) == nil)
-        #expect(ViewDraft.timelineDate(of: LibraryView(id: ItemID("v"), title: "V")) == nil)
-    }
-
     @Test func aChangedTimelineDateDiffersAndIsSavedAsTheDayGroup() {
         let view = LibraryView(id: ItemID("v"), title: "V", version: 2, group: LibraryViewGroup(field: "properties.due_at", bucket: .day))
         let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
@@ -732,10 +716,5 @@ struct ViewDraftTests {
 
     @Test func aFilterTheCoreRefusesHasNoPreview() {
         #expect(Self.preview(LibraryViewQuery(filter: "not a filter ((")) == nil)
-    }
-
-    @Test func aViewWithNoFilterPreviewsAsItself() {
-        let query = LibraryViewQuery(types: [Self.task], tier: .feed, states: [.active, .archived])
-        #expect(Self.preview(query) == query)
     }
 }

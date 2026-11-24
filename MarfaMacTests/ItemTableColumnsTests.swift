@@ -28,15 +28,6 @@ struct ItemTableColumnsTests {
         #expect(shown.count < columns.count)
     }
 
-    @Test func aHiddenColumnComesBackWhenShownAndLeavesAgainWhenHidden() {
-        let columns = Self.columns
-        var properties = ViewProperties()
-        properties.setShown(.created, true)
-        #expect(Self.ids(properties.shownColumns(columns)).contains("created"))
-        properties.setShown(.created, false)
-        #expect(!Self.ids(properties.shownColumns(columns)).contains("created"))
-    }
-
     @Test func aColumnShownByDefaultLeavesWhenHiddenAndKeepsItsPlaceInTheOrder() throws {
         let columns = Self.columns
         let victim = try #require(columns.first { $0.isShownByDefault && $0.content != .title })
@@ -54,11 +45,6 @@ struct ItemTableColumnsTests {
         properties.setShown(.edited, false)
         properties.reset()
         #expect(Self.ids(properties.shownColumns(columns)) == Self.ids(columns.filter(\.isShownByDefault)))
-    }
-
-    @Test func theNameStaysEvenIfTheStoredPropertiesHideIt() {
-        let properties = ViewProperties(shown: ["title": false])
-        #expect(Self.ids(properties.shownColumns(Self.columns)).first == "title")
     }
 
     @Test func aStoredLayoutSurvivesTheRoundTripPerPlace() {

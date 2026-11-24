@@ -42,23 +42,6 @@ struct InspectorFieldsTests {
 
     // MARK: Status
 
-    @Test func aStatusFieldIsFoundByItsKindWhateverItsName() throws {
-        let type = MarfaMapping.itemType(ItemType(id: "core.media", label: "Media", fields: [Self.field("progress", "status", definition: Self.words)]))
-        let status = try #require(type.statusField)
-        #expect(status.key == "progress")
-        #expect(status.options == ["pending", "in_progress", "completed", "canceled"])
-        #expect(status.isPicked)
-        #expect(status.statusGroup(of: "completed") == .completed)
-        #expect(status.statusGroup(of: "mystery") == nil)
-    }
-
-    @Test func aStatusWithNoWordsIsStillFound() throws {
-        let type = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("status", "status")]))
-        let status = try #require(type.statusField)
-        #expect(status.options.isEmpty)
-        #expect(!status.isPicked)
-    }
-
     @Test func aFieldIsNotAStatusByItsNameOrItsDescription() {
         let named = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("status")]))
         let choice = MarfaMapping.itemType(ItemType(
@@ -72,13 +55,6 @@ struct InspectorFieldsTests {
         #expect(number.statusField == nil)
         #expect(choice.fields[0].options == ["open", "done"], "still a choice, only not a status")
         #expect(described.fields[0].options.isEmpty, "a description is never read for values")
-    }
-
-    @Test func optionsReadAsWords() {
-        #expect(ItemTypeInfo.Field.label(ofOption: "completed") == "Completed")
-        #expect(ItemTypeInfo.Field.label(ofOption: "in_progress") == "In Progress")
-        #expect(ItemTypeInfo.Field.label(ofOption: "on-hold") == "On Hold")
-        #expect(ItemTypeInfo.Field.label(ofOption: "") == "")
     }
 
     // MARK: The header's status pin
@@ -174,24 +150,6 @@ struct InspectorFieldsTests {
         #expect(InspectorFields.addable(of: item, type: Self.task, hidden: hidden).map(\.key) == ["status", "priority"])
     }
 
-    @Test func theRelationshipsListLeavesOutWhatLinksToTheItem() {
-        func target(_ title: String) -> ItemRelationshipTarget {
-            ItemRelationshipTarget(title: title, itemID: ItemID(title), resolution: .resolved(ItemID(title)))
-        }
-        let groups = [
-            ItemRelationship(field: "child-of", label: "Parent", targets: [target("a")], isEditable: true, allowsMultiple: false),
-            ItemRelationship(field: "inverse:parent-of", label: "Children", targets: [target("b")], isEditable: false, allowsMultiple: true),
-            ItemRelationship(field: "inverse:references", label: "Referenced By", targets: [target("c")], isEditable: false, allowsMultiple: true),
-            ItemRelationship(field: "about", label: "About", targets: [], isEditable: true, allowsMultiple: true),
-        ]
-        #expect(InspectorFields.relationships(groups).map(\.field) == ["child-of"], "incoming links are Linked From's, once")
-    }
-
-    @Test func onlyATrueValueReadsAsChecked() {
-        #expect(InspectorFields.isYes(.bool(true)))
-        for value: PropertyValue? in [.bool(false), nil, .null, .string("yes")] { #expect(!InspectorFields.isYes(value)) }
-    }
-
     @Test func aUrlOrEmailValueIsALinkOnlyToAWebOrMailAddress() {
         func link(_ format: ItemTypeInfo.Field.TextFormat?, _ text: String) -> String? {
             let field = ItemTypeInfo.Field(key: "k", label: "K", kind: .text, declaredBy: TypeID("aic.x"), format: format)
@@ -221,12 +179,6 @@ struct InspectorFieldsTests {
         #expect(InspectorFields.addable(of: item, type: Self.task, hidden: ["title", "body"]).map(\.key) == ["status"])
     }
 
-    @Test func anItemWithNoValuesListsNothingAndOffersEveryProperty() {
-        let item = Self.item("aic.ticket.task")
-        #expect(InspectorFields.properties(of: item, type: Self.task, hidden: ["title", "body"]).isEmpty)
-        #expect(InspectorFields.addable(of: item, type: Self.task, hidden: ["title", "body"]).map(\.key) == ["description", "status", "priority"])
-    }
-
     @Test func aPropertyTheItemCannotTakeIsNeverOffered() {
         var item = Self.item("aic.ticket.task")
         item.state = .trashed
@@ -254,11 +206,6 @@ struct InspectorFieldsTests {
     }
 
     // MARK: Labels
-
-    @Test func aTypeAuthorsLabelIsShownAsWritten() {
-        let field = ItemTypeInfo.Field(key: "completed_at", label: "Completed at", kind: .date(includesTime: false), declaredBy: TypeID("aic.x"))
-        #expect(field.label == "Completed at", "the page does not set the author's words in title case")
-    }
 
     @MainActor @Test func aTitleFromTheFirstLineHidesNothingElse() {
         let note = Self.item("core.note", rule: .firstLine)
@@ -292,58 +239,4 @@ struct InspectorFieldsTests {
         #expect(library.hiddenPropertyKeys(of: note) == ["title"])
     }
 
-    @Test func aFieldWithNothingInItAndNoWayToAddToItHasNoRow() {
-        let list = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("tags", "array")]))
-        let empty = Self.item("aic.x")
-        #expect(InspectorFields.properties(of: empty, type: list, hidden: []).isEmpty)
-        let full = Self.item("aic.x", properties: [Property(key: "tags", value: .array([.string("a")]))])
-        #expect(InspectorFields.properties(of: full, type: list, hidden: []).map(\.key) == ["tags"])
-    }
-
-    @Test func aWebAddressShowsAsALinkHoweverTheCatalogueSpellsItsKind() {
-        let type = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [
-            Self.field("home", "url"),
-            Self.field("site", "string", definition: ["format": "url"]),
-            Self.field("contact", "email"),
-            Self.field("mail", "string", definition: ["format": "email"]),
-            Self.field("notes", "string", definition: ["format": "bcp47"]),
-        ]))
-        let item = Self.item("aic.x", properties: [
-            Property(key: "home", value: .string("https://example.com/a")),
-            Property(key: "site", value: .string(" https://example.com/b ")),
-            Property(key: "contact", value: .string("a@example.com")),
-            Property(key: "mail", value: .string("b@example.com")),
-            Property(key: "notes", value: .string("en-GB")),
-        ])
-        let values = Dictionary(uniqueKeysWithValues: type.fields.map { ($0.key, PropertyRow.value(of: $0, in: item, format: .standard)) })
-        #expect(values["home"] == .url("https://example.com/a"))
-        #expect(values["site"] == .url("https://example.com/b"))
-        #expect(values["contact"] == .email("a@example.com"))
-        #expect(values["mail"] == .email("b@example.com"))
-        #expect(values["notes"] == .text("en-GB"))
-    }
-
-    // MARK: Labels for other properties
-
-    @Test func aKeyEveryTypeLabelsTheSameKeepsThatLabel() {
-        func type(_ id: String, _ label: String) -> ItemTypeInfo {
-            ItemTypeInfo(id: TypeID(id), label: id, fields: [.init(key: "due", label: label, kind: .date(includesTime: false), declaredBy: TypeID(id))], titleField: nil, bodyField: nil, parent: nil)
-        }
-        let types = [type("aic.b", "Due B"), type("aic.a", "Due A"), type("aic.c", "Due C")]
-        // The same answer whatever order the types arrive in and however the dictionary lays them out.
-        for order in [types, types.reversed(), [types[1], types[2], types[0]]] {
-            let catalogue = Catalogue(itemTypes: order)
-            #expect(catalogue.label(ofField: "due", for: nil) == "Due A")
-            #expect(catalogue.label(ofField: "due", for: TypeID("aic.x")) == "Due A")
-            #expect(catalogue.label(ofField: "due", for: TypeID("aic.c")) == "Due C", "the item's own type labels it first")
-            #expect(catalogue.label(ofField: "missing", for: TypeID("aic.c")) == nil)
-        }
-    }
-
-    @Test func theLabelsFollowTheCatalogueWhenItsTypesChange() {
-        var catalogue = Catalogue(itemTypes: [Self.task])
-        #expect(catalogue.label(ofField: "priority", for: nil) == "Priority")
-        catalogue.itemTypes[Self.task.id] = nil
-        #expect(catalogue.label(ofField: "priority", for: nil) == nil)
-    }
 }

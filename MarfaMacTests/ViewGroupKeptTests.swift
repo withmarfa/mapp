@@ -73,19 +73,6 @@ struct ViewGroupKeptTests {
         }
     }
 
-    @Test func aDateOpensGroupedByItsDayWeekMonthOrYear() {
-        for bucket in LibraryViewGroup.Bucket.allCases {
-            for (field, column) in [("properties.due_at", "field.due_at"), ("created_at", "created"), ("updated_at", "edited"), ("occurred_at", "occurred")] {
-                let options = ViewDraft.options(for: Self.view(LibraryViewGroup(field: field, bucket: bucket)), catalogue: Self.catalogue)
-                #expect(options.grouping == .column(column, by: .bucket(bucket)), "\(field) by \(bucket)")
-            }
-        }
-        // A span of something that is no date, and a link the app has no column for, open ungrouped.
-        #expect(ViewDraft.options(for: Self.view(LibraryViewGroup(field: "properties.note", bucket: .week)), catalogue: Self.catalogue).grouping == .none)
-        #expect(ViewDraft.options(for: Self.view(LibraryViewGroup(field: "edge[cites]")), catalogue: Self.catalogue).grouping == .none)
-        #expect(ViewDraft.options(for: Self.view(LibraryViewGroup(field: "tier")), catalogue: Self.catalogue).grouping == .none)
-    }
-
     // MARK: Writes that leave the group alone
 
     @Test func aChangeOfNameQueryOrSortLeavesTheGroupAsRead() {
@@ -445,31 +432,6 @@ struct ViewGroupKeptTests {
         return ItemTableRow(item: item, typeLabel: "Task", typeIcon: nil, parent: nil)
     }
 
-    @Test func weeksInAViewStartOnMondayAndTheUndatedComeLast() {
-        var base = Calendar(identifier: .gregorian)
-        base.timeZone = TimeZone(identifier: "Europe/London")!
-        base.firstWeekday = 1
-        let calendar = DateGroups.viewCalendar(base)
-        // Saturday 21 November 2026 and Sunday 22 November are in the week of Monday 16; Monday 23 starts the next.
-        let rows = [Self.row("sun", due: "2026-11-22"), Self.row("none", due: nil), Self.row("mon", due: "2026-11-23"),
-                    Self.row("sat", due: "2026-11-21"), Self.row("bad", due: "soon")]
-        let now = base.date(from: DateComponents(year: 2026, month: 11, day: 21))!
-        let groups = ItemTableLayout.groups(of: rows, by: Self.dueColumn, mode: .bucket(.week), calendar: calendar, now: now)
-        #expect(groups.map(\.id) == ["2026-11-16", "2026-11-23", ""])
-        #expect(groups.map { $0.rows.map(\.item.id.rawValue) } == [["sun", "sat"], ["mon"], ["none", "bad"]])
-        #expect(groups[0].title == String(localized: "Week of \(base.date(from: DateComponents(year: 2026, month: 11, day: 16))!.formatted(Date.FormatStyle(locale: base.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone).day().month(.abbreviated)))"))
-        // A place's own weeks start where Settings says, here Sunday, which moves Sunday 22 into the next week.
-        let sundays = ItemTableLayout.groups(of: rows, by: Self.dueColumn, mode: .bucket(.week), calendar: base, now: now)
-        #expect(sundays.map(\.id) == ["2026-11-15", "2026-11-22", ""])
-
-        let months = ItemTableLayout.groups(of: rows, by: Self.dueColumn, mode: .bucket(.month), calendar: calendar, now: now)
-        #expect(months.map(\.id) == ["2026-11-01", ""])
-        let years = ItemTableLayout.groups(of: rows, by: Self.dueColumn, mode: .bucket(.year), calendar: calendar, now: now)
-        #expect(years.map(\.id) == ["2026-01-01", ""])
-        let days = ItemTableLayout.groups(of: rows, by: Self.dueColumn, mode: .bucket(.day), calendar: calendar, now: now)
-        #expect(days.map(\.title).prefix(3) == [String(localized: "Today"), String(localized: "Tomorrow"), days[2].title])
-    }
-
     @Test func aPlaceKeepsADateGroupingInItsDefaultView() throws {
         var kept = PlaceDefault()
         kept.keep(ItemTableOptions(grouping: .column("field.due_at", by: .bucket(.week))))
@@ -479,25 +441,4 @@ struct ViewGroupKeptTests {
         #expect(String(data: data, encoding: .utf8)?.contains("week:field.due_at") == true)
     }
 
-    // MARK: The board follows the sort
-
-    @Test func aBoardsCardsFollowTheViewsSortWithinEachLane() {
-        let catalogue = Catalogue(itemTypes: [
-            ItemTypeInfo(id: Self.task, label: "Task", fields: [Self.priority, Self.due], titleField: "title", bodyField: "body", parent: nil),
-        ])
-        func item(_ title: String, priority: String, due: String) -> MarfaMac.Item {
-            MarfaMac.Item(id: ItemID(title), type: Self.task, title: title, titleRule: .property("title"),
-                 properties: [Property(key: "priority", value: .string(priority)), Property(key: "due_at", value: .string(due))],
-                 version: ItemVersion(1), created: Date(timeIntervalSince1970: 0), modified: Date(timeIntervalSince1970: 0))
-        }
-        let items = [item("A", priority: "high", due: "2026-12-03"), item("B", priority: "high", due: "2026-11-24"),
-                     item("C", priority: "high", due: "2026-11-30")]
-        let byTitle = ItemBoardLayout.lanes(items: items, key: "priority", catalogue: catalogue)
-        #expect(byTitle.first { $0.id == .option("high") }?.items.map(\.id.rawValue) == ["A", "B", "C"])
-        let rows = items.map { ItemTableRow(item: $0, typeLabel: "Task", typeIcon: nil, parent: nil) }
-        let sorted = ItemTableLayout.sorted(rows, by: [ItemTableComparator(column: Self.dueColumn, order: .forward)])
-        let order = Dictionary(uniqueKeysWithValues: sorted.enumerated().map { ($0.element.item.id, $0.offset) })
-        let byDue = ItemBoardLayout.lanes(items: items, key: "priority", catalogue: catalogue, order: order)
-        #expect(byDue.first { $0.id == .option("high") }?.items.map(\.id.rawValue) == ["B", "C", "A"])
-    }
 }

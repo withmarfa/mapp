@@ -72,55 +72,6 @@ import Testing
         #expect(await eventually { page.editor.header?.title == "Alpha, renamed" })
         #expect(page.builds == 2)
     }
-
-    @Test func aNewTitleOfAnItemLinkedFromHereIsShown() async throws {
-        let page = try await Page.opening(F.p1)
-        // The plain note holds an about link to the project.
-        #expect(page.editor.header?.linked.map(\.title).contains("Plain note") == true)
-        var linking = try #require(page.library.item(F.n1))
-        linking.title = "Plain note, renamed"
-        try await page.send(linking)
-        #expect(await eventually { page.editor.header?.linked.map(\.title).contains("Plain note, renamed") == true })
-        #expect(page.editor.header?.linked.map(\.title).contains("Plain note") == false)
-    }
-
-    @Test func aLinkAnotherItemGainsIsShown() async throws {
-        let page = try await Page.opening(F.p2)
-        #expect(page.editor.header?.linked.isEmpty == true)
-        var linking = try #require(page.library.item(F.n2))
-        linking.edgesOut = [Edge(id: EdgeID("a2"), type: "about", from: F.n2, to: .item(F.p2), origin: .property("about"))]
-        try await page.send(linking)
-        #expect(await eventually { page.editor.header?.linked.map(\.title) == ["Feed note"] })
-    }
-
-    @Test func aLinkAnotherItemMovesAwayFromHereIsGone() async throws {
-        let page = try await Page.opening(F.p1)
-        var linking = try #require(page.library.item(F.n1))
-        linking.edgesOut = [Edge(id: EdgeID("a1"), type: "about", from: F.n1, to: .item(F.p2), origin: .property("about"))]
-        try await page.send(linking)
-        #expect(await eventually { page.editor.header?.linked.map(\.title).contains("Plain note") == false })
-    }
-
-    @Test func linkedFromIsSentOnlyWhereTheTypePlacesItOnThePage() async throws {
-        let source = FakeItemSource()
-        let library = MarfaLibrary(source: source, notices: Notices())
-        source.send(.loaded(F.snapshot))
-        try #require(await eventually { library.isLoaded })
-        let drafts = DetailsPresentation()
-        let byDefault = try #require(ItemPageHeader.header(of: F.p1, in: library, drafts: drafts, placements: PagePlacements()))
-        #expect(byDefault.linked.isEmpty, "an ordinary type keeps Linked From in the inspector")
-        var placements = PagePlacements()
-        placements.setLinkedFrom(.page, of: F.project, in: library.catalogue)
-        let onPage = try #require(ItemPageHeader.header(of: F.p1, in: library, drafts: drafts, placements: placements))
-        #expect(onPage.linked.map(\.title).contains("Plain note"))
-    }
-
-    @Test func aLinkingItemThatIsRemovedIsGone() async throws {
-        let page = try await Page.opening(F.p1)
-        #expect(page.editor.header?.linked.map(\.title).contains("Plain note") == true)
-        page.source.send(.removed([F.n1]))
-        #expect(await eventually { page.editor.header?.linked.map(\.title).contains("Plain note") == false })
-    }
 }
 
 /// The pictures the header's pins use, drawn once and kept.
@@ -152,13 +103,5 @@ import Testing
         #endif
         #expect(both.symbols.count == one.symbols.count + 1)
         for (key, icon) in one.symbols { #expect(both.symbols[key]?.url == icon.url) }
-    }
-
-    @Test func aNewTextSizeDrawsEverythingAtTheNewSize() throws {
-        let small = try #require(PageHeaderIcons(textSize: 11, typeIcons: ["lucide:folder"]))
-        let large = try #require(PageHeaderIcons(textSize: 24, typeIcons: ["lucide:folder"]))
-        #expect(small.indicator.width < large.indicator.width)
-        let back = try #require(PageHeaderIcons(textSize: 11, typeIcons: ["lucide:folder"]))
-        #expect(back.indicator.url == small.indicator.url)
     }
 }

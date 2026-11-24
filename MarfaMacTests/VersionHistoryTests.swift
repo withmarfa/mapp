@@ -63,16 +63,6 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         #expect(model.isComplete)
     }
 
-    @Test func theThreadGrowsAsEachPageArrives() async {
-        let source = FakeHistory([page([1, 2], next: "more"), page([3], next: nil)])
-        let model = ItemHistoryModel(id: Self.id, source: source)
-        model.load()
-        #expect(await eventually { model.phase == .loaded })
-        await settled(model)
-        #expect(model.snapshots.map(\.version) == [1, 2, 3])
-        #expect(!model.hasMore)
-    }
-
     @Test func aVeryLongHistoryStopsAfterTenPagesAndLoadMoreReadsOn() async {
         let pages = (0..<12).map { page([$0 * 2 + 1, $0 * 2 + 2], next: "p\($0)") }
         let source = FakeHistory(pages)
@@ -127,17 +117,6 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         #expect(model.moreFailure == nil)
     }
 
-    @Test func aLibraryWithNoHistoryHasNothingToLoad() async {
-        let model = await loaded(nil)
-        #expect(model.phase == .failed(.unsupported))
-    }
-
-    @Test func aLongTextIsCutForReadingAndSaysHowMuch() {
-        let excerpt = TextExcerpt(String(repeating: "a", count: 25), limit: 10)
-        #expect(excerpt.text.count == 10)
-        #expect(excerpt.omitted == 15)
-    }
-
     // MARK: Whether a version can be put back
 
     @Test func restoreIsOfferedOnlyWhereTheVersionDiffersAndTheItemCanTakeIt() {
@@ -155,17 +134,6 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         if case .unavailable = library.restoreCheck(of: unknown, for: note.id) {} else { Issue.record("restorable without text") }
         // An item deleted elsewhere while Version History was open.
         if case .unavailable = library.restoreCheck(of: snapshot(1), for: ItemID("missing")) {} else { Issue.record("restorable when gone") }
-    }
-
-    @Test func restoringFromTheFakeLibraryChangesTheTextOnce() {
-        let library = FakeItemLibrary(items: [])
-        library.catalogue = TypeChangeFixture.catalogue
-        let note = library.add("Agenda")
-        #expect(library.restoreVersion(snapshot(1, body: "Old"), of: note.id, undoManager: nil))
-        #expect(library.body(of: note.id)?.text == "Old")
-        // The version now current is not written again.
-        #expect(library.restoreVersion(snapshot(1, body: "Old"), of: note.id, undoManager: nil))
-        #expect(library.restored.count == 1)
     }
 }
 

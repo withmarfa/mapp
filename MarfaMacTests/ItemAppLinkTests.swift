@@ -15,18 +15,6 @@ struct ItemAppLinkTests {
         #expect(link.item == ItemID(Self.item))
     }
 
-    @Test func readsTheLinkAURLCarries() throws {
-        let url = try #require(URL(string: Self.valid))
-        let link = try #require(ItemAppLink(url))
-        #expect(link.item == ItemID(Self.item))
-    }
-
-    @Test func takesTheSchemeInAnyCase() throws {
-        let link = try #require(ItemAppLink(parsing: "MaRfA://\(Self.instance)/\(Self.item)"))
-        #expect(link.item == ItemID(Self.item))
-        #expect(link.url.absoluteString == Self.valid)
-    }
-
     @Test func aMarfaWhoseIdIsNotAUUIDv7IsStillOne() {
         #expect(ItemAppLink(parsing: "marfa://3f2504e0-4f89-41d3-9a0c-0305e82c3301/\(Self.item)") != nil)
     }

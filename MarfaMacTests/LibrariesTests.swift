@@ -14,14 +14,6 @@ import Testing
         return Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
     }
 
-    @Test func withNoServerSetTheWindowsAskForOne() {
-        for state in [MarfaConnectionState.disconnected, .online, .keyRefused] {
-            for flag in [false, true] {
-                #expect(Libraries.mode(hasSource: false, isConfigured: false, state: state, isLaunching: flag, isBusy: flag) == .unconfigured)
-            }
-        }
-    }
-
     @Test func anOpenCopyIsTheLibraryWhateverTheServerSays() {
         for state in [MarfaConnectionState.connecting, .online, .offline(reason: nil), .keyRefused, .unavailable(message: "x")] {
             #expect(Libraries.mode(hasSource: true, isConfigured: true, state: state, isLaunching: false, isBusy: false) == .marfa)

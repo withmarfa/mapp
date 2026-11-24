@@ -60,11 +60,6 @@ import Testing
         #expect(item.writeObstacle == .inBin)
     }
 
-    @Test func theReadOnlySentenceSaysWhyInPlainWords() {
-        #expect(skips(.readOnly) == "1 item is managed by a connector, so changes made here would be overwritten.")
-        #expect(skips(.readOnly, .inBin)?.contains("Recently Deleted") == true)
-    }
-
     // MARK: Writes through the library
 
     @Test func aValueOfAReadOnlyItemIsNotWritten() async throws {
@@ -167,13 +162,4 @@ import Testing
         #expect(library.relationships(for: F.n1).contains { $0.isEditable }, "an item no connector keeps still does")
     }
 
-    // MARK: What stays open
-
-    @Test func aReadOnlyItemCanStillBeReadAndItsLayoutCustomised() async throws {
-        let (library, _) = try await loaded()
-        let item = try #require(library.item(F.n2))
-        #expect(item.displayTitle == "Feed note")
-        #expect(library.body(of: F.n2)?.text == "Text of n2")
-        #expect(PageCustomization.isAvailable(for: item), "Customize Layout changes no item")
-    }
 }

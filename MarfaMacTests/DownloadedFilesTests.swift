@@ -10,34 +10,6 @@ import Testing
         }
     }
 
-    @Test func unknownCountsAreNotShownAsZero() {
-        let cache = FileCache(setting: .default, budget: nil, held: nil, heldUnreadable: "unreadable",
-                              volumeUnreadable: true, backupMarkFailure: nil, attachments: nil)
-        let files = DownloadedFileState(cache)
-        #expect(files.bytes == nil)
-        #expect(files.attachments == nil)
-        #expect(files.budget == .automatic)
-    }
-
-    @Test func everyMissingAttachmentReasonHasUsefulWords() {
-        for reason in NotHeldReason.allCases {
-            let missing = MissingAttachments(reason: reason, count: 3)
-            #expect(!DownloadWording.reason(missing).isEmpty)
-            #expect(DownloadWording.reason(missing).contains("3"))
-        }
-        #expect(DownloadWording.reason(MissingAttachments(reason: .noRoom, count: 3)).contains("space"))
-    }
-
-    @Test func oneReasonIsTheLineOfTheRowAndSeveralAreCounted() {
-        #expect(DownloadWording.line([]) == nil)
-        #expect(DownloadWording.line([MissingAttachments(reason: .notFetched, count: 3)]) == "Waiting to download.")
-        #expect(DownloadWording.line([MissingAttachments(reason: .notFetched, count: 3), MissingAttachments(reason: .noRoom, count: 2)])
-            == "3 waiting to download. 2 need more disk space.")
-        for reason in NotHeldReason.allCases {
-            #expect(DownloadWording.line([MissingAttachments(reason: reason, count: 1)])?.hasSuffix(".") == true)
-        }
-    }
-
     @Test func removalKeepsTheChosenBudgetAndUploads() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

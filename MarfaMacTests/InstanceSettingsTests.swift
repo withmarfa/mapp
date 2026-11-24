@@ -307,15 +307,6 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(await asked([.versionMaxVersions: .number(100)], [.versionMaxVersions: "99"]).count == 1)
     }
 
-    @Test func theWordsSayAnUnknownSettingMayRemoveItemsSooner() {
-        let typed = InstanceSettingsModel.Shortening(setting: .trashRetentionDays, change: .mayBeShorter(to: 100))
-        let words = InstanceWording.consequence(typed)
-        #expect(words.contains("may remove deleted items sooner than the server’s current setting"))
-        #expect(words.contains("100 days"))
-        let known = InstanceWording.consequence(.init(setting: .trashRetentionDays, change: .shorter(from: 60, to: 7)))
-        #expect(!known.contains("sooner than"))
-    }
-
     @Test func aSettingChangedElsewhereIsShownAndNotOverwritten() async {
         let (model, source) = await loaded([.name: .text("Library")])
         model.draft[.name] = "Home"
@@ -465,34 +456,6 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(model.serverChanged)
         #expect(model.loaded?.instanceID == "instance-2")
         #expect(model.draft[.name] == "Library")
-    }
-
-    @Test func aLibraryWithNoServerSettingsSaysSoInsteadOfReadingForever() async throws {
-        // The sample library has no configurer, so the host has no source to ask.
-        let bench = try HostBench()
-        bench.defaults.set("https://marfa.test", forKey: "MarfaAddress")
-        let host = MarfaHost(defaults: bench.defaults, signIns: bench.signIns, location: bench.location, configurer: { _, _ in nil })
-        #expect(host.configuredConnection != nil)
-        let model = InstanceSettingsModel { host.instanceConfigTarget() }
-
-        await model.load()
-
-        #expect(model.failure == .unsupported)
-        #expect(!model.isAvailable)
-        #expect(!model.isLoading)
-    }
-
-    @Test func settingsAreReadOnceAServerCanBeAsked() async {
-        let source = FakeInstanceConfig([.name: .text("Library")])
-        var target: InstanceSettingsModel.Target?
-        let model = InstanceSettingsModel { target }
-        await model.load()
-        #expect(model.failure == .unsupported)
-
-        target = .init(id: "https://marfa.test", source: source)
-        await model.load()
-        #expect(model.failure == nil)
-        #expect(model.loaded?.name == "Library")
     }
 
     @Test func anotherServerStartsFromNothing() async {

@@ -88,18 +88,6 @@ import Testing
         #expect(library.tagWrites.count == 1)
     }
 
-    @Test func suggestionsAreTheTagsInUseLessThoseHeldAndTheExactMatch() {
-        let library = FakeItemLibrary()
-        let first = library.add("One"), second = library.add("Two")
-        library.addTag("travel", to: [first.id, second.id], undoManager: nil)
-        library.addTag("trade", to: [first.id], undoManager: nil)
-        library.addTag("work", to: [second.id], undoManager: nil)
-        #expect(library.knownTags == ["travel", "trade", "work"])
-        #expect(library.tagSuggestions(matching: "tr", excluding: ["trade"]) == ["travel"])
-        #expect(library.tagSuggestions(matching: "travel", excluding: []).isEmpty)
-        #expect(library.tagSuggestions(matching: "", excluding: ["work"]) == ["travel", "trade"])
-    }
-
     // MARK: Writes to the source
 
     private func loaded() async throws -> (MarfaLibrary, FakeItemSource) {

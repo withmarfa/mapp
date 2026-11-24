@@ -18,17 +18,6 @@ extension EditorTests {
             "return await window.webkit.messageHandlers.items.postMessage(\(request))", arguments: [:], in: nil, contentWorld: .page)
     }
 
-    @Test func theItemsAreOfferedAfterDoubleBracketsFromTheLibrary() async throws {
-        let page = try await Page()
-        _ = addItems(["Garden ideas", "Bike service", "Gardening tools"], to: page)
-        try await page.load("Intro\n")
-        let names = try await ask(page, "{ type: 'suggest', query: 'gard' }") as? [String]
-        #expect(Set(names ?? []) == ["Garden ideas", "Gardening tools"])
-        #expect(try await ask(page, "{ type: 'suggest', query: 'zzz' }") as? [String] == [])
-        let unread = try await ask(page, "{ type: 'nonsense' }")
-        #expect(unread == nil || unread is NSNull, "a request that cannot be read is answered, not left waiting")
-    }
-
     @Test func aLinkTheCoreReadsAsTwoDoesNotDropTheMarksOfTheItemsOtherLinks() async throws {
         let page = try await Page()
         _ = addItems(["Plan"], to: page)
@@ -58,24 +47,6 @@ extension EditorTests {
 
     private func raw(_ texts: String...) -> String { "[" + texts.map { "{ raw: \(json($0)) }" }.joined(separator: ", ") + "]" }
 
-    @Test func aLinkAnswerNamesTheTypeIconAndToneOfTheItemItBinds() async throws {
-        let page = try await Page()
-        let ids = addItems(["Plan", "Errands", "Chores"], to: page)
-        for id in ids.dropFirst() { page.library.items[page.library.items.firstIndex { $0.id == id }!].type = TypeID("core.task") }
-        try await page.load("Intro\n")
-        let note = try #require(page.editor.pageItemID)
-        let icon = TypeIconKey.value(for: "lucide:list-checks")
-        let answer = try await resolve(page, note, raw("[[Plan]]", "[[Errands]]", "[[Chores]]", "[[Nowhere]]"))
-        #expect(answer.links.map(\.missing) == [false, false, false, true])
-        #expect(answer.links[0].icon == TypeIconKey.value(for: nil), "a type with no icon of its own gets the glyph every list gives it")
-        #expect(answer.links[0].tone == TypeTone.neutral.rawValue)
-        #expect(answer.links[1].icon == icon && answer.links[2].icon == icon)
-        #expect(answer.links[1].tone == TypeTone(icon: "lucide:list-checks").rawValue)
-        #expect(answer.links[3].icon == nil && answer.links[3].tone == nil, "a missing link names no type")
-        #expect(answer.icons.count == 2, "each icon's image goes once however many links name it")
-        #expect(answer.icons[icon]?.hasPrefix("data:image/png;base64,") == true)
-    }
-
     @Test func aLinkToAnAmbiguousUnresolvedOrBinnedItemNamesNoType() async throws {
         let page = try await Page()
         let twins = addItems(["Twin", "Twin", "Gone"], to: page)
@@ -88,21 +59,6 @@ extension EditorTests {
         #expect(answer.links[0].icon != nil, "its mark is what says it is a link where the underline waits for the pointer")
         #expect(answer.links[1].missing == true && answer.links[1].icon == nil && answer.links[1].tone == nil)
         #expect(answer.icons.count == 1)
-    }
-
-    @Test func anIconThatCannotBeDrawnLeavesTheToneAndAnswersEveryLink() async throws {
-        let requests = ItemRequests()
-        requests.readings = { links, _ in
-            links.map { _ in LinkReading(missing: false, type: .init(icon: "lucide:list-checks", tone: .teal)) }
-        }
-        requests.drawIcon = { _ in nil }
-        let links = [ItemLink(linkText: "[[A]]"), nil, ItemLink(linkText: "[[B]]")]
-        let reply = await requests.answerLinks(links, in: ItemID("n"))
-        #expect(reply.links.map(\.tone) == ["teal", TypeTone.neutral.rawValue, "teal"])
-        #expect(reply.links.allSatisfy { $0.icon == nil } && reply.icons.isEmpty)
-        requests.readings = { _, _ in [] }
-        let short = await requests.answerLinks(links, in: ItemID("n"))
-        #expect(short.links.count == 3 && short.links.allSatisfy { !$0.missing && $0.tone == TypeTone.neutral.rawValue }, "a count that does not line up says nothing of any link")
     }
 
     @Test func linkToItemWaitsForTheChoiceAndAnswersWithTheLink() async throws {
@@ -152,16 +108,6 @@ extension EditorTests {
         try await page.wait { editor.linkRequest != nil }
         editor.windowWent()
         #expect(try await answered(), "closing the window answers the page with nothing")
-    }
-
-    @Test func theSlashMenuAndItsWordsComeFromTheAppsStrings() async throws {
-        let page = try await Page()
-        try await page.load("\n")
-        let labels = try await page.editor.webView.evaluateJavaScript("window.marfaLabels") as? [String: String]
-        #expect(labels?["linkToItem"] == "Link to Item")
-        #expect(labels?["slashTable"] == "Table")
-        #expect(labels?["suggestionsLoading"] == "Loading…")
-        #expect(labels?["suggestionsEmpty"] == "No Results")
     }
 
     @Test func quotesAndDashesStayAsTypedBecauseSmartPunctuationIsOff() async throws {

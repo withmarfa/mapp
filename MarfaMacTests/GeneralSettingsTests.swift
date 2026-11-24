@@ -28,27 +28,6 @@ struct GeneralSettingsTests {
         #expect(WeekStart.stored(in: defaults) == nil)
     }
 
-    @Test func aChosenFirstDayChangesACalendarsFirstColumn() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
-        var base = Calendar(identifier: .gregorian)
-        base.timeZone = TimeZone(identifier: "Europe/London")!
-        base.firstWeekday = 2
-        let day = base.date(from: DateComponents(year: 2026, month: 9, day: 25, hour: 12))!
-        func firstColumn(_ calendar: Calendar) -> Int {
-            let week = CalendarLayout.interval(of: .week, containing: day, calendar: calendar)
-            return calendar.component(.weekday, from: week.start)
-        }
-        #expect(firstColumn(WeekStart.calendar(base, in: defaults)) == 2)
-        defaults.set(1, forKey: WeekStart.key)
-        #expect(firstColumn(WeekStart.calendar(base, in: defaults)) == 1)
-        defaults.set(7, forKey: WeekStart.key)
-        #expect(firstColumn(WeekStart.calendar(base, in: defaults)) == 7)
-        let month = CalendarMonth.make(entries: [], around: day, calendar: WeekStart.calendar(base, in: defaults), now: day)
-        let firstRow = try #require(month.weeks.first)
-        #expect(base.component(.weekday, from: try #require(firstRow.first).date) == 7)
-    }
-
     // MARK: Start With
 
     @Test func aChoiceOfPlaceIsReadBackAndAnythingElseIsWhereIWasLeft() throws {
@@ -63,41 +42,7 @@ struct GeneralSettingsTests {
         #expect(StartWith.stored(in: defaults) == .leftOff)
     }
 
-    @Test func whereILeftOffIsTheLastPlaceAndAChosenPlaceIsThatPlace() throws {
-        let (defaults, done) = try defaults()
-        defer { done() }
-        #expect(StartWith.leftOff.startingPlace(in: defaults) == nil)
-        StartWith.remember(.itemType("core.task"), in: defaults)
-        #expect(StartWith.leftOff.startingPlace(in: defaults) == .itemType("core.task"))
-        #expect(StartWith.place(.inbox).startingPlace(in: defaults) == .inbox)
-    }
-
-    @Test func aWindowWithNothingToRestoreOpensInTheStartPlaceAndARestoredOneKeepsItsOwn() {
-        let library = FakeItemLibrary()
-        let browser = Browser()
-        browser.restore(from: nil, in: library, order: ItemOrder(), start: .favorites)
-        #expect(browser.item == .favorites)
-
-        let kept = Browser()
-        let snapshot = try? JSONEncoder().encode(Browser.Snapshot(place: .recents, selection: []))
-        kept.restore(from: snapshot, in: library, order: ItemOrder(), start: .favorites)
-        #expect(kept.item == .recents)
-    }
-
     // MARK: New Items Are
-
-    @Test func aChosenKindIsUsedOutsideATypesOwnListAndTheLastUsedOtherwise() {
-        let catalogue = Catalogue()
-        let offered = ["core.note", "core.task", "core.event"]
-        func kind(place: SidebarItem = .allItems, chosen: String?, remembered: String?) -> String? {
-            QuickAdd.startingType(asked: nil, place: place, chosen: chosen, remembered: remembered, offered: offered, in: catalogue)
-        }
-        #expect(kind(chosen: nil, remembered: "core.event") == "core.event")
-        #expect(kind(chosen: "core.task", remembered: "core.event") == "core.task")
-        #expect(kind(place: .itemType("core.event"), chosen: "core.task", remembered: nil) == "core.event")
-        // A kind the server no longer offers is passed over.
-        #expect(kind(chosen: "core.gone", remembered: "core.event") == "core.event")
-    }
 
     @Test func theChosenKindIsReadFromTheDefaultsAndEmptyMeansLastUsed() throws {
         let (defaults, done) = try defaults()

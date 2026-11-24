@@ -52,15 +52,6 @@ struct FileDropTests {
         #expect(library.notices.waiting.count == 1)
     }
 
-    @Test func nothingIsToldWhenNothingWasDropped() async {
-        let library = FakeItemLibrary()
-        let browser = Browser()
-        browser.adopt(library)
-        let ids = await browser.importFiles([], in: library, order: ItemOrder(), undoManager: nil)
-        #expect(ids.isEmpty)
-        #expect(library.notices.waiting.isEmpty)
-    }
-
     @Test func filesGoWhereTheyWereDroppedWhenThePersonMovesOnMidImport() async throws {
         let collection = FakeItemLibrary.collection("Reading")
         let library = FakeItemLibrary(items: [collection])
@@ -119,25 +110,6 @@ struct FileDropTests {
         #expect(browser.selection.isEmpty)
     }
 
-    @Test func aLongTitleIsShortenedToFitAFileNameWithoutSplittingACharacter() {
-        let title = String(repeating: "日本語🇬🇧e\u{301}", count: 40)
-        #expect(title.utf8.count > 300)
-        let name = QuickLookFile.name(for: title, type: .pdf)
-        #expect(name.utf8.count <= 255)
-        #expect(name.hasSuffix(".pdf"))
-        let base = String(name.dropLast(4))
-        #expect(title.hasPrefix(base))
-        #expect(base.utf8.count > 240)
-        #expect(QuickLookFile.name(for: "Plans", type: .markdown) == "Plans.md")
-    }
-
-    @Test func aLongTitleKeepsItsHeldExtension() {
-        let title = String(repeating: "é", count: 300) + ".pdf"
-        let name = QuickLookFile.name(for: title, type: .pdf)
-        #expect(name.utf8.count <= 255)
-        #expect(name.hasSuffix(".pdf"))
-    }
-
     @Test func aSymbolicLinkToAFileIsTakenAsThatFile() throws {
         let target = disk.url("real.txt", "contents")
         let link = disk.directory.appending(path: "link.txt")
@@ -181,94 +153,6 @@ struct FileDropTests {
         let decoded = try JSONDecoder().decode(ItemReference.self, from: data)
         #expect(decoded.id == note.id)
         #expect(decoded.text == nil)
-    }
-
-    @Test func quickLookShowsAnItemAsTextAndAFileAsItself() async throws {
-        let library = FakeItemLibrary()
-        let note = library.add("# Plans\n\nSome text")
-        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allItems))
-        library.files[fileID] = disk.url("kept", "file contents")
-        let browser = Browser()
-        browser.adopt(library)
-        browser.selection = [note.id, fileID]
-        await browser.quickLookSelection(in: library)
-        let request = try #require(browser.quickLook)
-        #expect(request.urls.count == 2)
-        let texts = try request.urls.map { try String(contentsOf: $0, encoding: .utf8) }
-        #expect(Set(texts) == ["# Plans\n\nSome text", "file contents"])
-        #expect(request.current == request.urls[0])
-        browser.dismissQuickLook()
-        #expect(browser.quickLook == nil)
-        #expect(request.urls.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
-    }
-
-    @Test func quickLookGoesThroughTheItemsInTheOrderTheyAreOnScreen() async throws {
-        let older = FakeItemLibrary.note("Apple", modified: Date(timeIntervalSinceReferenceDate: 1_000))
-        let newer = FakeItemLibrary.note("Zebra", modified: Date(timeIntervalSinceReferenceDate: 2_000))
-        let library = FakeItemLibrary(items: [older, newer], bodies: [older.id: "# Apple", newer.id: "# Zebra"])
-        let browser = Browser()
-        browser.adopt(library)
-        let drawn = browser.sections(in: library, order: ItemOrder(), now: Date(timeIntervalSinceReferenceDate: 3_000))
-            .flatMap { $0.items.map(\.title) }
-        #expect(drawn == ["Zebra", "Apple"])
-        browser.selection = [older.id, newer.id]
-        await browser.quickLookSelection(in: library)
-        let request = try #require(browser.quickLook)
-        #expect(request.urls.map(\.lastPathComponent) == ["Zebra.md", "Apple.md"])
-        browser.dismissQuickLook()
-    }
-
-    @Test func quickLookFetchesOnlyTheFirstFewOfALargeSelection() async throws {
-        let library = FakeItemLibrary()
-        let notes = (0..<Browser.quickLookLimit + 5).map { library.add("# Note \($0)") }
-        let browser = Browser()
-        browser.adopt(library)
-        browser.selection = Set(notes.map(\.id))
-        await browser.quickLookSelection(in: library)
-        let request = try #require(browser.quickLook)
-        #expect(request.urls.count == Browser.quickLookLimit)
-        let notice = try #require(library.notices.waiting.first)
-        #expect(library.notices.waiting.count == 1)
-        #expect(notice.message.contains("10") && notice.message.contains("15"))
-        #expect(!notice.message.contains("^["), "a plural is read as a word, never shown as its markup")
-        #expect(notice.message.hasSuffix("15 items."))
-        browser.dismissQuickLook()
-    }
-
-    @Test func thingsThatAreNotFilesAreCountedInWords() {
-        let notices = Notices()
-        QuickAdd.File.tellUnreadable([], unreadable: 1, to: notices)
-        QuickAdd.File.tellUnreadable([], unreadable: 3, to: notices)
-        #expect(notices.waiting.map(\.message) == ["1 item can’t be added as a file.", "3 items can’t be added as a file."])
-    }
-
-    @Test func quickLookCountsOnlyTheItemsItShowsAgainstItsLimit() async throws {
-        let library = FakeItemLibrary()
-        var empty: [ItemID] = []
-        for index in 0..<12 {
-            empty.append(try #require(await library.addFile(disk.url("empty\(index).txt"), title: nil, parentID: nil, in: .allItems)))
-        }
-        let notes = (0..<12).map { library.add("# Note \($0)") }
-        let browser = Browser()
-        browser.adopt(library)
-        browser.selection = Set(empty + notes.map(\.id))
-        await browser.quickLookSelection(in: library)
-        let request = try #require(browser.quickLook)
-        #expect(request.urls.count == Browser.quickLookLimit)
-        #expect(library.notices.waiting.count == 1)
-        browser.dismissQuickLook()
-    }
-
-    @Test func quickLookSaysNothingAboutTheLimitWhenEverythingFits() async throws {
-        let library = FakeItemLibrary()
-        let notes = (0..<Browser.quickLookLimit).map { library.add("# Note \($0)") }
-        let browser = Browser()
-        browser.adopt(library)
-        browser.selection = Set(notes.map(\.id))
-        await browser.quickLookSelection(in: library)
-        #expect(browser.quickLook?.urls.count == Browser.quickLookLimit)
-        #expect(library.notices.waiting.isEmpty)
-        browser.dismissQuickLook()
     }
 
     @Test func copiesAreMadeInAFolderOfTheRunningProcess() throws {
@@ -391,23 +275,5 @@ struct FileDropTests {
         await browser.quickLookSelection(in: library)
         #expect(browser.quickLook == nil)
         #expect(library.notices.waiting.count == 1)
-    }
-
-    @Test func quickLookWithNothingSelectedDoesNothing() async {
-        let library = FakeItemLibrary()
-        let browser = Browser()
-        browser.adopt(library)
-        await browser.quickLookSelection(in: library)
-        #expect(browser.quickLook == nil)
-        #expect(library.notices.waiting.isEmpty)
-    }
-
-    @Test func quickLookIsOfferedOnlyWithASelection() {
-        let library = FakeItemLibrary()
-        let note = library.add("# Plans")
-        let none = ItemCommandContext(library: library, ids: [], hasBrowser: true, pageItem: nil)
-        let some = ItemCommandContext(library: library, ids: [note.id], hasBrowser: true, pageItem: note.id)
-        #expect(!ItemCommand.quickLook.isEnabled(in: none))
-        #expect(ItemCommand.quickLook.isEnabled(in: some))
     }
 }

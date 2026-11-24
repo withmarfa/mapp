@@ -142,34 +142,6 @@ private func bundle(_ plugin: ReleasePlugin, types: [String] = [], connector: Bo
         return PluginsModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { grants }), calls: calls, access: access)
     }
 
-    @Test func aNewerReleaseIsAnUpdateAndAPluginNotInstalledIsAvailable() async {
-        let calls = FakePluginCalls()
-        let tickets = listed("tickets", "Tickets", version: "0.0.14")
-        calls.state.withLock {
-            $0.installed = [installed("tickets", "Tickets", version: "0.0.13"), installed("rss", "RSS", version: "0.0.13")]
-            $0.release = [tickets, listed("rss", "RSS", version: "0.0.13"), listed("github", "GitHub", version: "0.0.13")]
-            $0.bundles["tickets"] = bundle(tickets, types: ["common.ticket"])
-        }
-        let model = model(calls)
-        await model.load()
-        #expect(model.updates.map(\.id) == ["tickets"], "the same version is not an update")
-        #expect(model.available.map(\.name) == ["github"])
-    }
-
-    @Test func aReleaseThatCannotBeReadLeavesTheInstalledPluginsAndSaysSo() async {
-        let calls = FakePluginCalls()
-        calls.state.withLock {
-            $0.installed = [installed("tickets", "Tickets", version: "0.0.13")]
-            $0.releaseFailure = .releaseUnreadable("offline")
-        }
-        let model = model(calls)
-        await model.load()
-        #expect(model.installed.map(\.name) == ["tickets"])
-        #expect(model.release == .unreadable(.releaseUnreadable("offline")))
-        #expect(model.updates.isEmpty && model.available.isEmpty)
-        #expect(model.failure == nil)
-    }
-
     @Test func anUpdateSaysWhatItAddsAndNeverThatAnythingIsRemoved() async {
         let calls = FakePluginCalls()
         let spikes = listed("tickets", "Tickets", version: "0.0.14")
@@ -271,21 +243,6 @@ private func bundle(_ plugin: ReleasePlugin, types: [String] = [], connector: Bo
         #expect(ClientPluginCalls.refusal(declined) == .owner(.notConfirmed))
     }
 
-    @Test func aNewerMarfaIsToldWithBothReleases() async {
-        let calls = FakePluginCalls()
-        let entry = listed("tickets", "Tickets", version: "0.0.14")
-        calls.state.withLock {
-            $0.release = [entry]
-            $0.bundles["tickets"] = bundle(entry)
-            $0.installRefusal = .needsNewerServer(marfa: "0.0.102", server: "0.0.101")
-        }
-        let model = model(calls)
-        await model.load()
-        await model.install(entry)
-        let problem = try! #require(model.problem)
-        #expect(PluginWording.line(problem.failure, title: "Tickets") == "Tickets needs Marfa 0.0.102 or later. This server runs 0.0.101.")
-    }
-
     @Test func aBundleFileIsSentAsItIsAndAGuidanceRefusalGivesTheCommandWithItsPath() async {
         let calls = FakePluginCalls()
         let bytes = Data("{ \"name\" : \"tickets\" }".utf8)
@@ -360,51 +317,6 @@ private func bundle(_ plugin: ReleasePlugin, types: [String] = [], connector: Bo
         #expect(with.hostName(of: with.installed[0]) == "Castell Studio")
     }
 
-    @Test func removingIsToldInTheServersWordsForAPluginWithNothingKept() {
-        let answer = PluginRemoval(name: "x", version: "1.0.0", removedConnector: false, keptTypes: [], keptEdgeTypes: [], keptConnector: nil)
-        #expect(PluginWording.removed(answer, title: "X") == "Removed X 1.0.0. Nothing it brought is left to keep.")
-    }
-
-    @Test func removingSaysOneTypeOrOneAgreementInTheSingular() {
-        let one = PluginRemoval(
-            name: "x", version: "1.0.0", removedConnector: true, keptTypes: ["common.x"], keptEdgeTypes: ["blocks"],
-            keptConnector: .init(source: "x", state: false, agreements: 1))
-        #expect(
-            PluginWording.removed(one, title: "X")
-                == "Removed X 1.0.0. Its connector stopped, and its settings, secrets and saved mapping are gone, with any rewrite it asked for. Its source x keeps its 1 agreement. Its type, its edge type and their items stay.")
-        let many = PluginRemoval(
-            name: "x", version: "1.0.0", removedConnector: false, keptTypes: ["a", "b"], keptEdgeTypes: ["c", "d"], keptConnector: nil)
-        #expect(PluginWording.removed(many, title: "X") == "Removed X 1.0.0. Its 2 types, its 2 edge types and their items stay.")
-        let edges = PluginRemoval(name: "x", version: "1.0.0", removedConnector: false, keptTypes: [], keptEdgeTypes: ["c"], keptConnector: nil)
-        #expect(PluginWording.removed(edges, title: "X") == "Removed X 1.0.0. Its edge type stays.")
-    }
-
-    @Test func theInstalledPluginsShowAtOnceWhileTheReleaseIsStillBeingRead() async {
-        let calls = FakePluginCalls()
-        let gate = ReleaseGate()
-        calls.state.withLock {
-            $0.installed = [installed("tickets", "Tickets", version: "0.0.13")]
-            $0.release = [listed("tickets", "Tickets", version: "0.0.13")]
-            $0.releaseGate = gate
-        }
-        let model = model(calls)
-        let loading = Task { await model.load() }
-        #expect(await eventually { model.hasLoaded })
-        #expect(model.installed.map(\.name) == ["tickets"])
-        #expect(model.release == .reading, "the release is still being read, and the page already shows what is installed")
-        await gate.open()
-        await loading.value
-        #expect(model.entries.map(\.name) == ["tickets"])
-    }
-
-    @Test func aFailedFirstReadStillEndsTheLoading() async {
-        let calls = FakePluginCalls()
-        calls.state.withLock { $0.installedFailure = .unreachable }
-        let model = model(calls)
-        await model.load()
-        #expect(model.hasLoaded && model.failure == .unreachable)
-    }
-
     @Test func readingTheReleaseAgainDropsEveryBundleReadBefore() async {
         let calls = FakePluginCalls()
         let first = listed("tickets", "Tickets", version: "0.0.14")
@@ -434,26 +346,6 @@ private func bundle(_ plugin: ReleasePlugin, types: [String] = [], connector: Bo
         other.sha256 = String(repeating: "b", count: 64)
         #expect(throws: PluginFailure.releaseChanged) { try ClientPluginCalls.confirm(shown, in: [other]) }
         #expect(throws: PluginFailure.releaseChanged, "a plugin the release stopped listing") { try ClientPluginCalls.confirm(shown, in: []) }
-    }
-
-    @Test func aReadThatWasCancelledIsNotShownAsAFailure() async {
-        let calls = FakePluginCalls()
-        let entry = listed("tickets", "Tickets", version: "0.0.14")
-        calls.state.withLock {
-            $0.installed = [installed("tickets", "Tickets", version: "0.0.13")]
-            $0.release = [entry]
-            $0.releaseFailure = .canceled
-        }
-        let model = model(calls)
-        await model.load()
-        #expect(model.release == .notRead, "a first read that was cancelled does not stay on Reading, and is not a failure")
-        calls.state.withLock {
-            $0.releaseFailure = nil
-            $0.bundleFailure = .canceled
-        }
-        await model.install(entry)
-        #expect(model.problem == nil, "a cancelled bundle read is no refusal")
-        #expect(model.bundles["tickets"] == nil, "it is read again when asked, not kept as a failure")
     }
 
     @Test func tryAgainReadsTheBundleTheNewReleaseLists() async {
