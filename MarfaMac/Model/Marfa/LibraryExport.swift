@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Marfa
 import MarfaAPI
@@ -355,9 +356,9 @@ nonisolated private final class Staging: Sendable {
 /// Reads an archive back from the file it was written to, through the descriptor the export holds, and says whether it is
 /// a whole archive the app can check: plain ustar entries only; `manifest.json` first, naming the Marfa it is of; then the
 /// six line files in the order the server writes them (`archive/archive-entries`), each one gzip stream that inflates to
-/// its end with its checksum and size whole; then a `blobs/<hex>` entry, named by the hex of a SHA-256 hash, for each file
-/// the manifest counts in `blob_count`; and the end of the tar, with only zeros after it. Malformed input is a refusal,
-/// never a trap: every offset and count is checked.
+/// its end with its checksum and size whole, holding as many lines as the manifest counts for it; then a `blobs/<hex>`
+/// entry for each file the manifest counts in `blob_count`, its bytes hashing to the SHA-256 its name gives; and the end
+/// of the tar, with only zeros after it. Malformed input is a refusal, never a trap: every offset and count is checked.
 nonisolated enum ArchiveCheck {
     enum Verdict: Equatable {
         case whole(Whole)
@@ -386,10 +387,19 @@ nonisolated enum ArchiveCheck {
         let format: String
         let instanceId: String
         let fileCount: UInt64
+        let itemCount: UInt64
+        let versionCount: UInt64
+        let edgeCount: UInt64
+        let rowCount: UInt64
         let blobCount: UInt64
         enum CodingKeys: String, CodingKey {
-            case format, instanceId = "instance_id", fileCount = "file_count", blobCount = "blob_count"
+            case format, instanceId = "instance_id", fileCount = "file_count", itemCount = "item_count"
+            case versionCount = "version_count", edgeCount = "edge_count", rowCount = "row_count", blobCount = "blob_count"
         }
+
+        /// The lines the manifest counts in each line file, in the order of `lineFiles`; it counts `instance.ndjson.gz` by
+        /// kind, not by line.
+        var lines: [UInt64?] { [fileCount, nil, itemCount, versionCount, edgeCount, rowCount] }
     }
 
     private enum Refusal: Error {
@@ -413,7 +423,7 @@ nonisolated enum ArchiveCheck {
         let length = UInt64(info.st_size)
         var offset: UInt64 = 0
         var manifest: Manifest?
-        var lines = lineFiles[...]
+        var lines = lineFiles.indices[...]
         var blobs: Set<String> = []
         while true {
             if stop() { throw .notWhole }
@@ -437,11 +447,15 @@ nonisolated enum ArchiveCheck {
                     !read.instanceId.isEmpty, read.blobCount <= read.fileCount
                 else { throw .notWhole }
                 manifest = read
-            } else if let line = lines.first {
-                guard entry.name == line, inflates(file, from: offset, count: entry.size) else { throw .notWhole }
+            } else if let line = lines.first, let manifest {
+                guard entry.name == lineFiles[line], let counted = lineCount(file, from: offset, count: entry.size),
+                    manifest.lines[line].map({ $0 == counted }) != false
+                else { throw .notWhole }
                 lines.removeFirst()
             } else {
-                guard isBlob(entry.name), blobs.insert(entry.name).inserted else { throw .notWhole }
+                guard isBlob(entry.name), blobs.insert(entry.name).inserted,
+                    hash(file, from: offset, count: entry.size, length: length) == String(entry.name.dropFirst(6))
+                else { throw .notWhole }
             }
             offset = next
         }
@@ -548,13 +562,40 @@ nonisolated enum ArchiveCheck {
         }
     }
 
-    /// Whether the `count` bytes at `offset` are exactly one gzip stream: zlib inflates it to its end and checks the
-    /// trailer's CRC and size before it says the stream ended, and nothing may follow it.
-    private static func inflates(_ file: Int32, from offset: UInt64, count: UInt64) -> Bool {
-        guard count > 0, let start = off_t(exactly: offset) else { return false }
+    /// The lowercase hex of the SHA-256 of the `count` bytes at `offset`, read in pieces, or nil where they can't be read.
+    private static func hash(_ file: Int32, from offset: UInt64, count: UInt64, length: UInt64) -> String? {
+        var hasher = SHA256()
+        var position = offset
+        let end = offset + count
+        while position < end {
+            let size = min(end - position, UInt64(chunk))
+            guard let piece = try? bytes(file, at: position, count: size, length: length) else { return nil }
+            hasher.update(data: piece)
+            position += size
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The lines in the `count` bytes at `offset`, or nil where they are not exactly one gzip stream: zlib inflates it to
+    /// its end and checks the trailer's CRC and size before it says the stream ended, and nothing may follow it. A line is
+    /// a run of bytes other than a newline, as the server's restore counts them.
+    private static func lineCount(_ file: Int32, from offset: UInt64, count: UInt64) -> UInt64? {
+        guard count > 0, let start = off_t(exactly: offset) else { return nil }
+        var lines: UInt64 = 0
+        var inLine = false
+        func countLines(_ produced: Int, in output: UnsafeMutableRawBufferPointer) {
+            for byte in output[0..<produced] {
+                if byte == UInt8(ascii: "\n") {
+                    inLine = false
+                } else if !inLine {
+                    inLine = true
+                    lines += 1
+                }
+            }
+        }
         var stream = z_stream()
         // 15 window bits, plus 16 for a gzip header and trailer.
-        guard inflateInit2_(&stream, 31, zlibVersion(), Int32(MemoryLayout<z_stream>.size)) == Z_OK else { return false }
+        guard inflateInit2_(&stream, 31, zlibVersion(), Int32(MemoryLayout<z_stream>.size)) == Z_OK else { return nil }
         defer { inflateEnd(&stream) }
         let input = UnsafeMutableRawBufferPointer.allocate(byteCount: chunk, alignment: 1)
         let output = UnsafeMutableRawBufferPointer.allocate(byteCount: chunk, alignment: 1)
@@ -566,7 +607,7 @@ nonisolated enum ArchiveCheck {
         var left = count
         while left > 0 {
             let size = Int(min(left, UInt64(chunk)))
-            guard readFully(file, UnsafeMutableRawBufferPointer(rebasing: input[0..<size]), at: position) else { return false }
+            guard readFully(file, UnsafeMutableRawBufferPointer(rebasing: input[0..<size]), at: position) else { return nil }
             position += off_t(size)
             left -= UInt64(size)
             stream.next_in = input.baseAddress!.assumingMemoryBound(to: Bytef.self)
@@ -575,12 +616,13 @@ nonisolated enum ArchiveCheck {
                 stream.next_out = output.baseAddress!.assumingMemoryBound(to: Bytef.self)
                 stream.avail_out = uInt(chunk)
                 let status = inflate(&stream, Z_NO_FLUSH)
-                if status == Z_STREAM_END { return left == 0 && stream.avail_in == 0 }
+                countLines(chunk - Int(stream.avail_out), in: output)
+                if status == Z_STREAM_END { return left == 0 && stream.avail_in == 0 ? lines : nil }
                 // A buffer error with no input left only asks for more.
-                guard status == Z_OK || (status == Z_BUF_ERROR && stream.avail_in == 0) else { return false }
+                guard status == Z_OK || (status == Z_BUF_ERROR && stream.avail_in == 0) else { return nil }
                 if status == Z_BUF_ERROR { break }
             } while stream.avail_in > 0 || stream.avail_out == 0
         }
-        return false
+        return nil
     }
 }
