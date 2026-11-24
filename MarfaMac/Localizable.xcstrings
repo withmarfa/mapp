@@ -3214,6 +3214,52 @@
         }
       }
     },
+    "%lld items have changed since, so they were left as they are." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item has changed since, so it was left as it is."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items have changed since, so they were left as they are."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld items will come back active, not archived, if they are recovered." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item will come back active, not archived, if it is recovered."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items will come back active, not archived, if they are recovered."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld minutes" : {
 
     },
@@ -4148,6 +4194,9 @@
       "extractionState" : "manual"
     },
     "Couldn’t change downloaded files. Check the current limit and try again." : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t Finish Undo" : {
       "extractionState" : "manual"
     },
     "Couldn’t Make This Change" : {
@@ -5626,6 +5675,9 @@
     "Recover" : {
 
     },
+    "Recovered but Not Archived" : {
+      "extractionState" : "manual"
+    },
     "Redo" : {
 
     },
@@ -6104,6 +6156,9 @@
       "extractionState" : "manual"
     },
     "That change wasn’t made, so there is nothing to undo here." : {
+      "extractionState" : "manual"
+    },
+    "That change wasn’t made, so there is nothing to redo here." : {
       "extractionState" : "manual"
     },
     "That didn’t work. Try again in a moment." : {

@@ -35,7 +35,7 @@
 - Every save names the version of the text it was typed on. Only the first save sent on a version is merged against it (`BodyMerge.asRead`); later ones follow the person's own (`.following`), so saves never conflict with each other or overwrite text the person never saw. Do not replace this with last-writer-wins.
 - Text read before the server answered this device's create is at version 0; an edit on it goes on version 1 (`MarfaEngine.version(read:holding:)`), never the copy's version.
 - `MarfaLibrary` coalesces typing (`TextPause`): held at once and until answered, as a raced read is older; sent after a pause or at a hand-over, leaving none waiting.
-- An Undo or Redo the copy refuses while catching up is held (`MarfaEngine+Holding`) and made only if what it touches is as it was when it was pressed; otherwise none of the step is made and the person is told. A held write never overwrites newer text and never waits without end.
+- An Undo or Redo the copy refuses while catching up is held (`MarfaEngine+Holding`) and made only if what it touches is as it was when it was pressed; otherwise no held write of the step is made and the person is told. A held write never overwrites newer text or waits without end.
 - Where the server keeps its text over the person's, the page shows the server's and says the person's changes went to a copy.
 - A restore writes only the title and the text, through the ordinary edit path on the version the library holds.
 
