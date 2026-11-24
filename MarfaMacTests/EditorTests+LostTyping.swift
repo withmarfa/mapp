@@ -5,14 +5,22 @@ import WebKit
 
 /// The page lost what the person typed last, or reported an edit the app cannot place: the person is told, and an edit
 /// the app holds goes back to them. Real WebKit cannot be made to crash or fail a file load here, so these call the
-/// controller's own navigation delegate methods, as WebKit does.
+/// controller's own navigation delegate methods, as WebKit does. A page with no window draws no frames, so a page
+/// that comes back never reports that it showed the item unless a test posts `painted` for it.
 extension EditorTests {
-    private static func flushed(_ page: Page) async -> Bool {
-        await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
+    /// Whether a flush goes ahead: one `leaving` is a quit, a window close or a library change.
+    private static func flushed(_ page: Page, leaving: Bool) async -> Bool {
+        await withCheckedContinuation { continuation in
+            page.editor.flush(leaving: leaving) { continuation.resume(returning: $0) }
+        }
     }
 
     private static func post(_ message: String, to page: Page) async throws {
         try await page.run("window.webkit.messageHandlers.host.postMessage(\(message))")
+    }
+
+    private static func answerAll(_ notices: Notices) {
+        while let first = notices.waiting.first { notices.answered(first.id) }
     }
 
     @Test func aPageWhoseProcessEndsTellsThePersonAndHoldsLeavingUntilItIsBack() async throws {
@@ -20,10 +28,10 @@ extension EditorTests {
         try await page.load("Original\n")
         page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
         #expect(page.library.notices.waiting.count == 1)
-        #expect(await Self.flushed(page) == false)
+        #expect(await Self.flushed(page, leaving: true) == false)
         #expect(page.library.notices.waiting.count == 1, "told once")
         try await page.wait { page.editor.isReady }
-        #expect(await Self.flushed(page), "the item is back on the page, so the person can check it and go")
+        #expect(await Self.flushed(page, leaving: true), "the item is back on the page, so the person can check it and go")
     }
 
     @Test func aFlushUnderWayWhenThePageProcessEndsFails() async throws {
@@ -32,7 +40,7 @@ extension EditorTests {
         page.editor.flushLimit = waitLimit
         try await page.run("window.editor.flush = () => ({ commandError: 'composition', message: 'Composing' })")
         var kept: Bool?
-        page.editor.flush { kept = $0 }
+        page.editor.flush(leaving: true) { kept = $0 }
         page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
         try await page.wait { kept != nil }
         #expect(kept == false)
@@ -43,14 +51,48 @@ extension EditorTests {
     @Test func aPageThatCannotComeBackHoldsLeavingUntilThePersonAnswers() async throws {
         let page = try await Page()
         try await page.load("Original\n")
-        let notices = page.library.notices
         page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
         page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
-        var kept: [Bool] = []
-        page.editor.flush { kept.append($0) }
-        while let first = notices.waiting.first { notices.answered(first.id) }
-        page.editor.flush { kept.append($0) }
-        #expect(kept == [false, true])
+        #expect(await Self.flushed(page, leaving: true) == false)
+        Self.answerAll(page.library.notices)
+        #expect(await Self.flushed(page, leaving: true))
+    }
+
+    /// Choosing another item stays in the window, so it waits for no answer: what was lost is already told.
+    @Test func anItemChosenWhileThePageComesBackShowsOnceItIsBack() async throws {
+        let library = FakeItemLibrary()
+        let first = library.add("First\n")
+        let second = library.add("Second\n")
+        let page = try await Page(library: library)
+        try await page.show(first.id)
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        page.editor.select(try #require(library.item(second.id)))
+        try await page.wait { page.editor.isReady }
+        #expect(page.editor.pageItemID == second.id)
+        #expect(try await page.shownText(until: "Second") == "Second")
+    }
+
+    @Test func anItemChosenWhileAHandOverWaitsWhenThePageEndsShowsOnceItIsBack() async throws {
+        let library = FakeItemLibrary()
+        let first = library.add("First\n")
+        let second = library.add("Second\n")
+        let page = try await Page(library: library)
+        try await page.show(first.id)
+        page.editor.flushLimit = waitLimit
+        try await page.run("window.editor.flush = () => ({ commandError: 'composition', message: 'Composing' })")
+        page.editor.select(try #require(library.item(second.id)))
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        try await page.wait { page.editor.pageItemID == second.id && page.editor.isReady }
+        #expect(try await page.shownText(until: "Second") == "Second")
+    }
+
+    @Test func anItemLeftWhileThePageComesBackIsLeft() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        page.editor.close()
+        try await page.wait { page.editor.isReady }
+        #expect(page.editor.pageItemID == nil)
     }
 
     @Test func aPageThatFailsToLoadAfterItWasReadyTellsThePersonAndHoldsLeaving() async throws {
@@ -58,7 +100,7 @@ extension EditorTests {
         try await page.load("Original\n")
         page.editor.webView(page.editor.webView, didFailProvisionalNavigation: page.editor.pageNavigation, withError: URLError(.cannotOpenFile))
         #expect(page.library.notices.waiting.count == 1)
-        #expect(await Self.flushed(page) == false)
+        #expect(await Self.flushed(page, leaving: true) == false)
     }
 
     /// WebKit can fail the page's own load for its process ending before it says the process ended.

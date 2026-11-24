@@ -23,7 +23,7 @@ final class EditorController: NSObject {
     @ObservationIgnored var flushLimit = Duration.seconds(2)
     /// Whether a flush has its turn with the page, and the flushes waiting for theirs (`flush`).
     @ObservationIgnored var isFlushing = false
-    @ObservationIgnored var waitingFlushes: [(Bool) -> Void] = []
+    @ObservationIgnored var waitingFlushes: [(leaving: Bool, done: (Bool) -> Void)] = []
     private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false {

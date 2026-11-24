@@ -15,7 +15,9 @@ extension EditorController {
     /// page is given up on the same way.
     ///
     /// A page that went down after it had been ready (`pageWentDown`) may have lost what the person typed last, so a
-    /// flush fails while it is down, and one under way when it went down fails too.
+    /// flush `leaving` the window or the library (a quit, a window close, a library change) fails while it is down, and
+    /// one under way when it went down fails too. A flush that stays, as when another item is chosen, goes ahead: the
+    /// page holds nothing more to hand over, and the person has been told.
     ///
     /// Outside text reloading the item mid-flush leaves the item the one being flushed, so the flush goes ahead. A
     /// flush whose item was replaced on the page stops, and the person is told why.
@@ -25,11 +27,11 @@ extension EditorController {
     /// closes or the app quits just after a selection, waits and then hands over whatever is on the page, instead of
     /// finding its item replaced. Those waiting behind a flush that fails fail with it, without asking the page: they
     /// were waiting on the edit it could not keep, and the person has been told once.
-    func flush(then done: @escaping (Bool) -> Void = { _ in }) {
+    func flush(leaving: Bool = false, then done: @escaping (Bool) -> Void = { _ in }) {
         releaseHeldEdit()
-        guard !isFlushing else { return waitingFlushes.append(done) }
+        guard !isFlushing else { return waitingFlushes.append((leaving, done)) }
         isFlushing = true
-        handOver { [self] kept in
+        handOver(leaving: leaving) { [self] kept in
             // An edit the page reported before the hand-over but that arrived during it was held, and the page's
             // answer leaves it out, since the page counts it as reported.
             releaseHeldEdit()
@@ -39,19 +41,22 @@ extension EditorController {
             let waiting = waitingFlushes
             waitingFlushes = []
             done(kept)
-            guard kept else { return waiting.forEach { $0(false) } }
+            guard kept else { return waiting.forEach { $0.done(false) } }
             // `done` may have started a flush of its own, which keeps its turn.
             waitingFlushes = waiting + waitingFlushes
-            if !isFlushing, !waitingFlushes.isEmpty { flush(then: waitingFlushes.removeFirst()) }
+            if !isFlushing, !waitingFlushes.isEmpty {
+                let next = waitingFlushes.removeFirst()
+                flush(leaving: next.leaving, then: next.done)
+            }
         }
     }
 
     /// One turn of `flush`: asks the page for its last edit and answers once.
-    private func handOver(then done: @escaping (Bool) -> Void) {
+    private func handOver(leaving: Bool, then done: @escaping (Bool) -> Void) {
         guard let pageItemID else { return done(true) }
         let generation = generation
         let losses = pageLosses
-        if !isReady, pageLoss != nil { return done(!lossHoldsFlush()) }
+        if !isReady, pageLoss != nil { return done(!leaving || !lossHoldsFlush()) }
         // A page still loading for the first time has nothing unreported: it reports every change as it is made.
         guard isReady, generation != abandonedGeneration else { return done(true) }
         var finished = false
@@ -67,6 +72,7 @@ extension EditorController {
             guard self.pageItemID == pageItemID else { return replaced() }
             // The page went down while this flush waited for it, taking what it held back.
             guard losses == pageLosses else {
+                guard leaving else { return finish(true) }
                 tellPageLoss()
                 return finish(false)
             }
@@ -221,7 +227,7 @@ extension EditorController {
                 continue
             }
             if editor.isFlushing { trace?.editorWaitsItsTurn() }
-            editor.flush(then: gate.arrive)
+            editor.flush(leaving: leaving, then: gate.arrive)
         }
     }
 
