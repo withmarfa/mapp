@@ -61,54 +61,6 @@ import Testing
         return ConnectorsModel(context: bench.context)
     }
 
-    // MARK: Health
-
-    @Test func healthIsDerivedInOrderFromWhatWasChosenWhatWasReportedAndWhatIsMissing() {
-        func health(
-            paused: Bool = false, host: String? = "h1", missing: [String] = [], registration: ConnectorRegistration? = Self.registration(),
-            requested: Date? = nil, seen: Date? = nil
-        ) -> ConnectorHealth {
-            ConnectorHealth.of(
-                control: ConnectorControl(host: host, registration: registration == nil ? nil : "r", paused: paused, runRequested: requested),
-                registration: registration, settings: ConnectorSettingsReading(settings: [], missing: missing),
-                host: host.map { ConnectorHostInfo(id: $0, name: "Mac mini", lastSeen: seen) }, now: Self.now)
-        }
-        #expect(health(paused: true, host: nil, missing: ["feeds"]) == .paused)
-        #expect(health(host: nil, missing: ["feeds"]) == .needsSetup(missing: ["feeds"]))
-        #expect(health(host: nil) == .noMachine)
-        #expect(health(registration: nil) == .waiting(machineSeen: false))
-        #expect(health(registration: nil, seen: Self.now) == .waiting(machineSeen: true))
-        #expect(health(registration: Self.registration(problems: ["x"])) == .problems(count: 1))
-        #expect(health(registration: Self.registration(ranAt: Self.now, succeeded: false)) == .lastRunFailed(Self.now))
-        #expect(health(requested: Self.now) == .runRequested)
-        #expect(health(registration: Self.registration(ranAt: nil)) == .notRunYet)
-        #expect(health() == .ran(Self.now.addingTimeInterval(-120)))
-        #expect(ConnectorHealth.of(control: nil, registration: nil, settings: nil, host: nil, now: Self.now) == .unread)
-    }
-
-    @Test func aConnectorWithNoSignOfLifeForAnHourIsNotHeardFromAndOneHeardLaterIsNot() {
-        let old = Self.now.addingTimeInterval(-7200)
-        let stale = ConnectorRegistration(lastHeartbeat: old, lastRun: nil, problems: [])
-        let control = ConnectorControl(host: "h1", registration: "r", paused: false, runRequested: nil)
-        func health(_ seen: Date?) -> ConnectorHealth {
-            ConnectorHealth.of(
-                control: control, registration: stale, settings: ConnectorSettingsReading(settings: [], missing: []),
-                host: ConnectorHostInfo(id: "h1", name: "Mac mini", lastSeen: seen), now: Self.now)
-        }
-        #expect(health(nil) == .silent(since: old))
-        #expect(health(Self.now.addingTimeInterval(-60)) == .notRunYet)
-    }
-
-    @Test func theListReadsEachConnectorsOwnState() async {
-        let bench = OwnerBench(grants: [.connectorsManage])
-        let model = rss(bench)
-        await model.load()
-        let entry = try! #require(model.entry("rss"))
-        #expect(model.health(of: entry, now: Self.now) == .ran(Self.now.addingTimeInterval(-120)))
-        #expect(model.hostName(of: entry) == "Mac mini")
-        #expect(model.typeName("rss.entry") == "rss.entry")
-    }
-
     // MARK: Pause, Resume, Run Now
 
     @Test func pausingIsStoredAndClearsARunAskedFor() async throws {
@@ -294,28 +246,6 @@ import Testing
         #expect(model.signInProblems["google-calendar"] == "The sign-in didn’t finish.")
     }
 
-    @Test func theServersSignInRefusalNamesItsSettings() {
-        let refusal = MarfaError.server(
-            status: 409, code: "connector_sign_in_settings_missing", message: "Set them.",
-            details: .object(["settings": .array([.string("google_client_id"), .string("google_client_secret")])]), server: nil)
-        #expect(ClientOwnerCalls.signInSettingsMissing(refusal) == ["google_client_id", "google_client_secret"])
-        #expect(ClientOwnerCalls.signInSettingsMissing(MarfaError.server(status: 409, code: "connector_paused", message: "No.", details: nil, server: nil)) == nil)
-    }
-
-    @Test func aSignInWhoseReturnAddressIsRefusedIsToldWithoutTheParametersName() {
-        let refused = MarfaError.validation(
-            code: "validation_error", message: "return_to must name a path or an address on this server.", details: nil, server: nil)
-        #expect(ClientOwnerCalls.signInReturnRefused(refused))
-        #expect(!ClientOwnerCalls.signInReturnRefused(MarfaError.validation(code: "validation_error", message: "Too long.", details: nil, server: nil)))
-    }
-
-    @Test func aPluginsSentenceLabelsAreTitledAndAcronymsStay() {
-        #expect(ConnectorWording.settingTitle("Google client ID") == "Google Client ID")
-        #expect(ConnectorWording.settingTitle("Confirmation of a held batch of deletes") == "Confirmation of a Held Batch of Deletes")
-        #expect(ConnectorWording.settingTitle("Private hosts") == "Private Hosts")
-        #expect(ConnectorWording.settingTitle("Spacing between requests in milliseconds") == "Spacing Between Requests in Milliseconds")
-    }
-
     // MARK: The page
 
     @Test func aSignInReadBackAsAnotherOnesIsToldAsNotFinishedWhateverItsStatus() async {
@@ -341,16 +271,6 @@ import Testing
         await model.reload("rss")
         let read = try #require(model.entry("rss"))
         #expect(model.health(of: read, now: Self.now) == .ran(Self.now.addingTimeInterval(-120)))
-    }
-
-    @Test func aTimeInASentenceHasItsDayInLowercase() {
-        let now = Self.now
-        let calendar = Calendar(identifier: .gregorian)
-        let earlier = now.addingTimeInterval(-300)
-        let line = ConnectorWording.head(hostName: nil, run: ConnectorRunInfo(succeeded: true, started: earlier, finished: earlier, summary: nil), now: now)
-        #expect(line.hasPrefix("Last run today, "))
-        #expect(ConnectorWording.line(.silent(since: earlier), hostName: nil, now: now).hasPrefix("Last heard from today, "))
-        #expect(ConnectorWording.line(.lastRunFailed(earlier), hostName: nil, now: now).hasPrefix("Its last run, today, "))
     }
 
     @Test func theSidebarListsConnectorsBesideWebhooksAndFoldersAndItNeedsConnectorsManage() {

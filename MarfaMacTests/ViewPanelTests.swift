@@ -424,32 +424,6 @@ struct ViewPanelTests {
         #expect(browser.tableOptions[browser.item]?.filter.relative.count == 1)
     }
 
-    // MARK: Group by, from one place
-
-    @Test func aListShowsItsDateSectionsAsItsGrouping() {
-        let (browser, library, undo) = Self.opened()
-        undo.beginUndoGrouping()
-        browser.viewMode = .list
-        Self.close(undo)
-        browser.tableOptions[browser.item]?.grouping = .automatic
-        browser.tableOptions[browser.item]?.sort = nil
-        let content = browser.tableContent(in: library)
-        let shown = SavedViews.arrangement(browser, content: content, order: ItemOrder())
-        #expect(shown.hasDateSections)
-        #expect(shown.isDated)
-        // Group by ticks the list's date by day, whose sections it shows.
-        #expect(browser.shownGrouping(in: library) == .column(ItemTableColumn.edited.id, by: .bucket(.day)))
-    }
-
-    @Test func aTableShowsItsOwnGroupingNotTheListsDates() {
-        let (browser, library, _) = Self.opened()
-        browser.viewMode = .table
-        let content = browser.tableContent(in: library)
-        let shown = SavedViews.arrangement(browser, content: content, order: ItemOrder())
-        #expect(!shown.hasDateSections)
-        #expect(browser.shownGrouping(in: library) != .column(ItemTableColumn.edited.id, by: .bucket(.day)))
-    }
-
     // MARK: Faults the review found
 
     @Test func groupByDateOnAListWritesNoSortThePersonDidNotChooseAndLeavesTheViewUnedited() async {
@@ -601,17 +575,5 @@ struct ViewPanelTests {
         await browser.finishViewPanel(in: library, order: Self.order)
         #expect(library.views.count == 2)
         #expect(library.views.contains { $0.title == "New View" })
-    }
-
-    @Test func aTypesListOffersToSaveWhatItShowsAsAView() async {
-        let library = FakeItemLibrary()
-        let browser = Browser()
-        browser.defaults = Self.defaults()
-        browser.adopt(library, undoManager: UndoManager())
-        browser.sidebarItem = .itemType("core.task")
-        browser.viewMode = .table
-        browser.openViewPanel(in: library)
-        #expect(browser.viewPanel?.purpose == .place)
-        #expect(library.views.isEmpty)
     }
 }

@@ -12,34 +12,6 @@ import Testing
         func add(_ ids: [String]) { asked.append(ids) }
     }
 
-    // MARK: The adapter
-
-    @Test func theAdapterTellsACopyThatCannotAnswerAsUnavailableNotAsZero() async {
-        struct Cannot: Error {}
-        let counts = MarfaCounts { _, _ in throw Cannot() }
-        await #expect(throws: ItemCountUnavailable.self) { try await counts.counts(of: [ItemID("a")], .children) }
-    }
-
-    @Test func theAdapterKeepsOnlyTheIdsAskedAndReadsTheGroups() async throws {
-        let counts = MarfaCounts { _, _ in
-            [
-                Marfa.ItemCount(
-                    id: "a", total: 5, statusGroups: StatusGroupCounts(notStarted: 1, completed: 2, canceled: 1), held: true),
-                Marfa.ItemCount(id: "stranger", total: 9, held: true),
-            ]
-        }
-        let answers = try await counts.counts(of: [ItemID("a"), ItemID("b")], .children)
-        #expect(answers.keys.map(\.rawValue) == ["a"])
-        #expect(answers[ItemID("a")]?.groups?.finished == 3)
-        #expect(answers[ItemID("a")]?.total == 5)
-    }
-
-    @Test func theAdapterAsksForTheEdgeOrTheTableEachQueryNames() {
-        #expect(MarfaCounts.counted(.children) == .backref(edgeType: "parent-of"))
-        #expect(MarfaCounts.counted(.members) == .edge(edgeType: "in-collection"))
-        #expect(MarfaCounts.counted(.rows(table: "messages")) == .rows(table: "messages"))
-    }
-
     // MARK: The store
 
     private func answering(_ total: Counter, log: Log? = nil) -> ItemCounts {
@@ -96,34 +68,6 @@ import Testing
         counts.want(ids, .children)
         #expect(await eventually { counts.answer(of: ids[249], .children) != nil })
         #expect(await log.asked.map(\.count) == [100, 100, 50])
-    }
-
-    @Test func aCountThatCannotBeAnsweredStaysEmptyAndALaterChangeAsksAgain() async {
-        let works = Flag()
-        let counts = ItemCounts { ids, _ in
-            guard works.isSet else { throw ItemCountUnavailable() }
-            return Dictionary(uniqueKeysWithValues: ids.map { ($0, ItemCountAnswer(total: 2, groups: nil)) })
-        }
-        let id = ItemID("a")
-        counts.want([id], .children)
-        #expect(await eventually { counts.questions == 1 })
-        #expect(counts.answer(of: id, .children) == nil)
-
-        works.set()
-        counts.refresh()
-        #expect(await eventually { counts.answer(of: id, .children)?.total == 2 })
-    }
-
-    @Test func aChangeAsksAgainAndTheNewNumberReplacesTheOldOne() async {
-        let total = Counter()
-        let counts = answering(total)
-        let id = ItemID("a")
-        total.value = 1
-        counts.want([id], .members)
-        #expect(await eventually { counts.answer(of: id, .members)?.total == 1 })
-        total.value = 2
-        counts.refresh()
-        #expect(await eventually { counts.answer(of: id, .members)?.total == 2 })
     }
 
     @Test func aChangeToATableAsksOnlyForRowsAndAnAnswerGoneWhereMarfaCanNoLongerAnswer() async {

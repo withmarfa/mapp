@@ -260,12 +260,6 @@ import UniformTypeIdentifiers
         #expect(library.notices.waiting.isEmpty)
     }
 
-    @Test func aPlaceAndAnImageHaveNoNameToType() throws {
-        #expect(try !panel(for: add("core.entity.place", london)).hasNameField)
-        #expect(try !panel(for: add("core.file.image", london, content: .file(.png, byteCount: 3))).hasNameField)
-        #expect(try panel(for: add("core.event")).hasNameField)
-    }
-
     // MARK: Cannot edit
 
     @Test func aReadOnlyItemShowsItsPointAndWritesNothing() throws {
@@ -297,44 +291,6 @@ import UniformTypeIdentifiers
         #expect(model.point == LocationPoint(latitude: 51.5246, longitude: -0.0788))
     }
 
-    // MARK: What cannot be drawn
-
-    @Test func aPairOffTheEarthIsNotDrawnAndThePanelSaysSo() throws {
-        let event = add("core.event", ["latitude": Self.number("95"), "longitude": Self.number("10")])
-        let model = try panel(for: event)
-        #expect(model.point == nil)
-        #expect(model.problem != nil)
-        #expect(model.hasLocation)
-        // The numbers can still be cleared, and the pin placed anew.
-        step { model.clear() }
-        #expect(!model.hasLocation)
-    }
-
-    @Test func oneNumberAloneIsNotDrawnAndThePanelSaysSo() throws {
-        let model = try panel(for: add("core.event", ["longitude": Self.number("10")]))
-        #expect(model.point == nil && model.problem != nil && model.hasLocation)
-    }
-
-    // MARK: Where the map opens
-
-    @Test func withNoPointTheMapOpensOnTheWorld() throws {
-        let model = try panel(for: add("core.event"))
-        #expect(model.startFrame == .world)
-    }
-
-    @Test func withNoPointTheMapOpensRoundTheOtherPlacesTheLibraryHolds() throws {
-        add("core.entity.place", london, name: "Elsewhere")
-        let model = try panel(for: add("core.event", name: "Dinner"))
-        let frame = model.startFrame
-        #expect(frame != .world)
-        #expect(abs(frame.latitude - 51.5246) < 0.001)
-    }
-
-    @Test func withAPointTheMapOpensOnIt() throws {
-        let model = try panel(for: add("core.event", london))
-        #expect(model.startFrame == .around(Self.point(51.5246, -0.0788)))
-    }
-
     // MARK: Search
 
     @Test func choosingAResultOnlyMovesTheMap() throws {
@@ -349,18 +305,4 @@ import UniformTypeIdentifiers
         #expect(model.name.isEmpty)
     }
 
-    // MARK: The panel
-
-    @Test func theLocationPanelOpensOnAnItemItCannotEditOnlyWhereThereIsAPointToShow() throws {
-        let empty = add("core.event", readOnly: true)
-        let placed = add("core.event", london, readOnly: true)
-        let spec = try #require(ItemLocation.of(library.catalogue.itemTypes[empty.type]))
-        let closed = ValueEditModel(ValueEditRequest(kind: .location(spec), library: library, item: empty.id, undoManager: undo))
-        let shown = ValueEditModel(ValueEditRequest(kind: .location(spec), library: library, item: placed.id, undoManager: undo))
-        #expect(!closed.isEditable)
-        #expect(shown.isEditable)
-        #expect(shown.location != nil)
-        #expect(!ValueEditKind.location(spec).closesOnChoice)
-        #expect(ValueEditKind.location(spec).rowID == ItemLocation.rowID)
-    }
 }

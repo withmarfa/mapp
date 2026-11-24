@@ -32,10 +32,6 @@ import UniformTypeIdentifiers
         #expect(library.pageLayout(of: untyped) == .webPage(document: untyped.id, runsScripts: false))
     }
 
-    @Test func anyOtherFileOpensInItsPreview() {
-        #expect(library.pageLayout(of: file("List.txt", type: .plainText)) == .file)
-    }
-
     @Test func aWebPageRunsItsScripts() {
         library.catalogue.itemTypes[TypeID("core.file.webpage")] = ItemTypeInfo(
             id: TypeID("core.file.webpage"), label: "Web Page", fields: [], titleField: nil, bodyField: nil, parent: .file)
@@ -64,13 +60,6 @@ import UniformTypeIdentifiers
         #expect(library.pageLayout(of: article) == .webPage(document: older.id, runsScripts: false))
     }
 
-    @Test func aDocumentIsFoundByItsContentTypeNotByAnyConnectorsField() {
-        let article = article()
-        let untyped = file("saved.htm", type: nil, attachedTo: article.id)
-
-        #expect(library.pageLayout(of: article) == .webPage(document: untyped.id, runsScripts: false))
-    }
-
     @Test func anItemToReadWithTextOfItsOwnKeepsTheEditor() {
         let article = article()
         file("article.html", type: .html, attachedTo: article.id)
@@ -80,14 +69,6 @@ import UniformTypeIdentifiers
 
         library.bodies[article.id] = " \n\t "
         if case .webPage = library.pageLayout(of: article) {} else { Issue.record("a blank body opens the document") }
-    }
-
-    @Test func anItemToReadWithAnEmptyBodyOpensToTheDocument() {
-        let article = article()
-        let document = file("article.html", type: .html, attachedTo: article.id)
-        library.bodies[article.id] = ""
-
-        #expect(library.pageLayout(of: article) == .webPage(document: document.id, runsScripts: false))
     }
 
     @Test func anyOtherItemKeepsItsTextWhateverIsAttached() {

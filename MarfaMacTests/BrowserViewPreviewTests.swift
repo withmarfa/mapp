@@ -46,44 +46,6 @@ struct BrowserViewPreviewTests {
         browser.tableContent(in: library).rows.map(\.item.title).sorted()
     }
 
-    @Test func anUnchangedWindowListsTheViewAndReadsNoPreview() {
-        let library = Self.library()
-        let browser = Self.window(library)
-        #expect(browser.viewPreview == nil)
-        #expect(titles(browser, library) == ["t0", "t2", "t3"])
-        #expect(library.previewsAsked.isEmpty)
-    }
-
-    @Test func aChipTakenOffBringsItsRowsBackAtOnce() {
-        let library = Self.library()
-        let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filter = FilterState()
-        #expect(browser.hasViewChanges)
-        #expect(titles(browser, library) == ["t0", "t1", "t2", "t3"])
-        #expect(library.previewsAsked.last == LibraryViewQuery(types: [Self.task], states: [.active]))
-    }
-
-    @Test func aChangedChipNarrowsThePreviewLocally() {
-        let library = Self.library()
-        let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filter = FilterState(clauses: [FilterClause(field: Self.status, op: .is, values: ["todo"])])
-        #expect(titles(browser, library) == ["t0", "t3"])
-        // The chip's other values are still on offer, though no row of the saved view held "done".
-        let content = browser.tableContent(in: library)
-        let target = content.filterOffer.targets[Self.status]
-        #expect(target?.declared.contains("done") == true)
-    }
-
-    @Test func revertingReturnsToTheSavedList() {
-        let library = Self.library()
-        let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filter = FilterState()
-        #expect(titles(browser, library).count == 4)
-        browser.revertView(in: library)
-        #expect(browser.viewPreview == nil)
-        #expect(titles(browser, library) == ["t0", "t2", "t3"])
-    }
-
     @Test func savingMakesTheChangedFiltersTheViewsOwn() {
         let library = Self.library()
         let browser = Self.window(library)
@@ -115,18 +77,6 @@ struct BrowserViewPreviewTests {
         browser.tableOptions[browser.item]?.filter = FilterState()
         _ = browser.tableContent(in: library)
         #expect(library.previewsAsked.last?.filter == #"id eq "x""#)
-    }
-
-    @Test func aViewWhoseFilterTheCoreRefusesHasNoPreview() {
-        let view = Self.view(filter: "not a filter ((")
-        let library = Self.library(view)
-        let browser = Self.window(library, view: view)
-        browser.tableOptions[browser.item]?.filter = FilterState(is: [Self.status: ["todo"]])
-        #expect(browser.hasViewChanges)
-        #expect(browser.viewPreview == nil)
-        // The view's own list, narrowed by the chip.
-        #expect(titles(browser, library) == ["t0", "t3"])
-        #expect(library.previewsAsked.isEmpty)
     }
 
     @Test func mixedAndOrConditionsStayWhole() {

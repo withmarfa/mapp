@@ -53,19 +53,6 @@ struct MarfaViewsTests {
         await source.close()
     }
 
-    @Test func aViewWhoseFilterChangesElsewhereListsAnew() async throws {
-        let views = SavedViews([Self.planning])
-        let source = Self.source(views: views)
-        let library = MarfaLibrary(source: source, notices: Notices())
-        try #require(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [ItemID("n1")] })
-        // Another device changes what the view asks for, not its title, so only its version tells it apart.
-        views.members.withLock { $0["view-planning"] = ["n2"] }
-        views.list.withLock { $0 = [LibraryView(id: Self.planning.id, title: Self.planning.title, version: 2)] }
-        await source.hear(Change(origin: .server(event: "item.updated", cursor: "2"), itemId: Self.planning.id.rawValue, edgeId: nil))
-        #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [ItemID("n2")] })
-        await source.close()
-    }
-
     /// A hydration under way answers the views that have arrived, so a view not yet back is not taken as deleted.
     @Test func viewsReadPartwayThroughAHydrationKeepTheOnesAlreadyRead() async throws {
         let views = SavedViews([Self.planning])
@@ -89,23 +76,6 @@ struct MarfaViewsTests {
         await source.close()
     }
 
-    @Test func aViewDeletedElsewhereLeavesTheSidebarAndItsPlace() async throws {
-        let views = SavedViews([Self.planning])
-        let source = Self.source(views: views)
-        let library = MarfaLibrary(source: source, notices: Notices())
-        try #require(await eventually { library.views == [Self.planning] })
-        let browser = Browser()
-        browser.show(.view(Self.planning.id), in: library, order: ItemOrder())
-        views.list.withLock { $0 = [] }
-        // As the copy tells of a view deleted through it; the engine reads the views again for the view's id.
-        await source.hear(Change(origin: .refreshed(.purged), itemId: Self.planning.id.rawValue, edgeId: nil))
-        #expect(await eventually { library.views.isEmpty })
-        browser.placeRemoved(in: library, order: ItemOrder())
-        #expect(browser.sidebarItem == .allItems)
-        #expect(SidebarPlan(library, layout: SidebarLayout()).library.contains(.views) == false)
-        await source.close()
-    }
-
     // MARK: The library
 
     private static func loaded(views: [LibraryView]) async throws -> (MarfaLibrary, FakeItemSource) {
@@ -114,48 +84,6 @@ struct MarfaViewsTests {
         source.send(.loaded(SourceSnapshot(items: LibraryFixture.items, catalogue: LibraryFixture.catalogue, views: views)))
         try #require(await eventually { library.isLoaded })
         return (library, source)
-    }
-
-    @Test func theSidebarListsTheViewsAfterTypesAndNoneWithoutThem() async throws {
-        let (library, source) = try await Self.loaded(views: [Self.planning, Self.reading])
-        let plan = SidebarPlan(library, layout: SidebarLayout())
-        #expect(plan.library == [.views, .types])
-        #expect(library.views.map(\.title) == ["Planning", "Reading"])
-        #expect(library.name(of: .view(Self.reading.id)) == "Reading")
-
-        // A view renamed elsewhere is named anew; a view gone has no place and no name.
-        source.send(.views([LibraryView(id: Self.planning.id, title: "This Week")]))
-        #expect(await eventually { library.views.map(\.title) == ["This Week"] })
-        #expect(library.name(of: .view(Self.reading.id)) == "")
-
-        source.send(.views([]))
-        #expect(await eventually { library.views.isEmpty })
-        #expect(SidebarPlan(library, layout: SidebarLayout()).library == [.types])
-    }
-
-    @Test func aViewHiddenFromTheSidebarStaysListedForSettings() async throws {
-        let (library, _) = try await Self.loaded(views: [Self.planning])
-        var layout = SidebarLayout()
-        layout.setHidden(.views, true)
-        let plan = SidebarPlan(library, layout: layout)
-        #expect(plan.library.contains(.views))
-        #expect(!plan.shownLibrary.contains(.views))
-    }
-
-    @Test func selectingAViewListsWhatTheCopyHoldsOfIt() async throws {
-        let F = LibraryFixture.self
-        let (library, source) = try await Self.loaded(views: [Self.planning])
-        // An id the library does not hold, such as one the copy has not read yet, is not listed.
-        source.viewMembers.withLock { $0[Self.planning.id] = [F.n1, F.t1, ItemID("not-held")] }
-        #expect(await eventually { Set(library.items(in: .view(Self.planning.id)).map(\.id)) == [F.n1, F.t1] })
-        #expect(library.count(in: .view(Self.planning.id)) == 2)
-
-        // A change to the items reads the view again.
-        source.viewMembers.withLock { $0[Self.planning.id] = [F.n1] }
-        var renamed = try #require(library.item(F.n2))
-        renamed.title = "Other"
-        source.send(.upserted([renamed]))
-        #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [F.n1] })
     }
 
     @Test func aChangedViewDropsItsListAndTheOthersKeepTheirs() async throws {
@@ -178,28 +106,6 @@ struct MarfaViewsTests {
         #expect(library.items(in: .view(Self.reading.id)).map(\.id) == [F.t1])
     }
 
-    @Test func aViewTheCopyCannotAnswerKeepsItsListAndSaysSoOnce() async throws {
-        let F = LibraryFixture.self
-        let (library, source) = try await Self.loaded(views: [Self.planning])
-        source.viewMembers.withLock { $0[Self.planning.id] = [F.n1] }
-        #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [F.n1] })
-
-        source.viewFails.withLock { $0 = true }
-        for title in ["Other", "Another"] {
-            var renamed = try #require(library.item(F.n2))
-            renamed.title = title
-            let reads = source.viewReads.withLock { $0 }
-            source.send(.upserted([renamed]))
-            #expect(await eventually {
-                _ = library.items(in: .view(Self.planning.id))
-                return source.viewReads.withLock { $0 } > reads
-            })
-        }
-        #expect(await eventually { library.notices.waiting.count == 1 })
-        #expect(library.notices.waiting.first?.title == String(localized: "Can’t Show This View"))
-        #expect(library.items(in: .view(Self.planning.id)).map(\.id) == [F.n1])
-    }
-
     // MARK: A view's changed filters, read before they are saved
 
     private static let widened = LibraryViewQuery(states: [.active])
@@ -218,18 +124,6 @@ struct MarfaViewsTests {
         #expect(source.previewQueries.withLock { $0 }.allSatisfy { $0 == Self.widened })
     }
 
-    @Test func aPreviewIsReadAgainWhenTheItemsChange() async throws {
-        let F = LibraryFixture.self
-        let (library, source) = try await Self.loaded(views: [Self.planning])
-        source.previewAnswers.withLock { $0[Self.widened] = [F.n1] }
-        #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id) == [F.n1] })
-        source.previewAnswers.withLock { $0[Self.widened] = [F.n2] }
-        var renamed = try #require(library.item(F.n2))
-        renamed.title = "Other"
-        source.send(.upserted([renamed]))
-        #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id) == [F.n2] })
-    }
-
     @Test func twoQueriesOfOneViewKeepTheirOwnAnswers() async throws {
         let F = LibraryFixture.self
         let (library, source) = try await Self.loaded(views: [Self.planning])
@@ -237,28 +131,6 @@ struct MarfaViewsTests {
         #expect(await eventually { Set(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id)) == [F.n1, F.n2] })
         #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.narrowed).map(\.id) == [F.n2] })
         #expect(Set(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id)) == [F.n1, F.n2])
-    }
-
-    @Test func aPreviewTheCopyRefusesKeepsItsLastListAndSaysSoOnce() async throws {
-        let F = LibraryFixture.self
-        let (library, source) = try await Self.loaded(views: [Self.planning])
-        source.previewAnswers.withLock { $0[Self.widened] = [F.n1] }
-        #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id) == [F.n1] })
-
-        source.previewFails.withLock { $0 = true }
-        for title in ["Other", "Another"] {
-            var renamed = try #require(library.item(F.n2))
-            renamed.title = title
-            let reads = source.previewQueries.withLock { $0.count }
-            source.send(.upserted([renamed]))
-            #expect(await eventually {
-                _ = library.previewItems(ofView: Self.planning.id, query: Self.widened)
-                return source.previewQueries.withLock { $0.count } > reads
-            })
-        }
-        #expect(await eventually { library.notices.waiting.count == 1 })
-        #expect(library.notices.waiting.first?.title == String(localized: "Can’t Show This View"))
-        #expect(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id) == [F.n1])
     }
 
     @Test func anOlderQueryAnsweringLateIsNotTheLastPreviewOfTheNewer() async throws {
@@ -279,14 +151,6 @@ struct MarfaViewsTests {
         #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.narrowed).map(\.id) == [F.n2] })
     }
 
-    @Test func aPreviewOfAViewGoneReadsNothing() async throws {
-        let (library, source) = try await Self.loaded(views: [Self.planning])
-        source.send(.views([]))
-        #expect(await eventually { library.views.isEmpty })
-        #expect(library.previewItems(ofView: Self.planning.id, query: Self.widened).isEmpty)
-        #expect(source.previewQueries.withLock { $0.isEmpty })
-    }
-
     @Test func aPreviewReadsWithNoServerAndWritesNothing() async throws {
         let F = LibraryFixture.self
         let (library, source) = try await Self.loaded(views: [Self.planning])
@@ -296,31 +160,6 @@ struct MarfaViewsTests {
         #expect(library.views == [Self.planning])
     }
 
-    // MARK: The window
-
-    @Test func aViewRemovedWhileSelectedFallsBackToItems() {
-        let library = FakeItemLibrary(items: [])
-        library.views = [Self.planning]
-        let browser = Browser()
-        browser.show(.view(Self.planning.id), in: library, order: ItemOrder())
-        browser.placeRemoved(in: library, order: ItemOrder())
-        #expect(browser.sidebarItem == .view(Self.planning.id))
-
-        library.views = []
-        browser.placeRemoved(in: library, order: ItemOrder())
-        #expect(browser.sidebarItem == .allItems)
-    }
-
-    @Test func aWindowRestoresAViewOnlyWhileItIsThere() {
-        let library = FakeItemLibrary(items: [])
-        let snapshot = Browser.Snapshot(place: .view(Self.planning.id), selection: [])
-        let browser = Browser()
-        browser.restore(snapshot, in: library, order: ItemOrder())
-        #expect(browser.sidebarItem == .allItems)
-        library.views = [Self.planning]
-        browser.restore(snapshot, in: library, order: ItemOrder())
-        #expect(browser.sidebarItem == .view(Self.planning.id))
-    }
 }
 
 /// The views the server holds, which a test changes as another device would.

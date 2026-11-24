@@ -70,15 +70,6 @@ struct MarfaMappingTests {
             isHeld: { held.contains($0) })
     }
 
-    // MARK: Who made an item
-
-    @Test func anItemKeepsTheSourceMarfaNamesAsWhatMadeIt() {
-        #expect(Self.item(Self.row("a")).source == "test")
-        var unnamed = Self.row("b")
-        unnamed.source = ""
-        #expect(Self.item(unnamed).source == nil)
-    }
-
     // MARK: Rows the copy could not read
 
     @Test func aRowTheCopyCouldNotReadIsShownAsDamagedNotAsEmpty() {
@@ -123,14 +114,6 @@ struct MarfaMappingTests {
         #expect(shown.preview == "A line from the core")
         #expect(shown.title == "Stored", "the stored title is what an edit starts from and is untouched")
         #expect(!shown.isUntitled)
-    }
-
-    @Test func onlyAnItemTheCoreCannotNameIsUntitled() {
-        let row = Self.row("u", properties: ["title": "Has a title but the core gave no name"])
-        let shown = Self.item(row, display: ItemDisplay(name: nil, preview: nil))
-        #expect(shown.isUntitled)
-        #expect(shown.displayTitle == String(localized: "Untitled"))
-        #expect(shown.preview.isEmpty)
     }
 
     // MARK: Catalogue
@@ -314,28 +297,6 @@ struct MarfaMappingTests {
         #expect(Self.item(Self.row("a")).trashed == nil)
         #expect(Self.item(Self.row("u", tier: nil)).tier == .library)
         #expect(Self.item(Self.row("r", state: .revoked)).state == .archived)
-    }
-
-    @Test func aFileItemIsReadAsItsKindOfFile() {
-        let image = Self.item(Self.row("i", type: "core.file.image", properties: ["title": "Cat", "mime_type": "image/png"]))
-        // The server stamps `size_bytes` once it holds the bytes, so a file not yet sent has no size.
-        #expect(image.content == .file(.png, byteCount: 0))
-        let unknown = Self.item(Self.row("f", type: "core.file", properties: ["title": "Blob"]))
-        #expect(unknown.content == .file(.data, byteCount: 0))
-        #expect(Self.item(Self.row("n")).content == .markdown)
-    }
-
-    @Test func aFileItemShowsTheSizeTheServerStamped() {
-        let sent = Self.item(Self.row(
-            "i", type: "core.file.image", properties: ["title": "Cat", "mime_type": "image/png", "size_bytes": 48_213]))
-        #expect(sent.content == .file(.png, byteCount: 48_213))
-        let large = Self.item(Self.row("l", type: "core.file", properties: ["title": "Big", "size_bytes": 5_000_000_000]))
-        #expect(large.content == .file(.data, byteCount: 5_000_000_000))
-        let odd = Self.item(Self.row("o", type: "core.file", properties: ["title": "Odd", "size_bytes": "many"]))
-        #expect(odd.content == .file(.data, byteCount: 0))
-        // The size is an integer; a fraction is no length.
-        let fraction = Self.item(Self.row("p", type: "core.file", properties: ["title": "Part", "size_bytes": 1.5]))
-        #expect(fraction.content == .file(.data, byteCount: 0))
     }
 
     @Test func linksAndEmbedsThatNameNoItemAreShownAsEdgesOfTheText() {

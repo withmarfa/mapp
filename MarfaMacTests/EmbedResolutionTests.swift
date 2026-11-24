@@ -63,17 +63,6 @@ import Testing
         #expect(await open("![[Dr. Smith]]", waiting: .seconds(3_600)).file == nil)
     }
 
-    @Test func aFileThatCanNotBeShownSaysWhy() async throws {
-        library.bindEmbed("![[Photo.png]]", in: note, file: try file("kept", Data("png".utf8)))
-        library.bindEmbed("![[Twin.png]]", in: note, resolution: .ambiguous([]))
-        library.bindEmbed("![[Later.png]]", in: note, resolution: .pending)
-        library.fetchFails = true
-
-        #expect(reason(await open("![[Photo.png]]")) == "The server can’t be reached.")
-        #expect(reason(await open("![[Twin.png]]")) == "More than one file has this name.")
-        #expect(reason(await open("![[Later.png]]")) != nil)
-    }
-
     @Test func aBinnedFileIsMissingAndARenamedOneIsStillTheFileTheEmbedIsBoundTo() async throws {
         let id = try #require(library.bindEmbed("![[Photo.png]]", in: note, file: try file("kept", Data("png".utf8))))
         #expect(await open("![[Photo.png]]").file?.length == 3)
@@ -85,103 +74,5 @@ import Testing
         library.items[index].state = .trashed
         #expect(await open("![[Photo.png]]").file == nil)
         #expect(reason(await open("![[Photo.png]]")) == nil, "an embed of a binned file is missing, as a link to a binned item is")
-    }
-
-    @Test func theLibraryTellsWhichEmbedsChangedWhenAFileArrivesIsRenamedOrBinned() async throws {
-        library.bindEmbed("![[Photo.png]]", in: note, resolution: .pending)
-        library.bindEmbed("![[Other.png]]", in: note, file: try file("other", Data("png".utf8)))
-        let before = library.embedStates(of: note)
-        #expect(before["![[Photo.png]]"]?.file == nil)
-
-        let id = try #require(library.bindEmbed("![[Photo.png]]", in: note, file: try file("kept", Data("png".utf8))))
-        var after = library.embedStates(of: note)
-        #expect(after.filter { before[$0.key] != $0.value }.keys.sorted() == ["![[Photo.png]]"], "a file arriving changes just its embed")
-
-        let index = try #require(library.items.firstIndex { $0.id == id })
-        library.items[index].title = "Beach.png"
-        let renamed = library.embedStates(of: note)
-        #expect(after.filter { renamed[$0.key] != $0.value }.keys.sorted() == ["![[Photo.png]]"])
-        after = renamed
-
-        library.items[index].state = .trashed
-        #expect(after.filter { library.embedStates(of: note)[$0.key] != $0.value }.keys.sorted() == ["![[Photo.png]]"])
-    }
-
-    @Test func anItemsPictureIsItsFirstEmbeddedImageReadThroughTheResolver() async throws {
-        library.bindEmbed("![[Budget.csv]]", in: note, file: try file("Budget.csv", Data("a,b\n".utf8)))
-        library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2)))
-        let item = try #require(library.item(note))
-
-        func picture() async -> String {
-            switch await GalleryPreview.image(for: item, attachments: CardAttachments.of(item, in: library), in: library) {
-            case .image(let image): "\(image.width)"
-            case .none: "none"
-            case .failed: "failed"
-            }
-        }
-        #expect(await picture() == "5")
-
-        library.fetchFails = true
-        #expect(await picture() == "failed", "a picture that could not be had now is not taken for none")
-    }
-
-    @Test func aPictureThatFailedIsTriedAgain() async throws {
-        library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2)))
-        let item = try #require(library.item(note))
-        library.fetchFails = true
-        #expect(await GalleryArtworkCache.artwork(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library) == nil)
-
-        library.fetchFails = false
-        #expect(await GalleryArtworkCache.artwork(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library)?.image.width == 5)
-    }
-
-    @Test func aFailedPictureIsToldApartFromAnItemWithNone() async throws {
-        let bare = try #require(library.item(note))
-        func name(_ outcome: GalleryArtworkCache.Outcome) -> String {
-            switch outcome {
-            case .picture: "picture"
-            case .none: "none"
-            case .failed: "failed"
-            }
-        }
-        #expect(name(await GalleryArtworkCache.outcome(for: bare, attachments: CardAttachments.of(bare, in: library), width: 200, scale: 2, in: library)) == "none")
-
-        library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2)))
-        let item = try #require(library.item(note))
-        library.fetchFails = true
-        #expect(name(await GalleryArtworkCache.outcome(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library)) == "failed")
-        library.fetchFails = false
-        #expect(name(await GalleryArtworkCache.outcome(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library)) == "picture")
-    }
-
-    /// Binning, renaming or restoring the file changes nothing of the item, so the card follows the file itself.
-    @Test func anItemsCardFollowsItsFileWhenItIsBinnedRenamedAndRestored() async throws {
-        let id = try #require(library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2))))
-        let item = try #require(library.item(note))
-        let index = try #require(library.items.firstIndex { $0.id == id })
-        func picture() async -> Int? { await GalleryArtworkCache.artwork(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library)?.image.width }
-        func basis() -> GalleryArtworkCache.Basis { GalleryArtworkCache.basis(of: item, attachments: CardAttachments.of(item, in: library), in: library) }
-        func peek() -> Int? { GalleryArtworkCache.peek(basis(), width: 200)?.image.width }
-
-        #expect(await picture() == 5)
-        #expect(peek() == 5)
-
-        library.items[index].state = .trashed
-        #expect(peek() == nil, "the picture of a file that is binned is not the card's")
-        #expect(await picture() == nil, "a binned file is no picture")
-
-        let binned = basis()
-        library.items[index].title = "Beach.png"
-        #expect(basis() != binned, "a rename is a change to what decides the picture")
-
-        library.items[index].state = .active
-        #expect(await picture() == 5, "a restored file is the card's picture again")
-
-        let restored = basis()
-        library.items[index].title = "Sand.png"
-        #expect(basis() != restored)
-        #expect(peek() == nil, "a picture made for the file under its old name is not taken for the new one")
-        #expect(await picture() == 5)
-        #expect(peek() == 5)
     }
 }

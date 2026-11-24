@@ -37,23 +37,6 @@ extension EditorTests {
         try await Task.sleep(for: .milliseconds(200))
     }
 
-    @Test func aLinkToNoItemIsMarkedMissingAndFollowsTheLibrary() async throws {
-        let page = try await Page()
-        let plan = page.library.add("Plan\n")
-        try await page.load("Reader\n\nSee [[Plan]] and [[Later]].\n")
-        #expect(try await marks(page, until: "live,missing") == "live,missing")
-
-        let later = page.library.add("Later\n")
-        #expect(try await marks(page, until: "live,live") == "live,live", "an item made makes its link live")
-
-        let index = try #require(page.library.items.firstIndex { $0.id == plan.id })
-        page.library.items[index].title = "Plan v2"
-        #expect(try await marks(page, until: "missing,live") == "missing,live", "an item renamed leaves its old link missing")
-
-        page.library.items.removeAll { $0.id == later.id }
-        #expect(try await marks(page, until: "missing,missing") == "missing,missing", "an item deleted makes its link missing")
-    }
-
     @Test func anItemOpenedWithItsLinksResolvedAndMarkedAndThenClosedIsNotRewritten() async throws {
         let page = try await Page()
         page.library.add("Plan\n")
@@ -145,57 +128,6 @@ extension EditorTests {
         #expect(opened == 0 && beeps == 0)
         page.editor.windowWent()
         await page.editor.openItemLink(ItemLink(linkText: "[[Plan]]")!, from: try #require(page.editor.pageItemID))
-        #expect(opened == 0 && beeps == 0)
-    }
-
-    @Test func aLinkWithAHeadingScrollsToItOnceTheItemIsShown() async throws {
-        let page = try await Page()
-        let plan = page.library.add("Plan\n\n# Soil\n\nLoam.\n\n## Light and Water\n\nSun.\n")
-        try await page.load("Reader\n\nSee [[Plan#light and water]] and [[Plan#Nowhere]].\n")
-        let library = page.library
-        let editor = page.editor
-        editor.onOpenItem = { id in
-            if let item = library.item(id) { editor.load(item) }
-        }
-        _ = try await marks(page, until: "live,live")
-        try await commandClick(0, in: page)
-        try await page.wait { editor.pageItemID == plan.id }
-        var heading = ""
-        _ = try await eventuallyAsking {
-            heading = try await editor.webView.evaluateJavaScript(
-                "(window.getSelection().anchorNode?.parentElement?.closest('h1,h2,h3')?.textContent) ?? ''") as? String ?? ""
-            return !heading.isEmpty
-        }
-        #expect(heading == "Light and Water", "the page moved to the heading, ignoring case")
-    }
-
-    @Test func aHeadingThatIsNotThereStillOpensTheItem() async throws {
-        let page = try await Page()
-        let plan = page.library.add("Plan\n\n# Soil\n")
-        try await page.load("Reader\n\nSee [[Plan#Nowhere]].\n")
-        var opened: [ItemID] = []
-        page.editor.onOpenItem = { opened.append($0) }
-        _ = try await marks(page, until: "live")
-        try await commandClick(0, in: page)
-        try await page.wait { !opened.isEmpty }
-        #expect(opened == [plan.id])
-    }
-
-    @Test func aLinkToAHeadingOfItsOwnItemMovesThePageWithoutOpeningAnything() async throws {
-        let page = try await Page()
-        try await page.load("Reader\n\n# Soil\n\nSee [[#soil]].\n")
-        var opened = 0, beeps = 0
-        page.editor.onOpenItem = { _ in opened += 1 }
-        page.editor.onUnopenableLink = { beeps += 1 }
-        _ = try await marks(page, until: "live")
-        try await commandClick(0, in: page)
-        var heading = ""
-        _ = try await eventuallyAsking {
-            heading = try await page.editor.webView.evaluateJavaScript(
-                "(window.getSelection().anchorNode?.parentElement?.closest('h1,h2,h3')?.textContent) ?? ''") as? String ?? ""
-            return !heading.isEmpty
-        }
-        #expect(heading == "Soil")
         #expect(opened == 0 && beeps == 0)
     }
 

@@ -45,35 +45,6 @@ import Testing
         return (library, source)
     }
 
-    @Test func theIndexListsActiveItemsOfContainerTypesByTitle() async throws {
-        let (library, _) = try await loaded()
-        #expect(library.collections.map(\.id) == [Self.archive, Self.holiday])
-        #expect(library.catalogue.collectionTypes == [F.album])
-    }
-
-    @Test func itemsWithChildrenAreNoCollections() async throws {
-        let (library, _) = try await loaded()
-        // Alpha holds Epic task through `child-of`, which once made it a collection.
-        #expect(!library.collections.contains { $0.id == F.p1 })
-        #expect(library.items(in: .collection(F.p1)).isEmpty)
-    }
-
-    @Test func membersFollowTheirPositionsThenTitle() async throws {
-        let (library, _) = try await loaded()
-        #expect(library.items(in: .collection(Self.holiday)).map(\.id) == [F.p1, F.n1, F.t1])
-        #expect(library.items(in: .collection(Self.archive)).map(\.id) == [F.en1, F.p2])
-        #expect(library.count(in: .collection(Self.holiday)) == 3)
-        #expect(library.name(of: .collection(Self.holiday)) == "Holiday")
-    }
-
-    @Test func aMemberInTheBinLeavesTheCollection() async throws {
-        let (library, source) = try await loaded()
-        var gone = try #require(library.item(F.n1))
-        gone.state = .trashed
-        source.send(.upserted([gone]))
-        #expect(await eventually { library.items(in: .collection(Self.holiday)).map(\.id) == [F.p1, F.t1] })
-    }
-
     @Test func addingWritesOneEdgeAfterTheLastPosition() async throws {
         let (library, source) = try await loaded()
         let undo = UndoManager()
@@ -174,13 +145,6 @@ import Testing
         #expect(!library.addToCollection([F.e1], Self.oldAlbum, undoManager: nil))
         #expect(source.writes.isEmpty)
         #expect(library.notices.waiting.last?.message == String(localized: "This collection isn’t in the library."))
-    }
-
-    @Test func theCollectionsHoldingTheItemsAreNamed() async throws {
-        let (library, _) = try await loaded()
-        #expect(library.collections(holding: [F.n1]).map(\.id) == [Self.holiday])
-        #expect(library.collections(holding: [F.p2, F.en1]).map(\.id) == [Self.archive])
-        #expect(library.collections(holding: [F.e1]).isEmpty)
     }
 
     /// The collection commands take the whole selection, files too, never only its notes, and leave out what

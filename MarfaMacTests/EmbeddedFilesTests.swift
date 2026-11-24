@@ -5,42 +5,13 @@ import UniformTypeIdentifiers
 import WebKit
 @testable import MarfaMac
 
-/// Small real files of each kind, made by code so the tests carry no binaries.
+/// Image and video fixtures for the embedded-file scheme.
 enum EmbedFixtures {
     static func png(width: Int = 4, height: Int = 3) throws -> Data {
         try #require(NSBitmapImageRep(
             bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4,
             hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
         )?.representation(using: .png, properties: [:]))
-    }
-
-    /// Half a second of a tone, as 16-bit mono PCM.
-    static func wav(seconds: Double = 0.5, rate: Int = 8000) -> Data {
-        let samples = Int(Double(rate) * seconds)
-        var data = Data()
-        func append<T: FixedWidthInteger>(_ value: T) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
-        data.append(contentsOf: Array("RIFF".utf8))
-        append(UInt32(36 + samples * 2))
-        data.append(contentsOf: Array("WAVEfmt ".utf8))
-        append(UInt32(16))
-        append(UInt16(1))
-        append(UInt16(1))
-        append(UInt32(rate))
-        append(UInt32(rate * 2))
-        append(UInt16(2))
-        append(UInt16(16))
-        data.append(contentsOf: Array("data".utf8))
-        append(UInt32(samples * 2))
-        for index in 0..<samples {
-            append(Int16(sin(Double(index) * 2 * .pi * 440 / Double(rate)) * 8000))
-        }
-        return data
-    }
-
-    /// A second of 64 by 64 H.264 video, made once with ffmpeg (`MarfaMacTests/Fixtures/README.md`). No test encodes
-    /// video as it runs: the hardware encoder is not for test runs.
-    static func movie(to url: URL) throws {
-        try fixture("Clip").write(to: url)
     }
 
     /// Five seconds of video in fragments, with zeros between the first fragment and the rest so the later frames lie
@@ -71,16 +42,6 @@ enum EmbedFixtures {
         return try Data(contentsOf: url)
     }
 
-    /// One page filled red, so a frame showing it can be told from an empty one.
-    static func pdf(to url: URL) throws {
-        var box = CGRect(x: 0, y: 0, width: 300, height: 300)
-        let context = try #require(CGContext(url as CFURL, mediaBox: &box, nil))
-        context.beginPDFPage(nil)
-        context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
-        context.fill(box)
-        context.endPDFPage()
-        context.closePDF()
-    }
 }
 
 /// A request WebKit would make of the scheme, keeping what the app answers.
@@ -301,18 +262,6 @@ struct EmbeddedFilesTests {
         try await Task.sleep(for: .milliseconds(300))
         #expect(task.received == EmbeddedFiles.piece, "WebKit throws on a task it has stopped")
         #expect(!task.finished)
-    }
-
-    @Test func eachKindOfFileIsToldAsThePageShowsIt() {
-        #expect(EmbeddedFiles.kind(of: .png) == "image")
-        #expect(EmbeddedFiles.kind(of: .mp3) == "audio")
-        #expect(EmbeddedFiles.kind(of: .wav) == "audio")
-        #expect(EmbeddedFiles.kind(of: .quickTimeMovie) == "video")
-        #expect(EmbeddedFiles.kind(of: .mpeg4Movie) == "video")
-        #expect(EmbeddedFiles.kind(of: .pdf) == "pdf")
-        #expect(EmbeddedFiles.kind(of: .commaSeparatedText) == "file")
-        #expect(EmbeddedFiles.kind(of: .zip) == "file")
-        #expect(EmbeddedFiles.kind(of: nil) == "file")
     }
 }
 

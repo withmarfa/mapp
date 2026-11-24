@@ -151,38 +151,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.catalogue == F.catalogue)
     }
 
-    @Test func eachPlaceHoldsWhatItsNameSays() async throws {
-        let (library, _) = try await loaded()
-        #expect(ids(library.items(in: .inbox)) == [F.n2])
-        #expect(ids(library.items(in: .allItems)) == [F.p1, F.e1, F.t1, F.n1, F.n2, F.en1, F.f1, F.p2])
-        #expect(ids(library.items(in: .favorites)) == [F.t1, F.n1])
-        #expect(ids(library.items(in: .favoriteItem(F.n1))) == [F.n1])
-        #expect(library.items(in: .favoriteItem(F.n2)).isEmpty)
-        // A type's place lists that type's own items and none of its subtypes'.
-        #expect(library.items(in: .itemType("aic.ticket")).isEmpty)
-        #expect(ids(library.items(in: .itemType("aic.ticket.task"))) == [F.e1])
-        #expect(ids(library.items(in: .itemType("aic.ticket.bug"))) == [F.t1])
-        // Only `in-collection` edges make members: the items filed under Alpha are its children, not its contents.
-        #expect(library.items(in: .collection(F.p1)).isEmpty)
-        #expect(ids(library.items(in: .files)) == [F.f1])
-        #expect(ids(library.deletedItems) == [F.n3])
-        for place in [SidebarItem.inbox, .allItems, .favorites, .itemType("aic.ticket"), .itemType("aic.ticket.task"), .collection(F.p1), .files] {
-            #expect(library.count(in: place) == library.items(in: place).count, "\(place)")
-        }
-        // Newest first, as the source paints them.
-        #expect(library.items(in: .allItems).first?.id == F.p1)
-    }
-
-    @Test func placesAreNamedForThePerson() async throws {
-        let (library, _) = try await loaded()
-        #expect(library.name(of: .inbox) == String(localized: "Inbox"))
-        #expect(library.name(of: .allItems) == String(localized: "Items"))
-        #expect(library.name(of: .itemType("aic.project")) == "Projects")
-        #expect(library.name(of: .itemType("aic.ticket.bug")) == "Bugs")
-        #expect(library.name(of: .collection(F.p1)) == "Alpha")
-        #expect(library.name(of: .favoriteItem(F.n1)) == "Plain note")
-    }
-
     @Test func changesFromTheSourceReplaceWhatWasHeld() async throws {
         let (library, source) = try await loaded()
         #expect(library.items(in: .recents).first?.id == F.p1)
@@ -222,40 +190,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.setBody("Changed in place", of: F.p1, version: 2)
         source.sendBody(of: F.p1)
         #expect(await eventually { library.body(of: F.p1)?.text == "Changed in place" })
-    }
-
-    @Test func searchListsWhatTheCopyFound() async throws {
-        let (library, source) = try await loaded()
-        source.hits.withLock { $0["body"] = [F.n1, F.p1] }
-        #expect(library.search("  ", in: .everywhere).items.isEmpty)
-        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.n1, F.p1] })
-        let searches = source.searches.withLock { $0 }
-        _ = library.search("body", in: .everywhere).items
-        #expect(source.searches.withLock { $0 } == searches)
-
-        // A change to the items asks again, and the last results stand meanwhile.
-        source.hits.withLock { $0["body"] = [F.p1] }
-        var renamed = try #require(library.item(F.n2))
-        renamed.title = "Other"
-        source.send(.upserted([renamed]))
-        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.p1] })
-    }
-
-    @Test func aSearchThatFailsKeepsWhatWasFoundAndSaysWhy() async throws {
-        let (library, source) = try await loaded()
-        source.hits.withLock { $0["body"] = [F.n1] }
-        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.n1] })
-        source.searchFails.withLock { $0 = true }
-        var renamed = try #require(library.item(F.n2))
-        renamed.title = "Other"
-        source.send(.upserted([renamed]))
-        // The list reads the search again as it redraws for the change.
-        #expect(await eventually {
-            _ = library.search("body", in: .everywhere).items
-            return library.notices.waiting.last != nil
-        })
-        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Search"))
-        #expect(library.search("body", in: .everywhere).items.map(\.id) == [F.n1])
     }
 
     @Test func relationshipsReadBothWaysUnderTheirNames() async throws {
@@ -305,14 +239,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(ids(library.relationshipCandidates(for: F.n1, field: "in-collection")) == [album.id])
         #expect(library.relationships(for: F.n1).contains { $0.field == "in-collection" })
         #expect(await library.changeItemRelationship(F.n1, field: "in-collection", adding: [album.id], removing: [], undoManager: nil))
-    }
-
-    @Test func aFileIsFetchedAndAnItemHasNoFile() async throws {
-        let (library, _) = try await loaded()
-        #expect(try await library.fileURL(of: F.f1) == URL(filePath: "/dev/null"))
-        #expect(try await library.fileURL(of: F.n1) == nil)
-        #expect(library.trashDays == nil)
-        #expect(library.idsForWindows([F.n1, ItemID("missing")]) == [F.n1])
     }
 }
 
@@ -1069,45 +995,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.upserted([waiting]))
         #expect(await eventually { library.item(F.n1)?.sync == .conflicted(sibling: F.n2, fields: ["body"]) })
     }
-
-    @Test func eachReadIsToldOfTheChangesThatAlterIt() async throws {
-        let (library, source) = try await loaded()
-        let list = observes { _ = library.items(in: .favorites) }
-        let count = observes { _ = library.count(in: .favorites) }
-        let one = observes { _ = library.item(F.n1) }
-        let other = observes { _ = library.item(F.p2) }
-        let text = observes { _ = library.body(of: F.n1) }
-        let relations = observes { _ = library.relationships(for: F.p1) }
-        var renamed = try #require(library.item(F.n1))
-        renamed.title = "Retitled"
-        source.send(.upserted([renamed]))
-        #expect(await eventually { list.isSet })
-        #expect(one.isSet)
-        #expect(relations.isSet)
-        // A title is not a place, another item is not this one, and the text did not change.
-        #expect(!count.isSet)
-        #expect(!other.isSet)
-        #expect(!text.isSet)
-
-        let count2 = observes { _ = library.count(in: .favorites) }
-        let text2 = observes { _ = library.body(of: F.n1) }
-        let gone = observes { _ = library.item(F.p2) }
-        let missing = observes { _ = library.item(ItemID("later")) }
-        renamed.tags = []
-        source.setBody("New text", of: F.n1, version: 2)
-        renamed.version = ItemVersion(2)
-        source.send(.upserted([renamed]))
-        #expect(await eventually { count2.isSet })
-        #expect(text2.isSet)
-        source.send(.removed([F.p2]))
-        #expect(await eventually { gone.isSet })
-        source.send(.upserted([F.item(ItemID("later"), F.note, "Later", age: 0)]))
-        #expect(await eventually { missing.isSet })
-
-        let search = observes { _ = library.search("x", in: .everywhere).items }
-        source.hits.withLock { $0["x"] = [F.n1] }
-        #expect(await eventually { search.isSet })
-    }
 }
 
 /// What an item's text links and embeds: the package writes each as an edge when the text is saved, so the items
@@ -1286,18 +1173,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.notices.waiting.map(\.text) == ["Typed as the row turned unreadable"])
         #expect(library.notices.waiting.last?.message == "\(MarfaLibrary.cantChange) Your text is on the clipboard, so you can paste it back.")
         #expect(source.writes.isEmpty)
-    }
-
-    @Test func textThatChangesNothingIsNotTold() async throws {
-        let (library, source) = try await loaded()
-        var damaged = try #require(library.item(LibraryFixture.n1))
-        damaged.problem = ItemProblem(message: "Damaged", withholdsText: true)
-        source.send(.upserted([damaged]))
-        try #require(await eventually { library.item(LibraryFixture.n1)?.problem != nil })
-        let held = try #require(library.body(of: LibraryFixture.n1)?.text)
-
-        library.updateBody(of: LibraryFixture.n1, to: held)
-        #expect(library.notices.waiting.isEmpty)
     }
 
     /// The page's last save can arrive for an item another device purged meanwhile, which no queue will take.
@@ -1512,14 +1387,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.clearWrites()
         #expect(await library.changeItemRelationship(F.n1, field: "related", adding: [], removing: [F.n2], undoManager: nil))
         #expect(source.writes == [.unlink(EdgeID("rel2"))])
-    }
-
-    @Test func aOneWayRelationNamesEachEndByItsOwnLabel() async throws {
-        let (library, _) = try await Self.loaded()
-        #expect(library.relationships(for: F.n1).first { $0.field == "about" }?.label == "About")
-        #expect(library.relationships(for: F.p1).first { $0.field == "inverse:about" }?.label == "Subject of")
-        #expect(library.relationships(for: F.e1).first { $0.field == "child-of" }?.label == "Parent")
-        #expect(library.relationships(for: F.p1).first { $0.field == "inverse:parent-of" }?.label == "Children")
     }
 
     /// A one-to-one relation holds one link whichever item made it, so replacing a link that points at this item

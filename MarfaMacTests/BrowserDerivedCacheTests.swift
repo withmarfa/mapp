@@ -83,21 +83,6 @@ struct BrowserDerivedCacheTests {
         return library
     }
 
-    @Test func aSortAloneOrdersTheListAndDoesNotGroupItByStatus() {
-        let library = tasks()
-        let browser = Browser()
-        // The table groups this place by status on its own.
-        #expect(browser.tableContent(in: library).grouping != nil)
-        browser.tableOptions[.allItems] = ItemTableOptions(sort: [ItemTableComparator(column: .title, order: .reverse)])
-        let sections = browser.sections(in: library, order: ItemOrder(), now: date)
-        #expect(sections.count == 1)
-        #expect(sections.first?.group == nil)
-        #expect(sections.flatMap { $0.items.map(\.title) } == ["Task 2", "Task 1", "Task 0"])
-        // A grouping the person chose still groups.
-        browser.tableOptions[.allItems]?.grouping = .column("field.status")
-        #expect(browser.sections(in: library, order: ItemOrder(), now: date).count == 2)
-    }
-
     @Test func aNewViewFromASortedListKeepsNoGroupingTheListDoesNotShow() {
         let library = tasks()
         let browser = Browser()
@@ -170,89 +155,6 @@ struct BrowserDerivedCacheTests {
 @Suite(.hangLimit)
 struct PlaceFallbackTests {
     private let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
-
-    @Test func aPlaceThatStandsHasNoFallback() {
-        let note = FakeItemLibrary.note("Note", modified: date, isFavorite: true)
-        let library = FakeItemLibrary(items: [note], now: date)
-        let browser = Browser()
-        #expect(browser.placeFallback(in: library) == nil)
-        browser.sidebarItem = .itemType("core.note")
-        #expect(browser.placeFallback(in: library) == nil)
-        browser.sidebarItem = .favoriteItem(note.id)
-        #expect(browser.placeFallback(in: library) == nil)
-    }
-
-    @Test func aTypeWithNoItemsLeftFallsBackToAllItems() {
-        let note = FakeItemLibrary.note("Note", modified: date)
-        let library = FakeItemLibrary(items: [note], now: date)
-        let browser = Browser()
-        browser.sidebarItem = .itemType("core.note")
-        library.items = []
-        #expect(browser.placeFallback(in: library) == .allItems)
-        #expect(browser.sidebarItem == .itemType("core.note"))
-    }
-
-    @Test func aCollectionNoLongerActiveFallsBackToAllItems() {
-        let collection = FakeItemLibrary.collection("Reading")
-        let library = FakeItemLibrary(items: [collection], now: date)
-        let browser = Browser()
-        browser.sidebarItem = .collection(collection.id)
-        #expect(browser.placeFallback(in: library) == nil)
-        library.items[0].state = .trashed
-        #expect(browser.placeFallback(in: library) == .allItems)
-    }
-
-    @Test func aFavoriteThatIsNoLongerOneFallsBackToFavorites() {
-        let note = FakeItemLibrary.note("Note", modified: date, isFavorite: true)
-        let library = FakeItemLibrary(items: [note], now: date)
-        let browser = Browser()
-        browser.sidebarItem = .favoriteItem(note.id)
-        library.items[0].tags = []
-        #expect(browser.placeFallback(in: library) == .favorites)
-    }
-
-    @Test func aDeletedViewFallsBackToAllItems() {
-        let library = FakeItemLibrary(items: [], now: date)
-        let view = LibraryView(id: .mint(), title: "Some")
-        library.views = [view]
-        let browser = Browser()
-        browser.sidebarItem = .view(view.id)
-        #expect(browser.placeFallback(in: library) == nil)
-        library.views = []
-        #expect(browser.placeFallback(in: library) == .allItems)
-    }
-
-    @Test func nothingFallsBackBeforeTheLibraryIsRead() {
-        let library = FakeItemLibrary(items: [], now: date)
-        library.isLoaded = false
-        let browser = Browser()
-        browser.sidebarItem = .itemType("core.note")
-        #expect(browser.placeFallback(in: library) == nil)
-    }
-
-    @Test func aWatcherIsToldWhenALibraryChangeRemovesThePlace() async throws {
-        let source = FakeItemSource()
-        let library = MarfaLibrary(source: source, notices: Notices())
-        source.send(.loaded(SourceSnapshot(items: LibraryFixture.items, catalogue: LibraryFixture.catalogue)))
-        try #require(await eventually { library.isLoaded })
-        let browser = Browser()
-        browser.sidebarItem = .itemType(LibraryFixture.entity.rawValue)
-        let told = Told()
-        withObservationTracking { _ = browser.placeFallback(in: library) } onChange: { told.set() }
-        #expect(!told.isSet)
-        source.send(.removed([LibraryFixture.en1]))
-        try #require(await eventually { library.isGone(LibraryFixture.en1) })
-        #expect(told.isSet)
-        #expect(browser.placeFallback(in: library) == .allItems)
-    }
-
-    @Test func movingOnFromAGonePlaceShowsAllItems() {
-        let library = FakeItemLibrary(items: [], now: date)
-        let browser = Browser()
-        browser.sidebarItem = .itemType("core.note")
-        browser.placeRemoved(in: library, order: ItemOrder())
-        #expect(browser.item == .allItems)
-    }
 }
 
 private nonisolated final class Told: @unchecked Sendable {

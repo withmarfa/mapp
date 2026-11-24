@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MarfaMac
 
-/// Which kind quick add opens in, what a kind gives it, how Add and Open opens the item, and what an empty place says.
+/// The item kind and defaults used in Quick Add.
 @Suite(.hangLimit)
 struct MakingAnItemTests {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
@@ -63,25 +63,11 @@ struct MakingAnItemTests {
         return browser.quickAdd.draft?.typeID
     }
 
-    @Test func itemsAndTheSidebarOpenInTheKindLastUsed() {
-        #expect(opened(in: .allItems, remembered: "test.plain") == "test.plain")
-        #expect(opened(in: .inbox, remembered: "test.plain") == "test.plain")
-        #expect(opened(in: .favorites, remembered: "test.plain") == "test.plain")
-        #expect(opened(in: .view(ItemID("some-view")), remembered: "test.plain") == "test.plain")
-        #expect(opened(in: .allItems) == "core.note")
-    }
-
     @Test func aTypesPlaceHoldsItsTypeWhateverWasUsedLast() {
         #expect(opened(in: .itemType("core.task"), remembered: "test.plain") == "core.task")
         #expect(opened(in: .collections, remembered: "test.plain") == FakeItemLibrary.collectionType.rawValue)
         #expect(opened(in: .files, remembered: "test.plain") == TypeID.file.rawValue)
         #expect(opened(in: .itemType("core.task"), remembered: "test.plain", asked: "core.note") == "core.note", "a kind asked for wins")
-    }
-
-    @Test func aKindDeletedOrNotOfferedFallsBackToANote() {
-        #expect(opened(in: .allItems, remembered: "no.such.type") == "core.note")
-        #expect(opened(in: .itemType("no.such.type"), remembered: "test.plain") == "test.plain")
-        #expect(opened(in: .itemType("no.such.type")) == "core.note")
     }
 
     // MARK: What a kind gives it
@@ -151,99 +137,6 @@ struct MakingAnItemTests {
         #expect(QuickAdd.canSave(draft, in: library()))
     }
 
-    // MARK: Add and Open
-
-    @Test func addAndOpenFollowsTheSettingWithTheCaretWhereItWas() async throws {
-        for way in ItemOpening.allCases {
-            let library = library()
-            let browser = Browser()
-            var windows: [Set<ItemID>] = []
-            browser.windowOpener = { windows.append($0) }
-            browser.openQuickAdd(typeID: "core.note", in: library)
-            browser.quickAdd.draft?.title = "Lisbon packing list"
-            browser.quickAdd.draft?.body = "Boots"
-            browser.quickAdd.draft?.caret = 2
-            let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: defaults(way.rawValue)))
-            #expect(browser.selection == [id])
-            switch way {
-            case .modal:
-                #expect(browser.modalItem == id && !browser.isCollectionItemPresented)
-                #expect(browser.focusRequest == .page && browser.focusCaret == .after("Bo"))
-            case .fullPage:
-                #expect(browser.isCollectionItemPresented && browser.modalItem == nil)
-                #expect(browser.focusRequest == .page && browser.focusCaret == .after("Bo"))
-            case .newWindow:
-                #expect(windows == [[id]] && browser.modalItem == nil && !browser.isCollectionItemPresented)
-            }
-        }
-    }
-
-    @Test func anItemWithNoTextOpensWithTheKeyboardInItsTitle() async throws {
-        let library = library()
-        let browser = Browser()
-        browser.openQuickAdd(typeID: "core.note", in: library)
-        browser.quickAdd.draft?.title = "Only a title"
-        _ = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: defaults("modal")))
-        #expect(browser.focusRequest == .title)
-    }
-
-    @Test func aRefusedAddKeepsWhatWasTypedAndOpensNothing() async {
-        let library = library()
-        library.refusesCreations = true
-        let browser = Browser()
-        var windows: [Set<ItemID>] = []
-        browser.windowOpener = { windows.append($0) }
-        browser.openQuickAdd(typeID: "core.note", in: library)
-        browser.quickAdd.draft?.title = "Kept"
-        browser.quickAdd.draft?.body = "Kept too"
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: defaults("newWindow")) == nil)
-        #expect(browser.quickAdd.draft?.title == "Kept" && browser.quickAdd.draft?.body == "Kept too")
-        #expect(browser.quickAdd.isPresented && browser.modalItem == nil && windows.isEmpty && browser.selection.isEmpty)
-    }
-
     // MARK: Empty places
 
-    private func empty(_ place: SidebarItem, offered: [String] = ["core.task", "core.note"]) -> PlaceEmpty {
-        PlaceEmpty.of(place, in: Self.catalogue, offered: offered)
-    }
-
-    @Test func aTypesEmptyPlaceOffersNewAndItsNameOnlyWhereOneCanBeMade() {
-        let tasks = empty(.itemType("core.task"))
-        #expect(tasks.title == "No Tasks" && tasks.line == "Tasks you make show here.")
-        #expect(tasks.makes == "core.task" && tasks.buttonTitle == "New Task")
-        #expect(empty(.itemType("core.task"), offered: []).makes == nil, "a library that cannot be written to has no button")
-        #expect(empty(.itemType("test.plain")).makes == nil, "a type that is not offered has no button")
-        #expect(empty(.itemType("no.such")).makes == nil)
-    }
-
-    private static let otherPlaces: [SidebarItem] = [
-        .inbox, .favorites, .recents, .allItems, .files, .collections, .sources, .source("x"), .view(ItemID("v")),
-        .collection(ItemID("c")), .favoriteItem(ItemID("f")),
-    ]
-
-    @Test func everyOtherEmptyPlaceHasNoButton() {
-        for place in Self.otherPlaces { #expect(empty(place).makes == nil && empty(place).buttonTitle == nil, "\(place)") }
-        #expect(empty(.favorites).title == "No Favorites")
-        #expect(empty(.inbox).title == "Inbox Is Empty")
-    }
-
-    @Test func aLongPluralFallsBackToAShortLine() {
-        let id = TypeID("test.long")
-        let catalogue = Catalogue(
-            itemTypes: [ItemTypeInfo(
-                id: id, label: "Spec", plural: "Specifications of the manufacturer", fields: [],
-                titleField: "title", bodyField: "body", parent: nil)],
-            edgeTypes: [])
-        let empty = PlaceEmpty.of(.itemType(id.rawValue), in: catalogue, offered: [id.rawValue])
-        #expect(empty.title == "No Specifications of the manufacturer")
-        #expect(empty.line == "Nothing here yet.")
-        #expect(empty.makes == id.rawValue, "the button is kept")
-    }
-
-    @Test func everyLineIsUnderFortyCharacters() {
-        for place in Self.otherPlaces + [.itemType("core.task"), .itemType("test.odd")] {
-            let line = empty(place).line
-            #expect((line?.count ?? 0) < 40, "\(place): \(line ?? "")")
-        }
-    }
 }

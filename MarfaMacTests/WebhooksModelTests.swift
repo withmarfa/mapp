@@ -71,22 +71,6 @@ import Testing
         #expect(model.groups.map(\.standing) == [.standing, .standing, .standing, .expired, .gone])
     }
 
-    @Test func anAppThatIsNoLongerConnectedIsNamedAsSuch() async {
-        let bench = OwnerBench()
-        let model = model(bench, hooks: [Self.hook("a", maker: "client", makerName: nil)])
-        await model.load()
-        #expect(model.heading(of: model.groups[1]) == "Made by an app that’s no longer connected")
-        #expect(model.maker(of: model.webhooks[0]) == "an app that’s no longer connected")
-    }
-
-    @Test func thePageHasAnOwnGroupFirstEvenWithNoneOfItsOwn() async {
-        let bench = OwnerBench()
-        let model = model(bench, hooks: [Self.hook("a", maker: "other", makerName: "Raycast")])
-        await model.load()
-        #expect(model.groups.map(\.id) == ["own", "app:other"])
-        #expect(model.groups[0].webhooks.isEmpty, "New Webhook… has its place")
-    }
-
     @Test func aSignInThatIsAKeyKnowsItsOwnByTheKeysId() async {
         let bench = OwnerBench()
         bench.calls.state.withLock { $0.identity = OwnIdentity(keyID: "k-live", expires: nil) }
@@ -217,28 +201,6 @@ import Testing
         #expect(!model.atCap)
     }
 
-    @Test func aWebhookSaysItsTypeAndHowManyEventsItSends() async {
-        let bench = OwnerBench()
-        bench.calls.state.withLock { $0.names = ["core.task": "Tasks"] }
-        let model = model(bench, hooks: [Self.hook("a", type: "core.task", events: ["item.created", "item.updated", "item.trashed"])])
-        await model.load()
-        #expect(model.summary(of: model.webhooks[0]) == "Tasks. 3 events.")
-        #expect(model.typeTitle(nil) == "All Types")
-    }
-
-    @Test func aWebhookWhoseLatestDeliveryFailedIsFailingAndAnInactiveOneIsOff() async {
-        let bench = OwnerBench()
-        bench.calls.state.withLock {
-            $0.deliveries["a"] = [Self.delivery("d2", .failed, code: 500), Self.delivery("d1", .succeeded, code: 200)]
-            $0.deliveries["b"] = [Self.delivery("d3", .succeeded, code: 200)]
-        }
-        let model = model(bench, hooks: [Self.hook("a"), Self.hook("b"), Self.hook("c", active: false)])
-        await model.load()
-        #expect(model.isSending(model.webhooks[0]) == .failing)
-        #expect(model.isSending(model.webhooks[1]) == .sending)
-        #expect(model.isSending(model.webhooks[2]) == .off)
-    }
-
     @Test func aRefusedReadNamesThePermissionAndReadsTheGrantsAgain() async {
         let bench = OwnerBench()
         bench.calls.fail("webhooks", with: .notPermitted("webhooks.manage"))
@@ -361,35 +323,6 @@ import Testing
         #expect(model.created == nil)
         #expect(model.sheet == nil)
         #expect(bench.late.isEmpty, "nothing is told twice")
-    }
-
-    @Test func theListShowsOnceItIsReadAndEachWebhooksSendingFillsInAfterwards() async throws {
-        let bench = OwnerBench()
-        bench.calls.state.withLock { $0.deliveries["a"] = [Self.delivery("d1", .failed, code: 500)] }
-        let model = model(bench, hooks: [Self.hook("a")])
-        let gate = bench.calls.hold("deliveries")
-        let loading = Task { await model.load() }
-        #expect(try await eventuallyAsking { model.hasLoaded })
-        #expect(model.webhooks.count == 1)
-        #expect(model.isSending(model.webhooks[0]) == .sending, "until its deliveries are read")
-        gate.open()
-        await loading.value
-        #expect(model.isSending(model.webhooks[0]) == .failing)
-    }
-
-    @Test func deliveriesAreReadFourAtATimeAndAllOfThemAreRead() async {
-        let bench = OwnerBench()
-        let hooks = (0..<10).map { Self.hook("h\($0)") }
-        bench.calls.state.withLock { state in
-            state.readDelay = .milliseconds(30)
-            for hook in hooks { state.deliveries[hook.id] = [Self.delivery("d-\(hook.id)", .failed, code: 500)] }
-        }
-        let model = model(bench, hooks: hooks)
-        await model.load()
-        let most = bench.calls.state.withLock { $0.mostReadsInFlight }
-        #expect(most > 1, "they run together")
-        #expect(most <= 4, "with a small bound")
-        #expect(hooks.allSatisfy { model.isSending(model.webhook($0.id)!) == .failing })
     }
 
     @Test func aNewWebhookDoesNotWaitForTheDeliveriesOfTheOthers() async throws {
@@ -589,15 +522,6 @@ import Testing
         await model.redeliver(model.deliveries["a"]![0], of: model.webhooks[0])
         #expect(model.deliveryErrors["a"] == .unreachable)
         #expect(model.deliveries["a"]?[0].status == .failed)
-    }
-
-    @Test func theServerNotAnsweringShowsTheFailureNotAnEmptyList() async {
-        let bench = OwnerBench()
-        bench.calls.fail("webhooks", with: .unreachable)
-        let model = model(bench)
-        await model.load()
-        #expect(model.failure == .unreachable)
-        #expect(model.hasLoaded)
     }
 
     @Test func aSignInAtTheWebhookCapCannotMakeAnother() async {

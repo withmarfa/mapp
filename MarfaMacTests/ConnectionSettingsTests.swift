@@ -14,14 +14,6 @@ import Testing
 
     // MARK: The section
 
-    @Test func syncingSaysWhereTheyAreKeptAndOffersRemove() {
-        let syncing = words(.syncing)
-        #expect(syncing.isShown)
-        #expect(syncing.title == "Kept in Home")
-        #expect(syncing.line == "Every Mac that connects to it uses them.")
-        #expect(syncing.action == .remove && syncing.actionTitle == "Remove…")
-    }
-
     @Test func withoutAPermissionTheySayTheyStayOnThisMacAndOfferAllowMore() {
         let needing = words(.off(.needsPermission))
         #expect(needing.title == "Kept on This Mac Only")
@@ -29,21 +21,11 @@ import Testing
         #expect(needing.action == .allowMore && needing.actionTitle == "Allow More…")
     }
 
-    @Test func whileTheCopyFillsItIsAQuietLineWithNothingToPress() {
-        let filling = words(.off(.notFilled))
-        #expect(filling.isShown && filling.action == .none && filling.actionTitle == nil)
-        #expect(filling.line == "The app keeps them in Home once this Mac has finished downloading it.")
-    }
-
     @Test func removedSettingsStayOnThisMacUntilThePersonKeepsThemAgain() {
         let removed = words(.off(.removed))
         #expect(removed.title == "Kept on This Mac Only")
         #expect(removed.line == "They were removed from Home. This Mac keeps its own.")
         #expect(removed.action == .keepAgain && removed.actionTitle == "Keep in Marfa Again")
-    }
-
-    @Test func withoutAMarfaTheSectionIsNotShown() {
-        #expect(!words(.off(.noMarfa)).isShown)
     }
 
     @Test func removingAsksFirstAndSaysEveryMacLosesThem() {

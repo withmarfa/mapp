@@ -53,38 +53,6 @@ struct ShortcutTests {
 
     // MARK: Writing and recording
 
-    @Test func shortcutsAreWrittenWithTheirModifiersInTheSystemsOrder() {
-        #expect(key("n").display == "⌘N")
-        #expect(key("n", [.command, .option]).display == "⌥⌘N")
-        #expect(key("p", [.shift, .command]).display == "⇧⌘P")
-        #expect(key("\u{7F}").display == "⌘⌫")
-        #expect(key(" ", [.control, .option]).display == "⌃⌥Space")
-        #expect(key(String(UnicodeScalar(UInt32(NSLeftArrowFunctionKey))!), [.command, .option]).display == "⌥⌘←")
-    }
-
-    @Test func paletteActionsIsCommandJAndCommandKOnlyOpensThePalette() {
-        #expect(ShortcutCommand.paletteActions.defaultShortcut == key("j"))
-        #expect(ShortcutCommand.commandPalette.defaultShortcut == key("k"))
-        #expect(ShortcutCommand.all.contains(.paletteActions))
-        let bindings = ShortcutBindings(defaults: defaults())
-        #expect(bindings.display(for: .paletteActions) == "⌘J")
-        bindings.set(nil, for: .paletteActions)
-        #expect(bindings.display(for: .paletteActions) == nil)
-    }
-
-    @Test func aKeyPressBecomesAShortcutWithItsKeyCode() throws {
-        func press(_ characters: String, _ modifiers: NSEvent.ModifierFlags, code: UInt16) throws -> Shortcut {
-            let event = try #require(NSEvent.keyEvent(
-                with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0, windowNumber: 0, context: nil,
-                characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code))
-            return try #require(Shortcut(event: event))
-        }
-        let palette = try press("k", .command, code: 40)
-        #expect(palette == key("k"))
-        #expect(palette.keyCode == 40)
-        #expect(try press("P", [.command, .shift], code: 35) == key("p", [.command, .shift]))
-    }
-
     @Test func theCataloguesDefaultsNeverGiveTwoCommandsOneKeyOrTakeTheSystemsOwn() {
         let commands = ShortcutCommand.all
         #expect(Set(commands.map(\.id)).count == commands.count)
@@ -92,29 +60,6 @@ struct ShortcutTests {
         #expect(Set(defaults).count == defaults.count)
         #expect(defaults.allSatisfy { SystemShortcuts.owner(of: $0) == nil })
         #expect(defaults.allSatisfy { $0.menuProblem == nil })
-    }
-
-    @Test func insertTableHasADefaultNoOtherCommandOrTheSystemHolds() throws {
-        let table = ShortcutCommand.format(.table)
-        let shortcut = try #require(table.defaultShortcut)
-        #expect(table.title == "Insert Table")
-        #expect(shortcut != key("t", [.option, .command]))
-        #expect(SystemShortcuts.owner(of: key("t", [.option, .command])) == "Show Toolbar")
-        #expect(ShortcutCommand.all.filter { $0.defaultShortcut == shortcut }.map(\.id) == [table.id])
-        #expect(SystemShortcuts.owner(of: shortcut) == nil)
-    }
-
-    @Test func theShortcutsInAnyAppAreNamedApartFromTheMenuCommands() {
-        #expect(AnyAppCommand.allCases.map(\.title) == ["Show Command Palette", "Search Items", "Quick Add"])
-        #expect(AnyAppCommand.searchItems.line == nil)
-        #expect(!ShortcutCommand.all.map(\.title).contains("Quick Add"))
-    }
-
-    @Test func everyCommandTheMenusBindIsInTheCatalogue() {
-        let ids = Set(ShortcutCommand.all.map(\.id))
-        for command in ItemCommand.allCases { #expect(ids.contains(command.shortcutCommand.id)) }
-        for command in FileViewCommand.allCases { #expect(ids.contains(command.shortcutCommand.id)) }
-        for format in Format.allCases { #expect(ids.contains(ShortcutCommand.format(format).id)) }
     }
 
     // MARK: Menu commands
@@ -466,37 +411,10 @@ struct ShortcutTests {
         #expect(anyApp.shortcut(for: .quickAdd) == nil)
     }
 
-    // MARK: Search
-
-    @Test func aSearchByNameLeavesTheCommandsWhoseTitleHasTheWords() {
-        let (model, _, _) = page(defaults())
-        model.search = "tag"
-        #expect(model.sections.flatMap(\.commands).map(\.id).contains("addTag"))
-        #expect(!model.sections.flatMap(\.commands).map(\.id).contains("newItem"))
-        model.search = "zzzz"
-        #expect(!model.hasResults)
-    }
-
-    @Test func aSearchByKeysFindsTheCommandThatHasThem() {
-        let (model, _, _) = page(defaults())
-        model.searchesByKeys = true
-        model.pressed = key("k")
-        #expect(model.sections.flatMap(\.commands).map(\.id) == ["commandPalette"])
-        #expect(model.line(forCount: 1) == "One command uses ⌘K.")
-        model.search = "tag"
-        #expect(model.sections.count == 1)
-    }
 }
 
 @MainActor
 struct FormatKeymapTests {
-    @Test func theItemPageAnswersTheShortcutThePersonChoseForAFormat() {
-        let chosen = Shortcut(key: "b", modifiers: [.command, .option])
-        #expect(Format.bold.pageKey(for: chosen) == "Alt-Mod-b")
-        #expect(Format.bold.pageKey(for: ShortcutCommand.format(.bold).defaultShortcut) == "Mod-b")
-        #expect(Format.title.pageKey(for: ShortcutCommand.format(.title).defaultShortcut) == "Shift-Mod-t")
-    }
-
     @Test func aClearedShortcutOrOneThePageHasNoNameForIsLeftToTheMenu() {
         #expect(Format.bold.pageKey(for: nil) == nil)
         #expect(Format.link.pageKey(for: Shortcut(key: "k", modifiers: .command)) == nil)

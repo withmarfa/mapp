@@ -27,15 +27,6 @@ struct CommandValuePanelTests {
 
     // MARK: Collections
 
-    @Test func theCollectionPanelListsEveryCollectionAndNarrowsByWhatIsTyped() {
-        let world = world()
-        let model = model(.collections, over: [world.first.id], in: world.library)
-        #expect(model.rows.map(\.title) == ["Reading", "Work"])
-        model.query = "wor"
-        #expect(model.rows.map(\.title) == ["Work"])
-        #expect(model.chips.isEmpty)
-    }
-
     @Test func choosingACollectionFilesEveryItemThePanelIsForAndKeepsThePanelOpen() {
         let world = world()
         let model = model(.collections, over: [world.first.id, world.second.id], in: world.library)

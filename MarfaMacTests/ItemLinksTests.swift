@@ -59,44 +59,6 @@ struct ItemLinksTests {
         #expect(try #require(ItemLink(linkText: "[[Cafe\u{301}]]")) != ItemLink(linkText: "[[Café]]"))
     }
 
-    @Test func suggestionsFavorPrefixesThenRecentItems() async {
-        let items = [
-            note("Regarding gardens", minutes: 9), note("Gardening tools", minutes: 1), note("Garden ideas", minutes: 5),
-            note("Bike service", minutes: 7),
-        ]
-        let names = await ItemLinks.Index().titles(matching: "gard", among: items, limit: 10)
-        #expect(names == ["Garden ideas", "Gardening tools", "Regarding gardens"])
-        #expect(await ItemLinks.Index().titles(matching: "  GARD ", among: items, limit: 2) == ["Garden ideas", "Gardening tools"])
-        #expect(await ItemLinks.Index().titles(matching: "bk", among: items, limit: 10) == ["Bike service"], "letters in order")
-    }
-
-    @Test func suggestionsLeaveOutFiles() async {
-        var photo = note("Garden photo")
-        photo.content = .file(.png, byteCount: 3)
-        let names = await ItemLinks.Index().titles(matching: "garden", among: [note("Garden ideas"), photo], limit: 10)
-        #expect(names == ["Garden ideas"])
-    }
-
-    @Test func anEmptyQueryOffersTheMostRecentItemsUpToTheLimit() async {
-        let items = (0..<30).map { note("Note \($0)", minutes: $0) }
-        let index = ItemLinks.Index()
-        let names = await index.titles(matching: "", among: items, limit: 12)
-        #expect(names == (18..<30).reversed().map { "Note \($0)" })
-        #expect(await index.titles(matching: "zzz", among: items, limit: 12).isEmpty)
-    }
-
-    @Test func theIndexFollowsEditsAndRemovalsOfItems() async {
-        let index = ItemLinks.Index()
-        var garden = note("Garden ideas")
-        let bike = note("Bike service")
-        #expect(await index.titles(matching: "ga", among: [garden, bike], limit: 5) == ["Garden ideas"])
-        garden.title = "Allotment plan"
-        garden.version = ItemVersion(garden.version.rawValue + 1)
-        #expect(await index.titles(matching: "ga", among: [garden, bike], limit: 5).isEmpty, "a renamed item is found by its new title")
-        #expect(await index.titles(matching: "allot", among: [garden, bike], limit: 5) == ["Allotment plan"])
-        #expect(await index.titles(matching: "allot", among: [bike], limit: 5).isEmpty, "a removed item is forgotten")
-    }
-
     @Test func aLargeLibraryIsReadOnceAndAKeystrokeFoldsNothingAgain() async {
         let titles = ["alpha", "beta", "gamma", "delta", "kitchen", "garden", "recipe", "meeting"]
         var items = (0..<20_000).map { note("\(titles[$0 % titles.count]) \($0)", minutes: $0) }

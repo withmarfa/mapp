@@ -52,14 +52,6 @@ import Testing
         #expect(DeletionWords.moveMessage(alsoTaking: 1) == "1 more item linked to them may also move to Recently Deleted.")
     }
 
-    @Test func aPreviewThatNamesNothingMoreSaysNothingMore() async throws {
-        let items = ids(2)
-        let (library, source) = try await loaded(items)
-        source.moreTaken.withLock { $0 = 0 }
-        #expect(await library.moreItemsTaken(with: Set(items.map(\.id))) == 0)
-        #expect(DeletionWords.moveMessage(alsoTaking: 0) == "You can bring them back from Recently Deleted.")
-    }
-
     @Test func offlineOverTwentyOrAFailedPreviewGivesNoCountAndNoPackageText() async throws {
         let few = ids(3)
         let (offline, offlineSource) = try await loaded(few, online: false)

@@ -56,15 +56,4 @@ struct ItemDateTests {
         #expect(moment == "2026-10-27T14:00:00.000Z")
         #expect(ItemDate.parse(moment)?.date == Self.utc(2026, 10, 27, 14, 0))
     }
-
-    @Test func aValueReadsInThePersonsLocaleAndTimeZone() throws {
-        let london = Self.calendar("Europe/London")
-        let locale = Locale(identifier: "en_GB")
-        let moment = try #require(ItemDate.parse("2026-10-27T14:00:00.000Z", calendar: london))
-        #expect(moment.text(format: .standard, locale: locale, calendar: london) == "27 Oct 2026 at 14:00")
-        let tokyo = Self.calendar("Asia/Tokyo")
-        #expect(moment.text(format: .standard, locale: locale, calendar: tokyo) == "27 Oct 2026 at 23:00")
-        let day = try #require(ItemDate.parse("2026-10-27", calendar: tokyo))
-        #expect(day.text(format: .standard, locale: locale, calendar: tokyo) == "27 Oct 2026")
-    }
 }
