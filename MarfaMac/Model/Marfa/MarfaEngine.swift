@@ -57,7 +57,8 @@ actor MarfaEngine {
     }
 
     /// The person's latest edit of an item's text, and the version of the item their own writes account for: the
-    /// version that edit was typed on, moved on by each answer to this device's writes of the item.
+    /// version that edit was typed on, moved to each later version an answer proves holds exactly that text
+    /// (`MarfaEngine.counting`).
     nonisolated struct OwnText: Equatable {
         var text: String
         var on: Int64
@@ -172,9 +173,6 @@ actor MarfaEngine {
         return .seconds(30)
     }
 
-    /// Edits queued as read on a version older than the copy held, whose answer lands on whatever the server held,
-    /// not one version on from the version sent (`counting`).
-    var sentAsRead: Set<String> = []
     var painted = false
     /// Whether the package's first update, which always asks to read everything, has been taken.
     var tookFirstUpdate = false

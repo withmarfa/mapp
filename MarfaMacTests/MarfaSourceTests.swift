@@ -692,53 +692,103 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
-    /// An answer moves the person's text to the version the answer names, never past it to one the copy holds
-    /// since, and only once its effect is known: a named version is held to the copy's, which an expired copy
-    /// cannot read, so it stays to be counted again.
+    /// An answer to a write of the item, as the server sends it: the item at `version`, holding `body` as its text.
+    private static func answered(
+        _ id: String, _ verdict: Marfa.Verdict, kind: Marfa.WriteKind = .updateItem, made version: Int64? = nil,
+        holding body: String? = nil
+    ) -> Marfa.QueuedWrite {
+        let properties: JSONObject = body.map { ["body": .string($0)] } ?? [:]
+        return Marfa.QueuedWrite(
+            id: id, kind: kind, itemId: "item", idempotencyKey: id, verdict: verdict,
+            answer: version.map {
+                .object(["item": .object(["version": .integer($0), "type": .string("core.note"), "properties": .object(properties)])])
+            },
+            queuedAt: "2026-10-06T00:00:00Z")
+    }
+
+    /// The version the person's text "Mine", last on `on`, follows once `queue`'s answers are counted against a copy
+    /// holding `held`.
+    private static func following(
+        _ queue: [Marfa.QueuedWrite], on: Int64 = 3, held: Int64, counted: inout Set<String>
+    ) async throws -> Int64 {
+        try await MarfaEngine.counting(
+            queue, for: ItemID("item"), own: MarfaEngine.OwnText(text: "Mine", on: on), counted: &counted,
+            bodyField: { $0 == "core.note" ? "body" : nil }, held: { held }
+        ).on
+    }
+
+    private static func following(_ queue: [Marfa.QueuedWrite], on: Int64 = 3, held: Int64) async throws -> Int64 {
+        var counted: Set<String> = []
+        return try await following(queue, on: on, held: held, counted: &counted)
+    }
+
+    /// An answer moves the person's text on only once its effect is known. A version it proves needs the version the
+    /// copy holds, which an expired copy cannot read, so it stays to be counted again; counted once, it moves the
+    /// text no further.
     @Test func anAnswerIsCountedOnlyOnceTheVersionItNeedsIsRead() async throws {
         struct Unreadable: Error {}
-        func write(_ id: String, _ verdict: Marfa.Verdict, made version: Int64? = nil) -> Marfa.QueuedWrite {
-            Marfa.QueuedWrite(
-                id: id, kind: .updateItem, itemId: "item", idempotencyKey: id, verdict: verdict,
-                answer: version.map { .object(["item": .object(["version": .integer($0)])]) },
-                queuedAt: "2026-10-06T00:00:00Z")
-        }
-        func count(_ queue: [Marfa.QueuedWrite], asRead: Set<String> = [], held: Int64) async -> Int64 {
-            var counted: Set<String> = []
-            let own = MarfaEngine.OwnText(text: "Mine", on: 3)
-            return await MarfaEngine.counting(queue, for: ItemID("item"), own: own, counted: &counted, sentAsRead: asRead) { held }.on
-        }
-        let queue = [write("merged", .merged(fields: ["body"]), made: 7), write("taken", .accepted)]
-        let own = MarfaEngine.OwnText(text: "Mine", on: 3)
+        let queue = [Self.answered("merged", .merged(fields: ["title"]), made: 7, holding: "Mine"), Self.answered("taken", .accepted)]
         var counted: Set<String> = []
         await #expect(throws: Unreadable.self) {
-            _ = try await MarfaEngine.counting(queue, for: ItemID("item"), own: own, counted: &counted, sentAsRead: []) {
-                throw Unreadable()
-            }
+            _ = try await MarfaEngine.counting(
+                queue, for: ItemID("item"), own: MarfaEngine.OwnText(text: "Mine", on: 3), counted: &counted,
+                bodyField: { _ in "body" }, held: { throw Unreadable() })
         }
         #expect(counted.isEmpty)
-
-        let moved = await MarfaEngine.counting(queue, for: ItemID("item"), own: own, counted: &counted, sentAsRead: []) {
-            12
-        }
-        #expect(moved.on == 8)
+        #expect(try await Self.following(queue, held: 12, counted: &counted) == 7)
         #expect(counted == ["merged", "taken"])
-        // Counted once, the same answers move it no further.
-        let again = await MarfaEngine.counting(queue, for: ItemID("item"), own: moved, counted: &counted, sentAsRead: []) {
-            12
-        }
-        #expect(again == moved)
-        #expect(await count([write("read", .accepted, made: 5)], asRead: ["read"], held: 9) == 5)
-        #expect(await count([write("merged", .merged(fields: ["body"]), made: 7)], held: 6) == 6)
-        // With no version named, a save merged elsewhere leaves the text where it was, so the next one is merged too.
-        #expect(await count([write("merged", .merged(fields: ["body"]))], held: 9) == 3)
-        #expect(await count([write("read", .accepted)], asRead: ["read"], held: 9) == 3)
-        // Accepted on the version it was sent on, an answer moves the text one version on without reading.
-        var fresh: Set<String> = []
-        let accepted = try await MarfaEngine.counting(
-            [write("taken", .accepted)], for: ItemID("item"), own: own, counted: &fresh, sentAsRead: []
-        ) { throw Unreadable() }
-        #expect(accepted.on == 4)
+        #expect(try await Self.following(queue, on: 7, held: 12, counted: &counted) == 7)
+        // A refused or conflicted write left the server's text, so its answer is counted and moves nothing.
+        #expect(try await Self.following([Self.answered("conflicted", .conflicted(siblingId: "copy", fields: ["body"]), made: 8, holding: "Mine")], held: 12) == 3)
+    }
+
+    /// A write that did not carry the text, such as a title change, is answered with whatever text the server held,
+    /// which can be another device's. Only an answer holding the person's own text moves it on.
+    @Test func aSaveFollowsOnlyAnAnswerHoldingThePersonsText() async throws {
+        // Saved at version 2; another device wrote the text at 3; the title change was answered at 4 with theirs.
+        let save = Self.answered("save", .accepted, made: 2, holding: "Mine")
+        let title = Self.answered("title", .merged(fields: ["title"]), made: 4, holding: "Theirs")
+        #expect(try await Self.following([save, title], on: 1, held: 4) == 2)
+        #expect(try await Self.following([title, save], on: 1, held: 4) == 2)
+        // The version an answer holding the person's text names is followed, whichever write it answers.
+        let titleOverMine = Self.answered("title", .accepted, made: 4, holding: "Mine")
+        #expect(try await Self.following([save, titleOverMine], on: 1, held: 4) == 4)
+        // A merge that changed the text leaves it where it was, so the next save is merged too.
+        #expect(try await Self.following([Self.answered("save", .merged(fields: ["body"]), made: 5, holding: "Mine, theirs")], held: 5) == 3)
+    }
+
+    /// The person's own create made version 1, whatever version the item has reached when the answer comes, as for
+    /// a create whose answer was lost and that is answered as a repeat after another device wrote.
+    @Test func aCreateIsCountedAtTheVersionItMade() async throws {
+        let create = Self.answered("create", .accepted, kind: .createItem, made: 2, holding: "Theirs")
+        #expect(try await Self.following([create], on: 0, held: 2) == 1)
+        #expect(MarfaEngine.version(read: 1, holding: 2) == 1)
+        #expect(try await Self.following([Self.answered("create", .accepted, kind: .createItem)], on: 0, held: 1) == 1)
+        let save = Self.answered("save", .accepted, made: 3, holding: "Mine")
+        #expect(try await Self.following([save, create], on: 0, held: 3) == 3)
+        #expect(try await Self.following([create, save], on: 0, held: 3) == 3)
+    }
+
+    /// An answer that names no version, or an unchanged acknowledgement that made none, proves no version holds the
+    /// person's text, so the text stays where it was, whatever order the answers are read in.
+    @Test func anAnswerWithNoVersionLeavesTheTextWhereItWas() async throws {
+        let named = Self.answered("named", .accepted, made: 7, holding: "Mine")
+        let plain = Self.answered("plain", .accepted)
+        #expect(try await Self.following([named, plain], held: 9) == 7)
+        #expect(try await Self.following([plain, named], held: 9) == 7)
+        #expect(try await Self.following([plain], held: 9) == 3)
+        #expect(try await Self.following([Self.answered("merged", .merged(fields: ["body"]))], held: 9) == 3)
+    }
+
+    /// The copy can record an answer before it reads the item back. An answer at a version the copy does not hold yet
+    /// waits uncounted, the text staying where it was, and moves it once the copy holds that version.
+    @Test func anAnswerAheadOfTheCopyWaitsForTheReadBack() async throws {
+        let queue = [Self.answered("save", .accepted, made: 7, holding: "Mine")]
+        var counted: Set<String> = []
+        #expect(try await Self.following(queue, held: 6, counted: &counted) == 3)
+        #expect(counted.isEmpty)
+        #expect(try await Self.following(queue, held: 7, counted: &counted) == 7)
+        #expect(counted == ["save"])
     }
 
     private static func edge(of type: String, from id: ItemID, in source: MarfaSource) async -> Marfa.Edge? {
