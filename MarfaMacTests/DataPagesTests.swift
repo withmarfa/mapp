@@ -435,7 +435,7 @@ import Testing
     @Test func theLimitIsReadWithTheTypesAndSourcesItNames() async {
         let bench = OwnerBench(grants: [.configManage])
         bench.calls.state.withLock {
-            $0.sourceLimit = SourceLimit(instanceID: "instance-1", isOn: true, types: ["core.highlight"], sources: ["readwise"], strictTypes: nil, allowlist: nil)
+            $0.enforcement = Enforcement(instanceID: "instance-1", filter: .init(types: ["core.highlight"], sources: ["readwise"]))
             $0.names = ["core.highlight": "Highlights", "core.bookmark": "Bookmarks", "system.view": "Views"]
         }
         let model = model(bench, sources: rows)
@@ -451,7 +451,7 @@ import Testing
     @Test func aSourceTheLimitNamesThatHoldsNoItemsIsStillListedSoSavingNeverDropsIt() async {
         let bench = OwnerBench(grants: [.configManage])
         bench.calls.state.withLock {
-            $0.sourceLimit = SourceLimit(instanceID: "instance-1", isOn: true, types: ["core.note"], sources: ["gone"], strictTypes: nil, allowlist: nil)
+            $0.enforcement = Enforcement(instanceID: "instance-1", filter: .init(types: ["core.note"], sources: ["gone"]))
         }
         let model = model(bench, sources: rows)
         await model.load()
@@ -466,10 +466,10 @@ import Testing
         model.checkedSources = ["rss", "readwise"]
         #expect(model.canSave)
         await model.save()
-        let sent = bench.calls.state.withLock { $0.limitsSent }
+        let sent = bench.calls.state.withLock { $0.enforcementsSent }
         #expect(sent.count == 1)
-        #expect(sent.first??.types == ["core.note"])
-        #expect(sent.first??.sources == ["readwise", "rss"])
+        #expect(sent.first?.filter?.types == ["core.note"])
+        #expect(sent.first?.filter?.sources == ["readwise", "rss"])
         #expect(model.isOn)
         #expect(!model.hasEdits)
     }
@@ -481,20 +481,20 @@ import Testing
         model.types = ["core.note"]
         #expect(!model.canSave)
         await model.save()
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.enforcementsSent.isEmpty })
     }
 
     @Test func turningItOffRemovesTheFilter() async {
         let bench = OwnerBench(grants: [.configManage])
         bench.calls.state.withLock {
-            $0.sourceLimit = SourceLimit(instanceID: "instance-1", isOn: true, types: ["core.note"], sources: ["rss"], strictTypes: nil, allowlist: nil)
+            $0.enforcement = Enforcement(instanceID: "instance-1", filter: .init(types: ["core.note"], sources: ["rss"]))
         }
         let model = model(bench, sources: rows)
         await model.load()
         await model.turnOff()
-        let sent = bench.calls.state.withLock { $0.limitsSent }
+        let sent = bench.calls.state.withLock { $0.enforcementsSent }
         #expect(sent.count == 1)
-        #expect(sent.first! == nil)
+        #expect(sent.first?.filter == nil)
         #expect(!model.isOn)
         #expect(model.types.isEmpty)
     }
@@ -506,19 +506,19 @@ import Testing
         model.types = ["core.note"]
         model.checkedSources = ["rss"]
         // Another device changed the limit after it was read.
-        bench.calls.state.withLock { $0.sourceLimit.types = ["core.highlight"] }
+        bench.calls.state.withLock { $0.enforcement.filter = .init(types: ["core.highlight"], sources: ["readwise"]) }
         await model.save()
         #expect(model.line?.contains("changed somewhere else") == true)
         #expect(model.types == ["core.note"])
         #expect(model.checkedSources == ["rss"])
-        #expect(model.limit?.types == ["core.highlight"])
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(model.limit?.filter?.types == ["core.highlight"])
+        #expect(bench.calls.state.withLock { $0.enforcementsSent.isEmpty })
     }
 
     @Test func anotherMarfaAnsweringAtTheWriteIsToldAndTheDraftStartsAgainFromIt() async {
         let bench = OwnerBench(grants: [.configManage])
         bench.calls.state.withLock {
-            $0.sourceLimit = SourceLimit(instanceID: "instance-1", isOn: true, types: ["core.note"], sources: ["rss"], strictTypes: nil, allowlist: nil)
+            $0.enforcement = Enforcement(instanceID: "instance-1", filter: .init(types: ["core.note"], sources: ["rss"]))
             $0.names = ["core.note": "Notes"]
         }
         let model = model(bench, sources: rows)
@@ -527,11 +527,11 @@ import Testing
         model.checkedSources = ["rss", "readwise"]
         // Between the read and the write, another Marfa takes the address and refuses the write.
         bench.calls.state.withLock { [calls = bench.calls] in
-            $0.beforeLimitWrite = {
+            $0.beforeEnforcementWrite = {
                 calls.state.withLock {
-                    $0.sourceLimit = SourceLimit(instanceID: "instance-2", isOn: true, types: ["core.highlight"], sources: ["readwise"], strictTypes: nil, allowlist: nil)
+                    $0.enforcement = Enforcement(instanceID: "instance-2", filter: .init(types: ["core.highlight"], sources: ["readwise"]))
                     $0.names = ["core.highlight": "Highlights"]
-                    $0.beforeLimitWrite = nil
+                    $0.beforeEnforcementWrite = nil
                 }
             }
         }
@@ -543,7 +543,7 @@ import Testing
         #expect(model.checkedSources == ["readwise"])
         #expect(!model.hasEdits)
         #expect(model.typeChoices.map(\.code) == ["core.highlight"])
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.enforcementsSent.isEmpty })
     }
 
     @Test func anotherMarfaFoundWhenTheLimitIsReadBeforeTheWriteGetsNoWrite() async {
@@ -553,7 +553,7 @@ import Testing
         model.types = ["core.note"]
         model.checkedSources = ["rss"]
         bench.calls.state.withLock {
-            $0.sourceLimit = SourceLimit(instanceID: "instance-2", isOn: true, types: ["core.highlight"], sources: ["readwise"], strictTypes: nil, allowlist: nil)
+            $0.enforcement = Enforcement(instanceID: "instance-2", filter: .init(types: ["core.highlight"], sources: ["readwise"]))
         }
         await model.save()
 
@@ -561,7 +561,7 @@ import Testing
         #expect(model.types == ["core.highlight"])
         #expect(model.checkedSources == ["readwise"])
         #expect(!model.hasEdits)
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.enforcementsSent.isEmpty })
         // Saving again sends nothing of the first instance's choice.
         #expect(!model.canSave)
     }
@@ -572,9 +572,38 @@ import Testing
         await model.load()
         model.types = ["core.note"]
         model.checkedSources = ["rss"]
-        bench.calls.fail("setSourceLimit", with: .notPermitted("config.manage"))
+        bench.calls.fail("setEnforcement", with: .notPermitted("config.manage"))
         await model.save()
         #expect(bench.refreshed == 1)
+        #expect(model.line == OwnerWording.line(.notPermitted("config.manage")))
+        #expect(model.types == ["core.note"])
+    }
+
+    @Test func aLeverChangedElsewhereGoesBackAsTheServerHoldsIt() async {
+        let bench = OwnerBench(grants: [.configManage])
+        let model = model(bench, sources: rows)
+        await model.load()
+        model.types = ["core.note"]
+        model.checkedSources = ["rss"]
+        // Another device turned strict mode on for a type after the page was read.
+        bench.calls.state.withLock { $0.enforcement.strictTypes = ["user.job"] }
+        await model.save()
+        let sent = bench.calls.state.withLock { $0.enforcementsSent }
+        #expect(sent.count == 1)
+        #expect(sent.first?.strictTypes == ["user.job"], "a write never undoes another lever")
+        #expect(sent.first?.filter == .init(types: ["core.note"], sources: ["rss"]))
+        #expect(model.line == nil)
+    }
+
+    @Test func aSignInThatNoLongerHoldsConfigManageSendsNothing() async {
+        let bench = OwnerBench(grants: [.configManage])
+        let model = model(bench, sources: rows)
+        await model.load()
+        model.types = ["core.note"]
+        model.checkedSources = ["rss"]
+        bench.grants = []
+        await model.save()
+        #expect(bench.calls.state.withLock { $0.enforcementsSent.isEmpty })
         #expect(model.line == OwnerWording.line(.notPermitted("config.manage")))
         #expect(model.types == ["core.note"])
     }
@@ -593,11 +622,48 @@ import Testing
 
     @Test func theServerNotAnsweringShowsItWithNothingChosen() async {
         let bench = OwnerBench(grants: [.configManage])
-        bench.calls.fail("sourceLimit", with: .unreachable)
+        bench.calls.fail("enforcement", with: .unreachable)
         let model = model(bench)
         await model.load()
         #expect(model.failure == .unreachable)
         #expect(model.limit == nil)
+    }
+}
+
+@MainActor
+@Suite(.hangLimit) struct EnforcementSettingsTests {
+    /// Two pages writing different levers at once: the second reads only once the first has written, so it sends the first's
+    /// lever back as the server then holds it, never as it was before.
+    @Test func writesRunOneAtATimeSoNoneUndoesAnother() async throws {
+        let bench = OwnerBench(grants: [.configManage])
+        let context = bench.context
+        let gate = bench.calls.hold("setEnforcement")
+        let strict = Task {
+            try await context.writeEnforcement(readFrom: "instance-1") { $0.strictTypes = ["user.job"] }
+        }
+        #expect(await eventually { bench.calls.calls.contains("setEnforcement") })
+        let filter = Task {
+            try await context.writeEnforcement(readFrom: "instance-1") { $0.filter = .init(types: ["core.note"], sources: ["rss"]) }
+        }
+        // Given time to run, the second write still waits for the first rather than reading under it.
+        let readUnder = await eventually(within: .milliseconds(300)) { bench.calls.calls.filter { $0 == "enforcement" }.count > 1 }
+        #expect(!readUnder)
+        gate.open()
+        _ = try await strict.value
+        gate.open()
+        let last = try await filter.value
+        #expect(last.strictTypes == ["user.job"])
+        #expect(last.filter == .init(types: ["core.note"], sources: ["rss"]))
+        #expect(bench.calls.state.withLock { $0.enforcement } == last)
+    }
+
+    @Test func anotherMarfaAnsweringIsToldAndNothingIsSent() async {
+        let bench = OwnerBench(grants: [.configManage])
+        bench.calls.state.withLock { $0.enforcement = Enforcement(instanceID: "instance-2") }
+        await #expect(throws: EnforcementSettings.Failure.anotherMarfa) {
+            try await bench.context.writeEnforcement(readFrom: "instance-1") { $0.strictTypes = ["user.job"] }
+        }
+        #expect(bench.calls.state.withLock { $0.enforcementsSent.isEmpty })
     }
 }
 

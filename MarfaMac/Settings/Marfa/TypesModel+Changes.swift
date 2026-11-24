@@ -82,14 +82,26 @@ extension TypesModel {
     /// Reads what moving to the chosen type would do. An answer for a type no longer chosen is dropped.
     func readMove() async {
         guard let id = openID, let target = moveTarget else { return }
-        do {
-            let preview = try await calls.previewMove(of: id, to: target)
+        do throws(TypeFailure) {
+            let preview = try await preview(of: id, to: target)
             guard moveTarget == target, openID == id else { return }
             movePreview = preview
+            movePreviewFailure = nil
         } catch {
             guard moveTarget == target, openID == id else { return }
             if case .owner(let failure) = error { await context.learn(from: failure) }
             movePreviewFailure = OwnerWording.line(Self.owner(error), on: .types)
+        }
+    }
+
+    /// What moving `id`'s items to `target` would do. A move a setting or a table stops is refused rather than previewed
+    /// (`types/move-blocked`), so that refusal is the preview, naming what stops it.
+    private func preview(of id: String, to target: String) async throws(TypeFailure) -> TypeMovePreview {
+        do {
+            return try await calls.previewMove(of: id, to: target)
+        } catch {
+            guard case .moveBlocked(let settings, let tables) = error else { throw error }
+            return TypeMovePreview(items: nil, settings: settings, tables: tables)
         }
     }
 
@@ -102,26 +114,39 @@ extension TypesModel {
     /// The settings a move can't change, which hold it back until they are changed.
     var blockedSettings: [TypeSettingRecord] { movePreview?.settings.filter { $0.blocked != nil } ?? [] }
 
+    /// Whether a setting or a table stops the move.
+    var isMoveBlocked: Bool { !blockedSettings.isEmpty || !(movePreview?.tables.isEmpty ?? true) }
+
     var canConfirmDelete: Bool {
         guard !isDeleting else { return false }
         switch deleteChoice {
-        case .move: return moveTarget != nil && movePreview != nil && blockedSettings.isEmpty
+        case .move: return moveTarget != nil && movePreview != nil && !isMoveBlocked
         case .leave: return true
         }
     }
 
-    /// Moves the items and then deletes the type, or deletes it and leaves them, as the person chose. The type is deleted
-    /// only once the move has left no item of it; otherwise the sheet says what is left and the type stays.
+    /// Moves the items and then deletes the type, or deletes it and leaves them, as the person chose. The move is
+    /// previewed again just before it starts, as the server takes no precondition on it (withmarfa/marfa#3536): where it
+    /// would now move other items or change other settings than the sheet showed, nothing moves and the sheet shows the new
+    /// preview for the person to agree to. The type is deleted only once the move has left no item of it; otherwise the
+    /// sheet says what moved, what is left and the type stays.
     func confirmDelete() async {
         guard let id = openID, canConfirmDelete else { return }
         let choice = deleteChoice
         let target = moveTarget
+        let shown = movePreview
         isDeleting = true
         deleteSheetFailure = nil
         defer { isDeleting = false }
         let took = await enqueue { () async -> Bool in
             do throws(TypeFailure) {
-                if choice == .move, let target {
+                if choice == .move, let target, let shown {
+                    let now = try await self.preview(of: id, to: target)
+                    guard now.isSame(as: shown) else {
+                        self.movePreview = now
+                        self.deleteSheetFailure = String(localized: "What the move changes is different now. Nothing moved. Check it, then delete again.")
+                        return false
+                    }
                     let result = try await self.calls.move(id, to: target)
                     guard result.isDone else {
                         self.deleteSheetFailure = self.moveLine(result, type: id)
@@ -132,26 +157,38 @@ extension TypesModel {
                 return true
             } catch {
                 if case .owner(let failure) = error { await self.context.learn(from: failure) }
+                if case .moveBlocked(let settings, let tables) = error { self.movePreview = TypeMovePreview(items: nil, settings: settings, tables: tables) }
                 self.deleteSheetFailure = self.deleteLine(for: error, type: id)
                 return false
             }
         }
         await reread()
         guard took else {
-            await readMove()
+            // A new preview stands as the sheet shows it, for the person to agree to; any other end reads it again.
+            if movePreview == shown { await readMove() }
             return
         }
         isConfirmingDelete = false
         deleted = id
     }
 
-    private func moveLine(_ result: TypeMoveResult, type id: String) -> String {
+    /// What a move that left the type in use did: how many of the items it tried moved and how many couldn't, then why the
+    /// type stays. Items made while it ran are no failure of the move's, so they are told apart.
+    func moveLine(_ result: TypeMoveResult, type id: String) -> String {
         let name = title(of: id)
-        if let problem = result.problem { return String(localized: "\(problem) \(name) was kept.") }
-        if result.remaining > 0 {
-            return String(AttributedString(localized: "^[\(result.remaining) item](inflect: true) couldn’t move, so \(name) was kept.").characters)
+        let moved = String(AttributedString(localized: "^[\(result.moved) item](inflect: true) moved.").characters)
+        let failed = String(AttributedString(localized: "^[\(result.failed) item](inflect: true) couldn’t move.").characters)
+        let why: String
+        if let problem = result.problem {
+            why = result.failed > 0 ? "\(failed) " + String(localized: "\(problem) \(name) was kept.") : String(localized: "\(problem) \(name) was kept.")
+        } else if result.failed > 0 {
+            why = String(AttributedString(localized: "^[\(result.failed) item](inflect: true) couldn’t move, so \(name) was kept.").characters)
+        } else if result.remaining > 0 {
+            why = String(AttributedString(localized: "\(name) got ^[\(result.remaining) new item](inflect: true) while they moved, so it was kept. Delete again to move them too.").characters)
+        } else {
+            why = String(localized: "Items this sign-in can’t see are still of this type, so \(name) was kept.")
         }
-        return String(localized: "Items this sign-in can’t see are still of this type, so \(name) was kept.")
+        return "\(moved) \(why)"
     }
 
     private func deleteLine(for failure: TypeFailure, type id: String) -> String {
@@ -163,7 +200,7 @@ extension TypesModel {
             }
             if settings > 0 { return String(localized: "A folder, view or webhook still uses \(name). Change it first.") }
             return String(localized: "Something still uses \(name), so it was kept.")
-        case .moveBlocked(let message): return String(localized: "\(message) Nothing moved.")
+        case .moveBlocked: return String(localized: "Something listed under Also Changes stops the move. Nothing moved.")
         case .hasSubtypes(let ids):
             let names = ids.map { title(of: $0) }.formatted(.list(type: .and))
             return ids.isEmpty

@@ -26,11 +26,34 @@ nonisolated struct ServerTypeCalls: TypeCalls {
     }
 
     func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure) {
+        // A change to how long versions stay is sent only while they are kept as the person was told when agreeing to it.
+        if case .versionWindow(_, let read) = edit, try await versionKeeping(of: type) != read { throw .changedOnServer }
         try await run { client in
             try await TypeDefinitionEdit.run(
                 Self.change(edit), to: type,
                 read: { try await client.listTypes().ok.body.json.data },
                 replace: { _ = try await client.replace(itemType: type, with: $0) })
+        }
+    }
+
+    func versionKeeping(of type: String) async throws(TypeFailure) -> VersionKeepingReading {
+        try await run { client in
+            let listed = try await client.listTypes().ok.body.json.data
+            guard let own = listed.first(where: { $0.value1.id == type })?.value1 else { throw TypeSchemaFailure.changedOnServer }
+            let resolved = try await client.getType(path: .init(id: type)).ok.body.json.value1.versionPolicy
+            var above: Components.Schemas.VersionPolicy?
+            if let parent = own.parent, listed.contains(where: { $0.value1.id == parent }) {
+                above = try await client.getType(path: .init(id: parent)).ok.body.json.value1.versionPolicy
+            }
+            // History's settings stand where no type sets a window; a sign-in that can't read them leaves them unknown.
+            let config = try? await client.getConfig().ok.body.json
+            let now = VersionKeeping(
+                recent: resolved?.recentDays ?? config?.versionRecentDays, daily: resolved?.dailySnapshotDays ?? config?.versionDailySnapshotDays,
+                weekly: resolved?.weeklySnapshotDays ?? config?.versionWeeklySnapshotDays, most: resolved?.maxVersions ?? config?.versionMaxVersions)
+            let without = VersionKeeping(
+                recent: above?.recentDays ?? config?.versionRecentDays, daily: above?.dailySnapshotDays ?? config?.versionDailySnapshotDays,
+                weekly: above?.weeklySnapshotDays ?? config?.versionWeeklySnapshotDays, most: now.most)
+            return VersionKeepingReading(now: now, above: without)
         }
     }
 
@@ -68,39 +91,10 @@ nonisolated struct ServerTypeCalls: TypeCalls {
             case .failed, .canceled: problem = job.error ?? String(localized: "The move stopped before it finished.")
             case .queued, .inProgress: problem = String(localized: "The move stopped before it finished.")
             }
-            return TypeMoveResult(remaining: result?.remaining ?? 0, remainingHidden: result?.remainingHidden ?? false, problem: problem)
+            return TypeMoveResult(
+                moved: job.succeeded, failed: job.errored, remaining: result?.remaining ?? 0, remainingHidden: result?.remainingHidden ?? false,
+                problem: problem)
         }
-    }
-
-    func strictTypes() async throws(TypeFailure) -> Set<String> {
-        try await run { client in Set(try await client.getConfig().ok.body.json.enforcement?.strictMode?.types ?? []) }
-    }
-
-    func setStrict(_ isOn: Bool, for type: String) async throws(TypeFailure) -> Set<String> {
-        try await run { client in
-            let config = try await client.getConfig().ok.body.json
-            let body = Self.strictBody(config.enforcement, isOn: isOn, for: type)
-            let answer = try await client.updateConfig(headers: .init(xMarfaInstanceId: config.instanceId), body: .json(body)).ok.body.json
-            return Set(answer.enforcement?.strictMode?.types ?? [])
-        }
-    }
-
-    /// The configuration change that adds `type` to strict mode or takes it out. Sending the enforcement replaces all three
-    /// levers, so the source allow-list and the source filter go back as they were read.
-    static func strictBody(
-        _ enforcement: Components.Schemas.InstanceConfig.EnforcementPayload?, isOn: Bool, for type: String
-    ) -> Operations.UpdateConfig.Input.Body.JsonPayload {
-        var strict = enforcement?.strictMode?.types ?? []
-        strict.removeAll { $0 == type }
-        if isOn { strict.append(type) }
-        var levers = Components.Schemas.MarfaInlineaeb0b69539bcab54()
-        levers.strictMode = strict.isEmpty ? nil : .init(types: strict)
-        levers.sourceAllowlist = enforcement?.sourceAllowlist.map { .init(types: $0.types, sources: $0.sources) }
-        levers.sourceFilter = enforcement?.sourceFilter.map { .init(types: $0.types, sources: $0.sources) }
-        var body = Operations.UpdateConfig.Input.Body.JsonPayload()
-        let empty = levers.strictMode == nil && levers.sourceAllowlist == nil && levers.sourceFilter == nil
-        body.enforcement = empty ? .null : .value(levers)
-        return body
     }
 
     static func setting(_ setting: Components.Schemas.TypeSetting) -> TypeSettingRecord {
@@ -110,7 +104,33 @@ nonisolated struct ServerTypeCalls: TypeCalls {
             case .view: .view
             case .webhook: .webhook
             }
-        return TypeSettingRecord(kind: kind, id: setting.id, blocked: setting.reason == nil ? nil : (setting.message ?? ""))
+        return TypeSettingRecord(
+            kind: kind, id: setting.id, field: setting.field,
+            blocked: setting.reason.map { block($0.rawValue, message: setting.message) })
+    }
+
+    /// A setting as a `type_move_blocked` refusal names it in `details.settings`.
+    static func setting(_ object: JSONObject) -> TypeSettingRecord? {
+        let kind: TypeSettingRecord.Kind
+        switch object["kind"]?.string {
+        case "folder": kind = .folder
+        case "view": kind = .view
+        case "webhook": kind = .webhook
+        default: return nil
+        }
+        return TypeSettingRecord(
+            kind: kind, id: object["id"]?.string, field: object["field"]?.string ?? "",
+            blocked: object["reason"]?.string.map { block($0, message: object["message"]?.string) })
+    }
+
+    private static func block(_ reason: String, message: String?) -> TypeSettingRecord.Block {
+        switch reason {
+        case "not_permitted": .notPermitted
+        case "filter_term": .filterTerm
+        case "placement_conflict": .placementConflict
+        case "subtypes": .subtypes
+        default: .other(message ?? reason)
+        }
     }
 
     // MARK: Reading
@@ -164,7 +184,7 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         case .removeField(let key): .removeField(key: key)
         case .feedWindow(let window): .feedWindow(window)
         case .mergeStrategy(let name): .mergeStrategy(name)
-        case .versionWindow(let days): .versionWindow(days)
+        case .versionWindow(let days, _): .versionWindow(days)
         }
     }
 
@@ -205,8 +225,10 @@ nonisolated struct ServerTypeCalls: TypeCalls {
             case .server(let status, let code, _, let details, let server) where status == 409 && code == "type_in_use":
                 let object = (details ?? server?.details)?.object
                 return .inUse(items: object?["item_count"]?.number.map { Int($0) }, settings: object?["settings"]?.array?.count ?? 0)
-            case .server(_, let code, let message, _, _) where code == "type_move_blocked":
-                return .moveBlocked(message)
+            case .server(let status, let code, _, let details, let server) where status == 409 && code == "type_move_blocked":
+                let object = (details ?? server?.details)?.object
+                let settings = object?["settings"]?.array?.compactMap { $0.object.flatMap(Self.setting) } ?? []
+                return .moveBlocked(settings: settings, tables: object?["tables"]?.array?.compactMap(\.string) ?? [])
             case .server(let status, let code, _, let details, let server) where status == 409 && code == "type_has_subtypes":
                 return .hasSubtypes((details ?? server?.details)?.object?["subtype_ids"]?.array?.compactMap(\.string) ?? [])
             case .forbidden(_, _, let server):

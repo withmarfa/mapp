@@ -28,8 +28,8 @@ extension LiveMarfaTests {
             #expect(profile.username?.isEmpty == false)
             let stores = try await calls.fileStores()
             #expect(stores.stores.contains { $0.kind == .disk })
-            let limit = try await calls.sourceLimit()
-            #expect(limit.instanceID?.isEmpty == false)
+            let enforcement = try await calls.enforcement()
+            #expect(enforcement.instanceID?.isEmpty == false)
         }
 
         @Test(.timeLimit(.minutes(3))) func theHistoryAndFileStorageSettingsAreChangedOneAtATimeAndPutBack() async throws {
@@ -75,22 +75,24 @@ extension LiveMarfaTests {
         @Test(.timeLimit(.minutes(2))) func aSourceLimitIsWrittenWithTheOtherLeversAndTurnedOff() async throws {
             let (_, server) = try connection()
             let calls = ClientOwnerCalls { try server.client() }
-            let before = try await calls.sourceLimit()
+            let before = try await calls.enforcement()
             var result: Result<Void, any Error> = .success(())
             do {
-                let written = try await calls.setSourceLimit(before, to: (["core.bookmark"], ["demo-seed"]))
-                #expect(written.isOn)
-                #expect(written.types == ["core.bookmark"])
-                #expect(written.sources == ["demo-seed"])
+                var limited = before
+                limited.filter = .init(types: ["core.bookmark"], sources: ["demo-seed"])
+                let written = try await calls.setEnforcement(limited)
+                #expect(written.filter == limited.filter)
                 #expect(written.strictTypes == before.strictTypes, "the levers not changed went back as they were")
-                #expect(written.allowlist?.types == before.allowlist?.types)
-                let off = try await calls.setSourceLimit(written, to: nil)
-                #expect(!off.isOn)
+                #expect(written.allowlist == before.allowlist)
+                var off = written
+                off.filter = nil
+                #expect(try await calls.setEnforcement(off).filter == nil)
             } catch {
                 result = .failure(error)
             }
-            let now = try await calls.sourceLimit()
-            _ = try await calls.setSourceLimit(now, to: before.isOn ? (before.types, before.sources) : nil)
+            var now = try await calls.enforcement()
+            now.filter = before.filter
+            _ = try await calls.setEnforcement(now)
             try result.get()
         }
     }

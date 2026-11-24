@@ -25,7 +25,7 @@ import Testing
     var deletedCount = 0
     var deletedRetentionDays: Int? = 60
     var canDeletePermanently = true
-    var openInApp: ((String) -> Void)? { nil }
+    var openInApp: ((String) -> Void)?
     var ownAppVendor: String? { "app.marfa-mac" }
 
     var webSignInReturn: String { "com.withmarfa.marfa.test:/signed-in" }
@@ -453,8 +453,7 @@ struct RenderedWindow<Detail: View>: View {
         let host = await stub { $0.sources = Self.sourceRows }
         fake(host).state.withLock {
             $0.names = ["core.highlight": "Highlights", "core.bookmark": "Bookmarks"]
-            $0.sourceLimit = SourceLimit(
-                instanceID: "instance-1", isOn: true, types: ["core.highlight"], sources: ["marfa-mac", "readwise"], strictTypes: nil, allowlist: nil)
+            $0.enforcement = Enforcement(instanceID: "instance-1", filter: .init(types: ["core.highlight"], sources: ["marfa-mac", "readwise"]))
         }
         try await SettingsRender.png(
             windowed(.sources, host: host, subpage: SourcesPage.limitSources), size: Self.size, named: "Sources, Limit Sources")

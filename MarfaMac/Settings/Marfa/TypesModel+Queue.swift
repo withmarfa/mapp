@@ -81,7 +81,7 @@ extension TypesModel {
         return took
     }
 
-    private func send(_ edit: TypeEdit, to id: String, field: Field) async -> Bool {
+    func send(_ edit: TypeEdit, to id: String, field: Field) async -> Bool {
         do {
             try await calls.change(id, edit)
         } catch {
@@ -101,7 +101,7 @@ extension TypesModel {
         return true
     }
 
-    private func refused(_ error: TypeFailure, field: Field) async {
+    func refused(_ error: TypeFailure, field: Field) async {
         switch error {
         case .invalid(let path, let message):
             let named = field == .newField ? nil : Self.field(named: path)
@@ -110,6 +110,9 @@ extension TypesModel {
             // The server's sentence names its pattern; a word that doesn't start with a letter is told in the page's words.
             if target == .word, let first = Self.value(ofTyped: wordDraft).first, !first.isLetter { line = Self.line(for: .word) ?? message }
             fieldErrors[target] = line
+        case .changedOnServer where field == .versions:
+            fieldErrors[.versions] = String(localized: "How long versions stay changed while you were choosing. Nothing was changed. Choose again.")
+            await reread()
         case .changedOnServer:
             pageFailure = .conflict
             await reread()

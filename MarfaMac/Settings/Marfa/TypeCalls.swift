@@ -50,6 +50,47 @@ nonisolated enum VersionWindow: Hashable, Sendable {
     case custom
 }
 
+/// How long versions stay: the three windows of a version policy and the most kept, each nil where it could not be read.
+nonisolated struct VersionKeeping: Hashable, Sendable {
+    var recent: Int?
+    var daily: Int?
+    /// Zero keeps a weekly version for as long as the item lives.
+    var weekly: Int?
+    var most: Int?
+
+    /// The one length all three windows share, where they do and it ends.
+    var uniformDays: Int? {
+        guard let recent, recent > 0, daily == recent, weekly == recent else { return nil }
+        return recent
+    }
+
+    /// Whether this keeps every version `other` keeps: each window at least as long and the count at least as high. A
+    /// window not read can't be told, so it is never at least as long.
+    func keepsAll(of other: VersionKeeping) -> Bool {
+        func atLeast(_ new: Int?, _ old: Int?, zeroIsForever: Bool = false) -> Bool {
+            guard let new, let old else { return false }
+            if zeroIsForever { return new == 0 || (old != 0 && new >= old) }
+            return new >= old
+        }
+        let most = most == other.most || atLeast(most, other.most)
+        return atLeast(recent, other.recent) && atLeast(daily, other.daily) && atLeast(weekly, other.weekly, zeroIsForever: true) && most
+    }
+}
+
+/// What decides how long a type's versions stay, read together just before a change to them.
+nonisolated struct VersionKeepingReading: Hashable, Sendable {
+    /// What the type keeps now: its own windows, else those of the types above, else This Marfa's History settings.
+    var now: VersionKeeping
+    /// What it would keep with no windows of its own, its own most kept left as it is.
+    var above: VersionKeeping
+
+    /// What the type keeps once `days` is set, or with nil once its own windows are left out.
+    func after(_ days: Int?) -> VersionKeeping {
+        guard let days else { return above }
+        return VersionKeeping(recent: days, daily: days, weekly: days, most: now.most)
+    }
+}
+
 /// The kinds of field an owner adds. Marfa has more (lists, status words, thumbnails); those come from a plugin or the
 /// command line.
 nonisolated enum FieldKind: String, CaseIterable, Hashable, Sendable {
@@ -130,8 +171,9 @@ nonisolated enum TypeEdit: Hashable, Sendable {
     case feedWindow(FeedWindow?)
     /// Nil leaves the strategy to the type above.
     case mergeStrategy(String?)
-    /// Keeps every version for this many days, then only each item's newest. Nil leaves the windows to the type above.
-    case versionWindow(Int?)
+    /// Keeps every version for this many days, then only each item's newest. Nil leaves the windows to the type above. It is
+    /// sent only while the type's versions are still kept as `readAs` says, which the person agreed to change.
+    case versionWindow(Int?, readAs: VersionKeepingReading)
 }
 
 /// A field the owner adds to a type.
@@ -159,20 +201,48 @@ nonisolated struct NewTypeRecord: Hashable, Sendable {
 /// A folder, view or webhook that names a type, as a move of its items reads it.
 nonisolated struct TypeSettingRecord: Hashable, Sendable {
     enum Kind: Hashable, Sendable { case folder, view, webhook }
+    /// Why a move can't change a setting (`types/move-blocked`, `types/move-settings-authority`).
+    enum Block: Hashable, Sendable {
+        /// This sign-in may not change the setting.
+        case notPermitted
+        /// Its filter names the type in a way a move can't rewrite, or rewriting would make it too long.
+        case filterTerm
+        /// It places the two types in different folders.
+        case placementConflict
+        /// A webhook's type filter names a type with subtypes.
+        case subtypes
+        /// A reason this app doesn't know, in the server's words.
+        case other(String)
+    }
+
     var kind: Kind
     var id: String?
-    /// Why a move can't change it, in the server's words. Nil where a move changes it to name the new type.
-    var blocked: String?
+    /// Where the setting names the type, such as `query.types` or `type_filter`.
+    var field: String = ""
+    /// Why a move can't change it. Nil where a move changes it to name the new type.
+    var blocked: Block?
 }
 
 /// What moving a type's items would do: how many it moves and the settings that name the type.
 nonisolated struct TypeMovePreview: Hashable, Sendable {
-    var items: Int
+    /// Nil where the server refused the move before counting them.
+    var items: Int?
     var settings: [TypeSettingRecord]
+    /// Tables items hold rows in that the target type doesn't declare, which stop the move.
+    var tables: [String] = []
+
+    /// Whether a move would do what `other` said it would: the same items counted and the same settings and tables.
+    func isSame(as other: TypeMovePreview) -> Bool {
+        items == other.items && Set(settings) == Set(other.settings) && Set(tables) == Set(other.tables)
+    }
 }
 
 /// How a move of a type's items ended.
 nonisolated struct TypeMoveResult: Hashable, Sendable {
+    /// Items the job moved.
+    var moved: Int = 0
+    /// Items the job tried and left unmoved. Items made while it ran are not among them.
+    var failed: Int = 0
     /// Items still of the old type that the sign-in can see.
     var remaining: Int
     /// Whether items the sign-in can't see are still of the old type.
@@ -216,8 +286,9 @@ nonisolated enum TypeFailure: Error, Hashable, Sendable {
     case inUse(items: Int?, settings: Int)
     /// Types are based on it (`types/delete-subtypes`).
     case hasSubtypes([String])
-    /// A setting names the type in a way a move can't change (`type_move_blocked`), so nothing moved.
-    case moveBlocked(String)
+    /// Settings name the type in a way a move can't change, or items hold rows in tables the target lacks
+    /// (`type_move_blocked`), so nothing moved.
+    case moveBlocked(settings: [TypeSettingRecord], tables: [String])
 }
 
 /// What the Types page asks of the server. Every call needs the server and is never queued.
@@ -228,6 +299,9 @@ nonisolated protocol TypeCalls: Sendable {
     /// Reads the type's own definition again and sends it back with `edit` applied. The replacement keeps the other fields
     /// from that read (`PUT /types/{id}` replaces the whole definition and has no write precondition).
     func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure)
+    /// How long the type's versions stay now and would with no windows of its own, read from the type, the types above it
+    /// (`GET /types/{id}`) and, where the sign-in may read them, This Marfa's History settings (`GET /config`).
+    func versionKeeping(of type: String) async throws(TypeFailure) -> VersionKeepingReading
     /// Registers a `user.*` type with its plural and icon, below its parent or based on nothing (`POST /types`).
     func addType(_ type: NewTypeRecord) async throws(TypeFailure)
     /// Deletes a type of the owner's that no type is based on (`DELETE /types/{id}`). Unforced, a type an item or a setting
@@ -237,11 +311,6 @@ nonisolated protocol TypeCalls: Sendable {
     func previewMove(of type: String, to target: String) async throws(TypeFailure) -> TypeMovePreview
     /// Moves every item of `type` to `target` and waits for the server's job to end (`types/move`, `types/move-settings`).
     func move(_ type: String, to target: String) async throws(TypeFailure) -> TypeMoveResult
-    /// The types the instance's strict mode names (`enforcement.strict_mode`, `config.manage`); empty while it names none.
-    func strictTypes() async throws(TypeFailure) -> Set<String>
-    /// Reads the configuration and sends it back with `type` added to or taken from strict mode, the other levers as read,
-    /// to the instance it was read from (`PATCH /config`, `types/strict-mode`). Answers the types strict mode then names.
-    func setStrict(_ isOn: Bool, for type: String) async throws(TypeFailure) -> Set<String>
 }
 
 nonisolated extension FieldKind {

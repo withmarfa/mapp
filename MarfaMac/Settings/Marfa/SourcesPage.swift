@@ -95,7 +95,7 @@ struct SourcesPage: View {
 
     private var limitValue: String? {
         guard let reading = limit.limit else { return nil }
-        return reading.isOn ? String(localized: "On") : String(localized: "Not Set")
+        return reading.filter != nil ? String(localized: "On") : String(localized: "Not Set")
     }
 
     /// How a source got its name, in a line.

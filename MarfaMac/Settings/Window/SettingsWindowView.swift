@@ -14,10 +14,10 @@ struct SettingsWindowView: View {
     @State private var sheets = SettingsSheetPresenter()
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
 
-    init(launcher: SettingsLauncher, libraries: Libraries) {
+    init(launcher: SettingsLauncher, libraries: Libraries, mainWindows: ItemLinkOpener? = nil) {
         self.launcher = launcher
         self.libraries = libraries
-        _host = State(initialValue: AppSettingsHost(libraries: libraries, launcher: launcher))
+        _host = State(initialValue: AppSettingsHost(libraries: libraries, launcher: launcher, mainWindows: mainWindows))
     }
 
     private var navigation: SettingsNavigation { launcher.navigation }

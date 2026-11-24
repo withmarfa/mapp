@@ -56,26 +56,20 @@ nonisolated struct FileStores: Hashable, Sendable {
     var orphansComplete: Bool
 }
 
-/// The server's source filter: for the types it names, every app and key reads only items from the sources it names.
-/// The other two levers are carried unchanged, since a write replaces all three.
-nonisolated struct SourceLimit: Hashable, Sendable {
+/// The instance's three enforcement levers as `/config` holds them, with the instance they were read from. A write
+/// replaces all three, so a lever is changed only through `EnforcementSettings`, which sends the other two as just read.
+nonisolated struct Enforcement: Hashable, Sendable {
+    /// Types and the sources that hold for them.
+    struct Lever: Hashable, Sendable {
+        var types: [String]
+        var sources: [String]
+    }
+
     var instanceID: String?
-    var isOn: Bool
-    var types: [String]
-    var sources: [String]
+    /// The types strict mode names; nil while it is off.
     var strictTypes: [String]?
-    var allowlist: (types: [String], sources: [String])?
-
-    static func == (lhs: SourceLimit, rhs: SourceLimit) -> Bool {
-        lhs.instanceID == rhs.instanceID && lhs.isOn == rhs.isOn && lhs.types == rhs.types && lhs.sources == rhs.sources
-            && lhs.strictTypes == rhs.strictTypes && lhs.allowlist?.types == rhs.allowlist?.types
-            && lhs.allowlist?.sources == rhs.allowlist?.sources
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(instanceID)
-        hasher.combine(isOn)
-        hasher.combine(types)
-        hasher.combine(sources)
-    }
+    /// Which sources may write the types it names; nil while it is off.
+    var allowlist: Lever?
+    /// The source filter: for the types it names, every app and key reads only items from the sources it names.
+    var filter: Lever?
 }

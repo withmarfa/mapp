@@ -42,8 +42,11 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         var refusal: TypeFailure?
         var deleteRefusal: TypeFailure?
         var gate: TypeCallGate?
-        var strict: Set<String> = []
-        var strictRefusal: TypeFailure?
+        /// A refusal of the move's preview, as the server answers a move a setting stops.
+        var previewRefusal: TypeFailure?
+        /// How long the type's versions stay as the server reads them now.
+        var keeping = VersionKeepingReading(
+            now: VersionKeeping(recent: 30, daily: 30, weekly: 30, most: 50), above: VersionKeeping(recent: 30, daily: 90, weekly: 365, most: 50))
     }
 
     let state = Mutex(State())
@@ -56,6 +59,8 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
 
     func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure) {
         state.withLock { $0.started.append(edit) }
+        // Like the app's half: versions are changed only while they are kept as the person was told.
+        if case .versionWindow(_, let read) = edit, state.withLock({ $0.keeping }) != read { throw .changedOnServer }
         if let gate = state.withLock({ $0.gate }) { await gate.wait() }
         if let refusal = state.withLock({ $0.refusal }) { throw refusal }
         // Like the server's replacement: a change the type already holds sends nothing, and the rest is made on the type as it is now.
@@ -116,8 +121,11 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
     }
 
     func previewMove(of type: String, to target: String) async throws(TypeFailure) -> TypeMovePreview {
-        state.withLock { $0.preview }
+        if let refusal = state.withLock({ $0.previewRefusal }) { throw refusal }
+        return state.withLock { $0.preview }
     }
+
+    func versionKeeping(of type: String) async throws(TypeFailure) -> VersionKeepingReading { state.withLock { $0.keeping } }
 
     func move(_ type: String, to target: String) async throws(TypeFailure) -> TypeMoveResult {
         state.withLock { state in
@@ -127,15 +135,6 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         }
     }
 
-    func strictTypes() async throws(TypeFailure) -> Set<String> { state.withLock { $0.strict } }
-
-    func setStrict(_ isOn: Bool, for type: String) async throws(TypeFailure) -> Set<String> {
-        if let refusal = state.withLock({ $0.strictRefusal }) { throw refusal }
-        return state.withLock { state in
-            if isOn { state.strict.insert(type) } else { state.strict.remove(type) }
-            return state.strict
-        }
-    }
 }
 
 private func record(
@@ -158,13 +157,13 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 @Suite(.hangLimit) struct TypesModelTests {
     private func model(
         _ calls: FakeTypeCalls, counts: [String: Int] = [:], late: LateDrafts = LateDrafts(),
-        grants: Set<InstancePermission> = [.schemaWrite],
+        grants: Set<InstancePermission> = [.schemaWrite], owner: FakeOwnerCalls = FakeOwnerCalls(),
         setIcon: @escaping (String?, String) async -> OwnerFailure? = { _, _ in nil }
     ) -> TypesModel {
         let access = TypeAccess(
             ownItems: { counts[$0] ?? 0 }, currentIcon: { _ in nil }, setIcon: setIcon,
             markSets: [MarfaMarkSet(id: "lucide", title: "Lucide")], marks: { _, _ in [] }, plural: { _ in nil })
-        let context = OwnerContext(calls: FakeOwnerCalls(), grants: { grants }, lateDraft: { draft in late.drafts.withLock { $0.append(draft) } })
+        let context = OwnerContext(calls: owner, grants: { grants }, lateDraft: { draft in late.drafts.withLock { $0.append(draft) } })
         return TypesModel(context: context, calls: calls, access: access)
     }
 
@@ -776,7 +775,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         calls.state.withLock {
             $0.deleteRefusal = .inUse(items: 18, settings: 0)
             $0.preview = TypeMovePreview(items: 18, settings: [])
-            $0.moveResult = TypeMoveResult(remaining: 3, remainingHidden: false)
+            $0.moveResult = TypeMoveResult(moved: 15, failed: 3, remaining: 3, remainingHidden: false)
         }
         let model = model(calls, counts: ["user.job": 18])
         await model.load()
@@ -789,7 +788,45 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(calls.state.withLock { $0.deleted.isEmpty })
         #expect(model.deleted == nil)
         #expect(model.isConfirmingDelete)
-        #expect(model.deleteSheetFailure == "3 items couldn’t move, so Jobs was kept.")
+        #expect(model.deleteSheetFailure == "15 items moved. 3 items couldn’t move, so Jobs was kept.")
+    }
+
+    @Test func itemsMadeWhileTheMoveRanAreNotToldAsFailures() async {
+        let calls = deletable()
+        calls.state.withLock {
+            $0.preview = TypeMovePreview(items: 18, settings: [])
+            $0.moveResult = TypeMoveResult(moved: 18, failed: 0, remaining: 2, remainingHidden: false)
+        }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(await eventually { model.movePreview != nil })
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.deleted.isEmpty })
+        #expect(model.deleteSheetFailure == "18 items moved. Jobs got 2 new items while they moved, so it was kept. Delete again to move them too.")
+    }
+
+    /// The server takes no precondition on a move, so the move is previewed again just before it starts: a webhook made since
+    /// the person agreed is shown and agreed to before anything moves.
+    @Test func aMoveWhosePreviewChangedSinceTheOwnerAgreedAsksAgain() async {
+        let calls = deletable()
+        calls.state.withLock { $0.preview = TypeMovePreview(items: 18, settings: []) }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(await eventually { model.movePreview != nil })
+        let webhook = TypeSettingRecord(kind: .webhook, id: "w1", field: "type_filter")
+        calls.state.withLock { $0.preview = TypeMovePreview(items: 18, settings: [webhook]) }
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.isEmpty && $0.deleted.isEmpty })
+        #expect(model.movePreview?.settings == [webhook])
+        #expect(model.deleteSheetFailure != nil)
+        #expect(model.isConfirmingDelete)
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.count } == 1)
+        #expect(model.deleted == "user.job")
     }
 
     @Test func aTypeIsDeletedUnforcedOnlyOnceItsItemsHaveMoved() async {
@@ -826,14 +863,16 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 
     @Test func aSettingAMoveCannotChangeHoldsTheMoveBack() async {
         let calls = deletable()
-        calls.state.withLock {
-            $0.preview = TypeMovePreview(items: 18, settings: [TypeSettingRecord(kind: .folder, id: "f1", blocked: "Change its filter first.")])
-        }
+        // The server refuses the preview itself, naming the setting and why (`types/move-blocked`).
+        let folder = TypeSettingRecord(kind: .folder, id: "f1", field: "query.filter", blocked: .filterTerm)
+        calls.state.withLock { $0.previewRefusal = .moveBlocked(settings: [folder], tables: []) }
         let model = model(calls, counts: ["user.job": 18])
         await model.load()
         model.open("user.job")
         model.beginDelete()
         #expect(await eventually { model.movePreview != nil })
+        #expect(model.blockedSettings == [folder])
+        #expect(model.movePreviewFailure == nil)
         #expect(!model.canConfirmDelete)
         await model.confirmDelete()
         #expect(calls.state.withLock { $0.moves.isEmpty && $0.deleted.isEmpty })
@@ -874,30 +913,90 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
                 == [.addField(NewFieldRecord(key: "site", label: "Site", kind: .text, isRequired: true, isSearchable: false))])
     }
 
-    @Test func keepVersionsSendsTheTypesOwnWindowsOrLeavesThemAbove() async {
+    @Test func keepingVersionsLongerIsSentWithoutAskingAndShorterOnlyOnceAgreed() async {
         let calls = withFields()
         let model = model(calls)
         await model.load()
-        #expect(model.versionSelection(of: "user.job") == nil)
-        #expect(!model.keepsVersionsLonger(.days(30), of: "user.job"))
-        await model.setVersionWindow(.days(90), of: "user.job")
-        await model.setVersionWindow(nil, of: "user.job")
-        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.versionWindow(90)])
+        var asked: [TypesModel.VersionChange] = []
+        await model.setVersionWindow(.days(90), of: "user.job") { asked.append($0); return true }
+        #expect(asked.isEmpty, "every window grows from 30 days")
+        await model.setVersionWindow(.days(7), of: "user.job") { asked.append($0); return false }
+        #expect(asked.map(\.new.recent) == [7])
+        #expect(asked.first?.now == calls.state.withLock { $0.keeping.now })
+        let read = calls.state.withLock { $0.keeping }
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.versionWindow(90, readAs: read)])
+    }
+
+    /// The page may show a window another device has since lengthened: the question is decided from the server's answer,
+    /// read just before sending, and so is leaving the windows to the types above.
+    @Test func whetherToAskIsDecidedFromWhatTheServerHoldsNow() async {
+        let calls = withFields()
+        calls.state.withLock { $0.keeping.now = VersionKeeping(recent: 365, daily: 365, weekly: 365, most: 50) }
+        let model = model(calls)
+        await model.load()
+        var asked: [TypesModel.VersionChange] = []
+        await model.setVersionWindow(.days(90), of: "user.job") { asked.append($0); return false }
+        #expect(asked.map(\.now.recent) == [365])
+        #expect(asked.map(\.new.recent) == [90])
+        calls.state.withLock { $0.types[2].versionWindow = .days(365) }
+        await model.load()
+        await model.setVersionWindow(nil, of: "user.job") { asked.append($0); return false }
+        #expect(asked.last?.new == calls.state.withLock { $0.keeping.above }, "History's or the type above's windows, which are shorter")
+        #expect(calls.state.withLock { $0.changes.isEmpty })
+    }
+
+    @Test func versionsChangedWhileTheOwnerWasAskedAreNotChanged() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        await model.setVersionWindow(.days(7), of: "user.job") { _ in
+            calls.state.withLock { $0.keeping.now.recent = 3 }
+            return true
+        }
+        #expect(calls.state.withLock { $0.changes.isEmpty })
+        #expect(model.fieldErrors[.versions] != nil)
+    }
+
+    @Test func windowsThatCantBeReadAlwaysAsk() {
+        let known = VersionKeeping(recent: 30, daily: 30, weekly: 30, most: nil)
+        #expect(!known.keepsAll(of: VersionKeeping(recent: nil, daily: nil, weekly: nil, most: nil)))
+        #expect(!VersionKeeping(recent: 90, daily: 90, weekly: 90, most: nil).keepsAll(of: VersionKeeping(recent: 30, daily: 90, weekly: 0, most: nil)), "a weekly window of 0 keeps one a week for good")
+        #expect(VersionKeeping(recent: 90, daily: 90, weekly: 90, most: nil).keepsAll(of: known))
     }
 
     @Test func aStrictSwitchTheServerRefusesShowsWhatTheServerHolds() async {
         let calls = listing()
-        calls.state.withLock { $0.strict = ["user.job"] }
-        let model = model(calls, grants: [.schemaWrite, .configManage])
+        let owner = FakeOwnerCalls()
+        owner.state.withLock { $0.enforcement.strictTypes = ["user.job"] }
+        let model = model(calls, grants: [.schemaWrite, .configManage], owner: owner)
         await model.load()
         #expect(model.isStrict("user.job"))
-        calls.state.withLock { $0.strictRefusal = .owner(.refused("No.")) }
+        owner.fail("setEnforcement", with: .refused("No."))
         await model.setStrict(false, of: "user.job")
         #expect(model.isStrict("user.job"))
         #expect(model.fieldErrors[.strict] != nil)
-        let unread = self.model(calls)
+        let unread = self.model(calls, owner: owner)
         await unread.load()
         #expect(unread.strictTypes == nil)
+    }
+
+    /// Strict changes only this type's place in strict mode: a source limit set elsewhere since the page read it goes back.
+    @Test func strictChangesOnlyItsOwnTypeAndKeepsTheOtherLevers() async {
+        let calls = listing()
+        let owner = FakeOwnerCalls()
+        owner.state.withLock { $0.enforcement.strictTypes = ["user.quote"] }
+        let model = model(calls, grants: [.schemaWrite, .configManage], owner: owner)
+        await model.load()
+        let filter = Enforcement.Lever(types: ["core.highlight"], sources: ["readwise"])
+        owner.state.withLock {
+            $0.enforcement.filter = filter
+            $0.enforcement.strictTypes = ["user.quote", "user.rework"]
+        }
+        await model.setStrict(true, of: "user.job")
+        let sent = owner.state.withLock { $0.enforcementsSent }
+        #expect(sent.map(\.filter) == [filter])
+        #expect(sent.map(\.strictTypes) == [["user.quote", "user.rework", "user.job"]])
+        #expect(model.strictTypes == ["user.quote", "user.rework", "user.job"])
     }
 
     @Test func aNameTypedInTheNewTypeSheetIsHandedBackWhenSettingsCloses() async {
@@ -1097,25 +1196,18 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     }
 
     /// Sending the enforcement replaces all three levers: one dropped here would let writes through that the owner limited.
-    @Test func strictSendsTheSourceLeversBackAsTheyWereRead() {
-        let read = Components.Schemas.InstanceConfig.EnforcementPayload(
-            strictMode: .init(types: ["user.quote"]), sourceAllowlist: .init(types: ["core.task"], sources: ["github"]),
-            sourceFilter: .init(types: ["core.highlight"], sources: ["readwise"]))
-        guard case .value(let on)? = ServerTypeCalls.strictBody(read, isOn: true, for: "user.job").enforcement else {
+    @Test func anEnforcementWriteSendsAllThreeLevers() {
+        let all = Enforcement(
+            instanceID: "instance-1", strictTypes: ["user.quote"], allowlist: .init(types: ["core.task"], sources: ["github"]),
+            filter: .init(types: ["core.highlight"], sources: ["readwise"]))
+        guard case .value(let levers) = ClientOwnerCalls.enforcementBody(all) else {
             Issue.record("The levers were not sent")
             return
         }
-        #expect(on.strictMode?.types == ["user.quote", "user.job"])
-        #expect(on.sourceAllowlist?.types == ["core.task"] && on.sourceAllowlist?.sources == ["github"])
-        #expect(on.sourceFilter?.types == ["core.highlight"] && on.sourceFilter?.sources == ["readwise"])
-        guard case .value(let off)? = ServerTypeCalls.strictBody(read, isOn: false, for: "user.quote").enforcement else {
-            Issue.record("The levers were not sent")
-            return
-        }
-        #expect(off.strictMode == nil)
-        #expect(off.sourceAllowlist?.sources == ["github"] && off.sourceFilter?.sources == ["readwise"])
-        let alone = Components.Schemas.InstanceConfig.EnforcementPayload(strictMode: .init(types: ["user.job"]))
-        #expect(ServerTypeCalls.strictBody(alone, isOn: false, for: "user.job").enforcement == .null)
+        #expect(levers.strictMode?.types == ["user.quote"])
+        #expect(levers.sourceAllowlist?.types == ["core.task"] && levers.sourceAllowlist?.sources == ["github"])
+        #expect(levers.sourceFilter?.types == ["core.highlight"] && levers.sourceFilter?.sources == ["readwise"])
+        #expect(ClientOwnerCalls.enforcementBody(Enforcement(instanceID: "instance-1")) == .null)
     }
 
     @Test func aFeedWindowAndAMergeStrategyAreSetNeverAndLeftToTheTypeAbove() throws {
@@ -1171,6 +1263,21 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let below = try answer(#"{"subtype_ids":["user.rework"]}"#, status: 409, code: "type_has_subtypes")
         let children = MarfaError.server(status: 409, code: "type_has_subtypes", message: "Has subtypes", details: nil, server: below)
         #expect(ServerTypeCalls.failure(children) == .hasSubtypes(["user.rework"]))
+    }
+
+    /// A move a setting or a table stops is refused, dry run or not, naming each and why (`types/move-blocked`).
+    @Test func aBlockedMoveNamesEachSettingAndWhy() throws {
+        let blocked = try answer(
+            #"{"settings":[{"kind":"view","id":"v1","field":"query.filter","reason":"filter_term","message":"Change the filter."},{"kind":"webhook","field":"type_filter","reason":"not_permitted"}],"tables":["rooms"]}"#,
+            status: 409, code: "type_move_blocked")
+        let error = MarfaError.server(status: 409, code: "type_move_blocked", message: "Blocked", details: nil, server: blocked)
+        #expect(
+            ServerTypeCalls.failure(error)
+                == .moveBlocked(
+                    settings: [
+                        TypeSettingRecord(kind: .view, id: "v1", field: "query.filter", blocked: .filterTerm),
+                        TypeSettingRecord(kind: .webhook, id: nil, field: "type_filter", blocked: .notPermitted),
+                    ], tables: ["rooms"]))
     }
 }
 

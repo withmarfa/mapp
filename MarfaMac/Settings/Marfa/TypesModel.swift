@@ -47,6 +47,8 @@ import Observation
     var pageFailure: OwnerFailure?
     /// The types the instance's strict mode names; nil until read, and never read without `config.manage`.
     var strictTypes: Set<String>?
+    /// The instance strict mode was read from, so a switch is never written to another.
+    var strictInstance: String?
 
     // The drafts of the open type: what was typed, kept until it is saved or the page leaves.
     private(set) var openID: String?
@@ -165,7 +167,7 @@ import Observation
         case .guidanceByApp: .refused(String(localized: "This Marfa takes guidance only from the command line for now."))
         case .canceled: .notConfirmed
         case .inUse, .hasSubtypes: .conflict
-        case .moveBlocked(let message): .refused(message)
+        case .moveBlocked: .refused(String(localized: "A folder, view, webhook or table stops the move. Nothing moved."))
         }
     }
 

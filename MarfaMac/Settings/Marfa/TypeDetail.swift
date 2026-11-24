@@ -30,11 +30,12 @@ struct TypeDetail: View {
         }
     }
 
-    /// The owner's type opens its items in the app where the app can; Marfa's and a plugin's make a type based on them.
+    /// The owner's type opens its items in the app where the app can and it has any; Marfa's and a plugin's make a type based
+    /// on them.
     @ViewBuilder private var headButton: some View {
         switch type.origin {
         case .registered, .unknown:
-            if let openInApp = host.openInApp {
+            if let openInApp = host.openInApp, model.count(of: type.id) > 0 {
                 SettingsButton(verbatim: String(localized: "Show \(model.count(of: type.id).formatted()) \(model.title(of: type))")) { openInApp(type.id) }
             }
         case .platform:
@@ -270,29 +271,41 @@ struct TypeDetail: View {
         }
     }
 
-    /// Keeping versions for longer is sent at once; any other change may remove versions, which can't be recovered, so it asks.
-    private func askToKeepVersions(_ window: VersionWindow?) {
-        guard window != .custom, window != model.versionSelection(of: type.id) else { return }
-        guard !model.keepsVersionsLonger(window, of: type.id) else {
-            Task { await model.setVersionWindow(window, of: type.id) }
-            return
-        }
+    /// Sends the choice. The model reads again how long versions stay just before sending, and a change that can delete
+    /// versions, which can't be recovered, asks first, naming how long they stay now and after.
+    private func setVersions(_ window: VersionWindow?) {
+        let id = type.id
         let items = model.title(of: type).localizedLowercase
+        let server = host.serverName
+        Task { await model.setVersionWindow(window, of: id) { await Self.confirm($0, items: items, server: server) } }
+    }
+
+    private static func confirm(_ change: TypesModel.VersionChange, items: String, server: String) async -> Bool {
         let title: String
-        let message: String
-        if case .days(let days)? = window {
-            let length = Self.title(of: VersionWindow.days(days)).localizedLowercase
-            title = String(localized: "Keep Versions for \(length)?")
-            message = String(localized: "The next time \(host.serverName) thins versions, it can permanently delete versions of \(items) older than \(length). Each item keeps its newest saved version. Items with two or fewer saved versions keep them all. Types based on \(items) may also lose versions.")
+        if let days = change.new.uniformDays {
+            title = String(localized: "Keep Versions for \(Self.title(of: VersionWindow.days(days)))?")
         } else {
-            let above = model.versionsComeFromAbove(type.id) ? (parentTitle ?? "") : String(localized: "History")
-            title = String(localized: "Leave Versions to \(above)?")
-            message = String(localized: "The inherited limits may remove versions of \(items) and types based on them sooner. Deleted versions can’t be recovered.")
+            title = String(localized: "Change How Long Versions Are Kept?")
         }
-        SettingsAlert.confirm(title: title, message: message, confirm: String(localized: "Change"), window: NSApp.keyWindow) { confirmed, _ in
-            guard confirmed else { return }
-            Task { await model.setVersionWindow(window, of: type.id) }
+        let now = describe(change.now)
+        let new = describe(change.new)
+        let message = String(localized: "Versions of \(items) are kept \(now) now, and would be kept \(new). The next time \(server) thins versions, it can permanently delete the ones this no longer keeps. Each item keeps its newest saved version. Items with two or fewer saved versions keep them all. Types based on \(items) may also lose versions.")
+        return await withCheckedContinuation { continuation in
+            SettingsAlert.confirm(title: title, message: message, confirm: String(localized: "Change"), window: NSApp.keyWindow) { confirmed, _ in
+                continuation.resume(returning: confirmed)
+            }
         }
+    }
+
+    /// How long versions stay, as a phrase after "kept".
+    private static func describe(_ keeping: VersionKeeping) -> String {
+        guard let recent = keeping.recent, let daily = keeping.daily, let weekly = keeping.weekly else {
+            return String(localized: "as This Marfa’s History settings say")
+        }
+        let length = { (days: Int) in Self.title(of: VersionWindow.days(days)).localizedLowercase }
+        if let days = keeping.uniformDays { return String(localized: "for \(length(days))") }
+        let weeks = weekly == 0 ? String(localized: "one a week after that") : String(localized: "one a week for \(length(weekly))")
+        return String(localized: "every version for \(length(recent)), one a day for \(length(daily)) and \(weeks)")
     }
 
     private static func title(of window: VersionWindow) -> String {
@@ -316,7 +329,7 @@ struct TypeDetail: View {
             SettingsRow("Keep Versions", error: model.fieldErrors[.versions]) {
                 SettingsPopUp(
                     title: "Keep Versions",
-                    selection: Binding<VersionWindow?> { model.versionSelection(of: type.id) } set: { askToKeepVersions($0) },
+                    selection: Binding<VersionWindow?> { model.versionSelection(of: type.id) } set: { setVersions($0) },
                     isError: model.fieldErrors[.versions] != nil
                 ) {
                     if model.versionsComeFromAbove(type.id), let parentTitle {

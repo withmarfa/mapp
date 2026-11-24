@@ -277,49 +277,76 @@ extension TypesModel {
     /// Whether a type above sets how long versions stay, so leaving it to the type above is not the same as History.
     func versionsComeFromAbove(_ id: String) -> Bool { chain(of: id).dropLast().contains { $0.versionWindow != nil } }
 
-    /// Whether `window` keeps versions longer than the type does now, the one change made without asking: any other may
-    /// remove versions, which can't be recovered.
-    func keepsVersionsLonger(_ window: VersionWindow?, of id: String) -> Bool {
-        guard case .days(let new)? = window, case .days(let now)? = versionSelection(of: id) else { return false }
-        return new > now
+    /// A change to how long versions stay, worked out from what the server holds just before it is sent.
+    struct VersionChange: Equatable {
+        /// What the type keeps now.
+        let now: VersionKeeping
+        /// What it keeps after the change.
+        let new: VersionKeeping
+        /// Whether the change can delete versions, which can't be recovered, so it is sent only once the person agrees.
+        var mayDelete: Bool { !new.keepsAll(of: now) }
     }
 
-    func setVersionWindow(_ window: VersionWindow?, of id: String) async {
-        guard let type = record(id), isEditable(type), window != versionSelection(of: id) else { return }
-        switch window {
-        case .custom?: return
-        case .days(let days)?: await apply(.versionWindow(days), to: id, field: .versions)
-        case nil: await apply(.versionWindow(nil), to: id, field: .versions)
+    /// Sets how long the type keeps versions, or with nil leaves it to the type above. It waits behind the changes queued
+    /// before it, then reads the type, the types above and History's settings again: a change that can delete versions is
+    /// sent only once `confirm` agrees to what that read says, and only while the server still holds what it read.
+    func setVersionWindow(_ window: VersionWindow?, of id: String, confirm: @escaping @MainActor (VersionChange) async -> Bool) async {
+        guard let type = record(id), isEditable(type), window != .custom, window != versionSelection(of: id) else { return }
+        let days: Int? = if case .days(let days)? = window { days } else { nil }
+        fieldErrors[.versions] = nil
+        pageFailure = nil
+        _ = await enqueue { () async -> Bool in
+            let read: VersionKeepingReading
+            do throws(TypeFailure) {
+                read = try await self.calls.versionKeeping(of: id)
+            } catch {
+                await self.refused(error, field: .versions)
+                return false
+            }
+            let change = VersionChange(now: read.now, new: read.after(days))
+            if change.mayDelete, !(await confirm(change)) { return false }
+            return await self.send(.versionWindow(days, readAs: read), to: id, field: .versions)
         }
     }
 
     /// Reads which types strict mode names, where the sign-in may read the configuration. A failed read leaves the switch out.
     func loadStrict() async {
-        guard context.grants().contains(.configManage) else {
+        guard context.grants().contains(.configManage), let read = try? await context.calls.enforcement() else {
             strictTypes = nil
             return
         }
-        strictTypes = try? await calls.strictTypes()
+        strictTypes = Set(read.strictTypes ?? [])
+        strictInstance = read.instanceID
     }
 
     func isStrict(_ id: String) -> Bool { strictTypes?.contains(id) ?? false }
 
-    /// Adds the type to strict mode or takes it out. It waits behind the changes queued before it, so two switches flipped
-    /// at once each send the other's back as the server holds it. A refusal leaves the switch as the server holds it.
+    /// Adds the type to strict mode or takes it out, through the app's one enforcement writer, which changes only this type's
+    /// place in strict mode and sends the other levers back as the server holds them. A refusal leaves the switch as the server
+    /// holds it.
     func setStrict(_ isOn: Bool, of id: String) async {
         guard let type = record(id), isEditable(type), isOn != isStrict(id) else { return }
         fieldErrors[.strict] = nil
         strictTypes?.formSymmetricDifference([id])
-        _ = await enqueue { () async -> Bool in
-            do throws(TypeFailure) {
-                self.strictTypes = try await self.calls.setStrict(isOn, for: id)
-                return true
-            } catch {
-                if case .owner(let failure) = error { await self.context.learn(from: failure) }
-                self.fieldErrors[.strict] = OwnerWording.line(Self.owner(error), on: .types)
-                self.strictTypes = (try? await self.calls.strictTypes()) ?? self.strictTypes.map { $0.symmetricDifference([id]) }
-                return false
+        do throws(EnforcementSettings.Failure) {
+            let written = try await context.writeEnforcement(readFrom: strictInstance) { levers in
+                var strict = levers.strictTypes ?? []
+                strict.removeAll { $0 == id }
+                if isOn { strict.append(id) }
+                levers.strictTypes = strict.isEmpty ? nil : strict
             }
+            strictTypes = Set(written.strictTypes ?? [])
+        } catch {
+            switch error {
+            case .owner(let failure):
+                await context.learn(from: failure)
+                fieldErrors[.strict] = OwnerWording.line(failure, on: .types)
+            case .anotherMarfa, .changedElsewhere:
+                fieldErrors[.strict] = InstanceConfigFailure.instanceChanged.message
+            }
+            let shown = strictTypes
+            await loadStrict()
+            if strictTypes == nil, let shown { strictTypes = shown.symmetricDifference([id]) }
         }
     }
 }

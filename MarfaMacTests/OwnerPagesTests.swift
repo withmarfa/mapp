@@ -56,11 +56,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var concerns: [AttentionConcern] = []
         var metrics = InstanceMetricsReading(version: "0.0.84", databaseBytes: nil, fileBytes: 0)
         var fileStores = FileStores(stores: [], orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
-        var sourceLimit = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: nil)
-        /// What each source limit write sent: the filter, or nil for turning it off.
-        var limitsSent: [(types: [String], sources: [String])?] = []
-        /// Run as a source limit write arrives, to let a test move the server under it.
-        var beforeLimitWrite: (@Sendable () -> Void)?
+        var enforcement = Enforcement(instanceID: "instance-1")
+        /// What each enforcement write sent, all three levers.
+        var enforcementsSent: [Enforcement] = []
+        /// Run as an enforcement write arrives, to let a test move the server under it.
+        var beforeEnforcementWrite: (@Sendable () -> Void)?
         var webhooks: [OwnerWebhook] = []
         var deliveries: [String: [WebhookDeliveryInfo]] = [:]
         var webhooksMade: [NewWebhook] = []
@@ -413,21 +413,20 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return state.withLock { $0.fileStores }
     }
 
-    func sourceLimit() async throws(OwnerFailure) -> SourceLimit {
-        try enter("sourceLimit")
-        return state.withLock { $0.sourceLimit }
+    func enforcement() async throws(OwnerFailure) -> Enforcement {
+        try enter("enforcement")
+        return state.withLock { $0.enforcement }
     }
 
-    func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit {
-        try enter("setSourceLimit")
-        state.withLock { $0.beforeLimitWrite }?()
+    func setEnforcement(_ enforcement: Enforcement) async throws(OwnerFailure) -> Enforcement {
+        try enter("setEnforcement")
+        await held("setEnforcement")
+        state.withLock { $0.beforeEnforcementWrite }?()
         return try state.withLock { state throws(OwnerFailure) in
-            guard state.sourceLimit.instanceID == limit.instanceID else { throw .instanceChanged }
-            state.limitsSent.append(filter)
-            state.sourceLimit.isOn = filter != nil
-            state.sourceLimit.types = filter?.types ?? []
-            state.sourceLimit.sources = filter?.sources ?? []
-            return state.sourceLimit
+            guard state.enforcement.instanceID == enforcement.instanceID else { throw .instanceChanged }
+            state.enforcementsSent.append(enforcement)
+            state.enforcement = enforcement
+            return enforcement
         }
     }
 

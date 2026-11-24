@@ -250,19 +250,42 @@ struct TypeDeleteSheet: View {
         }
     }
 
-    /// The folders, views and webhooks a move changes to name the new type, and any it can't change.
+    /// The folders, views and webhooks a move changes to name the new type, and any it can't change, with what to change
+    /// first, and the tables that stop it.
     @ViewBuilder private var alsoChanges: some View {
         let settings = model.movePreview?.settings ?? []
-        if !settings.isEmpty {
-            let target = model.moveTarget.map { model.title(of: $0).localizedLowercase } ?? ""
+        let tables = model.movePreview?.tables ?? []
+        if !settings.isEmpty || !tables.isEmpty {
+            let target = model.moveTarget.map { model.title(of: $0) } ?? ""
             SettingsSection("Also Changes") {
                 ForEach(Array(settings.enumerated()), id: \.offset) { _, setting in
                     SettingsRow(
                         title: Text(verbatim: Self.title(of: setting.kind)),
-                        line: Text(verbatim: setting.blocked ?? Self.line(of: setting.kind, target: target)),
+                        line: Text(verbatim: setting.blocked.map { Self.line(of: $0, kind: setting.kind) } ?? Self.line(of: setting.kind, target: target.localizedLowercase)),
                         error: nil, lead: .symbol(Self.symbol(of: setting.kind)), lines: nil)
                 }
+                if !tables.isEmpty {
+                    SettingsRow(
+                        title: Text("Tables"),
+                        line: Text("Items hold rows in \(tables.formatted(.list(type: .and))), which \(target) doesn’t have. Add them to \(target) first."),
+                        error: nil, lead: .symbol("tablecells"), lines: nil)
+                }
             }
+        }
+    }
+
+    /// Why a move can't change a setting, and what to change first.
+    private static func line(of block: TypeSettingRecord.Block, kind: TypeSettingRecord.Kind) -> String {
+        switch block {
+        case .notPermitted:
+            switch kind {
+            case .webhook: String(localized: "This app can’t change it: another app or key made it, or this app isn’t allowed to. Change or remove it in Webhooks first.")
+            case .folder, .view: String(localized: "This app isn’t allowed to change it. Allow more, or change it where it was made, first.")
+            }
+        case .filterTerm: String(localized: "Its filter uses this type in a way a move can’t rewrite. Change its filter first.")
+        case .placementConflict: String(localized: "It places the two types in different folders. Change where it places them first.")
+        case .subtypes: String(localized: "It sends events for this type and the types based on it. Change its type filter first.")
+        case .other(let message): message
         }
     }
 
