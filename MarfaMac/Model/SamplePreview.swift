@@ -1,9 +1,7 @@
+#if DEBUG
 import Foundation
 
-/// The reading text the sample library's fake copy answers an item's name and preview with: a body's Markdown left out,
-/// as the core does (`device/item-preview-*`), for the parts a sample's bodies use. A fence's lines are kept as written,
-/// a table reads as its cells, a line loses its quote, list and heading marks, and inline marks go, so a list row's
-/// second line reads as text. It is a stand-in for the core, which a real library asks, and never reads an item.
+/// Reading text for the sample library's fake copy, for the Markdown used in sample bodies.
 nonisolated enum SamplePreview {
     private nonisolated(unsafe) static let rule = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/
     private nonisolated(unsafe) static let underline = /^\s*=+\s*$/
@@ -93,3 +91,4 @@ private extension String {
         })
     }
 }
+#endif
