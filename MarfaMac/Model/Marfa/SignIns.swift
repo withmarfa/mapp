@@ -14,9 +14,9 @@ nonisolated protocol SignIns: Sendable {
     func server(for connection: MarfaConnection) throws -> Server?
 
     /// Signs in through the system's web authentication session, which shows the server's own pages over the
-    /// window in front. The sign-in is kept before this returns, in place of any kept before. `permissions` are asked
-    /// for besides the scopes the app always asks; the owner may approve fewer.
-    @MainActor func signInWithBrowser(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> SignedIn
+    /// window in front. The sign-in is kept before this returns, in place of any kept before. It asks for
+    /// `SystemSignIns.scopes`, every owner permission among them; the owner may approve fewer.
+    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws -> SignedIn
 
     /// The permissions the sign-in kept for `connection` holds: nil where none is kept or it has ended, and a throw
     /// where one is kept and cannot be read.
@@ -32,8 +32,8 @@ nonisolated protocol SignIns: Sendable {
     func scopes(for connection: MarfaConnection) throws -> [String]?
 
     /// Starts a device sign-in, for a Mac that cannot use the browser: the person types the code on any device.
-    /// `permissions` are asked for as `signInWithBrowser` asks for them.
-    func startCodeSignIn(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> CodeSignIn
+    /// It asks for what `signInWithBrowser` asks for.
+    func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn
 
     /// Forgets the sign-in on this Mac and revokes it at the server. Only `.notConfirmed` leaves an approval that may
     /// stand there until the owner ends it. Sign-out can wait for a renewal before asking the server to end the
@@ -168,17 +168,15 @@ nonisolated struct SystemSignIns: SignIns {
     static let clientName = "Marfa for Mac"
 
     /// What the app asks the owner to approve: every item to read and write, and every edge (relationships, links
-    /// and attachments), which the server grants apart from items (`edge.*`). With them the three permissions its
-    /// features use: Permanently Delete (`items.purge`), This Marfa (`config.manage`) and a type's icon
-    /// (`schema.write`), and the read of the owner's own name for Signed In As, which `GET /profile` gives a credential
-    /// only with its profile read scope. That read is no owner permission. The app's own settings (`PreferencesType`) need
-    /// a scope that reaches the type, which `*:write` never does, and registering the type where the Marfa holds none
-    /// (`metadata.types:write`). The app asks for `app.*:write`: the vendor scope is unavailable before its first type
-    /// exists (`keys-and-oauth/app-vendor-not-named`), and discovery never lists it afterward. This reaches every app's
-    /// types; withmarfa/marfa#3522 would let the app ask for its vendor alone. The owner
-    /// may approve less, and what is missing is told where it is needed.
-    static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write"]
-        + profileScopes + [PreferencesType.rootScope, PreferencesType.registeringScope]
+    /// and attachments), which the server grants apart from items (`edge.*`). Full Access grants every owner permission
+    /// the app can hold (`askedAtSignIn`). Signed In As reads the owner's name from `GET /profile` with its own scope.
+    /// The app's own settings (`PreferencesType`) need a scope that reaches the type, which `*:write`
+    /// never does, and registering the type where the Marfa holds none (`metadata.types:write`). The app asks for
+    /// `app.*:write`: the vendor scope is unavailable before its first type exists (`keys-and-oauth/app-vendor-not-named`),
+    /// and discovery never lists it afterward. This reaches every app's types; withmarfa/marfa#3522 would let the app ask
+    /// for its vendor alone. The owner may approve less, and what is missing is told where it is needed.
+    static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write"]
+        + askedAtSignIn.map(\.rawValue).sorted() + profileScopes + [PreferencesType.rootScope, PreferencesType.registeringScope]
 
     /// What Signed In As needs: the owner's name (`instance-claim/profile-read`).
     static let profileScopes = ["profile.name:read"]
@@ -186,8 +184,9 @@ nonisolated struct SystemSignIns: SignIns {
     /// Whether `scopes`, as a sign-in holds them, let it read the owner's name.
     static func readsProfile(_ scopes: [String]) -> Bool { profileScopes.allSatisfy(scopes.contains) }
 
-    /// The permissions `scopes` already asks for, which a sign-in holds unless the owner approved fewer.
-    static let askedAtSignIn: Set<InstancePermission> = [.itemsPurge, .configManage, .schemaWrite]
+    /// Every owner permission, which every sign-in asks for and a sign-in holds unless the owner approved fewer. The
+    /// package's list is the contract's but `connectors.host`, which only a connector host's own key holds.
+    static let askedAtSignIn = Set(InstancePermission.allCases)
 
     /// The service the sign-ins are kept under: the bundle identifier followed by `.marfa-sign-in`.
     let service: String
@@ -212,10 +211,8 @@ nonisolated struct SystemSignIns: SignIns {
     /// connector's vendor sign-in is sent back to it too, so the system's sheet ends there.
     var redirectAddress: String { scheme + ":/signed-in" }
 
-    func authorization(for connection: MarfaConnection, asking permissions: Set<InstancePermission> = []) throws -> Authorization {
-        let client = Authorization.Client(
-            name: Self.clientName, redirect: URL(string: redirectAddress), scopes: Self.scopes,
-            permissions: permissions.sorted { $0.rawValue < $1.rawValue })
+    func authorization(for connection: MarfaConnection) throws -> Authorization {
+        let client = Authorization.Client(name: Self.clientName, redirect: URL(string: redirectAddress), scopes: Self.scopes)
         return try Authorization(server: connection.address, client: client, service: service)
     }
 
@@ -242,13 +239,13 @@ nonisolated struct SystemSignIns: SignIns {
         }
     }
 
-    @MainActor func signInWithBrowser(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> SignedIn {
+    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws -> SignedIn {
         guard let window = anchor() else { throw NoSignInWindow() }
-        return SignedIn(try await authorization(for: connection, asking: permissions).signIn(presentingFrom: window))
+        return SignedIn(try await authorization(for: connection).signIn(presentingFrom: window))
     }
 
-    func startCodeSignIn(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> CodeSignIn {
-        let started = try await authorization(for: connection, asking: permissions).startDeviceSignIn()
+    func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn {
+        let started = try await authorization(for: connection).startDeviceSignIn()
         return CodeSignIn(
             code: started.userCode, address: started.verificationURL, completeAddress: started.verificationURLComplete,
             expiresAt: started.expiresAt, finish: { SignedIn(try await started.credential()) })

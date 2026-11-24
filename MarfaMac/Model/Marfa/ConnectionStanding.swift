@@ -85,9 +85,9 @@ nonisolated struct ConnectionStanding: Equatable, Sendable {
 /// What the Account section of Connection holds in each state: who is signed in, what the owner has allowed the app, and
 /// what waits to be sent.
 nonisolated struct ConnectionAccount: Equatable, Sendable {
-    /// Every owner permission: what Connection counts and what Allow More… asks for, `sign_ins.manage` included, as a
-    /// key's and an app's pages count them. Only the sign-in itself leaves it out (`SystemSignIns.askedAtSignIn`).
-    static let asked: Set<InstancePermission> = Set(InstancePermission.allCases)
+    /// Every owner permission, as every sign-in and Allow More… asks for them (`SystemSignIns.askedAtSignIn`): what
+    /// Connection counts, as a key's and an app's pages count them.
+    static let asked = SystemSignIns.askedAtSignIn
 
     /// The permissions the app holds, and how many of the `asked` ones that is; nil where the sign-in cannot be read or
     /// the server is not reached, when nothing is said.
