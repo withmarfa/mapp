@@ -213,7 +213,8 @@ extension MarfaEngine {
         } catch {
             let reason = Self.failure(error).message
             failures.append(SourceFailure(
-                kind: .failed, message: String(localized: "The item was made, but it couldn’t be put under its parent: \(reason)")))
+                kind: .failed, message: String(localized: "The item was made, but it couldn’t be put under its parent: \(reason)"),
+                title: String(localized: "Can’t Put Item Under Its Parent")))
         }
     }
 

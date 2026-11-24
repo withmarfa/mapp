@@ -654,7 +654,7 @@ import Observation
             if failure.kind == .denied {
                 notices.tell(String(localized: "Signed Out of Your Marfa Server"), failure.message, action: .openSettings(.connection))
             } else {
-                notices.tell(String(localized: "Can’t Read This Library"), failure.message)
+                notices.tell(failure.title ?? String(localized: "Can’t Read This Library"), failure.message)
             }
         }
     }

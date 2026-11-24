@@ -429,7 +429,9 @@ struct MarfaSourceOfflineTests {
             .create(id: child, ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST child", body: "Queued", parent: ItemID("not-an-item"))),
             as: WriteID())
         let told = await eventually {
-            library.notices.waiting.contains { $0.message.contains("couldn’t be put under its parent") }
+            library.notices.waiting.contains {
+                $0.title == "Can’t Put Item Under Its Parent" && $0.message.contains("couldn’t be put under its parent")
+            }
         }
         #expect(told, "told: \(library.notices.waiting.map(\.message))")
         #expect(library.item(child)?.title == "MARFAMACTEST child")
