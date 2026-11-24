@@ -46,9 +46,6 @@
     "%@ Couldn’t Show One" : {
 
     },
-    "%@ Failed" : {
-
-    },
     "%@ From %@" : {
       "localizations" : {
         "en" : {
@@ -58,9 +55,6 @@
           }
         }
       }
-    },
-    "%@ Hasn’t Come Back Yet" : {
-
     },
     "%@ Isn’t Answering" : {
 
@@ -90,9 +84,6 @@
     "%@ The change is also listed in Settings." : {
 
     },
-    "%@ Took Another Date" : {
-
-    },
     "%@ Types" : {
 
     },
@@ -105,6 +96,16 @@
     "%@ and %@" : {
 
     },
+    "%@ and %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ and %2$@."
+          }
+        }
+      }
+    },
     "%@ and %lld more." : {
       "localizations" : {
         "en" : {
@@ -114,6 +115,9 @@
           }
         }
       }
+    },
+    "%@ answered a link that can’t be pasted safely." : {
+
     },
     "%@ answers on it too." : {
 
@@ -148,6 +152,9 @@
     "%@ changed" : {
 
     },
+    "%@ changed since you chose Delete, so it wasn’t deleted. Check it, then try again." : {
+
+    },
     "%@ cleared" : {
 
     },
@@ -169,6 +176,9 @@
     "%@ ended the app’s sign-in. Sign in again in Connection." : {
 
     },
+    "%@ failed" : {
+
+    },
     "%@ files aren’t copied to the backup place yet." : {
 
     },
@@ -181,6 +191,9 @@
     "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
       "extractionState" : "manual"
     },
+    "%@ hasn’t come back yet" : {
+
+    },
     "%@ hasn’t connected yet." : {
 
     },
@@ -189,6 +202,15 @@
     },
     "%@ in %@" : {
       "comment" : "A search row's second line: an item's type, then the collections it is in."
+    },
+    "%@ in the feed." : {
+
+    },
+    "%@ in the library and the feed." : {
+
+    },
+    "%@ in the library." : {
+
     },
     "%@ is %@’s." : {
 
@@ -211,6 +233,16 @@
     },
     "%@ is required." : {
       "extractionState" : "manual"
+    },
+    "%@ is set to run on “%@”, and its one-time link can’t be shown again. If you didn’t paste its command there, choose No Machine on %@’s page, then add it again on “%@”." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is set to run on “%2$@”, and its one-time link can’t be shown again. If you didn’t paste its command there, choose No Machine on %3$@’s page, then add it again on “%4$@”."
+          }
+        }
+      }
     },
     "%@ is still connected." : {
 
@@ -274,6 +306,9 @@
     },
     "%@ needs these values:" : {
       "extractionState" : "manual"
+    },
+    "%@ now comes from a plugin or from Marfa, so it wasn’t deleted." : {
+
     },
     "%@ of %@ selected" : {
 
@@ -350,6 +385,9 @@
     "%@ to %@" : {
       "extractionState" : "manual"
     },
+    "%@ took another date" : {
+
+    },
     "%@ was changed elsewhere. The app read the new value; yours wasn’t saved." : {
 
     },
@@ -384,6 +422,16 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@, %2$@ and their items stay."
+          }
+        }
+      }
+    },
+    "%@, %@, and %lld more." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@, and %3$lld more."
           }
         }
       }
@@ -520,9 +568,6 @@
 
     },
     "%lld More Events" : {
-
-    },
-    "%lld Removals Wait on %@" : {
 
     },
     "%lld Seconds" : {
@@ -1245,6 +1290,16 @@
     "%lld removals wait" : {
 
     },
+    "%lld removals wait on %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld removals wait on %2$@"
+          }
+        }
+      }
+    },
     "%lld results" : {
 
     },
@@ -1433,9 +1488,6 @@
     "1 Nov" : {
 
     },
-    "1 Removal Waits on %@" : {
-
-    },
     "1 Version" : {
 
     },
@@ -1479,6 +1531,9 @@
 
     },
     "1 removal waits" : {
+
+    },
+    "1 removal waits on %@" : {
 
     },
     "1 result" : {
@@ -1622,6 +1677,9 @@
     "A filter Marfa refuses: %@" : {
       "extractionState" : "manual"
     },
+    "A folder is made where it is kept in step, such as with the command line." : {
+
+    },
     "A folder that already exists on the machine %@ runs on." : {
 
     },
@@ -1673,6 +1731,9 @@
           }
         }
       }
+    },
+    "A restore point couldn’t be saved first, so nothing was changed. Check that this Mac has free space, then try again." : {
+
     },
     "A restore wasn’t sent" : {
       "extractionState" : "manual"
@@ -1759,6 +1820,9 @@
     "A view or a place can set its own." : {
 
     },
+    "A way one item can point to another, which every app can use." : {
+
+    },
     "A web page at %@." : {
 
     },
@@ -1825,6 +1889,9 @@
     "Add Column Before" : {
 
     },
+    "Add Connector" : {
+
+    },
     "Add Entry" : {
       "extractionState" : "manual"
     },
@@ -1885,10 +1952,19 @@
     "Add a Choice" : {
 
     },
+    "Add a Connector" : {
+
+    },
+    "Add a Connector…" : {
+
+    },
     "Add a Fact" : {
 
     },
     "Add a Field…" : {
+
+    },
+    "Add a Name or Pattern" : {
 
     },
     "Add a Passkey…" : {
@@ -2043,6 +2119,12 @@
     "Allow More… lets the app read the owner’s name." : {
 
     },
+    "Allow more additions before pausing?" : {
+
+    },
+    "Allow more removals before pausing?" : {
+
+    },
     "Allowed" : {
 
     },
@@ -2155,10 +2237,16 @@
     "Another item opened before the app finished saving this one, so your most recent typing might not be saved. Try again." : {
 
     },
+    "Another link type has this name. Choose another." : {
+
+    },
     "Answer" : {
 
     },
     "Any" : {
+
+    },
+    "Any Type" : {
 
     },
     "Anything that uses it will stop working when it expires." : {
@@ -2345,9 +2433,6 @@
     "Back" : {
 
     },
-    "Back and Forward" : {
-
-    },
     "Back Up" : {
 
     },
@@ -2358,6 +2443,9 @@
 
     },
     "Back Up Now takes the first." : {
+
+    },
+    "Back and Forward" : {
 
     },
     "Back to %@." : {
@@ -2390,16 +2478,16 @@
     "Backups" : {
 
     },
-    "Backups Are Failing" : {
+    "Backups are failing" : {
 
     },
-    "Backups Are Incomplete" : {
+    "Backups are incomplete" : {
 
     },
-    "Backups Are Turned Off" : {
+    "Backups are turned off" : {
 
     },
-    "Backups Can’t Be Kept There" : {
+    "Backups can’t be kept there" : {
 
     },
     "Backups of %@" : {
@@ -2415,6 +2503,24 @@
 
     },
     "Based on %@. " : {
+
+    },
+    "Before First Sync" : {
+
+    },
+    "Before Import" : {
+
+    },
+    "Before Reset" : {
+
+    },
+    "Before Restoring" : {
+
+    },
+    "Before Switching Marfa" : {
+
+    },
+    "Before Taking Another Mac’s Settings" : {
 
     },
     "Behind a date, a status or a tag you change." : {
@@ -2544,9 +2650,6 @@
     "Can’t Attach Images" : {
 
     },
-    "Can’t Change Automatic Update Settings" : {
-
-    },
     "Can’t Change This Relationship" : {
       "extractionState" : "manual"
     },
@@ -2673,6 +2776,9 @@
     "Can’t be shorter than “%@”." : {
       "extractionState" : "manual"
     },
+    "Can’t change automatic update settings" : {
+
+    },
     "Card Density" : {
       "extractionState" : "manual"
     },
@@ -2746,7 +2852,7 @@
     "Change the Saved Address" : {
 
     },
-    "Change this folder’s ignore patterns, limits and files with the command line: %@." : {
+    "Change what it holds with the command line: %@." : {
 
     },
     "Changed" : {
@@ -2942,6 +3048,9 @@
     "Choose how often to back up." : {
 
     },
+    "Choose it in Runs next time, or remove it in Terminal with %@." : {
+
+    },
     "Choose one item to read or edit it." : {
 
     },
@@ -2957,19 +3066,25 @@
     "Choose where to save the archive." : {
 
     },
+    "Choose which paths can sync. Ignore rules still apply. Hidden paths need an explicit pattern." : {
+
+    },
     "Choose…" : {
 
     },
     "Chosen" : {
 
     },
+    "Chosen by Each File" : {
+
+    },
     "Claimed this server" : {
 
     },
-    "Clean-Up Is Paused" : {
+    "Clean-up" : {
 
     },
-    "Clean-up" : {
+    "Clean-up is paused" : {
 
     },
     "Clean-up waits until the server’s clock is right." : {
@@ -3089,6 +3204,9 @@
     "Command Palette, Search Items and Quick Add." : {
 
     },
+    "Command to Paste There" : {
+
+    },
     "Commands" : {
 
     },
@@ -3153,6 +3271,15 @@
 
     },
     "Connector Deliveries, Waiting" : {
+
+    },
+    "Connector Link Not Shown Again" : {
+
+    },
+    "Connector Machine Kept" : {
+
+    },
+    "Connector Not Added" : {
 
     },
     "Connectors" : {
@@ -3228,9 +3355,6 @@
     "Copy the Signing Secret Now" : {
 
     },
-    "Couldn’t Change This" : {
-
-    },
     "Couldn’t Check" : {
 
     },
@@ -3246,16 +3370,10 @@
     "Couldn’t Check the Webhook’s Key" : {
 
     },
-    "Couldn’t Confirm the Date" : {
-
-    },
     "Couldn’t Confirm the Sign-In" : {
 
     },
     "Couldn’t Count" : {
-
-    },
-    "Couldn’t Do That" : {
 
     },
     "Couldn’t Export Layouts" : {
@@ -3288,13 +3406,7 @@
     "Couldn’t Read %@’s Settings" : {
 
     },
-    "Couldn’t Read Automatic Update Settings" : {
-
-    },
     "Couldn’t Read Available Types" : {
-
-    },
-    "Couldn’t Read Backup Settings" : {
 
     },
     "Couldn’t Read Connector Machines" : {
@@ -3313,6 +3425,9 @@
 
     },
     "Couldn’t Read This Folder" : {
+
+    },
+    "Couldn’t Read This Folder’s Settings" : {
 
     },
     "Couldn’t Read This Page" : {
@@ -3372,6 +3487,15 @@
     "Couldn’t change it. Links still open in %@." : {
 
     },
+    "Couldn’t change this" : {
+
+    },
+    "Couldn’t confirm the date" : {
+
+    },
+    "Couldn’t do that" : {
+
+    },
     "Couldn’t export." : {
 
     },
@@ -3399,6 +3523,12 @@
     "Couldn’t read" : {
 
     },
+    "Couldn’t read automatic update settings" : {
+
+    },
+    "Couldn’t read backup settings" : {
+
+    },
     "Couldn’t read downloaded files. The app will try again." : {
       "extractionState" : "manual"
     },
@@ -3418,6 +3548,9 @@
       "extractionState" : "manual"
     },
     "Create Key" : {
+
+    },
+    "Create Link Type" : {
 
     },
     "Create Webhook" : {
@@ -3537,6 +3670,12 @@
 
     },
     "Delete Items" : {
+
+    },
+    "Delete Link Type" : {
+
+    },
+    "Delete Link Type…" : {
 
     },
     "Delete Row" : {
@@ -3749,7 +3888,13 @@
     "Each %@ keeps its value." : {
 
     },
+    "Each Mac keeps its own window sizes and positions, column widths, global shortcuts, and On This Mac settings." : {
+
+    },
     "Each Option" : {
+
+    },
+    "Each copy stops the next time it syncs. You can’t sync this folder again. Its items stay in Marfa and its files stay on disk. Push any unsent changes from each copy before stopping. Afterward, use marfa folders remove to detach each directory and keep its files as plain files." : {
 
     },
     "Each item keeps the value it holds, and %@ stops asking for it." : {
@@ -3897,6 +4042,9 @@
     "Enter a whole number from %@ to %@." : {
       "extractionState" : "manual"
     },
+    "Enter a whole number from 0 to %@." : {
+
+    },
     "Enter a whole number of %@ or less." : {
       "extractionState" : "manual"
     },
@@ -3957,10 +4105,16 @@
     "Every command goes back to its own shortcut, and the shortcuts that work in any app are turned off." : {
 
     },
+    "Every copy stops. The files stay where each copy keeps them." : {
+
+    },
     "Every few hours." : {
 
     },
     "Every group with items is hidden. Show a group in Edit View to see its items." : {
+
+    },
+    "Every installed connector has a machine. A new one comes with its plugin." : {
 
     },
     "Every item of this type, and of any type based on it, can hold it." : {
@@ -3973,6 +4127,9 @@
 
     },
     "Every source is read again." : {
+
+    },
+    "Everything" : {
 
     },
     "Everywhere" : {
@@ -4053,6 +4210,9 @@
     "Failing" : {
 
     },
+    "Faults show on Overview too. Secrets are never shown." : {
+
+    },
     "Favorite" : {
 
     },
@@ -4122,9 +4282,6 @@
     "Files" : {
       "extractionState" : "manual"
     },
-    "Files Are Waiting for a Second Copy" : {
-
-    },
     "Files From the Web" : {
 
     },
@@ -4136,6 +4293,12 @@
     },
     "Files Not in the Text" : {
       "extractionState" : "manual"
+    },
+    "Files and folders Marfa leaves alone." : {
+
+    },
+    "Files are waiting for a second copy" : {
+
     },
     "Files may be missing from it." : {
 
@@ -4230,10 +4393,10 @@
     "Folder" : {
 
     },
-    "Folders" : {
+    "Folder Not Renamed" : {
 
     },
-    "Folders are made with the command line. Only folders the app may read are listed." : {
+    "Folders" : {
 
     },
     "Fonts" : {
@@ -4275,8 +4438,30 @@
     "From %@" : {
 
     },
+    "From %@ to %@. %@" : {
+      "comment" : "Link type row. The placeholders are the source type names, destination type names, and a sentence describing the link cardinality.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "From %1$@ to %2$@. %3$@"
+          }
+        }
+      }
+    },
     "From %@." : {
 
+    },
+    "From %@. From %@ to %@. %@" : {
+      "comment" : "Link type row. The placeholders are the plugin name, source type names, destination type names, and a sentence describing the link cardinality.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "From %1$@. From %2$@ to %3$@. %4$@"
+          }
+        }
+      }
     },
     "From Apps" : {
 
@@ -4294,6 +4479,9 @@
 
     },
     "From a list or a search." : {
+
+    },
+    "From a plugin you’ve installed." : {
 
     },
     "From a web address, or one a chat attached." : {
@@ -4322,6 +4510,9 @@
 
     },
     "From the plugins release." : {
+
+    },
+    "From: %@" : {
 
     },
     "Full Page" : {
@@ -4525,6 +4716,9 @@
     "History" : {
 
     },
+    "Holds" : {
+
+    },
     "Home" : {
 
     },
@@ -4532,6 +4726,12 @@
 
     },
     "Housekeeping" : {
+
+    },
+    "How Many" : {
+
+    },
+    "How Many: %@" : {
 
     },
     "How a link to another item looks in an item’s text. A link to an item that doesn’t exist keeps its dashed line in every look." : {
@@ -4557,6 +4757,9 @@
     },
     "Icons are kept on your server, so you can choose one once the app is connected." : {
       "extractionState" : "manual"
+    },
+    "Ignore" : {
+
     },
     "Image" : {
 
@@ -4767,6 +4970,9 @@
     "It holds ^[%lld item](inflect: true). Move them to another type first." : {
 
     },
+    "It holds all %lld of the owner’s permissions, but not all the access it asks for." : {
+
+    },
     "It holds no changes that haven’t reached the server." : {
 
     },
@@ -4803,10 +5009,19 @@
     "It starts with the words and fields of the type it is based on, and adds its own." : {
 
     },
+    "It stops running until you choose a machine for it. Its settings and mapping are kept." : {
+
+    },
     "It stops running." : {
 
     },
     "It stops sending at once." : {
+
+    },
+    "It was changed on another device, so yours wasn’t kept. This Mac will show the change once it catches up." : {
+
+    },
+    "It was changed to %llu somewhere else, so yours wasn’t kept. Press Return to use yours." : {
 
     },
     "It was deleted, here or somewhere else." : {
@@ -4822,6 +5037,9 @@
 
     },
     "It was removed, or the release no longer lists it." : {
+
+    },
+    "It was renamed “%@” somewhere else, so yours wasn’t kept. Rename again to use yours." : {
 
     },
     "It was revoked, or it expired, somewhere else." : {
@@ -4895,6 +5113,9 @@
     },
     "Items listed: %llu" : {
       "extractionState" : "manual"
+    },
+    "Items still link with %@, so it was kept. Remove those links first." : {
+
     },
     "Items that already hold a choice you take out keep it." : {
 
@@ -4971,6 +5192,9 @@
     "Its last run, %@, failed." : {
 
     },
+    "Its link has ended." : {
+
+    },
     "Its machine" : {
 
     },
@@ -5032,6 +5256,9 @@
     },
     "It’s already in Recently Deleted. Deleting it now erases it permanently, and you can’t undo it." : {
       "extractionState" : "manual"
+    },
+    "It’s in the list already." : {
+
     },
     "Jinja text, filled from the item as it comes in." : {
 
@@ -5263,10 +5490,16 @@
     "Library" : {
 
     },
+    "Library and Feed" : {
+
+    },
     "Library unavailable" : {
       "extractionState" : "manual"
     },
     "Light" : {
+
+    },
+    "Limit Not Changed" : {
 
     },
     "Limit Requests" : {
@@ -5290,6 +5523,9 @@
     "Link" : {
 
     },
+    "Link Type Not Made" : {
+
+    },
     "Link to Item" : {
 
     },
@@ -5301,6 +5537,9 @@
     },
     "Links" : {
       "extractionState" : "manual"
+    },
+    "Links Between Items" : {
+
     },
     "Links in This Page" : {
 
@@ -5398,6 +5637,9 @@
     "MB" : {
 
     },
+    "Machine Name" : {
+
+    },
     "Made %@." : {
 
     },
@@ -5461,6 +5703,9 @@
     "Make a view of what this window shows" : {
 
     },
+    "Make one to link items in a way of your own." : {
+
+    },
     "Make the widths set in this window the defaults for new windows." : {
 
     },
@@ -5494,6 +5739,18 @@
     "Manage Webhooks" : {
 
     },
+    "Many to Many" : {
+
+    },
+    "Many to One" : {
+
+    },
+    "Many to many." : {
+
+    },
+    "Many to one." : {
+
+    },
     "Map" : {
       "extractionState" : "manual"
     },
@@ -5525,6 +5782,12 @@
 
     },
     "Marfa Shortcuts" : {
+
+    },
+    "Marfa deletes a link type only while no item uses it." : {
+
+    },
+    "Marfa deletes a link type only while no item uses it. Deleting can’t be undone." : {
 
     },
     "Marfa for Mac can’t check this link yet. Try again once your Marfa has finished syncing." : {
@@ -5659,8 +5922,17 @@
     "Name" : {
 
     },
+    "Name at the Other End" : {
+
+    },
+    "Name at the Other End: %@" : {
+
+    },
     "Name of the place" : {
       "extractionState" : "manual"
+    },
+    "Name or Pattern" : {
+
     },
     "Name: %@" : {
 
@@ -5740,6 +6012,9 @@
     "New Field Choices Not Kept" : {
 
     },
+    "New Files Become" : {
+
+    },
     "New Item" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
@@ -5757,6 +6032,15 @@
 
     },
     "New Key…" : {
+
+    },
+    "New Link" : {
+
+    },
+    "New Link Type" : {
+
+    },
+    "New Link Type…" : {
 
     },
     "New Password" : {
@@ -5853,9 +6137,6 @@
     "No Apps" : {
 
     },
-    "No Backups Are Kept" : {
-
-    },
     "No Backups Yet" : {
 
     },
@@ -5923,6 +6204,9 @@
 
     },
     "No Limit" : {
+
+    },
+    "No Link Types of Your Own" : {
 
     },
     "No Machine" : {
@@ -6012,6 +6296,9 @@
     "No apps are connected." : {
 
     },
+    "No backups are kept" : {
+
+    },
     "No browsers are signed in." : {
 
     },
@@ -6045,7 +6332,7 @@
     "No machine" : {
 
     },
-    "No machine is linked to run connectors yet." : {
+    "No machine runs connectors yet. Add a Connector… on Connectors links one." : {
 
     },
     "No more values" : {
@@ -6097,6 +6384,9 @@
 
     },
     "Not Installed From a File" : {
+
+    },
+    "Not Made" : {
 
     },
     "Not Now" : {
@@ -6340,6 +6630,15 @@
     "On" : {
 
     },
+    "On %@" : {
+
+    },
+    "On Another Machine" : {
+
+    },
+    "On That Machine" : {
+
+    },
     "On This Mac" : {
 
     },
@@ -6368,6 +6667,18 @@
       "extractionState" : "manual"
     },
     "One shortcut was imported." : {
+
+    },
+    "One to Many" : {
+
+    },
+    "One to One" : {
+
+    },
+    "One to many." : {
+
+    },
+    "One to one." : {
 
     },
     "One version a day kept for" : {
@@ -6522,6 +6833,9 @@
     "Operator" : {
 
     },
+    "Optional" : {
+
+    },
     "Optional. Not used to sign in." : {
 
     },
@@ -6645,13 +6959,45 @@
     "Pasting" : {
 
     },
+    "Pattern Not Added" : {
+
+    },
     "Pause" : {
 
+    },
+    "Pause Additions Over" : {
+
+    },
+    "Pause Additions Over changes from %llu to %llu files. More new files can then be added at once before a copy stops to ask." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pause Additions Over changes from %1$llu to %2$llu files. More new files can then be added at once before a copy stops to ask."
+          }
+        }
+      }
+    },
+    "Pause Removals Over" : {
+
+    },
+    "Pause Removals Over changes from %llu to %llu files. More files can then be removed at once before a copy stops to ask." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pause Removals Over changes from %1$llu to %2$llu files. More files can then be removed at once before a copy stops to ask."
+          }
+        }
+      }
     },
     "Pause, Resume and Run Now are kept on %@. The connector follows them at its next run." : {
 
     },
     "Paused" : {
+
+    },
+    "Pauses also depend on the share of the folder. Removals have a separate ceiling." : {
 
     },
     "Pending" : {
@@ -6852,6 +7198,9 @@
     "Quote" : {
 
     },
+    "Raise Limit" : {
+
+    },
     "Ran %@" : {
 
     },
@@ -6894,7 +7243,7 @@
     "Read the Audit Log" : {
 
     },
-    "Read when %@ starts. Change them where it runs." : {
+    "Read when it starts. Change them there." : {
 
     },
     "Reader" : {
@@ -7156,6 +7505,9 @@
     "Rename Field…" : {
 
     },
+    "Rename Folder" : {
+
+    },
     "Rename Key" : {
 
     },
@@ -7338,6 +7690,9 @@
     "Right Away" : {
 
     },
+    "Role %@" : {
+
+    },
     "Roles" : {
       "extractionState" : "manual"
     },
@@ -7371,10 +7726,16 @@
     "Running" : {
 
     },
+    "Runs" : {
+
+    },
     "Runs On" : {
 
     },
     "Runs on %@." : {
+
+    },
+    "Safety" : {
 
     },
     "Save" : {
@@ -7475,9 +7836,6 @@
       "extractionState" : "manual"
     },
     "Secondary Line" : {
-
-    },
-    "Secrets are never shown. To change one, type it again." : {
 
     },
     "Section" : {
@@ -7595,6 +7953,9 @@
     "Set them again if you install it later." : {
 
     },
+    "Set." : {
+
+    },
     "Set. Never shown." : {
 
     },
@@ -7606,6 +7967,9 @@
     },
     "Settings (%@, build %@)" : {
       "extractionState" : "manual"
+    },
+    "Settings Not Reset" : {
+
     },
     "Settings Not Saved" : {
 
@@ -7748,6 +8112,9 @@
 
     },
     "Show Plugin" : {
+
+    },
+    "Show Plugins" : {
 
     },
     "Show Property" : {
@@ -7963,9 +8330,6 @@
     "Some Items Were Skipped" : {
       "extractionState" : "manual"
     },
-    "Some Stored Backups Are Damaged" : {
-
-    },
     "Some Typing Might Be Missing" : {
 
     },
@@ -7982,6 +8346,9 @@
 
     },
     "Some of it may still be there." : {
+
+    },
+    "Some stored backups are damaged" : {
 
     },
     "Some stored parts of backups are damaged." : {
@@ -8122,6 +8489,18 @@
     "Stop Leaving Out" : {
 
     },
+    "Stop Syncing" : {
+
+    },
+    "Stop Syncing %@" : {
+
+    },
+    "Stop Syncing…" : {
+
+    },
+    "Stop syncing %@?" : {
+
+    },
     "Stopped syncing a folder" : {
 
     },
@@ -8141,6 +8520,9 @@
 
     },
     "Suggestions" : {
+
+    },
+    "Supplied By" : {
 
     },
     "Switched Servers, but Not Everything Was Removed" : {
@@ -8202,6 +8584,22 @@
     },
     "Tags: %@" : {
       "extractionState" : "manual"
+    },
+    "Take %@ off its machine?" : {
+
+    },
+    "Take %@ off “%@”?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Take %1$@ off “%2$@”?"
+          }
+        }
+      }
+    },
+    "Take Off" : {
+
     },
     "Taken" : {
 
@@ -8278,9 +8676,6 @@
     "The Keychain wouldn’t keep or give the sign-in. Check that the app can use the Keychain, then try again." : {
       "extractionState" : "manual"
     },
-    "The Last Backup Didn’t Finish" : {
-
-    },
     "The Marfa server can’t be reached. The items are still in Recently Deleted." : {
       "extractionState" : "manual"
     },
@@ -8316,9 +8711,6 @@
     },
     "The Sign-In Is in Use" : {
       "extractionState" : "manual"
-    },
-    "The Update to %@ Didn’t Work" : {
-
     },
     "The View menu switches it." : {
 
@@ -8473,7 +8865,7 @@
     "The app holds %lld of the owner’s %lld permissions." : {
 
     },
-    "The app holds all %lld of the owner’s permissions." : {
+    "The app holds all %lld of the owner’s permissions, but not all the access it asks for." : {
 
     },
     "The app is no longer allowed to %@. Allow it again from the page that needs it." : {
@@ -8486,6 +8878,9 @@
 
     },
     "The app isn’t allowed to %@." : {
+
+    },
+    "The app isn’t allowed to add link types. Choose Allow More… to ask for it." : {
 
     },
     "The app isn’t allowed to change types, their icons, words or fields." : {
@@ -8674,6 +9069,9 @@
     "The copy of your library on this Mac is damaged, so the app can’t open it." : {
 
     },
+    "The current file-count threshold is %llu. Review the removals where this copy runs." : {
+
+    },
     "The date couldn’t be saved." : {
       "extractionState" : "manual"
     },
@@ -8785,6 +9183,9 @@
     "The key “%@” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page." : {
 
     },
+    "The last backup didn’t finish" : {
+
+    },
     "The last backup run failed or lost files." : {
 
     },
@@ -8815,8 +9216,17 @@
     "The limit was changed somewhere else. Nothing was sent. Check what you chose, then save again." : {
 
     },
+    "The link types couldn’t be read again to choose an unused ID, so nothing was sent. %@" : {
+
+    },
+    "The link works once and gives this machine its own key." : {
+
+    },
     "The list can’t be saved while it holds an entry it doesn’t take. Correct or remove the entries marked in this list." : {
       "extractionState" : "manual"
+    },
+    "The list changed somewhere else, so the app read it again. Nothing was changed." : {
+
     },
     "The list could not be saved." : {
       "extractionState" : "manual"
@@ -8865,6 +9275,9 @@
     },
     "The new kind of item doesn’t have this property." : {
       "extractionState" : "manual"
+    },
+    "The new sign-in still isn’t allowed to add link types. Choose Allow More… and approve Full Access." : {
+
     },
     "The new value is never shown again." : {
 
@@ -9112,6 +9525,9 @@
     "The types and sources chosen and left out make more conditions than one search can hold." : {
 
     },
+    "The update to %@ didn’t work" : {
+
+    },
     "The value changed while you were editing it." : {
       "extractionState" : "manual"
     },
@@ -9179,6 +9595,9 @@
       "extractionState" : "manual"
     },
     "The words that matched, under each result." : {
+
+    },
+    "Their plugins keep them." : {
 
     },
     "Their plugins keep them. Add a child type to change one." : {
@@ -9302,6 +9721,9 @@
 
     },
     "This Kind Is Gone" : {
+
+    },
+    "This Link Type Is Gone" : {
 
     },
     "This Mac" : {
@@ -9432,6 +9854,9 @@
     },
     "This file isn’t on this Mac, and the Marfa server can’t be reached." : {
       "extractionState" : "manual"
+    },
+    "This folder was stopped somewhere else." : {
+
     },
     "This is a website address." : {
 
@@ -9691,6 +10116,9 @@
     },
     "To start a new copy from this server, choose Disconnect in Settings, then connect again." : {
       "extractionState" : "manual"
+    },
+    "To: %@" : {
+
     },
     "Today" : {
 
@@ -10226,6 +10654,9 @@
     "What %@ Means" : {
 
     },
+    "What %@ calls it." : {
+
+    },
     "What %@ may read and change." : {
 
     },
@@ -10283,8 +10714,15 @@
     "What went wrong, never your items." : {
 
     },
-    "What you added to %@." : {
-
+    "What you added to %@. Browse %@ under Available." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "What you added to %1$@. Browse %2$@ under Available."
+          }
+        }
+      }
     },
     "What you typed reached a folded section, which is now open. It wasn’t added, so type it again." : {
 
@@ -10325,6 +10763,9 @@
     "Where files are kept." : {
 
     },
+    "Where it can reach what it reads." : {
+
+    },
     "Where it put things, and any rewrite it asked for. Map it again if you install it later." : {
 
     },
@@ -10335,6 +10776,9 @@
 
     },
     "Where you sign in, and where apps connect." : {
+
+    },
+    "Which and Where" : {
 
     },
     "Who" : {
@@ -10350,9 +10794,6 @@
 
     },
     "Window Layout" : {
-
-    },
-    "Window sizes and positions, column widths and On This Mac stay on each Mac." : {
 
     },
     "With %@." : {
@@ -10563,6 +11004,9 @@
     "an edge type" : {
 
     },
+    "another plugins release" : {
+
+    },
     "before today" : {
 
     },
@@ -10597,6 +11041,9 @@
 
     },
     "events" : {
+
+    },
+    "files" : {
 
     },
     "has any" : {
@@ -10884,11 +11331,27 @@
     "“%@” isn’t a time, so the time wasn’t changed." : {
 
     },
+    "“%@” isn’t linked yet. A new link ends the one it was given." : {
+
+    },
     "“%@” isn’t part of this list. Remove it to save the list." : {
       "extractionState" : "manual"
     },
     "“%@” may remove items sooner than the server’s current setting." : {
       "extractionState" : "manual"
+    },
+    "“%@” was added but runs nothing yet." : {
+
+    },
+    "“%@” was added but runs nothing yet. Choose it in Runs next time, or remove it in Terminal with marfa hosts remove %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” was added but runs nothing yet. Choose it in Runs next time, or remove it in Terminal with marfa hosts remove %2$@."
+          }
+        }
+      }
     },
     "“%@” was attached to “%@” but isn’t in its text, because the item was no longer open for editing." : {
       "extractionState" : "manual"
