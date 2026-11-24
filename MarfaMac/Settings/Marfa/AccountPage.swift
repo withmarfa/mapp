@@ -209,7 +209,7 @@ private struct ProfilePictureMark: View {
                         Text(verbatim: initials).settingsFont(.small)
                     }
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(SettingsTokens.tileForeground)
             }
         }
         .frame(width: SettingsTokens.Metric.tile, height: SettingsTokens.Metric.tile)
