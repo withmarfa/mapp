@@ -1,4 +1,4 @@
-"""Tests for version.py and appcast.py. Run: python3 -m unittest discover -s Scripts/release"""
+"""Tests for version.py, appcast.py and release_notes.py. Run: python3 -m unittest discover -s Scripts/release"""
 
 import datetime
 import io
@@ -10,6 +10,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import appcast
+import release_notes
 import version
 
 HERE = Path(__file__).parent
@@ -224,3 +225,40 @@ class AppcastTests(unittest.TestCase):
 
 if __name__ == "__main__":
     sys.exit(unittest.main())
+
+
+class ReleaseNotesTests(unittest.TestCase):
+    def test_lists_what_a_person_notices_by_section_and_leaves_out_the_rest(self):
+        subjects = [
+            "ci: run the release build on main and skip unneeded UI-test builds (#535)",
+            "fix(sign-in): ask for every app's data scope, which a first sign-in needs (#531)",
+            "feat(settings): choose which app opens Marfa links (#534)",
+            "fix(release): measure a file's size with wc, which works on linux (#528)",
+            "chore(deps): move marfa-swift to v0.0.90 (#512)",
+            "perf(views): a keystroke redraws only the page (#518)",
+            "test: drop the busy-mac memory bound and wall clock (#488) (#515)",
+            "docs(app): name Sparkle among what connects out",
+            "fix(model)!: accept only a server address with no path (#524)",
+        ]
+        self.assertEqual(
+            release_notes.notes(subjects),
+            "### New\n- Choose which app opens Marfa links\n\n"
+            "### Fixed\n- Ask for every app's data scope, which a first sign-in needs\n"
+            "- Accept only a server address with no path\n\n"
+            "### Faster\n- A keystroke redraws only the page\n",
+        )
+
+    def test_leaves_out_the_pull_request_numbers(self):
+        text = release_notes.notes(["fix(editor): keep the caret in place (#512)", "fix: undo a merge (#488) (#515)"])
+        self.assertEqual(text, "### Fixed\n- Keep the caret in place\n- Undo a merge\n")
+
+    def test_says_so_when_nothing_a_person_notices_changed(self):
+        self.assertEqual(release_notes.notes(["ci: lint", "chore: tidy", "Merge branch 'main'"]), release_notes.NOTHING + "\n")
+
+    def test_a_repeated_subject_is_listed_once(self):
+        text = release_notes.notes(["fix(app): one thing (#1)", "fix(app): one thing (#2)"])
+        self.assertEqual(text.count("One thing"), 1)
+
+    def test_the_notes_read_as_html_in_the_appcast(self):
+        html_text = appcast.notes_to_html(release_notes.notes(["feat(app): add <b> & \"quotes\" (#9)"]))
+        self.assertEqual(html_text, "<h3>New</h3><ul><li>Add &lt;b&gt; &amp; &quot;quotes&quot;</li></ul>")
