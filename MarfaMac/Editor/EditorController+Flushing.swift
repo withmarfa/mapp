@@ -274,6 +274,7 @@ extension EditorController {
         for (id, embeds) in pendingEmbeds { notInText(embeds, of: id) }
         pendingEmbeds = [:]
         pictureSettingWatch?.cancel()
+        reloadWatch?.cancel()
         Self.open.remove(self)
     }
 

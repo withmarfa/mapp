@@ -28,7 +28,7 @@ final class EditorController: NSObject {
     @ObservationIgnored var isFlushing = false
     @ObservationIgnored var waitingFlushes: [(leaving: Bool, done: (Bool) -> Void)] = []
     /// Gives up on a page coming back that is not ready within `reloadLimit`.
-    @ObservationIgnored private var reloadWatch: Task<Void, Never>?
+    @ObservationIgnored var reloadWatch: Task<Void, Never>?
     private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false {

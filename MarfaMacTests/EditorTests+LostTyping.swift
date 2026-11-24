@@ -88,6 +88,19 @@ extension EditorTests {
         try await page.wait { page.editor.isReady }
     }
 
+    @Test func aWindowThatGoesStopsWatchingItsPageComeBack() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        let notices = page.library.notices
+        page.editor.reloadLimit = .milliseconds(10)
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        let told = notices.told
+        page.editor.windowWent()
+        // Well past `reloadLimit`, for a watch still running to give the page up.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(notices.told == told, "a gone window's page is not told about")
+    }
+
     @Test func aReloadThatIsNotReadyInTimeCountsAsUnableToComeBack() async throws {
         let page = try await Page()
         try await page.load("Original\n")
