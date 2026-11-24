@@ -29,7 +29,7 @@ struct ItemCommandTests {
         #expect(enabled(context([note.id], page: note.id)) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .copyLink, .addAttachment, .toggleSource, .print, .exportPDF])
     }
 
-    @Test func aSelectedItemNotOnThePageEnablesOnlyOpeningInAWindow() {
+    @Test func aSelectedItemWithoutAnOpenPageEnablesOpeningAndCopyLink() {
         let note = library.add("A note\n")
         #expect(enabled(context([note.id])) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .copyLink])
         #expect(enabled(context([note.id], page: .mint())) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .copyLink])

@@ -95,8 +95,7 @@ struct ItemCommandContext {
 enum ItemCommand: CaseIterable {
     case open, openAsModal, openAsFullPage, quickLook, openInNewWindow, openOriginal, openInBrowser, copyLink, addAttachment, toggleSource, toggleReader, toggleFormats, toggleFocus, print, exportPDF
 
-    /// The menu the menu bar puts it in, which is where ⌘K lists it: Add Attachment under Edit, the two ways of
-    /// showing the page under View, and the rest under File.
+    /// The menu bar group also determines where ⌘K lists the command.
     var paletteGroup: PaletteSections.CommandGroup {
         switch self {
         case .copyLink, .addAttachment: .edit
@@ -177,7 +176,6 @@ enum ItemCommand: CaseIterable {
         case .quickLook, .openInNewWindow: context.hasBrowser && !context.ids.isEmpty
         case .openOriginal: context.originalAddress != nil
         case .openInBrowser: context.browserTarget != nil
-        // One item, held or not trashed or not, a file too.
         case .copyLink: context.item != nil
         case .addAttachment: context.editableItem != nil
         case .toggleSource, .print, .exportPDF: context.visibleItem != nil

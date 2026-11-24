@@ -162,9 +162,8 @@ nonisolated struct PaletteAction: Identifiable, Equatable, Sendable {
         self.isDestructive = isDestructive
     }
 
-    /// What Actions offers for an item, by the same rules as the menus: the favorite toggle and Delete only for an
-    /// item that is not in the bin, Version History and Copy Wiki Link only for an item that is not a file. Copy Link is for every
-    /// item, a file and one in the bin too. Never Delete Immediately.
+    /// Actions can copy any item's link. Wiki links and version history apply to non-file items only.
+    /// Only active items can be favorited or moved to Recently Deleted from Actions.
     static func forItem(isFile: Bool, isFavorite: Bool, isActive: Bool) -> [PaletteAction] {
         var actions = [
             PaletteAction(.open, String(localized: "Open"), "arrow.up.right", keys: ["↩"]),
