@@ -13,6 +13,28 @@ extension NSView {
 final class ValueEditPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    /// Uses the parent window's appearance so the panel matches it when it opens.
+    static func make(holding host: NSView, over parent: NSWindow) -> ValueEditPanel {
+        let panel = ValueEditPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.appearance = parent.effectiveAppearance
+        panel.contentView = ValueEditPanelSession.surface(holding: host, style: ValuePanelStyle.stored(), appearance: panel.appearance)
+        return panel
+    }
+
+    /// The part of the screen a panel may fill under `parent`, for `ValuePanelFrame.placement`: sideways it stays in the
+    /// window, which it belongs to; up and down it may leave it, as a menu does.
+    static func visibleArea(of parent: NSWindow, around target: NSRect) -> CGRect {
+        let visible = (parent.screen ?? NSScreen.main)?.visibleFrame ?? target.insetBy(dx: -400, dy: -400)
+        let inside = parent.frame.insetBy(dx: 8, dy: 0)
+        let minX = max(visible.minX, inside.minX)
+        return CGRect(x: minX, y: visible.minY, width: min(visible.maxX, inside.maxX) - minX, height: visible.height)
+    }
 }
 
 /// A child window under the value, in the shape of a system menu on the system's glass.
@@ -44,14 +66,7 @@ final class ValueEditPanelSession: ValueEditSession {
         savedResponder = parent.firstResponder
         let host = NSHostingView(rootView: Self.content(of: model))
         host.sizingOptions = []
-        let panel = ValueEditPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.hidesOnDeactivate = false
-        panel.isReleasedWhenClosed = false
-        panel.appearance = parent.effectiveAppearance
-        panel.contentView = Self.surface(holding: host, style: ValuePanelStyle.stored(), appearance: panel.appearance)
+        let panel = ValueEditPanel.make(holding: host, over: parent)
         self.panel = panel
         model.layoutChanged = { [weak self] in self?.layoutSoon() }
         width = model.fittingWidth(scale: InterfaceStyle.scale(for: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize))
@@ -125,10 +140,7 @@ final class ValueEditPanelSession: ValueEditSession {
 
     private func layout() {
         guard let panel, let parent, let target = anchor.screenRect(of: rect) else { return }
-        var visible = (parent.screen ?? NSScreen.main)?.visibleFrame ?? target.insetBy(dx: -400, dy: -400)
-        // Sideways a panel stays in its window, which it belongs to; up and down it may leave it, as a menu does.
-        let inside = parent.frame.insetBy(dx: 8, dy: 0)
-        visible = CGRect(x: max(visible.minX, inside.minX), y: visible.minY, width: min(visible.maxX, inside.maxX) - max(visible.minX, inside.minX), height: visible.height)
+        let visible = ValueEditPanel.visibleArea(of: parent, around: target)
         // A long list scrolls in a panel of at most this height, as a menu's does, whatever room the screen has.
         let scale = InterfaceStyle.scale(for: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize)
         let wanted = model.naturalHeight(scale: scale)
