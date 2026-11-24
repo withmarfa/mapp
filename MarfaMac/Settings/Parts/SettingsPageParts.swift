@@ -1,28 +1,50 @@
 import SwiftUI
 
 /// A page's column: its sections in a column at most 620 points wide, centered, with more room either side as the window
-/// widens. The page scrolls as one.
+/// widens. The page scrolls as one, unless `scrolls` is false: the sections then take only their height, above a state
+/// that fills the rest.
 struct SettingsPageColumn<Content: View>: View {
+    var scrolls = true
     @ViewBuilder let content: Content
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SettingsTokens.Metric.pageSpacing) {
-                Group(subviews: content) { subviews in
-                    ForEach(subviews.indices, id: \.self) { index in
-                        subviews[index].padding(.top, index == 0 ? subviews[index].containerValues.settingsFirstInset : 0)
-                    }
+        if scrolls {
+            ScrollView { column }
+                .scrollBounceBehavior(.basedOnSize)
+                .scrollEdgeEffectStyle(.soft, for: .top)
+                .background(SettingsTokens.page)
+        } else {
+            column.background(SettingsTokens.page)
+        }
+    }
+
+    private var column: some View {
+        VStack(alignment: .leading, spacing: SettingsTokens.Metric.pageSpacing) {
+            Group(subviews: content) { subviews in
+                ForEach(subviews.indices, id: \.self) { index in
+                    subviews[index].padding(.top, index == 0 ? subviews[index].containerValues.settingsFirstInset : 0)
                 }
             }
-            .frame(maxWidth: SettingsTokens.Metric.column, alignment: .leading)
-            .padding(.horizontal, SettingsTokens.Metric.pageSide)
-            .padding(.top, SettingsTokens.Metric.pageTop)
-            .padding(.bottom, SettingsTokens.Metric.pageBottom)
-            .frame(maxWidth: .infinity)
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .scrollEdgeEffectStyle(.soft, for: .top)
-        .background(SettingsTokens.page)
+        .frame(maxWidth: SettingsTokens.Metric.column, alignment: .leading)
+        .padding(.horizontal, SettingsTokens.Metric.pageSide)
+        .padding(.top, SettingsTokens.Metric.pageTop)
+        .padding(.bottom, scrolls ? SettingsTokens.Metric.pageBottom : 0)
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// A state that fills the page (`SettingsPageState`, a read in progress) under sections that keep their place, for
+/// what holds whatever the state.
+struct SettingsStandingState<Above: View, State: View>: View {
+    @ViewBuilder let above: Above
+    @ViewBuilder let state: State
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SettingsPageColumn(scrolls: false) { above }
+            state
+        }
     }
 }
 
