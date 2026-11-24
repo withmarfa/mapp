@@ -4,8 +4,8 @@
 
 ## Running tests
 
-- Run only the tests a change touches, while working and before merging: `-only-testing:MarfaMacTests/<Suite>`. CI runs the whole `Unit` plan for ready pull requests with logic changes.
-- Run UI tests locally (`-only-testing:MarfaMacUITests/<Class>` or the `UI` plan) with the screen free. CI builds them when their files, a test plan, the project, or `checks.yml` change.
+- A pull request runs no Mac job (the organization has 5 macOS runners). Before an admin merge, run locally the Debug `build-for-testing`, the suites the change touches (`-only-testing:MarfaMacTests/<Suite>`) and, for any screen it touches, its UI class (`-only-testing:MarfaMacUITests/<Class>`) with the screen free. Run the Release compile too when the change touches `#if DEBUG`, build settings, `Config/`, `Info.plist` or the project file.
+- After a merge, `main.yml` runs the whole `Unit` plan with a Debug build whose warnings are errors, and compiles Release. `release.yml` runs the `UI` plan before it publishes.
 - A plan given a server creates and deletes items there, so give it a test instance only. Name it with the `instance_id` that `GET <address>/` reports (`TEST_RUNNER_MARFA_TEST_INSTANCE_ID`): a run refuses an address that reports another.
 
 ## Commands
@@ -13,6 +13,10 @@
 For the owner-page `Live` tests, use a key with `instance.read`, `audit.read`, `backups.manage`, `sign_ins.manage`, `keys.mint` and `webhooks.manage`, such as the test instance's admin key.
 
 ```sh
+# Debug build for testing, as CI does.
+xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -testPlan Unit -destination 'platform=macOS' -derivedDataPath build build-for-testing
+# Release compile, as main.yml does.
+xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -configuration Release -destination 'generic/platform=macOS' -derivedDataPath build-release CODE_SIGNING_ALLOWED=NO build
 # Unit tests: no window, no Dock icon, so they can run while the Mac is in use.
 xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -destination 'platform=macOS' -derivedDataPath build test
 # UI tests: take control of the keyboard and mouse.

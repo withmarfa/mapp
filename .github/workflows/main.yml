@@ -1,0 +1,128 @@
+name: Main
+
+# Pull requests run no Mac job, because GitHub lets the organization run only 5 macOS jobs at once. These two run
+# after each merge to main that changes the app's own code, so a break is found there and fixed forward.
+# - `release` compiles the Release configuration, which leaves out code that only Debug builds hold; see v0.0.21 to
+#   v0.0.24-rc1. The tag build and `release.yml`'s dry run compile Release too.
+# - `unit-tests` builds Debug with warnings fatal, then runs the Unit plan.
+# A failure opens the issue "Main build failed", or comments on it while it is open; the next passing run closes it.
+# Only the newest commit on main is built: Mac runners are few, and a newer commit cancels this run.
+on:
+  push:
+    branches: [main]
+    paths:
+      - MarfaMac/**
+      - MarfaMacTests/**
+      - MarfaMac.xcodeproj/**
+      - TestPlans/**
+      - Config/**
+      - .github/scripts/run-unit-tests.sh
+      - .github/workflows/main.yml
+      - '!**/*.md'
+  workflow_dispatch:
+
+concurrency:
+  group: main-build
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Release build
+    # The hosted image with Xcode 27 (a public preview at the time of writing).
+    runs-on: xcode-27
+    # A slow runner has taken over 40 minutes; a limit too near that ends the run as cancelled, which is not reported.
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
+      - name: Build the release configuration
+        run: >
+          xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -configuration Release -destination 'generic/platform=macOS'
+          -derivedDataPath build-release CODE_SIGNING_ALLOWED=NO build
+
+  unit-tests:
+    name: Unit tests
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
+      # The build and the tests are separate steps, so the tests get a limit of their own: a stall then ends
+      # in minutes, with a sample of the blocked process, instead of at the job's limit. The project makes Swift
+      # warnings errors.
+      - name: Build the app and unit tests
+        run: >
+          xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -testPlan Unit -destination 'platform=macOS'
+          -derivedDataPath build build-for-testing
+      - name: Run the unit tests
+        run: .github/scripts/run-unit-tests.sh 720 diagnostics
+      - name: Upload the stall diagnostics
+        if: failure() && hashFiles('diagnostics/**') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-diagnostics
+          path: diagnostics
+      - name: Show failures
+        if: failure() && hashFiles('TestResults.xcresult/**') != ''
+        run: |
+          xcrun xcresulttool get test-results tests --path TestResults.xcresult --compact \
+            | python3 -c "
+          import collections, json, sys
+          seen = collections.Counter()
+          def walk(n):
+              if n.get('nodeType') == 'Failure Message':
+                  seen[n.get('name', '')[:300]] += 1
+              for c in n.get('children', []):
+                  walk(c)
+          for n in json.load(sys.stdin)['testNodes']:
+              walk(n)
+          for message, count in seen.most_common(15):
+              print('::warning::%dx %s' % (count, message))
+          "
+
+  # A newer commit on main cancels this run, so a cancelled build is not reported; a failure is.
+  report:
+    name: Report the result
+    needs: [release, unit-tests]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE: ${{ needs.release.result }}
+          UNIT: ${{ needs.unit-tests.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          # A newer commit cancels a run; a cancelled run is not reported unless the other job failed.
+          if [ "$RELEASE" != failure ] && [ "$UNIT" != failure ] && { [ "$RELEASE" = cancelled ] || [ "$UNIT" = cancelled ]; }; then
+            exit 0
+          fi
+          title="Main build failed"
+          open=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+            --jq "map(select(.title == \"$title\")) | first | .number // empty")
+          if [ "$RELEASE" = success ] && [ "$UNIT" = success ]; then
+            if [ -n "$open" ]; then
+              gh issue close "$open" --comment "The release build and the unit tests passed at $SHA: $RUN_URL"
+            fi
+            exit 0
+          fi
+          message="The release build ended as $RELEASE and the unit tests as $UNIT at $SHA: $RUN_URL"
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$message"
+          else
+            gh issue create --title "$title" --label needs-triage --body "$message
+
+          Fix main forward before the next tag; the next passing run closes this issue."
+          fi

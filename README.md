@@ -13,7 +13,7 @@ Marfa for Mac is a native macOS app for the items in a Marfa server. Its editor 
 xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -destination 'platform=macOS' -derivedDataPath build test
 ```
 
-This builds the app and runs the unit tests. To run the app, open `MarfaMac.xcodeproj` in Xcode and run the `MarfaMac` scheme.
+This builds the app and runs the unit tests. A pull request runs no Mac job in CI, because GitHub lets the organization run only 5 macOS jobs at once. `.github/workflows/main.yml` compiles Release and runs the unit tests after each merge to `main`, and the release workflow runs the UI tests before it publishes. Run the build and the tests you need locally before you merge; `MarfaMacTests/AGENTS.md` lists the commands. To run the app, open `MarfaMac.xcodeproj` in Xcode and run the `MarfaMac` scheme.
 
 ## Signing
 
@@ -29,7 +29,7 @@ The release workflow writes `Config/Local.xcconfig` for a release build from the
 
 ## Releasing
 
-A tag publishes a release. The workflow in `.github/workflows/release.yml` builds the app, signs it with a Developer ID, notarizes and staples it, packs it in a disk image that it signs, notarizes and staples too, and signs the image for Sparkle. It then creates the GitHub release, uploads the disk image and the appcast to `https://downloads.withmarfa.com/marfa-mac/`, and checks that each file is served as uploaded. The app updates itself from that appcast through [Sparkle](https://sparkle-project.org).
+A tag publishes a release. The workflow in `.github/workflows/release.yml` runs the UI tests beside the build, and publishes only if they pass. The build job builds the app, signs it with a Developer ID, notarizes and staples it, packs it in a disk image that it signs, notarizes and staples too, and signs the image for Sparkle. It then creates the GitHub release, uploads the disk image and the appcast to `https://downloads.withmarfa.com/marfa-mac/`, and checks that each file is served as uploaded. The app updates itself from that appcast through [Sparkle](https://sparkle-project.org).
 
 ### Versions and tags
 
@@ -57,7 +57,7 @@ To rebuild a tag, re-run its workflow run. The run replaces the disk image and t
 
 ### Check a release
 
-1. In GitHub, open the **Actions** tab and check that the **Release** run for the tag has finished. Its `build` job signs and notarizes, and its `publish` job releases and uploads.
+1. In GitHub, open the **Actions** tab and check that the **Release** run for the tag has finished. Its `ui-tests` job runs the UI tests, its `build` job signs and notarizes, and its `publish` job releases and uploads.
 2. Open the repository's **Releases** page. The release for the tag lists the disk image, and a candidate is marked as a pre-release.
 3. Fetch the appcast and look for the tag's item at the top. A candidate's item has `<sparkle:channel>beta</sparkle:channel>`; a release's item has no channel:
 
@@ -69,7 +69,7 @@ To rebuild a tag, re-run its workflow run. The run replaces the disk image and t
 
 ### Dry run
 
-A ready pull request that changes `.github/workflows/release.yml`, `Scripts/release/`, `MarfaMac/Info.plist` or `Config/` runs the dry run. You can also run it manually. It archives with ad hoc signing, makes the disk image, signs it with a throwaway Sparkle key and builds an appcast from a fixture feed. It skips Developer ID export, notarization and publishing. It reads no release secrets and uploads the disk image and appcast as the `dry-run` artifact. A tag run stops if the environment lacks any value it needs.
+A ready pull request that changes `.github/workflows/release.yml`, `Scripts/release/`, `MarfaMac/Info.plist` or `Config/` runs the dry run. You can also run it manually. It archives with ad hoc signing, makes the disk image, signs it with a throwaway Sparkle key and builds an appcast from a fixture feed. It skips the UI tests, Developer ID export, notarization and publishing. It reads no release secrets and uploads the disk image and appcast as the `dry-run` artifact. A tag run stops if the environment lacks any value it needs.
 
 ### Release scripts
 
