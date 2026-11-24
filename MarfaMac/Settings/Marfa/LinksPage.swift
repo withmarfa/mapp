@@ -51,9 +51,9 @@ struct LinksPage: View {
             .alert(
                 model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelDelete() } },
                 presenting: model.question
-            ) { _ in
+            ) { asked in
                 Button("Cancel", role: .cancel) { model.cancelDelete() }
-                Button("Delete Link Type", role: .destructive) { Task { await model.confirmDelete() } }
+                Button("Delete Link Type", role: .destructive) { Task { await model.confirmDelete(asked) } }
             } message: { asked in
                 Text(verbatim: asked.message)
             }
@@ -125,13 +125,16 @@ struct LinkTypeDetail: View {
                     SettingsRow(title: Text("Description"), line: Text(verbatim: description), lines: nil)
                 }
             }
-            SettingsSection("Delete") {
-                let failure = model.deleteLine(for: type.id)
-                SettingsRow(
-                    title: Text("Delete \(type.label)"),
-                    line: failure == nil ? Text("Marfa deletes a link type only while no item uses it.") : nil, error: failure, lines: nil
-                ) {
-                    SettingsButton("Delete Link Type…", role: .destructive) { model.askToDelete(type.id) }.disabled(model.isDeleting)
+            let failure = model.deleteLine(for: type.id)
+            if model.isYours(type) || failure != nil {
+                SettingsSection("Delete") {
+                    SettingsRow(
+                        title: Text("Delete \(type.label)"),
+                        line: failure == nil ? Text("Marfa deletes a link type only while no item uses it.") : nil, error: failure, lines: nil
+                    ) {
+                        SettingsButton("Delete Link Type…", role: .destructive) { model.askToDelete(type.id) }
+                            .disabled(model.isDeleting || !model.isYours(type))
+                    }
                 }
             }
         }
@@ -169,9 +172,14 @@ struct NewLinkTypeSheet: View {
                         ForEach(LinkCardinality.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
                     }
                 }
-                if model.makeNeedsPermission, let failure = model.makeFailure {
+                if model.makeNeedsPermission, let line = model.makeFailureLine {
                     SettingsSection(name: nil) {
-                        OwnerProblemRow(title: "Not Made", failure: failure, line: model.makeFailureLine, page: .types, host: host)
+                        SettingsProblemRow(
+                            title: Text("Not Made"), line: Text(verbatim: line), symbol: "lock", tone: nil,
+                            actions: [
+                                SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { Task { await model.allowMore() } }
+                            ])
+                            .disabled(host.isAllowingMore)
                     }
                 }
             }

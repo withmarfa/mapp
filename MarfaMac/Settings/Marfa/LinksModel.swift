@@ -50,17 +50,22 @@ import Observation
 
     // MARK: Reading
 
-    func load() async {
+    func load() async { await reread() }
+
+    /// Reads the list again, and answers why it could not be read; a list read before stands.
+    @discardableResult private func reread() async -> OwnerFailure? {
+        defer { hasLoaded = true }
         do {
             let listing = try await context.calls.linkTypes()
             linkTypes = listing.linkTypes
             typeNames = listing.typeNames
             failure = nil
+            return nil
         } catch {
             await context.learn(from: error)
             if !hasLoaded { failure = error }
+            return error
         }
-        hasLoaded = true
     }
 
     /// The owner's own: registered here or by another app, and brought by no plugin.
@@ -140,20 +145,30 @@ import Observation
         makeFailure = nil
     }
 
+    /// The longest ID the server takes (`types/id-grammar`), which an edge type's dotted ID follows (`edges/types-register-id`).
+    static let identifierLimit = 128
+    private static let identifierRoot = "user."
+
     /// The ID a new link type gets under `user.`, as the owner's own item types do: the name in lowercase letters, digits
-    /// and underscores, made unique among the link types listed.
+    /// and underscores, cut to fit `identifierLimit`, and made unique among the IDs and reverse names listed, which the
+    /// server refuses as held (`edges/types-name-held`).
     func identifier(forNamed text: String) -> String {
-        let folded = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current).lowercased()
+        let folded = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).lowercased()
         var slug = String(folded.map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "_" })
         while slug.contains("__") { slug = slug.replacingOccurrences(of: "__", with: "_") }
         slug = slug.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
         if slug.isEmpty || !(slug.first?.isLetter ?? false) { slug = "link_" + slug }
-        if slug.hasSuffix("_") { slug.removeLast() }
-        let taken = Set(linkTypes.map(\.id))
-        var id = "user." + slug
+        let taken = Set(linkTypes.map(\.id) + linkTypes.compactMap(\.reverseName))
+        let room = Self.identifierLimit - Self.identifierRoot.count
+        func fitted(_ suffix: String) -> String {
+            var made = String(slug.prefix(room - suffix.count))
+            while made.hasSuffix("_") { made.removeLast() }
+            return Self.identifierRoot + made + suffix
+        }
+        var id = fitted("")
         var number = 2
         while taken.contains(id) {
-            id = "user.\(slug)_\(number)"
+            id = fitted("_\(number)")
             number += 1
         }
         return id
@@ -163,6 +178,9 @@ import Observation
         guard canMake else { return }
         isWorking = true
         makeFailure = nil
+        let typed = typedDraft()
+        // The ID is made against the list as the server holds it now; a list that can't be read leaves the last one.
+        await reread()
         let new = NewLinkType(
             id: identifier(forNamed: trimmedName), label: trimmedName, reverseLabel: trimmedOtherEnd.isEmpty ? nil : trimmedOtherEnd,
             cardinality: cardinality, fromTypes: [fromType ?? "*"], toTypes: [toType ?? "*"])
@@ -181,7 +199,7 @@ import Observation
             await context.learn(from: error)
             if closedWhileWorking {
                 closedWhileWorking = false
-                context.lateDraft(.typed(title: String(localized: "Link Type Not Made"), text: new.label))
+                if let typed { context.lateDraft(typed) }
             } else {
                 makeFailure = error
             }
@@ -205,6 +223,12 @@ import Observation
         if case .notPermitted = makeFailure { true } else { false }
     }
 
+    /// Allow More… from the sheet's refusal: an approval drops the refusal, and Create Link Type asks the server again.
+    func allowMore() async {
+        guard makeNeedsPermission else { return }
+        if await context.allowMore([]) == .allowed, makeNeedsPermission { makeFailure = nil }
+    }
+
     func takeDrafts() -> [OwnerDraft] {
         guard isMaking else { return [] }
         if isWorking {
@@ -212,8 +236,25 @@ import Observation
             return []
         }
         isMaking = false
-        guard !trimmedName.isEmpty else { return [] }
-        return [.typed(title: String(localized: "Link Type Not Made"), text: trimmedName)]
+        return typedDraft().map { [$0] } ?? []
+    }
+
+    /// Every field of New Link Type…, where a name at either end was typed, or nil where none was.
+    private func typedDraft() -> OwnerDraft? {
+        guard !trimmedName.isEmpty || !trimmedOtherEnd.isEmpty else { return nil }
+        let lines = [
+            trimmedName.isEmpty ? nil : String(localized: "Name: \(trimmedName)"),
+            trimmedOtherEnd.isEmpty ? nil : String(localized: "Name at the Other End: \(trimmedOtherEnd)"),
+            String(localized: "From: \(endName(fromType))"),
+            String(localized: "To: \(endName(toType))"),
+            String(localized: "How Many: \(cardinality.title)"),
+        ].compactMap { $0 }
+        return .typed(title: String(localized: "Link Type Not Made"), text: lines.joined(separator: "\n"))
+    }
+
+    private func endName(_ type: String?) -> String {
+        guard let type else { return String(localized: "Any Type") }
+        return typeNames[type] ?? type
     }
 
     // MARK: Delete…
@@ -228,13 +269,25 @@ import Observation
 
     func cancelDelete() { question = nil }
 
-    func confirmDelete() async {
-        guard let asked = question else { return }
+    /// Deletes what `asked` names, the question the owner answered, which the alert gives back since closing it clears
+    /// `question`. The list is read again first, and nothing is sent unless the type is still listed and still the owner's.
+    func confirmDelete(_ asked: Question) async {
+        guard !isDeleting else { return }
         question = nil
         isDeleting = true
         deleteFailure = nil
         defer { isDeleting = false }
-        let name = linkType(asked.id)?.label ?? asked.id
+        if let failure = await reread() {
+            deleteFailure = (asked.id, OwnerWording.line(failure, on: .types))
+            return
+        }
+        // Deleted somewhere else: its page says it is gone.
+        guard let type = linkType(asked.id) else { return }
+        let name = type.label
+        guard isYours(type) else {
+            deleteFailure = (asked.id, String(localized: "\(name) now comes from a plugin or from Marfa, so it wasn’t deleted."))
+            return
+        }
         do {
             switch try await context.calls.deleteLinkType(asked.id) {
             case .deleted, .gone:

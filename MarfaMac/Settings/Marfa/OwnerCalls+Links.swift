@@ -47,6 +47,8 @@ nonisolated struct OwnerLinkType: Identifiable, Hashable, Sendable {
     var shipped: Bool
     /// The title of the plugin that brought it, where an installed plugin did.
     var plugin: String?
+    /// The name the type goes by from its to end, which no other type's ID may take (`edges/types-name-held`).
+    var reverseName: String?
 }
 
 /// The link types, with the names of the item types they join.
@@ -138,6 +140,6 @@ extension ClientOwnerCalls {
         OwnerLinkType(
             id: type.id, label: type.label, reverseLabel: type.reverseLabel, description: type.description,
             cardinality: LinkCardinality(rawValue: type.cardinality.rawValue) ?? .manyToMany, fromTypes: type.fromTypeConstraints,
-            toTypes: type.toTypeConstraints, shipped: type.shipped, plugin: plugin)
+            toTypes: type.toTypeConstraints, shipped: type.shipped, plugin: plugin, reverseName: type.reverseName)
     }
 }

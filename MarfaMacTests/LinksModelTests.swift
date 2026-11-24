@@ -33,22 +33,49 @@ import Testing
         return model
     }
 
-    @Test func aDeleteIsSentOnlyOnceTheOwnerAgrees() async {
+    /// The alert clears `question` as it closes, before the destructive button's task runs, so the delete takes the
+    /// question the alert presented.
+    @Test func aDeleteIsSentOnlyOnceTheOwnerAgreesWithTheQuestionTheAlertPresented() async throws {
         let calls = listing()
         let model = await loaded(calls)
 
         model.askToDelete("user.supplied_by")
-        #expect(model.question?.id == "user.supplied_by")
+        let asked = try #require(model.question)
+        #expect(asked.id == "user.supplied_by")
         model.cancelDelete()
-        await model.confirmDelete()
         #expect(!calls.calls.contains("deleteLinkType"))
-        #expect(model.linkType("user.supplied_by") != nil)
 
-        model.askToDelete("user.supplied_by")
-        await model.confirmDelete()
+        await model.confirmDelete(asked)
         #expect(calls.calls.filter { $0 == "deleteLinkType" }.count == 1)
         #expect(model.linkType("user.supplied_by") == nil)
         #expect(model.deleted == "user.supplied_by")
+    }
+
+    @Test func aTypeThatStoppedBeingTheOwnersSinceTheQuestionIsNotDeleted() async throws {
+        let calls = listing()
+        let model = await loaded(calls)
+        model.askToDelete("user.supplied_by")
+        let asked = try #require(model.question)
+        calls.state.withLock { state in
+            if let index = state.linkTypes.firstIndex(where: { $0.id == "user.supplied_by" }) { state.linkTypes[index].plugin = "Suppliers" }
+        }
+
+        await model.confirmDelete(asked)
+        #expect(!calls.calls.contains("deleteLinkType"))
+        #expect(model.deleted == nil)
+        #expect(model.deleteLine(for: "user.supplied_by") == "Supplied By now comes from a plugin or from Marfa, so it wasn’t deleted.")
+    }
+
+    @Test func nothingIsDeletedWhenTheListCannotBeReadAgain() async throws {
+        let calls = listing()
+        let model = await loaded(calls)
+        model.askToDelete("user.supplied_by")
+        let asked = try #require(model.question)
+        calls.fail("linkTypes", with: .unreachable)
+
+        await model.confirmDelete(asked)
+        #expect(!calls.calls.contains("deleteLinkType"))
+        #expect(model.deleteLine(for: "user.supplied_by") != nil)
     }
 
     @Test func onlyTheOwnersOwnLinkTypesCanBeAskedAbout() async {
@@ -62,13 +89,13 @@ import Testing
         #expect(model.builtIn.map(\.id) == ["parent-of"])
     }
 
-    @Test func aRefusedDeleteLeavesTheListAsTheServerHoldsIt() async {
+    @Test func aRefusedDeleteLeavesTheListAsTheServerHoldsIt() async throws {
         let calls = listing()
         calls.state.withLock { $0.linkTypesInUse = ["user.supplied_by"] }
         let model = await loaded(calls)
 
         model.askToDelete("user.supplied_by")
-        await model.confirmDelete()
+        await model.confirmDelete(try #require(model.question))
         #expect(model.linkTypes == calls.state.withLock { $0.linkTypes })
         #expect(model.deleted == nil)
         #expect(model.deleteLine(for: "user.supplied_by") == "Items still link with Supplied By, so it was kept. Remove those links first.")
@@ -76,7 +103,7 @@ import Testing
         calls.state.withLock { $0.linkTypesInUse = [] }
         calls.fail("deleteLinkType", with: .notPermitted("schema.write"))
         model.askToDelete("user.supplied_by")
-        await model.confirmDelete()
+        await model.confirmDelete(try #require(model.question))
         #expect(model.linkTypes == calls.state.withLock { $0.linkTypes })
         #expect(model.linkType("user.supplied_by") != nil)
         #expect(model.deleteLine(for: "user.supplied_by") != nil)
@@ -102,5 +129,96 @@ import Testing
         #expect(sent.map(\.id) == ["user.supplied_by_2"])
         #expect(sent.first?.fromTypes == ["user.job"] && sent.first?.toTypes == ["*"])
         #expect(model.made == "user.supplied_by_2")
+    }
+
+    @Test func closingSettingsAfterARefusalHandsBackEveryField() async {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.linkTypeNames = ["user.job": "Job", "core.person": "Person"] }
+        let model = LinksModel(context: bench.context)
+        await model.load()
+        model.beginNew()
+        model.name = "Supplied By"
+        model.otherEndName = "Supplies"
+        model.fromType = "user.job"
+        model.cardinality = .manyToOne
+        bench.calls.fail("registerLinkType", with: .refused("Another link type has this name. Choose another."))
+        await model.make()
+        #expect(model.takeDrafts() == [
+            .typed(
+                title: "Link Type Not Made",
+                text: "Name: Supplied By\nName at the Other End: Supplies\nFrom: Job\nTo: Any Type\nHow Many: Many to One"),
+        ])
+        #expect(!model.isMaking)
+    }
+
+    @Test func aNameTypedOnlyAtTheOtherEndIsHandedBack() async {
+        let model = await loaded(listing())
+        model.beginNew()
+        model.otherEndName = "Supplies"
+        model.toType = "core.person"
+        #expect(model.takeDrafts() == [
+            .typed(title: "Link Type Not Made", text: "Name at the Other End: Supplies\nFrom: Any Type\nTo: Person\nHow Many: Many to Many"),
+        ])
+
+        model.beginNew()
+        model.fromType = "user.job"
+        #expect(model.takeDrafts().isEmpty, "a choice of type alone is nothing typed")
+    }
+
+    @Test func aNewIDAvoidsEveryNameHeldAndFitsTheServersLimit() async {
+        let calls = listing()
+        calls.state.withLock {
+            $0.linkTypes.append(
+                OwnerLinkType(
+                    id: "user.made_by", label: "Made By", reverseLabel: "Makes", cardinality: .manyToOne, fromTypes: ["*"], toTypes: ["*"],
+                    shipped: false, reverseName: "user.supplies"))
+        }
+        let model = await loaded(calls)
+        #expect(model.identifier(forNamed: "Supplies") == "user.supplies_2", "another type's reverse name is held")
+        #expect(model.identifier(forNamed: "Supplied By") == "user.supplied_by_2")
+
+        let long = String(repeating: "a", count: 200)
+        let fitted = model.identifier(forNamed: long)
+        #expect(fitted.utf8.count == LinksModel.identifierLimit)
+        calls.state.withLock {
+            $0.linkTypes.append(
+                OwnerLinkType(id: fitted, label: long, reverseLabel: long, cardinality: .manyToMany, fromTypes: ["*"], toTypes: ["*"], shipped: false))
+        }
+        await model.load()
+        let next = model.identifier(forNamed: long)
+        #expect(next != fitted && next.utf8.count <= LinksModel.identifierLimit && next.hasSuffix("_2"))
+
+        // A name another app registered since the list was read is avoided too.
+        model.beginNew()
+        model.name = "Ordered From"
+        calls.state.withLock {
+            $0.linkTypes.append(
+                OwnerLinkType(
+                    id: "user.ordered_from", label: "Ordered From", reverseLabel: "Ordered From", cardinality: .manyToMany, fromTypes: ["*"],
+                    toTypes: ["*"], shipped: false))
+        }
+        await model.make()
+        #expect(calls.state.withLock { $0.linkTypesMade.map(\.id) } == ["user.ordered_from_2"])
+        #expect(model.identifier(forNamed: String(repeating: "a", count: 121) + " b").utf8.count <= LinksModel.identifierLimit)
+    }
+
+    @Test func anApprovalDropsTheSheetsRefusal() async {
+        let bench = OwnerBench()
+        let model = LinksModel(context: bench.context)
+        await model.load()
+        model.beginNew()
+        model.name = "Supplied By"
+        bench.calls.fail("registerLinkType", with: .notPermitted(ClientOwnerCalls.registeringLinkTypes))
+        await model.make()
+        #expect(model.makeNeedsPermission)
+
+        bench.allowing = .cancelled
+        await model.allowMore()
+        #expect(model.makeNeedsPermission, "nothing was approved")
+
+        bench.allowing = .allowed
+        await model.allowMore()
+        #expect(model.makeFailure == nil)
+        #expect(model.isMaking && model.name == "Supplied By")
     }
 }
