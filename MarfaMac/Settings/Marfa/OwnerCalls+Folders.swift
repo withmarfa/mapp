@@ -131,7 +131,7 @@ nonisolated protocol FolderCalls: Sendable {
     /// Replaces one setting, based on `baseVersion`. A change to the same setting since is a `conflict`, and nothing is
     /// written over.
     func change(_ id: String, _ change: FolderSettingChange, baseVersion: Int64) async throws(OwnerFailure) -> FolderSettingsReading
-    /// Stops the folder everywhere, for good, and lets the copy stop holding it.
+    /// Stops the folder everywhere and requests release of any temporary pin it acquired.
     func stopSyncing(_ id: String) async throws(OwnerFailure)
     /// Lets go of every folder held only to be shown, once Folders is left.
     func release() async
