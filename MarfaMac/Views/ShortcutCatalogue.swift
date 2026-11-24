@@ -30,6 +30,7 @@ nonisolated extension ShortcutCommand {
     static let exportPDF = ShortcutCommand("exportPDF", in: .file, String(localized: "Export as PDF…"))
     static let print = ShortcutCommand("print", in: .file, String(localized: "Print…"), "p")
 
+    static let copyLink = ShortcutCommand("copyLink", in: .edit, String(localized: "Copy Link"), "c", [.command, .shift])
     static let addAttachment = ShortcutCommand("addAttachment", in: .edit, String(localized: "Add Attachment…"), "a", [.command, .shift])
     static let searchItems = ShortcutCommand("searchItems", in: .edit, String(localized: "Search Items…"), "p", [.command, .shift])
     static let commandPalette = ShortcutCommand("commandPalette", in: .edit, String(localized: "Command Palette"), "k")
@@ -91,7 +92,7 @@ nonisolated extension ShortcutCommand {
         let commands: [ShortcutCommand] = [
             settings, newItem, newWindow, refresh, open, openAsModal, openAsFullPage, openInNewWindow, quickLook, openOriginal, openInBrowser,
             favorite, addTag, changeType, customizeLayout, versionHistory, delete, exportPDF, print,
-            addAttachment, searchItems, commandPalette, paletteActions, searchList, find, findNext, findPrevious, useSelectionForFind,
+            copyLink, addAttachment, searchItems, commandPalette, paletteActions, searchList, find, findNext, findPrevious, useSelectionForFind,
             toggleSource, toggleReader, toggleFormats, focus, viewAsList, viewAsGallery, viewAsTable, viewAsBoard, viewAsTimeline, viewAsCalendar,
             toggleFilters, addFilter, clearFilters, today, previousPeriod, nextPeriod, showWeek, showMonthScale, toggleMonth,
             newView, editView, saveAsView, resetView, duplicateView, toggleDetails, customizeSidebar, back, forward, previousItem, nextItem,

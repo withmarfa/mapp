@@ -519,6 +519,7 @@ private struct MoreMenu: View {
             command(.openOriginal)
             command(.openInBrowser)
             ItemShareLink(item: item, fileURL: fileURL, library: library, showsIcon: false)
+            command(.copyLink)
             Divider()
             ItemOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)
             CollectionActions(selection: ids, details: details, undoManager: undoManager)

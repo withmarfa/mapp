@@ -26,25 +26,25 @@ struct ItemCommandTests {
 
     @Test func anItemOnThePageEnablesThePageCommands() {
         let note = library.add("A note\n")
-        #expect(enabled(context([note.id], page: note.id)) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .addAttachment, .toggleSource, .print, .exportPDF])
+        #expect(enabled(context([note.id], page: note.id)) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .copyLink, .addAttachment, .toggleSource, .print, .exportPDF])
     }
 
     @Test func aSelectedItemNotOnThePageEnablesOnlyOpeningInAWindow() {
         let note = library.add("A note\n")
-        #expect(enabled(context([note.id])) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow])
-        #expect(enabled(context([note.id], page: .mint())) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow])
+        #expect(enabled(context([note.id])) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .copyLink])
+        #expect(enabled(context([note.id], page: .mint())) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .copyLink])
     }
 
     @Test func aPageThatIsNotReadyIsNotThere() {
         #expect(ItemCommandContext.pageItem(showsPage: true, editorHasItem: false, pageItemID: .mint()) == nil)
     }
 
-    @Test func aFileHasNoPageCommands() {
+    @Test func aFileHasNoPageCommandsButHasALink() {
         let id = ItemID.mint()
         library.items.append(Item(
             id: id, type: TypeID("core.file"), title: "Report.pdf", titleRule: .property("title"), content: .file(.pdf, byteCount: 10),
             version: ItemVersion(1), created: .now, modified: .now))
-        #expect(enabled(context([id], page: id)) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow])
+        #expect(enabled(context([id], page: id)) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .copyLink])
     }
 
     @Test func severalItemsHaveNoSinglePage() {

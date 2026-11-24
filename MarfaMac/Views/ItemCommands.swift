@@ -93,13 +93,13 @@ struct ItemCommandContext {
 /// once here: its title, symbol, shortcut, when it applies and what it does. A menu shows every one of them and
 /// dims the ones that do not apply, so the two menus never differ in what they offer or when.
 enum ItemCommand: CaseIterable {
-    case open, openAsModal, openAsFullPage, quickLook, openInNewWindow, openOriginal, openInBrowser, addAttachment, toggleSource, toggleReader, toggleFormats, toggleFocus, print, exportPDF
+    case open, openAsModal, openAsFullPage, quickLook, openInNewWindow, openOriginal, openInBrowser, copyLink, addAttachment, toggleSource, toggleReader, toggleFormats, toggleFocus, print, exportPDF
 
     /// The menu the menu bar puts it in, which is where ⌘K lists it: Add Attachment under Edit, the two ways of
     /// showing the page under View, and the rest under File.
     var paletteGroup: PaletteSections.CommandGroup {
         switch self {
-        case .addAttachment: .edit
+        case .copyLink, .addAttachment: .edit
         case .toggleSource, .toggleReader, .toggleFormats, .toggleFocus: .view
         case .open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .openOriginal, .openInBrowser, .print, .exportPDF: .file
         }
@@ -116,6 +116,7 @@ enum ItemCommand: CaseIterable {
         case .openInNewWindow: "Open in New Window"
         case .openOriginal: "Open Original"
         case .openInBrowser: "Open in Browser"
+        case .copyLink: "Copy Link"
         case .addAttachment: "Add Attachment…"
         case .toggleSource: (sourceMode ?? context.showsSource) ? "Show Formatted Text" : "Show Markdown Source"
         case .toggleReader: context.pageLook?.mode == .original ? "Show Reader" : "Show Original"
@@ -134,6 +135,7 @@ enum ItemCommand: CaseIterable {
         case .quickLook: "eye"
         case .openInNewWindow: "macwindow"
         case .openOriginal, .openInBrowser: "safari"
+        case .copyLink: "link"
         case .addAttachment: "paperclip"
         case .toggleSource: "doc.plaintext"
         case .toggleReader: "text.page"
@@ -155,6 +157,7 @@ enum ItemCommand: CaseIterable {
         case .openInNewWindow: .openInNewWindow
         case .openOriginal: .openOriginal
         case .openInBrowser: .openInBrowser
+        case .copyLink: .copyLink
         case .addAttachment: .addAttachment
         case .toggleSource: .toggleSource
         case .toggleReader: .toggleReader
@@ -174,6 +177,8 @@ enum ItemCommand: CaseIterable {
         case .quickLook, .openInNewWindow: context.hasBrowser && !context.ids.isEmpty
         case .openOriginal: context.originalAddress != nil
         case .openInBrowser: context.browserTarget != nil
+        // One item, held or not trashed or not, a file too.
+        case .copyLink: context.item != nil
         case .addAttachment: context.editableItem != nil
         case .toggleSource, .print, .exportPDF: context.visibleItem != nil
         case .toggleReader: context.pageLook != nil
@@ -194,6 +199,7 @@ enum ItemCommand: CaseIterable {
         case .openOriginal: context.originalAddress.map { _ = NSWorkspace.shared.open($0) }
         case .openInBrowser:
             if let item = context.item, let target = context.browserTarget { BrowserOpening.open(target, for: item) }
+        case .copyLink: if let id = context.item?.id { Task { await library.copyLink(of: id) } }
         case .addAttachment: editor?.isChoosingImages = true
         case .toggleSource: editor.map { $0.setSourceMode(!$0.caret.sourceMode) }
         case .toggleReader: context.pageLook.map { $0.choose($0.mode == .reader ? .original : .reader) }

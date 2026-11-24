@@ -3846,6 +3846,9 @@
     "Can’t Copy Link" : {
 
     },
+    "Can’t Copy Wiki Link" : {
+
+    },
     "Can’t Create Item" : {
       "extractionState" : "manual"
     },
@@ -4195,6 +4198,9 @@
     },
     "Copy Text" : {
       "extractionState" : "manual"
+    },
+    "Copy Wiki Link" : {
+
     },
     "Couldn’t change downloaded files. Check the current limit and try again." : {
       "extractionState" : "manual"
@@ -6577,6 +6583,9 @@
     },
     "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The app reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected." : {
       "extractionState" : "manual"
+    },
+    "This item doesn’t have a link yet. Try again once Marfa has finished syncing." : {
+
     },
     "This item has no file." : {
       "extractionState" : "manual"

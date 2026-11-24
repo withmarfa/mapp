@@ -499,12 +499,15 @@ struct CommandPalette: View {
             ItemWindows.open(library.idsForWindows([id])) { openWindow(value: $0) }
         case .copyLink:
             close()
+            Task { await library.copyLink(of: id) }
+        case .copyWikiLink:
+            close()
             Task {
                 if let link = await library.bodyLink(to: id, in: nil) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(link, forType: .string)
                 } else {
-                    library.notices.tell(String(localized: "Can’t Copy Link"), String(localized: "This item isn’t ready to link yet. Try again once its copy has loaded."))
+                    library.notices.tell(String(localized: "Can’t Copy Wiki Link"), String(localized: "This item isn’t ready to link yet. Try again once its copy has loaded."))
                 }
             }
         case .addToFavorites, .removeFromFavorites:

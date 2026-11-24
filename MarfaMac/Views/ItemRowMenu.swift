@@ -37,6 +37,8 @@ struct ItemRowMenu<LayoutActions: View>: View {
             }
         case .share:
             ItemShareLink(item: single, fileURL: single.flatMap { browser.fileURL(of: $0.id) }, library: library)
+        case .copyLink:
+            if let single { Button("Copy Link", systemImage: "link") { Task { await library.copyLink(of: single.id) } } }
         case .favorite: FavoriteButton(ids: ids, undoManager: undoManager)
         case .tag: AddTagButton(ids: ids, details: details, undoManager: undoManager)
         case .collection: CollectionActions(selection: ids, details: details, undoManager: undoManager)
