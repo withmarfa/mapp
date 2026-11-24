@@ -69,9 +69,7 @@ struct OwnerLoading: View {
     }
 }
 
-/// A problem row for a call that failed, in a section already on the page: what went wrong in the page's words, and the one
-/// action that helps. A refusal for want of a permission offers Allow More…; anything else offers Try Again where the page
-/// has something to read again.
+/// A problem row in the page's words. A missing permission offers Allow More…, and a failed read with a retry offers Try Again.
 struct OwnerProblemRow: View {
     let title: LocalizedStringKey
     let failure: OwnerFailure

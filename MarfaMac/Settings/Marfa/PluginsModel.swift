@@ -95,7 +95,6 @@ struct PluginsAccess {
     var removal: Removal?
     /// The command last copied, for the button to say so.
     private(set) var copied: String?
-    /// Loads that arrived while one was running. Each is resumed when that one finishes, and then reads for itself.
 
     init(context: OwnerContext, calls: any PluginCalls, access: PluginsAccess) {
         self.context = context
