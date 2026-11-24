@@ -114,6 +114,7 @@ struct SettingsDetail: View {
         .environment(\.settingsSubpage, navigation.current.subpage)
         .environment(\.settingsNavigation, SettingsNavigationActions(navigation: navigation))
         .id(navigation.current)
+        .onChange(of: navigation.page) { left, _ in if left == .marfa(.folders) { host.releaseFolders() } }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("SettingsDetail")
     }

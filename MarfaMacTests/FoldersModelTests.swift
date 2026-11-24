@@ -154,6 +154,8 @@ nonisolated final class FakeFolderCalls: FolderCalls {
         }
     }
 
+    func release() async {}
+
     func stopSyncing(_ id: String) async throws(OwnerFailure) {
         try state.withLock { state throws(OwnerFailure) in
             guard var folder = state.folders[id] else { throw .notFound }

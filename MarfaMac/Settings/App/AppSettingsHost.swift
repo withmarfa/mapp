@@ -216,8 +216,24 @@ enum LibraryDescription {
     /// What Activity, Monitoring, Limits and Start-Up ask of the server, through the same client.
     var instanceCalls: any InstanceCalls { ClientInstanceCalls(client: confirmingClient) }
 
-    /// A folder's settings, read and written through the open copy, which owns the folder doors.
-    var folderCalls: any FolderCalls { CopyFolderCalls(copy: (host.library?.source as? MarfaSource)?.copy) }
+    @ObservationIgnored private var heldFolderCalls: CopyFolderCalls?
+
+    /// A folder's settings, read and written through the open copy, which owns the folder doors. One for each copy, so the
+    /// folders it holds to show are known across Folders' pages and let go when Folders is left.
+    var folderCalls: any FolderCalls {
+        let copy = (host.library?.source as? MarfaSource)?.copy
+        if let held = heldFolderCalls, held.copy === copy { return held }
+        releaseFolders()
+        let made = CopyFolderCalls(copy: copy)
+        heldFolderCalls = made
+        return made
+    }
+
+    /// Lets go of the folders Folders held only to show them, once it is left or Settings closes.
+    func releaseFolders() {
+        guard let held = heldFolderCalls else { return }
+        Task { await held.release() }
+    }
 
     /// The package's server, for the one call the generated client does not hold (`Server.health()`).
     private var plainServer: (@Sendable () throws -> Server)? {
@@ -309,8 +325,10 @@ enum LibraryDescription {
     // MARK: Closing
 
     /// Hands over what was typed in the Marfa's pages and not saved, as the app's rules say for a panel that ends any way but
-    /// the person's own Cancel: the text goes through `Notices.notKept`, to the clipboard, and the draft is dropped.
+    /// the person's own Cancel: the text goes through `Notices.notKept`, to the clipboard, and the draft is dropped. The
+    /// folders Folders held only to show them are let go.
     func handOverDrafts() {
+        releaseFolders()
         instanceSettings.handOver(
             to: libraries.host.notices, because: String(localized: "You closed Settings before saving the changes to the server’s settings."))
         ownerDrafts.handOver(to: libraries.host.notices, because: String(localized: "You closed Settings before this was saved."))

@@ -125,13 +125,16 @@ nonisolated enum FolderSettingChange: Hashable, Sendable {
 /// What the Folders page asks of the working copy, which sends a folder's writes at once and never queues them. The host
 /// supplies it, since the copy is the app's.
 nonisolated protocol FolderCalls: Sendable {
-    /// Reads the folder from the server and keeps it in the copy, which then follows it and checks a change against it.
+    /// Reads the folder, holding it in the copy where it is not held yet, so the copy follows it and checks a change
+    /// against it. A folder stopped here is not held again.
     func settings(of id: String) async throws(OwnerFailure) -> FolderSettingsReading
     /// Replaces one setting, based on `baseVersion`. A change to the same setting since is a `conflict`, and nothing is
     /// written over.
     func change(_ id: String, _ change: FolderSettingChange, baseVersion: Int64) async throws(OwnerFailure) -> FolderSettingsReading
     /// Stops the folder everywhere, for good, and lets the copy stop holding it.
     func stopSyncing(_ id: String) async throws(OwnerFailure)
+    /// Lets go of every folder held only to be shown, once Folders is left.
+    func release() async
 }
 
 nonisolated extension FolderSettingsReading {
