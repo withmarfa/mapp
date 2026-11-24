@@ -90,10 +90,12 @@ struct ConnectionPage: View {
                 .accessibilityIdentifier("MarfaAddress")
             }
             SettingsRow("Sign In", line: "On the server’s own page, in a sheet.") {
-                signInButtons(
-                    title: "Sign In…", canStart: model.canConnect, browser: .connect(usingCode: false), code: .connect(usingCode: true),
-                    identifier: "MarfaConnect")
+                SettingsButton("Sign In…") { model.start(.connect(usingCode: false)) }
+                    .disabled(!model.canConnect)
+                    .accessibilityIdentifier("MarfaConnect")
             }
+            codeSignInRow(canStart: model.canConnect, step: .connect(usingCode: true), identifier: "MarfaConnectCode")
+            if model.isWorking { signInProgress }
         }
     }
 
@@ -171,9 +173,11 @@ struct ConnectionPage: View {
                 .accessibilityIdentifier("SignedInAs")
             }
             if account.showsPermissions {
-                SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: account.permissionsLine)) {
-                    // The one Allow More… on the page: it asks for the owner's name too, which every sign-in asks for. A row holds
-                    // one control, so the value stands only where there is no button.
+                let line = account.holdsAll && account.offersName
+                    ? String(localized: "The app holds all \(account.total) of the owner’s permissions.")
+                    : account.permissionsLine
+                SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: line)) {
+                    // Allow More… also asks to read the owner's name.
                     if !account.holdsAll || account.offersName {
                         SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
                             Task { _ = await settingsHost.allowMore(ConnectionAccount.asked) }
@@ -205,10 +209,12 @@ struct ConnectionPage: View {
                         .accessibilityIdentifier("MarfaOtherAddress")
                 }
                 SettingsRow("Sign In and Switch") {
-                    signInButtons(
-                        title: "Sign In and Switch", canStart: model.canSwitch, browser: .switchServer(usingCode: false),
-                        code: .switchServer(usingCode: true), identifier: "MarfaSwitch")
+                    SettingsButton("Sign In and Switch…") { model.start(.switchServer(usingCode: false)) }
+                        .disabled(!model.canSwitch)
+                        .accessibilityIdentifier("MarfaSwitch")
                 }
+                codeSignInRow(canStart: model.canSwitch, step: .switchServer(usingCode: true), identifier: "MarfaSwitchCode")
+                if model.isWorking { signInProgress }
             }
         }
     }
@@ -314,6 +320,25 @@ struct ConnectionPage: View {
     }
 
     // MARK: Shared
+
+    private func codeSignInRow(canStart: Bool, step: MarfaSettingsModel.SignInStep, identifier: String) -> some View {
+        SettingsRow("Use a Code Instead", line: "From a device already signed in.") {
+            SettingsButton("Enter Code…") { model.start(step) }
+                .disabled(!canStart)
+                .accessibilityIdentifier(identifier)
+        }
+    }
+
+    private var signInProgress: some View {
+        SettingsRow(
+            model.code == nil ? "Working…" : "Waiting for Approval…",
+            lead: .custom(AnyView(ProgressView().controlSize(.small)))
+        ) {
+            if model.canCancelSignIn {
+                SettingsButton("Cancel") { model.cancelSignIn() }.accessibilityIdentifier("MarfaSignInCancel")
+            }
+        }
+    }
 
     /// The two ways to sign in side by side, and Cancel while one waits on the person.
     private func signInButtons(

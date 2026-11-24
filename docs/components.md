@@ -19,7 +19,7 @@ Agreed on 22 November 2026 and built in the main window: the shape rule below re
 - In Settings, a row's trailing edge holds one control, and a value it acts on goes in the row's line. A problem row is the exception, with up to two buttons.
 - A switch is a capsule no larger than 24 points. A search field is the system's: white, with a hairline edge, a capsule. Chips, tokens and text fields keep their rounded-rectangle corners, so a value never reads as a button.
 - A sheet puts a destructive action alone at the leading edge, and Cancel and the primary action at the trailing edge. A text field has its label above it, such as Name. The button reads Delete, not Delete Collection.
-- `AppButtonStyle` draws the shapes and their focus rings. Pass `.value` or `.commands` to `appMenu` to choose the arrow. The index page and Link to Item sheet use the system search field (`InlineSearchField`). Connect… on the first-run window is 36 points. Open Settings… on the library error screen is 28 points. Settings, alerts, the toolbar, and the item page's web editor draw their own buttons.
+- `AppButtonStyle` draws the shapes and their focus rings. Pass `.value` or `.commands` to `appMenu` to choose the arrow. The index page and Link to Item sheet use the system search field (`InlineSearchField`). Connect… on the first-run window is 36 points. Open Settings… on the library error screen is 28 points. Settings draws [its shared controls](views-and-lists.md#settings) with the system's buttons by the same rule; alerts, the toolbar, and the item page's web editor draw their own.
 
 ## Keycaps
 
