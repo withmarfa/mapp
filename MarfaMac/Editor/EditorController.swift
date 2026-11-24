@@ -6,10 +6,7 @@ import WebKit
 
 private let log = Telemetry.logger(.editor)
 
-/// One window's editor: a web page running the formatted markdown editor, loaded when the window opens so
-/// the first item shows without a wait, and reused for every item the window shows. This file holds the state, which
-/// Swift keeps in the type's body, and the driving of the page; what the page says is in `+Messages` and its loading in
-/// `+Navigation`.
+/// One window's Markdown editor. Its web page loads when the window opens and serves every item the window shows.
 @Observable
 final class EditorController: NSObject {
     var caret = CaretState()
