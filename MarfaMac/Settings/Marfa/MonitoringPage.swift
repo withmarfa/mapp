@@ -53,7 +53,7 @@ struct MonitoringPage: View {
                     secretRow(.postHogHost)
                     secretRow(.postHogToken)
                 }
-                SettingsSection("Telemetry", footer: "Secrets are never shown. To change one, type it again.") {
+                SettingsSection("Telemetry", footer: "Faults show on Overview too. Secrets are never shown.") {
                     switchRow(
                         "Send Telemetry", key: "telemetry_enabled", hasReceiver: model.telemetryHasReceiver,
                         line: "Traces, logs and metrics. Off keeps the settings.", idle: "Nothing is sent until an address is set.")
@@ -77,19 +77,12 @@ struct MonitoringPage: View {
 
     private func secretRow(_ secret: MonitoringSecret) -> some View {
         let isSet = model.isSet(secret)
-        return SettingsRow(verbatim: secret.title, error: model.line(secret.key)) {
-            HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                SettingsValue(isSet ? "Set" : "Not Set")
-                SettingsButton(isSet ? "Change…" : "Set…") { model.begin(secret) }
-                    .accessibilityIdentifier("Monitoring-" + secret.rawValue)
-                if isSet {
-                    SettingsMoreMenu {
-                        Button("Remove…", role: .destructive) { model.askToRemove(secret) }
-                    }
-                    .disabled(model.isWriting)
-                    .accessibilityIdentifier("MonitoringMore-" + secret.rawValue)
-                }
-            }
+        return SettingsRow(
+            title: Text(verbatim: secret.title), line: Text(isSet ? "Set." : "Not set."), error: model.line(secret.key)
+        ) {
+            SettingsButton(isSet ? "Change…" : "Set…") { model.begin(secret) }
+                .disabled(model.isWriting)
+                .accessibilityIdentifier("Monitoring-" + secret.rawValue)
         }
     }
 }
@@ -116,6 +109,15 @@ struct MonitoringSecretSheetView: View {
                             .accessibilityIdentifier("MonitoringSecretField-" + field.rawValue)
                         }
                     }
+                }
+            } leading: {
+                if model.isSet(sheet.secret) {
+                    SettingsButton("Remove…", role: .destructive) {
+                        model.close()
+                        model.askToRemove(sheet.secret)
+                    }
+                    .disabled(model.isWriting)
+                    .accessibilityIdentifier("MonitoringRemove-" + sheet.secret.rawValue)
                 }
             } buttons: {
                 SettingsButton("Cancel") { model.close() }

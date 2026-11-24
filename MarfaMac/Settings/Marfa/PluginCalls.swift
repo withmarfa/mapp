@@ -158,6 +158,8 @@ nonisolated protocol PluginCalls: Sendable {
     /// The name of a connector host (`connectors.manage`).
     func hostName(_ id: String) async throws(OwnerFailure) -> String
 
+    /// Where the release is read from, as a line says it: the plugins repository, or the address a Debug build was pointed at.
+    var releaseName: String { get }
     /// The plugins the release lists, read without a credential.
     func release() async throws(PluginFailure) -> [ReleasePlugin]
     /// A bundle the release lists, checked against the digest the release lists.
