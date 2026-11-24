@@ -340,6 +340,25 @@ final class Browser {
         history.target(.forward, in: library, shown: selection) != nil
     }
 
+    /// Whether Back has anywhere to go, as the View menu and the sidebar's title bar offer it: out of a page opened from a
+    /// collection's layout, or to an earlier item where the list is showing.
+    func canStepBack(in library: any ItemLibrary) -> Bool {
+        if usesCollection || isCollectionItemPresented { return isCollectionItemPresented }
+        return canGoBack(in: library)
+    }
+
+    func canStepForward(in library: any ItemLibrary) -> Bool {
+        !usesCollection && !isCollectionItemPresented && canGoForward(in: library)
+    }
+
+    func stepBack(in library: any ItemLibrary) {
+        if isCollectionItemPresented { returnToCollection() } else { go(.back, in: library) }
+    }
+
+    func stepForward(in library: any ItemLibrary) {
+        go(.forward, in: library)
+    }
+
     /// Shows the item before, or after, the one shown, skipping any that are gone. It is shown in the place it was
     /// last seen when that place still lists it, and in All Items otherwise; any search is put away to show it.
     func go(_ direction: SelectionHistory.Direction, in library: any ItemLibrary) {

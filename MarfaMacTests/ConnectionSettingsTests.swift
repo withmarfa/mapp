@@ -37,9 +37,7 @@ import Testing
 
     /// The section's state is the sync's own, so Allow More… moving it on needs nothing else.
     @Test func theSectionFollowsTheSyncsStanding() async throws {
-        let suite = "ConnectionSettingsTests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("ConnectionSettingsTests")
         let copy = FakePreferencesCopy()
         await copy.set(PreferencesReadiness(filled: true, holdsType: false, tablesWhole: false, instance: "instance-1"))
         let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(10), reload: {})
@@ -59,7 +57,7 @@ import Testing
         keeps: Bool = true, removal: @escaping @MainActor (Bool) async throws -> Void = { _ in },
         waiting: @escaping @MainActor (Set<String>) async -> Bool = { _ in false }
     ) async throws -> (MarfaSettingsModel, HostBench) {
-        let bench = try HostBench()
+        let bench = HostBench()
         let model = MarfaSettingsModel(host: bench.host())
         model.address = "http://first.test:8210"
         _ = model.host.scripted("key-1")
@@ -202,8 +200,7 @@ import Testing
 
     /// What each step of a disconnect sent, over a real sync on a copy that holds a change of the library's.
     private func overSync(_ copy: FakePreferencesCopy, delivers: Bool = true) async throws -> (MarfaSettingsModel, PreferencesSync, HostBench) {
-        let suite = "ConnectionSettingsTests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = ThrowawayDefaults.make("ConnectionSettingsTests")
         let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(10), reload: {})
         sync.attach(copy, library: "marfa:https://home", name: { "Home" })
         await sync.flush()
@@ -275,9 +272,7 @@ import Testing
     }
 
     @Test func aRemovalQueuedAndNeverDeliveredIsFoundAmongTheUnsentWrites() async throws {
-        let suite = "ConnectionSettingsTests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("ConnectionSettingsTests")
         let copy = FakePreferencesCopy()
         let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(10), reload: {})
         sync.attach(copy, library: "marfa:https://home", name: { "Home" })
@@ -293,8 +288,7 @@ import Testing
     // MARK: The sync's removal
 
     private func syncing(_ copy: FakePreferencesCopy) async throws -> (PreferencesSync, UserDefaults) {
-        let suite = "ConnectionSettingsTests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = ThrowawayDefaults.make("ConnectionSettingsTests")
         let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(10), reload: {})
         sync.attach(copy, library: "marfa:https://home", name: { "Home" })
         await sync.flush()

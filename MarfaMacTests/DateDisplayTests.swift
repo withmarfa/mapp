@@ -38,9 +38,7 @@ struct DateDisplayTests {
     // MARK: What is stored
 
     @Test func aStoredChoiceIsReadBackAndAnUnknownOneIsTheStandard() throws {
-        let suite = "DateDisplayTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("DateDisplayTests")
         #expect(DateFormat.stored(in: defaults) == .standard)
         let chosen = DateFormat(usesWords: false, date: .long, time: .twelveHour)
         defaults.set(chosen.rawValue, forKey: DateFormat.key)
@@ -56,9 +54,7 @@ struct DateDisplayTests {
     }
 
     @Test func aStoredValueThatDoesNotReadIsSetAsideBeforeAnythingWritesOverIt() throws {
-        let suite = "DateDisplayTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("DateDisplayTests")
         let unreadable = ["automatic", "relative", #"{"date":"weird"}"#]
         for text in unreadable {
             defaults.set(text, forKey: DateFormat.key)

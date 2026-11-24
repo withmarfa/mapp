@@ -12,15 +12,16 @@ enum ColumnWidth: String, CaseIterable, Identifiable {
 
     var defaultWidth: CGFloat {
         switch self {
-        case .sidebar: 230
+        case .sidebar: 232
         case .list: 330
         }
     }
 
-    /// The narrowest and widest the column can be, which are the limits the column is given.
+    /// The narrowest and widest the column can be, which are the limits the column is given. The sidebar is never narrower
+    /// than its title bar controls need (`SidebarToolbar`).
     var range: ClosedRange<CGFloat> {
         switch self {
-        case .sidebar: 200...340
+        case .sidebar: 232...340
         case .list: 280...480
         }
     }

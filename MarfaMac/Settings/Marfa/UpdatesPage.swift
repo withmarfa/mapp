@@ -89,7 +89,7 @@ struct UpdatesPage: View {
             SettingsSection("Needs Attention") {
                 if let undone {
                     SettingsProblemRow(
-                        title: Text("The Update to \(undone.release) Didn’t Work"),
+                        title: Text("The update to \(undone.release) didn’t work"),
                         line: Text(
                             undone.result == .putBack
                                 ? "\(host.serverName) is back on \(status.running), as before. Nothing was lost."
@@ -98,12 +98,12 @@ struct UpdatesPage: View {
                 }
                 if model.lostTrack {
                     SettingsProblemRow(
-                        title: Text("\(host.serverName) Hasn’t Come Back Yet"),
+                        title: Text("\(host.serverName) hasn’t come back yet"),
                         line: Text("The app stopped waiting. Check again to see where it stands."),
                         actions: [SettingsProblemAction("Check Again") { Task { await model.load() } }])
                 }
                 if let error = model.error {
-                    OwnerProblemRow(title: "Couldn’t Do That", failure: error, page: .updates, host: host)
+                    OwnerProblemRow(title: "Couldn’t do that", failure: error, page: .updates, host: host)
                 }
             }
         }
@@ -150,11 +150,11 @@ struct UpdatesPage: View {
             }
             if let failure = model.settingsFailure {
                 OwnerProblemRow(
-                    title: "Couldn’t Read Automatic Update Settings", failure: failure, page: .updates, host: host,
+                    title: "Couldn’t read automatic update settings", failure: failure, page: .updates, host: host,
                     retry: { Task { await model.load() } })
             } else if !model.canChangeSettings {
                 OwnerProblemRow(
-                    title: "Can’t Change Automatic Update Settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
+                    title: "Can’t change automatic update settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
                     page: .updates, host: host)
             }
         }

@@ -40,9 +40,7 @@ import Testing
     }
 
     @Test func theQuickAddTilesAreOffUntilTheSettingIsTurnedOn() throws {
-        let suite = "IndexPageTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("IndexPageTests")
         #expect(!defaults.bool(forKey: ListKey.showsQuickAdd))
         defaults.set(true, forKey: ListKey.showsQuickAdd)
         #expect(defaults.bool(forKey: ListKey.showsQuickAdd))

@@ -11,7 +11,7 @@ extension Browser {
 
     static var initialDefaults: UserDefaults {
         #if DEBUG
-        if TestHost.isRequested, let suite = UserDefaults(suiteName: "MarfaMac.Browser.\(UUID().uuidString)") { return suite }
+        if TestHost.isRequested { return ThrowawayDefaults.make("MarfaMac.Browser") }
         #endif
         return .standard
     }

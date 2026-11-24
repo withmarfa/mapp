@@ -13,7 +13,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
-        XCTAssertTrue(list.waitForExistence(timeout: 5))
+        XCTAssertTrue(element("ItemsIndex").waitForExistence(timeout: 5), "the window opens on the Items index")
     }
 
     @MainActor override func tearDown() async throws {
@@ -47,7 +47,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
     }
 
     @MainActor func testFavoritesListsItsItemsForSelection() {
-        sidebarText("Favorites").click()
+        choose("Favorites")
         let title = window.itemPageTitle
         for favorite in ["Kitchen quotes", "Reading list"] {
             let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", favorite)).firstMatch
@@ -74,7 +74,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(element("QuickAddTitle").waitForNonExistence(timeout: 2))
-        XCTAssertTrue(list.exists, "the window stays where it was")
+        XCTAssertTrue(element("ItemsIndex").exists, "the window stays where it was")
     }
 
     /// A click near the sidebar's trailing edge, level with `row`, past the end of its words.
@@ -94,12 +94,6 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    @MainActor func testChoosingItemsFromAnotherPlaceOpensTheGallery() {
-        sidebarText("Inbox").click()
-        sidebarText("Items").click()
-        XCTAssertTrue(list.waitForNonExistence(timeout: 3), "Items opens in the gallery, which spans the window")
-    }
-
     @MainActor func testTheCogOpensSettingsWithNoMenu() {
         instanceName.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
@@ -110,8 +104,9 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
     @MainActor func testTheCogOpensSettingsInAWindowOfItsOwnAndTheMainWindowStays() {
         instanceName.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
-        XCTAssertTrue(list.exists, "the main window keeps its list")
-        XCTAssertTrue(sidebar.exists, "and its sidebar")
+        // The Settings window is the front one, so the main window's parts are asked of the whole app.
+        XCTAssertTrue(app.descendants(matching: .any)["ItemsIndex"].exists, "the main window keeps its page")
+        XCTAssertTrue(app.outlines["Sidebar"].exists, "and its sidebar")
         XCTAssertEqual(app.windows.count, 2)
         attachScreenshot("SettingsFromInstanceMenu")
     }
@@ -123,7 +118,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
     }
 
     @MainActor func testFavoritesRemainsAvailableAfterTheLastItemIsRemoved() {
-        sidebarText("Favorites").click()
+        choose("Favorites")
         for favorite in ["Kitchen quotes", "Reading list"] {
             let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", favorite)).firstMatch
             XCTAssertTrue(note.waitForExistence(timeout: 3))
@@ -133,14 +128,17 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         }
         XCTAssertTrue(sidebarText("Favorites").exists)
         XCTAssertTrue(sidebarText("Types").exists)
-        sidebarText("Items").click()
-        app.typeKey("1", modifierFlags: .command)
+        // Items is an index page; a type lists its items.
+        element("SidebarType-core.note").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading list")).firstMatch
         XCTAssertTrue(note.waitForExistence(timeout: 3))
         note.rightClick()
         window.menuItems["Add to Favorites"].click()
         XCTAssertTrue(sidebarText("Favorites").waitForExistence(timeout: 3))
-        sidebarText("Favorites").click()
+        choose("Favorites")
+        // Reading list is also in the Notes list, so the row alone would show a missed click as a pass.
+        let shown = expectation(for: NSPredicate(format: "title BEGINSWITH %@", "Favorites"), evaluatedWith: window)
+        wait(for: [shown], timeout: 3)
         XCTAssertTrue(note.waitForExistence(timeout: 3))
     }
 
@@ -149,8 +147,8 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         XCTAssertLessThan(sidebarText("Sources").frame.maxY, sidebarText("Collections").frame.minY)
         XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY, "the indexes are in the Library group, above Views")
         XCTAssertFalse(sidebarText("Home").exists, "collection entries belong in the index")
-        sidebarText("Collections").click()
-        let index = element("SidebarIndex")
+        choose("Collections")
+        let index = window.outlines["IndexPage"]
         XCTAssertTrue(index.waitForExistence(timeout: 3))
         let home = index.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Home")).firstMatch
         let reading = index.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading")).firstMatch
@@ -166,6 +164,12 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
 
     @MainActor private func element(_ identifier: String) -> XCUIElement {
         window.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
+    }
+
+    /// Clicks a sidebar row at the middle of its words. The row's label is not "hittable" to UI testing, which wants the
+    /// click to land on the label itself, while the list row around it takes the click.
+    @MainActor private func choose(_ title: String) {
+        sidebarText(title).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     }
 
     @MainActor private func sidebarText(_ title: String) -> XCUIElement {

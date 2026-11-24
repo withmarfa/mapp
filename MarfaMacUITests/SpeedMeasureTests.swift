@@ -8,7 +8,8 @@ import XCTest
 ///
 /// It runs only in the `Measure UI` plan with `MARFA_MAC_MEASURE_UI` set and the instance's address and key given as
 /// `MARFA_API_URL` and `MARFA_API_KEY` (xcodebuild's `TEST_RUNNER_` prefix hands them over); otherwise each test is
-/// skipped. The one write is an item it makes for the typing; `Scripts/measure-ui.sh` removes it afterwards.
+/// skipped. The one write is an item it makes for the typing; it prints the item's link as a `MADE|<title>|<link>` line, and
+/// `Scripts/measure-ui.sh` removes the item by that id afterwards.
 ///
 /// Each test prints `UI|<name>|<median>|<max>|<unit>` lines after XCTest's own report, for the time the test itself
 /// saw, from the action to the result it waited for. That includes UI testing's own query cost, so it bounds what a
@@ -137,17 +138,17 @@ nonisolated final class SpeedMeasureTests: XCTestCase {
         }
     }
 
-    /// The table on each place the sidebar offers, which is where a person feels the table rebuild its columns.
+    /// The table on each type place the sidebar offers, which is where a person feels the table rebuild its columns.
     @MainActor func testMovingBetweenTablePlaces() throws {
         try launchWarm()
         let types = typeRows().prefix(2)
         try XCTSkipIf(types.count < 2, "The instance shows fewer than two types in the sidebar")
-        let items = sidebarElement("SidebarPlace-all")
-        // The window is on the items; see testChoosingPlaces for why no place repeats the one before it.
-        let places = types.map(sidebarElement) + [items]
-        let titles = places.map(\.placeName)
-        let spots = places.map(spot)
-        items.click()
+        let first = sidebarElement(types[0])
+        let second = sidebarElement(types[1])
+        let titles = [second.placeName, first.placeName]
+        let spots = [spot(second), spot(first)]
+        // The window starts on the first type's table, so no place repeats the one before it: see testChoosingPlaces.
+        spot(first).click()
         app.typeKey("3", modifierFlags: .command)
         XCTAssertTrue(element("ItemTable").waitForExistence(timeout: 60), "the table showed")
         try begin("table.places")
@@ -162,7 +163,7 @@ nonisolated final class SpeedMeasureTests: XCTestCase {
     /// Moving the selection down the table one row at a time, which moves the soft selection's marks.
     @MainActor func testSelectingInTheTable() throws {
         try launchWarm()
-        sidebarElement("SidebarPlace-all").click()
+        try chooseFirstType()
         app.typeKey("3", modifierFlags: .command)
         let table = element("ItemTable")
         XCTAssertTrue(table.waitForExistence(timeout: 60), "the table showed")
@@ -179,7 +180,7 @@ nonisolated final class SpeedMeasureTests: XCTestCase {
     /// Clicking one card after another in the gallery.
     @MainActor func testSelectingInTheGallery() throws {
         try launchWarm()
-        sidebarElement("SidebarPlace-all").click()
+        try chooseFirstType()
         app.typeKey("2", modifierFlags: .command)
         let gallery = element("ItemGallery")
         XCTAssertTrue(gallery.waitForExistence(timeout: 60), "the gallery showed")
@@ -236,8 +237,10 @@ nonisolated final class SpeedMeasureTests: XCTestCase {
     /// addresses, and one with a very long field, each between two short ones, so every open replaces a different page.
     @MainActor func testOpeningLargeItems() throws {
         try launchWarm()
+        // The sidebar folds the types after the first few under Show More.
+        if !typeRows().contains(where: { $0.hasSuffix("core.media.article") }) { sidebarElement("SidebarShowMore").click() }
         let place = try XCTUnwrap(typeRows().first { $0.hasSuffix("core.media.article") }, "The instance shows the Article type in the sidebar")
-        sidebarElement(place).click()
+        spot(sidebarElement(place)).click()
         XCTAssertTrue(list.waitForExistence(timeout: 20))
         let titles = ["Speed open short", "Speed open long", "Speed open pictures", "Speed open long field"]
         var rows: [String: XCUICoordinate] = [:]
@@ -294,7 +297,7 @@ nonisolated final class SpeedMeasureTests: XCTestCase {
     // MARK: Typing
 
     /// Makes an item and types forty characters into its page one key at a time; `Scripts/measure-ui.sh` removes the
-    /// item afterwards. A keystroke's time runs from the key event until the app is idle again; the page reports no
+    /// item afterwards, by the id in the link this prints. A keystroke's time runs from the key event until the app is idle again; the page reports no
     /// echo to wait on, and reading its accessibility value costs more than a keystroke, so the text is checked once
     /// at the end. The total is the sum.
     @MainActor func testTypingInAnItem() throws {
@@ -305,8 +308,7 @@ nonisolated final class SpeedMeasureTests: XCTestCase {
         let field = element("QuickAddTitle")
         element("SidebarNew").click()
         XCTAssertTrue(field.waitForExistence(timeout: 30))
-        element("QuickAddType").click()
-        window.menuItems["Note"].click()
+        // A new item starts as a Note, which is what this types into.
         field.click()
         field.typeText(title)
         app.typeKey(.return, modifierFlags: .command)
@@ -318,9 +320,24 @@ nonisolated final class SpeedMeasureTests: XCTestCase {
         for character in text { time("key") { app.typeText(String(character)) } }
         samples["total"] = [samples["key", default: []].reduce(0, +)]
         XCTAssertTrue(waitUntil { (editor.value as? String)?.hasSuffix(String(text)) == true }, "the text showed in the page")
+        // Copy Link waits for the server to know the item, so it is asked until the link is on the pasteboard.
+        NSPasteboard.general.clearContents()
+        var link = ""
+        XCTAssertTrue(waitUntil(timeout: 60) {
+            self.app.typeKey("c", modifierFlags: [.command, .shift])
+            link = NSPasteboard.general.string(forType: .string) ?? ""
+            return !link.isEmpty
+        }, "Copy Link gave the new item's link")
+        print("MADE|\(title)|\(link)")
     }
 
     // MARK: Helpers
+
+    /// Chooses the first type the sidebar lists. A type's place takes the layout keys; the Items place is an index page.
+    @MainActor private func chooseFirstType() throws {
+        let place = try XCTUnwrap(typeRows().first, "The instance shows a type in the sidebar")
+        spot(sidebarElement(place)).click()
+    }
 
     @MainActor private func begin(_ name: String) throws {
         label = name

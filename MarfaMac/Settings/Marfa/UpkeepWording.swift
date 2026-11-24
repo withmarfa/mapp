@@ -84,31 +84,31 @@ nonisolated enum UpkeepWording {
         var problems: [(title: String, line: String)] = []
         switch backups.reason {
         case .noDestination?:
-            problems.append((String(localized: "No Backups Are Kept"), String(localized: "Choose a folder or an object store.")))
+            problems.append((String(localized: "No backups are kept"), String(localized: "Choose a folder or an object store.")))
         case .turnedOff?:
-            problems.append((String(localized: "Backups Are Turned Off"), String(localized: "Choose how often to back up.")))
+            problems.append((String(localized: "Backups are turned off"), String(localized: "Choose how often to back up.")))
         case .destinationUnusable?, nil:
             break
         }
         for fault in backups.faults {
             switch fault {
             case .runFailed:
-                problems.append((String(localized: "The Last Backup Didn’t Finish"), String(localized: "Files may be missing from it.")))
+                problems.append((String(localized: "The last backup didn’t finish"), String(localized: "Files may be missing from it.")))
             case .destinationRefusing:
-                problems.append((String(localized: "Backups Can’t Be Kept There"), String(localized: "The folder or object store isn’t taking them.")))
+                problems.append((String(localized: "Backups can’t be kept there"), String(localized: "The folder or object store isn’t taking them.")))
             case .filesWaiting(let count):
                 problems.append(
-                    (String(localized: "Files Are Waiting for a Second Copy"), String(localized: "\(count.formatted()) files aren’t copied to the backup place yet.")))
+                    (String(localized: "Files are waiting for a second copy"), String(localized: "\(count.formatted()) files aren’t copied to the backup place yet.")))
             case .damagedParts(let count):
-                problems.append((String(localized: "Some Stored Backups Are Damaged"), String(localized: "\(count.formatted()) parts are altered or can’t be read.")))
+                problems.append((String(localized: "Some stored backups are damaged"), String(localized: "\(count.formatted()) parts are altered or can’t be read.")))
             }
         }
         if problems.isEmpty {
             switch backups.state {
             case .failing:
-                problems.append((String(localized: "Backups Are Failing"), String(localized: "The server reports its backups aren’t working.")))
+                problems.append((String(localized: "Backups are failing"), String(localized: "The server reports its backups aren’t working.")))
             case .incomplete:
-                problems.append((String(localized: "Backups Are Incomplete"), String(localized: "The server reports the newest backup isn’t whole.")))
+                problems.append((String(localized: "Backups are incomplete"), String(localized: "The server reports the newest backup isn’t whole.")))
             case .ok, .off, .unknown:
                 break
             }

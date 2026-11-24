@@ -8,9 +8,7 @@ struct ViewLayoutsTests {
     private static let view = ItemID("view-open-tasks")
 
     private static func defaults() -> UserDefaults {
-        let suite = "MarfaMac.ViewLayoutsTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite) ?? .standard
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = ThrowawayDefaults.make("MarfaMac.ViewLayoutsTests")
         return defaults
     }
 

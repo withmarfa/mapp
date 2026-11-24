@@ -647,7 +647,7 @@ struct ValueEditingTests {
     // MARK: Quitting
 
     private func libraries(_ bench: HostBench, _ presenter: ValueEditPresenter) throws -> Libraries {
-        let defaults = try #require(UserDefaults(suiteName: "ValueEditingTests-\(UUID().uuidString)"))
+        let defaults = ThrowawayDefaults.make("ValueEditingTests")
         return Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, valuePanels: presenter)
     }
 
@@ -658,7 +658,7 @@ struct ValueEditingTests {
         let presenter = presenter(sessions)
         presenter.present(Self.request(.text(Self.note), item: item, in: library), anchor: anchor())
         sessions.all[0].model.typed = "my careful words"
-        let bench = try HostBench()
+        let bench = HostBench()
         let kept = try libraries(bench, presenter)
         #expect(await kept.flushEditors())
         #expect(!presenter.isOpen)
@@ -672,7 +672,7 @@ struct ValueEditingTests {
         let presenter = presenter(sessions)
         presenter.present(Self.request(.text(Self.note), item: item, in: library, write: { written.all.append($0); return true }), anchor: anchor())
         sessions.all[0].model.typed = "kept"
-        let bench = try HostBench()
+        let bench = HostBench()
         let kept = try libraries(bench, presenter)
         #expect(await kept.flushEditors(within: .seconds(5)))
         #expect(written.all == [PropertyValue.string("kept")] && library.notices.waiting.isEmpty)

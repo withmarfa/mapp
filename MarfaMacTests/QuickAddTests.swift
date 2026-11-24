@@ -6,11 +6,12 @@ import UniformTypeIdentifiers
 extension Browser {
     /// Quick add as a person uses it: open the panel, type, add.
     @discardableResult
-    func quickAdded(_ title: String, typeID: String? = nil, body: String = "", in library: any ItemLibrary, defaults: UserDefaults = .standard) async -> ItemID? {
+    func quickAdded(_ title: String, typeID: String? = nil, body: String = "", in library: any ItemLibrary, defaults: UserDefaults? = nil) async -> ItemID? {
         openQuickAdd(typeID: typeID, in: library)
         quickAdd.draft?.title = title
         quickAdd.draft?.body = body
-        return await saveQuickAdd(in: library, undoManager: nil, defaults: defaults)
+        // The browser's own defaults, never the host's standard ones, unless a test names others.
+        return await saveQuickAdd(in: library, undoManager: nil, defaults: defaults ?? self.defaults)
     }
 }
 
@@ -65,7 +66,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.body = "Ask about the date"
         browser.quickAdd.draft?.caret = 9
         browser.quickAdd.draft?.properties = ["priority": .string("high")]
-        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults))
 
         let item = try #require(library.item(id))
         #expect(item.type.rawValue == "core.task")
@@ -137,7 +138,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.title = "Plan"
         browser.quickAdd.draft?.body = "Steps"
         let typed = browser.quickAdd.draft
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) == nil)
         #expect(browser.quickAdd.isPresented)
         #expect(browser.quickAdd.draft == typed)
         #expect(!library.notices.waiting.isEmpty)
@@ -219,7 +220,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.title = "Trip"
         browser.quickAdd.draft?.body = "Plans"
         browser.quickAdd.draft?.files = [try disk.file("map 1.png", "map"), try disk.file("tickets.pdf", "pdf")]
-        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults))
         try #require(await eventually { browser.newEmbeds != nil })
 
         #expect(library.attachedFiles.map(\.name) == ["map 1.png", "tickets.pdf"])
@@ -241,7 +242,7 @@ struct QuickAddTests {
         browser.openQuickAdd(typeID: place.rawValue, in: library)
         browser.quickAdd.draft?.title = "Lisbon"
         browser.quickAdd.draft?.files = [try disk.file("brief.pdf")]
-        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults))
         try #require(await eventually { library.attachedFiles.count == 1 })
         #expect(library.attachedFiles.map(\.item) == [id])
         #expect(browser.newEmbeds == nil)
@@ -255,7 +256,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.title = "Trip"
         browser.quickAdd.draft?.body = "Plans"
         browser.quickAdd.draft?.files = [try disk.file("a.png"), try disk.file("b.png"), try disk.file("c.png")]
-        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults))
         try #require(await eventually { !library.notices.waiting.isEmpty })
 
         #expect(library.attachedFiles.map(\.name) == ["a.png", "c.png"])
@@ -279,14 +280,14 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [kept, gone]
         try FileManager.default.removeItem(at: gone.url)
 
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) == nil)
         #expect(library.created.isEmpty)
         #expect(browser.quickAdd.draft?.title == "Trip")
         #expect(browser.quickAdd.draft?.files == [kept])
         #expect(library.notices.waiting.first?.title == "File Not Found")
         #expect(library.notices.waiting.first?.message.contains("“gone.png”") == true)
 
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) != nil, "the person has been told; Add goes on")
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) != nil, "the person has been told; Add goes on")
     }
 
     @Test func aFileGoneAfterAddIsToldAsNotAttached() async throws {
@@ -297,7 +298,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.title = "Trip"
         let gone = try disk.file("gone.png")
         browser.quickAdd.draft?.files = [gone]
-        _ = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        _ = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults))
         try FileManager.default.removeItem(at: gone.url)
         library.deliverCreated()
         browser.finishNewItem(in: library)
@@ -313,7 +314,7 @@ struct QuickAddTests {
         browser.openQuickAdd(typeID: "core.note", in: library)
         browser.quickAdd.draft?.title = "Trip"
         browser.quickAdd.draft?.files = [try disk.file("a.png"), try disk.file("b.pdf")]
-        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults))
         library.refusedCreations.insert(id)
         browser.finishNewItem(in: library)
         #expect(browser.newItem == nil)
@@ -367,7 +368,7 @@ struct QuickAddTests {
         browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.title = "Holiday"
-        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) }
         #expect(await eventually { browser.quickAdd.isSaving })
         browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
         #expect(library.notices.waiting.isEmpty, "the file and its title are being added")
@@ -383,7 +384,7 @@ struct QuickAddTests {
         let browser = Browser()
         browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
-        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) }
         #expect(await eventually { browser.quickAdd.isSaving })
         browser.quickAdd.draft?.title = "Typed meanwhile"
         browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
@@ -405,12 +406,12 @@ struct QuickAddTests {
         #expect(QuickAdd.showsBody(draft, in: library.catalogue))
         #expect(!QuickAdd.canSave(draft, in: library))
 
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) == nil)
         #expect(library.addedFiles.isEmpty)
         #expect(browser.quickAdd.draft?.body == "Where we went")
 
         browser.quickAdd.draft?.body = ""
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) != nil)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) != nil)
         #expect(library.addedFiles.count == 1)
     }
 
@@ -431,7 +432,7 @@ struct QuickAddTests {
         draft = try #require(browser.quickAdd.draft)
         #expect(QuickAdd.showsBody(draft, in: library.catalogue))
         #expect(!QuickAdd.canSave(draft, in: library))
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) == nil)
         #expect(library.created.isEmpty)
 
         browser.chooseQuickAddType("core.note", in: library)
@@ -451,7 +452,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.parentID = project.id
         browser.quickAdd.draft?.files = [try disk.file("photo.png", "png")]
         browser.quickAdd.draft?.title = "Holiday"
-        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults))
 
         let added = try #require(library.addedFiles.first)
         #expect(added.name == "photo.png" && added.data == Data("png".utf8) && added.title == "Holiday")
@@ -477,9 +478,9 @@ struct QuickAddTests {
         browser.openQuickAdd(in: library)
         browser.quickAdd.draft?.parentID = project.id
         browser.quickAdd.draft?.title = "Plan"
-        let first = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        let first = Task { await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) }
         #expect(await eventually { browser.quickAdd.isSaving })
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil, "a second Add while the first is checked does nothing")
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) == nil, "a second Add while the first is checked does nothing")
         release.yield()
         #expect(await first.value != nil)
         #expect(library.items.count == 2, "the project and one new item")
@@ -491,7 +492,7 @@ struct QuickAddTests {
         browser.openQuickAdd(in: library)
         browser.quickAdd.draft?.parentID = project.id
         browser.quickAdd.draft?.title = "Plan"
-        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) }
         #expect(await eventually { browser.quickAdd.isSaving })
         browser.quickAdd.draft?.title = "Plan the launch"
         release.yield()
@@ -510,7 +511,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.parentID = project.id
         browser.quickAdd.draft?.title = "Plan"
         browser.quickAdd.draft?.body = "The first steps"
-        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) }
         #expect(await eventually { browser.quickAdd.isSaving })
         browser.putAwayQuickAdd()
         browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
@@ -534,7 +535,7 @@ struct QuickAddTests {
         browser.openQuickAdd(in: library)
         browser.quickAdd.draft?.parentID = project.id
         browser.quickAdd.draft?.title = "Plan"
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) == nil)
         #expect(library.items == [project], "no item was made")
         #expect(library.notices.waiting.last?.message == "That item is in the bin.")
         #expect(browser.quickAdd.draft?.title == "Plan", "the draft stays as typed")
@@ -550,7 +551,7 @@ struct QuickAddTests {
         #expect(draft.files.count == 2, "changing the kind keeps the files")
         #expect(QuickAdd.holdsFilesItCannotKeep(draft, in: library.catalogue))
         #expect(!QuickAdd.canSave(draft, in: library))
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) == nil)
         #expect(library.addedFiles.isEmpty)
 
         browser.quickAdd.draft?.files.removeLast()
@@ -564,7 +565,7 @@ struct QuickAddTests {
         let browser = Browser()
         browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
         browser.quickAdd.draft?.files = [try disk.file("a.pdf")]
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) == nil)
         #expect(browser.quickAdd.draft?.files.map(\.name) == ["a.pdf"])
         #expect(browser.quickAdd.isPresented)
     }
@@ -706,7 +707,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.add(.field("assignee"))
         browser.quickAdd.draft?.setParent(project.id)
         browser.quickAdd.draft?.remove(.field("assignee"), in: library.catalogue)
-        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults))
 
         let item = try #require(library.item(id))
         #expect(item.value(of: "priority") == .string("low"))
@@ -794,12 +795,12 @@ struct QuickAddTests {
         let draft = try #require(browser.quickAdd.draft)
         #expect(QuickAdd.holdsMissingParent(draft, in: library))
         #expect(!QuickAdd.canSave(draft, in: library))
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) == nil)
         #expect(library.created.isEmpty)
         #expect(QuickAdd.shownChips(draft, in: library.catalogue).contains(.parent), "so it can be removed")
 
         browser.quickAdd.draft?.remove(.parent, in: library.catalogue)
-        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) != nil)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) != nil)
     }
 
     // MARK: A file takes a parent and no field
@@ -857,7 +858,7 @@ struct QuickAddTests {
         browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.setParent(project.id)
-        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil, defaults: browser.defaults) }
         #expect(await eventually { browser.quickAdd.isSaving })
         browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
         #expect(library.notices.waiting.isEmpty, "the file and its parent are being added")

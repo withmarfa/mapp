@@ -12,7 +12,7 @@ struct WebPageItemPageTests {
         var item: Item
         let details = DetailsPresentation()
         /// The page's Reader or Original choice is kept here, so no other test or run sees it.
-        let defaults = UserDefaults(suiteName: "WebPageItemPageTests-\(UUID().uuidString)")!
+        let defaults = ThrowawayDefaults.make("WebPageItemPageTests")
         init(_ item: Item) { self.item = item }
     }
 

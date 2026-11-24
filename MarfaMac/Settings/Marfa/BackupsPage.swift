@@ -99,7 +99,7 @@ struct BackupsPage: View {
             SettingsSection("Where and When") {
                 if let failure = model.settingsFailure {
                     OwnerProblemRow(
-                        title: "Couldn’t Read Backup Settings", failure: failure, page: .backups, host: host,
+                        title: "Couldn’t read backup settings", failure: failure, page: .backups, host: host,
                         retry: { Task { await model.load() } })
                 }
                 keepIn
@@ -127,7 +127,7 @@ struct BackupsPage: View {
                 if hasDestination { lastBackup }
             }
             if let failure = model.rowError {
-                OwnerProblem(title: "Couldn’t Change This", failure: failure, page: .backups, host: host)
+                OwnerProblem(title: "Couldn’t change this", failure: failure, page: .backups, host: host)
             }
         }
     }

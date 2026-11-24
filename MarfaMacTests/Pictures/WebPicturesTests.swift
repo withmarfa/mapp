@@ -9,11 +9,10 @@ import Testing
 @MainActor struct WebPicturesTests {
     private let folder: TemporaryFolder
     private let defaults: UserDefaults
-    private let suite = "WebPicturesTests-\(UUID().uuidString)"
 
     init() throws {
         folder = try TemporaryFolder()
-        defaults = try #require(UserDefaults(suiteName: suite))
+        defaults = ThrowawayDefaults.make("WebPicturesTests")
     }
 
     private func pictures(

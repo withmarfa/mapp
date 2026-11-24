@@ -15,7 +15,11 @@ nonisolated final class PersonPageTests: XCTestCase {
     /// The header of a person's page, with the inspector open at the test window's size, keeps its title and contact
     /// lines readable: each is wider than a few characters, not set one character to a line.
     @MainActor func testPersonHeaderStaysReadableBesideTheInspector() {
-        app.outlines["Sidebar"].descendants(matching: .any).matching(identifier: "SidebarType-core.entity.person").element(boundBy: 0).click()
+        // The sidebar lists a few types and folds the rest under Show More.
+        let sidebar = app.outlines["Sidebar"]
+        let person = sidebar.descendants(matching: .any).matching(identifier: "SidebarType-core.entity.person").element(boundBy: 0)
+        if !person.exists { sidebar.descendants(matching: .any)["SidebarShowMore"].click() }
+        person.click()
         let row = app.outlines["ItemList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Ruth Okonjo")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()

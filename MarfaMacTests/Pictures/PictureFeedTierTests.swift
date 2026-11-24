@@ -13,7 +13,7 @@ import Testing
 
     init() throws {
         folder = try TemporaryFolder()
-        defaults = try #require(UserDefaults(suiteName: "PictureFeedTierTests-\(UUID().uuidString)"))
+        defaults = ThrowawayDefaults.make("PictureFeedTierTests")
         defaults.set(RemotePictureSetting.always.rawValue, forKey: RemotePictureSetting.key)
     }
 

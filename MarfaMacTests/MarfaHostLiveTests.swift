@@ -126,7 +126,7 @@ extension LiveMarfaTests {
         /// A throwaway key on a throwaway copy, so the real key is never revoked.
         @Test(.timeLimit(.minutes(2)))
         func aWrongKeyIsRefusedUntilTheRightOneIsGiven() async throws {
-            let bench = try HostBench()
+            let bench = HostBench()
             let host = host(bench)
             try await host.connect(address: try LiveMarfa.address(), key: "marfamactest-not-a-key-\(UUID().uuidString)")
             #expect(await eventually { host.state == .keyRefused }, "\(host.state)")

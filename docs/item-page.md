@@ -161,7 +161,7 @@ Built, not yet released. Where an item opens is Settings > General > Open Items 
 - Escape, the close button and a click on the dimmed area close the modal, and what was typed is saved as it closes. The modal also closes when another item, place or layout is chosen, when Version History opens, and when its item is gone from the library, and a search puts it, or a full page, away in every layout. An item that leaves the list while the modal is open closes it with the selection that held it.
 - New window from the modal closes it and opens the item in a window, after saving what was typed.
 - A link followed from the modal opens in the modal.
-- A full page takes the window in place of the layout, with a plain Back button at the toolbar's leading edge. The button has no label; Back in the View menu and Command-[ do the same. It is available from the list as well as from the other layouts. A full page has no view options.
+- A full page takes the window in place of the layout, with Back over the sidebar, or a plain Back arrow at the toolbar's leading edge while the sidebar or its Back and Forward do not show. Back in the View menu and Command-[ do the same. It is available from the list as well as from the other layouts. A full page has no view options.
 
 ## Spacing
 

@@ -54,7 +54,7 @@ import Testing
     }
 
     @MainActor @Test func anUnknownSourceCanBeRemovedAndTheRestStays() throws {
-        let defaults = try #require(UserDefaults(suiteName: "SearchLeaveOutList-\(UUID())"))
+        let defaults = ThrowawayDefaults.make("SearchLeaveOutList")
         let store = SearchLeaveOuts(defaults: defaults)
         store.update("marfa:a") { $0.sources = ["gone", "github"]; $0.types = [F.ticket] }
         store.update("marfa:a") { $0.sources.remove("gone") }

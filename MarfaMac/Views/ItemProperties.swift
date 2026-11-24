@@ -42,18 +42,20 @@ struct ItemPropertyRow: View {
     private var input: ItemPropertyDraft { retainedDraft ?? localDraft }
 
     var body: some View {
-        InspectorRow(fieldLabel: definition.label) {
-            VStack(alignment: .leading, spacing: 4) {
-                core.background(ValueEditAnchor(box: anchor))
-                if let invalidValue {
-                    Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
+        Group {
+            if isList {
+                // A list's entries need the sidebar's whole width, so its name sits above them.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(LocalizedStringKey(definition.label)).foregroundStyle(.secondary).help(definition.label)
+                        .onTapGesture { openEditor() }
+                    content
                 }
-                if isEditable && input.conflicts(with: currentText) { conflictNotice }
-                if input.rejected, !isList { rejectedNotice }
-                if lostEdit { lostEditNotice }
+                .interfaceFont(.body)
+            } else {
+                InspectorRow(fieldLabel: definition.label) { content }
+                    .onNameTap(panelKind != nil && isEditable ? { openEditor() } : nil)
             }
         }
-        .onNameTap(panelKind != nil && isEditable ? { openEditor() } : nil)
         .contextMenu { menu }
         .onAppear {
             input.field = definition
@@ -68,6 +70,18 @@ struct ItemPropertyRow: View {
             if !input.isDirty { editing = false }
         }
         .onDisappear(perform: leave)
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            core.background(ValueEditAnchor(box: anchor))
+            if let invalidValue {
+                Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
+            }
+            if isEditable && input.conflicts(with: currentText) { conflictNotice }
+            if input.rejected, !isList { rejectedNotice }
+            if lostEdit { lostEditNotice }
+        }
     }
 
     // MARK: Value

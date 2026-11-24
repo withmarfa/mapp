@@ -50,7 +50,7 @@ import Testing
 
     @Test(arguments: [false, true])
     func aSignInThatLeavesTheReplacedApprovalStandingTellsHowToEndIt(stands: Bool) async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "https://marfa.test", key: "one")
         host.notices.answerAll()
@@ -70,7 +70,7 @@ import Testing
     }
 
     @Test func aCodeSignInTellsItToo() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         let signIns = bench.signIns
         let address = try MarfaConnection(address: "https://marfa.test").address

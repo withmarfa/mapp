@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
-"""Reads `marfa search --json` answers on standard input, one after another, and prints the id of each item that a
-`Measure UI` run made: a `core.note` titled `Speed measure` and eight hex digits, or a `core.media.article` titled
-as `speed-fixtures.py` names it. Matching the type and the exact title in the data, never the table the command
-prints, leaves every other item alone. `Scripts/measure-ui.sh` removes what this prints."""
+"""Reads one `marfa ... --json` answer, or a `Measure UI` run's output, on standard input and prints an item id, for
+`Scripts/measure-ui.sh`, which removes only the items it recorded. It looks nothing up by name.
+
+  created          the id in the answer of `marfa items create --json`
+  made             the id behind each `MADE|<title>|<link>` line the typing test prints: the last part of the link's path
+  titled <title>   the answer of `marfa items get --json` when the item has exactly that title, otherwise nothing
+"""
 import json
-import re
 import sys
+from urllib.parse import urlparse
 
-RULES = {
-    "core.note": re.compile(r"Speed measure [0-9A-F]+$"),
-    "core.media.article": re.compile(r"Speed open (short|long|pictures|long field)$"),
-}
-
-decoder, text, position = json.JSONDecoder(), sys.stdin.read(), 0
-while True:
-    while position < len(text) and text[position].isspace():
-        position += 1
-    if position >= len(text):
-        break
-    answer, position = decoder.raw_decode(text, position)
-    for hit in answer.get("data", []):
-        item = hit["item"]
-        rule = RULES.get(item.get("type"))
-        if rule and rule.match(str(item.get("properties", {}).get("title", ""))):
-            print(item["id"])
+mode = sys.argv[1] if len(sys.argv) > 1 else ""
+if mode == "created":
+    print(json.load(sys.stdin)["item"]["id"])
+elif mode == "made":
+    for line in sys.stdin:
+        parts = line.rstrip("\n").split("|", 2)
+        if parts[0] == "MADE" and len(parts) == 3:
+            print(urlparse(parts[2].strip()).path.rstrip("/").rsplit("/", 1)[-1], parts[1], sep="\t")
+elif mode == "titled" and len(sys.argv) == 3:
+    item = json.load(sys.stdin).get("item", {})
+    if item.get("properties", {}).get("title") == sys.argv[2]:
+        print(item["id"])
+else:
+    sys.exit("usage: measure-ids.py created | made | titled <title>")

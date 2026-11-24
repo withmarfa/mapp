@@ -14,8 +14,9 @@ enum ItemPreviewFixtures {
     /// The libraries a main window reads, on defaults and a store of their own that each call empties, with no
     /// server set.
     @MainActor static func libraries(named name: String = "MarfaMac.ItemPreview") -> Libraries {
-        let suite = "\(AppPaths.bundleIdentifier).\(name)"
-        let defaults = UserDefaults(suiteName: suite) ?? .standard
+        let throwaway = TestHost.isRequested ? ThrowawayDefaults.make(name) : nil
+        let suite = throwaway?.suite ?? "\(AppPaths.bundleIdentifier).\(name)"
+        let defaults = throwaway ?? UserDefaults(suiteName: suite) ?? .standard
         defaults.removePersistentDomain(forName: suite)
         return Libraries(
             host: MarfaHost(

@@ -9,7 +9,7 @@ import Testing
     // MARK: Refresh
 
     @Test func refreshIsOfferedOnlyWhereItCanDoSomething() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         #expect(!host.canRefresh, "no library")
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -40,7 +40,7 @@ import Testing
     }
 
     @Test func refreshAsksTheSourceToSyncOnlyWhenItIsOffered() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         host.refresh()
         try await host.connect(address: "http://first.test:8210", key: "k")

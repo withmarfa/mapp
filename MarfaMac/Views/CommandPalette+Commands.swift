@@ -35,12 +35,12 @@ extension CommandPalette {
             }
             if browser.isCollectionItemPresented {
                 add(String(localized: browser.viewMode.backTitle), "chevron.backward", historyKey("⌘["), in: .go) { browser.returnToCollection() }
-            } else if !browser.usesCollection {
-                if browser.canGoBack(in: library) {
-                    add(String(localized: "Back"), "chevron.backward", historyKey("⌘["), in: .go) { browser.go(.back, in: library) }
+            } else {
+                if browser.canStepBack(in: library) {
+                    add(String(localized: "Back"), "chevron.backward", historyKey("⌘["), in: .go) { browser.stepBack(in: library) }
                 }
-                if browser.canGoForward(in: library) {
-                    add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]"), in: .go) { browser.go(.forward, in: library) }
+                if browser.canStepForward(in: library) {
+                    add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]"), in: .go) { browser.stepForward(in: library) }
                 }
             }
             if browser.isModalPresented {

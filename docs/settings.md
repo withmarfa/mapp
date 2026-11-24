@@ -30,7 +30,7 @@ Every setting here is kept in the defaults on this Mac, and synced through the c
 - **Text.** Text Size is the size of the sidebar, lists and controls. The item page's own text size is in Editor.
 - **Fonts.** Text Font is any installed font for an item's text, and Code Font any installed monospaced font for code. The interface stays the system font. The installed fonts are listed when the page appears, never before. A font chosen and later uninstalled is shown as "<name> (Missing)" in its pop-up, and the page and the editor use the default meanwhile. A place or a type chosen in Start With or New Items Are that the library no longer has reads the same way, and the app falls back as it did. They reach the page as `--inkkit-font-family` and `--inkkit-monospace-font`.
 - **Materials.** Value Panels and Palettes: Glass, Solid, and Translucent for palettes.
-- **Window.** Title When Scrolling and Toolbar Background When Scrolling (both for an item's page), and Symbols on Subtypes in the sidebar.
+- **Window.** Back and Forward over the sidebar, Title When Scrolling and Toolbar Background When Scrolling (both for an item's page), and Symbols on Subtypes in the sidebar.
 - **Window Layout.** Where the sidebar and the list start in a new window, with From This Window: Reset puts the built-in widths back, and Use Current Widths keeps the widths of the front window.
 
 ## Editor

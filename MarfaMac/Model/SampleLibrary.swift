@@ -75,17 +75,16 @@ nonisolated enum SampleLibrary {
 
     /// What the fake copy answers `items.displays` with, shaped like the core's: the title, else the first line of the
     /// body, as the name, and the body as the preview, leaving out the line a name came from and every line before it
-    /// (`device/item-preview-after-name`), joined with single spaces and cut at 240 characters with an ellipsis
-    /// (`device/item-preview-text`). It strips no Markdown.
+    /// (`device/item-preview-after-name`), with its Markdown left out (`SamplePreview`), joined with single spaces and
+    /// cut at 240 characters with an ellipsis (`device/item-preview-text`).
     @Sendable nonisolated static func display(_ input: ItemDisplayInput) -> ItemDisplay {
         let title = input.properties["title"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let lines = (input.properties["body"]?.string ?? "").split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
         let first = lines.firstIndex { !$0.isEmpty }
-        let name = title.isEmpty ? first.map { lines[$0] } ?? "" : title
-        let rest = title.isEmpty ? first.map { lines[($0 + 1)...] } ?? [] : lines[...]
-        var preview = rest.joined(separator: " ").split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        if preview.count > 240 { preview = String(preview.prefix(239)) + "\u{2026}" }
+        let name = title.isEmpty ? first.map { SamplePreview.line(lines[$0]) } ?? "" : title
+        let rest = title.isEmpty ? first.map { Array(lines[($0 + 1)...]) } ?? [] : lines
+        let preview = SamplePreview.text(of: rest)
         return ItemDisplay(name: name.isEmpty ? nil : name, preview: preview.isEmpty ? nil : preview)
     }
 

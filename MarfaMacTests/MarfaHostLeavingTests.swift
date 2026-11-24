@@ -13,7 +13,7 @@ import Testing
 
     /// Writes made while the new address's copy opens, slowly, are not discarded with the old copy.
     @Test func writesMadeWhileAnotherAddressOpensKeepTheOldCopy() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "one")
         let old = try #require(bench.servers.last)
@@ -42,7 +42,7 @@ import Testing
     }
 
     @Test func aKeyThatCannotBeRemovedIsReported() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         bench.signIns.script(signOut: .failure(SourceFailure(kind: .denied, message: "The keychain refused.")))
@@ -55,7 +55,7 @@ import Testing
 
     /// A copy the person chose to discard, which could not be removed, is never opened again as it was.
     @Test func aCopyThatCannotBeRemovedIsReportedAndNotResumed() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: bench.root.path)
@@ -99,7 +99,7 @@ import Testing
     /// The copy is marked discarded before anything is removed, so a launch after a crash part way never sends
     /// what the person chose to discard.
     @Test func aCopyIsMarkedDiscardedBeforeItIsRemoved() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let suite = bench.suite
@@ -114,7 +114,7 @@ import Testing
     }
 
     @Test func aKeyAndACopyThatCannotBeRemovedAreBothReported() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         bench.signIns.script(signOut: .failure(SourceFailure(kind: .denied, message: "The keychain refused.")))

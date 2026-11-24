@@ -13,6 +13,7 @@ struct AppearancePage: View {
     @AppStorage(InterfaceKey.paletteMaterial) private var paletteMaterial = PaletteMaterial.standard
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsTitle = true
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true
+    @AppStorage(InterfaceKey.showsSidebarHistory) private var showsHistory = true
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
     /// Read when the page has appeared, since asking the system for every installed font is slow.
     @State private var families: [String] = []
@@ -60,6 +61,9 @@ struct AppearancePage: View {
                 }
             }
             SettingsSection("Window") {
+                SettingsRow("Back and Forward", line: "Over the sidebar.") {
+                    SettingsToggle(title: "Back and Forward", isOn: $showsHistory).accessibilityIdentifier("SidebarHistoryToggle")
+                }
                 SettingsRow("Title When Scrolling", line: "On an item’s page.") {
                     SettingsToggle(title: "Title When Scrolling", isOn: $showsTitle).accessibilityIdentifier("ToolbarScrolledTitle")
                 }
