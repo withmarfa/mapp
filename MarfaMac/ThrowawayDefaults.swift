@@ -53,10 +53,15 @@ nonisolated final class ThrowawayDefaults: UserDefaults {
 
     deinit {
         // Through another instance: removing it through this one posts a change notification carrying an object
-        // already being freed, which crashes any observer that reads it.
-        UserDefaults().removePersistentDomain(forName: suite)
-        try? FileManager.default.removeItem(atPath: suite + ".plist")
-        Self.held.withLock { _ = $0.remove(suite) }
+        // already being freed, which crashes any observer that reads it. Later, not here: the last release can come
+        // while the notification center is delivering (an async sequence of defaults changes drops the notification
+        // that held this object), and posting from inside that delivery takes its lock twice and aborts the process.
+        let suite = suite
+        DispatchQueue.main.async {
+            UserDefaults().removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(atPath: suite + ".plist")
+            Self.held.withLock { _ = $0.remove(suite) }
+        }
     }
 }
 #endif
