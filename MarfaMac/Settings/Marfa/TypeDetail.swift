@@ -30,13 +30,15 @@ struct TypeDetail: View {
         }
     }
 
-    /// The owner's type opens its items in the app where the app can and it has any; Marfa's and a plugin's make a type based
-    /// on them.
+    /// The owner's type opens its own items in the app where the app can and it has any, as the main window lists a type's
+    /// own items; Marfa's and a plugin's make a type based on them.
     @ViewBuilder private var headButton: some View {
         switch type.origin {
         case .registered, .unknown:
-            if let openInApp = host.openInApp, model.count(of: type.id) > 0 {
-                SettingsButton(verbatim: String(localized: "Show \(model.count(of: type.id).formatted()) \(model.title(of: type))")) { openInApp(type.id) }
+            if let openInApp = host.openInApp, model.ownItemCount(of: type.id) > 0 {
+                SettingsButton(verbatim: String(localized: "Show \(model.ownItemCount(of: type.id).formatted()) \(model.title(of: type))")) {
+                    openInApp(type.id)
+                }
             }
         case .platform:
             SettingsButton(verbatim: String(localized: "New Type Based on \(model.title(of: type))…")) { model.beginChild(of: type.id) }
