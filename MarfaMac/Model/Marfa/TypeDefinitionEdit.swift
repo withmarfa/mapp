@@ -72,13 +72,16 @@ nonisolated enum TypeDefinitionEdit {
         /// What an own word means; empty leaves it out.
         case wordMeaning(value: String, text: String)
         /// A field the type declares. An enum field needs at least one choice, which the server judges.
-        case addField(key: String, label: String, kind: FieldKind, choices: [String])
+        case addField(NewFieldRecord)
         case field(key: String, TypeFieldChange)
         case removeField(key: String)
         /// Nil leaves out the type's own window, so the type above decides.
         case feedWindow(FeedWindow?)
         /// Nil leaves out the type's own default strategy, so the type above decides.
         case mergeStrategy(String?)
+        /// Every version for this many days and then only the newest: the three windows set alike. Nil leaves out the
+        /// type's own windows, so the type above or the server's settings decide. A `max_versions` the type holds is kept.
+        case versionWindow(Int?)
     }
 
     /// The replacement for `change` to `listed`. A word is added to the type's own status field, or to a redeclaration
@@ -117,13 +120,14 @@ nonisolated enum TypeDefinitionEdit {
                 changed.description = text.isEmpty ? nil : text
                 return changed
             }
-        case .addField(let key, let label, let kind, let choices):
-            guard own.fields.additionalProperties[key] == nil, !declaredAbove(key, from: listed, in: all) else {
-                throw .refused(String(localized: "This type already has a field named “\(label)”."))
+        case .addField(let new):
+            guard own.fields.additionalProperties[new.key] == nil, !declaredAbove(new.key, from: listed, in: all) else {
+                throw .refused(String(localized: "This type already has a field named “\(new.label)”."))
             }
-            guard let payload = Components.Schemas.FieldDefinition._TypePayload(rawValue: kind.rawValue) else { throw .changedOnServer }
-            update.fields.additionalProperties[key] = .init(
-                _type: payload, label: label, enumValues: kind == .choice ? choices : nil)
+            guard let payload = Components.Schemas.FieldDefinition._TypePayload(rawValue: new.kind.rawValue) else { throw .changedOnServer }
+            update.fields.additionalProperties[new.key] = .init(
+                _type: payload, label: new.label, required: new.isRequired ? true : nil, enumValues: new.kind == .choice ? new.choices : nil,
+                searchable: new.isSearchable ? nil : false)
         case .field(let key, let edit):
             // A field a type above declares is that type's to change, whatever the page showed.
             guard var field = own.fields.additionalProperties[key], !declaredAbove(key, from: listed, in: all) else { throw .changedOnServer }
@@ -157,6 +161,12 @@ nonisolated enum TypeDefinitionEdit {
             var policy = own.mergePolicy ?? .init()
             policy._default = name.flatMap(Components.Schemas.MergeStrategy.init(rawValue:))
             update.mergePolicy = policy._default == nil && (policy.fields?.additionalProperties.isEmpty ?? true) && policy.additionalProperties.isEmpty ? nil : policy
+        case .versionWindow(let days):
+            var policy = own.versionPolicy ?? .init()
+            policy.recentDays = days
+            policy.dailySnapshotDays = days
+            policy.weeklySnapshotDays = days
+            update.versionPolicy = days == nil && policy.maxVersions == nil && policy.additionalProperties.isEmpty ? nil : policy
         }
         return update
     }
@@ -200,6 +210,9 @@ nonisolated enum TypeDefinitionEdit {
             }
         case .mergeStrategy(let name):
             return type.mergePolicy?._default?.rawValue == name
+        case .versionWindow(let days):
+            let policy = type.versionPolicy
+            return policy?.recentDays == days && policy?.dailySnapshotDays == days && policy?.weeklySnapshotDays == days
         }
     }
 

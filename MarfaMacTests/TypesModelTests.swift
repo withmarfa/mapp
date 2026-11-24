@@ -33,9 +33,12 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         var types: [TypeRecord] = []
         var readings: [String: TypeReading] = [:]
         var changes: [(type: String, edit: TypeEdit)] = []
-        var children: [(id: String, label: String, parent: String)] = []
+        var made: [NewTypeRecord] = []
         var started: [TypeEdit] = []
-        var deleted: [String] = []
+        var deleted: [(type: String, force: Bool)] = []
+        var moves: [(type: String, target: String)] = []
+        var preview = TypeMovePreview(items: 0, settings: [])
+        var moveResult = TypeMoveResult(remaining: 0, remainingHidden: false)
         var refusal: TypeFailure?
         var deleteRefusal: TypeFailure?
         var gate: TypeCallGate?
@@ -93,19 +96,32 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         }
     }
 
-    func delete(_ type: String) async throws(TypeFailure) {
-        if let refusal = state.withLock({ $0.deleteRefusal }) { throw refusal }
+    func delete(_ type: String, force: Bool) async throws(TypeFailure) {
+        if !force, let refusal = state.withLock({ $0.deleteRefusal }) { throw refusal }
         state.withLock {
-            $0.deleted.append(type)
+            $0.deleted.append((type, force))
             $0.types.removeAll { $0.id == type }
         }
     }
 
-    func addChild(id: String, label: String, below parent: String) async throws(TypeFailure) {
+    func addType(_ type: NewTypeRecord) async throws(TypeFailure) {
         if let refusal = state.withLock({ $0.refusal }) { throw refusal }
         state.withLock {
-            $0.children.append((id, label, parent))
-            $0.types.append(TypeRecord(id: id, label: label, parent: parent, origin: .registered, fields: [:]))
+            $0.made.append(type)
+            $0.types.append(
+                TypeRecord(id: type.id, label: type.label, plural: type.plural.isEmpty ? nil : type.plural, parent: type.parent, origin: .registered, icon: type.icon, fields: [:]))
+        }
+    }
+
+    func previewMove(of type: String, to target: String) async throws(TypeFailure) -> TypeMovePreview {
+        state.withLock { $0.preview }
+    }
+
+    func move(_ type: String, to target: String) async throws(TypeFailure) -> TypeMoveResult {
+        state.withLock { state in
+            state.moves.append((type, target))
+            if state.moveResult.isDone { state.deleteRefusal = nil }
+            return state.moveResult
         }
     }
 }
@@ -293,8 +309,8 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.identifier(forNamed: "Job") == "user.job_2")
         model.childName = "Café Hours"
         await model.makeChild()
-        #expect(calls.state.withLock { $0.children.map(\.id) } == ["user.cafe_hours"])
-        #expect(calls.state.withLock { $0.children.map(\.parent) } == ["common.ticket"])
+        #expect(calls.state.withLock { $0.made.map(\.id) } == ["user.cafe_hours"])
+        #expect(calls.state.withLock { $0.made.map(\.parent) } == ["common.ticket"])
         #expect(model.made == "user.cafe_hours")
         #expect(model.identifier(forNamed: "2nd Fitting") == "user.type_2nd_fitting")
     }
@@ -547,7 +563,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.fieldErrors[.newField] != nil)
         model.newFieldName = "Site Address"
         await model.makeField()
-        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.addField(key: "site_address", label: "Site Address", kind: .choice, choices: ["Gold", "Silver"])])
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.addField(NewFieldRecord(key: "site_address", label: "Site Address", kind: .choice, choices: ["Gold", "Silver"]))])
         #expect(!model.isAddingField)
     }
 
@@ -698,13 +714,17 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 
     @Test func deletingATypeLeavesItsPageAndTellsAServerRefusalInWords() async {
         let calls = withFields()
-        calls.state.withLock { $0.deleteRefusal = .inUse(items: 18, settings: 0) }
-        let model = model(calls, counts: ["user.job": 18])
+        calls.state.withLock { $0.deleteRefusal = .inUse(items: 2, settings: 1) }
+        let model = model(calls)
         await model.load()
         model.open("user.job")
         await model.deleteType()
-        #expect(model.deleteFailure == "Jobs still holds 18 items, in the bin too. Move them to another type first.")
+        // Something uses it, in the bin or a setting, so the sheet asks what happens to it, and nothing is deleted yet.
+        #expect(model.isConfirmingDelete)
+        #expect(model.refusedUse?.items == 2)
         #expect(model.deleted == nil)
+        #expect(calls.state.withLock { $0.deleted.isEmpty })
+        model.cancelDelete()
         calls.state.withLock { $0.deleteRefusal = .hasSubtypes(["user.rework"]) }
         await model.deleteType()
         #expect(model.deleteFailure == "Types are based on Jobs: Rework. Change or delete those first.")
@@ -724,6 +744,120 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         model.open("core.task")
         await model.deleteType()
         #expect(calls.state.withLock { $0.deleted.isEmpty })
+    }
+
+    @Test func aMoveThatLeavesItemsBehindKeepsTheTypeAndSaysWhy() async {
+        let calls = withFields()
+        calls.state.withLock {
+            $0.deleteRefusal = .inUse(items: 18, settings: 0)
+            $0.preview = TypeMovePreview(items: 18, settings: [])
+            $0.moveResult = TypeMoveResult(remaining: 3, remainingHidden: false)
+        }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(model.moveTarget == "core.task")
+        #expect(await eventually { model.movePreview != nil })
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.map(\.target) } == ["core.task"])
+        #expect(calls.state.withLock { $0.deleted.isEmpty })
+        #expect(model.deleted == nil)
+        #expect(model.isConfirmingDelete)
+        #expect(model.deleteSheetFailure == "3 items couldn’t move, so Jobs was kept.")
+    }
+
+    @Test func aTypeIsDeletedUnforcedOnlyOnceItsItemsHaveMoved() async {
+        let calls = withFields()
+        calls.state.withLock {
+            $0.deleteRefusal = .inUse(items: 18, settings: 1)
+            $0.preview = TypeMovePreview(items: 18, settings: [TypeSettingRecord(kind: .view, id: "v1")])
+        }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(await eventually { model.movePreview != nil })
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.count } == 1)
+        #expect(calls.state.withLock { $0.deleted.map(\.force) } == [false])
+        #expect(model.deleted == "user.job")
+        #expect(!model.isConfirmingDelete)
+    }
+
+    @Test func leavingTheItemsDeletesTheTypeForcedAndMovesNothing() async {
+        let calls = withFields()
+        calls.state.withLock { $0.preview = TypeMovePreview(items: 18, settings: []) }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        model.deleteChoice = .leave
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.isEmpty })
+        #expect(calls.state.withLock { $0.deleted.map(\.force) } == [true])
+        #expect(model.deleted == "user.job")
+    }
+
+    @Test func aSettingAMoveCannotChangeHoldsTheMoveBack() async {
+        let calls = withFields()
+        calls.state.withLock {
+            $0.preview = TypeMovePreview(items: 18, settings: [TypeSettingRecord(kind: .folder, id: "f1", blocked: "Change its filter first.")])
+        }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(await eventually { model.movePreview != nil })
+        #expect(!model.canConfirmDelete)
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.isEmpty && $0.deleted.isEmpty })
+    }
+
+    @Test func aNewTypeBasedOnNothingIsSentWithItsPluralAndIcon() async {
+        let calls = listing()
+        let model = model(calls)
+        await model.load()
+        model.beginChild(of: nil)
+        #expect(model.childParent == nil)
+        model.childName = "Quote"
+        model.childPlural = " Quotes "
+        model.beginChildIcon()
+        await model.chooseIcon("lucide:quote")
+        #expect(!model.isChoosingChildIcon && model.isMakingChild)
+        await model.makeChild()
+        #expect(calls.state.withLock { $0.made } == [NewTypeRecord(id: "user.quote", label: "Quote", plural: "Quotes", icon: "lucide:quote", parent: nil)])
+        #expect(model.made == "user.quote")
+        #expect(TypesModel.regularPlural(of: "Story") == "Stories")
+        #expect(TypesModel.regularPlural(of: "Day") == "Days")
+        #expect(TypesModel.regularPlural(of: "Box") == "Boxes")
+        #expect(TypesModel.regularPlural(of: "URL") == "URLs")
+    }
+
+    @Test func aFieldIsAddedRequiredAndNotSearchableAsChosen() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.beginField()
+        model.newFieldName = "Site"
+        model.newFieldRequired = true
+        model.newFieldSearchable = false
+        await model.makeField()
+        #expect(
+            calls.state.withLock { $0.changes.map(\.edit) }
+                == [.addField(NewFieldRecord(key: "site", label: "Site", kind: .text, isRequired: true, isSearchable: false))])
+    }
+
+    @Test func keepVersionsSendsTheTypesOwnWindowsOrLeavesThemAbove() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        #expect(model.versionSelection(of: "user.job") == nil)
+        #expect(!model.keepsVersionsLonger(.days(30), of: "user.job"))
+        await model.setVersionWindow(.days(90), of: "user.job")
+        await model.setVersionWindow(nil, of: "user.job")
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.versionWindow(90)])
     }
 
     @Test func aNameTypedInTheNewTypeSheetIsHandedBackWhenSettingsCloses() async {
@@ -853,11 +987,11 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 
     @Test func aFieldIsAddedAndAChoiceFieldCarriesItsChoices() throws {
         let job = listed("user.job", parent: "core.task")
-        let text = try TypeDefinitionEdit.update(job, applying: .addField(key: "client", label: "Client", kind: .text, choices: []), in: [job, task])
+        let text = try TypeDefinitionEdit.update(job, applying: .addField(NewFieldRecord(key: "client", label: "Client", kind: .text)), in: [job, task])
         #expect(text.fields.additionalProperties["client"]?._type == .string)
         #expect(text.fields.additionalProperties["client"]?.label == "Client")
         #expect(text.fields.additionalProperties["client"]?.enumValues == nil)
-        let choice = try TypeDefinitionEdit.update(job, applying: .addField(key: "tier", label: "Tier", kind: .choice, choices: ["gold"]), in: [job, task])
+        let choice = try TypeDefinitionEdit.update(job, applying: .addField(NewFieldRecord(key: "tier", label: "Tier", kind: .choice, choices: ["gold"])), in: [job, task])
         #expect(choice.fields.additionalProperties["tier"]?._type == ._enum)
         #expect(choice.fields.additionalProperties["tier"]?.enumValues == ["gold"])
     }
@@ -865,7 +999,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     @Test func aFieldAParentDeclaresCannotBeAddedOrChangedHere() {
         let job = listed("user.job", parent: "core.task")
         #expect(throws: TypeSchemaFailure.self) {
-            try TypeDefinitionEdit.update(job, applying: .addField(key: "status", label: "Status", kind: .text, choices: []), in: [job, task])
+            try TypeDefinitionEdit.update(job, applying: .addField(NewFieldRecord(key: "status", label: "Status", kind: .text)), in: [job, task])
         }
         #expect(throws: TypeSchemaFailure.changedOnServer) {
             try TypeDefinitionEdit.update(job, applying: .field(key: "status", .required(true)), in: [job, task])
@@ -892,6 +1026,34 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(meaning.fields.additionalProperties["client"]?.description == nil)
         let removed = try TypeDefinitionEdit.update(job, applying: .removeField(key: "client"), in: [job])
         #expect(Set(removed.fields.additionalProperties.keys) == ["site"])
+    }
+
+    @Test func addingAFieldOrSettingVersionsSendsTheRestOfTheTypeBackAsItWas() throws {
+        let job = listed(
+            "user.job", parent: "core.task", guidance: "One job is one piece of paid work.", fields: [
+                "status": Definition(_type: .status, statusValues: [Word(value: "waiting", group: .notStarted, description: "Parts ordered.")]),
+                "client": Definition(_type: .string, label: "Client", required: true, searchable: false),
+            ])
+        let added = try TypeDefinitionEdit.update(
+            job, applying: .addField(NewFieldRecord(key: "site", label: "Site", kind: .text, isRequired: true, isSearchable: false)), in: [job, task])
+        #expect(added.fields.additionalProperties["site"] == Definition(_type: .string, label: "Site", required: true, searchable: false))
+        var versioned = job
+        versioned.value1.versionPolicy = .init(maxVersions: 200)
+        let windows = try TypeDefinitionEdit.update(versioned, applying: .versionWindow(90), in: [versioned, task])
+        #expect(windows.versionPolicy == .init(recentDays: 90, dailySnapshotDays: 90, weeklySnapshotDays: 90, maxVersions: 200))
+        let back = try TypeDefinitionEdit.update(versioned, applying: .versionWindow(nil), in: [versioned, task])
+        #expect(back.versionPolicy == .init(maxVersions: 200))
+        for update in [added, windows, back] {
+            #expect(update.fields.additionalProperties["status"] == job.value1.fields.additionalProperties["status"])
+            #expect(update.fields.additionalProperties["client"] == job.value1.fields.additionalProperties["client"])
+            #expect(update.guidance == "One job is one piece of paid work.")
+            #expect(update.label == "Job" && update.plural == "Jobs" && update.description == "Kitchens" && update.parent == "core.task")
+            #expect(update.version == 3)
+        }
+        #expect(try TypeDefinitionEdit.update(job, applying: .versionWindow(nil), in: [job, task]).versionPolicy == nil)
+        #expect(ServerTypeCalls.versionWindow(.init(recentDays: 30, dailySnapshotDays: 30, weeklySnapshotDays: 30)) == .days(30))
+        #expect(ServerTypeCalls.versionWindow(.init(recentDays: 30, dailySnapshotDays: 90, weeklySnapshotDays: 365)) == .custom)
+        #expect(ServerTypeCalls.versionWindow(.init(maxVersions: 10)) == nil)
     }
 
     @Test func aFeedWindowAndAMergeStrategyAreSetNeverAndLeftToTheTypeAbove() throws {

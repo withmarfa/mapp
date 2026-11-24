@@ -168,6 +168,8 @@ extension TypesModel {
         newFieldName = ""
         newFieldKind = .text
         newFieldChoices = ""
+        newFieldRequired = false
+        newFieldSearchable = true
         fieldErrors[.newField] = nil
         isAddingField = true
     }
@@ -211,7 +213,10 @@ extension TypesModel {
             fieldErrors[.newField] = String(localized: "This type already has a field named “\(name)”.")
             return
         }
-        let edit = TypeEdit.addField(key: key(forNamed: name, in: id), label: name, kind: newFieldKind, choices: typedChoices)
+        let edit = TypeEdit.addField(
+            NewFieldRecord(
+                key: key(forNamed: name, in: id), label: name, kind: newFieldKind, choices: newFieldKind == .choice ? typedChoices : [],
+                isRequired: newFieldRequired, isSearchable: newFieldSearchable))
         if await apply(edit, to: id, field: .newField) { isAddingField = false }
     }
 
@@ -254,5 +259,37 @@ extension TypesModel {
     func setMergeStrategy(_ name: String?, of id: String) async {
         guard let type = record(id), isEditable(type), name != mergeSelection(of: id) else { return }
         await apply(.mergeStrategy(name), to: id, field: .merge)
+    }
+
+    /// The lengths Keep Versions offers, and the type's own where it is another.
+    func versionDays(for id: String) -> [Int] {
+        var days = [7, 30, 90, 365, 730]
+        if case .days(let own)? = record(id)?.versionWindow, !days.contains(own) {
+            days.append(own)
+            days.sort()
+        }
+        return days
+    }
+
+    /// What the type sets for its versions; nil where it leaves them to the type above or to History.
+    func versionSelection(of id: String) -> VersionWindow? { record(id)?.versionWindow }
+
+    /// Whether a type above sets how long versions stay, so leaving it to the type above is not the same as History.
+    func versionsComeFromAbove(_ id: String) -> Bool { chain(of: id).dropLast().contains { $0.versionWindow != nil } }
+
+    /// Whether `window` keeps versions longer than the type does now, the one change made without asking: any other may
+    /// remove versions, which can't be recovered.
+    func keepsVersionsLonger(_ window: VersionWindow?, of id: String) -> Bool {
+        guard case .days(let new)? = window, case .days(let now)? = versionSelection(of: id) else { return false }
+        return new > now
+    }
+
+    func setVersionWindow(_ window: VersionWindow?, of id: String) async {
+        guard let type = record(id), isEditable(type), window != versionSelection(of: id) else { return }
+        switch window {
+        case .custom?: return
+        case .days(let days)?: await apply(.versionWindow(days), to: id, field: .versions)
+        case nil: await apply(.versionWindow(nil), to: id, field: .versions)
+        }
     }
 }

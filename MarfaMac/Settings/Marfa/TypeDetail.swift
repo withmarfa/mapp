@@ -14,7 +14,7 @@ struct TypeDetail: View {
     var body: some View {
         SettingsPageColumn {
             SettingsHead(lead: host.largeTypeMark(for: type.id), title: Text(verbatim: model.title(of: type)), line: Text(verbatim: model.headLine(of: type))) {
-                SettingsButton("New Child Type…") { model.beginChild(of: type.id) }
+                headButton
             }
             if let failure = model.pageFailure { OwnerProblem(title: "Not Changed", failure: failure, page: .types, host: host) }
             typeSection
@@ -26,6 +26,20 @@ struct TypeDetail: View {
                 historySection
                 deleteSection
             }
+        }
+    }
+
+    /// The owner's type opens its items in the app where the app can; Marfa's and a plugin's make a type based on them.
+    @ViewBuilder private var headButton: some View {
+        switch type.origin {
+        case .registered, .unknown:
+            if let openInApp = host.openInApp {
+                SettingsButton(verbatim: String(localized: "Show \(model.count(of: type.id).formatted()) \(model.title(of: type))")) { openInApp(type.id) }
+            }
+        case .platform:
+            SettingsButton(verbatim: String(localized: "New Type Based on \(model.title(of: type))…")) { model.beginChild(of: type.id) }
+        case .plugin:
+            SettingsButton("New Child Type…") { model.beginChild(of: type.id) }
         }
     }
 
@@ -65,9 +79,15 @@ struct TypeDetail: View {
                         title: "Description", text: $model.descriptionText, isError: model.fieldErrors[.description] != nil, width: nil,
                         onSubmit: { Task { await model.commit(.description) } }, onEndEditing: { Task { await model.commit(.description) } })
                 }
+                guidanceRows
             } else {
                 iconRow
-                SettingsStackRow(title: Text("Description")) { SettingsStackText(text: type.description ?? String(localized: "None"), isLocked: true) }
+                let description = type.description ?? String(localized: "None")
+                if description.count <= 48 {
+                    SettingsRow("Description") { SettingsLockedValue(text: description) }
+                } else {
+                    SettingsStackRow(title: Text("Description")) { SettingsStackText(text: description, isLocked: true) }
+                }
             }
         }
     }
@@ -84,51 +104,61 @@ struct TypeDetail: View {
 
     // MARK: Guidance
 
-    private var guidanceSection: some View {
+    /// The owner's own guidance, in the Type section: what an agent or an app builder reads to use the type.
+    @ViewBuilder private var guidanceRows: some View {
         @Bindable var model = model
+        SettingsStackRow(
+            title: Text("Guidance"),
+            line: Text("\(TypesModel.length(of: model.guidanceText)) of \(TypesModel.guidanceLimit) characters. Markdown works."),
+            error: model.guidanceNeedsCommand ? String(localized: "This Marfa takes guidance only from the command line for now. Your text is kept here.") : model.fieldErrors[.guidance]
+        ) {
+            SettingsTextArea(
+                title: "Guidance", text: $model.guidanceText,
+                isError: model.guidanceNeedsCommand || model.fieldErrors[.guidance] != nil,
+                onEndEditing: { Task { await model.commit(.guidance) } })
+        }
+        if model.guidanceNeedsCommand {
+            let command = TypesModel.guidanceCommand(for: type.id)
+            SettingsRow(verbatim: command, line: String(localized: "Save the text as \(type.id).md beside \(type.id).json."), lines: nil) {
+                SettingsButton(model.copiedCommand == command ? "Copied" : "Copy") { model.copyGuidanceCommand(command) }
+            }
+        }
+    }
+
+    /// The guidance a plugin's or Marfa's type gives, and the guidance of the types above, read only. Shown only where there
+    /// is some, or where it couldn't be read.
+    @ViewBuilder private var guidanceSection: some View {
         let reading = model.reading(of: type.id)
         let failure = model.readingFailure(of: type.id)
-        let own = (reading?.guidance ?? type.guidance) ?? ""
+        let own = isEditable ? "" : (reading?.guidance ?? type.guidance) ?? ""
         let ancestors = reading?.ancestors ?? []
-        return SettingsSection("Guidance", line: "What an agent or an app builder reads to use the type.") {
-            if let failure {
-                OwnerProblemRow(title: "Couldn’t Read This Type’s Guidance", failure: failure, page: .types, host: host) {
-                    Task { await model.loadReading(of: type.id) }
-                }
-            }
-            if isEditable {
-                SettingsStackRow(
-                    title: Text("Guidance"),
-                    line: Text("\(TypesModel.length(of: model.guidanceText)) of \(TypesModel.guidanceLimit) characters. Markdown works."),
-                    error: model.guidanceNeedsCommand ? String(localized: "This Marfa takes guidance only from the command line for now. Your text is kept here.") : model.fieldErrors[.guidance]
-                ) {
-                    SettingsTextArea(
-                        title: "Guidance", text: $model.guidanceText,
-                        isError: model.guidanceNeedsCommand || model.fieldErrors[.guidance] != nil,
-                        onEndEditing: { Task { await model.commit(.guidance) } })
-                }
-                if model.guidanceNeedsCommand {
-                    let command = TypesModel.guidanceCommand(for: type.id)
-                    SettingsRow(verbatim: command, line: String(localized: "Save the text as \(type.id).md beside \(type.id).json."), lines: nil) {
-                        SettingsButton(model.copiedCommand == command ? "Copied" : "Copy") { model.copyGuidanceCommand(command) }
+        if failure != nil || !own.isEmpty || !ancestors.isEmpty {
+            SettingsSection("Guidance", line: "What an agent or an app builder reads to use the type.") {
+                if let failure {
+                    OwnerProblemRow(title: "Couldn’t Read This Type’s Guidance", failure: failure, page: .types, host: host) {
+                        Task { await model.loadReading(of: type.id) }
                     }
                 }
-            } else if own.isEmpty && ancestors.isEmpty {
-                if failure == nil { SettingsRow("No Guidance", look: .off) }
-            } else if !own.isEmpty {
-                SettingsStackRow(title: Text(type.origin == .plugin ? "From the Plugin" : "Guidance")) {
-                    SettingsStackText(text: own, isLocked: true, isMarkdown: true)
+                if !own.isEmpty {
+                    SettingsStackRow(title: Text(type.origin == .plugin ? "From the Plugin" : "Guidance")) {
+                        SettingsStackText(text: own, isLocked: true, isMarkdown: true)
+                    }
                 }
-            }
-            ForEach(ancestors, id: \.type) { above in
-                SettingsStackRow(title: Text("From \(model.title(of: above.type))")) { SettingsStackText(text: above.guidance, isLocked: true, isMarkdown: true) }
+                ForEach(ancestors, id: \.type) { above in
+                    SettingsStackRow(title: Text("From \(model.title(of: above.type))")) { SettingsStackText(text: above.guidance, isLocked: true, isMarkdown: true) }
+                }
             }
         }
     }
 
     // MARK: Statuses
 
-    private var statusLine: Text {
+    private var statusLine: Text? {
+        if model.fieldErrors[.word] != nil { return nil }
+        if let group = model.addingGroup, case let value = TypesModel.value(ofTyped: model.wordDraft), !value.isEmpty {
+            let title = TypesModel.groups.first { $0.id == group }?.title ?? ""
+            return Text("Return adds “\(TypesModel.title(ofWord: value))” as \(title).")
+        }
         if isEditable {
             if let parent = type.parent, model.record(parent) != nil {
                 return Text("Each word counts as one of four. Words from \(model.title(of: parent)) can’t change here.")
@@ -187,7 +217,9 @@ struct TypeDetail: View {
             SettingsSection("Fields") {
                 if !inherited.isEmpty {
                     SettingsRow(
-                        verbatim: String(AttributedString(localized: "^[\(inherited.count) Field](inflect: true) From \(parentTitle ?? source)").characters),
+                        verbatim: isEditable && parentTitle != nil
+                            ? String(AttributedString(localized: "^[\(inherited.count) Field](inflect: true) From \(parentTitle ?? "")").characters)
+                            : String(AttributedString(localized: "^[\(inherited.count) Field](inflect: true)").characters),
                         line: Self.summary(of: inherited), lead: .none
                     ) { SettingsLockedValue(text: source) }
                 }
@@ -225,6 +257,40 @@ struct TypeDetail: View {
         }
     }
 
+    /// Keeping versions for longer is sent at once; any other change may remove versions, which can't be recovered, so it asks.
+    private func askToKeepVersions(_ window: VersionWindow?) {
+        guard window != .custom, window != model.versionSelection(of: type.id) else { return }
+        guard !model.keepsVersionsLonger(window, of: type.id) else {
+            Task { await model.setVersionWindow(window, of: type.id) }
+            return
+        }
+        let items = model.title(of: type).localizedLowercase
+        let title: String
+        let message: String
+        if case .days(let days)? = window {
+            let length = Self.title(of: .days(days)).localizedLowercase
+            title = String(localized: "Keep Versions for \(length)?")
+            message = String(localized: "Versions of \(items) older than \(length) will be permanently deleted the next time \(host.serverName) tidies up, except each item’s newest. They can’t be recovered.")
+        } else {
+            let above = model.versionsComeFromAbove(type.id) ? (parentTitle ?? "") : String(localized: "History")
+            title = String(localized: "Leave Versions to \(above)?")
+            message = String(localized: "\(model.title(of: type)) will keep versions as \(above) says, which may remove some sooner than now. What it removes can’t be recovered.")
+        }
+        SettingsAlert.confirm(title: title, message: message, confirm: String(localized: "Change"), window: NSApp.keyWindow) { confirmed, _ in
+            guard confirmed else { return }
+            Task { await model.setVersionWindow(window, of: type.id) }
+        }
+    }
+
+    private static func title(of window: VersionWindow) -> String {
+        switch window {
+        case .days(let days):
+            if days % 365 == 0 { days == 365 ? String(localized: "1 Year") : String(localized: "\(days / 365) Years") }
+            else { days == 1 ? String(localized: "1 Day") : String(localized: "\(days) Days") }
+        case .custom: String(localized: "Custom")
+        }
+    }
+
     private static func title(of window: FeedWindow) -> String {
         switch window {
         case .never: String(localized: "Never")
@@ -234,6 +300,23 @@ struct TypeDetail: View {
 
     private var historySection: some View {
         SettingsSection("History") {
+            SettingsRow("Keep Versions", error: model.fieldErrors[.versions]) {
+                SettingsPopUp(
+                    title: "Keep Versions",
+                    selection: Binding<VersionWindow?> { model.versionSelection(of: type.id) } set: { askToKeepVersions($0) },
+                    isError: model.fieldErrors[.versions] != nil
+                ) {
+                    if model.versionsComeFromAbove(type.id), let parentTitle {
+                        Text("As \(parentTitle)").tag(VersionWindow?.none)
+                    } else {
+                        Text("As in History").tag(VersionWindow?.none)
+                    }
+                    ForEach(model.versionDays(for: type.id), id: \.self) { days in
+                        Text(verbatim: Self.title(of: .days(days))).tag(Optional(VersionWindow.days(days)))
+                    }
+                    if model.versionSelection(of: type.id) == .custom { Text("Custom").tag(Optional(VersionWindow.custom)) }
+                }
+            }
             SettingsRow("When Two Edits Meet", error: model.fieldErrors[.merge]) {
                 SettingsPopUp(
                     title: "When Two Edits Meet",
@@ -256,7 +339,8 @@ struct TypeDetail: View {
         let below = model.children(of: type.id)
         if !below.isEmpty { return String(localized: "Types are based on \(name). Change or delete those first.") }
         let items = model.ownItemCount(of: type.id)
-        if items > 0 { return String(AttributedString(localized: "It holds ^[\(items) item](inflect: true). Move them to another type first.").characters) }
+        if items == 1 { return String(localized: "Its 1 item moves to another type first.") }
+        if items > 1 { return String(localized: "Its \(items.formatted()) items move to another type first.") }
         return String(localized: "No item in your library holds it.")
     }
 
@@ -266,7 +350,9 @@ struct TypeDetail: View {
                 title: Text("Delete \(model.title(of: type))"), line: model.deleteFailure == nil ? Text(verbatim: deleteLine) : nil,
                 error: model.deleteFailure, lines: nil
             ) {
-                SettingsButton("Delete Type…", role: .destructive) { askToDelete() }.disabled(model.isDeleting)
+                SettingsButton("Delete Type…", role: .destructive) {
+                    if model.ownItemCount(of: type.id) > 0 { model.beginDelete() } else { askToDelete() }
+                }.disabled(model.isDeleting)
             }
         }
     }

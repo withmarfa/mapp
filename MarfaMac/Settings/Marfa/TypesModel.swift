@@ -10,7 +10,7 @@ import Observation
     /// What a refusal can be about on a type's page.
     enum Field: Hashable {
         case name, plural, description, guidance, basedOn, word, meaning, newType
-        case fieldName, fieldMeaning, fieldLongest, fieldRule, fieldSearchable, fieldRemove, choice, newField, feed, merge
+        case fieldName, fieldMeaning, fieldLongest, fieldRule, fieldSearchable, fieldRemove, choice, newField, feed, merge, versions
     }
 
     /// The four groups a status word sits in, in the order of a piece of work's life.
@@ -73,6 +73,8 @@ import Observation
     var newFieldName = ""
     var newFieldKind = FieldKind.text
     var newFieldChoices = ""
+    var newFieldRequired = false
+    var newFieldSearchable = true
     var isRenamingField = false
     var fieldNameDraft = ""
 
@@ -81,11 +83,27 @@ import Observation
     var deleteFailure: String?
     /// The type that was deleted, so the page can leave it.
     var deleted: String?
+    /// Whether the sheet is open that asks what happens to the items and settings that use the open type.
+    var isConfirmingDelete = false
+    var deleteChoice = DeleteChoice.move
+    /// The type the items move to.
+    var moveTarget: String?
+    /// What moving to `moveTarget` would do, read when the sheet opens and again when the target changes.
+    var movePreview: TypeMovePreview?
+    var movePreviewFailure: String?
+    /// What uses the type, as the server's refusal said, until the preview is read.
+    var refusedUse: (items: Int?, settings: Int)?
+    var deleteSheetFailure: String?
 
-    // The sheet that makes a child type.
+    // The sheet that makes a type.
     var isMakingChild = false
+    /// The type the new type is based on; nil is Nothing.
     var childParent: String?
     var childName = ""
+    var childPlural = ""
+    var childIcon: String?
+    /// Whether the icon sheet is choosing the new type's icon, which it gives back to the New Type sheet.
+    var isChoosingChildIcon = false
 
     var iconTarget: String?
     var iconSearch = ""
@@ -144,6 +162,7 @@ import Observation
         case .guidanceByApp: .refused(String(localized: "This Marfa takes guidance only from the command line for now."))
         case .canceled: .notConfirmed
         case .inUse, .hasSubtypes: .conflict
+        case .moveBlocked(let message): .refused(message)
         }
     }
 
