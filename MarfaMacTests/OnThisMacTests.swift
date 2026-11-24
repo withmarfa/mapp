@@ -28,7 +28,7 @@ private struct FakeArchive: ArchiveSource {
     }
 }
 
-/// The bytes of a whole test archive carrying `bytes` after its manifest.
+/// The test stream's manifest followed by its payload.
 private func archive(_ bytes: [UInt8]) -> Data {
     Data(manifestEntry() + bytes)
 }
@@ -143,10 +143,9 @@ private func archive(_ bytes: [UInt8]) -> Data {
     @Test func aCancelledExportRemovesOnlyItsOwnTemporaryFile() async throws {
         struct Endless: ArchiveSource {
             func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
-                while true {
-                    try write([1])
-                    try await Task.sleep(for: .milliseconds(5))
-                }
+                try write([1])
+                // Hold the stream open until the test cancels it.
+                try await Task.sleep(for: .seconds(3600))
             }
         }
         let folder = try folder()

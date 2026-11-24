@@ -3,7 +3,7 @@ import Testing
 @testable import MarfaMac
 
 @Suite(.hangLimit) @MainActor struct AutomaticExportTests {
-    /// A whole archive: a manifest naming `files` files, of which it carries `carried`.
+    /// A manifest naming `files` files, of which the archive carries `carried`.
     private struct Archive: ArchiveSource {
         var files = 0
         var carried = 0
@@ -16,7 +16,8 @@ import Testing
     private struct Held: ArchiveSource {
         func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
             try write(manifestEntry())
-            while true { try await Task.sleep(for: .milliseconds(10)) }
+            // Hold the stream open until the test cancels it.
+            try await Task.sleep(for: .seconds(3600))
         }
     }
 
@@ -41,8 +42,8 @@ import Testing
         return folder
     }
 
-    private func defaults() throws -> UserDefaults {
-        try #require(UserDefaults(suiteName: "automatic-export-\(UUID())"))
+    private func defaults() -> UserDefaults {
+        ThrowawayDefaults.make("AutomaticExportTests")
     }
 
     private func files(in folder: URL) throws -> [String] {
@@ -54,7 +55,7 @@ import Testing
         defer { try? FileManager.default.removeItem(at: folder) }
         let open = Open()
         var clock = Date(timeIntervalSince1970: 1_795_000_000)
-        let export = AutomaticExport(defaults: try defaults(), marfa: { open.marfa }, tell: { _, _ in }, now: { clock })
+        let export = AutomaticExport(defaults: defaults(), marfa: { open.marfa }, tell: { _, _ in }, now: { clock })
         await export.learn()
         export.set(.daily, folder: folder)
 
@@ -73,7 +74,7 @@ import Testing
     @Test func aPlanBelongsToTheMarfaItWasSetFor() async throws {
         let first = try folder()
         defer { try? FileManager.default.removeItem(at: first) }
-        let defaults = try defaults()
+        let defaults = defaults()
         let open = Open()
         let export = AutomaticExport(defaults: defaults, marfa: { open.marfa }, tell: { _, _ in })
         export.set(.daily, folder: first)
@@ -108,7 +109,7 @@ import Testing
         open.source = Down()
         var told: [String] = []
         var clock = Date(timeIntervalSince1970: 1_795_000_000)
-        let export = AutomaticExport(defaults: try defaults(), marfa: { open.marfa }, tell: { told.append($1) }, now: { clock })
+        let export = AutomaticExport(defaults: defaults(), marfa: { open.marfa }, tell: { told.append($1) }, now: { clock })
         await export.learn()
         export.set(.daily, folder: folder)
 
@@ -137,7 +138,7 @@ import Testing
     @Test func aResetStopsARunningExportAndNothingIsWrittenBack() async throws {
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let defaults = try defaults()
+        let defaults = defaults()
         let open = Open()
         open.source = Held()
         let export = AutomaticExport(defaults: defaults, marfa: { open.marfa }, tell: { _, _ in Issue.record("nothing is told") })
@@ -159,7 +160,7 @@ import Testing
         defer { try? FileManager.default.removeItem(at: folder) }
         let open = Open()
         open.source = Held()
-        let export = AutomaticExport(defaults: try defaults(), marfa: { open.marfa }, tell: { _, _ in })
+        let export = AutomaticExport(defaults: defaults(), marfa: { open.marfa }, tell: { _, _ in })
         await export.learn()
         export.set(.daily, folder: folder)
         let check = Task { await export.check() }
