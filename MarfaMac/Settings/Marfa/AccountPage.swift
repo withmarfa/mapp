@@ -81,7 +81,8 @@ struct AccountPage: View {
         }
     }
 
-    /// Profile, and below it, in a section of its own since it has a mark, what the sign-in may not change.
+    /// Profile, and below it, in a section of its own since it has a mark, what the sign-in may not change, or may not read:
+    /// a picture the sign-in may not see is shown only there, locked.
     @ViewBuilder private func profileSection(_ profile: OwnerProfile) -> some View {
         SettingsSection("Profile") {
             if profile.pictureIsReadable {
@@ -118,17 +119,37 @@ struct AccountPage: View {
                 }
             }
         }
-        if model.profileNeedsMore {
+        let locked = model.lockedProfile
+        if !locked.isEmpty {
             SettingsSection(name: nil) {
                 SettingsProblemRow(
-                    title: Text("Name and Picture"), line: Text("The app isn’t allowed to change your name and picture."), symbol: "lock",
+                    title: lockedTitle(locked), line: lockedLine(locked, pictureIsReadable: profile.pictureIsReadable), symbol: "lock",
                     tone: nil,
                     actions: [
                         SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { Task { await model.allowProfileChanges() } }
                     ]
                 )
                 .disabled(host.isAllowingMore)
+                .accessibilityIdentifier("AccountProfileLocked")
             }
+        }
+    }
+
+    private func lockedTitle(_ locked: Set<ProfileField>) -> Text {
+        switch (locked.contains(.name), locked.contains(.avatar)) {
+        case (true, true): Text("Name and Picture")
+        case (true, false): Text("Name")
+        default: Text("Picture")
+        }
+    }
+
+    private func lockedLine(_ locked: Set<ProfileField>, pictureIsReadable: Bool) -> Text {
+        switch (locked.contains(.name), locked.contains(.avatar), pictureIsReadable) {
+        case (true, true, true): Text("The app isn’t allowed to change your name and picture.")
+        case (true, true, false): Text("The app isn’t allowed to change your name, or to show or change your picture.")
+        case (true, false, _): Text("The app isn’t allowed to change your name.")
+        case (false, _, true): Text("The app isn’t allowed to change your picture.")
+        case (false, _, false): Text("The app isn’t allowed to show or change your picture.")
         }
     }
 

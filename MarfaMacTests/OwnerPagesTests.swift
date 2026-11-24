@@ -23,6 +23,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var changeableProfile = Set(ProfileField.allCases)
         var picture: Data?
         var namesSent: [String] = []
+        /// Names the server refuses once their send has been let go, as a refusal that comes after a wait.
+        var namesRefused: Set<String> = []
         var picturesSent: [Data] = []
         var passkeys: [OwnerPasskey] = []
         var browsers: [BrowserSignIn] = []
@@ -193,6 +195,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     func setProfileName(_ name: String) async throws(OwnerFailure) -> OwnerProfile {
         try enter("setProfileName")
         await held("setProfileName")
+        if state.withLock({ $0.namesRefused.contains(name) }) { throw .refused("The name can’t be used.") }
         return state.withLock { state in
             state.namesSent.append(name)
             state.profile.name = name.trimmingCharacters(in: .whitespaces)

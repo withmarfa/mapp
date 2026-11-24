@@ -36,8 +36,17 @@ import Observation
     /// The name as typed, sent on Return or when the field is left.
     var nameDraft = ""
     private(set) var nameError: String?
-    private var isSendingName = false
-    /// The picture's bytes, where there is one the sign-in may read.
+    /// The name being sent, and the newest one submitted while it is, which is sent after it. Only the newest submitted name
+    /// waits: an older one is never sent after a newer.
+    private var nameSending: String?
+    private var nameWaiting: String?
+    /// Counts each time Settings closes, so a send that ends after it hands back what failed instead of showing it.
+    private var nameClosings = 0
+    /// What the field was set back to when Settings closed, which follows the server's answer until the person types again.
+    private var nameShownAtClose: String?
+    /// The name still being sent when Settings closed, with nothing newer typed: handed back if its send fails.
+    private var nameOwedAtClose: String?
+    /// A small copy of the picture for its row, where there is one the sign-in may read. Nothing larger is kept.
     private(set) var picture: Data?
     private(set) var pictureError: String?
     private(set) var isSendingPicture = false
@@ -91,7 +100,8 @@ import Observation
                     picture = nil
                     return
                 }
-                picture = try await context.calls.profilePicture()
+                let read = try await context.calls.profilePicture()
+                picture = await Task.detached(priority: .utility) { read.flatMap(ProfilePicture.thumbnail) }.value
             },
             .required(signInsRead) { [self] () throws(OwnerFailure) in
                 guard canManageSignIns else {
@@ -107,10 +117,13 @@ import Observation
 
     // MARK: Name and picture
 
-    /// Whether the sign-in may read the profile but not change all of what the page shows of it.
-    var profileNeedsMore: Bool {
-        guard let profile else { return false }
-        return (profile.name != nil && !changeable.contains(.name)) || (profile.pictureIsReadable && !changeable.contains(.avatar))
+    /// What of the profile the page shows locked, since the sign-in may not change it, or may not read the picture at all.
+    var lockedProfile: Set<ProfileField> {
+        guard let profile else { return [] }
+        var locked: Set<ProfileField> = []
+        if profile.name != nil, !changeable.contains(.name) { locked.insert(.name) }
+        if !profile.pictureIsReadable || !changeable.contains(.avatar) { locked.insert(.avatar) }
+        return locked
     }
 
     /// Asks again for everything, the profile's scopes among them, and reads what the new sign-in may do.
@@ -125,56 +138,82 @@ import Observation
         return nameDraft.trimmingCharacters(in: .whitespacesAndNewlines) != held
     }
 
-    /// Sends the name typed, once, and again if the person typed more while it was sent. An empty name is refused here as the
-    /// server would refuse it. A refusal keeps what was typed.
+    /// Submits the name typed, checked as the server checks it. Names are sent one at a time; one submitted while another is
+    /// sent waits and replaces any that waited before it, so the newest submitted name is the last sent. A refusal keeps what
+    /// was typed.
     func saveName() async {
-        guard changeable.contains(.name), !isSendingName, isNameEdited else {
-            if !isNameEdited { nameError = nil }
+        guard changeable.contains(.name), profile?.name != nil else { return }
+        let name: String
+        switch ProfileName.checked(nameDraft) {
+        case .failure(let problem):
+            nameError = problem.line
             return
+        case .success(let checked):
+            name = checked
         }
-        let name = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else {
-            nameError = String(localized: "Enter a name.")
-            return
-        }
-        isSendingName = true
         nameError = nil
-        do {
-            let answered = try await context.calls.setProfileName(name)
-            isSendingName = false
-            profile = answered
-            if nameDraft.trimmingCharacters(in: .whitespacesAndNewlines) == name {
-                nameDraft = answered.name ?? name
-            } else {
-                await saveName()
+        if let sending = nameSending {
+            nameWaiting = name == sending ? nil : name
+            return
+        }
+        guard name != profile?.name else { return }
+        nameWaiting = name
+        await sendWaitingNames()
+    }
+
+    private func sendWaitingNames() async {
+        while let name = nameWaiting {
+            nameWaiting = nil
+            nameSending = name
+            let closings = nameClosings
+            defer { if closings != nameClosings, nameOwedAtClose == name { nameOwedAtClose = nil } }
+            do {
+                let answered = try await context.calls.setProfileName(name)
+                nameSending = nil
+                profile = answered
+                if closings != nameClosings {
+                    if nameDraft == nameShownAtClose { nameDraft = answered.name ?? "" }
+                    nameShownAtClose = nameDraft
+                } else if nameWaiting == nil, nameDraft.trimmingCharacters(in: .whitespacesAndNewlines) == name {
+                    nameDraft = answered.name ?? name
+                }
+            } catch {
+                nameSending = nil
+                await context.learn(from: error)
+                if case .notPermitted = error { changeable = context.calls.changeableProfile() }
+                if closings != nameClosings {
+                    if nameOwedAtClose == name { context.lateDraft(Self.nameNotChanged(name)) }
+                } else if nameWaiting == nil {
+                    nameError = OwnerWording.line(error, on: .account)
+                }
             }
-        } catch {
-            isSendingName = false
-            nameError = OwnerWording.line(error, on: .account)
-            await context.learn(from: error)
-            if case .notPermitted = error { changeable = context.calls.changeableProfile() }
         }
     }
 
-    /// Sends the picture in `file` as the owner's picture, drawn again where the contract's limits need it.
+    private static func nameNotChanged(_ name: String) -> OwnerDraft {
+        .typed(title: String(localized: "Name Not Changed"), text: name)
+    }
+
+    /// Sends the picture in `file` as the owner's picture: as it is where the server would take it, and drawn again where
+    /// not. The bytes sent are let go when the call ends; the row keeps only a small copy.
     func setPicture(from file: URL) async {
         guard changeable.contains(.avatar), !isSendingPicture else { return }
         isSendingPicture = true
         pictureError = nil
         defer { isSendingPicture = false }
-        let prepared = await Task.detached(priority: .userInitiated) { () -> Data? in
+        let prepared = await Task.detached(priority: .userInitiated) { () -> (sent: Data, shown: Data?)? in
             let scoped = file.startAccessingSecurityScopedResource()
             defer { if scoped { file.stopAccessingSecurityScopedResource() } }
-            guard let data = try? Data(contentsOf: file, options: .mappedIfSafe) else { return nil }
-            return ProfilePicture.prepared(data)
+            guard let data = try? Data(contentsOf: file, options: .mappedIfSafe), let sent = ProfilePicture.prepared(data) else { return nil }
+            return (sent, ProfilePicture.thumbnail(sent))
         }.value
         guard let prepared else {
             pictureError = String(localized: "That file isn’t a picture the app can use.")
             return
         }
         do {
-            profile = try await context.calls.setProfilePicture(prepared)
-            picture = prepared
+            profile = try await context.calls.setProfilePicture(prepared.sent)
+            picture = prepared.shown
         } catch {
             pictureError = OwnerWording.line(error, on: .account)
             await context.learn(from: error)
@@ -364,10 +403,15 @@ import Observation
     func takeDrafts() -> [OwnerDraft] {
         var drafts: [OwnerDraft] = []
         let name = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        if isNameEdited, !name.isEmpty {
-            drafts.append(.typed(title: String(localized: "Name Not Changed"), text: name))
+        let sentOrHeld = nameSending ?? profile?.name
+        if profile?.name != nil, !name.isEmpty, name != sentOrHeld {
+            drafts.append(Self.nameNotChanged(name))
         }
+        nameWaiting = nil
+        nameClosings += 1
         nameDraft = profile?.name ?? ""
+        nameShownAtClose = nameDraft
+        nameOwedAtClose = nameSending.flatMap { $0 == name ? $0 : nil }
         nameError = nil
         return drafts + takeSheetDrafts()
     }
