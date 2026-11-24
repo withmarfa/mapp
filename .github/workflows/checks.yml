@@ -1,7 +1,7 @@
 name: Checks
 
 # Changes selects jobs by path. An unmatched path selects all regular checks, including the Swift unit tests.
-# On a ready pull request, a change to this workflow selects every job.
+# On a ready pull request, a change to this workflow or to the change classifier selects every job.
 # A draft runs only Linux checks.
 # Swift starts on ready pull requests after any selected Instructions and Editor checks pass.
 # Changes limited to the String Catalog, Assets.xcassets or UI tests select the build.
