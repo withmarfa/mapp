@@ -529,6 +529,31 @@ import Testing
         await scene.close()
     }
 
+    /// The server never answers a write the person withdrew, so the source answers it: as refused for being withdrawn,
+    /// which a library takes as not made and tells no one of (`MarfaLibrary+PropertyEdits`).
+    @Test func aWriteWithdrawnThroughTheSourceIsAnsweredAsWithdrawn() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("blocked", title: "Blocked")]))
+        let write = WriteID()
+        scene.source.submit(.editProperties(ItemID("blocked"), ["title": .string("Blocked again")], base: ItemVersion(1)), as: write)
+        await scene.source.engineTook()
+        scene.fake.verdict = { _ in .blocked(reason: .failingAlone) }
+        _ = try await scene.copy.queue.drain()
+        await scene.hear(.forgotten)
+        let queued = try #require(try await scene.copy.queue.all().first { $0.itemId == "blocked" })
+        try #require(await eventually { scene.source.syncReport.problems.contains { $0.id == .write(queued.id) } })
+        #expect(scene.log.current.answer(to: write) == .blocked(.failingAlone, nil))
+
+        #expect(try await scene.source.resolve(.write(queued.id), by: .withdraw))
+        let answered = try #require(await scene.log.wait { state in
+            state.changes.contains { if case .answered(write, .refused, _) = $0 { true } else { false } }
+        })
+        let refusal = answered.changes.lazy.compactMap { change -> SyncProblem? in
+            if case .answered(write, .refused(let problem), _) = change { problem } else { nil }
+        }.first
+        #expect(refusal?.code == MarfaEngine.withdrawnCode)
+        await scene.close()
+    }
+
     // MARK: Whole reads
 
     @Test func aBatchNamingMoreThanAQuarterOfTheRowsReadsTheCopyWholeOnceAndNoRowAlone() async throws {

@@ -398,7 +398,8 @@ import Testing
         #expect(scene.lastWrite == name("Ada", base: 6))
     }
 
-    /// The person withdrew the earlier edit from the queue, so the server will never answer it.
+    /// The person withdrew the earlier edit from the queue, so the server will never answer it. The source answers it
+    /// as this sends (`MarfaEngineCoalescingTests.aWriteWithdrawnThroughTheSourceIsAnsweredAsWithdrawn`).
     @Test func anUndoBuiltOnAWithdrawnEditIsNotMade() async throws {
         let scene = try await loaded()
         let earlier = try scene.set("Ada L", undoable: false)
