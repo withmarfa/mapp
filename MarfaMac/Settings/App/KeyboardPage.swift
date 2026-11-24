@@ -58,7 +58,7 @@ struct KeyboardPage: View {
                         SettingsButton("Export…") { KeyboardFiles.export(from: libraries) }
                             .accessibilityIdentifier("ExportShortcuts")
                     }
-                    SettingsRow("Import Shortcuts", line: "Replaces the shortcuts you have now.") {
+                    SettingsRow("Import Shortcuts", line: "Updates the shortcuts included in the file.") {
                         SettingsButton("Import…") { KeyboardFiles.importShortcuts(into: libraries) }
                             .accessibilityIdentifier("ImportShortcuts")
                     }

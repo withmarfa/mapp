@@ -68,7 +68,7 @@ private struct LayoutsList: View {
                 SettingsRow("Export Layouts", line: "As a file you can keep or share.") {
                     SettingsButton("Export…") { LooksFiles.export(from: libraries) }.accessibilityIdentifier("ExportLayouts")
                 }
-                SettingsRow("Import Layouts", line: "Replaces the layouts you have now.") {
+                SettingsRow("Import Layouts", line: "Updates the type layouts included in the file.") {
                     SettingsButton("Import…") { LooksFiles.importLooks(into: libraries) }.accessibilityIdentifier("ImportLayouts")
                 }
             }
