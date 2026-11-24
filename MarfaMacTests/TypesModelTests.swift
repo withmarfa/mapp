@@ -979,7 +979,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         }
         await model.setStrict(true, of: "user.job")
         let held = owner.state.withLock { $0.sourceLimit }
-        #expect(owner.state.withLock { $0.limitsSent.count } == 1)
+        #expect(owner.state.withLock { $0.leversSent.count } == 1)
         #expect(held.isOn && held.types == ["core.highlight"] && held.sources == ["readwise"])
         #expect(held.allowlist?.types == ["core.task"] && held.allowlist?.sources == ["github"])
         #expect(held.strictTypes == ["user.quote", "user.rework", "user.job"])
@@ -995,9 +995,44 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(!model.isStrict("user.job"))
         owner.state.withLock { $0.sourceLimit.strictTypes = ["user.job"] }
         await model.setStrict(true, of: "user.job")
-        #expect(owner.state.withLock { $0.limitsSent.isEmpty })
+        #expect(owner.state.withLock { $0.leversSent.isEmpty })
         #expect(model.fieldErrors[.strict] == "Strict was changed somewhere else. Nothing was sent.")
         #expect(model.isStrict("user.job"))
+    }
+
+    /// Who May Write and a type's Strict switch saved at once share the one enforcement writer: the second reads the levers
+    /// only once the first has written, so it carries the first's change and both are held.
+    @Test func whoMayWriteAndStrictSavedAtOnceAreBothHeld() async {
+        let owner = FakeOwnerCalls()
+        owner.state.withLock {
+            $0.sources = [OwnerSource(code: "rss", name: "RSS")]
+            $0.keys = [KeyInfo(id: "key-rss", label: "RSS", source: "rss", permissions: [], tier: .library, types: ["*": .write], expires: nil, claims: [])]
+        }
+        let access = TypeAccess(
+            ownItems: { _ in 0 }, currentIcon: { _ in nil }, setIcon: { _, _ in nil }, markSets: [], marks: { _, _ in [] }, plural: { _ in nil })
+        let context = OwnerContext(calls: owner, grants: { [.schemaWrite, .configManage, .keysManage] })
+        let types = TypesModel(context: context, calls: listing(), access: access)
+        let writers = SourceLimitModel(rule: .allowlist, context: context)
+        await types.load()
+        await writers.load()
+        writers.types = ["core.note"]
+        writers.checkedSources = ["rss"]
+        let gate = owner.hold("setSourceLimit")
+        let allowlist = Task { await writers.save() }
+        #expect(await eventually { owner.calls.contains("setSourceLimit") })
+        let strict = Task { await types.setStrict(true, of: "user.job") }
+        gate.open()
+        await allowlist.value
+        gate.open()
+        await strict.value
+
+        let held = owner.state.withLock { $0.sourceLimit }
+        #expect(owner.state.withLock { $0.leversSent.count } == 2)
+        #expect(held.allowlist?.types == ["core.note"] && held.allowlist?.sources == ["rss"])
+        #expect(held.strictTypes == ["user.job"])
+        #expect(writers.line == nil)
+        #expect(types.fieldErrors[.strict] == nil)
+        #expect(types.isStrict("user.job"))
     }
 
     @Test func aSignInThatNoLongerHoldsConfigManageSendsNoStrictSwitch() async {
@@ -1010,7 +1045,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         await model.load()
         grants = [.schemaWrite]
         await model.setStrict(true, of: "user.job")
-        #expect(owner.state.withLock { $0.limitsSent.isEmpty })
+        #expect(owner.state.withLock { $0.leversSent.isEmpty })
         #expect(model.fieldErrors[.strict] == OwnerWording.line(.notPermitted("config.manage"), on: .types))
     }
 
@@ -1261,7 +1296,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         await #expect(throws: EnforcementSettings.Failure.anotherMarfa) {
             try await bench.context.writeEnforcement(readFrom: "instance-1", unchangedSince: { _ in true }) { $0.strictTypes = ["user.job"] }
         }
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
     }
 }
 

@@ -423,14 +423,12 @@ import Testing
 
 @MainActor
 @Suite(.hangLimit) struct SourceLimitModelTests {
-    private func model(_ bench: OwnerBench, sources: [MarfaSourceRow] = []) -> SourceLimitModel {
-        SourceLimitModel(context: bench.context, sources: { sources })
+    private func model(_ bench: OwnerBench, sources: [OwnerSource] = []) -> SourceLimitModel {
+        bench.calls.state.withLock { $0.sources = sources }
+        return SourceLimitModel(rule: .filter, context: bench.context)
     }
 
-    private let rows = [
-        MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, hasChosenName: false),
-        MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, hasChosenName: false),
-    ]
+    private let rows = [OwnerSource(code: "readwise", name: "Readwise"), OwnerSource(code: "rss", name: "RSS")]
 
     @Test func theLimitIsReadWithTheTypesAndSourcesItNames() async {
         let bench = OwnerBench(grants: [.configManage])
@@ -466,7 +464,7 @@ import Testing
         model.checkedSources = ["rss", "readwise"]
         #expect(model.canSave)
         await model.save()
-        let sent = bench.calls.state.withLock { $0.limitsSent }
+        let sent = bench.calls.state.withLock { $0.filtersSent }
         #expect(sent.count == 1)
         #expect(sent.first??.types == ["core.note"])
         #expect(sent.first??.sources == ["readwise", "rss"])
@@ -481,7 +479,22 @@ import Testing
         model.types = ["core.note"]
         #expect(!model.canSave)
         await model.save()
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
+    }
+
+    @Test func savingWithEveryTypeUncheckedAsksFirstAndSendsNothing() async {
+        let bench = OwnerBench(grants: [.configManage])
+        bench.calls.state.withLock {
+            $0.sourceLimit = SourceLimit(instanceID: "instance-1", isOn: true, types: ["core.note"], sources: ["rss"], strictTypes: nil, allowlist: nil)
+        }
+        let model = model(bench, sources: rows)
+        await model.load()
+        model.types = []
+        #expect(model.canSave)
+        #expect(model.saveTurnsOff)
+        await model.save()
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
+        #expect(model.isOn)
     }
 
     @Test func turningItOffRemovesTheFilter() async {
@@ -492,7 +505,7 @@ import Testing
         let model = model(bench, sources: rows)
         await model.load()
         await model.turnOff()
-        let sent = bench.calls.state.withLock { $0.limitsSent }
+        let sent = bench.calls.state.withLock { $0.filtersSent }
         #expect(sent.count == 1)
         #expect(sent.first! == nil)
         #expect(!model.isOn)
@@ -505,14 +518,18 @@ import Testing
         await model.load()
         model.types = ["core.note"]
         model.checkedSources = ["rss"]
-        // Another device changed the limit after it was read.
-        bench.calls.state.withLock { $0.sourceLimit.types = ["core.highlight"] }
+        // Another device set the limit after it was read.
+        bench.calls.state.withLock {
+            $0.sourceLimit.isOn = true
+            $0.sourceLimit.types = ["core.highlight"]
+            $0.sourceLimit.sources = ["readwise"]
+        }
         await model.save()
         #expect(model.line?.contains("changed somewhere else") == true)
         #expect(model.types == ["core.note"])
         #expect(model.checkedSources == ["rss"])
         #expect(model.limit?.types == ["core.highlight"])
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
     }
 
     @Test func anotherMarfaAnsweringAtTheWriteIsToldAndTheDraftStartsAgainFromIt() async {
@@ -543,7 +560,7 @@ import Testing
         #expect(model.checkedSources == ["readwise"])
         #expect(!model.hasEdits)
         #expect(model.typeChoices.map(\.code) == ["core.highlight"])
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
     }
 
     @Test func anotherMarfaFoundWhenTheLimitIsReadBeforeTheWriteGetsNoWrite() async {
@@ -561,7 +578,7 @@ import Testing
         #expect(model.types == ["core.highlight"])
         #expect(model.checkedSources == ["readwise"])
         #expect(!model.hasEdits)
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
         // Saving again sends nothing of the first instance's choice.
         #expect(!model.canSave)
     }
@@ -606,8 +623,8 @@ import Testing
     /// A host's sources and the changes it was asked to make.
     @MainActor final class Server {
         var rows = [
-            MarfaSourceRow(code: "rss", name: "RSS", mark: "lucide:rss", count: 156, hasChosenName: false),
-            MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, hasChosenName: true),
+            MarfaSourceRow(code: "rss", name: "RSS", mark: "lucide:rss", count: 156, nameOrigin: .key),
+            MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, nameOrigin: .set),
         ]
         var refusal: OwnerFailure?
         var changes: [(String, MarfaSourceChange)] = []
@@ -620,7 +637,7 @@ import Testing
                     if let refusal = self.refusal { return refusal }
                     if case .rename(let name) = change, let index = self.rows.firstIndex(where: { $0.code == code }) {
                         let row = self.rows[index]
-                        self.rows[index] = MarfaSourceRow(code: row.code, name: name, mark: row.mark, count: row.count, hasChosenName: true)
+                        self.rows[index] = MarfaSourceRow(code: row.code, name: name, mark: row.mark, count: row.count, nameOrigin: .set)
                     }
                     return nil
                 },
@@ -702,11 +719,5 @@ import Testing
         // An unchanged name is nothing to hand back.
         model.beginRename("rss")
         #expect(model.takeDrafts().isEmpty)
-    }
-
-    @Test func howASourceGotItsNameIsToldInOneLine() {
-        #expect(SourcesPage.naming(MarfaSourceRow(code: "a", name: "A", mark: nil, count: 1, hasChosenName: true)) == "Named by you.")
-        #expect(SourcesPage.naming(MarfaSourceRow(code: "a", name: "a", mark: nil, count: 1, hasChosenName: false)) == "Not named yet.")
-        #expect(SourcesPage.naming(MarfaSourceRow(code: "a", name: "RSS", mark: nil, count: 1, hasChosenName: false)) == "Named by its app or key.")
     }
 }

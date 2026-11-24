@@ -296,3 +296,62 @@ import Observation
         return [.typed(title: title, text: typed)]
     }
 }
+
+/// The page asks first because enabling private addresses lets the server reach its own network.
+@Observable @MainActor final class PrivateAddressesModel {
+    static let key = "allow_private_addresses"
+
+    private let store: StoredSettings
+    /// Whether the owner is being asked before private addresses are allowed.
+    var asksToAllow = false
+    /// One line under the switch after a change that was not made.
+    private(set) var line: String?
+    /// What was told after a change found changed elsewhere; it closes when the person next changes the switch, or is closed.
+    private(set) var notice: String?
+    private(set) var isWriting = false
+
+    init(store: StoredSettings) {
+        self.store = store
+    }
+
+    convenience init(context: OwnerContext, calls: any InstanceCalls) {
+        self.init(store: StoredSettings(context: context, calls: calls))
+    }
+
+    var failure: OwnerFailure? { store.failure }
+    /// Whether the server listed the setting, so the switch has a value to show.
+    var isLoaded: Bool { store.setting(Self.key) != nil }
+    var isOn: Bool { store.setting(Self.key)?.value?.bool ?? false }
+
+    func load() async { await store.load() }
+
+    func dismissNotice() { notice = nil }
+
+    /// Turning the switch off is sent at once; turning it on asks first.
+    func set(_ on: Bool) async {
+        guard !isWriting, isLoaded, on != isOn else { return }
+        line = nil
+        notice = nil
+        if on {
+            asksToAllow = true
+        } else {
+            await send(false)
+        }
+    }
+
+    func allow() async {
+        asksToAllow = false
+        guard !isWriting, !isOn else { return }
+        await send(true)
+    }
+
+    private func send(_ on: Bool) async {
+        isWriting = true
+        defer { isWriting = false }
+        switch await store.write([Self.key: .set(.bool(on))]) {
+        case .saved: break
+        case .elsewhere: notice = StoredSettingWording.elsewhere([String(localized: "Private Addresses")])
+        case .failed(let failure): line = StoredSettingWording.line(failure)
+        }
+    }
+}

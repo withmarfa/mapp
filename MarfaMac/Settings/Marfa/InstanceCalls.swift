@@ -209,7 +209,14 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
                     throw OwnerFailure.failed(String(localized: "The app can’t change this setting."))
                 }
             }
-            _ = try await client.updateConfig(headers: .init(xMarfaInstanceId: instanceID), body: .json(body)).ok
+            do {
+                _ = try await client.updateConfig(headers: .init(xMarfaInstanceId: instanceID), body: .json(body)).ok
+            } catch {
+                if changes["allow_private_addresses"] == .set(.bool(false)), let line = StoredSettingWording.notPublic(error) {
+                    throw OwnerFailure.refused(line)
+                }
+                throw error
+            }
         }
     }
 
@@ -258,6 +265,7 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
         case "heartbeat_enabled": return flag(\.heartbeatEnabled)
         case "error_reporting_enabled": return flag(\.errorReportingEnabled)
         case "telemetry_enabled": return flag(\.telemetryEnabled)
+        case "allow_private_addresses": return flag(\.allowPrivateAddresses)
         case "heartbeat_url": return text(\.heartbeatUrl)
         case "posthog_host": return text(\.posthogHost)
         case "posthog_project_token": return text(\.posthogProjectToken)

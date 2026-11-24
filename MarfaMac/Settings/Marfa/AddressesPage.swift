@@ -5,15 +5,25 @@ import SwiftUI
 struct AddressesPage: View {
     let host: any MarfaSettingsHost
     @State private var model: AddressesModel
+    @State private var network: PrivateAddressesModel
 
     init(host: any MarfaSettingsHost) {
+        self.init(host: host, network: PrivateAddressesModel(context: OwnerContext(host: host), calls: host.instanceCalls))
+    }
+
+    init(host: any MarfaSettingsHost, network: PrivateAddressesModel) {
         self.host = host
         _model = State(initialValue: AddressesModel(context: OwnerContext(host: host)))
+        _network = State(initialValue: network)
     }
 
     var body: some View {
         content
-            .task(id: host.serverAddress) { await model.load() }
+            .task(id: host.serverAddress) {
+                async let network: Void = network.load()
+                await model.load()
+                await network
+            }
             .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.close() }) { AddressSheet(model: model, serverName: host.serverName) }
             .alert(
@@ -24,6 +34,12 @@ struct AddressesPage: View {
                 Button(asked.confirm, role: .destructive) { Task { await model.confirm(asked) } }
             } message: { asked in
                 Text(verbatim: asked.message)
+            }
+            .alert("Allow Private Addresses?", isPresented: $network.asksToAllow) {
+                Button("Cancel", role: .cancel) {}
+                Button("Allow") { Task { await network.allow() } }
+            } message: {
+                Text("\(host.serverName) can send webhooks, the heartbeat, error reports, telemetry, and object store requests to addresses that aren’t public, including its own computer and devices on private networks such as Tailscale.")
             }
             .accessibilityIdentifier("AddressesPage")
     }
@@ -59,9 +75,31 @@ struct AddressesPage: View {
                     }
                     SettingsAddRow("Add a Website…") { model.begin(.addWebsite) }
                 }
+                networkSection
             }
         } else {
             OwnerLoading()
+        }
+    }
+
+    @ViewBuilder private var networkSection: some View {
+        if let notice = network.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { network.dismissNotice() }) }
+        if network.isLoaded || network.failure != nil { networkRows }
+    }
+
+    private var networkRows: some View {
+        SettingsSection("Network") {
+            if network.isLoaded {
+                SettingsRow("Private Addresses", line: "Lets webhooks and the heartbeat reach this network.", error: network.line, lines: nil) {
+                    SettingsToggle(title: "Private Addresses", isOn: Binding { network.isOn } set: { on in Task { await network.set(on) } })
+                        .disabled(network.isWriting)
+                        .accessibilityIdentifier("PrivateAddresses")
+                }
+            } else if let failure = network.failure {
+                OwnerProblemRow(title: "Couldn’t Read Private Addresses", failure: failure, page: .addresses, host: host) {
+                    Task { await network.load() }
+                }
+            }
         }
     }
 }
@@ -104,10 +142,10 @@ struct AddressSheet: View {
                         title: "Address", text: $model.input, prompt: "https://", isError: model.inputError != nil, width: nil,
                         onSubmit: { Task { await model.confirm() } })
                 }
-                if model.sheet == .changeSignIn, let plan = model.currentPlan, !plan.consequences.isEmpty {
+                if model.sheet == .changeSignIn, let plan = model.currentPlan {
                     SettingsSection("What Happens") {
-                        ForEach(plan.consequences, id: \.code) { consequence in
-                            SettingsRow(verbatim: Self.title(of: consequence), line: consequence.sentence, lead: .symbol(Self.symbol(consequence.code)), lines: nil)
+                        ForEach(Self.happenings(plan.consequences)) { happening in
+                            SettingsRow(verbatim: happening.title, line: happening.line, lead: .symbol(happening.symbol), lines: nil)
                         }
                     }
                 }
@@ -136,21 +174,43 @@ struct AddressSheet: View {
         }
     }
 
-    static func title(of consequence: AddressPlan.Consequence) -> String {
-        switch consequence.code {
-        case "browser_sessions_end": String(localized: "Every browser signs out")
-        case "passkeys_unusable": String(localized: "Passkeys stop working")
-        case "apps_sign_in_again": String(localized: "Every app signs out")
-        case "address_removed": String(localized: "An address is removed")
-        default: consequence.sentence
-        }
+    /// One row of What Happens.
+    struct Happening: Identifiable {
+        let id: String
+        let title: String
+        let line: String?
+        let symbol: String
     }
 
-    static func symbol(_ code: String) -> String {
-        switch code {
-        case "browser_sessions_end", "apps_sign_in_again": "rectangle.portrait.and.arrow.right"
-        case "passkeys_unusable": "person.badge.key"
-        default: "link"
+    /// What moving the sign-in address does, in the app's words: browsers and apps signing out as one row, passkeys, any
+    /// consequence the app has no words for in the server's, and keys, which keep working whatever the server counts.
+    static func happenings(_ consequences: [AddressPlan.Consequence]) -> [Happening] {
+        let codes = Set(consequences.map(\.code))
+        var rows: [Happening] = []
+        let signOut: String? =
+            switch (codes.contains("browser_sessions_end"), codes.contains("apps_sign_in_again")) {
+            case (true, true): String(localized: "Every browser and app signs out")
+            case (true, false): String(localized: "Every browser signs out")
+            case (false, true): String(localized: "Every app signs out")
+            case (false, false): nil
+            }
+        if let signOut {
+            rows.append(Happening(
+                id: "sign_out", title: signOut, line: String(localized: "Each signs in again at the new address."),
+                symbol: "rectangle.portrait.and.arrow.right"))
         }
+        if codes.contains("passkeys_unusable") {
+            rows.append(Happening(
+                id: "passkeys_unusable", title: String(localized: "Passkeys stop working"),
+                line: String(localized: "Add a passkey at the new address."), symbol: "person.badge.key"))
+        }
+        let worded: Set<String> = ["browser_sessions_end", "apps_sign_in_again", "passkeys_unusable"]
+        for consequence in consequences where !worded.contains(consequence.code) {
+            rows.append(Happening(id: consequence.code, title: consequence.sentence, line: nil, symbol: "link"))
+        }
+        rows.append(Happening(
+            id: "keys", title: String(localized: "Keys keep working"), line: String(localized: "If the old address stops working, update your scripts."),
+            symbol: "key"))
+        return rows
     }
 }

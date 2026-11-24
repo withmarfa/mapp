@@ -1,4 +1,5 @@
 import Foundation
+import struct Marfa.ItemSource
 import Testing
 @testable import MarfaMac
 
@@ -41,8 +42,8 @@ struct IndexRowsTests {
 
     // MARK: Names, marks and counts from the server
 
-    private let readwise = SourceInfo(code: "readwise", name: "Readwise", mark: "simple-icons:readwise", hasChosenName: true)
-    private let github = SourceInfo(code: "gh", name: "GitHub", mark: nil, hasChosenName: false)
+    private let readwise = SourceInfo(code: "readwise", name: "Readwise", mark: "simple-icons:readwise", nameOrigin: .set)
+    private let github = SourceInfo(code: "gh", name: "GitHub", mark: nil, nameOrigin: .key)
 
 }
 

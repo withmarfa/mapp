@@ -40,25 +40,25 @@ nonisolated final class FakeSourceNames: SourceNameSource {
         return state.withLock { state in
             state.changes.append((code, name, mark))
             let old = state.infos.first { $0.code == code } ?? .unnamed(code)
-            let renamed: (String, Bool) = switch name {
-            case .set(let text)?: (text, true)
-            case .clear?: (code, false)
-            case nil: (old.name, old.hasChosenName)
+            let renamed: (String, Marfa.ItemSource.NameOrigin) = switch name {
+            case .set(let text)?: (text, .set)
+            case .clear?: (code, .code)
+            case nil: (old.name, old.nameOrigin)
             }
             let marked: String? = switch mark {
             case .set(let id)?: id
             case .clear?: nil
             case nil: old.mark
             }
-            let changed = SourceInfo(code: code, name: renamed.0, mark: marked, hasChosenName: renamed.1)
+            let changed = SourceInfo(code: code, name: renamed.0, mark: marked, nameOrigin: renamed.1)
             state.infos = state.infos.filter { $0.code != code } + [changed]
             return changed
         }
     }
 }
 
-private let readwise = SourceInfo(code: "readwise", name: "Readwise", mark: "simple-icons:readwise", hasChosenName: true)
-private let github = SourceInfo(code: "gh", name: "GitHub", mark: nil, hasChosenName: false)
+private let readwise = SourceInfo(code: "readwise", name: "Readwise", mark: "simple-icons:readwise", nameOrigin: .set)
+private let github = SourceInfo(code: "gh", name: "GitHub", mark: nil, nameOrigin: .key)
 
 @MainActor
 @Suite(.hangLimit) struct SourceNamesTests {

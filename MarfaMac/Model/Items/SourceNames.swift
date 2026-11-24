@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// A source as the server names it: the code that items carry in `source`, the name to show for it and the mark to
 /// draw beside the name.
@@ -8,13 +9,16 @@ nonisolated struct SourceInfo: Identifiable, Hashable, Sendable {
     let name: String
     /// An icon ID from the sets a type's icon comes from, drawn by `TypeGlyph`.
     let mark: String?
-    /// Whether the name was set on the source itself, so the person can take it back to the one an app or key gives.
-    let hasChosenName: Bool
+    /// Where the name comes from: set on the source itself, the app that writes under it, its key's label, or its code.
+    let nameOrigin: Marfa.ItemSource.NameOrigin
 
     var id: String { code }
 
+    /// Whether the name was set on the source itself, so the person can take it back to the one an app or key gives.
+    var hasChosenName: Bool { nameOrigin == .set }
+
     /// What stands in for a source the server has not named: its code.
-    static func unnamed(_ code: String) -> SourceInfo { SourceInfo(code: code, name: code, mark: nil, hasChosenName: false) }
+    static func unnamed(_ code: String) -> SourceInfo { SourceInfo(code: code, name: code, mark: nil, nameOrigin: .code) }
 }
 
 /// What the library knows of its sources from the server: their names and marks, and how many items each wrote.

@@ -70,7 +70,7 @@ enum LibraryDescription {
         guard let library = libraries.current else { return [] }
         return library.sources.listing(loaded: [:]).map { listed in
             let info = library.sources.info(listed.code)
-            return MarfaSourceRow(code: listed.code, name: listed.name, mark: info.mark, count: listed.count, hasChosenName: info.hasChosenName)
+            return MarfaSourceRow(code: listed.code, name: listed.name, mark: info.mark, count: listed.count, nameOrigin: info.nameOrigin)
         }
     }
 
@@ -240,7 +240,7 @@ enum LibraryDescription {
         return made
     }
 
-    /// The package's server, for the one call the generated client does not hold (`Server.health()`).
+    /// The package's server, for the calls the generated client does not hold (`Server.health()`, `Server.sources()`).
     private var plainServer: (@Sendable () throws -> Server)? {
         guard let connection = host.configuredConnection else { return nil }
         let signIns = host.signIns

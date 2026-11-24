@@ -333,7 +333,7 @@ struct RenderedWindow<Detail: View>: View {
 
     @Test func search() async throws {
         let library = FakeItemLibrary(items: [])
-        library.sources.infos = ["github": SourceInfo(code: "github", name: "GitHub", mark: "lucide:code-xml", hasChosenName: false)]
+        library.sources.infos = ["github": SourceInfo(code: "github", name: "GitHub", mark: "lucide:code-xml", nameOrigin: .key)]
         library.sources.counts = ["github": 1_840]
         let (libraries, bench) = try await connected()
         _ = bench
@@ -348,7 +348,7 @@ struct RenderedWindow<Detail: View>: View {
     @Test func searchAtTheLimit() async throws {
         let library = FakeItemLibrary(items: [])
         let codes = (0..<12).map { "source-\($0)" }
-        library.sources.infos = Dictionary(uniqueKeysWithValues: codes.map { ($0, SourceInfo(code: $0, name: "Source \($0)", mark: nil, hasChosenName: false)) })
+        library.sources.infos = Dictionary(uniqueKeysWithValues: codes.map { ($0, SourceInfo(code: $0, name: "Source \($0)", mark: nil, nameOrigin: .key)) })
         library.sources.counts = Dictionary(uniqueKeysWithValues: codes.map { ($0, 10) })
         let (libraries, bench) = try await connected()
         _ = bench
@@ -438,10 +438,10 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     private static let sourceRows = [
-        MarfaSourceRow(code: "marfa-mac", name: "Marfa for Mac", mark: nil, count: 4_212, hasChosenName: false),
-        MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, hasChosenName: true),
-        MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, hasChosenName: false),
-        MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, hasChosenName: false),
+        MarfaSourceRow(code: "marfa-mac", name: "Marfa for Mac", mark: nil, count: 4_212, nameOrigin: .app),
+        MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, nameOrigin: .set),
+        MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, nameOrigin: .key),
+        MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, nameOrigin: .key),
     ]
 
     @Test func sources() async throws {
@@ -453,6 +453,7 @@ struct RenderedWindow<Detail: View>: View {
         let host = await stub { $0.sources = Self.sourceRows }
         fake(host).state.withLock {
             $0.names = ["core.highlight": "Highlights", "core.bookmark": "Bookmarks"]
+            $0.sources = Self.sourceRows.map { OwnerSource(code: $0.code, name: $0.name) }
             $0.sourceLimit = SourceLimit(
                 instanceID: "instance-1", isOn: true, types: ["core.highlight"], sources: ["marfa-mac", "readwise"], strictTypes: nil, allowlist: nil)
         }

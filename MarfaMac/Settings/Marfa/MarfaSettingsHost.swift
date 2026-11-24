@@ -45,10 +45,13 @@ struct MarfaSourceRow: Identifiable, Hashable {
     let mark: String?
     /// Nil until the server has counted.
     let count: Int?
-    /// Whether the name was set on the source itself, so it can be taken back to the one its app or key gives.
-    let hasChosenName: Bool
+    /// Where the name comes from: set on the source itself, the app that writes under it, its key's label, or its code.
+    let nameOrigin: Marfa.ItemSource.NameOrigin
 
     var id: String { code }
+
+    /// Whether the name was set on the source itself, so it can be taken back to the one its app or key gives.
+    var hasChosenName: Bool { nameOrigin == .set }
 }
 
 /// One change to a source, for every app that reads it.

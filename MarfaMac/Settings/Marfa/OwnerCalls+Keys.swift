@@ -21,7 +21,7 @@ extension ClientOwnerCalls {
         return KeyInfo(
             id: key.id, label: key.label, source: key.source, permissions: key.permissions.map(\.rawValue),
             tier: KeyTier(rawValue: key.defaultTier.rawValue) ?? .library, types: types, created: date(key.createdAt),
-            expires: date(key.expiresAt), lastUsed: date(key.lastUsedAt), appClientID: key.oauthClientId)
+            expires: date(key.expiresAt), lastUsed: date(key.lastUsedAt), appClientID: key.oauthClientId, claims: key.sources)
     }
 
     private static func levels(_ types: [String: AccessLevel]) -> [String: Components.Schemas.TypePermissionLevel] {

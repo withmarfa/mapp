@@ -43,7 +43,7 @@ import Testing
 
     @Test func aSourceTheCopyNoLongerHasIsKeptAndShownAsUnknown() {
         var directory = SourceDirectory()
-        directory.infos = ["github": SourceInfo(code: "github", name: "GitHub", mark: nil, hasChosenName: false)]
+        directory.infos = ["github": SourceInfo(code: "github", name: "GitHub", mark: nil, nameOrigin: .key)]
         directory.counts = ["github": 1_840]
         let entries = entries(SearchLeaveOut(sources: ["github", "gone"]), sources: directory)
         let github = entries.first { $0.kind == .source("github") }
