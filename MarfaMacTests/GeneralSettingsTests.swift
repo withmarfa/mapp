@@ -84,7 +84,9 @@ struct GeneralSettingsTests {
         let defaults = ThrowawayDefaults.make("GeneralSettingsTests")
         let hotKeys = FakeHotKeys()
         let bench = HostBench()
-        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, hotKeys: hotKeys)
+        // Reset saves a restore point of the defaults' own domain first, so it is named.
+        let libraries = Libraries(
+            host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, hotKeys: hotKeys, defaultsDomain: defaults.suite)
         libraries.anyAppShortcuts.start()
         libraries.shortcuts.set(nil, for: .newItem)
         libraries.shortcuts.set(Shortcut(key: "j", modifiers: [.command, .option]), for: .refresh)

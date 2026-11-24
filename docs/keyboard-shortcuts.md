@@ -4,7 +4,7 @@ Status: Built, not yet released. The shortcuts that work in any app must be trie
 
 Where it lives: `Shortcut`, `ShortcutCommand`, `ShortcutBindings`, `ShortcutsFile`, `AnyAppShortcuts` and `SystemHotKeys` under `MarfaMac/Model/Shortcuts/`, `FrontBrowser` and the catalogue of commands (an extension of `ShortcutCommand`) under `MarfaMac/Views/`, and `KeyboardPage`, `KeyboardPageModel` and `KeyboardFiles` under `MarfaMac/Settings/App/`.
 
-Settings > Keyboard gives every menu command the app adds a shortcut that its person can change. It replaces the old Keyboard Shortcuts window, and Help > Keyboard Shortcuts opens the page. The shortcuts are kept with the app's other settings, so every Mac that connects to the same Marfa uses them ([Settings storage](settings-storage.md)).
+Settings > Keyboard gives every menu command the app adds a shortcut that its person can change. It replaces the old Keyboard Shortcuts window, and Help > Keyboard Shortcuts opens the page. The menu commands' shortcuts are kept with the app's other settings, so every Mac that connects to the same Marfa uses them. The shortcuts that work in any app stay on each Mac ([Settings storage](settings-storage.md)).
 
 ## Menu commands
 
@@ -30,7 +30,7 @@ A 28-point system search field sits above the first card and filters by command 
 
 ## Files
 
-Export Shortcuts… writes a small versioned JSON file (`marfa-mac-shortcuts`, version 1) with every command's shortcut and the shortcuts that work in any app. Import Shortcuts… reads it. A file that is not the app's, or comes from a newer the app, is refused and says so, and changes nothing. A shortcut naming a command the app no longer has is skipped and counted, and so is one whose keys another command or the system holds. Import adds and changes only what the file names, for menu commands and for the shortcuts that work in any app alike: a command the file does not name keeps its shortcut, and a shortcut left out keeps what its command had. The notice says how many were imported and how many were skipped.
+Export Shortcuts… writes menu and global shortcuts to a JSON file (`marfa-mac-shortcuts`, version 1). Import Shortcuts… rejects a foreign file or an unsupported version before changing any shortcuts. It skips unknown commands and shortcuts already held by another command or the system. Commands omitted from the file keep their shortcuts. The notice gives the number imported and skipped.
 
 Restore Defaults… puts every command back to its default and turns the shortcuts that work in any app off. Reset This App's Settings… in General does the same, at once: the menus and the registered hot keys change without a relaunch.
 

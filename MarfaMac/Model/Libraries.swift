@@ -67,7 +67,8 @@ import MarfaTesting
         host: MarfaHost, defaults: UserDefaults = .standard,
         handOverPages: ((@escaping (Bool) -> Void) -> Void)? = nil,
         valuePanels: ValueEditPresenter = .shared, instanceSettings: InstanceSettingsModel? = nil,
-        hotKeys: any HotKeyRegistrar = NoHotKeys(), syncsPreferences: Bool = false
+        hotKeys: any HotKeyRegistrar = NoHotKeys(), syncsPreferences: Bool = false, restorePoints: RestorePoints = .temporary(),
+        defaultsDomain: String? = nil
     ) {
         self.host = host
         self.defaults = defaults
@@ -79,8 +80,12 @@ import MarfaTesting
         searchLeaveOuts = SearchLeaveOuts(defaults: defaults)
         shortcuts = ShortcutBindings(defaults: defaults)
         anyAppShortcuts = AnyAppShortcuts(defaults: defaults, registrar: hotKeys)
+        // The standard defaults write the app's own domain; another's is named by the caller, as `UserDefaults` does not say.
+        let domain = defaultsDomain ?? (defaults === UserDefaults.standard ? Bundle.main.bundleIdentifier : nil)
         preferences = PreferencesSync(
-            defaults: defaults, enabled: syncsPreferences,
+            defaults: defaults, domain: domain, enabled: syncsPreferences, restorePoints: restorePoints,
+            library: { [host] in Libraries.libraryKey(for: host.configuredConnection?.address) },
+            refusedShortcuts: { [anyAppShortcuts] in Set(anyAppShortcuts.refused.map(\.rawValue)) },
             reload: { [sidebarLayouts, typeLooks, searchLeaveOuts, shortcuts, anyAppShortcuts] in
                 sidebarLayouts.reload()
                 typeLooks.reload()
@@ -103,12 +108,23 @@ import MarfaTesting
 
     /// Puts every setting on this Mac back (`MacSettings`) and the shortcuts already held in memory with it, so the menus
     /// and the hot keys change at once and nothing writes the old choices back. Where the settings sync, the Marfa's are
-    /// put back with them, for every Mac.
+    /// put back with them, for every Mac, even over another Mac's change not yet taken. A restore point is saved first,
+    /// which Restore Earlier Settings… brings back; where it cannot be, nothing changes and the person is told.
+    ///
+    /// It runs between sync steps (`PreferencesSync.resetBetweenSteps`): at once where none is under way, else as soon as
+    /// the one under way ends, so no step writes what it read before over the defaults.
     func resetMacSettings() {
-        shortcuts.restoreDefaults()
-        anyAppShortcuts.clearAll()
-        MacSettings.reset(in: defaults)
-        Task { await preferences.flush() }
+        preferences.resetBetweenSteps { [preferences, shortcuts, anyAppShortcuts, defaults] () throws(RestorePoints.Failure) in
+            try preferences.saveRestorePoint(.reset)
+            shortcuts.restoreDefaults()
+            anyAppShortcuts.clearAll()
+            MacSettings.reset(in: defaults)
+            preferences.replaced(PreferencesMap.synced)
+        } notSaved: { [notices = host.notices] in
+            notices.tell(
+                String(localized: "Settings Not Reset"),
+                String(localized: "A restore point couldn’t be saved first, so nothing was changed. Check that this Mac has free space, then try again."))
+        }
     }
 
     /// Has this app's settings follow the library's copy, where it has one of a Marfa server.
@@ -263,6 +279,8 @@ import MarfaTesting
     static var sampleDefaultsSuite: String { "\(AppPaths.bundleIdentifier).SampleMarfa" }
     /// The sample library's copy, under this copy's temporary folder.
     static var sampleStore: URL { AppPaths.temporary("Sample Marfa") }
+    /// The sample library's restore points, beside its copy and cleared with it.
+    static var sampleRestorePoints: URL { AppPaths.temporary("Sample Restore Points") }
     #endif
 
     /// The app's own: the person's defaults and Keychain, and the copy in the app's own storage.
@@ -286,11 +304,14 @@ import MarfaTesting
             if !keepsCopy {
                 defaults.removePersistentDomain(forName: suite)
                 try? FileManager.default.removeItem(at: root)
+                try? FileManager.default.removeItem(at: sampleRestorePoints)
             }
+            // The test host and previews keep points of their own, which no other run sees.
+            let points = SampleLibrary.isRequested ? RestorePoints(folder: sampleRestorePoints) : .temporary()
             guard SampleLibrary.isRequested, !SampleLibrary.startsUnconfigured else {
                 // The unit tests, previews and `-MarfaMacSampleUnconfigured` start with no server, as a first launch does.
                 let host = MarfaHost(defaults: defaults, signIns: ScriptedSignIns(), location: location(root: root))
-                return Libraries(host: host, defaults: defaults)
+                return Libraries(host: host, defaults: defaults, restorePoints: points, defaultsDomain: suite)
             }
             // A debug build can be pointed at a test server by hand, in place of the sample. The key stays in memory
             // and the address goes only to the sample defaults cleared above, so nothing reaches the Keychain or the
@@ -309,9 +330,11 @@ import MarfaTesting
                 }
                 // `-MarfaMacSyncSettings` keeps this app's settings in the test server's item, as a real sign-in does. The pages
                 // read the standard defaults, so the sync follows those, which this debug build starts empty.
-                guard ProcessInfo.processInfo.arguments.contains("-MarfaMacSyncSettings") else { return Libraries(host: host, defaults: defaults) }
+                guard ProcessInfo.processInfo.arguments.contains("-MarfaMacSyncSettings") else {
+                    return Libraries(host: host, defaults: defaults, restorePoints: points, defaultsDomain: suite)
+                }
                 UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier ?? "")
-                return Libraries(host: host, defaults: .standard, syncsPreferences: true)
+                return Libraries(host: host, defaults: .standard, syncsPreferences: true, restorePoints: points)
             }
             let sample = SampleLibrary.connection
             let host = MarfaHost(
@@ -323,11 +346,11 @@ import MarfaTesting
                 describer: { _ in SampleLibrary.name },
                 historian: { _, _ in nil }, configurer: { _, _ in nil })
             host.presetTestServer(sample)
-            return Libraries(host: host, defaults: defaults)
+            return Libraries(host: host, defaults: defaults, restorePoints: points, defaultsDomain: suite)
         }
         #endif
         let host = MarfaHost(defaults: .standard, signIns: SystemSignIns(), location: location())
-        return Libraries(host: host, hotKeys: SystemHotKeys(), syncsPreferences: true)
+        return Libraries(host: host, hotKeys: SystemHotKeys(), syncsPreferences: true, restorePoints: .standard)
     }
 
     private static func location(root: URL = MarfaStoreLocation.applicationSupport) -> MarfaStoreLocation {

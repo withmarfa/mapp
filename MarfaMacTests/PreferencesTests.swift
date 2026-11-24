@@ -34,7 +34,7 @@ import Testing
     }
 
     @Test func eachSettingOwnsItsOwnPlaces() {
-        let units: [PreferenceUnit] = PreferencesMap.synced.map { setting in
+        let units: [PreferenceUnit] = PreferencesMap.inFiles.map { setting in
             switch setting.place {
             case .member(let field), .serverMember(let field, _): .member(field, setting.key)
             case .rows(let table, let word, _, _, _, _), .serverRows(let table, let word, _), .set(let table, let word),
@@ -43,7 +43,7 @@ import Testing
             }
         }
         for unit in units {
-            #expect(PreferencesMap.synced.filter { $0.owns(unit) }.count == 1, "\(unit)")
+            #expect(PreferencesMap.inFiles.filter { $0.owns(unit) }.count == 1, "\(unit)")
         }
     }
 }
@@ -110,8 +110,7 @@ import Testing
         #expect(units[.row(.sidebar, setting: "layout", key: "hidden")] == #"["inbox","recents"]"#)
         #expect(units[.row(.sidebar, setting: "color", key: "view:1")] == #""blue""#)
         #expect(units[.row(.sidebar, setting: "home", key: "collection:9")] == #""g1""#)
-        let (joined, unreadable) = PreferencesSidebar.layout(from: units)
-        #expect(unreadable.isEmpty)
+        let joined = PreferencesSidebar.layout(from: units)
         #expect(NSDictionary(dictionary: joined) == NSDictionary(dictionary: layout.merging(["hidden": ["inbox", "recents"]]) { _, new in new }))
     }
 

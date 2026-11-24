@@ -47,6 +47,16 @@ actor FakePreferencesCopy: PreferencesCopy {
     private(set) nonisolated(unsafe) var runValue = "run-1"
     nonisolated var run: String { runValue }
 
+    /// Whether the next create is refused, as a copy refuses a write, so the step tries again later.
+    private var refusesNextCreate = false
+
+    func refuseNextCreate() { refusesNextCreate = true }
+
+    /// The table whose next batch is refused, as a copy refuses a write, after the writes before it were queued.
+    private var refusesNextWrite: PreferencesTable?
+
+    func refuseNextWrite(to table: PreferencesTable) { refusesNextWrite = table }
+
     /// Leaves the next field write unanswered until the test answers it.
     func holdNextAnswer() { answersAtOnce = false }
 
@@ -170,6 +180,10 @@ actor FakePreferencesCopy: PreferencesCopy {
     }
 
     func create(fields: [PreferencesField: JSONObject]) async throws -> String {
+        if refusesNextCreate {
+            refusesNextCreate = false
+            throw MarfaError.invalid(message: "the copy refused the create")
+        }
         creates += 1
         made += 1
         let id = "item-\(made)"
@@ -192,6 +206,10 @@ actor FakePreferencesCopy: PreferencesCopy {
     }
 
     func write(_ operations: [RowOperation], to table: PreferencesTable, of item: String) async throws {
+        if refusesNextWrite == table {
+            refusesNextWrite = nil
+            throw MarfaError.invalid(message: "the copy refused the write")
+        }
         batches[table, default: 0] += 1
         if held[item]?.trashed == true { writesToBinned += 1 }
         for operation in operations {

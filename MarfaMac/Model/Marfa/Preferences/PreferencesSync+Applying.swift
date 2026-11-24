@@ -4,9 +4,15 @@ import Marfa
 extension PreferencesSync {
     /// Writes `outcome` to this Mac and the item, and records in `adopted` what both now hold, the field write that
     /// waits for its answer, and each setting a store dropped when it read it again.
+    ///
+    /// `queued` is told after each write to the item is queued, with `adopted` as it stands then, whose base holds
+    /// what was read before for each unit still to be written, and with those units, so a write the copy refuses later
+    /// leaves a record that sends only what that write carried again.
     func apply(_ outcome: PreferencesMerge.Outcome, to item: PreferencesItem, local: Local, adopted: inout Record.Adopted,
-               retrying: Set<PreferenceUnit>, in copy: any PreferencesCopy) async throws
+               retrying: Set<PreferenceUnit>, in copy: any PreferencesCopy,
+               queued: ((Record.Adopted, Set<PreferenceUnit>) -> Void)? = nil) async throws
     {
+        let earlier = adopted.base
         // A dropped setting the Marfa has not changed keeps what the store left, so it is not set aside again.
         let kept = adopted.frozen.filter { unit, _ in !retrying.contains(unit) && outcome.merged[unit] == adopted.base[unit] }
         var written = outcome.merged.filter { PreferenceJSON.value($0.value) != nil }
@@ -29,14 +35,29 @@ extension PreferencesSync {
         }
         adopted.frozenBuild = build
         adopted.base = outcome.merged
+        var unsent = outcome.toRemote
         let fields = Self.fields(of: outcome.merged, changing: outcome.toRemote)
         if !fields.isEmpty {
             let write = try await copy.update(item.id, fields: fields, readAt: item.version)
             adopted.awaiting[write] = Record.Awaiting(
                 run: copy.run, order: adopted.writes, members: Self.members(outcome.merged, in: outcome.toRemote))
             adopted.writes += 1
+            unsent = unsent.filter { if case .member = $0 { false } else { true } }
         }
-        try await writeRows(outcome.toRemote, of: outcome.merged, to: item, in: copy)
+        guard let queued else {
+            return try await writeRows(outcome.toRemote, of: outcome.merged, to: item, in: copy)
+        }
+        let sent = adopted
+        func tell() {
+            var partial = sent
+            for unit in unsent { partial.base[unit] = earlier[unit] }
+            queued(partial, unsent)
+        }
+        if !fields.isEmpty { tell() }
+        try await writeRows(outcome.toRemote, of: outcome.merged, to: item, in: copy) { table in
+            unsent = unsent.filter { if case .row(table, _, _) = $0 { false } else { true } }
+            tell()
+        }
     }
 
     /// Writes the settings that own `units` into the defaults as `merged` holds them, has the stores read them, and
@@ -46,14 +67,21 @@ extension PreferencesSync {
         let settings = PreferencesMap.synced.filter { setting in units.contains { setting.owns($0) } }
         guard !settings.isEmpty else { return [] }
         for setting in settings { setting.write(merged, to: defaults, library: library) }
-        reload()
-        NotificationCenter.default.post(name: Self.appliedNotification, object: self)
+        storesReadAgain()
         return settings
     }
 
+    /// Has the stores, and what reads the defaults only when drawn, read the defaults again after something other than
+    /// a store wrote them.
+    func storesReadAgain() {
+        reload()
+        NotificationCenter.default.post(name: Self.appliedNotification, object: self)
+    }
+
     /// One batch for each table that changed: a whole row for each setting written, a delete for each one cleared.
+    /// `written` is told of each table once its batch is queued.
     func writeRows(_ units: Set<PreferenceUnit>, of merged: PreferenceUnits, to item: PreferencesItem,
-                   in copy: any PreferencesCopy) async throws
+                   in copy: any PreferencesCopy, written: (PreferencesTable) -> Void = { _ in }) async throws
     {
         var operations: [PreferencesTable: [RowOperation]] = [:]
         for unit in units.sorted(by: { "\($0)" < "\($1)" }) {
@@ -69,6 +97,7 @@ extension PreferencesSync {
         for table in PreferencesTable.allCases {
             guard let batch = operations[table], !batch.isEmpty else { continue }
             try await copy.write(batch, to: table, of: item.id)
+            written(table)
         }
     }
 

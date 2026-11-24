@@ -13,8 +13,11 @@ import os
 /// What `PreferencesMap` keeps on this Mac is never written.
 ///
 /// Nothing is decided from a copy that is not whole: until the hydration has completed and the item's tables are held
-/// whole, the defaults stay exactly as they are. Before the first write or adoption, every synced setting on this Mac is
-/// kept in one value (`beforeSyncKey`) until Reset This App's Settings, so the Mac's arrangement can always be recovered.
+/// whole, the defaults stay exactly as they are. Before a step replaces this Mac's settings at once (the first sync,
+/// taking another Mac's settings, switching Marfa), it saves a restore point (`restorePoints`), and where the point
+/// cannot be saved the step changes nothing and the next one tries again, so the Mac's arrangement can always be brought
+/// back. A row no setting here owns, such as one a later version of the app writes, is the Marfa's: this Mac never
+/// changes or deletes it.
 @Observable @MainActor
 final class PreferencesSync {
     nonisolated enum Standing: Equatable, Sendable {
@@ -35,8 +38,6 @@ final class PreferencesSync {
         case removed
     }
 
-    /// Every synced setting as it was on this Mac before the first sync, as JSON by defaults key.
-    nonisolated static let beforeSyncKey = "preferencesBeforeSync"
     /// What each Marfa this Mac adopted held after the last step, by instance. Bookkeeping, not a setting.
     nonisolated static let recordKey = "preferencesSync"
     /// Posted after another Mac's settings reach the defaults, for what reads the defaults only when drawn.
@@ -48,7 +49,10 @@ final class PreferencesSync {
     var marfaName: String? { copy == nil ? nil : name() }
 
     @ObservationIgnored let defaults: UserDefaults
-    @ObservationIgnored private let enabled: Bool
+    /// The persistent domain `defaults` writes, which a restore point reads; nil where it is not known, as for a test's
+    /// defaults that does not say, and then no point is saved, so nothing that needs one changes.
+    @ObservationIgnored let domain: String?
+    @ObservationIgnored let enabled: Bool
     @ObservationIgnored private let coalescing: Duration
     /// Has the stores read the defaults again after another Mac's settings reach them.
     @ObservationIgnored let reload: @MainActor () -> Void
@@ -60,7 +64,7 @@ final class PreferencesSync {
     @ObservationIgnored private var listening: Task<Void, Never>?
     @ObservationIgnored private var pending: Task<Void, Never>?
     @ObservationIgnored private var running = false
-    /// Above zero while a removal is under way: no step runs.
+    /// Above zero while a removal, or an import, a restore or Reset, is under way: no step runs.
     @ObservationIgnored private var holding = 0
     @ObservationIgnored private var again = false
     @ObservationIgnored private var waiting: [CheckedContinuation<Void, Never>] = []
@@ -71,6 +75,12 @@ final class PreferencesSync {
     @ObservationIgnored private var answered: [String: PreferenceAnswer] = [:]
     /// This app's build, which judged the settings a store dropped (`Record.Adopted.frozen`).
     @ObservationIgnored let build: String
+    /// The copies of this Mac's settings saved before something replaced them all.
+    @ObservationIgnored let restorePoints: RestorePoints
+    /// The library the settings kept for each server are read and written for while no copy is followed.
+    @ObservationIgnored private let detachedLibrary: @MainActor () -> String
+    /// The commands, by raw value, whose shortcut that works in any app the system refused at the stores' last reload.
+    @ObservationIgnored let refusedShortcuts: @MainActor () -> Set<String>
 
     /// The running app's version and build.
     nonisolated static var appBuild: String {
@@ -78,12 +88,20 @@ final class PreferencesSync {
         return "\(info["CFBundleShortVersionString"] as? String ?? "")+\(info["CFBundleVersion"] as? String ?? "")"
     }
 
-    init(defaults: UserDefaults, enabled: Bool, coalescing: Duration = .seconds(1), build: String = PreferencesSync.appBuild,
+    /// `library` names the library whose settings kept for each server are read and written while no copy is followed,
+    /// as with no Marfa connected or a run that never syncs.
+    init(defaults: UserDefaults, domain: String? = nil, enabled: Bool, coalescing: Duration = .seconds(1),
+         build: String = PreferencesSync.appBuild, restorePoints: RestorePoints = .temporary(),
+         library: @escaping @MainActor () -> String = { "" }, refusedShortcuts: @escaping @MainActor () -> Set<String> = { [] },
          reload: @escaping @MainActor () -> Void) {
         self.defaults = defaults
+        self.domain = domain
         self.enabled = enabled
         self.coalescing = coalescing
         self.build = build
+        self.restorePoints = restorePoints
+        detachedLibrary = library
+        self.refusedShortcuts = refusedShortcuts
         self.reload = reload
         guard enabled else { return }
         observer = NotificationCenter.default.addObserver(
@@ -124,6 +142,9 @@ final class PreferencesSync {
         item = nil
         standing = .off(.noMarfa)
     }
+
+    /// The library the settings kept for each server belong to now: the followed copy's, else the connected server's.
+    var settingsLibrary: String { copy == nil ? detachedLibrary() : library }
 
     /// Writes what changed on this Mac now rather than after the pause, as before the library changes or the app quits.
     func flush() async {
@@ -206,6 +227,43 @@ final class PreferencesSync {
         await run()
     }
 
+    // MARK: Replacing on purpose
+
+    /// Runs `change`, which replaces settings on this Mac on purpose (an import, a restore), between steps: steps stop and
+    /// one under way ends first, so none writes over what `change` writes with what it read before, or saves its record over
+    /// the marks `change` makes (`replaced`). Then a step runs.
+    func betweenSteps<T>(_ change: () throws(RestorePoints.Failure) -> T) async throws(RestorePoints.Failure) -> T {
+        pending?.cancel()
+        pending = nil
+        holding += 1
+        await run()
+        let result = Result(catching: change)
+        holding -= 1
+        await flush()
+        return try result.get()
+    }
+
+    /// Runs Reset's `change` between steps, as `betweenSteps` does, for a caller that does not wait: at once where no step is
+    /// under way, so the stores show the defaults as this returns, and otherwise once that step ends. `notSaved` runs, and
+    /// nothing changes, where `change` throws because its restore point could not be saved.
+    func resetBetweenSteps(_ change: @escaping @MainActor () throws(RestorePoints.Failure) -> Void,
+                           notSaved: @escaping @MainActor () -> Void) {
+        guard running else {
+            do { try change() } catch { return notSaved() }
+            Task { await flush() }
+            return
+        }
+        pending?.cancel()
+        pending = nil
+        holding += 1
+        Task {
+            await run()
+            do { try change() } catch { notSaved() }
+            holding -= 1
+            await flush()
+        }
+    }
+
     // MARK: Steps
 
     private func schedule(after delay: Duration) {
@@ -260,12 +318,14 @@ final class PreferencesSync {
             if let adopted = record.marfas[instance] {
                 if let chosen = originals.first, chosen.id == adopted.item {
                     guard let followed = try await follow(
-                        chosen, from: adopted, local: local, switched: record.last != instance,
-                        siblings: items.filter(\.isConflictedCopy), in: copy, generation: generation)
+                        chosen, from: adopted, of: instance, local: local, switched: record.last != instance,
+                        winning: record.winning ?? [:], siblings: items.filter(\.isConflictedCopy), in: copy,
+                        generation: generation)
                     else { return }
                     record.marfas[instance] = followed
                 } else if !originals.isEmpty {
                     // Two Macs made an item at once: the one made first is used from now on.
+                    try saveRestorePoint(.adoption)
                     guard let adopted = try await adopt(originals, local: local, in: copy, generation: generation) else { return }
                     record.marfas[instance] = adopted
                 } else if adopted.removed == true {
@@ -273,6 +333,7 @@ final class PreferencesSync {
                     return standing = .off(.removed)
                 } else if try await copy.isBinned(adopted.item) {
                     guard generation == self.generation else { return }
+                    record = Record.read(defaults)
                     record.marfas[instance]?.removed = true
                     record.save(defaults)
                     item = nil
@@ -284,7 +345,7 @@ final class PreferencesSync {
                     record.marfas[instance] = made
                 }
             } else {
-                keepBeforeSync()
+                try saveRestorePoint(originals.isEmpty ? .firstSync : .adoption)
                 let adopted: Record.Adopted?
                 if originals.isEmpty {
                     let fresh = !record.marfas.isEmpty && !record.restarting.contains(instance)
@@ -297,11 +358,18 @@ final class PreferencesSync {
                 record.restarting.remove(instance)
             }
             record.last = instance
+            // This step wrote the settings marked to win that it read; a mark made since stays.
+            let read = record.winning ?? [:]
+            let marked = (Record.read(defaults).winning ?? [:]).filter { key, units in read[key] != units }
+            record.winning = marked.isEmpty ? nil : marked
             record.save(defaults)
             answered = answered.filter { id, _ in record.marfas.values.contains { $0.awaiting[id] != nil } }
             standing = .syncing
         } catch is Moved {
             again = true
+        } catch is RestorePoints.Failure {
+            // No point, no replace: everything stays as it was, and the next step tries again.
+            Telemetry.logger(.sync).error("A restore point could not be saved, so this app's settings did not sync")
         } catch is CancellationError {
         } catch {
             // A read or a write the copy refused leaves everything as it was; the next change tries again.
@@ -382,17 +450,22 @@ final class PreferencesSync {
 
     /// The steady step: brings this Mac and the item together against what both held after the last step. After a
     /// switch from another Marfa the defaults hold that Marfa's settings, which are no change of this Mac's, so this
-    /// Marfa's settings are written into them whole.
+    /// Marfa's settings are written into them whole. Otherwise this Mac's value of each setting in `winning`
+    /// (`Record.winning`) is written wherever it differs from the Marfa's, but for the units its mark leaves out. Once
+    /// each write to the item is queued, the record is saved with what it carried and the marks of the settings it
+    /// finished cleared, so a later write the copy refuses sends only its own again, never over a change made since.
     ///
     /// A field write this Mac queued is judged by its answer, not by what reaches the copy first: until it is answered,
     /// no other Mac's value of a member it carries is taken; once the server answers that it kept another Mac's field
     /// and wrote this one to a conflicted copy, each member it carried that this Mac still holds is written again, so
     /// only the same member's later write wins.
-    private func follow(_ chosen: PreferencesItem, from adopted: Record.Adopted, local: Local, switched: Bool,
-                        siblings: [PreferencesItem], in copy: any PreferencesCopy, generation: Int) async throws
-        -> Record.Adopted?
+    private func follow(_ chosen: PreferencesItem, from adopted: Record.Adopted, of instance: String, local: Local,
+                        switched: Bool, winning: [String: Set<PreferenceUnit>], siblings: [PreferencesItem],
+                        in copy: any PreferencesCopy, generation: Int) async throws -> Record.Adopted?
     {
         var adopted = adopted
+        // The defaults hold the Marfa followed before, which this one's settings are about to replace.
+        if switched { try saveRestorePoint(.switching) }
         let remote = try await copy.units(of: chosen.id)
         let queued = try await copy.queued()
         var lost: PreferenceUnits = [:]
@@ -429,16 +502,38 @@ final class PreferencesSync {
             // The person's own change to a dropped setting is theirs to send, so it is no longer held.
             if mine[unit] == frozen.left { mine[unit] = base[unit] } else { adopted.frozen[unit] = nil }
         }
+        // This Mac holds nothing of a row no setting here owns, which is no deletion of the person's.
+        for unit in Set(remote.keys).union(base.keys) where !PreferencesMap.synced.contains(where: { $0.owns(unit) }) {
+            mine[unit] = base[unit]
+        }
         mine.merge(setAsideUnreadable(remote, base: base)) { _, unreadable in unreadable }
         var seen = remote
         for unit in holding { seen[unit] = base[unit] }
         let unreadable = local.frozen
+        var before = PreferencesMerge.base(base, reclaiming: lost, local: mine, remote: seen)
+        let won = switched ? [] : PreferencesMap.synced.filter { winning[$0.key] != nil }
+        if !won.isEmpty {
+            before = PreferencesMerge.base(before, winning: { unit in
+                won.contains { $0.owns(unit) && winning[$0.key]?.contains(unit) == false }
+            }, local: mine, remote: seen)
+        }
         var outcome = PreferencesMerge.reconcile(
-            local: mine, remote: seen, base: PreferencesMerge.base(base, reclaiming: lost, local: mine, remote: seen),
-            frozen: { unit in unreadable.contains { $0.owns(unit) } })
+            local: mine, remote: seen, base: before, frozen: { unit in unreadable.contains { $0.owns(unit) } })
         outcome.toLocal.formUnion(retrying)
         if switched { outcome.toLocal.formUnion(Set(local.units.keys).union(outcome.merged.keys)) }
-        try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: retrying, in: copy)
+        try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: retrying, in: copy) {
+            [defaults] partial, unsent in
+            var record = Record.read(defaults)
+            record.marfas[instance] = partial
+            // A switch wrote this Marfa's settings into the defaults before any write to the item.
+            if switched { record.last = instance }
+            let finished = switched ? Set(winning.keys) : Set(won.filter { !unsent.contains(where: $0.owns) }.map(\.key))
+            if var marked = record.winning {
+                for key in finished where marked[key] == winning[key] { marked[key] = nil }
+                record.winning = marked.isEmpty ? nil : marked
+            }
+            record.save(defaults)
+        }
         // Every write is judged above, by its answer or its conflicted copy, so the copies have nothing left to give.
         for sibling in siblings { _ = try await copy.remove(sibling.id) }
         item = chosen
@@ -454,15 +549,5 @@ final class PreferencesSync {
             SyncedSetting.setAside(text, in: kind, defaults)
         }
         return unreadable
-    }
-
-    /// Keeps every synced setting this Mac holds, once, before anything changes it.
-    private func keepBeforeSync() {
-        guard defaults.object(forKey: Self.beforeSyncKey) == nil else { return }
-        var kept: [String: Any] = [:]
-        for key in PreferencesMap.syncedKeys {
-            if let value = defaults.object(forKey: key) { kept[key] = PreferenceJSON.json(fromDefaults: value) }
-        }
-        defaults.set(PreferenceJSON.text(kept) ?? "{}", forKey: Self.beforeSyncKey)
     }
 }
