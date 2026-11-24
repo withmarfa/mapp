@@ -49,6 +49,9 @@
     "Try again in a moment." : {
 
     },
+    "Couldn’t load that page of activity. %@" : {
+
+    },
     "Couldn’t Read the Total File Size" : {
 
     },

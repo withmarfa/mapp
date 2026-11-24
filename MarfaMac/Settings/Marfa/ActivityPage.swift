@@ -62,7 +62,8 @@ struct ActivityPage: View {
                 },
                 foot: {
                     if let failure = model.failure, !model.entries.isEmpty {
-                        Text(verbatim: OwnerWording.problemLine(failure, on: .activity, canRetry: true))
+                        let guidance = OwnerWording.problemLine(failure, on: .activity, canRetry: true)
+                        Text("Couldn’t load that page of activity. \(guidance)")
                             .settingsFont(.line).foregroundStyle(SettingsTokens.errorRed)
                     } else if let range = model.range {
                         Text(verbatim: range).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
