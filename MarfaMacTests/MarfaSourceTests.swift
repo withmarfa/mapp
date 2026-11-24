@@ -696,34 +696,38 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
-    /// An answer to a write of the item, as the server sends it: the item at `version`, holding `body` as its text.
+    /// An answer to a write of the item, as the server sends it: the item at `version`, holding `body` in `field`. The
+    /// write carried `sent` in that field, or no text where `sent` is nil.
     private static func answered(
-        _ id: String, _ verdict: Marfa.Verdict, kind: Marfa.WriteKind = .updateItem, made version: Int64? = nil,
-        holding body: String? = nil
+        _ id: String, _ verdict: Marfa.Verdict? = nil, kind: Marfa.WriteKind = .updateItem, carrying sent: String? = nil,
+        made version: Int64? = nil, holding body: String? = nil, in field: String = "body"
     ) -> Marfa.QueuedWrite {
-        let properties: JSONObject = body.map { ["body": .string($0)] } ?? [:]
+        let properties: JSONObject = body.map { [field: .string($0)] } ?? [:]
         return Marfa.QueuedWrite(
             id: id, kind: kind, itemId: "item", idempotencyKey: id, verdict: verdict,
+            body: sent.map { ["properties": .object([field: .string($0)])] } ?? [:],
             answer: version.map {
                 .object(["item": .object(["version": .integer($0), "type": .string("core.note"), "properties": .object(properties)])])
             },
             queuedAt: "2026-10-06T00:00:00Z")
     }
 
-    /// The version the person's text "Mine", last on `on`, follows once `queue`'s answers are counted against a copy
-    /// holding `held`.
+    /// The version the person's text, last saved as `text` on `on`, follows once `queue`'s answers are counted against
+    /// a copy holding `held`.
     private static func following(
-        _ queue: [Marfa.QueuedWrite], on: Int64 = 3, held: Int64, counted: inout Set<String>
+        _ queue: [Marfa.QueuedWrite], text: String = "Mine", on: Int64 = 3, held: Int64, counted: inout Set<String>
     ) async throws -> Int64 {
         try await MarfaEngine.counting(
-            queue, for: ItemID("item"), own: MarfaEngine.OwnText(text: "Mine", on: on), counted: &counted,
-            bodyField: { $0 == "core.note" ? "body" : nil }, held: { held }
+            queue, for: ItemID("item"), own: MarfaEngine.OwnText(text: text, field: "body", on: on), counted: &counted,
+            held: { held }
         ).on
     }
 
-    private static func following(_ queue: [Marfa.QueuedWrite], on: Int64 = 3, held: Int64) async throws -> Int64 {
+    private static func following(
+        _ queue: [Marfa.QueuedWrite], text: String = "Mine", on: Int64 = 3, held: Int64
+    ) async throws -> Int64 {
         var counted: Set<String> = []
-        return try await following(queue, on: on, held: held, counted: &counted)
+        return try await following(queue, text: text, on: on, held: held, counted: &counted)
     }
 
     /// An answer moves the person's text on only once its effect is known. A version it proves needs the version the
@@ -735,8 +739,8 @@ struct MarfaSourceOfflineTests {
         var counted: Set<String> = []
         await #expect(throws: Unreadable.self) {
             _ = try await MarfaEngine.counting(
-                queue, for: ItemID("item"), own: MarfaEngine.OwnText(text: "Mine", on: 3), counted: &counted,
-                bodyField: { _ in "body" }, held: { throw Unreadable() })
+                queue, for: ItemID("item"), own: MarfaEngine.OwnText(text: "Mine", field: "body", on: 3),
+                counted: &counted, held: { throw Unreadable() })
         }
         #expect(counted.isEmpty)
         #expect(try await Self.following(queue, held: 12, counted: &counted) == 7)
@@ -750,15 +754,18 @@ struct MarfaSourceOfflineTests {
     /// which can be another device's. Only an answer holding the person's own text moves it on.
     @Test func aSaveFollowsOnlyAnAnswerHoldingThePersonsText() async throws {
         // Saved at version 2; another device wrote the text at 3; the title change was answered at 4 with theirs.
-        let save = Self.answered("save", .accepted, made: 2, holding: "Mine")
+        let save = Self.answered("save", .accepted, carrying: "Mine", made: 2, holding: "Mine")
         let title = Self.answered("title", .merged(fields: ["title"]), made: 4, holding: "Theirs")
         #expect(try await Self.following([save, title], on: 1, held: 4) == 2)
         #expect(try await Self.following([title, save], on: 1, held: 4) == 2)
         // The version an answer holding the person's text names is followed, whichever write it answers.
         let titleOverMine = Self.answered("title", .accepted, made: 4, holding: "Mine")
         #expect(try await Self.following([save, titleOverMine], on: 1, held: 4) == 4)
+        // The person's text in another property proves nothing of the one the text is in.
+        let elsewhere = Self.answered("save", .accepted, carrying: "Mine", made: 4, holding: "Mine", in: "summary")
+        #expect(try await Self.following([elsewhere], on: 1, held: 4) == 1)
         // A merge that changed the text leaves it where it was, so the next save is merged too.
-        #expect(try await Self.following([Self.answered("save", .merged(fields: ["body"]), made: 5, holding: "Mine, theirs")], held: 5) == 3)
+        #expect(try await Self.following([Self.answered("save", .merged(fields: ["body"]), carrying: "Mine", made: 5, holding: "Mine, theirs")], held: 5) == 3)
     }
 
     /// The person's own create made version 1, whatever version the item has reached when the answer comes, as for
@@ -768,7 +775,7 @@ struct MarfaSourceOfflineTests {
         #expect(try await Self.following([create], on: 0, held: 2) == 1)
         #expect(MarfaEngine.version(read: 1, holding: 2) == 1)
         #expect(try await Self.following([Self.answered("create", .accepted, kind: .createItem)], on: 0, held: 1) == 1)
-        let save = Self.answered("save", .accepted, made: 3, holding: "Mine")
+        let save = Self.answered("save", .accepted, carrying: "Mine", made: 3, holding: "Mine")
         #expect(try await Self.following([save, create], on: 0, held: 3) == 3)
         #expect(try await Self.following([create, save], on: 0, held: 3) == 3)
     }
@@ -787,12 +794,49 @@ struct MarfaSourceOfflineTests {
     /// The copy can record an answer before it reads the item back. An answer at a version the copy does not hold yet
     /// waits uncounted, the text staying where it was, and moves it once the copy holds that version.
     @Test func anAnswerAheadOfTheCopyWaitsForTheReadBack() async throws {
-        let queue = [Self.answered("save", .accepted, made: 7, holding: "Mine")]
+        let queue = [Self.answered("save", .accepted, carrying: "Mine", made: 7, holding: "Mine")]
         var counted: Set<String> = []
         #expect(try await Self.following(queue, held: 6, counted: &counted) == 3)
         #expect(counted.isEmpty)
         #expect(try await Self.following(queue, held: 7, counted: &counted) == 7)
         #expect(counted == ["save"])
+    }
+
+    /// On a slow link, saves the cap sends go out before the ones ahead are answered. Each answer holding the text its
+    /// own write carried is a version of the person's text, so the next save follows the latest, never the version
+    /// they all started from, where the server would set the person's text against itself.
+    @Test func aSaveFollowsTheLatestOfTheEarlierSavesAnswered() async throws {
+        let first = Self.answered("A", .accepted, carrying: "A", made: 2, holding: "A")
+        let second = Self.answered("AB", .accepted, carrying: "AB", made: 3, holding: "AB")
+        let third = Self.answered("ABC", carrying: "ABC")
+        #expect(try await Self.following([first, second, third], text: "ABC", on: 1, held: 3) == 3)
+        #expect(try await Self.following([third, second, first], text: "ABC", on: 1, held: 3) == 3)
+        #expect(try await Self.following([first, third], text: "ABC", on: 1, held: 2) == 2)
+    }
+
+    /// Another device restores the text the person started from between two of their saves, and the second conflicts.
+    /// The next save follows the first save's answer, so the server sees the restore and the person's text both
+    /// change it and keeps both. On the version they all started from, the restore would match it, and the person's
+    /// text would replace the restore.
+    @Test func aSaveAfterAConflictedOneFollowsTheLastAnswerHoldingTheText() async throws {
+        let first = Self.answered("A", .accepted, carrying: "A", made: 2, holding: "A")
+        let second = Self.answered("AB", .conflicted(siblingId: "copy", fields: ["body"]), carrying: "AB", made: 3, holding: "Base")
+        #expect(try await Self.following([first, second], text: "AB", on: 1, held: 3) == 2)
+        #expect(try await Self.following([second, first], text: "AB", on: 1, held: 3) == 2)
+    }
+
+    /// The server keeps text byte for byte, so two spellings of one character Swift calls equal are different text,
+    /// and an answer holding the other spelling proves nothing.
+    @Test func anAnswerProvesTheTextOnlyByteForByte() async throws {
+        let composed = "Caf\u{00E9}"
+        let decomposed = "Cafe\u{0301}"
+        try #require(composed == decomposed)
+        let save = Self.answered("save", .accepted, carrying: composed, made: 4, holding: decomposed)
+        #expect(try await Self.following([save], text: composed, held: 4) == 3)
+        let title = Self.answered("title", .accepted, made: 4, holding: decomposed)
+        #expect(try await Self.following([title], text: composed, held: 4) == 3)
+        let same = Self.answered("save", .accepted, carrying: decomposed, made: 4, holding: decomposed)
+        #expect(try await Self.following([same], text: decomposed, held: 4) == 4)
     }
 
     private static func edge(of type: String, from id: ItemID, in source: MarfaSource) async -> Marfa.Edge? {

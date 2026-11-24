@@ -127,19 +127,25 @@ extension MarfaEngine {
                 throw Unsupported(message: Self.noText)
             }
             let properties = JSONObject([(bodyField, .string(text))])
+            // What proves a version holds the person's text proves it for one property (`OwnText`), so after a
+            // retype that moved the text, the save goes as read.
+            let follows = merge == .following && ownText[id]?.field == bodyField
             // Read before the edit is sent: an answer that lands during the send is not in the version it was sent
             // on, so it is counted later, as it comes.
-            let answeredBefore = merge == .following && ownText[id] != nil ? [] : try await answeredWrites(of: id)
+            let answeredBefore = follows ? [] : try await answeredWrites(of: id)
             let queued: Marfa.QueuedWrite
             switch merge {
             case .ifUnchanged:
                 queued = try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: base.rawValue))
-            case .asRead:
+            case .asRead, .following where !follows:
                 queued = try await send(id, properties) { base.rawValue }
             case .following:
                 queued = try await send(id, properties) { try await self.followingVersion(id, otherwise: base) }
             }
-            ownText[id] = OwnText(text: text, on: queued.baseVersion ?? base.rawValue)
+            var on = queued.baseVersion ?? base.rawValue
+            // An answer counted while the save was sent proves a version of the person's text this save follows too.
+            if follows, let own = ownText[id], own.field == bodyField { on = max(on, own.on) }
+            ownText[id] = OwnText(text: text, field: bodyField, on: on)
             // A following edit counted the answers it saw as it chose its version (`followingVersion`).
             counted.formUnion(answeredBefore)
             return [queued]

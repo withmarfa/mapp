@@ -56,12 +56,19 @@ actor MarfaEngine {
         var problem: SyncProblem
     }
 
-    /// The person's latest edit of an item's text, and the version of the item their own writes account for: the
-    /// version that edit was typed on, moved to each later version an answer proves holds exactly that text
-    /// (`MarfaEngine.counting`).
+    /// The person's latest save of an item's text, the property it is in, and the latest version of the item known to
+    /// hold, in that property, text of the person's own saves and nothing else: at first the version the save was
+    /// typed on, then each later version an answer proves (`MarfaEngine.counting`). A save that follows this one goes
+    /// on that version only while it writes the same property.
     nonisolated struct OwnText: Equatable {
         var text: String
+        var field: String
         var on: Int64
+
+        /// Byte for byte, as the server compares text, where `String` takes two spellings of a character as one.
+        static func == (lhs: OwnText, rhs: OwnText) -> Bool {
+            lhs.text.utf8.elementsEqual(rhs.text.utf8) && lhs.field == rhs.field && lhs.on == rhs.on
+        }
     }
 
     nonisolated static var notCurrent: String {

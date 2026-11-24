@@ -38,53 +38,64 @@ extension MarfaEngine {
         read == 0 && held > 0 ? 1 : read
     }
 
-    /// The version an edit that follows the person's last edit of the text was typed on: the version their own
-    /// writes account for. Where the copy holds that version it holds only the person's text over what they read;
-    /// where it holds a later one, another device's change came in, and the edit is merged against it. While the
-    /// person's own edits of it still wait, a later version cannot yet say whether the server will take them or
-    /// keep the other device's text, so the answer is waited for a moment, as the drain under way brings it; one
-    /// that does not come leaves the edit merged against the older version, which never overwrites.
+    /// The version an edit that follows the person's last edit of the text was typed on: the latest version known to
+    /// hold only the person's text (`OwnText.on`). Where the copy holds that version it holds only the person's text
+    /// over what they read; where it holds a later one, another device's change came in, and the edit is merged
+    /// against it. While the person's own edits of it still wait, a later version cannot yet say whether the server
+    /// will take them or keep the other device's text, and an answer the copy has yet to read back cannot yet be
+    /// followed (`counting`), so either is waited for a moment, as the drain under way brings it. One that does not
+    /// come leaves the edit merged against the older version.
     func followingVersion(_ id: ItemID, otherwise base: ItemVersion) async throws -> Int64 {
         guard ownText[id] != nil else { return base.rawValue }
-        func waiting(_ queue: [Marfa.QueuedWrite]) -> Bool {
-            queue.contains { $0.itemId == id.rawValue && [.createItem, .updateItem].contains($0.kind) && $0.verdict == nil }
+        func unsettled(_ queue: [Marfa.QueuedWrite]) async throws -> Bool {
+            guard let own = ownText[id] else { return false }
+            let writes = queue.filter { $0.itemId == id.rawValue && [.createItem, .updateItem].contains($0.kind) }
+            if writes.contains(where: { $0.verdict != nil && !counted.contains($0.id) }) { return true }
+            guard writes.contains(where: { $0.verdict == nil }) else { return false }
+            return try await heldVersion(id) > own.on
         }
+        let clock = ContinuousClock()
+        let end = clock.now + .seconds(2)
         var queue = try await queueWithAnswers()
         try await count(answers: queue, for: id)
-        if let own = ownText[id], try await heldVersion(id) > own.on, waiting(queue) {
-            let clock = ContinuousClock()
-            let end = clock.now + .seconds(2)
-            while waiting(queue), clock.now < end {
-                try await Task.sleep(for: .milliseconds(50))
-                queue = try await queueWithAnswers()
-            }
+        while try await unsettled(queue), clock.now < end {
+            #if DEBUG
+            hooks.followWaits.update { $0 += 1 }
+            #endif
+            try await Task.sleep(for: .milliseconds(50))
+            queue = try await queueWithAnswers()
             try await count(answers: queue, for: id)
         }
         return ownText[id]?.on ?? base.rawValue
     }
 
-    /// Moves the version the person's own writes account for to the latest one the copy's answers prove holds exactly
-    /// the person's text (`counting`). A save that follows goes on that version only, so it never lands over a change
-    /// to the text the person did not see; where no answer proves a later one, it stays where it was, and the next
-    /// save is sent as read there, which the server merges or keeps beside the other change.
+    /// Moves the version the person's own writes account for to the latest one the copy's answers prove holds only the
+    /// person's text (`counting`). A save that follows goes on that version only, so it never lands over a change to
+    /// the text the person did not see; where no answer proves a later one, it stays where it was, and the next save
+    /// is sent as read there, which the server merges against the person's own earlier text or keeps beside the other
+    /// change.
     func count(answers queue: [Marfa.QueuedWrite], for id: ItemID) async throws {
         guard let own = ownText[id] else { return }
         var taken = counted
-        let types = catalogue.itemTypes
-        ownText[id] = try await Self.counting(
-            queue, for: id, own: own, counted: &taken, bodyField: { MarfaMapping.bodyField(of: types[TypeID($0)]) },
-            held: { try await self.heldVersion(id) })
+        let moved = try await Self.counting(queue, for: id, own: own, counted: &taken) { try await self.heldVersion(id) }
+        // A save sent while the copy was read set text of its own, which these answers are counted against next time.
+        guard ownText[id] == own else { return }
+        ownText[id] = moved
         counted.formUnion(taken)
     }
 
-    /// `own` moved to the latest version an answer in `queue`, not yet in `counted`, proves holds `own.text`. An
-    /// answer to an update proves its version where the item it carries holds that text in its type's body field
-    /// (`bodyField`), as the contract moves an edit onto an earlier edit's answer only where the answer holds what the
-    /// edit was made against (`queue-and-verdicts/edit-on-answer`, `queue-and-verdicts/edit-not-on-unheld-answer`).
-    /// An answer to a write that did not carry the text, as a title change, can hold another device's text, and one
-    /// that names no version, or a merge that changed the text, proves none. This device's create proves version 1,
-    /// the one it made, whatever version a repeat is answered at (`queue-and-verdicts/create-repeat-edit-rebased`).
-    /// The latest proven version is taken, whatever order the answers come in.
+    /// `own` moved to the latest version an answer in `queue`, not yet in `counted`, proves holds, in `own.field`,
+    /// only text of the person's own saves. An answer to a write that carried text in that property proves its
+    /// version where the item it carries holds that same text there, byte for byte, as the server keeps it: the
+    /// version is then that save of the person's laid over what it was sent on, whichever of their saves are still on
+    /// their way. An answer to a write that carried none, as a title change, or an edit moved onto an answer that
+    /// dropped the text it carried unchanged (`queue-and-verdicts/edit-drops-unchanged`), can hold another device's
+    /// text, so it proves its version only where the item holds `own.text` there. This is the contract's test for
+    /// moving an edit onto an earlier edit's answer (`queue-and-verdicts/edit-on-answer`,
+    /// `queue-and-verdicts/edit-not-on-unheld-answer`). This device's create proves version 1, the one it made,
+    /// whatever version a repeat is answered at (`queue-and-verdicts/create-repeat-edit-rebased`). An acceptance
+    /// that names no item version proves nothing. The latest proven version is taken, whatever order the answers come
+    /// in.
     ///
     /// An answer proving a version later than the copy holds (`held`), as one whose read-back is still owed, stays out
     /// of `counted` until the copy holds it, since an edit on a version the copy does not hold is refused
@@ -92,14 +103,14 @@ extension MarfaEngine {
     /// while it is hydrated again, throws and counts nothing.
     nonisolated static func counting(
         _ queue: [Marfa.QueuedWrite], for id: ItemID, own: OwnText, counted: inout Set<String>,
-        bodyField: (String) -> String?, held: () async throws -> Int64
+        held: () async throws -> Int64
     ) async rethrows -> OwnText {
         let answered = queue.filter {
             $0.itemId == id.rawValue && [.createItem, .updateItem].contains($0.kind) && $0.verdict != nil
                 && !counted.contains($0.id)
         }
         guard !answered.isEmpty else { return own }
-        let proven = answered.map { ($0.id, provenVersion(by: $0, holding: own.text, bodyField: bodyField)) }
+        let proven = answered.map { ($0.id, provenVersion(by: $0, of: own)) }
         let copy = proven.contains { ($0.1 ?? 0) > own.on } ? try await held() : own.on
         var own = own
         for (write, version) in proven {
@@ -112,26 +123,36 @@ extension MarfaEngine {
         return own
     }
 
-    /// The version `write`'s answer proves holds exactly `text`, if any.
-    private nonisolated static func provenVersion(
-        by write: Marfa.QueuedWrite, holding text: String, bodyField: (String) -> String?
-    ) -> Int64? {
+    /// The version `write`'s answer proves holds only the person's text in `own.field`, if any.
+    private nonisolated static func provenVersion(by write: Marfa.QueuedWrite, of own: OwnText) -> Int64? {
         switch write.verdict {
         case .accepted?, .merged?: break
         default: return nil
         }
         if write.kind == .createItem { return 1 }
         guard let item = write.answer?.object?["item"]?.object, let version = item["version"]?.integer,
-            let type = item["type"]?.string, let field = bodyField(type), let properties = item["properties"]?.object
+            let properties = item["properties"]?.object, let held = text(properties[own.field])
         else { return nil }
-        // An item with no text property holds empty text, as `MarfaMapping.body` reads it.
-        let body: String? =
-            switch properties[field] {
-            case nil, .null?: ""
-            case .string(let held)?: held
-            default: nil
+        let carried: String? =
+            if write.body["clear_properties"]?.array?.contains(.string(own.field)) == true {
+                ""
+            } else if let sent = write.body["properties"]?.object?[own.field] {
+                text(sent)
+            } else {
+                own.text
             }
-        return body == text ? version : nil
+        guard let carried else { return nil }
+        return held.utf8.elementsEqual(carried.utf8) ? version : nil
+    }
+
+    /// A text property's value as `MarfaMapping.body` reads it: none held is empty text, and a value that is not a
+    /// string is no text.
+    private nonisolated static func text(_ value: JSONValue?) -> String? {
+        switch value {
+        case nil, .null?: ""
+        case .string(let text)?: text
+        default: nil
+        }
     }
 
     func answeredWrites(of id: ItemID) async throws -> [String] {
