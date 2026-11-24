@@ -158,8 +158,7 @@ private struct IndexTypesCell: View {
     }
 }
 
-/// When a container's latest item changed, as the system words a time before now. The text keeps itself current as the
-/// minutes pass, so a row never says "4 sec ago" for minutes, and no view is redrawn for it.
+/// The system schedules updates to the date label without the table tracking the clock.
 struct IndexLatest: View {
     let date: Date?
 

@@ -223,7 +223,7 @@ final class ItemToolbarTests: XCTestCase {
     }
 
     func testViewAsShowsTheTableWithItsViewOptions() {
-        show("as Table")
+        show("View as Table")
         let table = control("ItemTable")
         XCTAssertTrue(table.waitForExistence(timeout: 3))
         XCTAssertFalse(window.outlines["ItemList"].exists, "the table spans the window")
@@ -235,18 +235,18 @@ final class ItemToolbarTests: XCTestCase {
         }
         capture("Table View Options menu")
         app.typeKey(.escape, modifierFlags: [])
-        show("as Gallery")
+        show("View as Gallery")
         XCTAssertTrue(control("ItemGallery").waitForExistence(timeout: 3))
         XCTAssertTrue(table.waitForNonExistence(timeout: 3))
         app.typeKey("3", modifierFlags: .command)
         XCTAssertTrue(table.waitForExistence(timeout: 3))
-        show("as List")
+        show("View as List")
         XCTAssertTrue(window.outlines["ItemList"].waitForExistence(timeout: 3))
         XCTAssertTrue(table.waitForNonExistence(timeout: 3))
     }
 
     func testViewOptionsHoldShowFiltersInEveryLayout() {
-        for title in ["as List", "as Gallery", "as Table", "as Board"] {
+        for title in ["View as List", "View as Gallery", "View as Table", "View as Board"] {
             show(title)
             control("ViewOptionsToolbar").click()
             XCTAssertTrue(window.menuItems["Show Filters"].firstMatch.waitForExistence(timeout: 3), title)

@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// What a button is for. A text button always has a fill; only a header row's symbol and a banner's close are plain.
 enum AppButtonRole {
     case primary, secondary, plain, destructive
 }

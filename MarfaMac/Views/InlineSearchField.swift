@@ -1,18 +1,20 @@
 import AppKit
 import SwiftUI
 
-/// The system's search field for an index page's header: white, a hairline edge, a capsule at 28 points, with the
-/// magnifier and the clear button drawn by AppKit. SwiftUI's `searchable` places a field only in a toolbar or a sidebar,
-/// so a field inside a page is an `NSSearchField`. It takes the keyboard each time it opens, Escape or an empty field
-/// that has lost the keyboard closes it, and Down Arrow hands the keyboard to the list.
-struct IndexSearchField: NSViewRepresentable {
+/// An `NSSearchField` for a page or sheet, where SwiftUI's `searchable` would place it in a toolbar or sidebar.
+struct InlineSearchField: NSViewRepresentable {
     @Environment(\.interfaceTextSize) private var textSize
     @Binding var text: String
     let prompt: String
+    let identifier: String
     /// Asks, each time it changes, for the field to take the keyboard again.
-    let focusRequests: Int
+    var focusRequests = 0
     let onDown: () -> Void
-    let onEnd: () -> Void
+    var onUp: (() -> Void)?
+    var onSubmit: (() -> Void)?
+    let onCancel: () -> Void
+    /// Closes a search that only stays open while it has focus or text.
+    var onEnd: (() -> Void)?
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
@@ -21,8 +23,11 @@ struct IndexSearchField: NSViewRepresentable {
         field.controlSize = .large
         field.sendsSearchStringImmediately = true
         field.delegate = context.coordinator
-        field.setAccessibilityIdentifier("ColumnSearch")
-        field.onClickElsewhere = { [weak coordinator = context.coordinator] in coordinator?.parent.onEnd() }
+        field.setAccessibilityIdentifier(identifier)
+        field.setAccessibilityLabel(prompt)
+        if onEnd != nil {
+            field.onClickElsewhere = { [weak coordinator = context.coordinator] in coordinator?.parent.onEnd?() }
+        }
         update(field)
         return field
     }
@@ -47,10 +52,10 @@ struct IndexSearchField: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, NSSearchFieldDelegate {
-        var parent: IndexSearchField
+        var parent: InlineSearchField
         var focusRequests: Int
 
-        init(parent: IndexSearchField) {
+        init(parent: InlineSearchField) {
             self.parent = parent
             focusRequests = parent.focusRequests
         }
@@ -61,17 +66,21 @@ struct IndexSearchField: NSViewRepresentable {
         }
 
         func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-            switch selector {
-            case #selector(NSResponder.moveDown(_:)): parent.onDown()
-            case #selector(NSResponder.cancelOperation(_:)): parent.onEnd()
-            default: return false
+            let action: (() -> Void)? = switch selector {
+            case #selector(NSResponder.moveDown(_:)): parent.onDown
+            case #selector(NSResponder.moveUp(_:)): parent.onUp
+            case #selector(NSResponder.insertNewline(_:)): parent.onSubmit
+            case #selector(NSResponder.cancelOperation(_:)): parent.onCancel
+            default: nil
             }
+            guard let action else { return false }
+            action()
             return true
         }
 
         // Left empty, the field goes back to being a button.
         func controlTextDidEndEditing(_ notification: Notification) {
-            if parent.text.isEmpty { parent.onEnd() }
+            if parent.text.isEmpty { parent.onEnd?() }
         }
     }
 
@@ -80,7 +89,7 @@ struct IndexSearchField: NSViewRepresentable {
         private var isAwaitingKeyboard = true
         /// Called once a click has landed outside the field while it was open and empty: the field editor keeps the
         /// keyboard through a click on a background that cannot take it, so the field never hears that the person moved on.
-        var onClickElsewhere: () -> Void = {}
+        var onClickElsewhere: (() -> Void)?
         private var monitor: Any?
 
         isolated deinit { removeMonitor() }
@@ -89,9 +98,11 @@ struct IndexSearchField: NSViewRepresentable {
             super.viewDidMoveToWindow()
             removeMonitor()
             guard window != nil else { return }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
-                MainActor.assumeIsolated { self?.watch(event) }
-                return event
+            if onClickElsewhere != nil {
+                monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
+                    MainActor.assumeIsolated { self?.watch(event) }
+                    return event
+                }
             }
             if isAwaitingKeyboard { takeKeyboard() }
         }
@@ -116,7 +127,7 @@ struct IndexSearchField: NSViewRepresentable {
             let point = content.convert(event.locationInWindow, from: nil)
             guard let hit = content.hitTest(point), !hit.isDescendant(of: self) else { return }
             DispatchQueue.main.async { [weak self] in
-                if let self, (self.currentEditor() as? NSTextView)?.string.isEmpty == true { self.onClickElsewhere() }
+                if let self, (self.currentEditor() as? NSTextView)?.string.isEmpty == true { self.onClickElsewhere?() }
             }
         }
     }
