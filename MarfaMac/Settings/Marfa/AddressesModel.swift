@@ -297,10 +297,7 @@ import Observation
     }
 }
 
-/// Private Addresses, the stored setting `allow_private_addresses`: whether the server may send webhooks, the heartbeat and its
-/// other reports to loopback, private and other addresses that are not public. Turning it on reaches the network the server runs
-/// on, so the page asks first and the server asks for a recent sign-in, which the call shows in place. A change is sent at once,
-/// after a fresh read finds the setting still as it was shown; the switch shows what the server holds.
+/// The page asks first because enabling private addresses lets the server reach its own network.
 @Observable @MainActor final class PrivateAddressesModel {
     static let key = "allow_private_addresses"
 

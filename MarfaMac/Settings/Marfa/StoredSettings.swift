@@ -14,7 +14,7 @@ nonisolated enum StoredSettingsWrite: Equatable, Sendable {
 /// The server's stored settings as a page last read them, and the one way a page changes them: a write is sent only after a
 /// fresh read finds each setting it changes still as the page showed it, to the instance that was read, so a change made
 /// elsewhere is told and never written over. A write that arrives while another runs waits for it. Another Marfa answering at
-/// the address is told as that, and nothing of it is taken as what the page shows. Monitoring and Limits each hold one.
+/// the address is told as that, and nothing of it is taken as what the page shows.
 @Observable @MainActor final class StoredSettings {
     private let context: OwnerContext
     private let calls: any InstanceCalls
@@ -132,9 +132,10 @@ nonisolated enum StoredSettingWording {
         switch key {
         case "heartbeat_url": MonitoringSecret.heartbeatAddress.removalName
         case "posthog_host": MonitoringSecret.postHogHost.removalName
-        case "otel_exporter_otlp_endpoint", "otel_exporter_otlp_traces_endpoint", "otel_exporter_otlp_logs_endpoint",
-            "otel_exporter_otlp_metrics_endpoint":
-            MonitoringSecret.telemetryAddress.removalName
+        case "otel_exporter_otlp_endpoint": MonitoringSecret.telemetryAddress.removalName
+        case "otel_exporter_otlp_traces_endpoint": String(localized: "telemetry traces address")
+        case "otel_exporter_otlp_logs_endpoint": String(localized: "telemetry logs address")
+        case "otel_exporter_otlp_metrics_endpoint": String(localized: "telemetry metrics address")
         case "object_store_endpoint": String(localized: "object store address")
         default: nil
         }

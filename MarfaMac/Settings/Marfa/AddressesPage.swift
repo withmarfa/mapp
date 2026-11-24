@@ -39,7 +39,7 @@ struct AddressesPage: View {
                 Button("Cancel", role: .cancel) {}
                 Button("Allow") { Task { await network.allow() } }
             } message: {
-                Text("\(host.serverName) will send webhooks, the heartbeat, error reports, telemetry and backups to addresses that aren’t public: the machine it runs on, and networks such as a home network or Tailscale.")
+                Text("\(host.serverName) can send webhooks, the heartbeat, error reports, telemetry, and object store requests to addresses that aren’t public, including its own computer and devices on private networks such as Tailscale.")
             }
             .accessibilityIdentifier("AddressesPage")
     }
@@ -90,7 +90,7 @@ struct AddressesPage: View {
     private var networkRows: some View {
         SettingsSection("Network") {
             if network.isLoaded {
-                SettingsRow("Private Addresses", line: "Lets webhooks and the heartbeat reach this network.", error: network.line) {
+                SettingsRow("Private Addresses", line: "Lets webhooks and the heartbeat reach this network.", error: network.line, lines: nil) {
                     SettingsToggle(title: "Private Addresses", isOn: Binding { network.isOn } set: { on in Task { await network.set(on) } })
                         .disabled(network.isWriting)
                         .accessibilityIdentifier("PrivateAddresses")
@@ -202,14 +202,14 @@ struct AddressSheet: View {
         if codes.contains("passkeys_unusable") {
             rows.append(Happening(
                 id: "passkeys_unusable", title: String(localized: "Passkeys stop working"),
-                line: String(localized: "A passkey works only where it was added. Add them again."), symbol: "person.badge.key"))
+                line: String(localized: "Add a passkey at the new address."), symbol: "person.badge.key"))
         }
         let worded: Set<String> = ["browser_sessions_end", "apps_sign_in_again", "passkeys_unusable"]
         for consequence in consequences where !worded.contains(consequence.code) {
             rows.append(Happening(id: consequence.code, title: consequence.sentence, line: nil, symbol: "link"))
         }
         rows.append(Happening(
-            id: "keys", title: String(localized: "Keys keep working"), line: String(localized: "Scripts change the address they call."),
+            id: "keys", title: String(localized: "Keys keep working"), line: String(localized: "If the old address stops working, update your scripts."),
             symbol: "key"))
         return rows
     }

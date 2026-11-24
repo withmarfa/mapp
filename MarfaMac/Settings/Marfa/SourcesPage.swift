@@ -197,8 +197,6 @@ private struct SourceSheet: View {
     }
 }
 
-/// The page a source rule opens, Limit Sources (S65) or Who May Write, which has no board of its own and is drawn the same way:
-/// the types and sources to check, then the button bar, then Turn Off.
 private struct SourceRulePage: View {
     let model: SourceLimitModel
     let host: any MarfaSettingsHost
@@ -293,15 +291,15 @@ private struct SourceRuleWords {
     var intro: String {
         switch rule {
         case .filter:
-            String(localized: "For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. The app too.")
+            String(localized: "Lists, search, exports, and webhooks include only items from the checked sources for these types and their subtypes. Individual items can still be opened directly. A key can use its own rule.")
         case .allowlist:
-            String(localized: "For these types, every app and key adds items only under the checked sources. The app too. Types made from them are not included.")
+            String(localized: "Only the checked sources can add items of the checked types. Subtypes have their own rules. A key can use its own rule.")
         }
     }
 
     var typesLine: String {
         switch rule {
-        case .filter: String(localized: "Types with no limit read every source.")
+        case .filter: String(localized: "Checking a type also limits its subtypes.")
         case .allowlist: String(localized: "Types left unchecked take items from every source.")
         }
     }
@@ -319,15 +317,15 @@ private struct SourceRuleWords {
 
     var turnOffLine: String {
         switch rule {
-        case .filter: String(localized: "Every source is read again.")
-        case .allowlist: String(localized: "Every source can add items again.")
+        case .filter: String(localized: "Remove the instance’s source filter.")
+        case .allowlist: String(localized: "Remove the instance’s rule for adding items.")
         }
     }
 
     var turnOffMessage: String {
         switch rule {
-        case .filter: String(localized: "Apps and keys will read items from every source for the types you limited.")
-        case .allowlist: String(localized: "Apps and keys will be able to add items of these types from every source.")
+        case .filter: String(localized: "Apps and keys using this rule will see items from every source for the types you limited, including subtypes.")
+        case .allowlist: String(localized: "Apps and keys using this rule will be able to add items of these types from any source.")
         }
     }
 }
