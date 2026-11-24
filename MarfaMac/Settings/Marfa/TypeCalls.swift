@@ -181,17 +181,19 @@ nonisolated struct TypeSettingRecord: Hashable, Sendable {
     var blocked: Block?
 }
 
-/// What moving a type's items would do: how many it moves and the settings that name the type.
+/// What moving a type's items would do: the items it moves and the settings that name the type.
 nonisolated struct TypeMovePreview: Hashable, Sendable {
     /// Nil where the server refused the move before counting them.
     var items: Int?
+    /// The items it moves.
+    var ids: [String] = []
     var settings: [TypeSettingRecord]
     /// Tables items hold rows in that the target type doesn't declare, which stop the move.
     var tables: [String] = []
 
-    /// Whether a move would do what `other` said it would: the same items counted and the same settings and tables.
+    /// Whether a move would do what `other` said it would: the same items, settings and tables.
     func isSame(as other: TypeMovePreview) -> Bool {
-        items == other.items && Set(settings) == Set(other.settings) && Set(tables) == Set(other.tables)
+        Set(ids) == Set(other.ids) && Set(settings) == Set(other.settings) && Set(tables) == Set(other.tables)
     }
 }
 
@@ -208,7 +210,8 @@ nonisolated struct TypeMoveResult: Hashable, Sendable {
     /// Why the move stopped or left the settings as they were, in the server's words.
     var problem: String?
 
-    var isDone: Bool { remaining == 0 && !remainingHidden && problem == nil }
+    /// Whether every item moved: a move with any item left or failed is partial.
+    var isDone: Bool { failed == 0 && remaining == 0 && !remainingHidden && problem == nil }
 }
 
 /// A change to one field a type declares itself.

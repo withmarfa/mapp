@@ -53,7 +53,7 @@ nonisolated struct ServerTypeCalls: TypeCalls {
     func previewMove(of type: String, to target: String) async throws(TypeFailure) -> TypeMovePreview {
         try await run { client in
             let preview = try await client.previewMove(ofType: type, to: target)
-            return TypeMovePreview(items: preview.matched, settings: preview.settings.map(Self.setting))
+            return TypeMovePreview(items: preview.matched, ids: preview.ids, settings: preview.settings.map(Self.setting))
         }
     }
 

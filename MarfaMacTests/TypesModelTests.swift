@@ -786,6 +786,24 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.deleteSheetFailure == "15 items moved. 3 items couldn’t move, so Jobs was kept.")
     }
 
+    /// A job with any failed item is partial, even where none is left of the type.
+    @Test func aMoveWithFailuresAndNothingLeftStillKeepsTheType() async {
+        let calls = deletable()
+        calls.state.withLock {
+            $0.preview = TypeMovePreview(items: 18, settings: [])
+            $0.moveResult = TypeMoveResult(moved: 16, failed: 2, remaining: 0, remainingHidden: false)
+        }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(await eventually { model.movePreview != nil })
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.deleted.isEmpty })
+        #expect(model.deleted == nil && model.isConfirmingDelete)
+        #expect(model.deleteSheetFailure == "16 items moved. 2 items couldn’t move, so Jobs was kept.")
+    }
+
     @Test func itemsMadeWhileTheMoveRanAreNotToldAsFailures() async {
         let calls = deletable()
         calls.state.withLock {
@@ -802,18 +820,22 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.deleteSheetFailure == "18 items moved. Jobs got 2 new items while they moved, so it was kept. Delete again to move them too.")
     }
 
-    /// The server takes no precondition on a move, so the move is previewed again just before it starts: a webhook made since
-    /// the person agreed is shown and agreed to before anything moves.
+    /// The server takes no precondition on a move, so the move is previewed again just before it starts: other items with the
+    /// same count, or a webhook made since the person agreed, are shown and agreed to before anything moves.
     @Test func aMoveWhosePreviewChangedSinceTheOwnerAgreedAsksAgain() async {
         let calls = deletable()
-        calls.state.withLock { $0.preview = TypeMovePreview(items: 18, settings: []) }
-        let model = model(calls, counts: ["user.job": 18])
+        calls.state.withLock { $0.preview = TypeMovePreview(items: 2, ids: ["i1", "i2"], settings: []) }
+        let model = model(calls, counts: ["user.job": 2])
         await model.load()
         model.open("user.job")
         model.beginDelete()
         #expect(await eventually { model.movePreview != nil })
+        calls.state.withLock { $0.preview = TypeMovePreview(items: 2, ids: ["i1", "i3"], settings: []) }
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.isEmpty && $0.deleted.isEmpty })
+        #expect(model.movePreview?.ids == ["i1", "i3"])
         let webhook = TypeSettingRecord(kind: .webhook, id: "w1", field: "type_filter")
-        calls.state.withLock { $0.preview = TypeMovePreview(items: 18, settings: [webhook]) }
+        calls.state.withLock { $0.preview = TypeMovePreview(items: 2, ids: ["i1", "i3"], settings: [webhook]) }
         await model.confirmDelete()
         #expect(calls.state.withLock { $0.moves.isEmpty && $0.deleted.isEmpty })
         #expect(model.movePreview?.settings == [webhook])
