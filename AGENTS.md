@@ -18,7 +18,7 @@ Marfa for Mac is a macOS app for a Marfa server's items, with a sidebar, a list 
 - Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, which delivers it to Claude Code. Edit the file, never the link. Codex loads no nested file, so the table above is how it finds the rest.
 - Keep each file under 200 lines and each chain from this file to a nested one under 32,000 bytes (Codex stops at 32 KiB). Detail about one type belongs in its doc comment, a concept in `docs/`.
 - List a new `AGENTS.md` under `MarfaMac/` and its link in the MarfaMac target's membership exceptions in `project.pbxproj`, or the build fails on duplicate resources.
-- Run `python3 Scripts/check-instructions.py` after changing an instruction file, a doc or a name a doc cites. It checks the limits, links, membership exceptions and that each name on a doc's "Where it lives" line exists. CI runs it as `Instructions`, on drafts too.
+- Run `python3 Scripts/check-instructions.py` after changing an instruction file, a doc or a name a doc cites (it checks limits, links, exceptions and named files). CI runs it as `Instructions`, on drafts too.
 
 ## Working here
 
@@ -34,7 +34,7 @@ Marfa for Mac is a macOS app for a Marfa server's items, with a sidebar, a list 
 - Target macOS 27 and Xcode 27 only, with no `#available` checks. Swift 6 language mode, main-actor isolation by default. Unit tests use Swift Testing; UI tests use XCTest.
 - Use SwiftUI with native containers and controls, and AppKit only where SwiftUI cannot express something. Check API questions against Apple's documentation.
 - Every user-facing string goes through the String Catalog. Building in Xcode updates `MarfaMac/Localizable.xcstrings`; `xcodebuild` alone does not.
-- The app is not sandboxed and keeps the hardened runtime with no exceptions. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting`, the plugins release reader (`PluginRelease`) and Sparkle may connect out. Neither the item page nor a sealed web page loads from the network itself.
+- The app is not sandboxed. Release keeps the hardened runtime with no exceptions; Debug leaves it off. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting`, the plugins release reader (`PluginRelease`) and Sparkle may connect out. Neither the item page nor a sealed web page loads from the network itself.
 
 ## Data rules
 

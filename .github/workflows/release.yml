@@ -11,7 +11,7 @@ name: Release
 # - A pull request that changes this workflow, `Scripts/release/`, `Config/` or `Info.plist`, and a manual run, make a dry
 #   run: the same steps with ad hoc signing and a throwaway Sparkle key, which skip the export, notarizing and the upload,
 #   build the appcast from a fixture feed and keep the disk image and the appcast as the `dry-run` artifact. A dry run
-#   reads no secret. The project file is left out: most app changes touch it, and `checks.yml` builds Release for them.
+#   reads no secret. The project file is left out: most app changes touch it, and `release-build.yml` builds Release on `main`.
 on:
   push:
     tags: ['v*']
@@ -45,7 +45,6 @@ jobs:
       build: ${{ steps.release.outputs.build }}
       candidate: ${{ steps.release.outputs.candidate }}
       file: ${{ steps.release.outputs.file }}
-      previous: ${{ steps.release.outputs.previous }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,12 +63,13 @@ jobs:
           if [ "$EVENT" = push ]; then tag="$REF_NAME"; else tag=v0.0.99-rc1; fi
           python3 Scripts/release/version.py "$tag" | tee -a "$GITHUB_OUTPUT"
           echo "file=Marfa-${tag#v}.dmg" >> "$GITHUB_OUTPUT"
-          # The release notes start at the tag before: for a candidate any tag, for a release the last release, so
-          # the first release's notes are not the whole history.
+          # The release notes list what a person notices since the tag before: for a candidate any tag, for a release
+          # the last release, so the first release's notes are not the whole history.
           exclude=()
           if [[ "$tag" != *-rc* ]]; then exclude=(--exclude '*-rc*'); fi
           previous=$(git describe --tags --abbrev=0 --match 'v*' ${exclude[@]+"${exclude[@]}"} "HEAD^" 2>/dev/null || true)
-          echo "previous=$previous" | tee -a "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/artifacts"
+          python3 Scripts/release/release_notes.py "$previous" HEAD "$RUNNER_TEMP/artifacts/notes.md"
 
       - name: Refuse a tag that is not on main
         if: github.event_name == 'push'
@@ -244,7 +244,6 @@ jobs:
       BUILD: ${{ needs.build.outputs.build }}
       CANDIDATE: ${{ needs.build.outputs.candidate }}
       FILE: ${{ needs.build.outputs.file }}
-      PREVIOUS: ${{ needs.build.outputs.previous }}
       GH_REPO: ${{ github.repository }}
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -265,19 +264,19 @@ jobs:
           MARFA_MAC_DOWNLOADS_URL: ${{ secrets.MARFA_MAC_DOWNLOADS_URL }}
         run: bash Scripts/release/check-secrets.sh publish
 
-      # A rebuilt tag finds its release and replaces the disk image on it.
+      # A rebuilt tag finds its release and replaces the disk image and the notes on it.
       - name: Create the GitHub release
         run: |
           dmg="$RUNNER_TEMP/artifacts/$FILE"
+          notes="$RUNNER_TEMP/artifacts/notes.md"
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" "$dmg" --clobber
+            gh release edit "$TAG" --notes-file "$notes"
           else
-            flags=(--verify-tag --generate-notes)
+            flags=(--verify-tag --notes-file "$notes")
             if [ "$CANDIDATE" = true ]; then flags+=(--prerelease); fi
-            if [ -n "$PREVIOUS" ]; then flags+=(--notes-start-tag "$PREVIOUS"); fi
             gh release create "$TAG" "$dmg" "${flags[@]}"
           fi
-          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/notes.md"
 
       - name: Build the appcast
         env:
@@ -289,7 +288,7 @@ jobs:
           length=$(grep '^length=' "$RUNNER_TEMP/artifacts/sparkle.env" | cut -d= -f2-)
           python3 Scripts/release/appcast.py --feed "$RUNNER_TEMP/live.xml" --out "$RUNNER_TEMP/appcast.xml" \
             --tag "$TAG" --downloads-url "$DOWNLOADS" --file-name "$FILE" --signature "$signature" --length "$length" \
-            --notes "$RUNNER_TEMP/notes.md" --releases-url "$RELEASES"
+            --notes "$RUNNER_TEMP/artifacts/notes.md" --releases-url "$RELEASES"
 
       - name: Upload to the downloads bucket
         env:
@@ -336,7 +335,7 @@ jobs:
           length=$(grep '^length=' "$RUNNER_TEMP/artifacts/sparkle.env" | cut -d= -f2-)
           python3 Scripts/release/appcast.py --feed Scripts/release/fixtures/feed-existing.xml --out "$RUNNER_TEMP/artifacts/appcast.xml" \
             --tag "$TAG" --downloads-url https://downloads.example.invalid/marfa-mac/ --file-name "$FILE" \
-            --signature "$signature" --length "$length" --notes Scripts/release/fixtures/notes-generated.md \
+            --signature "$signature" --length "$length" --notes "$RUNNER_TEMP/artifacts/notes.md" \
             --releases-url https://example.invalid/releases
           # The new candidate is first, in the beta channel, with the fixture's two items after it.
           python3 - "$RUNNER_TEMP/artifacts/appcast.xml" <<'PY'

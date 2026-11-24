@@ -19,6 +19,7 @@ This builds the app and runs the unit tests. To run the app, open `MarfaMac.xcod
 
 A checkout builds without a developer account and signs to run locally. `Config/Signing.xcconfig`, the project's base configuration, leaves each of the settings below empty and includes the ignored `Config/Local.xcconfig`.
 
+- The Debug configurations leave the hardened runtime off and Release keeps it. Under the hardened runtime, an app signed to run locally refuses to load Sparkle, which is signed the same way, because library validation accepts no locally signed library. Xcode turns the runtime off for such a build itself only when it is not optimized.
 - To sign with a team, write `DEVELOPMENT_TEAM = <team ID>` into `Config/Local.xcconfig`. The repository holds no tool for keeping that line.
 - To send errors and timings (`MarfaMac/Model/Telemetry/Reporting.swift`), write `MARFA_MAC_POSTHOG_HOST` and `MARFA_MAC_POSTHOG_PROJECT_TOKEN` into `Config/Local.xcconfig` the same way. `Info.plist` carries them into the build; a build without both sends nothing.
 - To make a build that updates itself, write `MARFA_MAC_UPDATE_FEED_URL` (the address of the appcast) and `MARFA_MAC_UPDATE_PUBLIC_KEY` (the public half of the Sparkle signing key) the same way. A build without both has no updater, no **Check for Updates…** and no Updates section in Settings, so a local build never offers to replace itself. In an xcconfig file, write the `://` of an address as `:/$()/`, since `//` starts a comment.
@@ -36,6 +37,7 @@ A tag publishes a release. The workflow in `.github/workflows/release.yml` build
 - A release candidate is a tag with `-rc` and a number from 1 to 98 after the version it is a candidate for, such as `v0.0.59-rc1`, then `-rc2`. It builds as version 0.0.59.
 - A candidate goes to the beta channel: only people who turn on **Beta Versions** in **Settings > General > Updates** are offered it. A release goes to everyone, and to the website's download, `Marfa.dmg`. A candidate is never counted as the latest release tag.
 - The build number comes from the tag, so nothing is written into a file: `X*10000000 + Y*100000 + Z*100 + N` for the candidate `vX.Y.Z-rcN`, and the same with 99 for N for the release `vX.Y.Z`. `v0.0.59-rc1` builds as 5901 and `v0.0.59` as 5999. Sparkle compares build numbers, so a candidate is older than its release, and a rebuilt tag keeps its number. `MARKETING_VERSION` stays `0.0.0` in the repository.
+- The release notes list what a person notices since the tag before (the last release, for a release): each `feat`, `fix` and `perf` pull request's title, under New, Fixed and Faster. Other types, and scopes such as `ci` and `release`, are left out, and so are names and pull request numbers (`Scripts/release/release_notes.py`). Write a title as the person should read it.
 - The workflow refuses a tag that is not that shape, that would build version 0.0.0, or that is not on the history of `main`.
 - Tag soon after any merge to `main` that changes what a person sees or does. Take the next candidate of the next version by default. Cut the release itself (`v0.0.59`) when a candidate has been tried, when a logical set of work is complete, or when the brief says so. Merges that change only tests, CI, docs, or notes are not tagged. Try a choice in a local build first, because a release is installed on every Mac that checks for updates.
 
@@ -51,7 +53,7 @@ A tag publishes a release. The workflow in `.github/workflows/release.yml` build
 
 3. Check the release, as described below.
 
-To rebuild a tag, re-run its workflow run. The run replaces the disk image on the GitHub release and the tag's item in the appcast.
+To rebuild a tag, re-run its workflow run. The run replaces the disk image and the notes on the GitHub release, and the tag's item in the appcast.
 
 ### Check a release
 
