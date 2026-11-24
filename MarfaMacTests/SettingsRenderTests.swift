@@ -17,6 +17,7 @@ import Testing
     /// A scope beyond the owner's permissions the sign-in lacks.
     var lacksScope = false
     var lacksAsked: Bool { !Set(InstancePermission.allCases).isSubset(of: grants) || lacksScope }
+    func holds(_ scope: String) -> Bool { !lacksScope }
     var isAllowingMore = false
     var instanceSettings: InstanceSettingsModel
     let ownerDrafts = OwnerDrafts()

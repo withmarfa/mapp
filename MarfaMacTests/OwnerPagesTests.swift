@@ -812,6 +812,9 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     let calls = FakeOwnerCalls()
     var grants: Set<InstancePermission>
     var allowing: MarfaAllowMoreOutcome = .allowed
+    /// The scopes beyond the owner's permissions the sign-in holds, and those an approval gives.
+    var scopes: Set<String> = []
+    var scopesApproved: Set<String> = []
     var asked: [Set<InstancePermission>] = []
     var refreshed = 0
     /// What a page handed over after Settings had closed.
@@ -823,10 +826,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     var context: OwnerContext {
         OwnerContext(
-            calls: calls, grants: { [unowned self] in grants },
+            calls: calls, grants: { [unowned self] in grants }, holds: { [unowned self] in scopes.contains($0) },
             allowMore: { [unowned self] permissions in
                 asked.append(permissions)
                 if allowing == .allowed { grants.formUnion(permissions) }
+                if allowing == .allowed || allowing == .approvedFewer { scopes = scopesApproved }
                 return allowing
             },
             refreshGrants: { [unowned self] in refreshed += 1 },

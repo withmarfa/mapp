@@ -32,6 +32,10 @@ import Observation
     private(set) var isWorking = false
     /// Why the server refused the new link type, kept beside what was typed.
     private(set) var makeFailure: OwnerFailure?
+    /// The list could not be read again before registering, so nothing was sent.
+    private(set) var makeFailedUnsent = false
+    /// An approval came back without `ClientOwnerCalls.registeringLinkTypes`.
+    private(set) var approvedWithoutRegistering = false
     /// The link type just made, so the page can open it.
     private(set) var made: String?
     /// Settings closed during registration, so a refused draft goes through the late handover.
@@ -138,14 +142,20 @@ import Observation
         fromType = nil
         toType = nil
         cardinality = .manyToMany
-        makeFailure = nil
+        clearMakeFailure()
         isMaking = true
     }
 
     func cancelNew() {
         guard !isWorking else { return }
         isMaking = false
+        clearMakeFailure()
+    }
+
+    private func clearMakeFailure() {
         makeFailure = nil
+        makeFailedUnsent = false
+        approvedWithoutRegistering = false
     }
 
     /// The server's 128-byte limit for dotted ASCII IDs (`edges/types-register-id`, `types/id-grammar`).
@@ -214,6 +224,12 @@ import Observation
     /// The words for a refused new link type, in place of the server's.
     var makeFailureLine: String? {
         guard let makeFailure else { return nil }
+        if makeFailedUnsent {
+            return String(localized: "The link types couldn’t be read again to choose an unused ID, so nothing was sent. \(OwnerWording.line(makeFailure, on: .types))")
+        }
+        if approvedWithoutRegistering {
+            return String(localized: "The new sign-in still isn’t allowed to add link types. Choose Allow More… and approve Full Access.")
+        }
         switch makeFailure {
         case .notPermitted(let scope) where scope == ClientOwnerCalls.registeringLinkTypes:
             return String(localized: "The app isn’t allowed to add link types. Choose Allow More… to ask for it.")
@@ -223,13 +239,24 @@ import Observation
     }
 
     var makeNeedsPermission: Bool {
-        if case .notPermitted = makeFailure { true } else { false }
+        if case .notPermitted = makeFailure, !makeFailedUnsent { true } else { false }
     }
 
-    /// Allow More… from the sheet's refusal: an approval drops the refusal, and Create Link Type asks the server again.
+    /// Allow More… from the sheet's refusal: an approval whose sign-in holds `ClientOwnerCalls.registeringLinkTypes` drops
+    /// the refusal, and Create Link Type asks the server again; one without it keeps the refusal and says so.
     func allowMore() async {
         guard makeNeedsPermission else { return }
-        if await context.allowMore([]) == .allowed, makeNeedsPermission { makeFailure = nil }
+        switch await context.allowMore([]) {
+        case .allowed, .approvedFewer:
+            guard makeNeedsPermission else { return }
+            if context.holds(ClientOwnerCalls.registeringLinkTypes) {
+                clearMakeFailure()
+            } else {
+                approvedWithoutRegistering = true
+            }
+        case .cancelled, .failed:
+            return
+        }
     }
 
     func takeDrafts() -> [OwnerDraft] {

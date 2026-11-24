@@ -252,7 +252,7 @@ import Testing
         #expect(model.identifier(forNamed: String(repeating: "a", count: 121) + " b").utf8.count <= LinksModel.identifierLimit)
     }
 
-    @Test func anApprovalDropsTheSheetsRefusal() async {
+    @Test func onlyAnApprovalThatGivesTheScopeDropsTheSheetsRefusal() async {
         let bench = OwnerBench()
         let model = LinksModel(context: bench.context)
         await model.load()
@@ -267,6 +267,11 @@ import Testing
         #expect(model.makeNeedsPermission, "nothing was approved")
 
         bench.allowing = .allowed
+        await model.allowMore()
+        #expect(model.makeNeedsPermission, "the new sign-in still lacks the scope")
+        #expect(model.makeFailureLine == "The new sign-in still isn’t allowed to add link types. Choose Allow More… and approve Full Access.")
+
+        bench.scopesApproved = [ClientOwnerCalls.registeringLinkTypes]
         await model.allowMore()
         #expect(model.makeFailure == nil)
         #expect(model.isMaking && model.name == "Supplied By")

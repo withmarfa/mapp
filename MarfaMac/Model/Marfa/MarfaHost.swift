@@ -670,6 +670,8 @@ import os
     /// an owner permission the owner left out, or a scope added since the sign-in was made. Allow More… then has something
     /// to ask for.
     private(set) var lacksAsked = false
+    /// The scopes the kept sign-in holds, once `grantsRead`.
+    private(set) var heldScopes: Set<String> = []
 
     /// Reads what the kept sign-in holds, where the main actor never waits on the Keychain. A sign-in the Keychain
     /// cannot give is not read: the grants last read stand and `grantsRead` is false, so nothing reads as holding none.
@@ -679,6 +681,7 @@ import os
             grantsRead = false
             readsProfile = false
             lacksAsked = false
+            heldScopes = []
             return
         }
         let held: Set<InstancePermission>?
@@ -700,6 +703,7 @@ import os
         grants = held ?? []
         readsProfile = profile ?? false
         lacksAsked = SystemSignIns.lacksAsked(scopes ?? [])
+        heldScopes = Set(scopes ?? [])
         grantsRead = true
     }
 
@@ -766,6 +770,7 @@ import os
         grantsRead = false
         readsProfile = false
         lacksAsked = false
+        heldScopes = []
     }
 
     /// What to tell of an error a step met. What a package error or the system said is never shown: the detail goes
