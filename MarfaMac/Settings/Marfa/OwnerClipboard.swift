@@ -22,11 +22,11 @@ enum OwnerClipboard {
         let pasteboard = NSPasteboard.general
         let concealed = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
         let transient = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
-        pasteboard.declareTypes([.string, concealed, transient], owner: nil)
+        // The count comes from the write itself: a read after it could already be another app's copy.
+        let count = pasteboard.declareTypes([.string, concealed, transient], owner: nil)
         pasteboard.setString(secret, forType: .string)
         pasteboard.setData(Data(), forType: concealed)
         pasteboard.setData(Data(), forType: transient)
-        let count = pasteboard.changeCount
         secretCount = count
         clearAtQuit()
         Task {
