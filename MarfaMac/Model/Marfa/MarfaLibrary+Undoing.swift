@@ -74,10 +74,9 @@ extension MarfaLibrary {
         action()
     }
 
-    /// A step's writes were not made: the engine did not make a held step's, because what they touch changed or the copy
-    /// was not brought up to date in time, or a property Undo is built on an earlier edit the server has not answered
-    /// (`MarfaLibrary+PropertyEdits`). An undo goes back on the undo stack, and registering outside an undo or redo
-    /// empties the whole redo stack, the step it had registered included; a redo cannot go back, so the undo it
+    /// A held step's writes were not made, because what they touch changed or the copy was not brought up to date in
+    /// time. An undo goes back on the undo stack. This happens after its run, and registering outside an undo or redo
+    /// empties the whole redo stack, the step it had registered included. A redo cannot go back, so the undo it
     /// registered does nothing and says so. A redo's write that carried the person's text is the only copy of it, so
     /// `text` is kept where they can get it back, as for a library that closed.
     func giveBack(_ run: UndoRun, _ problem: SyncProblem, title: String?, text: String?) {
@@ -96,5 +95,49 @@ extension MarfaLibrary {
             let again = restoring ? " " + String(localized: "Choose Undo again to try it as things are now.") : ""
             notices.tell(title, message + again)
         }
+    }
+
+    /// A property Undo that can be made once an earlier edit is answered, refused while it runs
+    /// (`MarfaLibrary+PropertyEdits`). It goes back on the undo stack without emptying the redo stack: what is
+    /// registered while an undo runs goes on the redo stack, so a step that puts it back goes there, and the library
+    /// redoes that step at once, which registers the Undo on the undo stack and leaves the rest of the redo stack as it
+    /// was. Where something else reached the undo manager first, the Undo is registered as `giveBack` does.
+    func putBack(_ run: UndoRun, reason: String) {
+        run.outcome.wasMade = false
+        run.told = true
+        notices.tell(run.step.name, reason + " " + String(localized: "Choose Undo again to try it as things are now."))
+        guard let manager = run.step.manager else { return }
+        let back = PutBack(UndoStep(manager: manager, name: run.step.name, handler: run.step.handler, counterpartOf: run.step.counterpartOf))
+        manager.registerUndo(withTarget: self) { library in library.register(back) }
+        manager.setActionName(run.step.name)
+        manager.setActionUserInfoValue(back, forKey: Self.putBackKey)
+        Task { [weak self, weak manager] in
+            guard let self, let manager, !back.done else { return }
+            if manager.redoActionUserInfoValue(forKey: Self.putBackKey) as AnyObject? === back, manager.groupingLevel == 0,
+                !manager.isUndoing, !manager.isRedoing
+            {
+                manager.redo()
+            } else {
+                register(back)
+            }
+        }
+    }
+
+    /// A step to put back on the undo stack once.
+    private final class PutBack {
+        let step: UndoStep
+        var done = false
+
+        init(_ step: UndoStep) {
+            self.step = step
+        }
+    }
+
+    private static let putBackKey = UndoManager.UserInfoKey("MarfaLibrary.putBack")
+
+    private func register(_ back: PutBack) {
+        guard !back.done else { return }
+        back.done = true
+        register(back.step)
     }
 }

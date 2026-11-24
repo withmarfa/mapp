@@ -642,7 +642,7 @@ import Observation
         case .changed(let changes):
             forgetAnsweredEdits(of: Set(changes.upserted.map(\.id)).union(changes.removed))
             take(changes)
-        case .answered(let id, let outcome):
+        case .answered(let id, let outcome, let holding):
             textSaves.removeValue(forKey: id)?.end()
             propertyWrites[id] = nil
             propertyMarks[id] = nil
@@ -650,12 +650,12 @@ import Observation
             answered(id, outcome)
             stateWriteAnswered(id, outcome)
             settle(id)
-            propertyAnswered(id, outcome)
+            propertyAnswered(id, outcome, holding: holding)
         case .taken(let id):
             textSaves.removeValue(forKey: id)?.end()
             propertyWrites[id] = nil
             if let mark = propertyMarks.removeValue(forKey: id) { remember(taken: mark) }
-            propertyEdits[id]?.taken = true
+            if let edit = propertyEdits[id] { edit.take(holding: { item(edit.item)?.value(of: $0) }) }
             took(id)
             stateWriteTaken(id)
             read(id)
@@ -931,17 +931,13 @@ import Observation
         case .create:
             return createdText(write)
         case .editProperties(_, let changes, _), .retype(_, _, let changes, _):
-            return typedText(changes)
+            let texts = changes.sorted { $0.key < $1.key }.flatMap { $0.value.map(texts(in:)) ?? [] }
+            return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
         case .tag(_, let tag, on: true) where tag != ItemTag.favorite:
             return tag
         default:
             return nil
         }
-    }
-
-    static func typedText(_ changes: [String: PropertyValue?]) -> String? {
-        let texts = changes.sorted { $0.key < $1.key }.flatMap { $0.value.map(texts(in:)) ?? [] }
-        return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
     }
 
     /// The text values a property holds, those inside a list of entries among them.
@@ -978,8 +974,8 @@ import Observation
         return edit
     }
 
-    private func propertyAnswered(_ id: WriteID, _ outcome: WriteOutcome) {
-        guard let edit = propertyEdits[id], let kept = PropertyEdit.kept(edit.changes, after: outcome) else { return }
+    private func propertyAnswered(_ id: WriteID, _ outcome: WriteOutcome, holding: [String: PropertyValue]?) {
+        guard let edit = propertyEdits[id], let kept = PropertyEdit.kept(edit.changes.keys, after: outcome, holding: holding) else { return }
         edit.kept = kept
         propertyEdits[id] = nil
     }
