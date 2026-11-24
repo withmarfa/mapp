@@ -5,7 +5,7 @@ name: Release build
 # is found before a tag. Pull requests do not run it, since Mac runners are few; the tag build and `release.yml`'s
 # dry run compile Release too. A failure opens the issue "Release build failed on main", or comments on it while it
 # is open; the next passing build closes it.
-# There is no concurrency group: no push to main is cancelled, so each commit keeps its own result.
+# Only the newest commit on main is built: Mac runners are few, and the tag build compiles Release anyway.
 on:
   push:
     branches: [main]
@@ -17,6 +17,10 @@ on:
       - '!**/*.md'
   workflow_dispatch:
 
+concurrency:
+  group: release-build-main
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -25,7 +29,7 @@ jobs:
     name: Release build
     # The hosted image with Xcode 27 (a public preview at the time of writing).
     runs-on: xcode-27
-    # A slow runner has taken over 40 minutes; a limit too near that reports a fault that is not there.
+    # A slow runner has taken over 40 minutes; a limit too near that ends the run as cancelled, which is not reported.
     timeout-minutes: 70
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -37,7 +41,7 @@ jobs:
           xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -configuration Release -destination 'generic/platform=macOS'
           -derivedDataPath build-release CODE_SIGNING_ALLOWED=NO build
 
-  # A job that reaches its time limit can end as cancelled rather than failed, so anything but success is reported.
+  # A newer commit on main cancels this run, so a cancelled build is not reported; a failure is.
   report:
     name: Report the result
     needs: release
@@ -54,6 +58,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SHA: ${{ github.sha }}
         run: |
+          [ "$RESULT" = cancelled ] && exit 0
           title="Release build failed on main"
           open=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
             --jq "map(select(.title == \"$title\")) | first | .number // empty")
