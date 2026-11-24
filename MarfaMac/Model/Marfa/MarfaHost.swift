@@ -7,6 +7,7 @@ import os
 /// The Marfa library the app is connected to, from the address the person gives and the sign-in they make to it.
 /// The address is kept in defaults, the sign-in by the package in the Keychain, and the copy in its own directory, so a launch
 /// paints from the copy before asking the server anything. The words for each state are the app's.
+/// Sign-in, switching, and disconnecting share one lifecycle so they can hand over writes before leaving a copy.
 @Observable @MainActor final class MarfaHost {
     typealias Opener = @Sendable (MarfaConnection, any SignIns, MarfaStoreLocation) async throws -> any ItemSource
     /// Reads the name the server at an address gives itself. It sends no sign-in.

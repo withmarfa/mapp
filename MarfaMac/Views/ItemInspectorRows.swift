@@ -374,6 +374,7 @@ struct InspectorCellGrid: Layout {
 
 /// A name in the secondary color in a column of its own, with its value beside it. Names and values start on one
 /// baseline, whatever the value holds, and a name that does not fit its column wraps to a second line.
+/// The inspector's rows, cells, and sections stay together because they share measurements and alignment.
 struct InspectorRow<Value: View>: View {
     @Environment(\.interfaceTextSize) private var textSize
     @Environment(\.inspectorNameWidth) private var sharedNameWidth

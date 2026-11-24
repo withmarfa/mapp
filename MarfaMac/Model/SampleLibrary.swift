@@ -6,6 +6,7 @@ import MarfaTesting
 /// A Marfa library to try the app with, held in memory by marfa-swift's fake working copy, for the UI tests and
 /// screenshots. A debug build launched with `-MarfaMacSampleLibrary` connects to it as if to a server. Nothing ships
 /// with it, and nothing it holds outlives the run.
+/// The catalog, views, and items stay together as one Debug fixture so their references can be read in context.
 nonisolated enum SampleLibrary {
     static let flag = "-MarfaMacSampleLibrary"
 
