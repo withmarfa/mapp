@@ -15,6 +15,12 @@ nonisolated enum OwnerWording {
         case .unsupported: String(localized: "There are no server settings to show for this library.")
         case .notConfirmed: String(localized: "Nothing was changed: the sign-in wasn’t confirmed.")
         case .refused(let reason), .sourceHeld(let reason), .failed(let reason): reason
+        case .redeliveryRefused(.webhookInactive): String(localized: "Turn on Sending to send this delivery again.")
+        case .redeliveryRefused(.credentialUnavailable):
+            String(localized: "The key or app that created this webhook no longer has access. Create a new webhook for future deliveries.")
+        case .redeliveryRefused(.deliveryNotFailed): String(localized: "Only failed deliveries can be sent again.")
+        case .redeliveryRefused(.deliveryExpired): String(localized: "This delivery expired and can’t be sent again.")
+        case .connectorPaused: String(localized: "The connector is paused. Resume it, then choose Run Now.")
         case .signInNeeds: String(localized: "Set the client settings the sign-in needs first.")
         }
     }

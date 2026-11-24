@@ -270,7 +270,8 @@ import Testing
         #expect(model.releaseVersion == "0.0.89")
     }
 
-    @Test func aFailedUpdateReadDoesNotOfferTheReleaseThatMetricsNowReportsAsInstalled() async {
+    @Test(arguments: ["0.0.90", "0.0.100"])
+    func anUpdateReadDoesNotOfferAReleaseAlreadyReachedByMetrics(installed: String) async {
         let bench = bench()
         bench.calls.state.withLock {
             $0.update.running = "0.0.89"
@@ -282,13 +283,27 @@ import Testing
         #expect(model.updateReady == "0.0.90")
 
         bench.calls.state.withLock {
-            $0.metrics = InstanceMetricsReading(version: "0.0.90", databaseBytes: nil, fileBytes: 0)
+            $0.metrics = InstanceMetricsReading(version: installed, databaseBytes: nil, fileBytes: 0)
         }
+        let gate = bench.calls.hold("updateStatus")
+        let loading = Task { await model.load() }
+        #expect(await eventually { bench.calls.state.withLock { $0.waiting["updateStatus"] == 1 } })
+        #expect(model.metrics?.version == installed)
+        #expect(model.releaseFailure == nil)
+        #expect(model.updateReady == nil)
+
         bench.calls.fail("updateStatus", with: .unreachable)
-        await model.load()
+        bench.calls.state.withLock { $0.gates["updateStatus"] = nil }
+        gate.open()
+        await loading.value
 
         #expect(model.releaseFailure == .unreachable)
-        #expect(model.releaseVersion == "0.0.90")
+        #expect(model.releaseVersion == installed)
+        #expect(model.updateReady == nil)
+
+        bench.calls.fail("updateStatus", with: nil)
+        await model.load()
+        #expect(model.releaseFailure == nil)
         #expect(model.updateReady == nil)
     }
 

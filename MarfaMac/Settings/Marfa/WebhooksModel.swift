@@ -366,17 +366,21 @@ import Observation
     /// Sends a change and takes the webhook as the server answers it. A webhook that is gone is told so.
     private func apply(_ id: String, _ change: WebhookChange) async throws(OwnerFailure) {
         do {
-            var updated = try await context.calls.change(webhook: id, change)
-            if let index = webhooks.firstIndex(where: { $0.id == id }) {
-                updated.maker = webhooks[index].maker
-                webhooks[index] = updated
-            }
-            sending[id] = nil
+            take(try await context.calls.change(webhook: id, change))
         } catch {
             if error == .notFound { markGone(id) }
             await context.learn(from: error)
             throw error
         }
+    }
+
+    private func take(_ webhook: OwnerWebhook) {
+        if let index = webhooks.firstIndex(where: { $0.id == webhook.id }) {
+            var updated = webhook
+            updated.maker = webhooks[index].maker
+            webhooks[index] = updated
+        }
+        sending[webhook.id] = nil
     }
 
     private func markGone(_ id: String) {
@@ -515,6 +519,9 @@ import Observation
             deliveryErrors[webhook.id] = error
             if error == .notFound { markGone(webhook.id) }
             await context.learn(from: error)
+            if error == .redeliveryRefused(.webhookInactive), let current = try? await context.calls.webhook(webhook.id) {
+                take(current)
+            }
             await loadDeliveries(of: webhook.id)
         }
     }

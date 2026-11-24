@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import MarfaAPI
 import Observation
 
 /// What the Overview reads of the server: what needs the owner's attention, and how the server stands. The app keeps one, so
@@ -16,8 +17,11 @@ import Observation
     private var lastBackup: Date?
 
     var updateReady: String? {
-        guard releaseFailure == nil, let update, update.available else { return nil }
-        return update.latest?.version
+        guard releaseFailure == nil, let update, update.available, let latest = update.latest?.version else { return nil }
+        if metricsFailure == nil, let installed = metrics?.version {
+            guard let offered = PluginVersion(latest), let running = PluginVersion(installed), offered > running else { return nil }
+        }
+        return latest
     }
     private let loader = OwnerLoader()
     var failure: OwnerFailure? { loader.failure }

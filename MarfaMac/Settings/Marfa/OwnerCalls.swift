@@ -178,6 +178,13 @@ nonisolated enum PasswordOutcome: Hashable, Sendable {
 
 /// Why an owner's call did not do what was asked, in terms a page can word.
 nonisolated enum OwnerFailure: Error, Hashable, Sendable {
+    enum RedeliveryRefusal: String, Hashable, Sendable {
+        case webhookInactive = "webhook_inactive"
+        case credentialUnavailable = "credential_unavailable"
+        case deliveryNotFailed = "delivery_not_failed"
+        case deliveryExpired = "delivery_expired"
+    }
+
     case unreachable
     case signedOut
     /// The server refused for want of a permission, which it names where it does.
@@ -194,6 +201,8 @@ nonisolated enum OwnerFailure: Error, Hashable, Sendable {
     /// The owner closed, or did not pass, the sign-in the server asked for.
     case notConfirmed
     case refused(String)
+    case redeliveryRefused(RedeliveryRefusal)
+    case connectorPaused
     /// A new key's source is another key's own, in the server's words.
     case sourceHeld(String)
     /// A connector's sign-in cannot start until these of its settings, named as the server names them, hold a value.
@@ -389,8 +398,14 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         case .notFound: return .notFound
         case .versionConflict: return .conflict
         case .instanceChanged: return .instanceChanged
-        case .server(let status, let code, let message, _, _) where status == 409:
+        case .server(409, let code, let message, let details, let server):
             OwnerSettingsLog.failure(error.localizedDescription)
+            if code == "connector_paused" { return .connectorPaused }
+            if code == "conflict", let reason = (details ?? server?.details)?.object?["reason"]?.string,
+                let refusal = OwnerFailure.RedeliveryRefusal(rawValue: reason)
+            {
+                return .redeliveryRefused(refusal)
+            }
             let refusals: Set<String> = ["sign_in_address_check_failed", "sign_in_address_change_unconfirmed"]
             return refusals.contains(code) ? .refused(message) : plainConflict(message)
         case .validation(_, let message, _, _):

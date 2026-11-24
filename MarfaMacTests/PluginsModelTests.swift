@@ -255,12 +255,15 @@ private func bundle(_ plugin: ReleasePlugin, types: [String] = [], connector: Bo
         #expect(model.commands[""] == "marfa plugins install '/Users/me/It'\\''s here/tickets.plugin.json'")
     }
 
-    @Test func aFileThatCannotBeReadIsToldAndNothingIsSent() async {
+    @Test func aFileThatCannotBeReadIsToldAndNothingIsSent() async throws {
         let calls = FakePluginCalls()
         let model = model(calls, file: .unreadable(name: "big.json"))
         await model.installFile()
         #expect(calls.state.withLock { $0.sent }.isEmpty)
-        #expect(model.problem?.title == "Not Installed From a File")
+        let problem = try #require(model.problem)
+        #expect(problem.title == "Not Installed From a File")
+        #expect(problem.failure == .bundleFileUnreadable(name: "big.json"))
+        #expect(PluginWording.line(problem.failure) == "The app couldn’t read “big.json” on this Mac. Choose another plugin bundle.")
     }
 
     @Test func removingAsksWithTheItemsEachTypeHoldsThenShowsWhatTheServerAnswered() async {

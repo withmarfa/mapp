@@ -452,8 +452,10 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo {
         try enter("redeliver")
         return try state.withLock { state throws(OwnerFailure) in
+            guard let hook = state.webhooks.first(where: { $0.id == webhook }) else { throw .notFound }
             guard let index = state.deliveries[webhook]?.firstIndex(where: { $0.id == delivery }) else { throw .notFound }
-            guard state.deliveries[webhook]?[index].status == .failed else { throw .refused("Only a failed delivery can be sent again.") }
+            guard hook.active else { throw .redeliveryRefused(.webhookInactive) }
+            guard state.deliveries[webhook]?[index].status == .failed else { throw .redeliveryRefused(.deliveryNotFailed) }
             state.redelivered.append(delivery)
             state.deliveries[webhook]?[index].status = .pending
             return state.deliveries[webhook]![index]
@@ -511,6 +513,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     func updateStatus() async throws(OwnerFailure) -> UpdateStatus {
+        await held("updateStatus")
         try enter("updateStatus")
         return state.withLock { state in
             if !state.updateReads.isEmpty { state.update = state.updateReads.count > 1 ? state.updateReads.removeFirst() : state.updateReads[0] }
@@ -646,7 +649,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func runConnector(_ plugin: String) async throws(OwnerFailure) -> ConnectorControl {
         try await controlled(plugin, "runConnector") { control throws(OwnerFailure) in
-            if control.paused { throw .refused("The connector is paused. Resume it to run it.") }
+            if control.paused { throw .connectorPaused }
             control.runRequested = .now
         }
     }
@@ -2244,6 +2247,26 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(OwnerWording.line(.notPermitted("webhooks.manage"), on: .webhooks) == MarfaSettingsPage.webhooks.permissionLine)
         #expect(OwnerWording.line(.notPermitted("keys.manage"), on: .webhooks) == OwnerWording.permissionLine("keys.manage"))
         #expect(OwnerWording.line(.unreachable, on: .webhooks) == OwnerWording.line(.unreachable))
+    }
+
+    @Test(arguments: [
+        ("webhook_inactive", "Turn on Sending to send this delivery again."),
+        ("credential_unavailable", "The key or app that created this webhook no longer has access. Create a new webhook for future deliveries."),
+        ("delivery_not_failed", "Only failed deliveries can be sent again."),
+        ("delivery_expired", "This delivery expired and can’t be sent again."),
+        ("unknown", "The server couldn’t do that."),
+    ])
+    func aRedeliveryRefusalUsesTheAppWording(reason: String, wording: String) {
+        let error = MarfaError.server(
+            status: 409, code: "conflict", message: "The server’s words.", details: .object(["reason": .string(reason)]), server: nil)
+        #expect(OwnerWording.problemLine(ClientOwnerCalls.failure(error), on: .webhooks, canRetry: false) == wording)
+    }
+
+    @Test func aPausedConnectorRefusalTellsTheOwnerToResumeIt() {
+        let error = MarfaError.server(status: 409, code: "connector_paused", message: "The server’s words.", details: nil, server: nil)
+        let failure = ClientOwnerCalls.failure(error)
+        #expect(failure == .connectorPaused)
+        #expect(OwnerWording.problemLine(failure, on: .connectors, canRetry: false) == "The connector is paused. Resume it, then choose Run Now.")
     }
 
     @Test func anotherMarfaAnsweringIsItsOwnFailureWithTheWordsOfTheSettingsPage() {

@@ -52,6 +52,24 @@
     "Couldn’t load that page of activity. %@" : {
 
     },
+    "Only failed deliveries can be sent again." : {
+
+    },
+    "The app couldn’t read “%@” on this Mac. Choose another plugin bundle." : {
+
+    },
+    "The connector is paused. Resume it, then choose Run Now." : {
+
+    },
+    "The key or app that created this webhook no longer has access. Create a new webhook for future deliveries." : {
+
+    },
+    "This delivery expired and can’t be sent again." : {
+
+    },
+    "Turn on Sending to send this delivery again." : {
+
+    },
     "Couldn’t Read the Total File Size" : {
 
     },

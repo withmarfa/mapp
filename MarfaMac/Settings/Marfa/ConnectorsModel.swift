@@ -186,10 +186,10 @@ import Observation
         }
     }
 
-    /// Asks for a run. The server refuses while the connector is paused, which the page shows as it says.
+    /// Re-reads after a paused refusal so the owner can resume a connector that was paused elsewhere.
     func runNow(_ plugin: String) async {
         await change(plugin) { calls throws(OwnerFailure) in try await calls.runConnector(plugin) }
-        if rowErrors[plugin] == nil { await reload(plugin) }
+        if rowErrors[plugin] == nil || rowErrors[plugin] == .connectorPaused { await reload(plugin) }
     }
 
     /// While a run is asked for, reads the connector again until the server clears the request, which it does when the

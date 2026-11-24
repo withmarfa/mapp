@@ -271,9 +271,7 @@ struct PluginsAccess {
         let title = String(localized: "Not Installed From a File")
         switch choice {
         case .unreadable(let name):
-            problem = Problem(
-                plugin: nil, title: title,
-                failure: .owner(.refused(String(localized: "“\(name)” couldn’t be read as a plugin bundle."))))
+            problem = Problem(plugin: nil, title: title, failure: .bundleFileUnreadable(name: name))
         case .file(_, let path, let data):
             await send(data, plugin: nil, title: title, filePath: path)
         }
