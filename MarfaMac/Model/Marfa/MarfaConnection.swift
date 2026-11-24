@@ -7,6 +7,9 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
     enum Problem: Error, Hashable, Sendable {
         /// Not an http or https address with a host, or one carrying a user or password.
         case notAServer
+        /// A server's address and more: a path beyond a lone `/`, a query or a fragment. The package keeps one sign-in
+        /// for each origin, so nothing after the origin can name another server.
+        case hasMore
     }
 
     /// Scheme and host in lower case and no trailing slash, otherwise the address as it was entered: the copy and the
@@ -19,12 +22,13 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         guard var components = URLComponents(string: trimmed),
             let scheme = components.scheme?.lowercased(), ["http", "https"].contains(scheme),
             let host = components.host, !host.isEmpty,
-            components.user == nil, components.password == nil,
-            components.query == nil, components.fragment == nil
+            components.user == nil, components.password == nil
         else { throw .notAServer }
+        // The encoded path, since `path` decodes `%2F` to a slash that would pass for the lone one.
+        guard ["", "/"].contains(components.percentEncodedPath), components.query == nil, components.fragment == nil else { throw .hasMore }
         components.scheme = scheme
         components.host = host.lowercased()
-        while components.path.hasSuffix("/") { components.path.removeLast() }
+        components.path = ""
         guard let address = components.url else { throw .notAServer }
         self.address = address
     }

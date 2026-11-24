@@ -77,6 +77,11 @@ struct ConnectionPage: View {
 
     private var disconnected: some View {
         SettingsSection("Connect to a Marfa", line: "The app shows one Marfa at a time.") {
+            if let address = host.unusableAddress {
+                SettingsProblemRow(
+                    title: Text("Change the Saved Address"), line: Text(verbatim: Words.savedAddressHasMore(address)), actions: [])
+                    .accessibilityIdentifier("MarfaSavedAddressNeedsChange")
+            }
             SettingsRow("Address") {
                 SettingsField(
                     title: "Address", text: Bindable(model).address, onSubmit: { model.start(.connect(usingCode: false)) }

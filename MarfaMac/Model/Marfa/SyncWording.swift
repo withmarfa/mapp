@@ -199,6 +199,18 @@ nonisolated enum Words {
         String(localized: "The app can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit the app first, then move the folder “\(folder)” to the Trash. Anything in it that hasn’t reached the server is lost.")
     }
 
+    /// An address typed with a path, a query or a fragment.
+    static var addressHasMore: String {
+        String(localized: "Use only the server’s address, with nothing after it, such as https://marfa.example.")
+    }
+
+    /// The address kept from an earlier version has a path. The copy made for it stays where it is, and a new address
+    /// makes a new one, so what it never sent stays unsent.
+    static func savedAddressHasMore(_ address: String) -> String {
+        String(
+            localized: "The saved address, \(address), has more after the server’s address, such as a path. Enter just the server’s address, such as https://marfa.example. A new address starts a new copy of your library on this Mac. Changes in the old copy that hadn’t reached the server stay there and aren’t sent.")
+    }
+
     /// Another process holds the copy as its writer, which on this Mac is another copy of the app.
     static var inUse: String {
         String(localized: "Another copy of the app on this Mac is using your library. Quit the other copy, then quit and reopen this one.")
