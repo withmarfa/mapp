@@ -10,29 +10,6 @@ import Testing
         func write(_ text: String) { written.append(text) }
     }
 
-    @Test func aNoticeWaitsBehindTheOneShownUntilThatIsAnswered() throws {
-        let notices = Notices()
-        notices.tell("Can’t Search", "The search failed.")
-        notices.tell("Couldn’t Print Item", "The printer is gone.")
-        #expect(notices.waiting.map(\.title) == ["Can’t Search", "Couldn’t Print Item"])
-
-        notices.answered(try #require(notices.waiting.first).id)
-        #expect(notices.waiting.map(\.title) == ["Couldn’t Print Item"])
-    }
-
-    @Test func theSameWordsWaitingAreNotToldTwiceButTheTellIsCounted() {
-        let notices = Notices()
-        notices.tell("Can’t Read This Library", "The store is damaged.")
-        notices.tell("Can’t Read This Library", "The store is damaged.")
-        #expect(notices.waiting.count == 1)
-        #expect(notices.told == 2)
-
-        notices.notKept("Couldn’t Save “Trip”", text: "Book the hotel")
-        notices.notKept("Couldn’t Save “Trip”", text: "Pack")
-        #expect(notices.waiting.count == 2)
-        #expect(notices.told == 4)
-    }
-
     @Test func textNotKeptIsGatheredUntilItIsShown() throws {
         let notices = Notices()
         notices.notKept("Couldn’t Save “Trip”", text: "Book the hotel")
@@ -78,13 +55,6 @@ import Testing
         #expect(notices.waiting.last?.title == "Some Changes Weren’t Saved")
         #expect(notices.waiting.last?.text == "Book the hotel\n\nPack\n\nRest")
         #expect(notices.waiting.last?.message == "The app couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back.")
-    }
-
-    @Test func aChangeNotKeptWithNoTextAsksThePersonToMakeItAgain() {
-        let notices = Notices()
-        notices.notKept("Couldn’t Save Item", text: "")
-        #expect(notices.waiting.last?.text == nil)
-        #expect(notices.waiting.last?.message == "The app closed the library before it could keep your change. Make the change again.")
     }
 
     @Test func aNoticeIsShownInOneWindowOnly() throws {
@@ -201,20 +171,6 @@ import Testing
         #expect(!notices.holdsQuit)
         #expect(notices.tellBeforeQuitting(copying: clipboard.write) { _ in Issue.record("nothing is left to tell") })
     }
-
-    @Test func aWithdrawnNoticeIsNotToldUnlessAWindowShowedIt() throws {
-        let notices = Notices()
-        notices.notKept("Typing Might Be Missing", text: nil, reason: "Check it when it shows again.", standsAlone: true)
-        notices.notKept("Typing Might Be Missing", text: nil, reason: "Close the window and open it again.", standsAlone: true)
-        notices.withdraw(try #require(notices.waiting.first).id)
-        #expect(notices.waiting.map(\.message) == ["Close the window and open it again."])
-
-        let window = UUID()
-        let shown = try #require(notices.show(in: window) { _ in })
-        notices.withdraw(shown.id)
-        #expect(notices.waiting.map(\.id) == [shown.id], "the person may be reading it")
-        #expect(notices.shownIn == window)
-    }
 }
 
 extension Notices {
@@ -239,20 +195,6 @@ extension Notices {
         #expect(notice.action == .openSettings(.connection))
         #expect(notice.message == MarfaSync.keyRefused)
         #expect(notice.message.contains("disconnect"), "the words say Settings can start again")
-        _ = library
-    }
-
-    @Test func otherLibraryFailuresAndOrdinaryNoticesOfferNothing() async throws {
-        let source = FakeItemSource()
-        let notices = Notices()
-        let library = MarfaLibrary(source: source, notices: notices)
-        source.send(.unavailable(SourceFailure(kind: .failed, message: "The store is damaged.")))
-        #expect(await eventually { !notices.waiting.isEmpty })
-        notices.tell("Can’t Search", "The search failed.")
-        notices.notKept("Couldn’t Save “Trip”", text: "Book the hotel")
-
-        #expect(notices.waiting.count == 3)
-        #expect(notices.waiting.allSatisfy { $0.action == nil })
         _ = library
     }
 

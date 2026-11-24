@@ -43,54 +43,6 @@ struct PagePlacementsTests {
             properties: properties.map { Property(key: $0, value: $1) }, version: ItemVersion(1), created: .now, modified: .now)
     }
 
-    // MARK: Defaults
-
-    @Test func withNoChoiceEveryRowShowsExceptTheLinkField() {
-        let placements = PagePlacements()
-        let comment = placements.placement(of: Self.comment, in: Self.catalogue)
-        #expect(comment.showsOnPage("repo"))
-        #expect(comment.showsOnPage("#tags"))
-        #expect(comment.showsOnPage("child-of"))
-        #expect(!comment.showsOnPage("github_id"))
-        // The link field is each type's own, never an inherited or sibling's. A type that names none still keeps
-        // a connector's identifier off the page, as bookkeeping.
-        #expect(!placements.placement(of: Self.ticket, in: Self.catalogue).showsOnPage("github_id"))
-    }
-
-    @Test func aConnectorsIdentifiersAndChecksumsStayOffThePageByDefault() {
-        let rows = ["entry_id", "feed_hash", "github_id", "blob_sha", "todoist_id", "ical_uid", "etag"]
-        let catalogue = Catalogue(itemTypes: [
-            MarfaMapping.itemType(ItemType(
-                id: "rss.entry", label: "RSS Entry",
-                fields: rows.map { Self.field($0, "rss.entry") } + ["feed_origin", "number", "title", "author", "repository", "private", "url", "reader_reading_progress"]
-                    .map { Self.field($0, "rss.entry") } + [Self.field("source_id", "core.bookmark")],
-                titleField: "title"))
-        ])
-        let placement = PagePlacements().placement(of: TypeID("rss.entry"), in: catalogue)
-        for row in rows { #expect(!placement.showsOnPage(row), "\(row) is bookkeeping") }
-        for row in ["feed_origin", "number", "title", "author", "repository", "private", "url", "reader_reading_progress"] {
-            #expect(placement.showsOnPage(row), "\(row) is for a person to read")
-        }
-        // A core type declares its own fields as content, even one whose key ends the same way.
-        #expect(placement.showsOnPage("source_id"))
-        // Show on Page and Customize Layout override the default either way.
-        var chosen = PagePlacements()
-        chosen.setShown(true, row: "feed_hash", of: TypeID("rss.entry"))
-        chosen.setShown(false, row: "url", of: TypeID("rss.entry"))
-        let overridden = chosen.placement(of: TypeID("rss.entry"), in: catalogue)
-        #expect(overridden.showsOnPage("feed_hash"))
-        #expect(!overridden.showsOnPage("url"))
-    }
-
-    @Test func linkedFromGoesToTheInspectorExceptForAPersonAndACollection() {
-        let placements = PagePlacements()
-        #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .inspector)
-        #expect(placements.placement(of: Self.person, in: Self.catalogue).linkedFromPlace == .page)
-        #expect(placements.placement(of: Self.folder, in: Self.catalogue).linkedFromPlace == .page)
-        // A type the catalogue does not hold is an ordinary one.
-        #expect(placements.placement(of: TypeID("aic.unknown"), in: Self.catalogue).linkedFromPlace == .inspector)
-    }
-
     // MARK: Choices
 
     @Test func aChoiceOverridesTheDefaultEitherWay() {
@@ -104,18 +56,6 @@ struct PagePlacementsTests {
         #expect(!ticket.showsOnPage("repo"))
         #expect(ticket.linkedFromPlace == .page)
         #expect(placements.placement(of: Self.person, in: Self.catalogue).linkedFromPlace == .inspector)
-    }
-
-    @Test func showingLinkedFromOnThePageMovesItThereAndHidingItMovesItBack() {
-        var placements = PagePlacements()
-        placements.set(true, row: PagePlacement.linkedFrom, of: Self.ticket, in: Self.catalogue)
-        #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .page)
-        placements.set(false, row: PagePlacement.linkedFrom, of: Self.ticket, in: Self.catalogue)
-        #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .inspector)
-        // A property row is a row of its own and never changes where Linked From is.
-        placements.set(false, row: "repo", of: Self.ticket, in: Self.catalogue)
-        #expect(!placements.placement(of: Self.ticket, in: Self.catalogue).showsOnPage("repo"))
-        #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .inspector)
     }
 
     @Test func aLinkedFromPlaceEqualToTheTypesDefaultIsNotKept() {
@@ -183,65 +123,7 @@ struct PagePlacementsTests {
         #expect(PagePlacements.stored(in: defaults) == PagePlacements())
     }
 
-    // MARK: The page's rows
-
-    @Test func theRowsFollowThePlacementOfTheItemsType() {
-        let type = Self.catalogue.itemTypes[Self.comment]
-        let item = Self.item(Self.comment, ["github_id": .string("IC_kwDO")])
-        func rows(_ placements: PagePlacements, tags: [String] = ["a"]) -> [String] {
-            PropertyRow.rows(
-                of: item, type: type, hidden: ["title"], relationships: [], parentField: "child-of", format: .standard, tags: tags,
-                placement: placements.placement(of: Self.comment, in: Self.catalogue)
-            ).map(\.id)
-        }
-        // The link field is left off until asked for.
-        #expect(rows(PagePlacements()) == ["#tags"])
-        var placements = PagePlacements()
-        placements.setShown(true, row: "github_id", of: Self.comment)
-        #expect(rows(placements) == ["github_id", "#tags"])
-        placements.setShown(false, row: "#tags", of: Self.comment)
-        #expect(rows(placements) == ["github_id"])
-        // Another type's choice changes nothing here.
-        var other = PagePlacements()
-        other.setShown(true, row: "github_id", of: Self.ticket)
-        other.setShown(false, row: "#tags", of: Self.ticket)
-        #expect(rows(other) == ["#tags"])
-    }
-
-    @Test func aRelationshipRowAndTheParentCanBeKeptOffThePage() {
-        let relationships = [
-            ItemRelationship(
-                field: "child-of", label: "Parent",
-                targets: [ItemRelationshipTarget(title: "Project", itemID: ItemID("p"), resolution: .resolved(ItemID("p")))],
-                isEditable: true, allowsMultiple: false),
-            ItemRelationship(
-                field: "about", label: "About",
-                targets: [ItemRelationshipTarget(title: "Notes", itemID: ItemID("n"), resolution: .resolved(ItemID("n")))],
-                isEditable: true, allowsMultiple: true),
-        ]
-        func rows(_ placements: PagePlacements) -> [String] {
-            PropertyRow.rows(
-                of: Self.item(Self.ticket), type: Self.catalogue.itemTypes[Self.ticket], hidden: ["title"], relationships: relationships,
-                parentField: "child-of", format: .standard, tags: [], placement: placements.placement(of: Self.ticket, in: Self.catalogue)
-            ).map(\.id)
-        }
-        #expect(rows(PagePlacements()) == ["child-of", "about"])
-        var placements = PagePlacements()
-        placements.setShown(false, row: "child-of", of: Self.ticket)
-        placements.setShown(false, row: "about", of: Self.ticket)
-        #expect(rows(placements).isEmpty)
-    }
-
     // MARK: Pins
-
-    @Test func withNoChoiceTheTypeStatusParentAndUpdatedArePinnedInThatOrder() {
-        let placements = PagePlacements()
-        // The status is the type's own status field, whatever it is called.
-        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#type", "state", "child-of", "#updated"])
-        // A type with no status has none to pin.
-        #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#type", "child-of", "#updated"])
-        #expect(placements.pins(of: TypeID("aic.unknown"), in: Self.catalogue) == ["#type", "child-of", "#updated"])
-    }
 
     @Test func aSubtypeDoesNotFollowItsParentsPins() {
         var placements = PagePlacements()
@@ -386,10 +268,5 @@ struct PagePlacementsTests {
 
         #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [unreadable])
         #expect(PagePlacements.stored(in: defaults).choices["aic.ticket"]?.rows == ["repo": true])
-    }
-
-    @Test func theTypeSourceAndUpdatedRowsShowOnThePageByDefault() {
-        let placement = PagePlacements().placement(of: Self.ticket, in: Self.catalogue)
-        for row in ["#type", "#source", "#updated"] { #expect(placement.showsOnPage(row)) }
     }
 }

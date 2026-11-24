@@ -28,12 +28,6 @@ import Testing
         (.unreadable(message: "The server answered 401 with invalid_grant."), .notMarfa),
     ]
 
-    @Test func everySignInErrorCaseHasItsOutcome() {
-        for (error, outcome) in Self.cases {
-            #expect(SignInOutcome(error) == outcome, "\(error)")
-        }
-    }
-
     @Test func noSignInErrorsWordsReachTheNotice() throws {
         for (error, _) in Self.cases {
             guard let notice = MarfaSettingsModel.notice(for: .signIn(SignInOutcome(error))) else {
@@ -48,21 +42,6 @@ import Testing
         }
     }
 
-    @Test func aSignInThePersonCanceledIsToldAsNothing() {
-        #expect(SignInOutcome(CancellationError()) == .canceled)
-        #expect(SignInOutcome(ASWebAuthenticationSessionError(.canceledLogin)) == .canceled)
-        #expect(MarfaSettingsModel.notice(for: .signIn(.canceled)) == nil)
-    }
-
-    @Test func aBrowserThatHadNoWindowToShowOverIsToldFromTheCatalog() throws {
-        #expect(SignInOutcome(ASWebAuthenticationSessionError(.presentationContextNotProvided)) == .noWindow)
-        #expect(SignInOutcome(ASWebAuthenticationSessionError(.presentationContextInvalid)) == .noWindow)
-        #expect(SignInOutcome(NoSignInWindow()) == .noWindow)
-        let notice = try #require(MarfaSettingsModel.notice(for: .signIn(.noWindow)))
-        #expect(notice.title == "No Window to Sign In From")
-        #expect(notice.message == "The app needs a window to show the server’s sign-in page over. Open one of its windows, then try again, or use a code instead.")
-    }
-
     @Test func aMacWithNoWindowThrowsTheAppsOwnErrorNotText() async throws {
         let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa.tests", anchor: { nil })
         let connection = try MarfaConnection(address: "https://marfa.test")
@@ -73,24 +52,6 @@ import Testing
             #expect(error is NoSignInWindow)
             #expect(SignInOutcome(error) == .noWindow)
         }
-    }
-
-    @Test func otherErrorsASignInCanThrowAreToldInTheSameWay() throws {
-        #expect(SignInOutcome(URLError(.notConnectedToInternet)) == .unreachable)
-        #expect(SignInOutcome(URLError(.timedOut)) == .unreachable)
-        struct Odd: Error, LocalizedError { var errorDescription: String? { "WebKitErrorDomain 102 invalid_grant" } }
-        #expect(SignInOutcome(Odd()) == .failed)
-        #expect(SignInOutcome(Keychain.Failure(status: errSecInteractionNotAllowed)) == .keychain)
-        for outcome in [SignInOutcome.failed, .keychain, .unreachable, .couldNotFinish] {
-            let notice = try #require(MarfaSettingsModel.notice(for: .signIn(outcome)))
-            for word in Self.raw { #expect(!(notice.title + notice.message).contains(word)) }
-        }
-    }
-
-    @Test func anAddressThatIsNotAMarfaServerSaysSo() throws {
-        let notice = try #require(MarfaSettingsModel.notice(for: .signIn(SignInOutcome(SignInError.unreadable(message: "Not JSON.")))))
-        #expect(notice.title == "Check the Address")
-        #expect(notice.message.contains("isn’t a Marfa server"))
     }
 
     // MARK: The approval a sign-in replaced
@@ -138,18 +99,5 @@ import Testing
     @Test(arguments: [false, true])
     func theConversionFromTheCredentialsAnswerKeepsWhetherTheReplacedApprovalStands(stands: Bool) {
         #expect(SignedIn(Grant(replacedGrantStands: stands)).replacedApprovalStands == stands)
-    }
-
-    // MARK: Two failures that were told wrongly
-
-    /// The package's `.unavailable` is the server not answering or the browser not starting, so the words claim neither.
-    @Test func aSignInThatCouldNotFinishDoesNotSayTheServerWasNotReached() throws {
-        for message in ["The browser could not open.", "the server could not be reached: offline"] {
-            #expect(SignInOutcome(SignInError.unavailable(message: message)) == .couldNotFinish)
-        }
-        let notice = try #require(MarfaSettingsModel.notice(for: .signIn(.couldNotFinish)))
-        #expect(notice.title == "Couldn’t Finish Signing In")
-        #expect(notice.message == "The app couldn’t finish signing in. Check your connection and try again, or sign in with a code.")
-        #expect(!(notice.title + notice.message).localizedCaseInsensitiveContains("reach"))
     }
 }

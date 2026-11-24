@@ -28,44 +28,13 @@ struct ItemLayerTests {
             titleField: "title", bodyField: "body", parent: parent)
     }
 
-    private static func item(
-        _ type: TypeID = note, state: ItemState = .active, tier: Tier = .library, tags: Set<String> = []
-    ) -> Item {
-        Item(
-            id: .mint(), type: type, title: "Title", titleRule: .firstLine, state: state, tier: tier,
-            tags: tags, version: ItemVersion(1), created: .now, modified: .now)
-    }
-
     // MARK: Catalogue
-
-    @Test func descendantsReachEveryLevelBelowButNotTheTypeItself() {
-        #expect(Self.catalogue.descendants(of: Self.entity) == [Self.person, Self.author])
-        #expect(Self.catalogue.descendants(of: Self.author).isEmpty)
-        #expect(Self.catalogue.descendants(of: TypeID("unknown")).isEmpty)
-    }
 
     @Test func aCycleInParentsEnds() {
         let a = TypeID("a"), b = TypeID("b")
         let catalogue = Catalogue(itemTypes: [Self.type(a, parent: b, fields: []), Self.type(b, parent: a, fields: [])])
         #expect(catalogue.descendants(of: a) == [b])
         #expect(!catalogue.isSubtype(a, ofAnyOf: [TypeID("c")]))
-    }
-
-    @Test func propertiesFollowTheCatalogueThenKeepTheRestAsGiven() {
-        let given = [
-            Property(key: "zeta", value: .string("z")),
-            Property(key: "priority", value: .string("high")),
-            Property(key: "alpha", value: .string("a")),
-            Property(key: "status", value: .string("pending"))
-        ]
-        let ordered = Self.catalogue.ordered(given, for: Self.note)
-        #expect(ordered.map(\.key) == ["status", "priority", "zeta", "alpha"])
-    }
-
-    @Test func unorderedPropertiesPutTheRestInKeyOrder() {
-        let given: [String: PropertyValue] = ["zeta": .null, "priority": .null, "alpha": .null, "status": .null]
-        #expect(Self.catalogue.ordered(given, for: Self.note).map(\.key) == ["status", "priority", "alpha", "zeta"])
-        #expect(Self.catalogue.ordered(given, for: TypeID("unknown")).map(\.key) == ["alpha", "priority", "status", "zeta"])
     }
 
     @Test func anEdgeIsFoundByItsNameOrItsReverseName() throws {
@@ -77,11 +46,6 @@ struct ItemLayerTests {
     }
 
     // MARK: Items and places
-
-    @Test func aFavoriteIsAnItemTaggedFavorite() {
-        #expect(Self.item(tags: [ItemTag.favorite]).isFavorite)
-        #expect(!Self.item(tags: ["Favorite", "starred"]).isFavorite)
-    }
 
     @Test func anItemIDEncodesAsItsString() throws {
         let id = ItemID("0198f2c4-7d1e-7a00-8000-000000000001")

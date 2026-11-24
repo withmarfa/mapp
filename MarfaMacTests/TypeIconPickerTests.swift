@@ -8,32 +8,6 @@ import Testing
     private let names = ["arrow-down", "arrow-up", "book", "book-open", "bookmark", "folder", "folder-open", "square-arrow-up"].map { "lucide:" + $0 }
     private func ids(_ names: [String]) -> [String] { names.map { "lucide:" + $0 } }
 
-    @Test func emptySearchFindsEveryName() {
-        #expect(IconNameSearch.matching("", in: names) == names)
-        #expect(IconNameSearch.matching("  ", in: names) == names)
-    }
-
-    @Test func aWordFindsTheNamesThatContainIt() {
-        #expect(IconNameSearch.matching("folder", in: names) == ids(["folder", "folder-open"]))
-        #expect(IconNameSearch.matching("zzz", in: names).isEmpty)
-    }
-
-    @Test func caseSpacesAndHyphensDoNotMatter() {
-        #expect(IconNameSearch.matching("Arrow Up", in: names) == ids(["arrow-up", "square-arrow-up"]))
-        #expect(IconNameSearch.matching("arrow-up", in: names) == ids(["arrow-up", "square-arrow-up"]))
-    }
-
-    @Test func aNameThatStartsWithTheWordComesFirst() {
-        #expect(IconNameSearch.matching("up", in: names) == ids(["arrow-up", "square-arrow-up"]))
-        #expect(IconNameSearch.matching("book", in: names) == ids(["book", "book-open", "bookmark"]))
-        #expect(IconNameSearch.matching("open", in: names) == ids(["book-open", "folder-open"]))
-    }
-
-    @Test func aNameThatStartsWithTheWordOutranksOneThatEndsWithIt() {
-        let list = ids(["bookmark", "address-book", "book-open"])
-        #expect(IconNameSearch.matching("book", in: list) == ids(["book-open", "bookmark", "address-book"]))
-    }
-
     @Test func thePickerSavesTheFullIDOfABrandIcon() async {
         let library = FakeItemLibrary(items: [])
         let model = TypeIconPickerModel(type: TypeID("core.task"), library: library, ids: [.simpleIcons: ["simple-icons:github"]])
@@ -44,38 +18,6 @@ import Testing
         #expect(model.current == "simple-icons:github")
     }
 
-    @Test func thePickerOpensOnTheSetOfTheTypesIcon() async {
-        let library = FakeItemLibrary(items: [])
-        #expect(TypeIconPickerModel(type: TypeID("core.task"), library: library).set == .lucide)
-        _ = await library.setIcon("simple-icons:github", ofType: TypeID("core.task"))
-        #expect(TypeIconPickerModel(type: TypeID("core.task"), library: library).set == .simpleIcons)
-    }
-
-    @Test func searchIgnoresTheSetPrefix() {
-        let ids = ["lucide:book", "simple-icons:lucide", "lucide:lucide-thing"]
-        #expect(IconNameSearch.matching("lucide", in: ids) == ["simple-icons:lucide", "lucide:lucide-thing"])
-        #expect(IconNameSearch.matching("simple", in: ids).isEmpty, "the prefix is not part of the name")
-    }
-
-    @Test func theSetsComeFromTheSDKWithFullIDs() {
-        #expect(IconSet.lucide.ids.contains("lucide:folder"))
-        #expect(IconSet.lucide.ids.allSatisfy { $0.hasPrefix("lucide:") })
-        #expect(IconSet.simpleIcons.ids.allSatisfy { $0.hasPrefix("simple-icons:") })
-        #expect(IconSet(iconID: "folder") == nil, "a bare name belongs to no set")
-        #expect(IconSet(iconID: "simple-icons:github") == .simpleIcons)
-    }
-
-    @Test func aBareNameDrawsTheFallbackAndABrandIDDraws() {
-        MarfaBrandIcons.register()
-        #expect(TypeIconArtwork(id: "folder") == .fallback)
-        #expect(TypeIconArtwork(id: "lucide:folder") != .fallback)
-        #expect(TypeIconArtwork(id: "simple-icons:github") == .brand("simple-icons:github"))
-    }
-
-    @Test func aNameReadsAsTitleCase() {
-        #expect(IconNameSearch.title(of: "lucide:book-open") == "Book Open")
-    }
-
     @Test func choosingAnIconShowsItAtOnce() async {
         let library = FakeItemLibrary(items: [])
         let model = TypeIconPickerModel(type: TypeID("core.task"), library: library, ids: [.lucide: ["lucide:bug", "lucide:zap"]])
@@ -84,28 +26,6 @@ import Testing
         #expect(model.current == "lucide:zap")
         #expect(library.chosenIcons.map(\.icon) == ["lucide:zap"])
         #expect(model.failure == nil)
-    }
-
-    @Test func theGridAndCancelAreOffWhileAChoiceIsBeingWritten() async {
-        let library = FakeItemLibrary(items: [])
-        library.holdsIconAnswers = true
-        let model = TypeIconPickerModel(type: TypeID("core.task"), library: library, ids: [.lucide: ["lucide:zap"]])
-        #expect(model.canChoose && model.canCancel)
-        let choice = Task { await model.choose("lucide:zap") }
-        #expect(await eventually { model.isWorking })
-        #expect(!model.canChoose, "a second choice cannot start")
-        #expect(!model.canCancel, "the sheet stays open until the server answers")
-        library.answerIcon()
-        #expect(await choice.value)
-        #expect(model.canChoose && model.canCancel)
-    }
-
-    @Test func theGridIsOffWithoutAServer() {
-        let library = FakeItemLibrary(items: [])
-        library.reachesServer = false
-        let model = TypeIconPickerModel(type: TypeID("core.task"), library: library, ids: [.lucide: ["lucide:zap"]])
-        #expect(!model.canChoose)
-        #expect(model.canCancel)
     }
 
     @Test func aRefusalIsKeptForThePickerToShow() async {

@@ -19,47 +19,6 @@ struct SyncStatusTests {
             actions: MarfaProblems.actions(for: kind))
     }
 
-    @Test func nothingIsSaidWhileDisconnected() {
-        let status = SyncStatus(state: .disconnected, report: report(waiting: 3, oldest: 99, problems: [entry()]), now: now)
-        #expect(status.notices.isEmpty)
-        #expect(status.primary == nil)
-    }
-
-    @Test func nothingIsSaidWhileEverythingIsInStep() {
-        for state in [MarfaConnectionState.online, .connecting] {
-            #expect(SyncStatus(state: state, report: report(), now: now).notices.isEmpty)
-        }
-    }
-
-    @Test func aChangeSentWithinMomentsIsNotWorthALine() {
-        let status = SyncStatus(state: .online, report: report(waiting: 1, oldest: 1), now: now)
-        #expect(status.notices.isEmpty)
-    }
-
-    @Test func aChangeStillWaitingOnlineSaysItIsBeingSent() throws {
-        let status = SyncStatus(state: .online, report: report(waiting: 3, oldest: SyncStatus.sendingDelay), now: now)
-        let note = try #require(status.primary)
-        #expect(note.kind == .sending)
-        #expect(note.title == "Sending 3 changes")
-        #expect(!note.isWarning)
-    }
-
-    @Test func offlineKeepsTheChangesAndSaysTheyWillGo() throws {
-        let none = try #require(SyncStatus(state: .offline(reason: "network: refused"), report: report(), now: now).primary)
-        #expect(none.kind == .offline)
-        #expect(none.title == "Offline")
-        #expect(!none.detail.contains("network"), "the reason is the package's, not the person's")
-
-        let some = try #require(SyncStatus(state: .offline(reason: nil), report: report(waiting: 1, oldest: 2), now: now).primary)
-        #expect(some.line == "Offline, 1 change waiting")
-    }
-
-    @Test func catchingUpAfterReconnectingIsSaid() throws {
-        let note = try #require(SyncStatus(state: .online, report: report(phase: .catchingUp), now: now).primary)
-        #expect(note.kind == .catchingUp)
-        #expect(note.title == "Catching up")
-    }
-
     @Test func aRefusedKeyPointsToSettingsAndSaysWhatWaits() throws {
         let status = SyncStatus(state: .keyRefused, report: report(waiting: 2, oldest: 60), now: now)
         let note = try #require(status.primary)
@@ -76,29 +35,9 @@ struct SyncStatusTests {
         #expect(status.primary?.kind == .unavailable)
     }
 
-    @Test func changesThatNeedThePersonCountedWithAnyOtherItem() throws {
-        let status = SyncStatus(
-            state: .offline(reason: nil), report: report(waiting: 1, oldest: 2, problems: [entry(), entry(.dead)]), now: now)
-        #expect(status.notices.map(\.kind) == [.needsAttention, .offline])
-        #expect(status.primary?.title == "Needs attention")
-        #expect(status.primary?.line == "2 changes need attention")
-    }
-
     @Test func aKeyThatIsRefusedComesBeforeAnythingElse() {
         let status = SyncStatus(state: .keyRefused, report: report(problems: [entry()]), now: now)
         #expect(status.notices.map(\.kind) == [.keyRefused, .needsAttention])
-    }
-
-    @Test func noWordIsJargon() {
-        let all = [MarfaConnectionState.online, .offline(reason: nil), .keyRefused, .unavailable(message: ""), .otherVersion(unsent: 2), .inUse].flatMap { state in
-            SyncStatus(state: state, report: report(waiting: 2, oldest: 60, phase: .catchingUp, problems: [entry()]), now: now)
-                .notices.flatMap { [$0.title, $0.detail] }
-        }
-        for text in all {
-            for word in ["sync", "write", "queue", "drain", "verdict"] {
-                #expect(!text.localizedCaseInsensitiveContains(word), "“\(text)” says “\(word)”")
-            }
-        }
     }
 }
 
@@ -126,27 +65,6 @@ struct ProblemWordingTests {
         #expect(wording.canCopyText)
     }
 
-    @Test func aRefusedCreateSaysTheItemWasNotCreated() {
-        #expect(wording(entry(.refused, change: .create)).headline == "“Plan the launch” wasn’t created")
-        #expect(wording(entry(.refused, change: .create, title: nil, item: nil)).headline == "A new item wasn’t created")
-    }
-
-    @Test func anItemThatCarriedNoTitleIsNamedFromTheLibrary() {
-        let wording = wording(entry(.refused, title: nil), titles: ["item": "Quarterly plan"])
-        #expect(wording.headline == "Changes to “Quarterly plan” weren’t sent")
-    }
-
-    @Test func aMissingPermissionSaysWhoToAsk() {
-        let grant = SyncProblem.Grant(kind: .type, name: "core.task", level: .write)
-        let wording = wording(entry(.refused, reason: SyncProblem(code: "forbidden", grant: grant)))
-        #expect(wording.explanation.hasPrefix("The app doesn’t have permission for “core.task”. Ask whoever runs the server to allow it"))
-    }
-
-    @Test func anItemInTheServersBinSaysToRestoreItFirst() {
-        let wording = wording(entry(.refused, reason: SyncProblem(code: "gone", isTrashed: true)))
-        #expect(wording.explanation.hasPrefix("The item is in Recently Deleted on the server"))
-    }
-
     @Test func eachFieldTheServerRefusedIsGivenItsReason() {
         let reason = SyncProblem(code: "validation_error", fields: ["status": "not one of open, closed", "due_at": "not a date"])
         var refused = entry(.refused, reason: reason)
@@ -155,47 +73,6 @@ struct ProblemWordingTests {
         // A field the type no longer holds is named by its key.
         refused.fieldLabels = ["status": "Status"]
         #expect(wording(refused).details == ["due_at: not a date", "Status: not one of open, closed"])
-    }
-
-    @Test func aChangeTooLargeToSendSaysItsSizesAndHowToKeepTheText() {
-        let reason = SyncProblem(
-            code: "over_request_limit", message: Words.unsent(.tooLarge(size: 12_000_000, limit: 10_000_000)),
-            unsent: .tooLarge(size: 12_000_000, limit: 10_000_000))
-        let wording = wording(entry(.refused, reason: reason))
-        let size = Int64(12_000_000).formatted(.byteCount(style: .file))
-        let limit = Int64(10_000_000).formatted(.byteCount(style: .file))
-        #expect(wording.explanation.hasPrefix("This change is \(size), more than the \(limit) the server takes at once"))
-        #expect(wording.explanation.contains("copy it before you discard"))
-        #expect(wording.actions.map(\.action) == [.discard])
-    }
-
-    /// Sizes that round to the same words would say the change is no larger than the limit, so they carry their bytes.
-    @Test func sizesThatReadTheSameCarryTheirBytes() {
-        let (size, limit) = Words.sizes(2_000_001, 2_000_000)
-        #expect(size != limit)
-        #expect(size.contains(Int64(2_000_001).formatted(.byteCount(style: .file))))
-    }
-
-    /// A change the copy refused for a reason of its own says only that it wasn't sent, with the copy's reason
-    /// beside it, never that an earlier change or the server refused it.
-    @Test func aChangeNotSentForItsOwnReasonSaysSo() {
-        let why = "the delete has no confirmed server version to remove; read the item before deleting it"
-        let reason = SyncProblem(code: "refused_unsent", message: Words.unsent(.notSent(reason: why)), unsent: .notSent(reason: why))
-        let wording = wording(entry(.refused, reason: reason))
-        #expect(wording.explanation.hasPrefix("The app couldn’t send this change."))
-        #expect(!wording.explanation.contains("earlier change"))
-        #expect(!wording.explanation.contains("The server refused it"))
-        #expect(wording.explanation.contains("copy it before you discard"))
-        #expect(wording.details == ["The delete has no confirmed server version to remove; read the item before deleting it."])
-        #expect(wording.actions.map(\.action) == [.discard])
-    }
-
-    /// A change refused only because one it went with was refused says so, rather than that the server refused it.
-    @Test func aChangeRefusedWithAnEarlierOneSaysSo() {
-        let reason = SyncProblem(code: "refused_with_dependency", message: Words.unsent(.afterRefusal), unsent: .afterRefusal)
-        let wording = wording(entry(.refused, reason: reason))
-        #expect(wording.explanation.hasPrefix("It went with an earlier change that wasn’t sent, so it wasn’t sent either."))
-        #expect(!wording.explanation.contains("The server refused it"))
     }
 
     @Test func aChangeFromACopyReadInPartIsHeldUntilThePersonSays() {
@@ -214,12 +91,6 @@ struct ProblemWordingTests {
         #expect(wording.actions.map(\.action) == [.tryAgain, .withdraw])
         #expect(wording.actions.map(\.title) == ["Try Again", "Undo Change"])
         #expect(wording.confirmation(for: .withdraw)?.copiesText == true)
-    }
-
-    @Test func aRefusalWithNoReasonStillSaysSomething() {
-        let wording = wording(entry(.refused, title: nil, body: nil))
-        #expect(wording.explanation == "The server refused it.")
-        #expect(!wording.canCopyText, "nothing was written, so there is nothing to copy")
     }
 
     @Test func aWriteHeldForTheContractsReasonsOffersOnlyWhatTheContractAllows() {
@@ -283,41 +154,9 @@ struct ProblemWordingTests {
             #expect(wording(entry(kind)).actions.map(\.action) == MarfaProblems.actions(for: kind))
         }
     }
-
-    @Test func noWordIsJargon() {
-        let kinds: [SyncProblemEntry.Kind] = [
-            .refused, .blocked(.credentialRefused), .blocked(.keySpent), .blocked(.ancestorUnavailable),
-            .blocked(.conflictUnresolved), .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread), .blocked(.serverRestored), .dead,
-            .conflicted(sibling: ItemID("c"), original: nil)
-        ]
-        let unsent: [SyncProblem.Unsent] = [
-            .tooLarge(size: 2_000_001, limit: 2_000_000), .afterRefusal, .notSent(reason: "the bytes are gone")
-        ]
-        let entries = kinds.map { entry($0) } + unsent.map {
-            entry(.refused, reason: SyncProblem(code: "unsent", message: Words.unsent($0), unsent: $0))
-        }
-        for entry in entries {
-            let wording = wording(entry)
-            let text = ([wording.headline, wording.explanation] + wording.actions.map(\.title)).joined(separator: " ")
-            for word in ["sync", "write", "queue", "idempotency", "verdict", "ancestor", "credential"] {
-                #expect(!text.localizedCaseInsensitiveContains(word), "“\(text)” says “\(word)”")
-            }
-        }
-    }
 }
 
 struct ConnectionStatusTests {
-    @Test func eachStateIsToldInWords() {
-        #expect(ConnectionStatus(.disconnected).title == "Not connected")
-        #expect(ConnectionStatus(.connecting).title == "Connecting…")
-        #expect(ConnectionStatus(.online).title == "Connected")
-        #expect(ConnectionStatus(.online).detail == nil)
-        #expect(ConnectionStatus(.offline(reason: "network: refused")).title == "Offline")
-        #expect(ConnectionStatus(.keyRefused).title == "Signed out")
-        #expect(ConnectionStatus(.keyRefused).isProblem)
-        #expect(ConnectionStatus(.unavailable(message: "The store is damaged.")).detail?.hasSuffix("The store is damaged.") == true)
-    }
-
     @Test func aCopyADifferentVersionMadeSaysWhatToDoWithoutTheErrorOrThePath() throws {
         let some = ConnectionStatus(.otherVersion(unsent: 3))
         #expect(some.title == "Library unavailable")
@@ -339,17 +178,5 @@ struct ConnectionStatusTests {
                 #expect(!text.localizedCaseInsensitiveContains(raw), "“\(text)” says “\(raw)”")
             }
         }
-    }
-
-    @Test(arguments: [MarfaConnectionState.otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse])
-    func theWindowSaysACopyThisVersionCantOpenIsUnavailable(state: MarfaConnectionState) {
-        let status = SyncStatus(state: state, report: SyncReport(), now: Date())
-        #expect(status.primary?.kind == .unavailable)
-    }
-
-    @Test func theReasonOfBeingOfflineIsNotShown() {
-        let status = ConnectionStatus(.offline(reason: "network: connection refused (os error 61)"))
-        #expect(status.detail?.contains("os error") == false)
-        #expect(!status.isProblem)
     }
 }

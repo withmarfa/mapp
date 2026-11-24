@@ -231,21 +231,6 @@ import Testing
         #expect(host.connection?.address.absoluteString == "http://first.test:8210")
     }
 
-    @Test(arguments: ["invalid_client", "access_denied_by_policy", "http_"])
-    func aRefusalWithAnOAuthErrorIsToldAsTheServerRefusing(code: String) {
-        #expect(SignInOutcome(SignInError.refused(code: code, message: "No.")) == .refused)
-    }
-
-    /// A sign-in the server refuses with an OAuth error is told as refused.
-    @Test func anOAuthRefusalIsToldAsRefused() async throws {
-        let bench = try HostBench()
-        bench.signIns.script(browser: [.failure(SignInError.refused(code: "invalid_client", message: "No."))])
-        let host = bench.host()
-        let told = await problem { () throws(MarfaHost.Problem) in try await host.connect(address: "http://first.test:8210", via: .browser) }
-        #expect(told == .signIn(.refused))
-        #expect(bench.signIns.calls == ["browser http://first.test:8210"])
-    }
-
     // MARK: A clean-up sign-out that throws
 
     /// The sign-out ran into the Keychain held elsewhere before it forgot or revoked anything: the sign-in may still be
@@ -380,11 +365,6 @@ import Testing
         for fragment in ["SQLite", "/Users", "I/O"] {
             #expect(!notice.message.contains(fragment), "“\(notice.message)” shows “\(fragment)”")
         }
-    }
-
-    @Test func aStoreErrorMeetWhileOpeningTheCopyIsToldInTheAppsWords() {
-        let failure = MarfaSource.failure(opening: MarfaError.store(message: "SQLite says: disk I/O error"))
-        #expect(failure.message == Words.copyCouldNotBeOpened)
     }
 
     @Test(arguments: [

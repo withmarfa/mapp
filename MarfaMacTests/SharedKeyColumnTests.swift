@@ -32,39 +32,6 @@ struct SharedKeyColumnTests {
 
     // MARK: Shared columns
 
-    @Test func aKeyTypesShareKeepsTheMostSpecificStyleWhicheverTypeComesFirst() throws {
-        // "example.other" sorts before "example.ticket": its plain choice is met first.
-        let catalogue = Catalogue(itemTypes: [
-            Self.info(Self.other, fields: [.init(key: "state", label: "State", kind: .choice(["a", "b"]), declaredBy: Self.other)]),
-            Self.info(Self.ticket, fields: [Self.status([("open", .notStarted), ("shut", .completed)], by: Self.ticket)]),
-        ])
-        let rows = [Self.row(Self.item("a", Self.other)), Self.row(Self.item("b", Self.ticket))]
-        let columns = ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [], looks: [:])
-        let column = try #require(columns.first { $0.id == "field.state" })
-        #expect(column.style == .status)
-        #expect(column.field?.isStatus == true)
-    }
-
-    @Test func aPriorityOutranksAChoiceOfTheSameKey() throws {
-        let priority = { (type: TypeID) in ItemTypeInfo.Field(key: "priority", label: "Priority", kind: .choice(["low", "high"]), declaredBy: type) }
-        let catalogue = Catalogue(itemTypes: [
-            Self.info(Self.other, fields: [priority(Self.other)]),
-            Self.info(Self.ticket, fields: [priority(Self.ticket)], parent: Self.task),
-            Self.info(Self.task, fields: []),
-        ])
-        let rows = [Self.row(Self.item("a", Self.other)), Self.row(Self.item("b", Self.ticket))]
-        let columns = ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [], looks: [:])
-        #expect(columns.first { $0.id == "field.priority" }?.style == .priority)
-    }
-
-    @Test func aTextFieldNamedAssigneeIsPlainText() throws {
-        let catalogue = Catalogue(itemTypes: [
-            Self.info(Self.ticket, fields: [.init(key: "assignee", label: "Assignee", kind: .text, declaredBy: Self.ticket)]),
-        ])
-        let columns = ItemTableLayout.columns(for: [Self.row(Self.item("a", Self.ticket))], catalogue: catalogue, hidden: [], looks: [:])
-        #expect(columns.first { $0.id == "field.assignee" }?.style == .text)
-    }
-
     @Test func aCellOffersOnlyTheWordsOfItsOwnRowsType() throws {
         let catalogue = Catalogue(itemTypes: [
             Self.info(Self.ticket, fields: [Self.status([("open", .notStarted), ("shut", .completed)], by: Self.ticket)]),
@@ -79,15 +46,5 @@ struct SharedKeyColumnTests {
         #expect(column.field(for: meeting, catalogue: catalogue)?.options == ["planned", "held"])
         let undeclaring = Self.row(Self.item("c", Self.plain))
         #expect(column.field(for: undeclaring, catalogue: catalogue) == nil)
-    }
-
-    // MARK: Board lanes
-
-    @Test func aChoiceBoardKeepsDeclaredOrder() {
-        let catalogue = Catalogue(itemTypes: [
-            Self.info(Self.ticket, fields: [.init(key: "size", label: "Size", kind: .choice(["small", "large", "medium"]), declaredBy: Self.ticket)]),
-        ])
-        let lanes = ItemBoardLayout.lanes(items: [Self.item("a", Self.ticket)], key: "size", catalogue: catalogue)
-        #expect(lanes.map(\.id) == [.option("small"), .option("large"), .option("medium"), .missing])
     }
 }

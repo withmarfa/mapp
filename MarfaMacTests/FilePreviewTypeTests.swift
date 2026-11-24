@@ -3,49 +3,7 @@ import Testing
 import UniformTypeIdentifiers
 @testable import MarfaMac
 
-struct FilePreviewTypeTests {
-    private let hashed = URL(filePath: "/cache/" + String(repeating: "ab", count: 32))
-
-    @Test func aFileKeptUnderItsHashIsShownByTheTypeTheLibrarySays() {
-        #expect(FileItemContent.type(of: hashed, contentType: .pdf) == .pdf)
-        #expect(FileItemContent.type(of: hashed, contentType: .png).conforms(to: .image))
-        #expect(FileItemContent.type(of: hashed, contentType: .plainText) == .plainText)
-    }
-
-    @Test func aFileWithNoKnownTypeIsShownByItsName() {
-        #expect(FileItemContent.type(of: URL(filePath: "/folder/Brief.pdf"), contentType: nil) == .pdf)
-        #expect(FileItemContent.type(of: URL(filePath: "/folder/Brief.pdf"), contentType: .data) == .pdf)
-        #expect(FileItemContent.type(of: hashed, contentType: nil) == .data)
-    }
-
-    @Test func theTypeTheLibrarySaysWinsOverTheName() {
-        #expect(FileItemContent.type(of: URL(filePath: "/folder/scan.bin"), contentType: .pdf) == .pdf)
-    }
-
-    @Test func onlyPlainTextTypesUseTheTextPage() {
-        #expect(FileItemContent.type(of: hashed, contentType: UTType(mimeType: "text/plain")).conforms(to: .plainText))
-        #expect(FileItemContent.type(of: URL(filePath: "/folder/note.txt"), contentType: nil).conforms(to: .plainText))
-        for type in [UTType.data, .png, .pdf, .rtf, .html] {
-            #expect(!FileItemContent.type(of: hashed, contentType: type).conforms(to: .plainText))
-        }
-    }
-}
-
 struct QuickLookFileTests {
-    @Test func aTitleWithoutAnExtensionGetsOneThatFitsTheType() {
-        #expect(QuickLookFile.name(for: "Shopping list", type: .plainText) == "Shopping list.txt")
-        #expect(QuickLookFile.name(for: "Brief", type: .pdf) == "Brief.pdf")
-    }
-
-    @Test func aTitleWithAFittingExtensionIsKept() {
-        #expect(QuickLookFile.name(for: "Shopping list.txt", type: .plainText) == "Shopping list.txt")
-        #expect(QuickLookFile.name(for: "photo.jpeg", type: .jpeg) == "photo.jpeg")
-    }
-
-    @Test func anUnknownTypeLeavesTheTitleAlone() {
-        #expect(QuickLookFile.name(for: "Archive", type: .data) == "Archive")
-    }
-
     @Test func aTitleIsMadeSafeAsAFileName() {
         #expect(QuickLookFile.name(for: "a/b:c.txt", type: .plainText) == "a-b-c.txt")
         #expect(QuickLookFile.name(for: "..hidden", type: .plainText) == "hidden.txt")

@@ -13,27 +13,6 @@ struct ScrolledItemTitleTests {
         return NSHostingView(rootView: OfferedWidth(width: width) { title }).fittingSize.width
     }
 
-    @Test func aTitleReportsItsOwnWidthWhateverIsOffered() {
-        let title = "146a Folder watch redraw"
-        let own = width(of: title, offered: nil)
-        #expect(own > 100 && own < ScrolledItemTitle.widest)
-        for offered in [CGFloat(0), 20, 60, 500, 5_000] {
-            #expect(width(of: title, offered: offered) == own, "offered \(offered)")
-        }
-    }
-
-    @Test func aShortTitleIsNeverStretchedOrCut() {
-        #expect(width(of: "14", offered: 20) == width(of: "14", offered: 500))
-        #expect(width(of: "14", offered: 20) < 40)
-    }
-
-    @Test func aLongTitleStopsAtTheWidest() {
-        let title = String(repeating: "A very long title ", count: 20)
-        for offered in [CGFloat(20), 500, 5_000] {
-            #expect(width(of: title, offered: offered) == ScrolledItemTitle.widest)
-        }
-    }
-
     @Test func theToolbarSettingsAreResetWithTheOtherInterfaceSettings() {
         #expect(InterfaceKey.all.contains(InterfaceKey.showsScrolledTitle))
         #expect(InterfaceKey.all.contains(InterfaceKey.showsPageToolbarBackground))

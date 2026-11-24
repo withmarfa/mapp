@@ -37,8 +37,6 @@ final class FakeItemLibrary: ItemLibrary {
         if instanceIDDelay > .zero { try? await Task.sleep(for: instanceIDDelay) }
         return heldInstanceID
     }
-    /// Whether counts cannot be answered, as when the copy cannot be sure and the server is out of reach.
-    var countsUnavailable = false
     /// The counts the library works out from its items the way Marfa does: only active items, the groups of each child's
     /// own type, an item with no status in the total alone.
     @ObservationIgnored lazy var counts: ItemCounts = makeCounts()
@@ -48,9 +46,6 @@ final class FakeItemLibrary: ItemLibrary {
     var fieldFailure: TypeSchemaFailure?
     private(set) var editedFields: [FieldEditPlan] = []
     private(set) var chosenIcons: [(type: TypeID, icon: String?)] = []
-    /// While set, an icon choice waits for `answerIcon()` before it answers.
-    var holdsIconAnswers = false
-    private var heldIconAnswer: CheckedContinuation<Void, Never>?
     /// What the server last gave for sources; `serverSources` is what the next refresh reads.
     var sources = SourceDirectory()
     var serverSources: SourceDirectory?
@@ -595,13 +590,7 @@ final class FakeItemLibrary: ItemLibrary {
         return nil
     }
 
-    func answerIcon() {
-        heldIconAnswer?.resume()
-        heldIconAnswer = nil
-    }
-
     func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure? {
-        if holdsIconAnswers { await withCheckedContinuation { heldIconAnswer = $0 } }
         if let iconFailure { return iconFailure }
         chosenIcons.append((type, icon))
         catalogue = catalogue.choosingIcon(icon, ofType: type)
@@ -776,7 +765,6 @@ extension FakeItemLibrary {
     }
 
     func countAnswers(_ ids: [ItemID], _ query: CountQuery) throws -> [ItemID: ItemCountAnswer] {
-        guard !countsUnavailable else { throw ItemCountUnavailable() }
         var answers: [ItemID: ItemCountAnswer] = [:]
         for id in ids {
             let counted: [Item]

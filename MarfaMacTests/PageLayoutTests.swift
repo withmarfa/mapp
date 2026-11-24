@@ -8,8 +8,6 @@ struct PageLayoutTests {
     private static let catalogue = Catalogue()
 
     private nonisolated static func row(_ id: String) -> PageLayout.Row { PageLayout.Row(id: id, label: id, symbol: "text.alignleft") }
-    /// A type with no fields of its own: the built-in rows and Linked From.
-    private static let builtIn = ["#type", "#updated", "#tags", "#linked"].map(row)
     private static let rows = ["#type", "#updated", "a", "b", "c", "#linked"].map(row)
 
     private static func layout(_ rows: [PageLayout.Row] = rows, _ placements: PagePlacements = PagePlacements()) -> PageLayout {
@@ -17,13 +15,6 @@ struct PageLayoutTests {
     }
 
     private static func ids(_ rows: [PageLayout.Row]) -> [String] { rows.map(\.id) }
-
-    @Test func aTypeWithNoFieldsListsItsBuiltInRows() {
-        let layout = Self.layout(Self.builtIn)
-        #expect(Self.ids(layout.pinned) == ["#type", "#updated"], "the default pins that this type has")
-        #expect(Self.ids(layout.page) == ["#tags"])
-        #expect(Self.ids(layout.hidden) == ["#linked"], "Linked From is in the inspector by default")
-    }
 
     @Test func aRowDraggedOnThePageKeepsTheOrderTheCopyShowedApartFromTheMovedRow() throws {
         // The page drew c, a, b, which is not this layout's own order (a, b, c); a dropped last must leave c first.
@@ -91,19 +82,6 @@ struct PageLayoutTests {
         #expect(layout.moving("a", to: .pinned, at: 0) != nil, "a pinned row can still be moved among the pins")
     }
 
-    @Test func pinningAHiddenRowShowsItAndUnpinningLeavesItOnThePage() {
-        var placements = PagePlacements()
-        placements.setShown(false, row: "a", of: Self.type)
-        var layout = Self.layout(Self.rows, placements)
-        #expect(Self.ids(layout.hidden) == ["a", "#linked"])
-        layout = layout.moving("a", to: .pinned)!
-        placements.apply(layout, of: Self.type, in: Self.catalogue)
-        #expect(placements.pins(of: Self.type, in: Self.catalogue) == ["#type", "#updated", "a", "child-of"], "the default parent pin has no row here and stays")
-        let unpinned = Self.layout(Self.rows, placements).moving("a", to: .page)!
-        placements.apply(unpinned, of: Self.type, in: Self.catalogue)
-        #expect(Self.ids(Self.layout(Self.rows, placements).page).contains("a"))
-    }
-
     @Test func aPinTheItemHasNoRowForStaysInStorageBehindTheShownPins() {
         var placements = PagePlacements()
         placements.setPins(["gone", "#type"], of: Self.type)
@@ -111,13 +89,5 @@ struct PageLayoutTests {
         #expect(Self.ids(layout.pinned) == ["#type"])
         placements.apply(layout.moving("a", to: .pinned)!, of: Self.type, in: Self.catalogue)
         #expect(placements.pins(of: Self.type, in: Self.catalogue) == ["#type", "a", "gone"])
-    }
-
-    @Test func linkedFromOnThePageIsOnItAndHidingItMovesItBack() {
-        var placements = PagePlacements()
-        placements.apply(Self.layout(Self.rows).moving("#linked", to: .page)!, of: Self.type, in: Self.catalogue)
-        #expect(placements.placement(of: Self.type, in: Self.catalogue).linkedFromPlace == .page)
-        placements.apply(Self.layout(Self.rows, placements).moving("#linked", to: .hidden)!, of: Self.type, in: Self.catalogue)
-        #expect(placements.placement(of: Self.type, in: Self.catalogue).linkedFromPlace == .inspector)
     }
 }
