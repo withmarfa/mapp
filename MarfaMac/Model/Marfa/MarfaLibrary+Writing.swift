@@ -335,8 +335,8 @@ extension MarfaLibrary {
             library.setTag(tag, on: !on, changing, undoManager: undoManager)
         }
     }
-
 }
+
 /// What a change of type wrote, filled in when its writes are made.
 private final class TypeUndos {
     var items: [TypeUndo] = []

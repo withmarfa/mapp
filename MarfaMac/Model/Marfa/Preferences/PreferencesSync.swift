@@ -465,5 +465,4 @@ final class PreferencesSync {
         }
         defaults.set(PreferenceJSON.text(kept) ?? "{}", forKey: Self.beforeSyncKey)
     }
-
 }
