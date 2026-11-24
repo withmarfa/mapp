@@ -270,6 +270,28 @@ import Testing
         #expect(model.releaseVersion == "0.0.89")
     }
 
+    @Test func aFailedUpdateReadDoesNotOfferTheReleaseThatMetricsNowReportsAsInstalled() async {
+        let bench = bench()
+        bench.calls.state.withLock {
+            $0.update.running = "0.0.89"
+            $0.update.available = true
+            $0.update.latest = UpdateRelease(version: "0.0.90")
+        }
+        let model = OverviewModel(context: bench.context)
+        await model.load()
+        #expect(model.updateReady == "0.0.90")
+
+        bench.calls.state.withLock {
+            $0.metrics = InstanceMetricsReading(version: "0.0.90", databaseBytes: nil, fileBytes: 0)
+        }
+        bench.calls.fail("updateStatus", with: .unreachable)
+        await model.load()
+
+        #expect(model.releaseFailure == .unreachable)
+        #expect(model.releaseVersion == "0.0.90")
+        #expect(model.updateReady == nil)
+    }
+
     @Test func aFailedReleaseReadIsToldAndKeepsTheLastRelease() async {
         let bench = bench()
         let metrics = InstanceMetricsReading(version: "0.0.89", databaseBytes: 214_000_000, fileBytes: 3_400_000_000)
@@ -302,7 +324,7 @@ import Testing
         #expect(model.releaseFailure == .unreachable)
         #expect(model.metricsFailure == .unreachable)
         #expect(model.releaseVersion == "0.0.89")
-        #expect(model.updateReady == "0.0.90")
+        #expect(model.updateReady == nil)
         #expect(model.metrics == metrics)
     }
 

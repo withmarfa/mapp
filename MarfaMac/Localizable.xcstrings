@@ -40,7 +40,13 @@
     "Couldn’t Read the Last Backup" : {
 
     },
-    "Couldn’t Read the Marfa Release" : {
+    "Couldn’t Check for Updates" : {
+
+    },
+    "Check your connection and try again." : {
+
+    },
+    "Try again in a moment." : {
 
     },
     "Couldn’t Read the Total File Size" : {

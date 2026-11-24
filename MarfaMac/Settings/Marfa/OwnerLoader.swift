@@ -46,8 +46,8 @@ import Observation
             await context.learn(from: error)
             return
         }
-        for read in secondary { await self.read(read, in: context) }
         if showBeforeFinishing { hasLoaded = true }
+        for read in secondary { await self.read(read, in: context) }
         await after()
         if !hasLoaded { hasLoaded = true }
     }

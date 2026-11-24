@@ -4,8 +4,8 @@ import Observation
 
 /// The Webhooks page: each webhook with its address, the events it sends, its deliveries and Delete. A sign-in holding
 /// Manage Webhooks and Manage Keys sees every app's and key's webhooks, grouped by who made them, and may delete any;
-/// only the maker changes one or sends a delivery again. The list, edits, delivery actions and secret sheet share ownership
-/// and scope checks.
+/// only the maker changes one or sends a delivery again. The model keeps the list, edits, delivery actions and secret
+/// sheet together so they use the same ownership and scope checks.
 @Observable @MainActor final class WebhooksModel: OwnerDraftHolding {
     /// Whether a maker still stands.
     enum Standing: Equatable {
@@ -87,10 +87,11 @@ import Observation
     private var keys: [KeyInfo] = []
     private(set) var typeNames: [String: String] = [:]
     private let loader = OwnerLoader()
+    private var isReadingDetails = false
     private let keysRead = OwnerLoader.ReadStatus()
     var keysFailure: OwnerFailure? { listedEvery ? keysRead.failure : nil }
     var failure: OwnerFailure? { loader.failure }
-    var isLoading: Bool { loader.isLoading }
+    private var isLoading: Bool { loader.isLoading || isReadingDetails }
     var hasLoaded: Bool { loader.hasLoaded }
     private(set) var sendingFailures: [String: OwnerFailure] = [:]
     /// Whether each webhook is sending, read from its latest delivery after the list shows.
@@ -240,8 +241,23 @@ import Observation
 
     // MARK: Reading
 
-    /// The list is available while the app checks the latest deliveries.
-    func load(waitForPrevious: Bool = false, readsDeliveries: Bool = true) async {
+    /// The list is available while the app reads type names and checks the latest deliveries.
+    func load() async {
+        guard !isLoading else { return }
+        isReadingDetails = true
+        await readList()
+        if failure == nil, seesEvery == listedEvery, !Task.isCancelled {
+            await loader.read(.quiet { [self] () throws(OwnerFailure) in
+                typeNames = try await context.calls.typeNames()
+            }, in: context)
+            if seesEvery == listedEvery, !Task.isCancelled { await loadSending() }
+        }
+        isReadingDetails = false
+        await reloadIfScopeChanged()
+    }
+
+    /// A create can refresh the list while an earlier load still reads its details.
+    private func readList(waitForPrevious: Bool = false) async {
         await loader.load(in: context, waitForPrevious: waitForPrevious, primary: { () throws(OwnerFailure) in
             let every = seesEvery
             if every {
@@ -253,13 +269,13 @@ import Observation
             listedEvery = every
             gone = gone.filter { id in !webhooks.contains { $0.id == id } }
         }, secondary: [
-            .quiet { [self] () throws(OwnerFailure) in typeNames = try await context.calls.typeNames() },
             .required(keysRead) { [self] () throws(OwnerFailure) in
                 if listedEvery { keys = try await context.calls.keys() }
             },
-        ], showBeforeFinishing: true, after: {
-            if readsDeliveries, seesEvery == listedEvery { await loadSending() }
-        })
+        ], showBeforeFinishing: true)
+    }
+
+    private func reloadIfScopeChanged() async {
         if !isLoading, scopeChangedWhileLoading || (failure == nil && seesEvery != listedEvery) {
             scopeChangedWhileLoading = false
             await readAgainIfScopeChanged()
@@ -285,12 +301,14 @@ import Observation
     /// Checks the latest deliveries a few at a time, after the list is available.
     private func loadSending() async {
         let calls = context.calls
+        let every = listedEvery
         await readEach(
             of: webhooks.filter(\.active).map(\.id),
             read: { id -> Result<WebhookDeliveryInfo?, OwnerFailure> in
                 do throws(OwnerFailure) { return .success(try await calls.deliveries(of: id).first) } catch { return .failure(error) }
             },
             take: { id, answer in
+                guard seesEvery == every, listedEvery == every, webhook(id)?.active == true else { return }
                 switch answer {
                 case .success(let latest):
                     sendingFailures[id] = nil
@@ -544,7 +562,8 @@ import Observation
             created = made
             sheet = .secret
         }
-        await load(waitForPrevious: true, readsDeliveries: false)
+        await readList(waitForPrevious: true)
+        await reloadIfScopeChanged()
     }
 
     /// The notice for a webhook made whose signing secret was never copied: it can't be shown again.

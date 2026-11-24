@@ -2,6 +2,7 @@ import Foundation
 import Marfa
 import MarfaAPI
 import OpenAPIRuntime
+import OSLog
 
 // What the owner's pages (Account, Apps, Keys, Addresses) ask of the server, in values of their own so the pages and
 // their models read nothing generated, and a test can script every answer.
@@ -375,7 +376,10 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
     /// What the package's error stands for, unwrapping the generated client's own wrapper. A `409` that names no cause of
     /// its own (the codes below) is the server refusing the call, which `plainConflict` words for the call that made it.
     static func failure(_ error: any Error, plainConflict: (String) -> OwnerFailure = { .refused($0) }) -> OwnerFailure {
-        guard let error = marfaError(error) else { return .failed(String(localized: "The server’s answer couldn’t be read.")) }
+        guard let error = marfaError(error) else {
+            OwnerSettingsLog.failure(error.localizedDescription)
+            return .failed(String(localized: "The server’s answer couldn’t be read."))
+        }
         if error.isOffline { return .unreachable }
         if error.isKeyRefusal { return .signedOut }
         switch error {
@@ -386,11 +390,17 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         case .versionConflict: return .conflict
         case .instanceChanged: return .instanceChanged
         case .server(let status, let code, let message, _, _) where status == 409:
+            OwnerSettingsLog.failure(error.localizedDescription)
             let refusals: Set<String> = ["sign_in_address_check_failed", "sign_in_address_change_unconfirmed"]
             return refusals.contains(code) ? .refused(message) : plainConflict(message)
-        case .validation(_, let message, _, _): return .refused(message)
+        case .validation(_, let message, _, _):
+            OwnerSettingsLog.failure(error.localizedDescription)
+            return .refused(message)
         case .confirmationRequired, .appSignInRequired, .canceled: return .notConfirmed
-        default: return .failed(error.localizedDescription)
+        default:
+            let detail = error.localizedDescription
+            OwnerSettingsLog.failure(detail)
+            return .failed(detail)
         }
     }
 
@@ -420,4 +430,12 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
 
     /// Whether the server's text names a time of day, not only a day.
     static func hasTime(_ text: String?) -> Bool { text?.contains("T") ?? true }
+}
+
+nonisolated enum OwnerSettingsLog {
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Marfa", category: "OwnerSettings")
+
+    static func failure(_ detail: String) {
+        logger.error("Settings request failed: \(detail, privacy: .private)")
+    }
 }

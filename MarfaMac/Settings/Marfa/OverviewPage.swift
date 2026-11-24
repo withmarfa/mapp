@@ -9,6 +9,7 @@ struct OverviewPage: View {
     private var model: OverviewModel { host.overview }
     private var settings: InstanceSettingsModel { host.instanceSettings }
     private var canChangeSettings: Bool { host.grants.contains(.configManage) }
+    private var metrics: InstanceMetricsReading? { model.metricsFailure == nil ? model.metrics : nil }
 
     var body: some View {
         content
@@ -112,15 +113,9 @@ struct OverviewPage: View {
         if settings.isAvailable || settings.isLoading {
             nameRow
         } else if let failure = settings.failure {
-            if failure == .notPermitted {
-                OwnerProblemRow(
-                    title: "Couldn’t Read \(host.serverName)’s Settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
-                    page: .overview, host: host)
-            } else {
-                SettingsProblemRow(
-                    title: Text("Couldn’t Read \(host.serverName)’s Settings"), line: Text(verbatim: failure.message),
-                    actions: failure == .unsupported ? [] : [SettingsProblemAction("Try Again") { Task { await settings.load() } }])
-            }
+            OwnerProblemRow(
+                title: "Couldn’t Read \(host.serverName)’s Settings", failure: OwnerFailure(failure), page: .overview, host: host,
+                retry: failure == .unsupported ? nil : { Task { await settings.load() } })
         }
     }
 
@@ -148,7 +143,7 @@ struct OverviewPage: View {
             SettingsRow(title: Text("Marfa \(ready) is ready")) { showUpdates }
         }
         if let failure = model.releaseFailure {
-            readProblem("Couldn’t Read the Marfa Release", failure: failure)
+            readProblem("Couldn’t Check for Updates", failure: failure)
         }
     }
 
@@ -156,15 +151,15 @@ struct OverviewPage: View {
 
     private var health: some View {
         SettingsSection("Health") {
-            let database = model.metricsFailure == nil ? model.health(of: .database) : HealthPart(condition: .unknown)
+            let database = model.health(of: .database)
             SettingsRow("Database") {
-                SettingsValue(verbatim: bytes(model.metrics?.databaseBytes) ?? Self.word(database.condition), dot: Self.dot(database.condition))
+                SettingsValue(verbatim: bytes(metrics?.databaseBytes) ?? Self.word(database.condition), dot: Self.dot(database.condition))
             }
             let disk = model.health(of: .disk)
             SettingsRow("Disk") {
                 SettingsValue(verbatim: Self.word(disk.condition), dot: Self.dot(disk.condition))
             }
-            filesRow(model.metricsFailure == nil ? model.health(of: .files) : HealthPart(condition: .unknown))
+            filesRow(model.health(of: .files))
             if let failure = model.metricsFailure {
                 readProblem("Couldn’t Read Database and File Sizes", failure: failure)
             }
@@ -189,7 +184,7 @@ struct OverviewPage: View {
     }
 
     @ViewBuilder private func filesRow(_ files: HealthPart) -> some View {
-        let value = bytes(model.metrics?.fileBytes).map { String(localized: "\($0) on its disk") } ?? Self.word(files.condition)
+        let value = bytes(metrics?.fileBytes).map { String(localized: "\($0) on its disk") } ?? Self.word(files.condition)
         if host.grants.contains(.configManage) {
             SettingsLinkRow(
                 verbatim: String(localized: "Files"), value: value, dot: Self.dot(files.condition)

@@ -9,6 +9,11 @@ struct UpdatesPage: View {
     @State private var copied = false
     @State private var asksToUpdate = false
 
+    private struct LoadID: Equatable {
+        let address: String?
+        let canChangeSettings: Bool
+    }
+
     init(host: any MarfaSettingsHost) {
         self.host = host
         _model = State(initialValue: UpdatesModel(context: OwnerContext(host: host)))
@@ -16,7 +21,7 @@ struct UpdatesPage: View {
 
     var body: some View {
         content
-            .task(id: host.serverAddress) { await model.load() }
+            .task(id: LoadID(address: host.serverAddress, canChangeSettings: model.canChangeSettings)) { await model.load() }
             .onDisappear { model.stop() }
             .alert("Update \(host.serverName)?", isPresented: $asksToUpdate) {
                 Button("Cancel", role: .cancel) {}
@@ -30,9 +35,7 @@ struct UpdatesPage: View {
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
             OwnerFailureState(page: .updates, failure: failure, host: host) { Task { await model.load() } }
-        } else if !model.hasLoaded {
-            OwnerLoading()
-        } else if let status = model.status {
+        } else if model.hasLoaded, let status = model.status {
             SettingsPageColumn {
                 if model.isUpdating {
                     updating(status)
@@ -42,6 +45,8 @@ struct UpdatesPage: View {
                     lastUpdate(status)
                 }
             }
+        } else {
+            OwnerLoading()
         }
     }
 

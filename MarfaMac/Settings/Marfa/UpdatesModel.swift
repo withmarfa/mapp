@@ -30,6 +30,7 @@ import Observation
     private(set) var lostTrack = false
     /// The one task that follows an update, held so it ends with the page.
     private var follower: Task<Void, Never>?
+    private var stopGeneration = 0
     private(set) var isSwitching = false
     /// Where Check Automatically is held, which needs `config.manage` to change.
     private(set) var settings: UpkeepSettings?
@@ -64,27 +65,36 @@ import Observation
     }
 
     func load() async {
-        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+        let generation = stopGeneration
+        await loader.load(in: context, waitForPrevious: true, primary: { () throws(OwnerFailure) in
+            guard generation == stopGeneration, !Task.isCancelled else { return }
             do throws(OwnerFailure) {
-                status = try await context.calls.updateStatus()
+                let reading = try await context.calls.updateStatus()
+                guard generation == stopGeneration, !Task.isCancelled else { return }
+                status = reading
                 lostTrack = false
             } catch {
+                guard generation == stopGeneration, !Task.isCancelled else { return }
                 throw UpkeepWording.owned(error)
             }
-        }, secondary: [
-            .required(settingsRead) { [self] () throws(OwnerFailure) in
+        }, showBeforeFinishing: true, after: {
+            guard generation == stopGeneration, !Task.isCancelled else { return }
+            if status?.progress != nil { await follow() }
+            guard generation == stopGeneration, !Task.isCancelled else { return }
+            await loader.read(.required(settingsRead) { [self] () throws(OwnerFailure) in
                 guard canChangeSettings else {
                     settings = nil
                     return
                 }
                 do throws(OwnerFailure) {
-                    settings = try await context.calls.upkeepSettings()
+                    let reading = try await context.calls.upkeepSettings()
+                    guard generation == stopGeneration, !Task.isCancelled, canChangeSettings else { return }
+                    settings = reading
                 } catch {
-                    throw UpkeepWording.owned(error)
+                    guard generation == stopGeneration, !Task.isCancelled else { return }
+                    throw error
                 }
-            },
-        ], showBeforeFinishing: true, after: {
-            if status?.progress != nil { await follow() }
+            }, in: context)
         })
     }
 
@@ -122,7 +132,8 @@ import Observation
     }
 
     func update() async {
-        guard canUpdate else { return }
+        guard canUpdate, !Task.isCancelled else { return }
+        let generation = stopGeneration
         isStarting = true
         error = nil
         lostTrack = false
@@ -136,25 +147,35 @@ import Observation
             return
         }
         isStarting = false
+        guard generation == stopGeneration, !Task.isCancelled else { return }
         await follow()
     }
 
     var isFollowing: Bool { follower != nil }
 
     /// Follows the update to its end, as the one follower there is: a second call waits for the first.
-    func follow() async {
+    private func follow() async {
+        guard !Task.isCancelled else { return }
         if let follower {
             await follower.value
             return
         }
         let task = Task { await read() }
         follower = task
-        await task.value
-        if follower == task { follower = nil }
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        if follower == task {
+            follower = nil
+            isRestarting = false
+        }
     }
 
     /// Ends the follower, as when the page goes. The update itself carries on at the server.
     func stop() {
+        stopGeneration += 1
         follower?.cancel()
         follower = nil
         isRestarting = false
@@ -169,10 +190,13 @@ import Observation
             try? await Task.sleep(for: pause)
             if Task.isCancelled { return }
             do {
-                status = try await context.calls.updateStatus()
+                let reading = try await context.calls.updateStatus()
+                if Task.isCancelled { return }
+                status = reading
                 isRestarting = false
                 unanswered = 0
             } catch {
+                if Task.isCancelled { return }
                 let error = UpkeepWording.owned(error)
                 if case .notPermitted = error {
                     self.error = error

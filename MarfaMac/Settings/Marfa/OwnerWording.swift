@@ -35,9 +35,22 @@ nonisolated enum OwnerWording {
         return line(failure)
     }
 
+    /// A problem row uses app wording even when the failure carries a server message.
+    static func problemLine(_ failure: OwnerFailure, on page: MarfaSettingsPage, canRetry: Bool) -> String {
+        switch failure {
+        case .refused, .sourceHeld, .failed:
+            canRetry ? String(localized: "Try again in a moment.") : String(localized: "The server couldn’t do that.")
+        case .unreachable where canRetry:
+            String(localized: "Check your connection and try again.")
+        default:
+            line(failure, on: page)
+        }
+    }
+
     /// The line for a page that cannot be shown for want of the permission the server named: the page's own words when the
     /// server names the page's permission (or none), otherwise the generic line for the one it named.
     static func permissionLine(_ scope: String?, on page: MarfaSettingsPage) -> String {
+        if let scope, InstancePermission(rawValue: scope) == nil { return permissionLine(nil) }
         guard let permission = page.permission, scope == nil || scope == permission.rawValue else { return permissionLine(scope) }
         return page.permissionLine
     }

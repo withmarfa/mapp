@@ -468,6 +468,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func upkeepSettings() async throws(OwnerFailure) -> UpkeepSettings {
         try enter("upkeepSettings")
+        await held("upkeepSettings")
         return state.withLock { $0.upkeep }
     }
 

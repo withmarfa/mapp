@@ -16,7 +16,7 @@ import Observation
     private var lastBackup: Date?
 
     var updateReady: String? {
-        guard let update, update.available else { return nil }
+        guard releaseFailure == nil, let update, update.available else { return nil }
         return update.latest?.version
     }
     private let loader = OwnerLoader()
@@ -39,7 +39,10 @@ import Observation
 
     /// The release the server runs, left out for a development build: it carries version 0.0.0, which is no version.
     var releaseVersion: String? {
-        (update?.running ?? metrics?.version).flatMap { $0 == Self.developmentVersion ? nil : $0 }
+        let running =
+            if releaseFailure != nil, metricsFailure == nil { metrics?.version }
+            else { update?.running ?? metrics?.version }
+        return running.flatMap { $0 == Self.developmentVersion ? nil : $0 }
     }
 
     static let developmentVersion = "0.0.0"

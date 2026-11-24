@@ -56,7 +56,8 @@ struct OwnerFailureState: View {
             SettingsPageState(symbol: "gearshape", title: Text("No Server Settings"), line: Text(verbatim: OwnerWording.line(failure)))
         default:
             SettingsPageState(
-                symbol: "exclamationmark.triangle", title: Text("Couldn’t Read This Page"), line: Text(verbatim: OwnerWording.line(failure)),
+                symbol: "exclamationmark.triangle", title: Text("Couldn’t Read This Page"),
+                line: Text(verbatim: OwnerWording.problemLine(failure, on: page, canRetry: true)),
                 action: ("Try Again", retry))
         }
     }
@@ -82,7 +83,7 @@ struct OwnerProblemRow: View {
 
     var body: some View {
         SettingsProblemRow(
-            title: Text(title), line: Text(verbatim: line ?? OwnerWording.line(failure, on: page)),
+            title: Text(title), line: Text(verbatim: line ?? OwnerWording.problemLine(failure, on: page, canRetry: retry != nil)),
             symbol: isRefusal ? "lock" : "exclamationmark.triangle", tone: isRefusal ? nil : .orange, actions: actions
         )
         .disabled(isWaiting)
