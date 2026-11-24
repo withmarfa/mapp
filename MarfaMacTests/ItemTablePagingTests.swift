@@ -37,6 +37,21 @@ struct ItemTablePagingTests {
         #expect(paging.slice(rows, size: .fifty) == .init(rows: rows, remaining: 0))
     }
 
+    @Test func aGroupedPlaceShowsOnePageInGroupOrder() {
+        var paging = TablePaging()
+        let groups = [Self.group("a", 60), Self.group("b", 60), Self.group("c", 10)]
+        let first = paging.slice(groups: groups, collapsed: [], size: .fifty)
+        #expect(first.groups.map(\.group.id) == ["a"])
+        #expect(first.groups[0].rows.count == 50)
+        #expect(first.remaining == 80)
+        paging.loadMore()
+        let second = paging.slice(groups: groups, collapsed: [], size: .fifty)
+        #expect(second.groups.map(\.group.id) == ["a", "b"])
+        #expect(second.groups[0].rows.count == 60)
+        #expect(second.groups[1].rows.count == 40)
+        #expect(second.remaining == 30)
+    }
+
     @Test func revealingASelectedRowLoadsEnoughPages() {
         var paging = TablePaging()
         let rows = Self.rows(300)

@@ -172,9 +172,3 @@ nonisolated enum TypeChangeFixture {
         #expect(task == .failure(.valueDoesNotFit(F.info(F.task).fields[2])))
     }
 }
-
-@MainActor
-@Suite struct TypeChangeOptionsTests {
-    typealias F = TypeChangeFixture
-
-}

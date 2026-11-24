@@ -468,6 +468,23 @@ struct FilterClauseTests {
 
     // MARK: Kept in a place's default view
 
+    @Test func aCollectionsEmptyValueMeansInNoCollection() throws {
+        let rows = [Self.item("A", collections: ["C1"]), Self.item("B", collections: ["C1", "C2"]), Self.item("C")]
+        func titles(_ op: FilterOp, _ values: [String]) -> [String] { Self.titles(rows, FilterState(clauses: [Self.clause("collections", op, values)])) }
+        #expect(titles(.is, ["C1", ""]) == ["A", "B", "C"])
+        #expect(titles(.is, ["C2", ""]) == ["B", "C"])
+        #expect(titles(.is, [""]) == ["C"])
+        #expect(titles(.isNot, [""]) == ["A", "B"], "in some collection")
+        #expect(titles(.isNot, ["C2", ""]) == ["A"])
+        #expect(titles(.isNot, ["C1"]) == ["C"])
+        // An Any row of "is C1" and "is in none" keeps the rows the server lists, whichever way it was written and read back.
+        let saved = try #require(Self.filter([Self.clause("collections", .is, ["C1", ""])]).filter)
+        #expect(Self.titles(rows, try Self.read(saved).state) == ["A", "B", "C"], Comment(rawValue: saved))
+        let reading = try Self.read(#"edge[in-collection] eq "C1" OR edge[in-collection] not_exists"#)
+        #expect(reading.items.map(\.clause) == [Self.clause("collections", .is, ["", "C1"])], "one chip, the empty value standing for no collection")
+        #expect(Self.titles(rows, reading.state) == ["A", "B", "C"])
+    }
+
     @Test func aPlaceKeepsItsClausesIncludingARelativeDateAndDropsAFieldNoTypeDeclares() throws {
         var options = ItemTableOptions()
         options.filter = FilterState(
