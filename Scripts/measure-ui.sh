@@ -14,6 +14,10 @@
 # only, never a server that holds a person's data. The Debug-only `-MarfaMacKeepTestStore` flag keeps the copy the last
 # launch left, which is how a warm launch is timed. UI testing's own queries of a library this size take seconds, so
 # the tests click by coordinate and use shortcuts, and the signposts are the finer number.
+#
+# The run's own items (the articles it makes, and the one the typing test makes) are recorded by id when they are made,
+# and only those are trashed and purged afterwards, with the instance's item count before and after. A run stopped
+# before its end leaves them on the instance.
 set -u
 derived=${1:?usage: measure-ui.sh <derived data path> [xcodebuild arguments]}
 shift
@@ -32,15 +36,23 @@ fi
 
 log=$(mktemp -t marfa-mac-measure-log)
 out=$(mktemp -t marfa-mac-measure-out)
+ids=$(mktemp -t marfa-mac-measure-ids)
+
+# The ids of the items this run makes, the only ones it removes.
+reach() { command -v marfa > /dev/null && [[ -n ${TEST_RUNNER_MARFA_API_URL:-} && -n ${TEST_RUNNER_MARFA_API_KEY:-} ]]; }
+marfa_as_test() { MARFA_API_URL=$TEST_RUNNER_MARFA_API_URL MARFA_API_KEY=$TEST_RUNNER_MARFA_API_KEY MARFA_NO_KEYCHAIN=1 marfa "$@"; }
+# Every item the instance holds, in every state.
+count_items() {
+  marfa_as_test items stats --by state --json 2> /dev/null | python3 -c 'import json, sys; print(sum(json.load(sys.stdin).values()))' 2> /dev/null
+}
 
 # The articles the large-item test opens, made once for the run when the command line can reach the instance.
-if command -v marfa > /dev/null && [[ -n ${TEST_RUNNER_MARFA_API_URL:-} && -n ${TEST_RUNNER_MARFA_API_KEY:-} ]]; then
-  (
-    export MARFA_API_URL=$TEST_RUNNER_MARFA_API_URL MARFA_API_KEY=$TEST_RUNNER_MARFA_API_KEY MARFA_NO_KEYCHAIN=1
-    python3 "$dir/speed-fixtures.py" | while IFS= read -r properties; do
-      marfa items create --type core.media.article --properties "$properties" > /dev/null || echo "could not make a measuring article" >&2
-    done
-  )
+if reach; then
+  before=$(count_items)
+  python3 "$dir/speed-fixtures.py" | while IFS= read -r properties; do
+    id=$(marfa_as_test items create --type core.media.article --properties "$properties" --json 2> /dev/null | python3 "$dir/measure-ids.py" created)
+    if [[ -n $id ]]; then echo "made $id" >> "$ids"; else echo "could not make a measuring article" >&2; fi
+  done
 fi
 
 /usr/bin/log stream --signpost --level debug --style ndjson \
@@ -59,18 +71,21 @@ kill $stream
 wait $stream 2>/dev/null
 python3 "$dir/speed-report.py" "$log"
 
-# The typing test leaves its one note on the instance, since the app is closed before it could push a delete, and the
-# large-item test's articles are made above. Remove them (and any an earlier, interrupted run left) with the command
-# line, which reaches only what the key reaches.
-if command -v marfa > /dev/null && [[ -n ${TEST_RUNNER_MARFA_API_URL:-} && -n ${TEST_RUNNER_MARFA_API_KEY:-} ]]; then
-  export MARFA_API_URL=$TEST_RUNNER_MARFA_API_URL MARFA_API_KEY=$TEST_RUNNER_MARFA_API_KEY MARFA_NO_KEYCHAIN=1
-  # The search results are filtered by type and title before cleanup.
-  for id in ${(f)"$(for query in 'Speed measure' 'Speed open'; do
-      marfa search "$query" --state any --tier all --limit 100 --json 2>/dev/null
-    done | python3 "$dir/measure-ids.py")"}; do
-    marfa items trash "$id" > /dev/null 2>&1
-    marfa items purge "$id" > /dev/null 2>&1 || echo "could not purge item $id" >&2
+# The typing test makes one item in the app and prints its link, since the app is closed before it could push a
+# delete; the articles were recorded above. Remove those and only those, each by its id.
+if reach; then
+  while IFS=$'\t' read -r id title; do
+    # The id comes from a link, so it is checked against the item's title before it is recorded.
+    [[ -n $id && -n $(marfa_as_test items get "$id" --json 2> /dev/null | python3 "$dir/measure-ids.py" titled "$title") ]] \
+      && echo "made $id" >> "$ids" || echo "could not confirm the typing item behind '$title'; it stays" >&2
+  done < <(python3 "$dir/measure-ids.py" made < "$out")
+  removed=0
+  for id in ${${(f)"$(<$ids)"}#made }; do
+    marfa_as_test items trash "$id" > /dev/null 2>&1
+    if marfa_as_test items purge "$id" > /dev/null 2>&1; then removed=$((removed + 1)); else echo "could not purge item $id" >&2; fi
   done
+  echo "cleanup: the run made $(wc -l < "$ids" | tr -d ' ') items and removed $removed; the instance held ${before:-?} items before and holds $(count_items) after"
 fi
+rm -f "$ids"
 rm -f "$log" "$out"
 exit $result

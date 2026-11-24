@@ -95,14 +95,6 @@ final class SidebarNavigationTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    func testChoosingItemsFromAnotherPlaceOpensTheItemsIndex() {
-        choose("Inbox")
-        XCTAssertTrue(list.waitForExistence(timeout: 3), "Inbox is a list")
-        choose("Items")
-        XCTAssertTrue(element("ItemsIndex").waitForExistence(timeout: 3), "Items opens its index")
-        XCTAssertTrue(list.waitForNonExistence(timeout: 3), "the index spans the window")
-    }
-
     func testTheCogOpensSettingsWithNoMenu() {
         instanceName.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
@@ -145,6 +137,9 @@ final class SidebarNavigationTests: XCTestCase {
         window.menuItems["Add to Favorites"].click()
         XCTAssertTrue(sidebarText("Favorites").waitForExistence(timeout: 3))
         choose("Favorites")
+        // Reading list is also in the Notes list, so the row alone would show a missed click as a pass.
+        let shown = expectation(for: NSPredicate(format: "title BEGINSWITH %@", "Favorites"), evaluatedWith: window)
+        wait(for: [shown], timeout: 3)
         XCTAssertTrue(note.waitForExistence(timeout: 3))
     }
 

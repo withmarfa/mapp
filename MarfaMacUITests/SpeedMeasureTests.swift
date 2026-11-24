@@ -8,7 +8,8 @@ import XCTest
 ///
 /// It runs only in the `Measure UI` plan with `MARFA_MAC_MEASURE_UI` set and the instance's address and key given as
 /// `MARFA_API_URL` and `MARFA_API_KEY` (xcodebuild's `TEST_RUNNER_` prefix hands them over); otherwise each test is
-/// skipped. The one write is an item it makes for the typing; `Scripts/measure-ui.sh` removes it afterwards.
+/// skipped. The one write is an item it makes for the typing; it prints the item's link as a `MADE|<title>|<link>` line, and
+/// `Scripts/measure-ui.sh` removes the item by that id afterwards.
 ///
 /// Each test prints `UI|<name>|<median>|<max>|<unit>` lines after XCTest's own report, for the time the test itself
 /// saw, from the action to the result it waited for. That includes UI testing's own query cost, so it bounds what a
@@ -297,7 +298,7 @@ final class SpeedMeasureTests: XCTestCase {
     // MARK: Typing
 
     /// Makes an item and types forty characters into its page one key at a time; `Scripts/measure-ui.sh` removes the
-    /// item afterwards. A keystroke's time runs from the key event until the app is idle again; the page reports no
+    /// item afterwards, by the id in the link this prints. A keystroke's time runs from the key event until the app is idle again; the page reports no
     /// echo to wait on, and reading its accessibility value costs more than a keystroke, so the text is checked once
     /// at the end. The total is the sum.
     func testTypingInAnItem() throws {
@@ -320,6 +321,15 @@ final class SpeedMeasureTests: XCTestCase {
         for character in text { time("key") { app.typeText(String(character)) } }
         samples["total"] = [samples["key", default: []].reduce(0, +)]
         XCTAssertTrue(waitUntil { (editor.value as? String)?.hasSuffix(String(text)) == true }, "the text showed in the page")
+        // Copy Link waits for the server to know the item, so it is asked until the link is on the pasteboard.
+        NSPasteboard.general.clearContents()
+        var link = ""
+        XCTAssertTrue(waitUntil(timeout: 60) {
+            self.app.typeKey("c", modifierFlags: [.command, .shift])
+            link = NSPasteboard.general.string(forType: .string) ?? ""
+            return !link.isEmpty
+        }, "Copy Link gave the new item's link")
+        print("MADE|\(title)|\(link)")
     }
 
     // MARK: Helpers
