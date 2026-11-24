@@ -329,7 +329,7 @@ import Testing
             let id = "kept-\(index)"
             let item = try #require(scene.item(id), "\(id) was not shown")
             #expect(item.title == (index == 5 ? "Waiting 5" : "Kept \(index)"))
-            #expect(item.preview == "Body *\(index)*", "the stand-in for the core strips no Markdown")
+            #expect(item.preview == "Body \(index)", "the stand-in for the core reads the body's Markdown as text")
             #expect(shown.bodies[item.id]?.text == "Body *\(index)*")
             #expect((item.sync == .settled) == (index != 5), "\(id) is \(item.sync)")
         }

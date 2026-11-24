@@ -8,24 +8,67 @@ extension View {
     /// and sort by a click. SwiftUI cannot style the header the `NSTableView` behind a `Table` draws, so this gives the
     /// table a header view that draws every column's heading itself. The headings are drawn over the table's own
     /// background, or over `backdrop` where the table has none, so rows that scroll under them do not show through. The
-    /// same view keeps the table as wide as its page (see `Probe.fit`).
+    /// same view keeps the table as wide as its page (see `Probe.fit`), or, for a table whose column widths a person
+    /// sets and keeps, leaves every width to the person's drags (`resizing`).
     ///
     /// A table that sits directly under the toolbar passes `isUnderToolbar` to be told when its rows have scrolled past the
     /// headings, which stay pinned, and so under the toolbar, where the caller draws a `ToolbarBand`. A table in an index
     /// page leaves that to the page (`indexScrollsAway`).
-    func quietTableHeader(backdrop: NSColor = .windowBackgroundColor, isUnderToolbar: Binding<Bool>? = nil) -> some View {
-        background(QuietTableHeader(backdrop: backdrop, isUnderToolbar: isUnderToolbar))
+    func quietTableHeader(
+        backdrop: NSColor = .windowBackgroundColor, isUnderToolbar: Binding<Bool>? = nil, resizing: ColumnResizing? = nil
+    ) -> some View {
+        background(QuietTableHeader(backdrop: backdrop, isUnderToolbar: isUnderToolbar, resizing: resizing))
+    }
+}
+
+/// Whether a person is dragging a column's divider in a table's header. A table that keeps its column widths stores
+/// one only then: AppKit also gives columns new widths of its own when the table is first laid out and whenever its
+/// size or columns change, and those are not the person's.
+///
+/// AppKit has also refitted the columns by the time this view can first see the table, so it puts each shown column back
+/// to the width it should have (`widths`, in the order of the columns shown) as it stops the table's autoresizing.
+@MainActor
+final class ColumnResizing {
+    fileprivate weak var header: NSTableHeaderView?
+    /// The width each shown column starts at: the one the person kept, or the column's ideal.
+    var widths: [CGFloat] = [] {
+        didSet { if widths != oldValue { widthsChanged?() } }
+    }
+
+    /// Called when `widths` change, as when the table moves to a place with other widths. Nothing else tells the header
+    /// that the same table has another place to start at.
+    fileprivate var widthsChanged: (() -> Void)?
+
+    var isDragging: Bool { (header?.resizedColumn ?? -1) >= 0 }
+
+    /// The starting widths and shown columns last applied, so a change of place or of stored widths is applied once, and
+    /// the same table moving to a place with other widths never keeps the last place's.
+    private var applied: (widths: [CGFloat], columns: [NSUserInterfaceItemIdentifier])?
+
+    /// Answers false while the table's shown columns are not yet the ones `widths` is for, as when SwiftUI replaces them
+    /// after a change of place, so the caller tries again once they are.
+    fileprivate func restore(_ table: NSTableView) -> Bool {
+        guard !isDragging else { return true }
+        let shown = table.tableColumns.filter { !$0.isHidden }
+        guard shown.count == widths.count else { return false }
+        let columns = shown.map(\.identifier)
+        if let applied, applied.widths == widths, applied.columns == columns { return true }
+        applied = (widths, columns)
+        for (column, width) in zip(shown, widths) where column.width != width { column.width = width }
+        return true
     }
 }
 
 private struct QuietTableHeader: NSViewRepresentable {
     let backdrop: NSColor
     let isUnderToolbar: Binding<Bool>?
+    let resizing: ColumnResizing?
 
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ probe: Probe, context: Context) {
         probe.backdrop = backdrop
         probe.isUnderToolbar = isUnderToolbar
+        probe.resizing = resizing
         probe.refresh()
     }
 
@@ -36,6 +79,7 @@ private struct QuietTableHeader: NSViewRepresentable {
     final class Probe: NSView {
         var backdrop = NSColor.windowBackgroundColor
         var isUnderToolbar: Binding<Bool>?
+        var resizing: ColumnResizing?
         private weak var followed: NSClipView?
         private var observer: (any NSObjectProtocol)?
 
@@ -59,6 +103,8 @@ private struct QuietTableHeader: NSViewRepresentable {
                 table.headerView = view
             }
             (table.headerView as? QuietHeaderView)?.backdrop = backdrop
+            resizing?.header = table.headerView
+            resizing?.widthsChanged = { [weak self] in self?.restoreAfterChange() }
             if let scrollView = table.enclosingScrollView { fit(table, in: scrollView) }
             table.headerView?.needsDisplay = true
             follow(table)
@@ -67,6 +113,15 @@ private struct QuietTableHeader: NSViewRepresentable {
 
         /// The width and columns the table was last fitted to.
         private var fittedTo: String?
+        /// How many times the table's columns have been waited for, to match the widths it should start at.
+        private var restoreTries = 0
+
+        /// The widths the table starts at changed during a pass of SwiftUI, which has not yet given the table its columns.
+        /// The header looks again on the next pass of the run loop, and waits for the columns from there.
+        private func restoreAfterChange() {
+            restoreTries = 0
+            DispatchQueue.main.async { [weak self] in self?.refresh() }
+        }
 
         /// Makes the table as wide as the page it sits in, and keeps it so as that width changes. A page whose scroll view
         /// runs under the right-hand inspector gets the inspector's width as a safe area that SwiftUI does not carry into
@@ -75,9 +130,22 @@ private struct QuietTableHeader: NSViewRepresentable {
         /// available width gives the last the remainder, within every column's minimum and maximum, so the table scrolls
         /// sideways only where the minimums do not fit. A fit waits for the mouse to be up, so it does not undo a column
         /// a person is dragging, and happens again only when the width or the columns change.
+        ///
+        /// A table that keeps its widths is never fitted, and what AppKit does with its columns is never stored (see
+        /// `ColumnResizing`).
         private func fit(_ table: NSTableView, in scrollView: NSScrollView) {
             let safeRight = scrollView.safeAreaInsets.right
             if abs(scrollView.contentInsets.right - safeRight) > 0.5 { scrollView.contentInsets.right = safeRight }
+            if let resizing {
+                if table.columnAutoresizingStyle != .noColumnAutoresizing { table.columnAutoresizingStyle = .noColumnAutoresizing }
+                if resizing.restore(table) {
+                    restoreTries = 0
+                } else if restoreTries < 50 {
+                    restoreTries += 1
+                    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(20)) { [weak self] in self?.refresh() }
+                }
+                return
+            }
             let insets = scrollView.contentInsets
             let width = scrollView.contentView.bounds.width - insets.left - insets.right
             let key = "\(Int(width))|" + table.tableColumns.map(\.identifier.rawValue).joined(separator: ",")
@@ -158,8 +226,9 @@ private final class QuietHeaderView: NSTableHeaderView {
         }
         guard let first = table.tableColumns.indices.first, let last = table.tableColumns.indices.last else { return }
         // A row's separator runs the row's width less the table's inset and 6 points at each end, which is neither
-        // where the first column starts nor where the last one ends: a last column that has reached its widest stops
-        // short of the row, and one fitted to the page can run past it. So the line ends where the rows' separators do,
+        // where the first column starts nor where the last one ends: a last column that has reached its widest, or any
+        // column of a table that keeps its widths, stops short of the row, and one fitted to the page can run past it.
+        // So the line ends where the rows' separators do,
         // and at the last column's edge only while no row shows.
         let tableInset = headerRect(ofColumn: first).minX
         let start = tableInset + 6
