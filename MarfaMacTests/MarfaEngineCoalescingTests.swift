@@ -541,7 +541,8 @@ import Testing
         await scene.hear(.forgotten)
         let queued = try #require(try await scene.copy.queue.all().first { $0.itemId == "blocked" })
         try #require(await eventually { scene.source.syncReport.problems.contains { $0.id == .write(queued.id) } })
-        #expect(scene.log.current.answer(to: write) == .blocked(.failingAlone, nil))
+        // The problem can be reported before the log records the write's answer.
+        #expect(await scene.log.wait { $0.answer(to: write) == .blocked(.failingAlone, nil) } != nil)
 
         #expect(try await scene.source.resolve(.write(queued.id), by: .withdraw))
         let answered = try #require(await scene.log.wait { state in
