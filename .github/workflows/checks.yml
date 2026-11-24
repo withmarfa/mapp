@@ -1,24 +1,13 @@
 name: Checks
 
-# Each job runs only when its files changed, so a docs-only change finishes in seconds.
-# - A draft pull request runs no Swift job; marking it ready runs them once. Builders test locally first.
-# - A change that touches only the String Catalog, assets or UI tests compiles everything but does not run the
-#   unit tests. Views are not left out, since several unit tests host views.
-# - The release configuration is built after a merge to main (`release-build.yml`), not here: Mac runners are few,
-#   and the tag build and `release.yml`'s dry run compile Release before a release too.
-# - The unit tests run one at a time with a 12 minute limit; a run that reaches it uploads samples of its test host
-#   as the `unit-test-diagnostics` artifact and fails. A failed test fails the check, and nothing is retried.
-# - The UI tests are only built here, and only when they, the test plans or the project change: their target
-#   imports only XCTest, AppKit and os, so app code cannot break their compile. They take over the keyboard and
-#   mouse, so they run locally when a change needs them.
-# - A change to a workflow is checked by actionlint.
-# - The instruction check (`Scripts/check-instructions.py`) is cheap, so it runs on drafts too. It runs for any
-#   Markdown file, `project.pbxproj`, Swift or editor source (a renamed type can leave a doc stale), the script
-#   or this workflow.
-# - The release scripts (`Scripts/release/`) have unit tests, run when they or this workflow change. `release.yml` publishes tagged
-#   releases and rehearses itself on a change to the release files; it is not part of `Checks`.
-# The final job, "Checks", is the one required check. It runs after every job, and after a cancelled run when a job
-# failed. A run that a newer push cancelled ends it as cancelled, not failed, and a cancelled check never passes.
+# Changes selects jobs by path. An unmatched path selects all regular checks, including the Swift unit tests.
+# Workflow and classifier changes get Linux checks. A draft also runs only Linux checks.
+# Swift starts on ready pull requests after any selected Instructions and Editor checks pass.
+# The String Catalog, assets and UI tests require a build only. CI builds UI tests only when their files,
+# plans or project change. Run UI tests locally with the screen free.
+# Unit tests run serially with a 12-minute limit and upload diagnostics on a stall. CI retries nothing.
+# Checks is the required roll-up. A superseded run reports cancellation unless a job failed.
+# Release build and publishing run in release-build.yml and release.yml.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -41,6 +30,7 @@ jobs:
       logic: ${{ steps.filter.outputs.logic }}
       uitests: ${{ steps.filter.outputs.uitests }}
       scripts: ${{ steps.filter.outputs.scripts }}
+      classifier: ${{ steps.filter.outputs.classifier }}
       workflows: ${{ steps.filter.outputs.workflows }}
       instructions: ${{ steps.filter.outputs.instructions }}
     steps:
@@ -50,36 +40,10 @@ jobs:
           persist-credentials: false
       - id: filter
         # The first parent of the merge commit is the base, so this diff is the pull request's own change.
+        shell: bash
         run: |
-          files=$(git diff --name-only HEAD^1 HEAD)
-          echo "$files"
-          if echo "$files" | grep -qE '^(editor/|MarfaMac/Editor/Page/|\.github/workflows/checks\.yml$)'; then
-            echo "editor=true" >> "$GITHUB_OUTPUT"
-          fi
-          app=$(echo "$files" | grep -vE '\.md$' | grep -E '^(MarfaMac/|MarfaMacTests/|MarfaMacUITests/|MarfaMac\.xcodeproj/|TestPlans/|Config/|\.github/workflows/checks\.yml$|\.github/scripts/)' || true)
-          if [ -n "$app" ]; then
-            echo "swift=true" >> "$GITHUB_OUTPUT"
-          fi
-          # Anything outside the String Catalog, assets and UI tests may change logic. Views count: several unit
-          # tests host them.
-          logic=$(echo "$app" | grep -vE '^(MarfaMac/Localizable\.xcstrings$|MarfaMac/Assets\.xcassets/|MarfaMacUITests/)' || true)
-          if [ -n "$logic" ]; then
-            echo "logic=true" >> "$GITHUB_OUTPUT"
-          fi
-          # The UI test target compiles only its own folder, under the project's settings and the test plans.
-          if echo "$app" | grep -qE '^(MarfaMacUITests/|TestPlans/|MarfaMac\.xcodeproj/|\.github/workflows/checks\.yml$)'; then
-            echo "uitests=true" >> "$GITHUB_OUTPUT"
-          fi
-          if echo "$files" | grep -qE '^(Scripts/release/|\.github/workflows/checks\.yml$)'; then
-            echo "scripts=true" >> "$GITHUB_OUTPUT"
-          fi
-          if echo "$files" | grep -qE '^\.github/(workflows/|actionlint\.ya?ml$)'; then
-            echo "workflows=true" >> "$GITHUB_OUTPUT"
-          fi
-          # Docs name types and files in the source, so a source change can make a doc untrue.
-          if echo "$files" | grep -qE '(\.md|\.swift|project\.pbxproj)$|^(editor/src/|Scripts/check-instructions\.py$|\.github/workflows/checks\.yml$)'; then
-            echo "instructions=true" >> "$GITHUB_OUTPUT"
-          fi
+          git diff --no-renames --name-only -z HEAD^1 HEAD |
+            python3 .github/scripts/classify_changes.py >> "$GITHUB_OUTPUT"
 
   editor:
     name: Editor
@@ -143,21 +107,32 @@ jobs:
       - run: python3 Scripts/check-instructions.py
 
   release-scripts:
-    name: Release scripts
+    name: Script tests
     needs: changes
-    if: needs.changes.outputs.scripts == 'true'
+    if: needs.changes.outputs.scripts == 'true' || needs.changes.outputs.classifier == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: python3 -m unittest discover -s Scripts/release -v
+      - name: Test release scripts
+        if: needs.changes.outputs.scripts == 'true'
+        run: python3 -m unittest discover -s Scripts/release -v
+      - name: Test the change classifier
+        if: needs.changes.outputs.classifier == 'true'
+        run: python3 -m unittest discover -s .github/scripts -v
 
   swift:
     name: Unit tests
-    needs: changes
-    if: needs.changes.outputs.swift == 'true' && github.event.pull_request.draft == false
+    needs: [changes, instructions, editor]
+    if: >-
+      !cancelled() &&
+      needs.changes.result == 'success' &&
+      (needs.instructions.result == 'success' || needs.instructions.result == 'skipped') &&
+      (needs.editor.result == 'success' || needs.editor.result == 'skipped') &&
+      needs.changes.outputs.swift == 'true' &&
+      github.event.pull_request.draft == false
     # The hosted image with Xcode 27 (a public preview at the time of writing).
     runs-on: xcode-27
     timeout-minutes: 45

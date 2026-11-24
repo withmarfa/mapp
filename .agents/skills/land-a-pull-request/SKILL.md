@@ -11,8 +11,8 @@ A session merges its own pull request once the review its risk calls for is done
 
 `Checks` is the one required check, and it reports on a draft too. A draft runs no Swift job, so its green says nothing about the tests. Set auto-merge only once the ready run has started, so it waits for that run's `Checks` rather than merging on the draft's green.
 
-1. Run the tests that cover the change yourself while the pull request is a draft.
-2. Mark it ready with no push in flight: `gh pr ready <number>`.
+1. Keep the pull request draft until you push the final changes and targeted local tests pass. Push review fixes together.
+2. After the last draft run finishes, mark it ready with `gh pr ready <number>`.
 3. Once the ready run's `Checks` shows as pending on the head commit, set auto-merge: `gh pr merge <number> --auto --squash --delete-branch`. Then go on with other work; do not wait for CI.
 4. If the run fails, fix forward on the branch; auto-merge stays set and merges on the next green run.
 
@@ -20,9 +20,9 @@ A branch does not need to be up to date with `main` to merge. Update it only for
 
 ## Merging without waiting for Checks
 
-In the five cases below, merge with `gh pr merge <number> --squash --admin --delete-branch` and say on the pull request which case applies and why. GitHub merges no draft, so mark a draft ready and cancel the run that starts (`gh run cancel <run>`) first. Nothing runs on a push to `main` here, so the next pull request's run is the check after an admin merge.
+In the five cases below, merge with `gh pr merge <number> --squash --admin --delete-branch` and say on the pull request which case applies and why. GitHub merges no draft, so mark a draft ready and cancel the run that starts (`gh run cancel <run>`) first. The next pull request runs `Checks` after an admin merge. The release build runs on `main` for matching changes.
 
-- **Jobs the change cannot affect.** Check the change locally, cancel the run, merge, and correct the rule in the `Changes` job of `.github/workflows/checks.yml` so the next change of that kind runs only what it needs.
+- **Jobs the change cannot affect.** Check the change locally, cancel the run, merge, and correct the rule in `.github/scripts/classify_changes.py` so the next change of that kind runs only what it needs.
 - **Check bookkeeping on a head that passed its full checks:** a required check left "expected" because a later run on the same commit was cancelled.
 - **A fix for a red `main`.** When `main` is red, for example because two pull requests that each passed clash, or because a test is flaky, fix it before other work, in one small pull request, because a red `main` fails every open pull request's checks. A fix that changes only tests merges once its local quick checks pass. A change to a workflow is not test-only, because a workflow can reach secrets. Any other fix follows the usual rules.
 - **A pull request that failed only because `main` was red.** Once `main` is fixed, it merges when the only failed jobs are the ones `main` broke and its local quick checks pass. Do not rebase it and run everything again.

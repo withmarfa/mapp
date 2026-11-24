@@ -25,8 +25,8 @@ Marfa for Mac is a macOS app for a Marfa server's items, with a sidebar, a list 
 - Marfa for Mac is an app for items of every type. Names, strings and comments say "note" only for a `core.note`'s text, a type's own name or the Note callout.
 - Use American English. Put no time estimates, absolute paths, machine or account names or credentials in files. A comment says only why.
 - Use scoped lowercase Conventional Commits in the present tense: `feat(app):`, `fix(editor):`.
-- Work on a branch in a worktree under `.claude/worktrees/` and reach `main` through a pull request. Merge it as `.agents/skills/land-a-pull-request/SKILL.md` says.
-- CI runs each check only when its files changed, and retries nothing: `checks.yml` on pull requests, with `Checks` the one required check (green on a draft, which runs no Swift job), and `release-build.yml` on `main`.
+- Work in `.claude/worktrees/` and merge by pull request. Keep it draft until you push the final changes and targeted local tests pass. Push review fixes together. Follow `.agents/skills/land-a-pull-request/SKILL.md`.
+- Pull requests use path-based `Checks`, the required check. Drafts skip Swift. `release-build.yml` runs on `main`. CI retries nothing.
 - Keep no legacy: no shims, deprecation aliases or migration paths.
 
 ## Platform
