@@ -265,6 +265,4 @@ extension CommandPalette {
     func reveal(_ item: Item) {
         browser.reveal(item, in: library, order: order)
     }
-
-    /// The key the person has given a menu command, as the menus write it, for the row that runs the command.
 }
