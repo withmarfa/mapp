@@ -16,15 +16,27 @@ nonisolated final class ThrowawayDefaults: UserDefaults, @unchecked Sendable {
     /// Sweeps the folder once, and removes what is still held when the process exits.
     private static let start: Void = {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let dayAgo = Date(timeIntervalSinceNow: -86_400)
-        for file in (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [] {
-            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-            if let modified, modified < dayAgo { try? FileManager.default.removeItem(at: file) }
-        }
+        sweep()
         atexit {
             for path in ThrowawayDefaults.held.withLock({ $0 }) { try? FileManager.default.removeItem(atPath: path + ".plist") }
         }
     }()
+
+    /// Removes this helper's own files that a killed run left, once a day old: only regular files named as `make`
+    /// names them, and only while the folder resolves inside the temporary folder, so it never follows a link out.
+    private static func sweep() {
+        let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path + "/"
+        guard folder.resolvingSymlinksInPath().path.hasPrefix(temporary) else { return }
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey, .isSymbolicLinkKey]
+        let dayAgo = Date(timeIntervalSinceNow: -86_400)
+        let ours = /-[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\.plist$/
+        for file in (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys)) ?? [] {
+            guard file.lastPathComponent.contains(ours), let values = try? file.resourceValues(forKeys: Set(keys)),
+                  values.isRegularFile == true, values.isSymbolicLink != true,
+                  let modified = values.contentModificationDate, modified < dayAgo else { continue }
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
 
     /// Defaults of their own, named for what they serve, that stay until the returned object is released.
     static func make(_ name: String) -> ThrowawayDefaults {
