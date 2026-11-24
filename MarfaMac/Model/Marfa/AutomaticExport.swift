@@ -40,8 +40,9 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
 /// Export Automatically: the same archive Export Everything writes, into the folder the person chose for the Marfa that is
 /// open, when one is due. Each Marfa has its own plan, so another Marfa shows Never until it is set there. It is checked at
 /// launch and then about every hour while the app runs, with no background agent, so a Mac that is off or an app that is
-/// closed exports at its next launch. Each distinct failure is told once, and an export never touches an earlier one
-/// (`LibraryExport` removes only its own temporary file). A quit or a reset stops an export that is running.
+/// closed exports at its next launch. Each distinct failure is told once, as is an archive that lacks files, and an export
+/// never touches an earlier one (`LibraryExport` removes only its own temporary file). A quit or a reset stops an export
+/// that is running.
 @Observable @MainActor final class AutomaticExport {
     /// The Marfa that is open.
     struct Marfa {
@@ -68,7 +69,7 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
     private let tell: (String, String) -> Void
     private let now: () -> Date
     @ObservationIgnored private var loop: Task<Void, Never>?
-    @ObservationIgnored private var running: (task: Task<Result<URL, LibraryExport.Failure>, Never>, partial: URL)?
+    @ObservationIgnored private var running: (task: Task<Result<LibraryExport.Exported, LibraryExport.Failure>, Never>, partial: URL)?
     /// Raised by a reset, so an export that began before it writes nothing back.
     @ObservationIgnored private var era = 0
     /// The kind of thing last told, so the same failure, or the same lack, is not told again at every check.
@@ -150,7 +151,7 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
         let moment = now()
         guard plan.schedule.isDue(last: plan.last, now: moment) else { return true }
         let id = UUID()
-        let task = Task { () -> Result<URL, LibraryExport.Failure> in
+        let task = Task { () -> Result<LibraryExport.Exported, LibraryExport.Failure> in
             do throws(LibraryExport.Failure) {
                 return .success(try await LibraryExport.export(from: source, serverName: marfa.name, to: folder, now: moment, id: id))
             } catch {
@@ -163,12 +164,17 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
         running = nil
         guard era == self.era, !task.isCancelled else { return true }
         switch result {
-        case .success:
+        case .success(let exported):
             if let index = ExportPlan.index(in: plans, address: marfa.address, instance: instance) {
                 plans[index].last = moment
                 save()
             }
-            told = nil
+            if let lack = LibraryExport.lacking(exported, serverName: marfa.name) {
+                let line = String(localized: "Saved “\(exported.file.lastPathComponent)” in “\(folder.lastPathComponent)”.") + " " + lack
+                tellOnce(String(localized: "Exported Without Some Files"), line, kind: "lacking \(exported.notCarried)")
+            } else {
+                told = nil
+            }
         case .failure(let failure):
             tellOnce(String(localized: "Couldn’t Export Automatically"), failure.message, kind: failure.message)
         }

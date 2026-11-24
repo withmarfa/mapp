@@ -254,8 +254,9 @@ struct OnThisMacPage: View {
         Task {
             defer { isExporting = false }
             do {
-                let file = try await LibraryExport.export(from: source, serverName: server, to: folder)
-                exported = String(localized: "Saved as “\(file.lastPathComponent)”.")
+                let export = try await LibraryExport.export(from: source, serverName: server, to: folder)
+                let saved = String(localized: "Saved as “\(export.file.lastPathComponent)”.")
+                exported = LibraryExport.lacking(export, serverName: server).map { "\(saved) \($0)" } ?? saved
             } catch let failure as LibraryExport.Failure {
                 exportFailure = failure.message
             } catch {

@@ -5,15 +5,32 @@ import Synchronization
 import Testing
 @testable import MarfaMac
 
-/// Where an archive's bytes come from in a test.
+/// An archive's first entry: a `manifest.json` naming `files` files, of which it carries `carried`.
+nonisolated func manifestEntry(files: Int = 0, carried: Int = 0) -> [UInt8] {
+    let body = Array(#"{"version":4,"format":"marfa-archive","file_count":\#(files),"blob_count":\#(carried)}"#.utf8)
+    var header = [UInt8](repeating: 0, count: 512)
+    header.replaceSubrange(0..<13, with: Array("manifest.json".utf8))
+    let size = String(body.count, radix: 8)
+    header.replaceSubrange(124..<135, with: Array((String(repeating: "0", count: 11 - size.count) + size).utf8))
+    return header + body + [UInt8](repeating: 0, count: (512 - body.count % 512) % 512)
+}
+
+/// Where an archive's bytes come from in a test: its manifest, then its pieces.
 private struct FakeArchive: ArchiveSource {
     var pieces: [[UInt8]] = []
     var failure: (any Error)?
+    var manifest = manifestEntry()
 
     func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
+        try write(manifest)
         for piece in pieces { try write(piece) }
         if let failure { throw failure }
     }
+}
+
+/// The bytes of a whole test archive carrying `bytes` after its manifest.
+private func archive(_ bytes: [UInt8]) -> Data {
+    Data(manifestEntry() + bytes)
 }
 
 @Suite(.hangLimit) struct LibraryExportTests {
@@ -28,9 +45,10 @@ private struct FakeArchive: ArchiveSource {
         defer { try? FileManager.default.removeItem(at: folder) }
         let file = try await LibraryExport.export(
             from: FakeArchive(pieces: [[1, 2], [3]]), serverName: "Castell Studio", to: folder,
-            now: Date(timeIntervalSince1970: 1_795_000_000))
+            now: Date(timeIntervalSince1970: 1_795_000_000)
+        ).file
         #expect(file.lastPathComponent == "Castell Studio 2026-11-18.tar")
-        #expect(try Data(contentsOf: file) == Data([1, 2, 3]))
+        #expect(try Data(contentsOf: file) == archive([1, 2, 3]))
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["Castell Studio 2026-11-18.tar"])
     }
 
@@ -38,11 +56,11 @@ private struct FakeArchive: ArchiveSource {
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let now = Date(timeIntervalSince1970: 1_795_000_000)
-        let first = try await LibraryExport.export(from: FakeArchive(pieces: [[1]]), serverName: "Marfa", to: folder, now: now)
-        let second = try await LibraryExport.export(from: FakeArchive(pieces: [[2]]), serverName: "Marfa", to: folder, now: now)
+        let first = try await LibraryExport.export(from: FakeArchive(pieces: [[1]]), serverName: "Marfa", to: folder, now: now).file
+        let second = try await LibraryExport.export(from: FakeArchive(pieces: [[2]]), serverName: "Marfa", to: folder, now: now).file
         #expect(first != second)
         #expect(second.lastPathComponent == "Marfa 2026-11-18 2.tar")
-        #expect(try Data(contentsOf: first) == Data([1]))
+        #expect(try Data(contentsOf: first) == archive([1]))
     }
 
     @Test func twoExportsAtOnceIntoOneFolderBothEndWholeAndKeepAnEarlierFile() async throws {
@@ -62,7 +80,7 @@ private struct FakeArchive: ArchiveSource {
             let meeting: Meeting
             let byte: UInt8
             func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
-                try write([byte])
+                try write(manifestEntry() + [byte])
                 await meeting.arrive()
                 try write([byte, byte])
             }
@@ -75,9 +93,9 @@ private struct FakeArchive: ArchiveSource {
         let meeting = Meeting()
         async let one = LibraryExport.export(from: Met(meeting: meeting, byte: 1), serverName: "Marfa", to: folder, now: now)
         async let two = LibraryExport.export(from: Met(meeting: meeting, byte: 2), serverName: "Marfa", to: folder, now: now)
-        let files = try await [one, two]
+        let files = try await [one, two].map(\.file)
         #expect(Set(files.map(\.lastPathComponent)) == ["Marfa 2026-11-18 2.tar", "Marfa 2026-11-18 3.tar"])
-        #expect(Set(try files.map { try Data(contentsOf: $0) }) == [Data([1, 1, 1]), Data([2, 2, 2])])
+        #expect(Set(try files.map { try Data(contentsOf: $0) }) == [archive([1, 1, 1]), archive([2, 2, 2])])
         #expect(try Data(contentsOf: earlier) == Data([9]))
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).count == 3, "no temporary file is left")
     }
@@ -86,7 +104,7 @@ private struct FakeArchive: ArchiveSource {
         struct Taken: ArchiveSource {
             let name: URL
             func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
-                try write([1])
+                try write(manifestEntry() + [1])
                 try Data([9]).write(to: name)
             }
         }
@@ -94,10 +112,32 @@ private struct FakeArchive: ArchiveSource {
         defer { try? FileManager.default.removeItem(at: folder) }
         let taken = folder.appending(path: "Marfa 2026-11-18.tar")
         let file = try await LibraryExport.export(
-            from: Taken(name: taken), serverName: "Marfa", to: folder, now: Date(timeIntervalSince1970: 1_795_000_000))
+            from: Taken(name: taken), serverName: "Marfa", to: folder, now: Date(timeIntervalSince1970: 1_795_000_000)
+        ).file
         #expect(file.lastPathComponent == "Marfa 2026-11-18 2.tar")
         #expect(try Data(contentsOf: taken) == Data([9]))
-        #expect(try Data(contentsOf: file) == Data([1]))
+        #expect(try Data(contentsOf: file) == archive([1]))
+    }
+
+    @Test func anArchiveSaysHowManyFilesItDoesNotCarry() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let entry = manifestEntry(files: 5, carried: 2)
+        let split = FakeArchive(pieces: [Array(entry[300...]), [1]], manifest: Array(entry[..<300]))
+        let exported = try await LibraryExport.export(from: split, serverName: "Marfa", to: folder)
+        #expect(exported.notCarried == 3, "a manifest that arrives in pieces is read whole")
+        #expect(LibraryExport.lacking(exported, serverName: "Marfa") == "It lacks 3 files Marfa couldn’t send.")
+        let whole = try await LibraryExport.export(from: FakeArchive(pieces: [[1]]), serverName: "Marfa", to: folder)
+        #expect(whole.notCarried == 0 && LibraryExport.lacking(whole, serverName: "Marfa") == nil)
+    }
+
+    @Test func aStreamWithNoManifestIsNotSavedAsAnArchive() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        await #expect(throws: LibraryExport.Failure.self) {
+            try await LibraryExport.export(from: FakeArchive(pieces: [[1, 2, 3]], manifest: []), serverName: "Marfa", to: folder)
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
     }
 
     @Test func aCancelledExportRemovesOnlyItsOwnTemporaryFile() async throws {

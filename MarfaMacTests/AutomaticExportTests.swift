@@ -3,14 +3,19 @@ import Testing
 @testable import MarfaMac
 
 @Suite(.hangLimit) @MainActor struct AutomaticExportTests {
+    /// A whole archive: a manifest naming `files` files, of which it carries `carried`.
     private struct Archive: ArchiveSource {
-        func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws { try write([1, 2, 3]) }
+        var files = 0
+        var carried = 0
+        func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
+            try write(manifestEntry(files: files, carried: carried))
+        }
     }
 
-    /// An archive that sends its first piece and then waits until its task is cancelled.
+    /// An archive that sends its manifest and then waits until its task is cancelled.
     private struct Held: ArchiveSource {
         func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
-            try write([1])
+            try write(manifestEntry())
             while true { try await Task.sleep(for: .milliseconds(10)) }
         }
     }
@@ -102,7 +107,8 @@ import Testing
         let open = Open()
         open.source = Down()
         var told: [String] = []
-        let export = AutomaticExport(defaults: try defaults(), marfa: { open.marfa }, tell: { told.append($1) })
+        var clock = Date(timeIntervalSince1970: 1_795_000_000)
+        let export = AutomaticExport(defaults: try defaults(), marfa: { open.marfa }, tell: { told.append($1) }, now: { clock })
         await export.learn()
         export.set(.daily, folder: folder)
 
@@ -117,6 +123,15 @@ import Testing
         await export.check()
         await export.check()
         #expect(told.count == 2, "a new kind of failure is told, once")
+
+        export.set(.daily, folder: folder)
+        open.source = Archive(files: 3, carried: 1)
+        await export.check()
+        clock.addTimeInterval(24 * 3600)
+        await export.check()
+        #expect(try files(in: folder).count == 3, "both exports were saved")
+        #expect(told.count == 3 && told.last?.contains("lacks 2 files") == true, "files not carried are told, once")
+        #expect(export.current?.last == clock, "an export with files not carried still counts as run")
     }
 
     @Test func aResetStopsARunningExportAndNothingIsWrittenBack() async throws {
