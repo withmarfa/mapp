@@ -22,8 +22,8 @@ struct SourcesPage: View {
             change: { [host] code, change in await host.changeSource(code, change) },
             marks: { [host] query, set in host.marks(matching: query, in: set) })
         _model = State(initialValue: SourcesModel(access: access, markSets: host.markSets))
-        _limit = State(initialValue: SourceLimitModel(rule: .filter, context: OwnerContext(host: host), sources: { [host] in host.sources }))
-        _allowlist = State(initialValue: SourceLimitModel(rule: .allowlist, context: OwnerContext(host: host), sources: { [host] in host.sources }))
+        _limit = State(initialValue: SourceLimitModel(rule: .filter, context: OwnerContext(host: host)))
+        _allowlist = State(initialValue: SourceLimitModel(rule: .allowlist, context: OwnerContext(host: host)))
     }
 
     var body: some View {
@@ -31,8 +31,8 @@ struct SourcesPage: View {
             .task(id: host.serverAddress) {
                 async let sources: Void = model.load()
                 if host.grants.contains(.configManage) {
-                    await limit.load()
-                    await allowlist.load()
+                    await limit.load(choices: false)
+                    await allowlist.load(choices: false)
                 }
                 await sources
             }
@@ -93,8 +93,8 @@ struct SourcesPage: View {
             if let failure = limit.failure ?? allowlist.failure {
                 OwnerProblemRow(title: "Couldn’t Read the Rules", failure: failure, page: .sources, host: host) {
                     Task {
-                        await limit.load()
-                        await allowlist.load()
+                        await limit.load(choices: false)
+                        await allowlist.load(choices: false)
                     }
                 }
             }
@@ -228,6 +228,11 @@ private struct SourceRulePage: View {
                     ForEach(model.typeChoices) { choice in checkRow(choice, in: $model.types, id: words.id + "Type") }
                 }
                 SettingsSection(name: Text("Sources"), line: Text(verbatim: words.sourcesLine)) {
+                    if let failure = model.sourcesFailure {
+                        OwnerProblemRow(title: "Couldn’t Read Every Source", failure: failure, page: .sources, host: host) {
+                            Task { await model.load() }
+                        }
+                    }
                     if model.sourceChoices.isEmpty { SettingsRow("No Sources", look: .off) }
                     ForEach(model.sourceChoices) { choice in checkRow(choice, in: $model.checkedSources, id: words.id + "Source") }
                 }
@@ -243,7 +248,10 @@ private struct SourceRulePage: View {
                     SettingsBar {
                         if model.isSaving { ProgressView().controlSize(.small) }
                         SettingsButton("Revert") { model.revert() }.disabled(!model.hasEdits || model.isSaving)
-                        SettingsButton("Save") { Task { await model.save() } }.disabled(!model.canSave).accessibilityIdentifier(words.id + "Save")
+                        SettingsButton("Save") {
+                            if model.saveTurnsOff { asksToTurnOff = true } else { Task { await model.save() } }
+                        }
+                        .disabled(!model.canSave).accessibilityIdentifier(words.id + "Save")
                     }
                 }
                 if model.isOn {

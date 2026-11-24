@@ -240,7 +240,7 @@ enum LibraryDescription {
         return made
     }
 
-    /// The package's server, for the one call the generated client does not hold (`Server.health()`).
+    /// The package's server, for the calls the generated client does not hold (`Server.health()`, `Server.sources()`).
     private var plainServer: (@Sendable () throws -> Server)? {
         guard let connection = host.configuredConnection else { return nil }
         let signIns = host.signIns

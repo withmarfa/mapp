@@ -122,6 +122,14 @@ nonisolated struct KeyInfo: Identifiable, Hashable, Sendable {
     var lastUsed: Date?
     /// The app that made it; nil for a key the owner made.
     var appClientID: String?
+    /// The sources it may write under besides its own.
+    var claims: [String] = []
+}
+
+/// A source the instance holds, by the name the server gives it.
+nonisolated struct OwnerSource: Hashable, Sendable {
+    let code: String
+    let name: String
 }
 
 nonisolated struct NewKey: Hashable, Sendable {
@@ -269,6 +277,9 @@ nonisolated protocol OwnerCalls: Sendable {
     func instanceMetrics() async throws(OwnerFailure) -> InstanceMetricsReading
     /// Where files are kept and the files nothing uses (`instance.read`).
     func fileStores() async throws(OwnerFailure) -> FileStores
+    /// Every source the instance holds (`keys.manage`): those of its items, whatever a source filter hides, those named or
+    /// marked, and those keys hold as their own or claim.
+    func sources() async throws(OwnerFailure) -> [OwnerSource]
     /// The instance's three enforcement levers, with the instance that holds them (`config.manage`).
     func sourceLimit() async throws(OwnerFailure) -> SourceLimit
     /// Replaces one source rule, sending the other levers as `limit` holds them, or turns it off with nil. The server guards
@@ -390,7 +401,8 @@ nonisolated struct AddressPlan: Hashable, Sendable {
 
 /// `OwnerCalls` over the package's generated client.
 nonisolated struct ClientOwnerCalls: OwnerCalls {
-    /// The package's server, for `Server.health()`, which the generated client does not hold. Nil where there is none.
+    /// The package's server, for `Server.health()` and `Server.sources()`, which the generated client does not hold. Nil where
+    /// there is none.
     var server: (@Sendable () throws -> Server)?
     let client: @Sendable () throws -> Client
 

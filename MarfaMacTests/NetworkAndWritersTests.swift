@@ -9,17 +9,22 @@ import Testing
 /// or write to the owner's Marfa, so each write is held to the levers and the setting as they were read.
 @MainActor
 @Suite(.hangLimit) struct WhoMayWriteTests {
-    private let rows = [
-        MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, nameOrigin: .key),
-        MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, nameOrigin: .key),
-    ]
+    private let rows = [OwnerSource(code: "readwise", name: "Readwise"), OwnerSource(code: "rss", name: "RSS")]
 
     private let read = SourceLimit(
         instanceID: "instance-1", isOn: true, types: ["core.highlight"], sources: ["readwise"], strictTypes: ["core.task"],
         allowlist: (["core.note"], ["rss"]))
 
+    private static func key(_ source: String, claims: [String] = [], expires: Date? = nil) -> KeyInfo {
+        KeyInfo(id: "key-" + source, label: source, source: source, permissions: [], tier: .library, types: [:], expires: expires, claims: claims)
+    }
+
     private func model(_ bench: OwnerBench) -> SourceLimitModel {
-        SourceLimitModel(rule: .allowlist, context: bench.context, sources: { [rows] in rows })
+        bench.calls.state.withLock { [rows] in
+            $0.sources = rows
+            $0.keys = [Self.key("readwise"), Self.key("rss")]
+        }
+        return SourceLimitModel(rule: .allowlist, context: bench.context)
     }
 
     @Test func eachRuleIsSentWithTheOtherLeversAsTheyWereRead() throws {
@@ -93,6 +98,49 @@ import Testing
         #expect(bench.calls.state.withLock { $0.allowlistsSent.isEmpty })
         #expect(model.line?.hasPrefix("Who May Write was changed somewhere else") == true)
         #expect(model.value?.sources == ["github"])
+    }
+
+    @Test func aListNoCurrentKeyOrAppWritesUnderIsRefused() async {
+        let bench = OwnerBench(grants: [.configManage])
+        let model = model(bench)
+        bench.calls.state.withLock {
+            $0.sources = [OwnerSource(code: "restored:oauth:old-app", name: "Old App")]
+            $0.keys = [Self.key("connector-host:host-1"), Self.key("ended", expires: .distantPast)]
+        }
+        await model.load()
+        model.types = ["core.note"]
+        model.checkedSources = ["restored:oauth:old-app", "connector-host:host-1", "ended"]
+        #expect(model.waitsFor != nil)
+        #expect(!model.canSave)
+        await model.save()
+        #expect(bench.calls.state.withLock { $0.allowlistsSent.isEmpty })
+    }
+
+    @Test func theChoicesHoldKeysAndAppsThatHaveWrittenNothingAndALimitedSource() async {
+        let bench = OwnerBench(grants: [.configManage])
+        let model = model(bench)
+        bench.calls.state.withLock {
+            $0.keys = [Self.key("readwise", claims: ["shared"])]
+            $0.apps = [AppAccess(id: "grant-1", clientID: "client-1", kind: .app, name: "Sketches", origins: [], scopes: [])]
+        }
+        await model.load()
+        let codes = Set(model.sourceChoices.map(\.code))
+        #expect(codes == ["readwise", "rss", "shared", "oauth:client-1"])
+        #expect(model.sourceChoices.contains { $0.code == "oauth:client-1" && $0.title == "Sketches" })
+    }
+
+    @Test func aWriterEndedSinceTheReadIsFoundAtSaveAndNothingIsSent() async {
+        let bench = OwnerBench(grants: [.configManage])
+        bench.calls.state.withLock { [read] in $0.sourceLimit = read }
+        let model = model(bench)
+        await model.load()
+        model.checkedSources = ["readwise"]
+        #expect(model.canSave)
+        bench.calls.state.withLock { $0.keys = [Self.key("rss")] }
+        await model.save()
+        #expect(bench.calls.state.withLock { $0.allowlistsSent.isEmpty })
+        #expect(model.line != nil)
+        #expect(model.checkedSources == ["readwise"])
     }
 
     @Test func aListThatWouldLetNoSourceWriteIsRefusedWithAReason() async {

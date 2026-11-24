@@ -52,6 +52,15 @@ extension ClientOwnerCalls {
             allowlist: config.enforcement?.sourceAllowlist.map { ($0.types, $0.sources) })
     }
 
+    func sources() async throws(OwnerFailure) -> [OwnerSource] {
+        guard let server else { throw .failed(String(localized: "There is no server to ask.")) }
+        do {
+            return try await server().sources().map { OwnerSource(code: $0.code, name: $0.name) }
+        } catch {
+            throw Self.failure(error)
+        }
+    }
+
     func sourceLimit() async throws(OwnerFailure) -> SourceLimit {
         try await run { client in Self.limit(try await client.getConfig().ok.body.json) }
     }

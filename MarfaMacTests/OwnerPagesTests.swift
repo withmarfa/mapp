@@ -56,6 +56,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var concerns: [AttentionConcern] = []
         var metrics = InstanceMetricsReading(version: "0.0.84", databaseBytes: nil, fileBytes: 0)
         var fileStores = FileStores(stores: [], orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
+        var sources: [OwnerSource] = []
         var sourceLimit = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: nil)
         /// What each Limit Sources write sent: the filter, or nil for turning it off.
         var limitsSent: [SourceRuleValue?] = []
@@ -413,6 +414,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     func fileStores() async throws(OwnerFailure) -> FileStores {
         try enter("fileStores")
         return state.withLock { $0.fileStores }
+    }
+
+    func sources() async throws(OwnerFailure) -> [OwnerSource] {
+        try enter("sources")
+        return state.withLock { $0.sources }
     }
 
     func sourceLimit() async throws(OwnerFailure) -> SourceLimit {

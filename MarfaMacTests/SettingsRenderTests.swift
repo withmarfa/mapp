@@ -453,6 +453,7 @@ struct RenderedWindow<Detail: View>: View {
         let host = await stub { $0.sources = Self.sourceRows }
         fake(host).state.withLock {
             $0.names = ["core.highlight": "Highlights", "core.bookmark": "Bookmarks"]
+            $0.sources = Self.sourceRows.map { OwnerSource(code: $0.code, name: $0.name) }
             $0.sourceLimit = SourceLimit(
                 instanceID: "instance-1", isOn: true, types: ["core.highlight"], sources: ["marfa-mac", "readwise"], strictTypes: nil, allowlist: nil)
         }

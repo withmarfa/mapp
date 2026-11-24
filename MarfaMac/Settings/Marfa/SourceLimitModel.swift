@@ -15,6 +15,34 @@ nonisolated enum SourceRule: Hashable, Sendable {
         case .allowlist: String(localized: "Who May Write")
         }
     }
+
+    /// What the app isn't allowed to do on the rule's page without `config.manage`.
+    var permissionLine: String {
+        switch self {
+        case .filter: String(localized: "The app isn’t allowed to read or change which sources apps and keys read.")
+        case .allowlist: String(localized: "The app isn’t allowed to read or change which sources may add items.")
+        }
+    }
+}
+
+/// The sources a current key or app can write under (`items/source-own`, `items/source-claimed`,
+/// `keys-and-oauth/app-source-code`), each with the name of what writes it. A connector host's key holds no access to any
+/// type, and a `restored:` source can belong to no credential (`keys-and-oauth/claims-reserved`), so neither is here.
+nonisolated struct SourceWriters: Hashable, Sendable {
+    let names: [String: String]
+
+    init(keys: [KeyInfo], apps: [AppAccess], now: Date = .now) {
+        var names: [String: String] = [:]
+        for app in apps { names["oauth:" + app.clientID] = app.name ?? app.clientID }
+        for key in keys where key.expires.map({ $0 > now }) ?? true {
+            guard !key.source.lowercased().hasPrefix("connector-host:") else { continue }
+            names[key.source] = names[key.source] ?? key.label
+            for claim in key.claims where names[claim] == nil { names[claim] = claim }
+        }
+        self.names = names
+    }
+
+    func canWrite(underAnyOf sources: Set<String>) -> Bool { sources.contains { names[$0] != nil } }
 }
 
 nonisolated struct SourceRuleValue: Hashable, Sendable {
@@ -34,7 +62,9 @@ extension SourceLimit {
 
 /// A source rule's page: Limit Sources, for the types checked every app and key reads only items from the sources checked, in
 /// lists, search, exports and webhooks; Who May Write, for exactly the types checked every app and key adds items only under
-/// the sources checked. Each is written whole after a fresh read: a change made elsewhere to the rule before the write is told and
+/// the sources checked. Its sources are every one the instance holds and those of every current key and app, so a source a
+/// filter hides can be checked again, and Who May Write refuses a list no current key or app could write under. Each is
+/// written whole after a fresh read: a change made elsewhere to the rule before the write is told and
 /// not written over, and the other levers are sent as that read found them. Another Marfa answering at the address is told in the settings page's words and the
 /// draft starts again from it, so what was chosen for one Marfa is never written to another. Turning a rule off removes it.
 @Observable @MainActor final class SourceLimitModel: OwnerDraftHolding {
@@ -46,25 +76,29 @@ extension SourceLimit {
 
     let rule: SourceRule
     private let context: OwnerContext
-    private let sources: () -> [MarfaSourceRow]
 
     private(set) var limit: SourceLimit?
     private(set) var typeNames: [String: String] = [:]
+    /// Every source the instance holds, read from the server, not from the items a source filter lets the app count.
+    private(set) var known: [OwnerSource] = []
+    /// Nil until the keys and apps are read.
+    private(set) var writers: SourceWriters?
     var types: Set<String> = []
     var checkedSources: Set<String> = []
     private let loader = OwnerLoader()
     private let typesRead = OwnerLoader.ReadStatus()
+    private let sourcesRead = OwnerLoader.ReadStatus()
     var failure: OwnerFailure? { loader.failure }
     var typesFailure: OwnerFailure? { typesRead.failure }
+    var sourcesFailure: OwnerFailure? { sourcesRead.failure }
     /// One line under the page's rows for what the server refused or the page can't send.
     private(set) var line: String?
     private(set) var isSaving = false
     var hasLoaded: Bool { loader.hasLoaded }
 
-    init(rule: SourceRule, context: OwnerContext, sources: @escaping () -> [MarfaSourceRow]) {
+    init(rule: SourceRule, context: OwnerContext) {
         self.rule = rule
         self.context = context
-        self.sources = sources
     }
 
     /// The rule as read, or nil where it is not set.
@@ -79,13 +113,15 @@ extension SourceLimit {
         return codes.map { Choice(code: $0, title: known[$0] ?? $0) }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    /// The sources a limit can name: those with items, and any the limit names that have none now.
+    /// The sources a rule can name: every one the instance holds, those of keys and apps that have written nothing yet, and
+    /// any the rule names that the server no longer lists.
     var sourceChoices: [Choice] {
-        var choices = sources().map { Choice(code: $0.code, title: $0.name) }
-        for code in (value?.sources ?? []) where !choices.contains(where: { $0.code == code }) {
-            choices.append(Choice(code: code, title: code))
-        }
-        return choices
+        var titles: [String: String] = [:]
+        for source in known where !source.code.isEmpty { titles[source.code] = source.name }
+        for (code, name) in writers?.names ?? [:] where titles[code] == nil { titles[code] = name }
+        for code in value?.sources ?? [] where titles[code] == nil { titles[code] = code }
+        return titles.map { Choice(code: $0.key, title: $0.value) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     var hasEdits: Bool {
@@ -94,19 +130,41 @@ extension SourceLimit {
     }
 
     /// Why what is checked can't be saved: a rule that names types and no source would hide every item of those types from every
-    /// app, or let no app or key add one.
+    /// app, and an allow-list naming no source a current key or app writes under would let none add one.
     var waitsFor: String? {
-        guard !types.isEmpty, checkedSources.isEmpty else { return nil }
-        return switch rule {
-        case .filter: String(localized: "Check a source too. With none, no app or key could read items of these types.")
-        case .allowlist: String(localized: "Check a source too. With none, no app or key could add items of these types.")
+        guard !types.isEmpty else { return nil }
+        if checkedSources.isEmpty {
+            return switch rule {
+            case .filter: String(localized: "Check a source too. With none, no app or key could read items of these types.")
+            case .allowlist: String(localized: "Check a source too. With none, no app or key could add items of these types.")
+            }
         }
+        guard rule == .allowlist else { return nil }
+        guard let writers else {
+            return sourcesFailure == nil
+                ? nil : String(localized: "The app couldn’t read your keys and apps, so it can’t check that one of them could still add these types.")
+        }
+        return Self.lockout(writers, checkedSources)
     }
 
-    var canSave: Bool { hasEdits && !isSaving && waitsFor == nil }
+    private static func lockout(_ writers: SourceWriters, _ sources: Set<String>) -> String? {
+        writers.canWrite(underAnyOf: sources)
+            ? nil : String(localized: "No key or app writes under the checked sources, so nothing could add items of these types. Check one that does.")
+    }
 
-    func load() async {
-        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+    /// Whether Save would turn the rule off, every type being unchecked, which asks first as Turn Off does.
+    var saveTurnsOff: Bool { isOn && types.isEmpty }
+
+    var canSave: Bool {
+        guard hasEdits, !isSaving else { return false }
+        if types.isEmpty { return isOn }
+        return waitsFor == nil && (rule == .filter || writers != nil)
+    }
+
+    /// Reads the rule; with `choices`, also the types, sources, keys and apps its page offers, waiting for a read already under
+    /// way so they are never skipped. The Sources list needs only the rule.
+    func load(choices: Bool = true) async {
+        await loader.load(in: context, waitForPrevious: choices, primary: { () throws(OwnerFailure) in
             let read = try await context.calls.sourceLimit()
             // Judge the draft against the limit the person was shown.
             let keepsDraft = hasEdits && hasLoaded
@@ -115,9 +173,17 @@ extension SourceLimit {
                 types = Set(read.value(of: rule)?.types ?? [])
                 checkedSources = Set(read.value(of: rule)?.sources ?? [])
             }
-        }, secondary: [
+        }, secondary: choices ? [
             .required(typesRead) { [self] () throws(OwnerFailure) in typeNames = try await context.calls.typeNames() },
-        ])
+            .required(sourcesRead) { [self] () throws(OwnerFailure) in
+                known = try await context.calls.sources()
+                writers = try await readWriters()
+            },
+        ] : [])
+    }
+
+    private func readWriters() async throws(OwnerFailure) -> SourceWriters {
+        SourceWriters(keys: try await context.calls.keys(), apps: try await context.calls.apps())
     }
 
     func revert() {
@@ -127,9 +193,10 @@ extension SourceLimit {
         line = nil
     }
 
+    /// Sends what is checked. Turning the rule off goes through `turnOff()`, after the question.
     func save() async {
-        guard canSave, let limit else { return }
-        await write(limit, to: types.isEmpty ? nil : SourceRuleValue(types: types.sorted(), sources: checkedSources.sorted()))
+        guard canSave, !types.isEmpty, let limit else { return }
+        await write(limit, to: SourceRuleValue(types: types.sorted(), sources: checkedSources.sorted()))
     }
 
     func turnOff() async {
@@ -154,6 +221,15 @@ extension SourceLimit {
                 self.limit = current
                 line = changedElsewhere
                 return
+            }
+            // A key or app may have ended since the page read them, so who could still write is read again too.
+            if rule == .allowlist, let value {
+                let now = try await readWriters()
+                writers = now
+                if let lockout = Self.lockout(now, Set(value.sources)) {
+                    line = lockout
+                    return
+                }
             }
             let written = try await context.calls.setSourceRule(rule, of: current, to: value)
             self.limit = written
@@ -185,6 +261,8 @@ extension SourceLimit {
     private func anotherMarfa() async {
         limit = nil
         typeNames = [:]
+        known = []
+        writers = nil
         types = []
         checkedSources = []
         await load()

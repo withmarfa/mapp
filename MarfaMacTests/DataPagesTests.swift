@@ -423,14 +423,12 @@ import Testing
 
 @MainActor
 @Suite(.hangLimit) struct SourceLimitModelTests {
-    private func model(_ bench: OwnerBench, sources: [MarfaSourceRow] = []) -> SourceLimitModel {
-        SourceLimitModel(rule: .filter, context: bench.context, sources: { sources })
+    private func model(_ bench: OwnerBench, sources: [OwnerSource] = []) -> SourceLimitModel {
+        bench.calls.state.withLock { $0.sources = sources }
+        return SourceLimitModel(rule: .filter, context: bench.context)
     }
 
-    private let rows = [
-        MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, nameOrigin: .key),
-        MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, nameOrigin: .key),
-    ]
+    private let rows = [OwnerSource(code: "readwise", name: "Readwise"), OwnerSource(code: "rss", name: "RSS")]
 
     @Test func theLimitIsReadWithTheTypesAndSourcesItNames() async {
         let bench = OwnerBench(grants: [.configManage])
@@ -482,6 +480,21 @@ import Testing
         #expect(!model.canSave)
         await model.save()
         #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+    }
+
+    @Test func savingWithEveryTypeUncheckedAsksFirstAndSendsNothing() async {
+        let bench = OwnerBench(grants: [.configManage])
+        bench.calls.state.withLock {
+            $0.sourceLimit = SourceLimit(instanceID: "instance-1", isOn: true, types: ["core.note"], sources: ["rss"], strictTypes: nil, allowlist: nil)
+        }
+        let model = model(bench, sources: rows)
+        await model.load()
+        model.types = []
+        #expect(model.canSave)
+        #expect(model.saveTurnsOff)
+        await model.save()
+        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(model.isOn)
     }
 
     @Test func turningItOffRemovesTheFilter() async {
