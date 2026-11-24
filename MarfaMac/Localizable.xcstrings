@@ -6139,7 +6139,7 @@
     "The editor sent your typing in a form the app couldn’t read." : {
 
     },
-    "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close this window, then open the item again to check it." : {
+    "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close the window that shows this item, then open the item again to check it." : {
 
     },
     "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing." : {

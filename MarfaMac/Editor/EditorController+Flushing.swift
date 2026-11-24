@@ -89,8 +89,8 @@ extension EditorController {
                 let refusal = result as? [String: Any]
                 let code = refusal?["commandError"] as? String
                 // A page composing or importing a picture, or holding back a reload until then, hands its edit over
-                // once it is done. A call that did not
-                // run in the page, as when its process ended, is asked again too, and then finds the page not ready.
+                // once it is done. A call that did not run in the page, as when its process ended, is asked again too,
+                // and then finds that the page went down.
                 if code.map(Self.passingFlushRefusals.contains) == true || error.map(Self.ranInPage) == false {
                     Task { try? await Task.sleep(for: .milliseconds(50)); capture() }
                     return
@@ -170,7 +170,7 @@ extension EditorController {
             ?? String(localized: "Some Typing Might Be Missing")
         let message = loss.comingBack
             ? String(localized: "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing.")
-            : String(localized: "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close this window, then open the item again to check it.")
+            : String(localized: "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close the window that shows this item, then open the item again to check it.")
         return (title, message)
     }
 
