@@ -35,9 +35,7 @@ final class FilterChipAnchors {
 
     fileprivate func set(_ view: NSView, for key: String) { views[key] = Weak(view: view) }
 
-    /// Calls `open` once the view for `key` has a window to open a panel under. The row makes a new chip's view on a later
-    /// turn of the run loop, and a panel asked for before it has a window does not open; after about half a second `open`
-    /// is called anyway.
+    /// Waits for SwiftUI to put a new chip in its window, then calls `open`. On timeout, `open` can clear the row's pending state.
     func whenShown(_ key: String, attempts: Int = 20, open: @escaping @MainActor () -> Void) {
         if view(for: key)?.window != nil || attempts == 0 {
             open()

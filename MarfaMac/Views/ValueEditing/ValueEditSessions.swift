@@ -14,8 +14,7 @@ final class ValueEditPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
-    /// The panel a value's editor and a filter's panel draw in: borderless, never active, on the system's glass or the
-    /// Solid ground, in the appearance of the `parent` window it belongs to.
+    /// Uses the parent window's appearance so the panel matches it when it opens.
     static func make(holding host: NSView, over parent: NSWindow) -> ValueEditPanel {
         let panel = ValueEditPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false

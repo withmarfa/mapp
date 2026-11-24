@@ -21,9 +21,8 @@ protocol PanelSession: AnyObject {
     func handleKey(_ event: NSEvent) -> Bool
 }
 
-/// Keeps at most one panel open under a view, whoever asks, and closes it as the system closes a menu: a click outside, the
-/// window under it moving, resizing or closing, the app going to the background, or the page or sidebar scrolling.
-/// Escape closes it too. The panel follows its anchor, and every view above it, as they move.
+/// Keeps one panel attached to its anchor as the view hierarchy or window moves. Like a menu, it closes on an outside
+/// click, Escape, scrolling in the anchor's window, a window resize or close, or app deactivation.
 @MainActor
 final class PanelPresenter {
     private(set) var session: (any PanelSession)?

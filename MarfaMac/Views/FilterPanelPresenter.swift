@@ -1,9 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Opens one panel at a time under a chip or the +, in a child window on the system's glass, as a value panel opens: the
-/// same `PanelPresenter` keeps and watches it. It closes on a click outside, Escape, a scroll, the app going to the
-/// background and the window resizing, and calls `onClose` then.
+/// Opens a panel under a filter chip or the + and lets the row clean up unfinished filters when it closes.
 @MainActor
 final class FilterPanelPresenter {
     static let shared = FilterPanelPresenter()
