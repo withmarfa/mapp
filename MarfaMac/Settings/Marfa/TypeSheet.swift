@@ -215,7 +215,7 @@ struct TypeDeleteSheet: View {
     }
 
     var body: some View {
-        SettingsSheet(title: Text("Delete \(plural)"), line: Text(verbatim: line)) {
+        SettingsSheet(title: Text("Delete \(plural)"), line: Text(verbatim: line), isWide: true) {
             VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
                 SettingsSection(name: items > 0 ? Text("Its \(items.formatted()) \(items == 1 ? singular : plural)") : nil) {
                     SettingsRadioRow(

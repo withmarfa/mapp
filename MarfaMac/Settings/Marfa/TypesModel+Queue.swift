@@ -154,7 +154,7 @@ extension TypesModel {
         case .fieldName: String(localized: "A field’s name can be 100 characters at most.")
         case .fieldMeaning: String(localized: "What a field means can be \(fieldMeaningLimit) characters at most.")
         case .fieldLongest: String(localized: "The longest a field can be is a whole number of at least 1.")
-        case .basedOn, .newType, .newField, .fieldRule, .fieldSearchable, .fieldRemove, .choice, .feed, .merge, .versions: nil
+        case .basedOn, .newType, .newField, .fieldRule, .fieldSearchable, .fieldRemove, .choice, .feed, .merge, .versions, .strict: nil
         }
     }
 

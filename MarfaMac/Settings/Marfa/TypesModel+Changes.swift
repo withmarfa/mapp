@@ -18,7 +18,7 @@ extension TypesModel {
         deleteFailure = nil
         defer { isDeleting = false }
         let took = await enqueue { () async -> Bool in
-            do {
+            do throws(TypeFailure) {
                 try await self.calls.delete(id, force: false)
                 return true
             } catch {
@@ -120,7 +120,7 @@ extension TypesModel {
         deleteSheetFailure = nil
         defer { isDeleting = false }
         let took = await enqueue { () async -> Bool in
-            do {
+            do throws(TypeFailure) {
                 if choice == .move, let target {
                     let result = try await self.calls.move(id, to: target)
                     guard result.isDone else {

@@ -22,6 +22,7 @@ struct TypeDetail: View {
             if model.hasStatus(type.id) { statusSection }
             fieldsSection
             if isEditable {
+                if model.strictTypes != nil { rulesSection }
                 feedSection
                 historySection
                 deleteSection
@@ -237,6 +238,18 @@ struct TypeDetail: View {
 
     private var parentTitle: String? { type.parent.flatMap { model.record($0) }.map { model.title(of: $0) } }
 
+    /// Strict mode holds for the type named and not for the types based on it (`types/strict-mode`).
+    private var rulesSection: some View {
+        SettingsSection("Rules") {
+            SettingsRow(
+                title: Text("Strict"), line: Text("Refuse fields \(model.title(of: type)) doesn’t have."), error: model.fieldErrors[.strict]
+            ) {
+                SettingsToggle(
+                    title: "Strict", isOn: Binding { model.isStrict(type.id) } set: { isOn in Task { await model.setStrict(isOn, of: type.id) } })
+            }
+        }
+    }
+
     private var feedSection: some View {
         SettingsSection("Feed") {
             SettingsRow(
@@ -268,7 +281,7 @@ struct TypeDetail: View {
         let title: String
         let message: String
         if case .days(let days)? = window {
-            let length = Self.title(of: .days(days)).localizedLowercase
+            let length = Self.title(of: VersionWindow.days(days)).localizedLowercase
             title = String(localized: "Keep Versions for \(length)?")
             message = String(localized: "Versions of \(items) older than \(length) will be permanently deleted the next time \(host.serverName) tidies up, except each item’s newest. They can’t be recovered.")
         } else {
@@ -312,7 +325,7 @@ struct TypeDetail: View {
                         Text("As in History").tag(VersionWindow?.none)
                     }
                     ForEach(model.versionDays(for: type.id), id: \.self) { days in
-                        Text(verbatim: Self.title(of: .days(days))).tag(Optional(VersionWindow.days(days)))
+                        Text(verbatim: Self.title(of: VersionWindow.days(days))).tag(Optional(VersionWindow.days(days)))
                     }
                     if model.versionSelection(of: type.id) == .custom { Text("Custom").tag(Optional(VersionWindow.custom)) }
                 }

@@ -42,6 +42,8 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         var refusal: TypeFailure?
         var deleteRefusal: TypeFailure?
         var gate: TypeCallGate?
+        var strict: Set<String> = []
+        var strictRefusal: TypeFailure?
     }
 
     let state = Mutex(State())
@@ -124,6 +126,16 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
             return state.moveResult
         }
     }
+
+    func strictTypes() async throws(TypeFailure) -> Set<String> { state.withLock { $0.strict } }
+
+    func setStrict(_ isOn: Bool, for type: String) async throws(TypeFailure) -> Set<String> {
+        if let refusal = state.withLock({ $0.strictRefusal }) { throw refusal }
+        return state.withLock { state in
+            if isOn { state.strict.insert(type) } else { state.strict.remove(type) }
+            return state.strict
+        }
+    }
 }
 
 private func record(
@@ -146,12 +158,13 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 @Suite(.hangLimit) struct TypesModelTests {
     private func model(
         _ calls: FakeTypeCalls, counts: [String: Int] = [:], late: LateDrafts = LateDrafts(),
+        grants: Set<InstancePermission> = [.schemaWrite],
         setIcon: @escaping (String?, String) async -> OwnerFailure? = { _, _ in nil }
     ) -> TypesModel {
         let access = TypeAccess(
             ownItems: { counts[$0] ?? 0 }, currentIcon: { _ in nil }, setIcon: setIcon,
             markSets: [MarfaMarkSet(id: "lucide", title: "Lucide")], marks: { _, _ in [] }, plural: { _ in nil })
-        let context = OwnerContext(calls: FakeOwnerCalls(), grants: { [.schemaWrite] }, lateDraft: { draft in late.drafts.withLock { $0.append(draft) } })
+        let context = OwnerContext(calls: FakeOwnerCalls(), grants: { grants }, lateDraft: { draft in late.drafts.withLock { $0.append(draft) } })
         return TypesModel(context: context, calls: calls, access: access)
     }
 
@@ -524,6 +537,13 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.title(of: "user.job") == "Jobs")
     }
 
+    /// Jobs with no type based on it, so it can be deleted.
+    private func deletable() -> FakeTypeCalls {
+        let calls = withFields()
+        calls.state.withLock { $0.types.removeAll { $0.id == "user.rework" } }
+        return calls
+    }
+
     private func withFields() -> FakeTypeCalls {
         let calls = listing()
         calls.state.withLock {
@@ -714,10 +734,18 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 
     @Test func deletingATypeLeavesItsPageAndTellsAServerRefusalInWords() async {
         let calls = withFields()
-        calls.state.withLock { $0.deleteRefusal = .inUse(items: 2, settings: 1) }
         let model = model(calls)
         await model.load()
         model.open("user.job")
+        // Rework is based on Jobs, so neither way of deleting is offered and the row says why.
+        model.beginDelete()
+        #expect(!model.isConfirmingDelete)
+        #expect(model.deleteFailure == "Types are based on Jobs: Rework. Change or delete those first.")
+        calls.state.withLock {
+            $0.types.removeAll { $0.id == "user.rework" }
+            $0.deleteRefusal = .inUse(items: 2, settings: 1)
+        }
+        await model.reread()
         await model.deleteType()
         // Something uses it, in the bin or a setting, so the sheet asks what happens to it, and nothing is deleted yet.
         #expect(model.isConfirmingDelete)
@@ -725,9 +753,6 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.deleted == nil)
         #expect(calls.state.withLock { $0.deleted.isEmpty })
         model.cancelDelete()
-        calls.state.withLock { $0.deleteRefusal = .hasSubtypes(["user.rework"]) }
-        await model.deleteType()
-        #expect(model.deleteFailure == "Types are based on Jobs: Rework. Change or delete those first.")
         calls.state.withLock { $0.deleteRefusal = nil }
         await model.deleteType()
         #expect(model.deleted == "user.job")
@@ -747,7 +772,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     }
 
     @Test func aMoveThatLeavesItemsBehindKeepsTheTypeAndSaysWhy() async {
-        let calls = withFields()
+        let calls = deletable()
         calls.state.withLock {
             $0.deleteRefusal = .inUse(items: 18, settings: 0)
             $0.preview = TypeMovePreview(items: 18, settings: [])
@@ -768,7 +793,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     }
 
     @Test func aTypeIsDeletedUnforcedOnlyOnceItsItemsHaveMoved() async {
-        let calls = withFields()
+        let calls = deletable()
         calls.state.withLock {
             $0.deleteRefusal = .inUse(items: 18, settings: 1)
             $0.preview = TypeMovePreview(items: 18, settings: [TypeSettingRecord(kind: .view, id: "v1")])
@@ -786,7 +811,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     }
 
     @Test func leavingTheItemsDeletesTheTypeForcedAndMovesNothing() async {
-        let calls = withFields()
+        let calls = deletable()
         calls.state.withLock { $0.preview = TypeMovePreview(items: 18, settings: []) }
         let model = model(calls, counts: ["user.job": 18])
         await model.load()
@@ -800,7 +825,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     }
 
     @Test func aSettingAMoveCannotChangeHoldsTheMoveBack() async {
-        let calls = withFields()
+        let calls = deletable()
         calls.state.withLock {
             $0.preview = TypeMovePreview(items: 18, settings: [TypeSettingRecord(kind: .folder, id: "f1", blocked: "Change its filter first.")])
         }
@@ -858,6 +883,21 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         await model.setVersionWindow(.days(90), of: "user.job")
         await model.setVersionWindow(nil, of: "user.job")
         #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.versionWindow(90)])
+    }
+
+    @Test func aStrictSwitchTheServerRefusesShowsWhatTheServerHolds() async {
+        let calls = listing()
+        calls.state.withLock { $0.strict = ["user.job"] }
+        let model = model(calls, grants: [.schemaWrite, .configManage])
+        await model.load()
+        #expect(model.isStrict("user.job"))
+        calls.state.withLock { $0.strictRefusal = .owner(.refused("No.")) }
+        await model.setStrict(false, of: "user.job")
+        #expect(model.isStrict("user.job"))
+        #expect(model.fieldErrors[.strict] != nil)
+        let unread = self.model(calls)
+        await unread.load()
+        #expect(unread.strictTypes == nil)
     }
 
     @Test func aNameTypedInTheNewTypeSheetIsHandedBackWhenSettingsCloses() async {
@@ -1054,6 +1094,28 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(ServerTypeCalls.versionWindow(.init(recentDays: 30, dailySnapshotDays: 30, weeklySnapshotDays: 30)) == .days(30))
         #expect(ServerTypeCalls.versionWindow(.init(recentDays: 30, dailySnapshotDays: 90, weeklySnapshotDays: 365)) == .custom)
         #expect(ServerTypeCalls.versionWindow(.init(maxVersions: 10)) == nil)
+    }
+
+    /// Sending the enforcement replaces all three levers: one dropped here would let writes through that the owner limited.
+    @Test func strictSendsTheSourceLeversBackAsTheyWereRead() {
+        let read = Components.Schemas.InstanceConfig.EnforcementPayload(
+            strictMode: .init(types: ["user.quote"]), sourceAllowlist: .init(types: ["core.task"], sources: ["github"]),
+            sourceFilter: .init(types: ["core.highlight"], sources: ["readwise"]))
+        guard case .value(let on)? = ServerTypeCalls.strictBody(read, isOn: true, for: "user.job").enforcement else {
+            Issue.record("The levers were not sent")
+            return
+        }
+        #expect(on.strictMode?.types == ["user.quote", "user.job"])
+        #expect(on.sourceAllowlist?.types == ["core.task"] && on.sourceAllowlist?.sources == ["github"])
+        #expect(on.sourceFilter?.types == ["core.highlight"] && on.sourceFilter?.sources == ["readwise"])
+        guard case .value(let off)? = ServerTypeCalls.strictBody(read, isOn: false, for: "user.quote").enforcement else {
+            Issue.record("The levers were not sent")
+            return
+        }
+        #expect(off.strictMode == nil)
+        #expect(off.sourceAllowlist?.sources == ["github"] && off.sourceFilter?.sources == ["readwise"])
+        let alone = Components.Schemas.InstanceConfig.EnforcementPayload(strictMode: .init(types: ["user.job"]))
+        #expect(ServerTypeCalls.strictBody(alone, isOn: false, for: "user.job").enforcement == .null)
     }
 
     @Test func aFeedWindowAndAMergeStrategyAreSetNeverAndLeftToTheTypeAbove() throws {

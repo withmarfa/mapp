@@ -237,6 +237,11 @@ nonisolated protocol TypeCalls: Sendable {
     func previewMove(of type: String, to target: String) async throws(TypeFailure) -> TypeMovePreview
     /// Moves every item of `type` to `target` and waits for the server's job to end (`types/move`, `types/move-settings`).
     func move(_ type: String, to target: String) async throws(TypeFailure) -> TypeMoveResult
+    /// The types the instance's strict mode names (`enforcement.strict_mode`, `config.manage`); empty while it names none.
+    func strictTypes() async throws(TypeFailure) -> Set<String>
+    /// Reads the configuration and sends it back with `type` added to or taken from strict mode, the other levers as read,
+    /// to the instance it was read from (`PATCH /config`, `types/strict-mode`). Answers the types strict mode then names.
+    func setStrict(_ isOn: Bool, for type: String) async throws(TypeFailure) -> Set<String>
 }
 
 nonisolated extension FieldKind {

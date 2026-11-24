@@ -292,4 +292,34 @@ extension TypesModel {
         case nil: await apply(.versionWindow(nil), to: id, field: .versions)
         }
     }
+
+    /// Reads which types strict mode names, where the sign-in may read the configuration. A failed read leaves the switch out.
+    func loadStrict() async {
+        guard context.grants().contains(.configManage) else {
+            strictTypes = nil
+            return
+        }
+        strictTypes = try? await calls.strictTypes()
+    }
+
+    func isStrict(_ id: String) -> Bool { strictTypes?.contains(id) ?? false }
+
+    /// Adds the type to strict mode or takes it out. It waits behind the changes queued before it, so two switches flipped
+    /// at once each send the other's back as the server holds it. A refusal leaves the switch as the server holds it.
+    func setStrict(_ isOn: Bool, of id: String) async {
+        guard let type = record(id), isEditable(type), isOn != isStrict(id) else { return }
+        fieldErrors[.strict] = nil
+        strictTypes?.formSymmetricDifference([id])
+        _ = await enqueue { () async -> Bool in
+            do throws(TypeFailure) {
+                self.strictTypes = try await self.calls.setStrict(isOn, for: id)
+                return true
+            } catch {
+                if case .owner(let failure) = error { await self.context.learn(from: failure) }
+                self.fieldErrors[.strict] = OwnerWording.line(Self.owner(error), on: .types)
+                self.strictTypes = (try? await self.calls.strictTypes()) ?? self.strictTypes.map { $0.symmetricDifference([id]) }
+                return false
+            }
+        }
+    }
 }

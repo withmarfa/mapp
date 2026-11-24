@@ -72,6 +72,37 @@ nonisolated struct ServerTypeCalls: TypeCalls {
         }
     }
 
+    func strictTypes() async throws(TypeFailure) -> Set<String> {
+        try await run { client in Set(try await client.getConfig().ok.body.json.enforcement?.strictMode?.types ?? []) }
+    }
+
+    func setStrict(_ isOn: Bool, for type: String) async throws(TypeFailure) -> Set<String> {
+        try await run { client in
+            let config = try await client.getConfig().ok.body.json
+            let body = Self.strictBody(config.enforcement, isOn: isOn, for: type)
+            let answer = try await client.updateConfig(headers: .init(xMarfaInstanceId: config.instanceId), body: .json(body)).ok.body.json
+            return Set(answer.enforcement?.strictMode?.types ?? [])
+        }
+    }
+
+    /// The configuration change that adds `type` to strict mode or takes it out. Sending the enforcement replaces all three
+    /// levers, so the source allow-list and the source filter go back as they were read.
+    static func strictBody(
+        _ enforcement: Components.Schemas.InstanceConfig.EnforcementPayload?, isOn: Bool, for type: String
+    ) -> Operations.UpdateConfig.Input.Body.JsonPayload {
+        var strict = enforcement?.strictMode?.types ?? []
+        strict.removeAll { $0 == type }
+        if isOn { strict.append(type) }
+        var levers = Components.Schemas.MarfaInlineaeb0b69539bcab54()
+        levers.strictMode = strict.isEmpty ? nil : .init(types: strict)
+        levers.sourceAllowlist = enforcement?.sourceAllowlist.map { .init(types: $0.types, sources: $0.sources) }
+        levers.sourceFilter = enforcement?.sourceFilter.map { .init(types: $0.types, sources: $0.sources) }
+        var body = Operations.UpdateConfig.Input.Body.JsonPayload()
+        let empty = levers.strictMode == nil && levers.sourceAllowlist == nil && levers.sourceFilter == nil
+        body.enforcement = empty ? .null : .value(levers)
+        return body
+    }
+
     static func setting(_ setting: Components.Schemas.TypeSetting) -> TypeSettingRecord {
         let kind: TypeSettingRecord.Kind =
             switch setting.kind {

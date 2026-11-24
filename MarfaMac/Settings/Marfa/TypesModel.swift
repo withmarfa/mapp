@@ -10,7 +10,7 @@ import Observation
     /// What a refusal can be about on a type's page.
     enum Field: Hashable {
         case name, plural, description, guidance, basedOn, word, meaning, newType
-        case fieldName, fieldMeaning, fieldLongest, fieldRule, fieldSearchable, fieldRemove, choice, newField, feed, merge, versions
+        case fieldName, fieldMeaning, fieldLongest, fieldRule, fieldSearchable, fieldRemove, choice, newField, feed, merge, versions, strict
     }
 
     /// The four groups a status word sits in, in the order of a piece of work's life.
@@ -45,6 +45,8 @@ import Observation
     var fieldErrors: [Field: String] = [:]
     /// A refusal that is not about one field, shown above the sections.
     var pageFailure: OwnerFailure?
+    /// The types the instance's strict mode names; nil until read, and never read without `config.manage`.
+    var strictTypes: Set<String>?
 
     // The drafts of the open type: what was typed, kept until it is saved or the page leaves.
     private(set) var openID: String?
@@ -143,6 +145,7 @@ import Observation
                 throw Self.owner(error)
             }
         }, after: {
+            await loadStrict()
             if let id = openID {
                 open(id)
                 await loadReading(of: id)
