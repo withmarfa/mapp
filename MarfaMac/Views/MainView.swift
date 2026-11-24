@@ -117,7 +117,7 @@ struct MainView: View {
     private var splitView: some View {
         // The gallery and the table replace this entire split view rather than changing the columns inside it.
         NavigationSplitView(columnVisibility: listColumnVisibility) {
-            sidebarColumn
+            sidebarColumn(WindowToolbarLayout.list)
         } content: {
             ItemList(browser: browser, order: order, pane: $pane).equatable()
                 .filterChips(browser)
@@ -145,7 +145,8 @@ struct MainView: View {
     /// Only the three-column split has a list column to measure.
     private var hasListColumn: Bool { shownPresentation == .list }
 
-    private var sidebarColumn: some View {
+    /// `toolbarLayout` is the split view's own, which all of its columns' toolbars share.
+    private func sidebarColumn(_ toolbarLayout: String) -> some View {
         VStack(spacing: 0) {
             Sidebar(browser: browser, order: order)
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
@@ -159,6 +160,11 @@ struct MainView: View {
             if let sidebar = widths.first { measuredWidths.record(sidebar, for: .sidebar) }
             if hasListColumn, widths.count > 1 { measuredWidths.record(widths[1], for: .list) }
         }
+        .toolbar(removing: .sidebarToggle)
+        .toolbar(id: toolbarLayout) {
+            SidebarToolbar(browser: browser, isSidebarVisible: Binding { isSidebarVisible } set: { isSidebarVisible = $0 })
+        }
+        // Last: under a toolbar the split view reads no limits, and the sidebar drags to any width.
         .navigationSplitViewColumnWidth(
             min: ColumnWidth.sidebar.range.lowerBound, ideal: measuredWidths.width(of: .sidebar), max: ColumnWidth.sidebar.range.upperBound)
     }
@@ -184,7 +190,7 @@ struct MainView: View {
                     .toastOverlay()
             } else if shownPresentation == .items {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
-                    sidebarColumn
+                    sidebarColumn(WindowToolbarLayout.items)
                 } detail: {
                     ItemsIndex(browser: browser, pane: $pane)
                         .toastOverlay()
@@ -193,7 +199,7 @@ struct MainView: View {
                 }
             } else if shownPresentation == .index {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
-                    sidebarColumn
+                    sidebarColumn(WindowToolbarLayout.index)
                 } detail: {
                     SidebarIndex(browser: browser, details: details, order: order, pane: $pane)
                         .toastOverlay()
@@ -201,7 +207,7 @@ struct MainView: View {
                 }
             } else if shownPresentation == .collection {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
-                    sidebarColumn
+                    sidebarColumn(WindowToolbarLayout.collection(shownViewMode))
                 } detail: {
                     Group {
                         if browser.showsCollection {
