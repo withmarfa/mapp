@@ -3100,6 +3100,9 @@
     "Choices" : {
 
     },
+    "Choose" : {
+
+    },
     "Choose Date" : {
       "extractionState" : "manual"
     },
@@ -3135,6 +3138,9 @@
 
     },
     "Choose a date before the app’s sign-in ends." : {
+
+    },
+    "Choose a folder on this Mac’s own disk." : {
 
     },
     "Choose a folder or an object store." : {
@@ -3186,6 +3192,9 @@
 
     },
     "Choose what to replace with the settings in “%@”." : {
+
+    },
+    "Choose where the app saves the archive." : {
 
     },
     "Choose where to keep backups first." : {
@@ -3504,6 +3513,9 @@
     "Couldn’t Count" : {
 
     },
+    "Couldn’t Export Automatically" : {
+
+    },
     "Couldn’t Export Layouts" : {
 
     },
@@ -3645,13 +3657,19 @@
     "Couldn’t do that" : {
 
     },
-    "Couldn’t export." : {
-
-    },
     "Couldn’t export. %@ didn’t send the archive." : {
 
     },
     "Couldn’t export. %@ isn’t answering." : {
+
+    },
+    "Couldn’t export. %@ sent an archive that isn’t whole, so it wasn’t saved." : {
+
+    },
+    "Couldn’t export. %@ sent an archive the app can’t check, so it wasn’t saved." : {
+
+    },
+    "Couldn’t export. %@ sent another Marfa’s archive, so it wasn’t saved." : {
 
     },
     "Couldn’t export. Sign in again in Connection first." : {
@@ -3660,10 +3678,16 @@
     "Couldn’t export. The app can’t write to that folder." : {
 
     },
+    "Couldn’t export. The app can’t yet tell which Marfa %@ is." : {
+
+    },
     "Couldn’t export. The app couldn’t write to that folder." : {
 
     },
     "Couldn’t export. The app isn’t allowed to export %@." : {
+
+    },
+    "Couldn’t export. The export was stopped." : {
 
     },
     "Couldn’t load that page of activity. %@" : {
@@ -4236,6 +4260,9 @@
     "Every %@ must have one." : {
 
     },
+    "Every Day" : {
+
+    },
     "Every Item" : {
 
     },
@@ -4249,6 +4276,9 @@
 
     },
     "Every Type" : {
+
+    },
+    "Every Week" : {
 
     },
     "Every app signs out" : {
@@ -4329,7 +4359,13 @@
     "Export" : {
 
     },
+    "Export Automatically" : {
+
+    },
     "Export Everything" : {
+
+    },
+    "Export Folder" : {
 
     },
     "Export Layouts" : {
@@ -4345,6 +4381,9 @@
 
     },
     "Export as PDF…" : {
+
+    },
+    "Exported Without Some Files" : {
 
     },
     "Exported items" : {
@@ -5173,6 +5212,16 @@
     "It keeps that type’s statuses and fields." : {
 
     },
+    "It lacks ^[%lld file](inflect: true) %@ couldn’t send." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "It lacks ^[%1$lld file](inflect: true) %2$@ couldn’t send."
+          }
+        }
+      }
+    },
     "It must sign in again with your password or a passkey. Apps and keys keep working." : {
 
     },
@@ -5685,6 +5734,9 @@
       }
     },
     "Last run failed" : {
+
+    },
+    "Last saved %@." : {
 
     },
     "Later Edit Wins" : {
@@ -8124,6 +8176,16 @@
     "Saved as “%@”." : {
 
     },
+    "Saved “%@” in “%@”." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Saved “%1$@” in “%2$@”."
+          }
+        }
+      }
+    },
     "Saved. The server now has:" : {
       "extractionState" : "manual"
     },
@@ -9536,6 +9598,9 @@
     "The entry was removed while you were editing it." : {
       "extractionState" : "manual"
     },
+    "The export folder was moved or replaced. Choose it again." : {
+
+    },
     "The feed, or straight into the library." : {
 
     },
@@ -10551,6 +10616,9 @@
     "To PostHog’s error tracking." : {
 
     },
+    "To a folder you choose." : {
+
+    },
     "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find the “Marfa for Mac” entry, then run “marfa apps revoke <id>”." : {
 
     },
@@ -10562,6 +10630,9 @@
     },
     "To start a new copy from this server, choose Disconnect in Settings, then connect again." : {
       "extractionState" : "manual"
+    },
+    "To “%@”." : {
+
     },
     "To: %@" : {
 
