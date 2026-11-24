@@ -52,7 +52,9 @@ nonisolated final class ThrowawayDefaults: UserDefaults {
     }
 
     deinit {
-        removePersistentDomain(forName: suite)
+        // Through another instance: removing it through this one posts a change notification carrying an object
+        // already being freed, which crashes any observer that reads it.
+        UserDefaults().removePersistentDomain(forName: suite)
         try? FileManager.default.removeItem(atPath: suite + ".plist")
         Self.held.withLock { _ = $0.remove(suite) }
     }
