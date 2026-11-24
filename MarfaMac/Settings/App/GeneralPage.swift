@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// The General page: how the app opens, what a new item is, how dates and times read, what the app does with the web, and
-/// putting every setting back.
+/// this app's settings: saving them to a file, bringing them back and starting them over.
 struct GeneralPage: View {
     let libraries: Libraries
+    @State private var files: SettingsFilesModel
     @AppStorage(StartWith.key) private var startWith = StartWith.standard
     @AppStorage(ReopenWindows.key) private var reopensWindows = ReopenWindows.standard
     @AppStorage(ListKey.openItemsIn) private var openItemsIn = ItemOpening.standard
@@ -17,6 +18,11 @@ struct GeneralPage: View {
     @Environment(\.appUpdater) private var updater
     @State private var isConfirmingReset = false
 
+    init(libraries: Libraries) {
+        self.libraries = libraries
+        _files = State(initialValue: SettingsFilesModel(libraries: libraries))
+    }
+
     var body: some View {
         SettingsPageColumn {
             opening
@@ -24,9 +30,11 @@ struct GeneralPage: View {
             dates
             privacy
             updates
-            reset
+            appSettings
         }
         .accessibilityIdentifier("GeneralPage")
+        .onAppear { files.refresh() }
+        .settingsSheet(presenting: files.sheet != nil, dismiss: { files.close() }) { SettingsFilesSheet(model: files) }
         .alert("Reset This App’s Settings?", isPresented: $isConfirmingReset) {
             Button("Cancel", role: .cancel) {}
             Button("Reset", role: .destructive) { resetSettings() }
@@ -195,10 +203,25 @@ struct GeneralPage: View {
         }
     }
 
-    // MARK: Reset
+    // MARK: This app's settings
 
-    private var reset: some View {
-        SettingsSection("Reset") {
+    private var appSettings: some View {
+        SettingsSection("This App’s Settings") {
+            SettingsRow("Export Settings", line: "Save every setting to a file.") {
+                SettingsButton("Export…") { files.export() }
+                    .accessibilityIdentifier("ExportSettings")
+            }
+            SettingsRow("Import Settings", line: "Replace settings with those in a file.") {
+                SettingsButton("Import…") { files.chooseFileToImport() }
+                    .accessibilityIdentifier("ImportSettings")
+            }
+            SettingsRow(
+                "Restore Earlier Settings", line: files.restorePoints.isEmpty ? "None saved yet." : "Go back to settings saved before a change.",
+                look: files.restorePoints.isEmpty ? .off : .normal
+            ) {
+                SettingsButton("Restore…") { files.chooseRestorePoint() }
+                    .accessibilityIdentifier("RestoreSettings")
+            }
             SettingsRow("Reset This App’s Settings", line: libraries.preferences.syncs ? "On every Mac that connects to this Marfa. Your items stay." : "Every setting on this Mac. Your items stay.") {
                 SettingsButton("Reset…", role: .destructive) { isConfirmingReset = true }
                     .accessibilityIdentifier("ResetSettings")
@@ -206,21 +229,24 @@ struct GeneralPage: View {
         }
     }
 
-    /// Where the settings sync, a reset reaches every Mac that connects to the Marfa.
+    /// Where the settings sync, a reset reaches every Mac that connects to the Marfa. Either way a restore point is saved first.
     private var resetMessage: String {
-        guard libraries.preferences.syncs else { return String(localized: "Every setting on this Mac starts over. Your items and sign-in stay.") }
-        guard let name = libraries.preferences.marfaName else {
-            return String(localized: "This app’s settings start over on every Mac that connects to this Marfa. Your items and sign-in stay.")
+        guard libraries.preferences.syncs else {
+            return String(localized: "Every setting on this Mac starts over. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back.")
         }
-        return String(localized: "This app’s settings start over on every Mac that connects to \(name). Your items and sign-in stay.")
+        guard let name = libraries.preferences.marfaName else {
+            return String(localized: "This app’s settings start over on every Mac that connects to this Marfa. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back.")
+        }
+        return String(localized: "This app’s settings start over on every Mac that connects to \(name). Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back.")
     }
 
     private func resetSettings() {
         // Only once the settings are reset, so a Reset that waits for a sync step and then cannot save its restore point
         // leaves the updater and reporting as their switches still read.
-        libraries.resetMacSettings { [updater] in
+        libraries.resetMacSettings { [updater, files] in
             updater?.resetChoices()
             Reporting.shared.switchChanged(to: true)
+            files.refresh()
         }
     }
 }
