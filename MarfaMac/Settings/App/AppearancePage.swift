@@ -165,22 +165,22 @@ struct AppearancePage: View {
     private var layout: some View {
         SettingsSection("Window Layout", footer: "New windows open at these widths.") {
             ForEach(ColumnWidth.allCases) { ColumnWidthRow(column: $0) }
-            SettingsRow("From This Window", line: "Or back to \(ColumnWidth.allCases.map { Int($0.defaultWidth).formatted() }.formatted(.list(type: .and))).") {
-                HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                    SettingsButton("Reset") {
-                        for column in ColumnWidth.allCases { UserDefaults.standard.removeObject(forKey: column.key) }
+            SettingsRow("From This Window", line: "The widths this window has now.") {
+                SettingsButton("Use Current Widths") {
+                    guard let front = registry.front else { return }
+                    for column in ColumnWidth.allCases {
+                        UserDefaults.standard.set(Double(column.resolved(Double(front.width(of: column)))), forKey: column.key)
                     }
-                    .accessibilityIdentifier("ColumnWidthsReset")
-                    SettingsButton("Use Current Widths") {
-                        guard let front = registry.front else { return }
-                        for column in ColumnWidth.allCases {
-                            UserDefaults.standard.set(Double(column.resolved(Double(front.width(of: column)))), forKey: column.key)
-                        }
-                    }
-                    .disabled(registry.front == nil)
-                    .help(registry.front == nil ? "Open a window to use its column widths." : "Make the widths set in this window the defaults for new windows.")
-                    .accessibilityIdentifier("ColumnWidthsUseCurrent")
                 }
+                .disabled(registry.front == nil)
+                .help(registry.front == nil ? "Open a window to use its column widths." : "Make the widths set in this window the defaults for new windows.")
+                .accessibilityIdentifier("ColumnWidthsUseCurrent")
+            }
+            SettingsRow("Reset Widths", line: "Back to \(ColumnWidth.allCases.map { Int($0.defaultWidth).formatted() }.formatted(.list(type: .and))).") {
+                SettingsButton("Reset") {
+                    for column in ColumnWidth.allCases { UserDefaults.standard.removeObject(forKey: column.key) }
+                }
+                .accessibilityIdentifier("ColumnWidthsReset")
             }
         }
     }

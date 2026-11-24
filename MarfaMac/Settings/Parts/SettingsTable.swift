@@ -28,7 +28,7 @@ struct SettingsRowAction<Row> {
     let perform: (Row) -> Void
 }
 
-/// A table's search field, small, at the trailing edge of a section's name or of the page's count.
+/// A table's search field, 28 points, at the trailing edge of a section's name or of the page's count.
 struct SettingsTableSearch: View {
     @Binding var text: String
 
@@ -45,12 +45,30 @@ struct SettingsTableFilter<Value: Hashable, Choices: View>: View {
 
     var body: some View {
         HStack(spacing: SettingsTokens.Metric.searchSpacing) {
-            Picker("Filter", selection: $choice) { choices }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
+            SettingsFilterPopUp(selection: $choice) { choices }
             SettingsTableSearch(text: $search)
         }
+    }
+}
+
+/// A table's filter: a pop-up with no fill, as a header row draws every control, which shows its shape only under the pointer.
+struct SettingsFilterPopUp<Value: Hashable, Choices: View>: View {
+    @Binding var selection: Value
+    @ViewBuilder let choices: Choices
+    @State private var isHovered = false
+
+    var body: some View {
+        Picker("Filter", selection: $selection) { choices }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .buttonStyle(.borderless)
+            .controlSize(.large)
+            .fontWeight(.regular)
+            .fixedSize()
+            .frame(height: SettingsTokens.Metric.controlHeight)
+            .padding(.horizontal, 4)
+            .background(isHovered ? SettingsTokens.buttonFill : .clear, in: .capsule)
+            .onHover { isHovered = $0 }
     }
 }
 
@@ -159,7 +177,7 @@ struct SettingsSectionTable<Row: Identifiable>: View {
                                 .foregroundStyle(SettingsTokens.secondaryText)
                         }
                         Spacer(minLength: 0)
-                        if let showAll { SettingsButton("Show All", small: true, action: showAll) }
+                        if let showAll { SettingsShowAllButton(action: showAll) }
                     }
                     .padding(.horizontal, SettingsTokens.Metric.inset)
                     .frame(height: 38)

@@ -172,16 +172,16 @@ struct ConnectionPage: View {
             }
             if account.showsPermissions {
                 SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: account.permissionsLine)) {
-                    HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                        if account.holdsAll { SettingsValue(verbatim: account.permissionsValue) }
-                        // The one Allow More… on the page: it asks for the owner's name too, which every sign-in asks for.
-                        if !account.holdsAll || account.offersName {
-                            SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
-                                Task { _ = await settingsHost.allowMore(ConnectionAccount.asked) }
-                            }
-                            .disabled(settingsHost.isAllowingMore)
-                            .accessibilityIdentifier("AllowMore")
+                    // The one Allow More… on the page: it asks for the owner's name too, which every sign-in asks for. A row holds
+                    // one control, so the value stands only where there is no button.
+                    if !account.holdsAll || account.offersName {
+                        SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
+                            Task { _ = await settingsHost.allowMore(ConnectionAccount.asked) }
                         }
+                        .disabled(settingsHost.isAllowingMore)
+                        .accessibilityIdentifier("AllowMore")
+                    } else {
+                        SettingsValue(verbatim: account.permissionsValue)
                     }
                 }
                 .accessibilityIdentifier("LookAfterThisMarfa")
@@ -327,7 +327,7 @@ struct ConnectionPage: View {
                     SettingsButton("Cancel") { model.cancelSignIn() }.accessibilityIdentifier("MarfaSignInCancel")
                 }
             }
-            SettingsButton("Use a Code Instead…") { model.start(code) }
+            SettingsButton("Use a Code Instead") { model.start(code) }
                 .disabled(!canStart)
                 .accessibilityIdentifier(identifier + "Code")
             SettingsButton(title) { model.start(browser) }
@@ -344,16 +344,16 @@ struct ConnectionPage: View {
                 footer: Text("Open \(code.address.absoluteString) on any device, sign in and type the code. It stops working at \(DateDisplay.timeOfDay(of: code.expiresAt, format: .stored())).")
             ) {
                 SettingsRow(verbatim: code.code) {
-                    HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                        SettingsButton("Open Page") { NSWorkspace.shared.open(code.completeAddress ?? code.address) }
-                        SettingsButton("Copy Code") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(code.code, forType: .string)
-                        }
+                    SettingsButton("Copy Code") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(code.code, forType: .string)
                     }
                 }
                 .textSelection(.enabled)
                 .accessibilityIdentifier("MarfaSignInCode")
+                SettingsRow(title: Text("Approve in a Browser"), line: Text(verbatim: code.address.absoluteString)) {
+                    SettingsButton("Open Page…") { NSWorkspace.shared.open(code.completeAddress ?? code.address) }
+                }
             }
         }
     }

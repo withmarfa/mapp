@@ -397,10 +397,9 @@ private struct ConnectorSecretSheet: View {
                     .accessibilityIdentifier("ConnectorSecretField")
                 }
             } buttons: {
-                Spacer(minLength: 0)
                 SettingsButton("Cancel") { model.closeSheet() }
-                SettingsButton("Save") { Task { await model.saveSecret() } }
-                    .disabled(!model.canSaveSecret).keyboardShortcut(.defaultAction)
+                SettingsButton("Save", role: .confirm) { Task { await model.saveSecret() } }
+                    .disabled(!model.canSaveSecret)
                     .accessibilityIdentifier("ConnectorSecretSave")
             }
         }

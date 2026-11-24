@@ -114,7 +114,10 @@ enum SettingsTokens {
         /// The lead column, in which a tile, a symbol or a mark sits; text starts after it, at 52.
         static let leadColumn: CGFloat = 24
         static let textInset: CGFloat = 52
-        static let controlWidth: CGFloat = 200
+        /// An input at a row's end: a pop-up, a text field, a shortcut field and a slider.
+        static let controlWidth: CGFloat = 160
+        /// A number's field, with its unit after it.
+        static let numberWidth: CGFloat = 72
         /// A field's height, which the system draws and a read-only value is as tall as.
         static let controlHeight: CGFloat = 28
         /// A table that is a page: its side margin, and the height of the bar above its columns and of the foot below them.
@@ -150,7 +153,7 @@ enum SettingsTokens {
         /// A well's symbol or mark, as a share of its side: 12 points in the 24 point well.
         static let wellGlyph: CGFloat = 0.5
         static let headTile: CGFloat = 44
-        /// A small search field at a list's trailing edge, and the button beside it that changes what it searches by.
+        /// A search field at a list's trailing edge, 28 points tall, and the button beside it that changes what it searches by.
         static let searchWidth: CGFloat = 200
         static let searchSpacing: CGFloat = 8
         /// The sidebar's tile.

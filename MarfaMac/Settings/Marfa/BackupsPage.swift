@@ -105,13 +105,10 @@ struct BackupsPage: View {
                 keepIn
                 if model.place == .folder, let folder = model.settings?.folder {
                     SettingsRow(
-                        verbatim: String(localized: "Folder"), line: String(localized: "On the machine \(host.serverName) runs on."),
+                        verbatim: String(localized: "Folder"), line: String(localized: "\(folder), on the machine \(host.serverName) runs on."),
                         lead: .symbol("folder")
                     ) {
-                        HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                            SettingsValue(verbatim: folder)
-                            SettingsButton("Change…") { model.beginFolder() }
-                        }
+                        SettingsButton("Change…") { model.beginFolder() }
                     }
                 }
                 if let settings = model.settings {
@@ -249,10 +246,9 @@ struct BackupSheet: View {
                     width: nil, onSubmit: { Task { await model.saveFolder() } })
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.close() }
-            SettingsButton("Use Folder") { Task { await model.saveFolder() } }
-                .disabled(!model.canSaveFolder).keyboardShortcut(.defaultAction)
+            SettingsButton("Use Folder", role: .confirm) { Task { await model.saveFolder() } }
+                .disabled(!model.canSaveFolder)
         }
     }
 
@@ -272,10 +268,9 @@ struct BackupSheet: View {
                 }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.close() }.disabled(model.isRestoring)
-            SettingsButton(model.isRestoring ? "Restoring…" : "Restore…", reserving: "Restoring…") { Task { await model.restore() } }
-                .disabled(model.isRestoring).keyboardShortcut(.defaultAction)
+            SettingsButton(model.isRestoring ? "Restoring…" : "Restore", role: .confirm, reserving: "Restoring…") { Task { await model.restore() } }
+                .disabled(model.isRestoring)
         }
     }
 }
