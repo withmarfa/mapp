@@ -28,6 +28,16 @@ struct MarfaWriteRecordTests {
         #expect(answer.outcome == .dead)
     }
 
+    /// A write still blocked may yet be made, but one refused never will be.
+    @Test func aRefusalOutweighsABlockedWrite() {
+        var record = MarfaWriteRecord()
+        let id = WriteID()
+        record.record(id, queued: ["a", "b"])
+
+        #expect(record.answer("a", .refused(SyncProblem(code: "validation_error"))) == nil)
+        #expect(record.answer("b", .dead)?.outcome == .refused(SyncProblem(code: "validation_error")))
+    }
+
     /// A blocked write is sent again once released, so what it was waiting for hears its final answer too.
     @Test func aBlockedWriteIsAnsweredAgainWhenItsFinalAnswerComes() {
         var record = MarfaWriteRecord()

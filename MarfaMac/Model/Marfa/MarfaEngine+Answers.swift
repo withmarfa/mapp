@@ -24,9 +24,9 @@ extension MarfaEngine {
         }
         var answers = taken
         if let queued = try? await copy.queue.all() {
-            answers += queued.filter { $0.verdict != nil && !told.contains($0.id) }
-            // A released write has no verdict, so a later refusal of it is told again.
-            told = Set(queued.filter { $0.verdict != nil }.map(\.id))
+            // A blocked write that is released and then refused carries a new verdict, which is told too.
+            answers += queued.filter { $0.verdict != nil && told[$0.id] != $0.verdict }
+            told = Dictionary(queued.compactMap { write in write.verdict.map { (write.id, $0) } }, uniquingKeysWith: { _, last in last })
         }
         let library = await libraryWrites(answers)
         let shown = Set(library.map(\.id))

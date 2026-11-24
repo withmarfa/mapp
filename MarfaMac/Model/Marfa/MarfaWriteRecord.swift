@@ -1,7 +1,7 @@
 /// The app's writes the engine has queued, each of which the package may queue as several writes, until every one
 /// of those has a final answer. The app's write is answered once every queued write it made has an answer, with the
-/// weightiest among them: a refusal or a conflict over a merge, and a merge over an acceptance. A blocked or dead
-/// write is sent again once released, so its later answer is given too.
+/// weightiest among them: a refusal or a conflict over a write still blocked or dead, which is over a merge, and a
+/// merge over an acceptance. A blocked or dead write is sent again once released, so its later answer is given too.
 nonisolated struct MarfaWriteRecord {
     /// The app's write for each queued write it made, until that write has a final answer.
     private var submitted: [String: WriteID] = [:]
@@ -45,7 +45,8 @@ nonisolated struct MarfaWriteRecord {
         switch outcome {
         case .accepted: 0
         case .merged: 1
-        default: 2
+        case .blocked, .dead: 2
+        case .refused, .conflicted: 3
         }
     }
 }
