@@ -12,9 +12,23 @@ struct SettingsSubpage: Hashable, Sendable {
     }
 }
 
+@MainActor protocol SettingsSubpageNavigation: AnyObject, Sendable {
+    func push(_ subpage: SettingsSubpage)
+    func back()
+}
+
+/// The sub-page actions compare by the identity of the window's navigation.
+nonisolated struct SettingsNavigationActions: Equatable, Sendable {
+    let navigation: any SettingsSubpageNavigation
+
+    static func == (left: Self, right: Self) -> Bool { left.navigation === right.navigation }
+
+    @MainActor func push(_ subpage: SettingsSubpage) { navigation.push(subpage) }
+    @MainActor func back() { navigation.back() }
+}
+
 extension EnvironmentValues {
-    /// The window's history, shared by pages that open or leave a sub-page.
-    @Entry var settingsNavigation: SettingsNavigation?
+    @Entry var settingsNavigation: SettingsNavigationActions?
     /// The sub-page the window shows, or nil where the page shows itself.
     @Entry var settingsSubpage: SettingsSubpage?
 }

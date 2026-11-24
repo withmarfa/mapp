@@ -112,7 +112,7 @@ struct SettingsDetail: View {
             }
         }
         .environment(\.settingsSubpage, navigation.current.subpage)
-        .environment(\.settingsNavigation, navigation)
+        .environment(\.settingsNavigation, SettingsNavigationActions(navigation: navigation))
         .id(navigation.current)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("SettingsDetail")

@@ -2,9 +2,7 @@ import SwiftUI
 
 /// Where the Settings window is, and where Back and Forward go: a history of pages and the sub-pages pushed on them. The
 /// app holds one, so every route that opens Settings names a page in the same window.
-@Observable @MainActor final class SettingsNavigation: Equatable {
-    nonisolated static func == (lhs: SettingsNavigation, rhs: SettingsNavigation) -> Bool { lhs === rhs }
-
+@Observable @MainActor final class SettingsNavigation: SettingsSubpageNavigation {
     struct Place: Hashable {
         var page: SettingsPage
         var subpage: SettingsSubpage?
