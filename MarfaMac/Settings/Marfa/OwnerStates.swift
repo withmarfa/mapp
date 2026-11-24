@@ -79,6 +79,7 @@ struct OwnerProblemRow: View {
     var line: String?
     let page: MarfaSettingsPage
     let host: any MarfaSettingsHost
+    var additionalActions: [SettingsProblemAction] = []
     var retry: (() -> Void)?
 
     var body: some View {
@@ -114,7 +115,7 @@ struct OwnerProblemRow: View {
     }
 
     private var actions: [SettingsProblemAction] {
-        switch offer {
+        let offered: [SettingsProblemAction] = switch offer {
         case .allowMore(let scope):
             [SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { host.askForMore(naming: scope) }]
         case .tryAgain:
@@ -122,6 +123,7 @@ struct OwnerProblemRow: View {
         case .nothing:
             []
         }
+        return offered + additionalActions
     }
 }
 

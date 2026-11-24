@@ -37,9 +37,10 @@ import Observation
     }
     private var list = TypeList()
     @ObservationIgnored private var listGeneration = 0
-    private(set) var failure: OwnerFailure?
-    private(set) var hasLoaded = false
-    private(set) var isLoading = false
+    private let loader = OwnerLoader()
+    private var detailReads: [String: OwnerLoader.ReadStatus] = [:]
+    var failure: OwnerFailure? { loader.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
     /// The line a refusal gives, by the field it is about, for the type open now.
     var fieldErrors: [Field: String] = [:]
     /// A refusal that is not about one field, shown above the sections.
@@ -115,25 +116,20 @@ import Observation
     // MARK: Reading
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
-            let listing = try await calls.types()
-            records = listing.types.filter { !Self.isHidden($0.id) }
-            pluginTitles = listing.pluginTitles
-            failure = nil
-        } catch {
-            failure = Self.owner(error)
-            await context.learn(from: Self.owner(error))
-        }
-        if let id = openID {
-            open(id)
-            await loadReading(of: id)
-        }
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+            do throws(TypeFailure) {
+                let listing = try await calls.types()
+                records = listing.types.filter { !Self.isHidden($0.id) }
+                pluginTitles = listing.pluginTitles
+            } catch {
+                throw Self.owner(error)
+            }
+        }, after: {
+            if let id = openID {
+                open(id)
+                await loadReading(of: id)
+            }
+        })
     }
 
     /// `system.*` and `app.*` are machinery that no app lists.
@@ -154,8 +150,18 @@ import Observation
     func record(_ id: String) -> TypeRecord? { list.recordsByID[id] }
 
     func loadReading(of id: String) async {
-        if let read = try? await calls.reading(of: id) { readings[id] = read }
+        let status = detailReads[id, default: OwnerLoader.ReadStatus()]
+        if detailReads[id] == nil { detailReads[id] = status }
+        await loader.read(.required(status) { [self] () throws(OwnerFailure) in
+            do throws(TypeFailure) {
+                readings[id] = try await calls.reading(of: id)
+            } catch {
+                throw Self.owner(error)
+            }
+        }, in: context)
     }
+
+    func readingFailure(of id: String) -> OwnerFailure? { detailReads[id]?.failure }
 
     /// Reads the types again, so the page shows what the server holds.
     @discardableResult

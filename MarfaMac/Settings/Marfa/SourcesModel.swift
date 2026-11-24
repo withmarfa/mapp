@@ -89,8 +89,15 @@ struct SourceAccess {
     // MARK: Changes
 
     /// A change made from a source's menu, with no sheet: the line is shown on the page's own refusal row.
-    func useDefaultName(_ code: String) async { listFailure = await access.change(code, .useDefaultName) }
-    func removeMark(_ code: String) async { listFailure = await access.change(code, .removeMark) }
+    func useDefaultName(_ code: String) async { await changeFromMenu(.useDefaultName, for: code) }
+    func removeMark(_ code: String) async { await changeFromMenu(.removeMark, for: code) }
+
+    private func changeFromMenu(_ change: MarfaSourceChange, for code: String) async {
+        guard !isWorking else { return }
+        isWorking = true
+        defer { isWorking = false }
+        listFailure = await access.change(code, change)
+    }
 
     func rename() async { await run(.rename(trimmedName), allowed: canRename) }
     func useDefaultName() async { await run(.useDefaultName, allowed: canUseDefaultName) }

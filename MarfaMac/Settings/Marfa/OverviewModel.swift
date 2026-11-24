@@ -10,10 +10,24 @@ import Observation
     private let healthReader: ServerHealthModel
 
     private(set) var concerns: [AttentionConcern] = []
-    private(set) var reading: InstanceReading?
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private(set) var metrics: InstanceMetricsReading?
+    private(set) var update: UpdateStatus?
+    private(set) var owner: String?
+    private var lastBackup: Date?
+
+    var updateReady: String? {
+        guard let update, update.available else { return nil }
+        return update.latest?.version
+    }
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    private let metricsRead = OwnerLoader.ReadStatus()
+    private let updateRead = OwnerLoader.ReadStatus()
+    private let backupsRead = OwnerLoader.ReadStatus()
+    var metricsFailure: OwnerFailure? { metricsRead.failure }
+    var releaseFailure: OwnerFailure? { updateRead.failure }
+    var lastBackupFailure: OwnerFailure? { backupsRead.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
 
     init(context: OwnerContext, health: ServerHealthModel? = nil) {
         self.context = context
@@ -25,7 +39,7 @@ import Observation
 
     /// The release the server runs, left out for a development build: it carries version 0.0.0, which is no version.
     var releaseVersion: String? {
-        reading?.version.flatMap { $0 == Self.developmentVersion ? nil : $0 }
+        (update?.running ?? metrics?.version).flatMap { $0 == Self.developmentVersion ? nil : $0 }
     }
 
     static let developmentVersion = "0.0.0"
@@ -47,36 +61,40 @@ import Observation
 
     /// The backups row, from the server's own account of its backups.
     var backups: BackupsHealth {
-        guard var backups = healthReader.health?.backups else { return BackupsHealth(state: .unknown, lastBackup: reading?.lastBackup) }
-        backups.lastBackup = backups.lastBackup ?? reading?.lastBackup
+        guard var backups = healthReader.health?.backups else { return BackupsHealth(state: .unknown, lastBackup: lastBackup) }
+        backups.lastBackup = backups.lastBackup ?? lastBackup
         return backups
     }
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        await healthReader.load()
-        do {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+            await healthReader.load()
             concerns = try await context.calls.attention()
-            failure = nil
-        } catch {
-            failure = error
-            await context.learn(from: error)
-            return
-        }
-        reading = try? await context.calls.reading()
+        }, secondary: [
+            .required(metricsRead) { [self] () throws(OwnerFailure) in metrics = try await context.calls.instanceMetrics() },
+            .required(updateRead) { [self] () throws(OwnerFailure) in update = try await context.calls.updateStatus() },
+            .required(backupsRead) { [self] () throws(OwnerFailure) in
+                guard context.grants().contains(.backupsManage) else {
+                    lastBackup = nil
+                    return
+                }
+                lastBackup = try await context.calls.backups().map(\.taken).max()
+            },
+            .quiet { [self] () throws(OwnerFailure) in owner = try await context.calls.profile().username },
+        ])
     }
 
     /// Forgets what was read, such as when another server is opened.
     func reset() {
         concerns = []
-        reading = nil
-        failure = nil
-        hasLoaded = false
+        metrics = nil
+        update = nil
+        owner = nil
+        lastBackup = nil
+        metricsRead.clear()
+        updateRead.clear()
+        backupsRead.clear()
+        loader.reset()
         healthReader.reset()
     }
 }

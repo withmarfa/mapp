@@ -30,9 +30,9 @@ import Observation
     private let context: OwnerContext
 
     private(set) var settings: AddressSettings?
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
     var sheet: Sheet?
     var input = ""
     /// What the server last said a typed change would do. It answers the address that was typed then, so read it through
@@ -88,19 +88,9 @@ import Observation
     var otherAddresses: [String] { settings.map { settings in settings.addresses.filter { $0 != settings.signIn } } ?? [] }
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
             settings = try await context.calls.addresses()
-            failure = nil
-        } catch {
-            failure = error
-            await context.learn(from: error)
-        }
+        })
     }
 
     // MARK: The sheets

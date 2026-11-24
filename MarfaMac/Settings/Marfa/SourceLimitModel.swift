@@ -23,12 +23,14 @@ import Observation
     private(set) var typeNames: [String: String] = [:]
     var types: Set<String> = []
     var checkedSources: Set<String> = []
-    private(set) var failure: OwnerFailure?
+    private let loader = OwnerLoader()
+    private let typesRead = OwnerLoader.ReadStatus()
+    var failure: OwnerFailure? { loader.failure }
+    var typesFailure: OwnerFailure? { typesRead.failure }
     /// One line under the page's rows for what the server refused or the page can't send.
     private(set) var line: String?
-    private(set) var isLoading = false
     private(set) var isSaving = false
-    private(set) var hasLoaded = false
+    var hasLoaded: Bool { loader.hasLoaded }
 
     init(context: OwnerContext, sources: @escaping () -> [MarfaSourceRow]) {
         self.context = context
@@ -63,28 +65,18 @@ import Observation
     var canSave: Bool { hasEdits && !isSaving && (types.isEmpty || !checkedSources.isEmpty) }
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
             let read = try await context.calls.sourceLimit()
-            // Whether the person has edited is judged against the limit they were shown, not the one just read.
+            // Judge the draft against the limit the person was shown.
             let keepsDraft = hasEdits && hasLoaded
             limit = read
             if !keepsDraft {
                 types = Set(read.types)
                 checkedSources = Set(read.sources)
             }
-            failure = nil
-        } catch {
-            failure = error
-            await context.learn(from: error)
-            return
-        }
-        typeNames = (try? await context.calls.typeNames()) ?? typeNames
+        }, secondary: [
+            .required(typesRead) { [self] () throws(OwnerFailure) in typeNames = try await context.calls.typeNames() },
+        ])
     }
 
     func revert() {

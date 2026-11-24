@@ -62,6 +62,11 @@ struct ConnectorMappingPage: View {
             if let failure = model.saveFailure {
                 OwnerProblem(title: "Not Saved", failure: failure, page: .connectors, host: host)
             }
+            if let failure = model.optionsFailure {
+                OwnerProblem(title: "Couldn’t Read Available Types", failure: failure, page: .connectors, host: host) {
+                    Task { await model.load() }
+                }
+            }
             if entry.draft.enabled { previewSection }
             brings(entry)
             if entry.draft.enabled {

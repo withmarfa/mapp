@@ -394,9 +394,11 @@ struct RenderedWindow<Detail: View>: View {
                 AttentionConcern(kind: .key, reference: "key-1", title: "Backup script expires on Monday"),
                 AttentionConcern(kind: .connector, reference: "rss", title: "RSS reports a problem"),
             ]
-            $0.reading = InstanceReading(
-                version: "0.0.84", updateReady: "0.0.85", databaseBytes: 214_000_000, fileBytes: 3_400_000_000,
-                lastBackup: Calendar.current.date(bySettingHour: 14, minute: 0, second: 0, of: .now), owner: "Mira Castell")
+            $0.metrics = InstanceMetricsReading(version: "0.0.84", databaseBytes: 214_000_000, fileBytes: 3_400_000_000)
+            $0.update.available = true
+            $0.update.latest = UpdateRelease(version: "0.0.85")
+            $0.profile = OwnerProfile(username: "Mira Castell", emailIsReadable: true, email: nil)
+            $0.health?.backups.lastBackup = Calendar.current.date(bySettingHour: 14, minute: 0, second: 0, of: .now)
         }
         host.bindOverview()
         try await SettingsRender.png(windowed(.overview, host: host, badge: 2), size: Self.size, named: "Overview")
@@ -404,7 +406,9 @@ struct RenderedWindow<Detail: View>: View {
 
     @Test func overviewWithoutTheOwnersPermissions() async throws {
         let host = await stub { $0.grants = [.instanceRead, .keysManage, .itemsPurge, .grantsManage, .keysMint] }
-        fake(host).state.withLock { $0.reading = InstanceReading(version: "0.0.84", databaseBytes: 214_000_000, fileBytes: 3_400_000_000) }
+        fake(host).state.withLock {
+            $0.metrics = InstanceMetricsReading(version: "0.0.84", databaseBytes: 214_000_000, fileBytes: 3_400_000_000)
+        }
         host.bindOverview()
         try await SettingsRender.png(windowed(.overview, host: host), size: Self.size, named: "Overview, without the owner’s permissions")
     }
@@ -475,7 +479,8 @@ struct RenderedWindow<Detail: View>: View {
                 stores: [
                     FileStoreRow(id: "a", kind: .disk, locator: "/var/lib/marfa/files", error: nil),
                     FileStoreRow(id: "b", kind: .folder, locator: "/Volumes/Studio Backup", error: nil),
-                ], fileBytes: 3_400_000_000, orphanCount: 3, orphanBytes: 12_000_000, firstFound: .now, orphansComplete: true)
+                ], orphanCount: 3, orphanBytes: 12_000_000, firstFound: .now, orphansComplete: true)
+            $0.metrics.fileBytes = 3_400_000_000
         }
         try await SettingsRender.png(windowed(.fileStorage, host: host), size: Self.size, named: "File Storage")
     }

@@ -101,7 +101,6 @@ The Marfa's pages show and change what the server holds for the owner. They use 
 - Folders: renaming, the tree of what a folder holds, the ignore and include patterns, the removal and addition limits, Read Every File Every, Stop Syncing and a button for removals that wait. Each needs the server's folder doors (`GET /folders`, `PATCH /folders/{id}` and `POST /folders/{id}/revoke`) or the paths of the `in-folder` edges, none of which the package's client offers. Read Every File Every is the copy's own setting, never the server's.
 - Backups: Export Everything and Restore an Archive (files the app reads and writes itself, which On This Mac's export covers for the owner's own items), adopting another instance's backup folder, and choosing an object store.
 - Keys: making a key end sooner, and the Needs Attention row on the list for a key that ends soon, which has no rule yet for how soon. The Overview shows the server's own concern for it.
-- Updates: a confirmation before Update, which the board does not draw.
 - Housekeeping: Run Now, and the jobs that only tidy the server's inside.
 - Activity's total count and a "Who" or "What" that names the item, which the audit log does not give.
 - Limits the board does not draw: the file inflation and memory caps, the inbound byte caps and the held and kept delivery counts, and the retention periods, which belong to the pages that own them.

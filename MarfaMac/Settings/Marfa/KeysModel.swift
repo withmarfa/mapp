@@ -70,9 +70,9 @@ import Observation
 
     private(set) var keys: [KeyInfo] = []
     private(set) var typeNames: [String: String] = [:]
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
     var sheet: Sheet?
     /// Whether New Key shows its owner permissions, a page of its own inside the sheet, in place of its fields.
     var isChoosingPermissions = false
@@ -96,7 +96,8 @@ import Observation
     /// expiry not known is not "no limit", so a key is extended only once this is read.
     private(set) var identity: OwnIdentity?
     /// Why who the app is signed in as could not be read, while it is not known.
-    private(set) var identityFailure: OwnerFailure?
+    private let identityRead = OwnerLoader.ReadStatus()
+    var identityFailure: OwnerFailure? { identityRead.failure }
     var extensionChoice: Extension = .days(30)
     private(set) var extendError: String?
     private(set) var isExtending = false
@@ -142,29 +143,14 @@ import Observation
     }
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
             let read = try await context.calls.keys()
             keys = read
             gone = gone.filter { id in !read.contains { $0.id == id } }
-            failure = nil
-        } catch {
-            failure = error
-            await context.learn(from: error)
-            return
-        }
-        typeNames = (try? await context.calls.typeNames()) ?? typeNames
-        do {
-            identity = try await context.calls.identity()
-            identityFailure = nil
-        } catch {
-            identityFailure = identity == nil ? error : nil
-        }
+        }, secondary: [
+            .quiet { [self] () throws(OwnerFailure) in typeNames = try await context.calls.typeNames() },
+            .required(identityRead) { [self] () throws(OwnerFailure) in identity = try await context.calls.identity() },
+        ])
     }
 
     // MARK: New key

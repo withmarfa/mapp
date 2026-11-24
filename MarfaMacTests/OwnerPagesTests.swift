@@ -48,8 +48,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var websitesSent: [[String]] = []
         var gates: [String: OwnerCallGate] = [:]
         var concerns: [AttentionConcern] = []
-        var reading = InstanceReading()
-        var fileStores = FileStores(stores: [], fileBytes: nil, orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
+        var metrics = InstanceMetricsReading(version: "0.0.84", databaseBytes: nil, fileBytes: 0)
+        var fileStores = FileStores(stores: [], orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
         var sourceLimit = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: nil)
         /// What each source limit write sent: the filter, or nil for turning it off.
         var limitsSent: [(types: [String], sources: [String])?] = []
@@ -359,9 +359,9 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return state.withLock { $0.concerns }
     }
 
-    func reading() async throws(OwnerFailure) -> InstanceReading {
-        try enter("reading")
-        return state.withLock { $0.reading }
+    func instanceMetrics() async throws(OwnerFailure) -> InstanceMetricsReading {
+        try enter("instanceMetrics")
+        return state.withLock { $0.metrics }
     }
 
     func fileStores() async throws(OwnerFailure) -> FileStores {
@@ -1348,6 +1348,29 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         bench.grants = [.grantsManage]
         await model.load()
         #expect(model.keysMade.isEmpty)
+    }
+
+    @Test func aFailedKeysReadIsToldAndKeepsTheKeysAlreadyRead() async {
+        let bench = bench(app())
+        let key = KeyInfo(id: "k", label: "Raycast capture", source: "raycast", permissions: [], tier: .feed, types: [:], appClientID: "raycast")
+        bench.calls.state.withLock { $0.keys = [key] }
+        let model = AppsModel(context: bench.context)
+        bench.calls.fail("keys", with: .unreachable)
+        await model.load()
+        #expect(model.failure == nil)
+        #expect(model.keysFailure == .unreachable)
+        #expect(model.apps.count == 1)
+
+        bench.calls.fail("keys", with: nil)
+        await model.load()
+        #expect(model.keysFailure == nil)
+        #expect(model.keysMade["raycast"] == [key])
+
+        bench.calls.fail("keys", with: .notPermitted("keys.manage"))
+        await model.load()
+        #expect(model.keysFailure == .notPermitted("keys.manage"))
+        #expect(model.keysMade["raycast"] == [key])
+        #expect(bench.refreshed == 1)
     }
 
     @Test func scopesAreNarrowedAndNeverWidened() {

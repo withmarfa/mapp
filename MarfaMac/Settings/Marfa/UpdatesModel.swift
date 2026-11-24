@@ -13,9 +13,12 @@ import Observation
     private let patience: Int
 
     private(set) var status: UpdateStatus?
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    private let settingsRead = OwnerLoader.ReadStatus()
+    var settingsFailure: OwnerFailure? { settingsRead.failure }
+    var canChangeSettings: Bool { context.grants().contains(.configManage) }
+    var hasLoaded: Bool { loader.hasLoaded }
     private(set) var isChecking = false
     private(set) var isStarting = false
     /// Whether the server stopped answering while an update ran, which is how it restarts.
@@ -61,30 +64,28 @@ import Observation
     }
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
-            status = try await context.calls.updateStatus()
-            failure = nil
-            lostTrack = false
-        } catch {
-            let error = UpkeepWording.owned(error)
-            failure = error
-            await context.learn(from: error)
-            return
-        }
-        // An update already under way is shown at once, then followed to its end.
-        hasLoaded = true
-        if status?.progress != nil { await follow() }
-        guard context.grants().contains(.configManage) else {
-            settings = nil
-            return
-        }
-        settings = try? await context.calls.upkeepSettings()
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+            do throws(OwnerFailure) {
+                status = try await context.calls.updateStatus()
+                lostTrack = false
+            } catch {
+                throw UpkeepWording.owned(error)
+            }
+        }, secondary: [
+            .required(settingsRead) { [self] () throws(OwnerFailure) in
+                guard canChangeSettings else {
+                    settings = nil
+                    return
+                }
+                do throws(OwnerFailure) {
+                    settings = try await context.calls.upkeepSettings()
+                } catch {
+                    throw UpkeepWording.owned(error)
+                }
+            },
+        ], after: {
+            if status?.progress != nil { await follow() }
+        })
     }
 
     // MARK: Check and update
@@ -194,7 +195,7 @@ import Observation
     // MARK: Check Automatically
 
     func setChecksAutomatically(_ on: Bool) async {
-        guard let settings, !isSwitching, settings.checksForUpdates != on else { return }
+        guard canChangeSettings, settingsFailure == nil, let settings, !isSwitching, settings.checksForUpdates != on else { return }
         isSwitching = true
         error = nil
         defer { isSwitching = false }

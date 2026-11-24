@@ -60,7 +60,8 @@ struct BackupsPage: View {
                 SettingsRow(
                     verbatim: String(localized: "Restored the backup from \(UpkeepWording.momentInSentence(done.backup.taken))"),
                     line: String(localized: "Added \(done.outcome.added.formatted()) items. \(done.outcome.alreadyHeld.formatted()) were already here."),
-                    lead: .symbol("checkmark.circle"))
+                    lead: .symbol("checkmark.circle")
+                ) { SettingsButton("Close") { model.dismissRestored() } }
                 if !done.outcome.secretsToSet.isEmpty {
                     let keys = done.outcome.secretsToSet
                     SettingsProblemRow(
@@ -96,6 +97,11 @@ struct BackupsPage: View {
     private var whereAndWhen: some View {
         VStack(spacing: SettingsTokens.Metric.pageSpacing) {
             SettingsSection("Where and When") {
+                if let failure = model.settingsFailure {
+                    OwnerProblemRow(
+                        title: "Couldn’t Read Backup Settings", failure: failure, page: .backups, host: host,
+                        retry: { Task { await model.load() } })
+                }
                 keepIn
                 if model.place == .folder, let folder = model.settings?.folder {
                     SettingsRow(
@@ -118,7 +124,7 @@ struct BackupsPage: View {
                                 Text(verbatim: UpkeepWording.interval(seconds)).tag(seconds)
                             }
                         }
-                        .disabled(model.isChanging)
+                        .disabled(model.isChanging || model.settingsFailure != nil)
                     }
                 }
                 if hasDestination { lastBackup }
@@ -153,7 +159,7 @@ struct BackupsPage: View {
                     Text("Nowhere").tag(BackupsModel.Place.nowhere)
                     Text("A Folder").tag(BackupsModel.Place.folder)
                 }
-                .disabled(model.isChanging)
+                .disabled(model.isChanging || model.settingsFailure != nil)
             }
         } else {
             SettingsRow("Keep Backups In") { SettingsValue(verbatim: Self.destination(backupsHealth)) }

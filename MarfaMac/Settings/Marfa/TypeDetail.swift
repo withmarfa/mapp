@@ -87,9 +87,15 @@ struct TypeDetail: View {
     private var guidanceSection: some View {
         @Bindable var model = model
         let reading = model.reading(of: type.id)
+        let failure = model.readingFailure(of: type.id)
         let own = (reading?.guidance ?? type.guidance) ?? ""
         let ancestors = reading?.ancestors ?? []
         return SettingsSection("Guidance", line: "What an agent or an app builder reads to use the type.") {
+            if let failure {
+                OwnerProblemRow(title: "Couldn’t Read This Type’s Guidance", failure: failure, page: .types, host: host) {
+                    Task { await model.loadReading(of: type.id) }
+                }
+            }
             if isEditable {
                 SettingsStackRow(
                     title: Text("Guidance"),
@@ -108,7 +114,7 @@ struct TypeDetail: View {
                     }
                 }
             } else if own.isEmpty && ancestors.isEmpty {
-                SettingsRow("No Guidance", look: .off)
+                if failure == nil { SettingsRow("No Guidance", look: .off) }
             } else if !own.isEmpty {
                 SettingsStackRow(title: Text(type.origin == .plugin ? "From the Plugin" : "Guidance")) {
                     SettingsStackText(text: own, isLocked: true, isMarkdown: true)

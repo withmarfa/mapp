@@ -77,9 +77,10 @@ struct PluginsAccess {
     private let access: PluginsAccess
 
     private(set) var installed: [InstalledPlugin] = []
-    private(set) var failure: OwnerFailure?
-    private(set) var hasLoaded = false
-    private(set) var isLoading = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
+    var isLoading: Bool { loader.isLoading }
     private(set) var release = Release.reading
     private(set) var bundles: [String: Bundle] = [:]
     private(set) var typeInfo: [String: PluginTypeInfo] = [:]
@@ -95,7 +96,6 @@ struct PluginsAccess {
     /// The command last copied, for the button to say so.
     private(set) var copied: String?
     /// Loads that arrived while one was running. Each is resumed when that one finishes, and then reads for itself.
-    private var loadsWaiting: [CheckedContinuation<Void, Never>] = []
 
     init(context: OwnerContext, calls: any PluginCalls, access: PluginsAccess) {
         self.context = context
@@ -106,34 +106,14 @@ struct PluginsAccess {
     // MARK: Reading
 
     func load() async {
-        // One already running may be cancelled and leave nothing read. This one waits, then reads.
-        if isLoading {
-            await withCheckedContinuation { loadsWaiting.append($0) }
-            guard !Task.isCancelled else { return }
-            await load()
-            return
-        }
-        isLoading = true
-        defer {
-            isLoading = false
-            let waiting = loadsWaiting
-            loadsWaiting = []
-            waiting.forEach { $0.resume() }
-        }
-        do {
+        // The earlier page's task may be canceled, so the next page waits and reads again.
+        await loader.load(in: context, waitForPrevious: true, primary: { () throws(OwnerFailure) in
             installed = try await calls.installed()
-            failure = nil
-        } catch {
-            failure = error
-            hasLoaded = true
-            await context.learn(from: error)
-            return
-        }
-        // What a type is called is a nicety: without it the plugin's own IDs show.
-        typeInfo = (try? await calls.typeInfo()) ?? typeInfo
-        // The server's answers are all the page needs to show what is installed; the release is read after, in its own row.
-        hasLoaded = true
-        await readRelease()
+        }, secondary: [
+            .quiet { [self] () throws(OwnerFailure) in typeInfo = try await calls.typeInfo() },
+        ], after: {
+            await readRelease()
+        })
     }
 
     /// Reads the release again. A release that cannot be read drops every bundle read before. A read that was cancelled puts
@@ -282,9 +262,10 @@ struct PluginsAccess {
 
     /// Installs a bundle file the owner chose, exactly as it is.
     func installFile() async {
-        guard !isInstallingFile, let choice = await access.chooseBundle() else { return }
+        guard !isInstallingFile else { return }
         isInstallingFile = true
         defer { isInstallingFile = false }
+        guard let choice = await access.chooseBundle() else { return }
         problem = nil
         notice = nil
         commands[""] = nil

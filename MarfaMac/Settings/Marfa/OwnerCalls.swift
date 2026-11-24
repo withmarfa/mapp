@@ -239,7 +239,7 @@ nonisolated protocol OwnerCalls: Sendable {
     func attention() async throws(OwnerFailure) -> [AttentionConcern]
     /// How the server stands: its health, what it holds and whether an update is ready (`instance.read`). A part the server
     /// does not give is left out.
-    func reading() async throws(OwnerFailure) -> InstanceReading
+    func instanceMetrics() async throws(OwnerFailure) -> InstanceMetricsReading
     /// Where files are kept and the files nothing uses (`instance.read`).
     func fileStores() async throws(OwnerFailure) -> FileStores
     /// The source filter, with the instance that holds it (`config.manage`).
