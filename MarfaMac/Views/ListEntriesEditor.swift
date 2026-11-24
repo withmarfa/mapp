@@ -30,7 +30,6 @@ struct ListEntriesEditor: View {
             if isEditable, editing.pending == nil {
                 Button { editing.startEntry() } label: { Label("Add Entry", systemImage: "plus") }
                     .appButton(.secondary, size: .small)
-                    // The row's own label names the list beside the button; a spoken one needs it said.
                     .accessibilityLabel("Add Entry to \(label)")
                     .accessibilityIdentifier("ItemListAdd.\(key)")
             }
