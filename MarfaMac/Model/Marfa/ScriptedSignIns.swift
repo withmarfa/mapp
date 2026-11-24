@@ -37,8 +37,16 @@ nonisolated final class ScriptedSignIns: SignIns {
     /// The token a scripted sign-in that succeeds leaves held.
     let signedInKey = "signed-in"
 
-    init(_ held: [URL: String] = [:]) {
-        for (address, token) in held { save(token, for: address) }
+    /// Keeps each of `held`, with `scopes` beside the owner's permissions and the read of the name. The sample passes
+    /// `approvedBeyondPermissions`, as a sign-in approved in full; a key for a test server holds only what it was given.
+    init(_ held: [URL: String] = [:], scopes: [String] = []) {
+        for (address, token) in held { save(token, for: address, scopes: scopes) }
+    }
+
+    /// What a sign-in approved in full holds beyond the owner's permissions and the read of the name, as
+    /// `SystemSignIns.scopes` asks for it; a browser or code sign-in here is approved them.
+    static let approvedBeyondPermissions = SystemSignIns.scopes.filter {
+        InstancePermission(rawValue: $0) == nil && !SystemSignIns.profileScopes.contains($0)
     }
 
     /// What the steps were asked, in order, as `browser <address>`, `code <address>` and `signOut <address>`.
@@ -173,7 +181,7 @@ nonisolated final class ScriptedSignIns: SignIns {
         try await onBrowser.withLock { $0 }?()
         let token = try next.get()
         keychain.succeed()
-        save(token, for: connection.address, permissions: granted, profile: profile)
+        save(token, for: connection.address, permissions: granted, profile: profile, scopes: Self.approvedBeyondPermissions)
         return signedIn
     }
 
@@ -197,7 +205,7 @@ nonisolated final class ScriptedSignIns: SignIns {
         return CodeSignIn(
             code: "SCRIPTED", address: address, completeAddress: nil, expiresAt: .distantFuture,
             finish: { [self] in
-                save(key, for: address, permissions: granted, profile: profile)
+                save(key, for: address, permissions: granted, profile: profile, scopes: Self.approvedBeyondPermissions)
                 return signedIn
             })
     }

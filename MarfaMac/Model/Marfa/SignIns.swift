@@ -186,6 +186,10 @@ nonisolated struct SystemSignIns: SignIns {
     /// Whether `scopes`, as a sign-in holds them, let it read the owner's name.
     static func readsProfile(_ scopes: [String]) -> Bool { profileScopes.allSatisfy(scopes.contains) }
 
+    /// Whether `held`, as a sign-in holds them, lacks any of `scopes`: an owner permission the owner left out, or a scope the
+    /// app began to ask for after the sign-in was made. Allow More… asks for them all again.
+    static func lacksAsked(_ held: [String]) -> Bool { !Set(held).isSuperset(of: scopes) }
+
     /// Every owner permission, which every sign-in asks for and a sign-in holds unless the owner approved fewer. The
     /// package's list is the contract's but `connectors.host`, which only a connector host's own key holds.
     static let askedAtSignIn = Set(InstancePermission.allCases)

@@ -163,7 +163,7 @@ struct ConnectionPage: View {
 
     private func account(name: String) -> some View {
         let account = ConnectionAccount(
-            state: host.state, grants: host.grants, grantsRead: host.grantsRead, readsProfile: host.readsProfile,
+            state: host.state, grants: host.grants, grantsRead: host.grantsRead, readsProfile: host.readsProfile, lacksAsked: host.lacksAsked,
             waiting: host.waitingChanges, serverName: name)
         return SettingsSection("Account") {
             if account.showsName {
@@ -173,12 +173,9 @@ struct ConnectionPage: View {
                 .accessibilityIdentifier("SignedInAs")
             }
             if account.showsPermissions {
-                let line = account.holdsAll && account.offersName
-                    ? String(localized: "The app holds all \(account.total) of the owner’s permissions.")
-                    : account.permissionsLine
-                SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: line)) {
-                    // Allow More… also asks to read the owner's name.
-                    if !account.holdsAll || account.offersName {
+                SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: account.permissionsLine)) {
+                    // Allow More… asks for everything a sign-in asks for, the read of the owner's name among it.
+                    if account.offersMore {
                         SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
                             Task { _ = await settingsHost.allowMore(ConnectionAccount.asked) }
                         }

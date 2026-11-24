@@ -314,7 +314,7 @@ import MarfaTesting
             }
             let sample = SampleLibrary.connection
             let host = MarfaHost(
-                defaults: defaults, signIns: ScriptedSignIns([sample.address: "sample"]), location: location(root: root),
+                defaults: defaults, signIns: ScriptedSignIns([sample.address: "sample"], scopes: ScriptedSignIns.approvedBeyondPermissions), location: location(root: root),
                 opener: { connection, _, _ in
                     let files = SampleGallery.isRequested ? await SampleGallery.files.value : []
                     return SampleLibrary.open(connection, galleryFiles: files)

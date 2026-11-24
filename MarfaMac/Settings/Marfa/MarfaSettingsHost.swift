@@ -75,6 +75,9 @@ struct MarfaMarkSet: Identifiable, Hashable {
     var connection: MarfaSettingsConnection { get }
     /// The permissions the sign-in holds (`Credential.grants`).
     var grants: Set<InstancePermission> { get }
+    /// Whether the sign-in lacks something the app asks for at sign-in (`SystemSignIns.lacksAsked`): an owner permission,
+    /// or a scope the app began to ask for after the sign-in was made. Overview offers Allow More… while it does.
+    var lacksAsked: Bool { get }
 
     /// Signs in again with the full request. The new sign-in holds what the owner approves.
     /// Returns `.allowed` when the new sign-in holds every permission in `permissions`.

@@ -103,10 +103,13 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
     /// Signed In As cannot be told because the sign-in may not read the owner's name, as one made before the app asked for it
     /// cannot; Allow More… gives it, and it is the one Allow More… on the page, beside Look After This Marfa.
     var offersName: Bool
+    /// Whether Look After This Marfa offers Allow More…: the sign-in lacks something the app asks for at sign-in
+    /// (`MarfaHost.lacksAsked`), an owner permission, the read of the name or a scope the app began to ask for later.
+    var offersMore: Bool
 
     init(
-        state: MarfaConnectionState, grants: Set<InstancePermission>, grantsRead: Bool, readsProfile: Bool = true, waiting: Int?,
-        serverName: String
+        state: MarfaConnectionState, grants: Set<InstancePermission>, grantsRead: Bool, readsProfile: Bool = true, lacksAsked: Bool = false,
+        waiting: Int?, serverName: String
     ) {
         let reached = state == .online || state == .connecting
         showsPermissions = reached && grantsRead
@@ -116,6 +119,7 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
         }
         offersName = showsPermissions && !readsProfile
         held = showsPermissions ? grants.intersection(Self.asked).count : nil
+        offersMore = showsPermissions && lacksAsked
         unsent = waiting.map { $0 > 0 ? Words.changes($0) : String(localized: "None") } ?? String(localized: "Unknown")
         switch state {
         case .keyRefused: unsentLine = (waiting ?? 0) > 0 ? String(localized: "Sent once you sign in again.") : nil
@@ -129,10 +133,13 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
         offersName ? String(localized: "Allow More… lets the app read the owner’s name.") : nil
     }
 
-    /// "The app holds 5 of the owner’s 14 permissions."
+    /// "The app holds 5 of the owner’s 14 permissions.", or where it holds them all and still lacks something it asks for,
+    /// says so beside Allow More….
     var permissionsLine: String {
-        guard let held, !holdsAll else { return String(localized: "The owner’s permissions the app holds.") }
-        return String(localized: "The app holds \(held) of the owner’s \(total) permissions.")
+        guard let held else { return String(localized: "The owner’s permissions the app holds.") }
+        if !holdsAll { return String(localized: "The app holds \(held) of the owner’s \(total) permissions.") }
+        if offersMore { return String(localized: "The app holds all \(total) of the owner’s permissions, but not all the access it asks for.") }
+        return String(localized: "The owner’s permissions the app holds.")
     }
 
     /// "All 14", where every permission is held.

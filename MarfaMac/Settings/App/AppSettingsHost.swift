@@ -178,6 +178,7 @@ enum LibraryDescription {
     }
 
     var grants: Set<InstancePermission> { host.grants }
+    var lacksAsked: Bool { host.lacksAsked }
 
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome {
         guard !isAllowingMore, host.connection != nil else { return .failed }
