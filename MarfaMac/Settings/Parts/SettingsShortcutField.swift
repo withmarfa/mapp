@@ -31,10 +31,7 @@ extension NSEvent {
     }
 }
 
-/// A shortcut at a row's trailing edge, the system has no recorder for, so it is the system's bordered button, 200 wide, with the
-/// keys in it. A set one has a clear button; an empty one reads Record Shortcut; one being recorded reads Type Shortcut with a
-/// gray focus ring; a refused one has the red ring, and the row's line says why. A click starts recording, the next key press is
-/// handed to `record`, Escape stops, and Delete clears.
+/// The system has no shortcut recorder. This control takes key presses before the menus can handle them.
 struct SettingsShortcutField: View {
     let title: LocalizedStringKey
     let keys: String?
@@ -109,9 +106,7 @@ struct SettingsShortcutField: View {
     }
 }
 
-/// A small search at a list's trailing edge, with a keyboard button before it that changes what it searches by: the words of
-/// a name, which are typed, or a shortcut, which is pressed. While the button is on, the field shows the keys pressed last,
-/// and Escape turns it off.
+/// Lets people search by pressing a shortcut as well as by typing its name.
 struct SettingsShortcutSearch: View {
     @Binding var text: String
     @Binding var byKeys: Bool

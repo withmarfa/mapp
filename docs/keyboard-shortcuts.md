@@ -26,7 +26,7 @@ Settings > Keyboard gives every menu command the app adds a shortcut that its pe
 
 ## Search
 
-A small search field, the system's, sits at the trailing end above the first card, its edge on the cards' edge, and filters by command name. The keyboard button beside it searches by pressing keys instead (⌘K finds Command Palette), and typing searches by name again when it is off. While it searches by keys, each section says how many of its commands use the keys.
+A 28-point system search field sits above the first card and filters by command name. Turn on the keyboard button to search by pressing a shortcut. For example, pressing ⌘K finds Command Palette. While searching by shortcut, each section shows how many of its commands use those keys.
 
 ## Files
 

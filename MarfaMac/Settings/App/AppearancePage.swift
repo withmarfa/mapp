@@ -186,7 +186,7 @@ struct AppearancePage: View {
     }
 }
 
-/// One column's default width, a field with its unit inside. A width outside what the column allows is brought inside it.
+/// One column's default width, clamped to the range it allows.
 private struct ColumnWidthRow: View {
     let column: ColumnWidth
     @AppStorage private var stored: Double
