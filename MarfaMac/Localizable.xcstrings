@@ -244,6 +244,9 @@
     "The time in “%@” wasn’t cleared. %@" : {
 
     },
+    "The date was cleared, so the time wasn’t set." : {
+
+    },
     "%@ on its disk" : {
 
     },

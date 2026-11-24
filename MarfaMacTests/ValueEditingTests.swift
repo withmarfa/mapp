@@ -653,7 +653,86 @@ struct ValueEditingTests {
         library.items[0] = Self.item(["due": .string("2026-11-07T16:00:00Z")])
         model.finish(cancelled: false)
         #expect(written.all.isEmpty)
-        #expect(library.notices.told == 1 && library.notices.waiting.first?.text == nil)
+        #expect(library.notices.told == 1 && library.notices.waiting.first?.text == nil && library.notices.holdsQuit)
+    }
+
+    @Test func aTimeIsNotWrittenOverOneThatArrivedAfterTheFieldShowedTheValueAndBeforeTheFirstKey() throws {
+        let written = Written()
+        let model = datePanel(Self.due, holding: "2026-11-07T09:30:00Z", written: written)
+        let library = try #require(model.request.library as? FakeItemLibrary)
+        model.beginTime()
+        library.items[0] = Self.item(["due": .string("2026-11-07T16:00:00Z")])
+        model.timeDraft = "14:45"
+        model.finish(cancelled: false)
+        #expect(written.all.isEmpty)
+        #expect(library.notices.waiting.first?.text == "Due: 14:45")
+    }
+
+    @Test func aWordTypedInFullAndChosenAsASuggestionIsHandedBackWhenTheListRefusesIt() {
+        var field = Self.labels
+        field.maxItems = 2
+        let item = Self.item(["labels": Self.list("a", "b")])
+        let library = Self.library([item, Self.item(["labels": Self.list("blue")], id: "10000000-0000-0000-0000-000000000101")])
+        let model = ValueEditModel(Self.request(.words(field), item: item, in: library, write: { _ in true }))
+        model.query = "blue"
+        model.submitTyped()
+        #expect(model.notice != nil)
+        model.finish(cancelled: false)
+        #expect(library.notices.waiting.first?.text == "Labels: blue")
+    }
+
+    @Test func aTagTheTagsBoxCanNoLongerTakeIsHandedBackBeforeTheBoxCloses() {
+        let item = Self.item()
+        let library = Self.library([item])
+        let model = ValueEditModel(Self.request(.tags, item: item, in: library))
+        var toldAtClose: Int?
+        model.close = { if toldAtClose == nil { toldAtClose = library.notices.told } }
+        model.query = "bluer"
+        library.items[0].readOnly = true
+        model.activate("tag:bluer")
+        model.finishTagField()
+        #expect(toldAtClose == 1 && library.notices.told == 1 && library.notices.waiting.first?.text == "bluer")
+    }
+
+    @Test func choosingNotSetHandsBackATimeTypedAndNotYetWritten() throws {
+        let written = Written()
+        let model = datePanel(Self.due, holding: "2026-11-07T09:30:00Z", written: written)
+        model.timeDraft = "14:45"
+        model.activate(ValueEditOptions.notSetID)
+        #expect(written.all == [nil])
+        #expect(try #require(model.request.library as? FakeItemLibrary).notices.waiting.first?.text == "Due: 14:45")
+    }
+
+    @Test func aRefusedWordAddedOnRetryLeavesNothingForALaterSearchToInherit() {
+        let (library, written) = (Self.library([]), Written())
+        let model = wordsPanel(["a", "b"], limit: 2, in: library, written: written)
+        add("c", to: model)
+        model.removeToken("a")
+        model.activate("create")
+        model.query = "x"
+        model.finish(cancelled: false)
+        #expect(library.notices.told == 0)
+    }
+
+    @Test func aClearedTimeIsNotToldAsLostWhereAnotherDeviceClearedItFirst() throws {
+        let written = Written()
+        let model = datePanel(Self.due, holding: "2026-11-07T09:30:00Z", written: written)
+        let library = try #require(model.request.library as? FakeItemLibrary)
+        model.timeDraft = ""
+        library.items[0] = Self.item(["due": .string("2026-11-07")])
+        model.finish(cancelled: false)
+        #expect(written.all.isEmpty && library.notices.told == 0)
+    }
+
+    @Test func aTagThatArrivedBeforeTheItemBecameReadOnlyIsNotHandedBack() {
+        let item = Self.item()
+        let library = Self.library([item])
+        let model = ValueEditModel(Self.request(.tags, item: item, in: library))
+        model.query = "blue"
+        library.items[0].tags.insert("blue")
+        library.items[0].readOnly = true
+        model.finishTagField()
+        #expect(library.notices.told == 0)
     }
 
     @Test func timesAreReadAsPeopleTypeThem() {

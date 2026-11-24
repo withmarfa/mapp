@@ -37,22 +37,31 @@ struct ValueEditRequest {
 final class ValueEditModel {
     let request: ValueEditRequest
     var query = "" {
-        // A refused entry stays the person's while they go on typing it.
-        didSet { if takesNewEntries, unsaved != nil { unsaved?.text = query } }
+        // A refused entry stays the person's while they go on typing it, and goes once the field is emptied.
+        didSet {
+            guard takesNewEntries, unsaved != nil else { return }
+            if query.isEmpty { unsaved = nil } else { unsaved?.text = query }
+        }
     }
     var notice: String?
-    /// What the person typed that is not saved yet: a time, or a new tag, word or person the list refused. It is
-    /// cleared only when that input is written, when the person cancels with Escape, or when it is handed back, so
-    /// ending the panel any other way never loses it, and a search that only finds a held value is never kept.
+    /// What the person typed that is not saved yet: a time, or a tag, word or person typed in full that the list
+    /// refused. It is cleared only when that input is written, when the person cancels with Escape or empties the
+    /// search field, or when it is handed back, so ending the panel any other way never loses it, and a search that
+    /// only finds a held value is never kept.
     struct UnsavedInput {
         var text: String
-        /// The value the field held when a time was first typed. The time is written only while the value still
-        /// holds it, so a change the person did not see is never written over.
+        /// The value the time field showed when the person began typing (`shownValue`). The time is written only
+        /// while the value still holds it, so a change the person did not see is never written over.
         var base: PropertyValue?
         /// Why the list refused the entry.
         var reason: String?
     }
-    private(set) var unsaved: UnsavedInput?
+    private(set) var unsaved: UnsavedInput? {
+        didSet { if isDate, unsaved == nil { shownValue = value } }
+    }
+    /// The value the time field last showed as stored: when the panel opened, when the field took focus, or when
+    /// what was typed in it was settled. A field being typed in may not show a change that arrives meanwhile.
+    @ObservationIgnored private var shownValue: PropertyValue?
     private var highlight: String?
     /// Whether the highlighted row was reached with the keyboard, which the list then scrolls to.
     private(set) var viaKeyboard = false
@@ -109,6 +118,7 @@ final class ValueEditModel {
             draft.text = Self.text(of: request.item.flatMap(request.library.item)?.value(of: field.key) ?? request.heldValue)
             draft.base = draft.text
         }
+        if isDate { shownValue = value }
     }
 
     private static func text(of value: PropertyValue?) -> String { value.map(ItemValueText.editing) ?? "" }
@@ -547,11 +557,10 @@ final class ValueEditModel {
 
     func activate(_ id: String) {
         guard isEditable else {
-            // A new word, tag or person typed in the search field has nowhere to go, so it goes back to the person.
-            if id == "create" {
-                handBack(query.trimmingCharacters(in: .whitespacesAndNewlines))
-                query = ""
-            }
+            // What was typed has nowhere to go now, so it goes back to the person before the panel ends.
+            if unsaved == nil, isTypedEntry(id) { unsaved = UnsavedInput(text: query) }
+            handBackUnsaved()
+            query = ""
             close()
             return
         }
@@ -610,7 +619,7 @@ final class ValueEditModel {
         }
         guard let entry else { return }
         if let refusal = shape.refusal(of: entry) {
-            refuse(refusal, typed: id == "create")
+            refuse(refusal, typed: isTypedEntry(id))
             return
         }
         // A tap on a row that was held by the last one is not a second person.
@@ -619,14 +628,29 @@ final class ValueEditModel {
             return
         }
         if let reason = limitReason(holding: ListEntries.entries(of: value).count + 1) {
-            refuse(reason, typed: id == "create")
+            refuse(reason, typed: isTypedEntry(id))
             return
         }
         if commit(ListEntries.appending(entry, to: value), failure: String(localized: "The list could not be saved.")) {
             query = ""
             highlight = nil
         } else {
-            refuse(notice, typed: id == "create")
+            refuse(notice, typed: isTypedEntry(id))
+        }
+    }
+
+    /// Whether row `id` adds what the person typed in full: the Add or Create row, or a suggestion that is the same.
+    private func isTypedEntry(_ id: String) -> Bool {
+        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard id != "create" else { return true }
+        guard !typed.isEmpty else { return false }
+        switch kind {
+        case .tags: return id == "tag:" + ItemTag.normalized(typed)
+        case .words: return id.lowercased() == "word:" + typed.lowercased()
+        case .people(_, let shape):
+            let person = PeopleSuggestions.entry(from: typed, shape: shape).flatMap { PeopleSuggestions.Person(entry: $0, shape: shape) }
+            return person.map { id == "person:" + $0.identity } ?? false
+        default: return false
         }
     }
 
@@ -642,7 +666,7 @@ final class ValueEditModel {
         guard !request.targets.isEmpty else { return }
         let tag = id == "create" ? ItemTag.normalized(query) : String(id.dropFirst("tag:".count))
         if let refusal = library.addTag(tag, to: request.targets, undoManager: request.undoManager) {
-            refuse(refusal.message, typed: id == "create")
+            refuse(refusal.message, typed: isTypedEntry(id))
         } else {
             notice = nil
             query = ""
@@ -669,14 +693,14 @@ final class ValueEditModel {
             return
         }
         if let reason = limitReason(holding: held.count + 1) {
-            refuse(reason, typed: id == "create")
+            refuse(reason, typed: isTypedEntry(id))
             return
         }
         if commitWords(held + [word]) {
             query = ""
             highlight = nil
         } else {
-            refuse(notice, typed: id == "create")
+            refuse(notice, typed: isTypedEntry(id))
         }
     }
 
@@ -909,8 +933,21 @@ final class ValueEditModel {
         get { isDate ? unsaved?.text : nil }
         set {
             guard let newValue else { return unsaved = nil }
-            if unsaved == nil { unsaved = UnsavedInput(text: newValue, base: value) } else { unsaved?.text = newValue }
+            if unsaved == nil { unsaved = UnsavedInput(text: newValue, base: shownValue) } else { unsaved?.text = newValue }
         }
+    }
+
+    /// The time field took focus, showing the value's own time unless something typed is still in it.
+    func beginTime() {
+        if unsaved == nil { shownValue = value }
+    }
+
+    /// Whether the value already holds the time `text` asks for: none where it is empty.
+    private func holdsTime(_ text: String) -> Bool {
+        guard !text.isEmpty else { return !hasTime }
+        guard hasTime, let time = TimeOfDay.parse(text), let date = storedDate?.date else { return false }
+        let held = request.calendar.dateComponents([.hour, .minute], from: date)
+        return held.hour == time.hour && held.minute == time.minute
     }
 
     /// The value's time as the person's locale writes it, or empty where the value holds none.
@@ -929,10 +966,9 @@ final class ValueEditModel {
         guard allowsTime, let input = unsaved else { return }
         let text = input.text.trimmingCharacters(in: .whitespacesAndNewlines)
         let time = TimeOfDay.parse(text)
-        let held = hasTime ? storedDate.map { request.calendar.dateComponents([.hour, .minute], from: $0.date) } : nil
         // The person changed nothing, or the value already holds their time (saved from another device, say): there
         // is nothing to write or to lose, and focus passing through the field adds no undo step.
-        if text == timeText(of: input.base) || (time != nil && held?.hour == time?.hour && held?.minute == time?.minute) {
+        if text == timeText(of: input.base) || holdsTime(text) {
             unsaved = nil
             return
         }
@@ -964,16 +1000,21 @@ final class ValueEditModel {
     }
 
     /// Gives back what `unsaved` holds, once, then forgets it: text goes to the clipboard with a notice, and a time
-    /// the person cleared, which has no text to give back, is told. An entry the list holds by now is not lost.
+    /// the person cleared, which has no text to give back, is told as a change not kept, which a quit waits for. What
+    /// the value or the list holds by now is not lost.
     func handBackUnsaved(reason: String? = nil) {
         guard let input = unsaved else { return }
         unsaved = nil
         let text = input.text.trimmingCharacters(in: .whitespacesAndNewlines)
         let reason = reason ?? input.reason
-        if isDate, text.isEmpty {
+        if isDate {
+            guard text != timeText(of: input.base), !holdsTime(text) else { return }
+            guard text.isEmpty else { return handBack(text, reason: reason) }
             let label = kind.field?.label ?? ""
             let why = reason ?? refusalReason(String(localized: "The value could not be saved."))
-            library.notices.tell(String(localized: "Property Not Saved"), String(localized: "The time in “\(label)” wasn’t cleared. \(why)"))
+            library.notices.notKept(
+                String(localized: "Property Not Saved"), text: nil, reason: String(localized: "The time in “\(label)” wasn’t cleared. \(why)"),
+                standsAlone: true)
         } else if !holds(entry: text) {
             handBack(text, reason: reason)
         }
@@ -983,7 +1024,12 @@ final class ValueEditModel {
     private func holds(entry text: String) -> Bool {
         switch kind {
         case .tags:
-            return heldTokens.contains(ItemTag.normalized(text))
+            // An item that became read-only still holds a tag that reached it first.
+            let tag = ItemTag.normalized(text)
+            let items = request.targets.compactMap(library.item)
+            let taking = items.filter(\.canEditTags)
+            let judged = taking.isEmpty ? items : taking
+            return !judged.isEmpty && judged.allSatisfy { library.tags(of: $0).contains(tag) }
         case .words:
             return heldWords.contains { $0.lowercased() == text.lowercased() }
         case .people(_, let shape):
@@ -1018,13 +1064,14 @@ final class ValueEditModel {
         let onBase = unsaved.map { $0.base == value } ?? false
         let taken = commit(.string(text), failure: String(localized: "The date couldn’t be saved."))
         if taken, onBase { unsaved?.base = value }
+        if taken, unsaved == nil { shownValue = value }
         return taken
     }
 
     func clearDate() {
-        // The time typed goes with the date; kept, it would set the date again as the panel closes.
+        // A time typed can't go on a date that is gone, and kept, it would set the date again as the panel closes.
         guard commit(nil, failure: String(localized: "The date couldn’t be saved.")) else { return }
-        unsaved = nil
+        handBackUnsaved(reason: String(localized: "The date was cleared, so the time wasn’t set."))
         close()
     }
 
