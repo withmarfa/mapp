@@ -1497,6 +1497,10 @@
     "The server’s own check found a problem." : {
 
     },
+    "The address used to connect to Marfa Cloud." : {
+    },
+    "The location of the tunnel connector for Marfa Cloud." : {
+    },
     "The port it listens on." : {
 
     },
