@@ -20,13 +20,15 @@ struct WindowToolbar: CustomizableToolbarContent {
     var fileURL: URL?
     /// Whether the list column holds Search and View Options, which otherwise come here.
     var hasListColumn = false
+    /// Whether Back stands over the sidebar, which a page opened from a layout then needs no Back of its own beside.
+    var hasSidebarBack = false
 
     var body: some CustomizableToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
         let showsItem = browser?.showsSidebarIndex != true
         let opensFromCollection = browser?.isCollectionItemPresented == true && !hasListColumn
         // A navigation item that is merely hidden still moves the title in a collection, so these two come and go.
-        if let browser, opensFromCollection {
+        if let browser, opensFromCollection, !hasSidebarBack {
             ToolbarItem(id: "backToCollection", placement: .navigation) {
                 // A plain arrow with no label: it goes back to wherever the page was opened from.
                 Button("Back", systemImage: "chevron.backward") { browser.returnToCollection() }
@@ -180,13 +182,14 @@ private struct FormatToggle: View {
 }
 
 /// The saved toolbars of the main window, one for each split view it mounts. All of a split view's columns name the same
-/// one.
+/// one. A layout saved under a name without the sidebar's items (`SidebarToolbar`) would show none of them, so a change to
+/// those items changes these names.
 enum WindowToolbarLayout {
-    static let list = "main"
-    static let index = "index"
-    static let items = "items"
+    static let list = "window.list"
+    static let index = "window.index"
+    static let items = "window.items"
 
-    static func collection(_ mode: ItemViewMode) -> String { "collection.\(mode)" }
+    static func collection(_ mode: ItemViewMode) -> String { "window.collection.\(mode)" }
 }
 
 /// Says when the Customize Toolbar tray of this window opens and closes. Menu commands still reach a window under its

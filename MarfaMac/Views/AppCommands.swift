@@ -168,14 +168,13 @@ struct AppCommands: Commands {
             // While the Settings window is key the same keys move through its pages.
             Button(String(localized: browser?.viewMode.backTitle ?? "Back"), systemImage: "chevron.backward") {
                 if let settingsNavigation { settingsNavigation.back() }
-                else if browser?.isCollectionItemPresented == true { browser?.returnToCollection() }
-                else if let browser, let library { browser.go(.back, in: library) }
+                else if let browser, let library { browser.stepBack(in: library) }
             }
                 .keyboardShortcut(pageKeepsHistoryKeys ? nil : shortcuts.shortcut(for: .back)?.keyboardShortcut)
                 .disabled(!canGoBack)
             Button("Forward", systemImage: "chevron.forward") {
                 if let settingsNavigation { settingsNavigation.forward() }
-                else if let browser, let library { browser.go(.forward, in: library) }
+                else if let browser, let library { browser.stepForward(in: library) }
             }
                 .keyboardShortcut(pageKeepsHistoryKeys ? nil : shortcuts.shortcut(for: .forward)?.keyboardShortcut)
                 .disabled(!canGoForward)
@@ -226,15 +225,14 @@ extension AppCommands {
 
     private var canGoBack: Bool {
         if let settingsNavigation { return settingsNavigation.canGoBack }
-        guard let browser else { return false }
-        if browser.usesCollection || browser.isCollectionItemPresented { return browser.isCollectionItemPresented }
-        return library.map { browser.canGoBack(in: $0) } ?? false
+        guard let browser, let library else { return false }
+        return browser.canStepBack(in: library)
     }
 
     private var canGoForward: Bool {
         if let settingsNavigation { return settingsNavigation.canGoForward }
-        guard let browser, !browser.usesCollection, !browser.isCollectionItemPresented else { return false }
-        return library.map { browser.canGoForward(in: $0) } ?? false
+        guard let browser, let library else { return false }
+        return browser.canStepForward(in: library)
     }
 
     /// Opens a palette over the window in front, or puts it away if that palette is already out.

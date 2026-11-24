@@ -4,6 +4,8 @@ import XCTest
 nonisolated final class GalleryTests: XCTestCase {
     @MainActor private var app: XCUIApplication!
     @MainActor private var window: XCUIElement { app.windows.firstMatch }
+    /// Back over the sidebar, which a page opened from a layout returns by.
+    @MainActor private var back: XCUIElement { window.buttons["SidebarBack"] }
     @MainActor private var gallery: XCUIElement { window.descendants(matching: .any).matching(identifier: "ItemGallery").element(boundBy: 0) }
     @MainActor private var list: XCUIElement { window.outlines["ItemList"] }
     @MainActor private var sidebar: XCUIElement { window.outlines["Sidebar"] }
@@ -86,7 +88,7 @@ nonisolated final class GalleryTests: XCTestCase {
         editor.click()
         app.typeKey(.end, modifierFlags: .command)
         app.typeText("\nGallery edit retained")
-        window.buttons["BackToGallery"].click()
+        back.click()
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         choose("List")
         XCTAssertTrue(list.waitForExistence(timeout: 3))
@@ -103,10 +105,10 @@ nonisolated final class GalleryTests: XCTestCase {
         let first = card("Kitchen quotes")
         XCTAssertTrue(first.waitForExistence(timeout: 3))
         first.doubleClick()
-        XCTAssertTrue(window.buttons["BackToGallery"].waitForExistence(timeout: 3))
+        XCTAssertTrue(back.wait(for: \.isEnabled, toEqual: true, timeout: 3))
         window.descendants(matching: .any).matching(identifier: "MoreToolbar").firstMatch.click()
         window.menuItems["Delete"].firstMatch.click()
-        window.buttons["BackToGallery"].click()
+        back.click()
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         XCTAssertFalse(first.exists)
         XCTAssertEqual(card("Reading list").value as? String, "Selected")
@@ -134,11 +136,12 @@ nonisolated final class GalleryTests: XCTestCase {
         app.typeKey("v", modifierFlags: .command)
         for _ in 0..<8 { page.scroll(byDeltaX: 0, deltaY: -100) }
         XCTAssertTrue(window.staticTexts["ScrolledItemTitle"].waitForExistence(timeout: 3))
-        XCTAssertTrue(window.buttons["BackToGallery"].exists)
+        XCTAssertTrue(back.isEnabled)
+        XCTAssertFalse(window.buttons["BackToGallery"].exists, "one Back while the sidebar shows its own")
         let more = window.descendants(matching: .any).matching(identifier: "MoreToolbar").firstMatch
         XCTAssertTrue(more.exists)
         XCTAssertGreaterThan(more.frame.minX, window.frame.midX)
-        window.buttons["BackToGallery"].click()
+        back.click()
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         XCTAssertFalse(window.staticTexts["ScrolledItemTitle"].exists)
     }
@@ -147,7 +150,7 @@ nonisolated final class GalleryTests: XCTestCase {
         choose("Gallery")
         XCTAssertTrue(card("Kitchen quotes").waitForExistence(timeout: 3))
         card("Kitchen quotes").doubleClick()
-        XCTAssertTrue(window.buttons["BackToGallery"].waitForExistence(timeout: 3))
+        XCTAssertTrue(back.wait(for: \.isEnabled, toEqual: true, timeout: 3))
         app.typeKey("f", modifierFlags: [.command, .option])
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         let search = window.textFields["ColumnSearch"]
@@ -188,7 +191,7 @@ nonisolated final class GalleryTests: XCTestCase {
         XCTAssertTrue(second.waitForExistence(timeout: 3))
         first.click()
         app.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(window.buttons["BackToGallery"].waitForExistence(timeout: 3))
+        XCTAssertTrue(back.wait(for: \.isEnabled, toEqual: true, timeout: 3))
     }
 
     @MainActor func testAnotherPlaceAndHiddenSidebarReturnToGallery() throws {
@@ -226,7 +229,7 @@ nonisolated final class GalleryTests: XCTestCase {
         let editor = app.itemPageBody
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         editor.typeText("Created from the gallery")
-        window.buttons["BackToGallery"].click()
+        back.click()
         XCTAssertTrue(card("Gallery item").waitForExistence(timeout: 3))
         card("Gallery item").doubleClick()
         let content = expectation(for: NSPredicate(format: "value CONTAINS %@", "Created from the gallery"), evaluatedWith: editor)
