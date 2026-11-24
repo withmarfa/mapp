@@ -44,8 +44,7 @@ struct ItemPropertyRow: View {
     var body: some View {
         Group {
             if isList {
-                // A list's entries are blocks of members, which need the sidebar's whole width: the name sits above them,
-                // and a click on it opens the picker, as a click on any other row's name does.
+                // A list's entries need the sidebar's whole width, so its name sits above them.
                 VStack(alignment: .leading, spacing: 4) {
                     Text(LocalizedStringKey(definition.label)).foregroundStyle(.secondary).help(definition.label)
                         .onTapGesture { openEditor() }
