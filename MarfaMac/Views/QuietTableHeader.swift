@@ -9,28 +9,49 @@ extension View {
     /// table a header view that draws every column's heading itself. The headings are drawn over the table's own
     /// background, or over `backdrop` where the table has none, so rows that scroll under them do not show through. The
     /// same view keeps the table as wide as its page (see `Probe.fit`), or, for a table whose column widths a person
-    /// sets and keeps, leaves every width to the person's drags (`keepsWidths`).
+    /// sets and keeps, leaves every width to the person's drags (`resizing`).
     ///
     /// A table that sits directly under the toolbar passes `isUnderToolbar` to be told when its rows have scrolled past the
     /// headings, which stay pinned, and so under the toolbar, where the caller draws a `ToolbarBand`. A table in an index
     /// page leaves that to the page (`indexScrollsAway`).
     func quietTableHeader(
-        backdrop: NSColor = .windowBackgroundColor, isUnderToolbar: Binding<Bool>? = nil, keepsWidths: Bool = false
+        backdrop: NSColor = .windowBackgroundColor, isUnderToolbar: Binding<Bool>? = nil, resizing: ColumnResizing? = nil
     ) -> some View {
-        background(QuietTableHeader(backdrop: backdrop, isUnderToolbar: isUnderToolbar, keepsWidths: keepsWidths))
+        background(QuietTableHeader(backdrop: backdrop, isUnderToolbar: isUnderToolbar, resizing: resizing))
+    }
+}
+
+/// Whether a person is dragging a column's divider in a table's header. A table that keeps its column widths stores
+/// one only then: AppKit also gives columns new widths of its own when the table is first laid out and whenever its
+/// size or columns change, and those are not the person's.
+///
+/// AppKit has also refitted the columns by the time this view can first see the table, so it puts each shown column back
+/// to the width it should have (`widths`, in the order of the columns shown) as it stops the table's autoresizing.
+@MainActor
+final class ColumnResizing {
+    fileprivate weak var header: NSTableHeaderView?
+    /// The width each shown column starts at: the one the person kept, or the column's ideal.
+    var widths: [CGFloat] = []
+
+    var isDragging: Bool { (header?.resizedColumn ?? -1) >= 0 }
+
+    fileprivate func restore(_ table: NSTableView) {
+        let shown = table.tableColumns.filter { !$0.isHidden }
+        guard shown.count == widths.count else { return }
+        for (column, width) in zip(shown, widths) where column.width != width { column.width = width }
     }
 }
 
 private struct QuietTableHeader: NSViewRepresentable {
     let backdrop: NSColor
     let isUnderToolbar: Binding<Bool>?
-    let keepsWidths: Bool
+    let resizing: ColumnResizing?
 
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ probe: Probe, context: Context) {
         probe.backdrop = backdrop
         probe.isUnderToolbar = isUnderToolbar
-        probe.keepsWidths = keepsWidths
+        probe.resizing = resizing
         probe.refresh()
     }
 
@@ -41,7 +62,7 @@ private struct QuietTableHeader: NSViewRepresentable {
     final class Probe: NSView {
         var backdrop = NSColor.windowBackgroundColor
         var isUnderToolbar: Binding<Bool>?
-        var keepsWidths = false
+        var resizing: ColumnResizing?
         private weak var followed: NSClipView?
         private var observer: (any NSObjectProtocol)?
 
@@ -65,6 +86,7 @@ private struct QuietTableHeader: NSViewRepresentable {
                 table.headerView = view
             }
             (table.headerView as? QuietHeaderView)?.backdrop = backdrop
+            resizing?.header = table.headerView
             if let scrollView = table.enclosingScrollView { fit(table, in: scrollView) }
             table.headerView?.needsDisplay = true
             follow(table)
@@ -82,14 +104,16 @@ private struct QuietTableHeader: NSViewRepresentable {
         /// sideways only where the minimums do not fit. A fit waits for the mouse to be up, so it does not undo a column
         /// a person is dragging, and happens again only when the width or the columns change.
         ///
-        /// A table that keeps its widths is never fitted: AppKit would give every column a new width when a column is
-        /// shown or hidden or the page changes, and the table writes each one to the stored layout, over the widths the
-        /// person set. It gets no column autoresizing at all, so a width changes only by a drag of a divider.
+        /// A table that keeps its widths is never fitted, and what AppKit does with its columns is never stored (see
+        /// `ColumnResizing`).
         private func fit(_ table: NSTableView, in scrollView: NSScrollView) {
             let safeRight = scrollView.safeAreaInsets.right
             if abs(scrollView.contentInsets.right - safeRight) > 0.5 { scrollView.contentInsets.right = safeRight }
-            if keepsWidths {
-                if table.columnAutoresizingStyle != .noColumnAutoresizing { table.columnAutoresizingStyle = .noColumnAutoresizing }
+            if let resizing {
+                if table.columnAutoresizingStyle != .noColumnAutoresizing {
+                    table.columnAutoresizingStyle = .noColumnAutoresizing
+                    resizing.restore(table)
+                }
                 return
             }
             let insets = scrollView.contentInsets

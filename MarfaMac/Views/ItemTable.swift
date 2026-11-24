@@ -24,6 +24,8 @@ struct ItemTable: View {
     @State private var placeTrace = TablePlaceTrace()
     /// The column widths last decoded, so a click does not decode them again.
     @State private var widthCache = ColumnWidthCache()
+    /// Whether a person is dragging a column's divider, the only time the table stores a width.
+    @State private var resizing = ColumnResizing()
 
     /// The inset style's own margin before the first column.
     static let inset: CGFloat = 16
@@ -38,6 +40,7 @@ struct ItemTable: View {
         let _ = daysSeen
         let _ = placeTrace.bodyRan(for: browser.item)
         let content = tableContent()
+        let _ = setStartingWidths(browser.shownColumns(content.columns))
         let (allRows, rows) = (content.allRows, content.rows)
         let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
@@ -107,7 +110,7 @@ struct ItemTable: View {
         .tableStyle(.inset)
         .onChange(of: browser.panelIsOut) { _, isOut in if isOut { hover.clear() } }
         .softSelection(rows: pages.shownIDs + collapsed.sorted(), hovers: true, inert: pages.headerPlaces(collapsed: collapsed), selection: { browser.selection })
-        .quietTableHeader(isUnderToolbar: $isUnderToolbar, keepsWidths: true)
+        .quietTableHeader(isUnderToolbar: $isUnderToolbar, resizing: resizing)
         .scrollEdgeEffectHidden(true, for: .top)
         .toolbarBand(isUnderToolbar: isUnderToolbar)
         .remembersScroll(in: browser.listMemory)
@@ -232,6 +235,8 @@ struct ItemTable: View {
             for column in columns where column.content != .title && next[visibility: column.id] == .hidden {
                 browser.setColumn(column, shown: false)
             }
+            // AppKit gives the columns widths of its own as the table appears and changes, which are not the person's.
+            guard resizing.isDragging else { return }
             let widths = Self.widthsOnly(next, columns)
             guard let id = viewID else {
                 storedColumns = ItemTableColumnLayouts.storing(widths, for: browser.item, in: storedColumns, setAsideIn: browser.defaults)
@@ -239,6 +244,13 @@ struct ItemTable: View {
             }
             browser.keepWidths(try? JSONEncoder().encode(widths), of: id)
         }
+    }
+
+    /// Tells the table's header what width each shown column starts at, which is the width the person kept or the column's
+    /// ideal one (`ColumnResizing`).
+    private func setStartingWidths(_ shown: [ItemTableColumn]) {
+        let kept = (try? JSONEncoder().encode(decodedWidths())).map(Self.keptWidths(in:)) ?? [:]
+        resizing.widths = shown.map { kept[$0.id] ?? $0.widths.ideal }
     }
 
     /// The stored widths for the place showing now. Decoded when the place or the stored data changes, and kept until
@@ -270,6 +282,19 @@ struct ItemTable: View {
         var widths = layout
         for column in columns where column.content != .title { widths[visibility: column.id] = .automatic }
         widths.resetOrder()
+        return widths
+    }
+
+    /// The width each column was left at, by the column's identifier. `TableColumnCustomization` keeps them only in the
+    /// data it encodes, under `perColumnState`, as alternating identifiers and states.
+    nonisolated static func keptWidths(in data: Data) -> [String: CGFloat] {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let states = object["perColumnState"] as? [[String: Any]] else { return [:] }
+        var widths: [String: CGFloat] = [:]
+        for index in stride(from: 0, to: states.count - 1, by: 2) {
+            let explicit = (states[index]["base"] as? [String: Any])?["explicit"] as? [String: Any]
+            if let id = explicit?["_0"] as? String, let width = states[index + 1]["currentWidth"] as? Double { widths[id] = width }
+        }
         return widths
     }
 
