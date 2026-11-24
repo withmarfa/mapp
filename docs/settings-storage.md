@@ -41,6 +41,10 @@ A mark's color and a place's section change one at a time, so each is its own ro
 
 Every Mac is another OAuth client to the server, and only the client that registered the first type under `app.marfa-mac` may replace it (withmarfa/marfa#3462). A later copy of the app could not change the type, so a new setting is a new member inside a field or a new `setting` word in a table, never a new field, table or column. `PreferencesTypeTests` fails on any change to the definition.
 
+### The scope the app asks for
+
+Every sign-in asks for `app.*:write`, never `app.marfa-mac.*:write`, and never both. Discovery never lists an app's vendor scope, and a first type is registered only while holding `app.*:write`. withmarfa/marfa#3522 would let the app ask for its vendor alone.
+
 ## What stays on this Mac
 
 Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `inspector*Open` keys, `inspectorAppOpen.*`, window scene storage), a table's column widths (`itemTableColumns`), `startLastPlace`, `quickAddLastType`, `sendErrorReports`, `betaVersions`, `NSQuitAlwaysKeepsWindows`, everything on On This Mac, the `Marfa*` connection keys and the sync's own keys: `preferencesBeforeSync` and `preferencesSync`.
@@ -49,7 +53,7 @@ Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `in
 
 Nothing is decided until the hydration is complete, the sign-in reaches the type and every table is held whole; until then the defaults stay as they are and Connection says the settings are not ready.
 
-- **The sign-in lacks the permission** (a sign-in made before the settings synced holds none of `app.marfa-mac.*:write`, `app.*:write` or `metadata.types:write`): nothing syncs, the defaults are untouched and Connection offers Allow More….
+- **The sign-in lacks the permission** (a sign-in made before the settings synced holds neither `app.*:write` nor `metadata.types:write`): nothing syncs, the defaults are untouched and Connection offers Allow More….
 - **Before the first write or adoption**, every synced key's value on this Mac is copied once into `preferencesBeforeSync`, kept until Reset.
 - **The Marfa holds no item, and this Mac never adopted a Marfa:** the item is made from this Mac's settings.
 - **The Marfa holds no item, and this Mac adopted another Marfa before:** the synced settings go back to the app's defaults and an empty item is made, so a new Marfa does not take another's arrangement.

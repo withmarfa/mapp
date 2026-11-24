@@ -75,6 +75,7 @@ struct MarfaConnectionTests {
         #expect(release.service == "com.withmarfa.marfa.marfa-sign-in")
         #expect(debug.service != release.service)
         #expect(debug.scheme == "com.withmarfa.marfa.debug")
+        #expect(SystemSignIns.scopes == ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write", "profile.name:read", "app.*:write", "metadata.types:write"])
     }
 
     @Test func theAppClaimsTheSchemeTheBrowserReturnsTo() throws {
