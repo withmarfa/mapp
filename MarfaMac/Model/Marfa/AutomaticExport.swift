@@ -36,7 +36,7 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
 /// the app runs, with no background agent, so a Mac that is off or an app that is closed exports at its next launch; until
 /// the copy knows its instance id or the server answers, it checks again within a minute. Each kind of failure is told
 /// once until an export succeeds. Reset, a restore that changes the plans, Quit and a new choice close the running
-/// export's gate without waiting on the disk, after which it begins no move into the folder and writes nothing back.
+/// export's gate without waiting on the disk and prevent it from updating the plan.
 @Observable @MainActor final class AutomaticExport {
     /// The Marfa that is open.
     struct Marfa {
@@ -197,8 +197,7 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
         return true
     }
 
-    /// Puts every plan back to Never, with the defaults `MacSettings.reset` cleared. An export that is running publishes
-    /// nothing once this returns, and writes nothing back.
+    /// Puts every plan back to Never, with the defaults `MacSettings.reset` cleared.
     func reset() {
         era += 1
         plans = []
@@ -206,9 +205,7 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
         if let running { stop(running) }
     }
 
-    /// Stops the checks for good and the export that is running, as the app quits: it begins no move into the folder once
-    /// this begins. Waits up to `limit` for the export to remove its own file; past that the app quits, and an export that
-    /// later ends touches only what it holds by descriptor.
+    /// Stops the checks and cancels the running export. Waits up to `limit` for the task to finish before quitting.
     func stop(within limit: Duration) async {
         stopped = true
         loop?.cancel()

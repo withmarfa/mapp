@@ -23,9 +23,8 @@ nonisolated struct MarfaArchiveSource: ArchiveSource {
     }
 }
 
-/// What lets one export publish its archive. Whoever stops the export closes it. Closing never waits on the disk, so it
-/// never holds up the main actor: once `close()` has returned, no export begins to move its archive into the folder, and
-/// one whose move had already begun may still land, as an export that ended a moment earlier would have.
+/// Closing the gate lets the main actor cancel an export without waiting on the disk. A move that has passed the gate's
+/// check can still finish.
 nonisolated final class ExportGate: Sendable {
     private struct State {
         var open = true
@@ -60,10 +59,8 @@ nonisolated final class ExportGate: Sendable {
 
 /// Export Everything: the whole library from the server into a folder the person chose. It needs the server, since the
 /// copy on this Mac holds what is cached and not what an archive must hold. The folder is opened once, and from then on
-/// reached only through that descriptor, so a folder moved or replaced during the export neither redirects nor receives
-/// anything. The archive is written into a file the export makes and holds open (`Staging`), read back through that same
-/// descriptor to check that it is a whole archive (`ArchiveCheck`), and moved into the folder without replacing a file.
-/// The export removes only the file it made, and never anything in the folder.
+/// reached through that descriptor for publishing, even if the folder's path changes. The export writes and checks the
+/// archive through the same open file descriptor (`Staging` and `ArchiveCheck`).
 nonisolated enum LibraryExport {
     /// Why an export did not finish, as one line, and whether it was because the server did not answer.
     struct Failure: Error, Equatable {
@@ -87,7 +84,7 @@ nonisolated enum LibraryExport {
 
     /// Writes the archive into `folder` and returns it. Throws `Failure` with the line to show, also for a stream that is
     /// not a whole archive the app can check and, where `instance` is given, for an archive of another Marfa. Cancelling
-    /// the task or closing `gate` stops the export, and it publishes nothing unless its move had already begun.
+    /// the task or closing `gate` stops the export at its next cancellation check.
     @concurrent static func export(
         from source: any ArchiveSource, serverName: String, to folder: URL, now: Date = .now, instance: String? = nil,
         gate: ExportGate = ExportGate()
@@ -183,8 +180,7 @@ nonisolated enum LibraryExport {
 
 /// The file an export writes before its archive is whole, made with `O_EXCL` and held open from then on. It is made in a
 /// private directory the system gives on the folder's volume, or, where the system gives none there, as a hidden file in
-/// the folder itself. Every step names it through a directory descriptor, and the export removes only this file, after
-/// checking that its name still holds it, and then the private directory if it is empty. Nothing is removed recursively.
+/// the folder itself.
 nonisolated private final class Staging: Sendable {
     let file: Int32
     /// The private directory, where the file is in one.
@@ -246,8 +242,6 @@ nonisolated private final class Staging: Sendable {
         return renameatx_np(directory, name, destination, final, UInt32(RENAME_EXCL)) == 0 ? 0 : errno
     }
 
-    /// Removes the file where its name still holds it, as it does unless it was published, then the private directory,
-    /// which fails harmlessly where anything else is in it.
     func end() {
         if holdsOwnFile() { unlinkat(directory, name, 0) }
         close(file)
