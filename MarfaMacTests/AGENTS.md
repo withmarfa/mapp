@@ -10,6 +10,8 @@
 
 ## Commands
 
+For the owner-page `Live` tests, use a key with `instance.read`, `audit.read`, `backups.manage`, `sign_ins.manage`, `keys.mint` and `webhooks.manage`, such as the test instance's admin key.
+
 ```sh
 # Unit tests: no window, no Dock icon, so they can run while the Mac is in use.
 xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -destination 'platform=macOS' -derivedDataPath build test

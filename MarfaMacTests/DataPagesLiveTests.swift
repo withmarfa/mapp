@@ -36,7 +36,6 @@ extension LiveMarfaTests {
             let before = try #require(model.loaded, "the key can read the settings: \(String(describing: model.failure))")
             var result: Result<Void, any Error> = .success(())
             do {
-                // A longer window, a switch, a count, a size in megabytes and a wait in seconds: nothing here keeps less.
                 let changes: [(InstanceSetting, String, InstanceValue)] = [
                     (.auditRetentionDays, "91", .number(91)), (.enrichmentOcrEnabled, "false", .flag(false)), (.mcpFetchMaxMegabytes, "40", .number(40)),
                     (.diskReserveMegabytes, "64", .number(64)), (.blobCleanupGraceSeconds, "3600", .number(3_600)),
@@ -44,9 +43,10 @@ extension LiveMarfaTests {
                 for (setting, text, value) in changes {
                     model.draft[setting] = text
                     await model.save([setting])
-                    // A retention asks first, which the person answers; nothing else does.
+                    // Shortening retention or lowering the disk reserve can ask for confirmation.
                     if let pending = model.pending {
-                        #expect(setting.isRetention, "\(setting) asked first")
+                        #expect(setting == .auditRetentionDays || setting == .diskReserveMegabytes, "\(setting) asked first")
+                        #expect(pending.shortenings.map(\.setting) == [setting])
                         await model.confirm(pending)
                     }
                     #expect(model.failure == nil, "\(setting): \(String(describing: model.failure))")
