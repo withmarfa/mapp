@@ -38,12 +38,14 @@ struct IndexTools: View {
         HStack(spacing: 4) {
             if browser.isSearchExpanded, !browser.isIndexHeaderAway {
                 InlineSearchField(
-                    text: $browser.searchText, prompt: String(localized: "Search"), identifier: "ColumnSearch",
+                    text: $browser.searchText, prompt: String(localized: "Search"), identifier: "ColumnSearch", clearIdentifier: "ClearColumnSearch",
                     focusRequests: browser.searchFocusRequests,
                     onDown: { browser.focusRequest = .list },
                     onCancel: closeSearch, onEnd: closeSearch
                 )
                 .frame(width: Self.fieldWidth)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("ColumnSearchField")
             } else {
                 symbol("Search", "magnifyingglass", id: "IndexSearch") { browser.showSearchField() }
             }
