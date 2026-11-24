@@ -25,7 +25,8 @@ jobs:
     name: Release build
     # The hosted image with Xcode 27 (a public preview at the time of writing).
     runs-on: xcode-27
-    timeout-minutes: 45
+    # A slow runner has taken over 40 minutes; a limit too near that reports a fault that is not there.
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
