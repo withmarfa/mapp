@@ -4,6 +4,16 @@
     "" : {
 
     },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
     "%@ %@ is already installed. Nothing changed." : {
       "localizations" : {
         "en" : {
@@ -20,6 +30,16 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ %2$@ kept the words as they were."
+          }
+        }
+      }
+    },
+    "%@ %@ was kept." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ was kept."
           }
         }
       }
@@ -149,16 +169,29 @@
     "%@ can hold %lld at most." : {
 
     },
+    "%@ can send webhooks, the heartbeat, error reports, telemetry, and object store requests to addresses that aren’t public, including its own computer and devices on private networks such as Tailscale." : {
+
+    },
     "%@ changed" : {
 
     },
     "%@ changed since you chose Delete, so it wasn’t deleted. Check it, then try again." : {
 
     },
+    "%@ checks whether any items, settings, or other types still use %@. If nothing uses it, deleting it can’t be undone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ checks whether any items, settings, or other types still use %2$@. If nothing uses it, deleting it can’t be undone."
+          }
+        }
+      }
+    },
     "%@ cleared" : {
 
     },
-    "%@ deletes a type only while no item holds it and no type is based on it. Deleting can’t be undone." : {
+    "%@ comes from its symbol." : {
 
     },
     "%@ didn’t accept the client ID or the client secret." : {
@@ -187,6 +220,16 @@
     },
     "%@ goes from %@ to %@. This can’t be undone: a key’s access can’t be widened again, and anything using it loses what it no longer reaches." : {
 
+    },
+    "%@ got ^[%lld new item](inflect: true) while they moved, so it was kept. Delete again to move them too." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ got ^[%2$lld new item](inflect: true) while they moved, so it was kept. Delete again to move them too."
+          }
+        }
+      }
     },
     "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
       "extractionState" : "manual"
@@ -230,6 +273,19 @@
     },
     "%@ is no longer where it was, so it was taken out of the new item. Add it again, or add the item without it." : {
       "extractionState" : "manual"
+    },
+    "%@ is ready." : {
+
+    },
+    "%@ is ready. Published %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is ready. Published %2$@."
+          }
+        }
+      }
     },
     "%@ is required." : {
       "extractionState" : "manual"
@@ -388,7 +444,16 @@
     "%@ took another date" : {
 
     },
+    "%@ use it." : {
+
+    },
+    "%@ uses it." : {
+
+    },
     "%@ was changed elsewhere. The app read the new value; yours wasn’t saved." : {
+
+    },
+    "%@ was changed somewhere else. Nothing was sent. Check what you chose, then save again." : {
 
     },
     "%@ wasn’t added." : {
@@ -1608,6 +1673,9 @@
     "A View" : {
 
     },
+    "A Webhook" : {
+
+    },
     "A change applies to new items. Existing ones change only when you ask." : {
 
     },
@@ -1692,10 +1760,16 @@
     "A folder, view or webhook still uses %@. Change it first." : {
 
     },
+    "A folder, view, webhook or table stops the move. Nothing moved." : {
+
+    },
     "A key can only be narrowed later, so choose what it needs now." : {
 
     },
     "A key can set its own instead." : {
+
+    },
+    "A kind of item, with fields of its own." : {
 
     },
     "A kind of link between items." : {
@@ -1709,6 +1783,12 @@
     },
     "A new item wasn’t created" : {
       "extractionState" : "manual"
+    },
+    "A new item, over any app." : {
+
+    },
+    "A new source can’t add these types until you check it." : {
+
     },
     "A new source is left out until you check it." : {
 
@@ -1787,7 +1867,7 @@
     "A status word belongs to one of four groups." : {
 
     },
-    "A status word starts with a letter, then letters, numbers and spaces." : {
+    "A status word starts with a letter." : {
 
     },
     "A tag can be at most %lld characters." : {
@@ -1907,6 +1987,9 @@
     "Add Entry to %@" : {
       "extractionState" : "manual"
     },
+    "Add Field" : {
+
+    },
     "Add File or Property" : {
       "extractionState" : "manual"
     },
@@ -1989,6 +2072,9 @@
 
     },
     "Add a filter" : {
+
+    },
+    "Add a passkey at the new address." : {
 
     },
     "Add an Address" : {
@@ -2122,10 +2208,16 @@
     "All versions kept for" : {
       "extractionState" : "manual"
     },
+    "Allow" : {
+
+    },
     "Allow More…" : {
 
     },
     "Allow More… lets the app read the owner’s name." : {
+
+    },
+    "Allow Private Addresses?" : {
 
     },
     "Allow more additions before pausing?" : {
@@ -2138,6 +2230,9 @@
 
     },
     "Already tagged." : {
+
+    },
+    "Also Changes" : {
 
     },
     "Also remove its data" : {
@@ -2159,9 +2254,6 @@
 
     },
     "An Object Store" : {
-
-    },
-    "An address is removed" : {
 
     },
     "An app for your Marfa server’s items." : {
@@ -2306,7 +2398,10 @@
     "Apps" : {
 
     },
-    "Apps and keys will read items from every source for the types you limited." : {
+    "Apps and keys using this rule will be able to add items of these types from any source." : {
+
+    },
+    "Apps and keys using this rule will see items from every source for the types you limited, including subtypes." : {
 
     },
     "Apps you sign in show here." : {
@@ -2345,6 +2440,9 @@
     "As a clip" : {
 
     },
+    "As a file you can keep or share." : {
+
+    },
     "As a message" : {
 
     },
@@ -2367,6 +2465,9 @@
 
     },
     "As an event" : {
+
+    },
+    "As in History" : {
 
     },
     "As in Layouts" : {
@@ -2587,12 +2688,6 @@
     "Brings in and sends out" : {
 
     },
-    "Brings the app forward to add an item." : {
-
-    },
-    "Brings the app forward with the palette open." : {
-
-    },
     "Browser" : {
       "extractionState" : "manual"
     },
@@ -2664,6 +2759,9 @@
     },
     "Can’t Change Type" : {
       "extractionState" : "manual"
+    },
+    "Can’t Check Apps That Write" : {
+
     },
     "Can’t Copy Link" : {
 
@@ -2803,6 +2901,9 @@
     "Caution" : {
 
     },
+    "Change" : {
+
+    },
     "Change %@" : {
 
     },
@@ -2819,6 +2920,9 @@
 
     },
     "Change Density" : {
+
+    },
+    "Change Keep Versions to %@?" : {
 
     },
     "Change Layout" : {
@@ -2954,6 +3058,12 @@
     "Check Spelling While Typing" : {
 
     },
+    "Check a source too. With none, no app or key could add items of these types." : {
+
+    },
+    "Check a source too. With none, no app or key could read items of these types." : {
+
+    },
     "Check for Updates" : {
 
     },
@@ -2967,6 +3077,9 @@
 
     },
     "Checking" : {
+
+    },
+    "Checking a type also limits its subtypes." : {
 
     },
     "Checking…" : {
@@ -3424,6 +3537,9 @@
     "Couldn’t Quit" : {
 
     },
+    "Couldn’t Read %@" : {
+
+    },
     "Couldn’t Read %@’s Settings" : {
 
     },
@@ -3439,10 +3555,13 @@
     "Couldn’t Read Downloaded Files" : {
 
     },
+    "Couldn’t Read Every Source" : {
+
+    },
     "Couldn’t Read Its Data" : {
 
     },
-    "Couldn’t Read Limit Sources" : {
+    "Couldn’t Read Private Addresses" : {
 
     },
     "Couldn’t Read This Folder" : {
@@ -3464,6 +3583,9 @@
 
     },
     "Couldn’t Read the Last Backup" : {
+
+    },
+    "Couldn’t Read the Rules" : {
 
     },
     "Couldn’t Read the Sign-Ins" : {
@@ -3497,6 +3619,9 @@
 
     },
     "Couldn’t Sign In" : {
+
+    },
+    "Couldn’t Update" : {
 
     },
     "Couldn’t be downloaded." : {
@@ -3577,6 +3702,9 @@
     "Create Link Type" : {
 
     },
+    "Create Type" : {
+
+    },
     "Create Webhook" : {
 
     },
@@ -3590,6 +3718,9 @@
 
     },
     "Current Password" : {
+
+    },
+    "Custom" : {
 
     },
     "Custom Color" : {
@@ -3930,6 +4061,9 @@
     "Each server has its own copy on this Mac." : {
       "extractionState" : "manual"
     },
+    "Each signs in again at the new address." : {
+
+    },
     "Each word counts as one of four." : {
 
     },
@@ -4039,6 +4173,9 @@
     "Enter Full Screen" : {
 
     },
+    "Enter a name." : {
+
+    },
     "Enter a number from %@ to %@." : {
       "extractionState" : "manual"
     },
@@ -4117,6 +4254,9 @@
     "Every app signs out" : {
 
     },
+    "Every browser and app signs out" : {
+
+    },
     "Every browser sign-in has ended. Apps and keys keep working." : {
 
     },
@@ -4141,16 +4281,13 @@
     "Every installed connector has a machine. A new one comes with its plugin." : {
 
     },
-    "Every item of this type, and of any type based on it, can hold it." : {
-
-    },
     "Every setting on this Mac starts over. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back." : {
 
     },
     "Every setting on this Mac. Your items stay." : {
 
     },
-    "Every source is read again." : {
+    "Every shortcut as Marfa ships it." : {
 
     },
     "Everything" : {
@@ -4195,6 +4332,9 @@
     "Export Everything" : {
 
     },
+    "Export Layouts" : {
+
+    },
     "Export Layouts…" : {
 
     },
@@ -4202,9 +4342,6 @@
 
     },
     "Export Shortcuts" : {
-
-    },
-    "Export Shortcuts…" : {
 
     },
     "Export as PDF…" : {
@@ -4436,9 +4573,6 @@
 
     },
     "For one item." : {
-
-    },
-    "For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. The app too." : {
 
     },
     "Format" : {
@@ -4788,6 +4922,9 @@
     "Icons are kept on your server, so you can choose one once the app is connected." : {
       "extractionState" : "manual"
     },
+    "If the old address stops working, update your scripts." : {
+
+    },
     "Ignore" : {
 
     },
@@ -4810,6 +4947,9 @@
     "Import" : {
 
     },
+    "Import Layouts" : {
+
+    },
     "Import Layouts…" : {
 
     },
@@ -4817,9 +4957,6 @@
 
     },
     "Import Shortcuts" : {
-
-    },
-    "Import Shortcuts…" : {
 
     },
     "Important" : {
@@ -5015,9 +5152,6 @@
     "It holds %lld of the owner’s %lld permissions." : {
 
     },
-    "It holds ^[%lld item](inflect: true). Move them to another type first." : {
-
-    },
     "It holds all %lld of the owner’s permissions, but not all the access it asks for." : {
 
     },
@@ -5036,6 +5170,9 @@
     "It is waiting for its first run." : {
 
     },
+    "It keeps that type’s statuses and fields." : {
+
+    },
     "It must sign in again with your password or a passkey. Apps and keys keep working." : {
 
     },
@@ -5043,6 +5180,9 @@
 
     },
     "It never ends." : {
+
+    },
+    "It places the two types in different folders. Change where it places them first." : {
 
     },
     "It reports problems." : {
@@ -5054,7 +5194,7 @@
     "It runs on a machine you link." : {
 
     },
-    "It starts with the words and fields of the type it is based on, and adds its own." : {
+    "It sends events for this type and the types based on it. Change its type filter first." : {
 
     },
     "It stops running until you choose a machine for it. Its settings and mapping are kept." : {
@@ -5111,6 +5251,9 @@
     "It will have none if you replace it." : {
 
     },
+    "It will send events for %@." : {
+
+    },
     "Italic" : {
 
     },
@@ -5159,6 +5302,16 @@
     "Items from your apps wait here." : {
 
     },
+    "Items hold rows in %@, which %@ doesn’t have. Add them to %@ first." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Items hold rows in %1$@, which %2$@ doesn’t have. Add them to %3$@ first."
+          }
+        }
+      }
+    },
     "Items listed: %llu" : {
       "extractionState" : "manual"
     },
@@ -5169,6 +5322,9 @@
 
     },
     "Items that apps send show here." : {
+
+    },
+    "Items this sign-in can’t see are still of this type, so %@ was kept." : {
 
     },
     "Items wait here first, so they can come back." : {
@@ -5195,6 +5351,19 @@
     "Items: %@." : {
 
     },
+    "Its %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Its %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Its %@ items move to another type first." : {
+
+    },
     "Its %lld edge types stay." : {
 
     },
@@ -5208,6 +5377,9 @@
 
     },
     "Its 1 item is kept." : {
+
+    },
+    "Its 1 item moves to another type first." : {
 
     },
     "Its Mapping" : {
@@ -5234,6 +5406,9 @@
     "Its edge type stays." : {
 
     },
+    "Its filter uses this type in a way a move can’t rewrite. Change its filter first." : {
+
+    },
     "Its last run failed." : {
 
     },
@@ -5247,6 +5422,9 @@
 
     },
     "Its plugin was removed, here or somewhere else." : {
+
+    },
+    "Its settings will use %@." : {
 
     },
     "Its source %@ keeps its %lld agreements." : {
@@ -5285,6 +5463,9 @@
 
     },
     "Its type and its items stay." : {
+
+    },
+    "Its type filter will use %@." : {
 
     },
     "Its types and items stay." : {
@@ -5346,6 +5527,19 @@
     },
     "Keep Opened Files" : {
 
+    },
+    "Keep Versions" : {
+
+    },
+    "Keep Versions changes from %@ to %@. The next time %@ thins versions, it can delete versions that %@ doesn’t keep. Deleted versions can’t be recovered." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Keep Versions changes from %1$@ to %2$@. The next time %3$@ thins versions, it can delete versions that %4$@ doesn’t keep. Deleted versions can’t be recovered."
+          }
+        }
+      }
     },
     "Keep in Marfa Again" : {
 
@@ -5409,6 +5603,9 @@
 
     },
     "Keys It Made" : {
+
+    },
+    "Keys keep working" : {
 
     },
     "Keys you make show here." : {
@@ -5520,6 +5717,9 @@
     "Leave Out a Type or Source…" : {
 
     },
+    "Leave Them As They Are" : {
+
+    },
     "Leave a field empty to use %@’s own default." : {
 
     },
@@ -5533,6 +5733,9 @@
 
     },
     "Let Tools Fetch Files" : {
+
+    },
+    "Lets webhooks and the heartbeat reach this network." : {
 
     },
     "Library" : {
@@ -5610,6 +5813,9 @@
     "Lists" : {
 
     },
+    "Lists, search, exports, and webhooks include only items from the checked sources for these types and their subtypes. Individual items can still be opened directly. A key can use its own rule." : {
+
+    },
     "Live Updates" : {
 
     },
@@ -5668,6 +5874,9 @@
 
     },
     "Look for a new version once a day." : {
+
+    },
+    "Looking After This Marfa" : {
 
     },
     "Low" : {
@@ -5811,9 +6020,6 @@
     "Marfa %@ is ready" : {
 
     },
-    "Marfa %@ is ready." : {
-
-    },
     "Marfa %@." : {
 
     },
@@ -5937,6 +6143,9 @@
     "Move Feed Items to Recently Deleted After" : {
 
     },
+    "Move Them to Another Type" : {
+
+    },
     "Move To" : {
 
     },
@@ -5970,7 +6179,23 @@
     "Moved “%@” to Recently Deleted" : {
 
     },
+    "Moving %@ to %@…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Moving %1$@ to %2$@…"
+          }
+        }
+      }
+    },
     "Name" : {
+
+    },
+    "Name Not Changed" : {
+
+    },
+    "Name and Picture" : {
 
     },
     "Name at the Other End" : {
@@ -5988,7 +6213,10 @@
     "Name: %@" : {
 
     },
-    "Named by its app or key." : {
+    "Named by its key." : {
+
+    },
+    "Named by the app." : {
 
     },
     "Named by the sign-in that keeps each one." : {
@@ -6030,6 +6258,9 @@
     "Needs setup" : {
 
     },
+    "Network" : {
+
+    },
     "Never" : {
 
     },
@@ -6055,9 +6286,6 @@
 
     },
     "New Collection" : {
-
-    },
-    "New Field" : {
 
     },
     "New Field Choices Not Kept" : {
@@ -6107,6 +6335,9 @@
 
     },
     "New Type" : {
+
+    },
+    "New Type Based on %@…" : {
 
     },
     "New Type…" : {
@@ -6225,9 +6456,6 @@
       "extractionState" : "manual"
     },
     "No Folders" : {
-
-    },
-    "No Guidance" : {
 
     },
     "No Icons Match" : {
@@ -6378,6 +6606,12 @@
 
     },
     "No items." : {
+
+    },
+    "No key or app that writes under the checked sources may add %@ items, so nothing could. Check a source that can." : {
+
+    },
+    "No key that writes under the checked sources may add %@ items, and the app can’t check your apps. Check a source a key can add them under, or allow the app to read your apps." : {
 
     },
     "No machine" : {
@@ -6765,6 +6999,9 @@
     "Only failed deliveries can be sent again." : {
 
     },
+    "Only for %@." : {
+
+    },
     "Only items from the sources you name are read." : {
 
     },
@@ -6772,6 +7009,12 @@
       "extractionState" : "manual"
     },
     "Only pictures at secure (https) addresses can be loaded." : {
+
+    },
+    "Only the checked sources can add items of the checked types. Subtypes have their own rules. A key can use its own rule." : {
+
+    },
+    "Only the sources you name may write these types." : {
 
     },
     "Only when something changed." : {
@@ -6938,10 +7181,16 @@
     "Over the sidebar." : {
 
     },
+    "Over whatever you’re doing." : {
+
+    },
     "Overview" : {
 
     },
     "Owned by %@." : {
+
+    },
+    "Owner’s Permissions" : {
 
     },
     "PDF" : {
@@ -7204,6 +7453,9 @@
     "Privacy" : {
 
     },
+    "Private Addresses" : {
+
+    },
     "Problems" : {
 
     },
@@ -7387,6 +7639,9 @@
     "Registered a connector" : {
 
     },
+    "Reject fields this type doesn’t declare or inherit." : {
+
+    },
     "Relation" : {
 
     },
@@ -7499,6 +7754,12 @@
 
     },
     "Remove the Data %@ Keeps?" : {
+
+    },
+    "Remove the instance’s rule for adding items." : {
+
+    },
+    "Remove the instance’s source filter." : {
 
     },
     "Remove “%@”" : {
@@ -7684,9 +7945,6 @@
     "Restore Defaults" : {
 
     },
-    "Restore Defaults…" : {
-
-    },
     "Restore Earlier Settings" : {
 
     },
@@ -7743,6 +8001,16 @@
     },
     "Retired an inbound address" : {
 
+    },
+    "Return adds “%@” as %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Return adds “%1$@” as %2$@."
+          }
+        }
+      }
     },
     "Reused an approval" : {
 
@@ -7980,6 +8248,9 @@
         }
       }
     },
+    "Sending…" : {
+
+    },
     "Sends No Events" : {
 
     },
@@ -8099,6 +8370,16 @@
     },
     "Show %@" : {
 
+    },
+    "Show %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show %1$@ %2$@"
+          }
+        }
+      }
     },
     "Show %@ Property" : {
 
@@ -8244,6 +8525,9 @@
       "extractionState" : "manual"
     },
     "Show in Finder" : {
+
+    },
+    "Show in Types" : {
 
     },
     "Show on Page" : {
@@ -8444,7 +8728,13 @@
     "Something answers there, but not this server." : {
 
     },
+    "Something listed under Also Changes stops the move. Nothing moved." : {
+
+    },
     "Something still uses %@, so it was kept." : {
+
+    },
+    "Something uses it." : {
 
     },
     "Something went wrong while signing in, so nothing changed. Try again, or use a code if the browser won’t open." : {
@@ -8591,6 +8881,12 @@
     "Stopped syncing a folder" : {
 
     },
+    "Strict" : {
+
+    },
+    "Strict was changed somewhere else. Nothing was sent." : {
+
+    },
     "Strikethrough" : {
 
     },
@@ -8652,6 +8948,9 @@
 
     },
     "Table Rows Changed" : {
+
+    },
+    "Tables" : {
 
     },
     "Tabs" : {
@@ -8745,6 +9044,12 @@
     "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://." : {
       "extractionState" : "manual"
     },
+    "That file couldn’t be opened." : {
+
+    },
+    "That file isn’t a picture the app can use." : {
+
+    },
     "That isn’t your current password." : {
 
     },
@@ -8752,6 +9057,12 @@
 
     },
     "That restore point can’t be read. No settings were changed." : {
+
+    },
+    "The %@ aren’t public. Change them first, then turn this off." : {
+
+    },
+    "The %@ isn’t public. Change it first, then turn this off." : {
 
     },
     "The Code Expired" : {
@@ -8801,9 +9112,6 @@
     },
     "The Sign-In Is in Use" : {
       "extractionState" : "manual"
-    },
-    "The View menu switches it." : {
-
     },
     "The address it listens on." : {
 
@@ -8916,6 +9224,9 @@
     "The app couldn’t read whether it holds changes that haven’t reached the server." : {
 
     },
+    "The app couldn’t read your keys, so it can’t check that one of them could still add these types." : {
+
+    },
     "The app couldn’t read “%@” on this Mac. Choose another plugin bundle." : {
 
     },
@@ -8976,6 +9287,18 @@
     "The app isn’t allowed to change types, their icons, words or fields." : {
 
     },
+    "The app isn’t allowed to change your name and picture." : {
+
+    },
+    "The app isn’t allowed to change your name, or to show or change your picture." : {
+
+    },
+    "The app isn’t allowed to change your name." : {
+
+    },
+    "The app isn’t allowed to change your picture." : {
+
+    },
     "The app isn’t allowed to do this." : {
 
     },
@@ -9009,6 +9332,12 @@
     "The app isn’t allowed to make keys." : {
 
     },
+    "The app isn’t allowed to read or change which sources apps and keys read." : {
+
+    },
+    "The app isn’t allowed to read or change which sources may add items." : {
+
+    },
     "The app isn’t allowed to read the jobs the server runs by itself." : {
 
     },
@@ -9022,6 +9351,9 @@
 
     },
     "The app isn’t allowed to read whether a newer Marfa is ready." : {
+
+    },
+    "The app isn’t allowed to read your apps, so only keys are checked before you save." : {
 
     },
     "The app isn’t allowed to rename, mark or limit sources." : {
@@ -9046,6 +9378,18 @@
 
     },
     "The app isn’t allowed to see, take or restore backups." : {
+
+    },
+    "The app isn’t allowed to show or change your name and picture." : {
+
+    },
+    "The app isn’t allowed to show or change your name, or to change your picture." : {
+
+    },
+    "The app isn’t allowed to show or change your name." : {
+
+    },
+    "The app isn’t allowed to show or change your picture." : {
 
     },
     "The app isn’t signed in to this Marfa server." : {
@@ -9303,9 +9647,6 @@
     "The library sets this tag itself." : {
 
     },
-    "The limit was changed somewhere else. Nothing was sent. Check what you chose, then save again." : {
-
-    },
     "The link types couldn’t be read again to choose an unused ID, so nothing was sent. %@" : {
 
     },
@@ -9337,6 +9678,9 @@
       "extractionState" : "manual"
     },
     "The mark shows in every app that uses %@." : {
+
+    },
+    "The move stopped before it finished." : {
 
     },
     "The name always shows." : {
@@ -9373,9 +9717,6 @@
 
     },
     "The oldest Marfa this version works with." : {
-
-    },
-    "The order a place starts in until you change its Sort by or Group by in View Options." : {
 
     },
     "The owner’s permissions the app holds." : {
@@ -9690,6 +10031,12 @@
     "The words that matched, under each result." : {
 
     },
+    "Their fields stay read-only until %@ exists again." : {
+
+    },
+    "Their own fields stay on each item." : {
+
+    },
     "Their plugins keep them." : {
 
     },
@@ -9877,6 +10224,12 @@
       "extractionState" : "manual"
     },
     "This address reaches a different Marfa server from the one this library was made for, so the app left the library as it was." : {
+
+    },
+    "This app can’t change it: another app or key made it, or this app isn’t allowed to. Change or remove it in Webhooks first." : {
+
+    },
+    "This app isn’t allowed to change it. Allow more, or change it where it was made, first." : {
 
     },
     "This app’s settings start over on every Mac that connects to %@. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back." : {
@@ -10264,10 +10617,10 @@
     "Turn Off" : {
 
     },
-    "Turn Off Limit Sources" : {
+    "Turn Off %@" : {
 
     },
-    "Turn Off Limit Sources?" : {
+    "Turn Off %@?" : {
 
     },
     "Turn Off…" : {
@@ -10344,10 +10697,10 @@
         }
       }
     },
-    "Types that Marfa or a plugin provides can’t be changed. Add the field to a type of your own instead." : {
+    "Types left unchecked take items from every source." : {
 
     },
-    "Types with no limit read every source." : {
+    "Types that Marfa or a plugin provides can’t be changed. Add the field to a type of your own instead." : {
 
     },
     "Typing" : {
@@ -10477,6 +10830,12 @@
     "Updates" : {
 
     },
+    "Updates the shortcuts included in the file." : {
+
+    },
+    "Updates the type layouts included in the file." : {
+
+    },
     "Update…" : {
 
     },
@@ -10549,8 +10908,14 @@
     "Use an address like https://marfa.example, with no path." : {
 
     },
+    "Use at most 200 characters." : {
+
+    },
     "Use digits only." : {
       "extractionState" : "manual"
+    },
+    "Use letters, numbers and punctuation." : {
+
     },
     "Use only the server’s address, with nothing after it, such as https://marfa.example." : {
 
@@ -10594,6 +10959,9 @@
 
     },
     "View" : {
+
+    },
+    "View > Show Original switches it." : {
 
     },
     "View As" : {
@@ -10801,6 +11169,9 @@
     "What it may read and change. It can only be narrowed." : {
 
     },
+    "What the move changes is different now. Nothing moved. Check it, then delete again." : {
+
+    },
     "What the release served isn’t what it lists, so the app used none of it." : {
 
     },
@@ -10878,6 +11249,12 @@
 
     },
     "Who Did What" : {
+
+    },
+    "Who May Write" : {
+
+    },
+    "Who May Write Not Saved" : {
 
     },
     "Whole Number" : {
@@ -10976,6 +11353,9 @@
     "Your Content" : {
 
     },
+    "Your Layouts" : {
+
+    },
     "Your Marfa library can’t be opened right now. Check the connection in Settings, then open the link again." : {
 
     },
@@ -10989,6 +11369,9 @@
       "extractionState" : "manual"
     },
     "Your Profile" : {
+
+    },
+    "Your Shortcuts" : {
 
     },
     "Your Types" : {
@@ -11054,6 +11437,9 @@
     "Zoom to Fit" : {
 
     },
+    "^[%lld Field](inflect: true)" : {
+
+    },
     "^[%lld Field](inflect: true) From %@" : {
       "localizations" : {
         "en" : {
@@ -11076,6 +11462,22 @@
     "^[%lld item](inflect: true) can’t be added as a file." : {
       "extractionState" : "manual"
     },
+    "^[%lld item](inflect: true) couldn’t move, so %@ was kept." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "^[%1$lld item](inflect: true) couldn’t move, so %2$@ was kept."
+          }
+        }
+      }
+    },
+    "^[%lld item](inflect: true) couldn’t move." : {
+
+    },
+    "^[%lld item](inflect: true) moved." : {
+
+    },
     "^[%lld item](inflect: true) selected" : {
 
     },
@@ -11086,6 +11488,9 @@
 
     },
     "^[%lld result](inflect: true)" : {
+
+    },
+    "^[%lld setting](inflect: true) use it." : {
 
     },
     "^[%lld version](inflect: true)" : {
@@ -11103,7 +11508,16 @@
     "a connector" : {
 
     },
+    "a folder" : {
+
+    },
     "a revoked key" : {
+
+    },
+    "a view" : {
+
+    },
+    "a webhook" : {
 
     },
     "activity and webhook deliveries" : {
@@ -11158,6 +11572,9 @@
 
     },
     "files" : {
+
+    },
+    "folders" : {
 
     },
     "has any" : {
@@ -11307,6 +11724,9 @@
     "no limit" : {
       "extractionState" : "manual"
     },
+    "object store address" : {
+
+    },
     "off" : {
 
     },
@@ -11347,6 +11767,15 @@
 
     },
     "telemetry headers" : {
+
+    },
+    "telemetry logs address" : {
+
+    },
+    "telemetry metrics address" : {
+
+    },
+    "telemetry traces address" : {
 
     },
     "the %@" : {
@@ -11392,6 +11821,12 @@
       "extractionState" : "manual"
     },
     "viewers" : {
+
+    },
+    "views" : {
+
+    },
+    "webhooks" : {
 
     },
     "yesterday" : {
