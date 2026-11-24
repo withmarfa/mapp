@@ -51,7 +51,7 @@ Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `in
 
 The shortcuts that work in any app are not synced, but a settings file and a restore point carry them. A Marfa that holds them from an earlier version keeps those rows, and the sync neither reads nor deletes them.
 
-On This Mac keeps Export Automatically in local defaults (`automaticExportPlans`): one plan for each Marfa it was set for, by its instance id, holding the schedule, the folder and when its last export was made.
+Export Automatically stores one plan per Marfa instance in this Mac's defaults (`automaticExportPlans`). Each plan records the schedule, destination folder, and last export time. Restore points include these plans.
 
 ## The first launch
 

@@ -1,9 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The On This Mac page: the copy of the library the app keeps on this Mac, and what can be done to it. The space it uses, the
-/// files opened and attachments kept offline, Export Everything to a folder, and Download Everything Again. What each file
-/// step does is `DownloadedFiles`', unchanged; a hydration keeps every change not yet sent (`MarfaSync.rehydrate`).
+/// Shows the space used by the local copy and its offline files, with controls for exports and downloads.
 struct OnThisMacPage: View {
     let openConnection: () -> Void
     @Environment(Libraries.self) private var libraries
