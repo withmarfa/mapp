@@ -11,8 +11,7 @@ struct LinksPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: LinksModel
-    @Environment(\.settingsPush) private var push
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -42,12 +41,12 @@ struct LinksPage: View {
             .onChange(of: model.made) {
                 guard let id = model.made, let type = model.linkType(id) else { return }
                 model.acknowledgeMade()
-                push(subpage(for: type))
+                navigation?.push(subpage(for: type))
             }
             .onChange(of: model.deleted) {
                 guard model.deleted != nil else { return }
                 model.acknowledgeDeleted()
-                back()
+                navigation?.back()
             }
             .alert(
                 model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelDelete() } },
@@ -73,7 +72,7 @@ struct LinksPage: View {
             } else {
                 SettingsPageState(
                     symbol: "link", title: Text("This Link Type Is Gone"), line: Text("It was deleted, here or somewhere else."),
-                    action: ("Back", back))
+                    action: ("Back", { navigation?.back() }))
             }
         } else {
             list
@@ -87,7 +86,7 @@ struct LinksPage: View {
                     SettingsEmptyCard(symbol: "link", title: Text("No Link Types of Your Own"), line: Text("Make one to link items in a way of your own."))
                 }
                 ForEach(model.yours) { type in
-                    SettingsLinkRow(verbatim: type.label, line: model.line(of: type), lead: .symbol("link")) { push(subpage(for: type)) }
+                    SettingsLinkRow(verbatim: type.label, line: model.line(of: type), lead: .symbol("link")) { navigation?.push(subpage(for: type)) }
                 }
                 SettingsAddRow("New Link Type…") { model.beginNew() }
             }
@@ -194,7 +193,7 @@ struct NewLinkTypeSheet: View {
 struct LinksSection: View {
     @State private var model: LinksModel
     let host: any MarfaSettingsHost
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost) {
         self.host = host
@@ -206,7 +205,7 @@ struct LinksSection: View {
             SettingsLinkRow(
                 verbatim: String(localized: "Links"), line: model.summary, lead: .symbol("link"),
                 value: model.hasLoaded && model.failure == nil ? model.linkTypes.count.formatted() : nil
-            ) { push(LinksPage.subpage) }
+            ) { navigation?.push(LinksPage.subpage) }
         }
         .task(id: host.serverAddress) { await model.load() }
     }
