@@ -123,7 +123,7 @@ struct AccountPage: View {
                     verbatim: browser.name, line: Self.line(added: browser.added, used: browser.lastUsed, signedIn: true),
                     error: model.rowErrors[browser.id].map { OwnerWording.line($0, on: .account) }, lead: .symbol("safari")
                 ) {
-                    SettingsButton("Sign Out") { model.askToEnd(browser) }
+                    SettingsButton("Sign Out…") { model.askToEnd(browser) }
                 }
             }
         }
@@ -164,8 +164,7 @@ private struct PasswordSheet: View {
             ) {
                 EmptyView()
             } buttons: {
-                Spacer(minLength: 0)
-                SettingsButton("Done") { model.closePasswordSheet() }.keyboardShortcut(.defaultAction)
+                SettingsButton("Done", role: .confirm) { model.closePasswordSheet() }
             }
         } else {
             SettingsSheet(
@@ -185,11 +184,9 @@ private struct PasswordSheet: View {
                     SettingsSheetStatus(text: Text("At least 8 characters."), isMet: model.isNewPasswordLongEnough)
                 }
             } buttons: {
-                Spacer(minLength: 0)
                 SettingsButton("Cancel") { model.closePasswordSheet() }
-                SettingsButton("Change Password") { Task { await model.changePassword() } }
+                SettingsButton("Change Password", role: .confirm) { Task { await model.changePassword() } }
                     .disabled(!model.canChangePassword)
-                    .keyboardShortcut(.defaultAction)
             }
         }
     }
@@ -206,9 +203,8 @@ private struct RenamePasskeySheet: View {
                     onSubmit: { Task { await model.rename() } })
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeRename() }
-            SettingsButton("Rename") { Task { await model.rename() } }.disabled(!model.canRename).keyboardShortcut(.defaultAction)
+            SettingsButton("Rename", role: .confirm) { Task { await model.rename() } }.disabled(!model.canRename)
         }
     }
 }

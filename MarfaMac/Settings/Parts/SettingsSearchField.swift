@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The system's search field, small, for a table's search and the keyboard's. SwiftUI's own `searchable` places a field only in
+/// The system's search field, large (28 points, a capsule), for a table's search and the keyboard's. SwiftUI's own `searchable` places a field only in
 /// a toolbar or a sidebar, so a field inside a page is `NSSearchField`, which draws the magnifier and the clear button itself.
 struct SettingsSearchField: NSViewRepresentable {
     let prompt: String
@@ -13,8 +13,8 @@ struct SettingsSearchField: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSSearchField {
         let field = NSSearchField()
-        field.controlSize = .small
-        field.font = .systemFont(ofSize: NSFont.systemFontSize(for: .small))
+        field.controlSize = .large
+        field.font = .systemFont(ofSize: NSFont.systemFontSize(for: .regular))
         field.sendsSearchStringImmediately = true
         field.target = context.coordinator
         field.action = #selector(Coordinator.changed(_:))

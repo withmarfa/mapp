@@ -225,11 +225,11 @@ nonisolated protocol OwnerCalls: Sendable {
     func apps() async throws(OwnerFailure) -> [AppAccess]
     /// Narrows an app to `scopes`, which were read as `expected`; a change since is a `conflict`.
     func narrow(_ app: AppAccess, to scopes: [String]) async throws(OwnerFailure)
-    /// Disconnects `app`; `removingData` also deletes for good what it keeps, in the same write (`items.purge`).
+    /// Disconnects `app`; `removingData` also deletes permanently what it keeps, in the same write (`items.purge`).
     func disconnect(_ app: AppAccess, removingData: Bool) async throws(OwnerFailure)
     /// What an app keeps under `vendor`, an `app.<vendor>` namespace (`grants.manage`).
     func appData(vendor: String) async throws(OwnerFailure) -> AppData
-    /// Deletes everything under `vendor` for good, calling again until none is left. Throws where the first call fails; a
+    /// Deletes everything under `vendor` permanently, calling again until none is left. Throws where the first call fails; a
     /// later failure comes back as `stoppedBy`.
     func removeAppData(vendor: String) async throws(OwnerFailure) -> AppDataRemoved
 

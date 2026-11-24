@@ -154,8 +154,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     /// A sign-in step the Cancel button can stop: the browser's page, or the wait for a code.
     enum SignInStep: Hashable, Sendable {
         case connect(usingCode: Bool)
-        /// `permissions` are asked for besides the ones the sign-in holds, which Allow More… names.
-        case signInAgain(usingCode: Bool, permissions: Set<InstancePermission> = [])
+        case signInAgain(usingCode: Bool)
         /// `choice` is the person's answer to the question about changes that wait, where they have given it.
         case switchServer(usingCode: Bool, choice: Choice? = nil)
     }
@@ -168,7 +167,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         let task = Task { [self] in
             switch step {
             case .connect(let usingCode): await connect(usingCode: usingCode)
-            case .signInAgain(let usingCode, let permissions): await signInAgain(usingCode: usingCode, asking: permissions)
+            case .signInAgain(let usingCode): await signInAgain(usingCode: usingCode)
             case .switchServer(let usingCode, let choice): await switchServer(choice, usingCode: usingCode)
             }
             signingIn = nil
@@ -201,11 +200,11 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         if isConnected(to: target) { address = "" }
     }
 
-    func signInAgain(usingCode: Bool = false, asking permissions: Set<InstancePermission> = []) async {
+    func signInAgain(usingCode: Bool = false) async {
         guard !isWorking, host.connection != nil else { return }
         let method = method(usingCode: usingCode)
         await run(.signingInAgain) { () async throws(MarfaHost.Problem) in
-            try await host.signInAgain(via: method, asking: permissions)
+            try await host.signInAgain(via: method)
         }
     }
 

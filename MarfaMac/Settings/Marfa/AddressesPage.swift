@@ -119,11 +119,9 @@ struct AddressSheet: View {
                 await model.check()
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.close() }
-            SettingsButton(confirmTitle) { Task { await model.confirm() } }
+            SettingsButton(confirmTitle, role: .confirm) { Task { await model.confirm() } }
                 .disabled(model.sheet == .addWebsite ? !(model.inputError == nil && AddressesModel.origin(from: model.input) != nil) : !model.canConfirm)
-                .keyboardShortcut(.defaultAction)
         }
     }
 

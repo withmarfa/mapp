@@ -430,7 +430,7 @@ private struct ReleasedPluginDetail: View {
 // MARK: Removing
 
 /// What removing a plugin takes and what stays, before it is sent.
-private struct PluginRemovalSheet: View {
+struct PluginRemovalSheet: View {
     let model: PluginsModel
     let removal: PluginsModel.Removal
 
@@ -471,10 +471,10 @@ private struct PluginRemovalSheet: View {
                     }
                 }
             }
+        } leading: {
+            SettingsButton("Remove", role: .destructive) { Task { await model.confirmRemoval() } }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.cancelRemoval() }
-            SettingsButton(verbatim: String(localized: "Remove \(plugin.title)"), role: .destructive) { Task { await model.confirmRemoval() } }
         }
     }
 }

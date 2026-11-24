@@ -189,11 +189,8 @@ private struct KeyDetail: View {
                 SettingsValue(verbatim: ends)
             }
         } else {
-            SettingsRow("Expires", line: "Extending keeps the same key, so nothing using it changes.") {
-                HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                    SettingsValue(verbatim: ends)
-                    SettingsButton("Extend…") { model.beginExtend(key) }
-                }
+            SettingsRow(title: Text("Expires"), line: Text("\(ends). Extending keeps the same key, so nothing using it changes.")) {
+                SettingsButton("Extend…") { model.beginExtend(key) }
             }
         }
     }
@@ -315,11 +312,8 @@ private struct NewKeySheet: View {
                         }
                     }
                     if !model.givablePermissions.isEmpty {
-                        SettingsRow("Look After This Marfa") {
-                            HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                                SettingsValue(verbatim: permissionCount)
-                                SettingsButton("Choose…") { model.isChoosingPermissions = true }
-                            }
+                        SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: permissionCount)) {
+                            SettingsButton("Choose…") { model.isChoosingPermissions = true }
                         }
                     }
                     if !addable.isEmpty {
@@ -333,9 +327,8 @@ private struct NewKeySheet: View {
                 Text("The source can’t change later.").settingsFont(.footer).foregroundStyle(SettingsTokens.secondaryText)
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Create Key") { Task { await model.make() } }.disabled(!model.canMakeDraft).keyboardShortcut(.defaultAction)
+            SettingsButton("Create Key", role: .confirm) { Task { await model.make() } }.disabled(!model.canMakeDraft)
         }
     }
 
@@ -354,8 +347,7 @@ private struct NewKeySheet: View {
                 }
             }
         } buttons: {
-            Spacer(minLength: 0)
-            SettingsButton("Back") { model.isChoosingPermissions = false }.keyboardShortcut(.defaultAction)
+            SettingsButton("Back", role: .confirm) { model.isChoosingPermissions = false }
         }
     }
 }
@@ -370,13 +362,12 @@ private struct ShownKeySheet: View {
                 SettingsSheetField(verbatim: created.label) { SettingsReadOnlyValue(text: created.secret) }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton(copied ? "Copied" : "Copy") {
                 guard let secret = model.created?.secret else { return }
                 OwnerClipboard.copySecret(secret)
                 copied = true
             }
-            SettingsButton("Done") { model.closeSheet() }.keyboardShortcut(.defaultAction)
+            SettingsButton("Done", role: .confirm) { model.closeSheet() }
         }
     }
 }
@@ -392,9 +383,8 @@ private struct RenameKeySheet: View {
                     onSubmit: { Task { await model.rename() } })
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Rename") { Task { await model.rename() } }.disabled(!model.canRename).keyboardShortcut(.defaultAction)
+            SettingsButton("Rename", role: .confirm) { Task { await model.rename() } }.disabled(!model.canRename)
         }
     }
 }
@@ -425,9 +415,8 @@ private struct ExtendKeySheet: View {
                 }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Extend") { Task { await model.extend() } }.disabled(model.isExtending).keyboardShortcut(.defaultAction)
+            SettingsButton("Extend", role: .confirm) { Task { await model.extend() } }.disabled(model.isExtending)
         }
     }
 }

@@ -123,7 +123,7 @@ import Observation
         let offersData = !removableVendors(of: app).isEmpty && !app.vendors.contains { isOwn($0) }
         var message = String(localized: "\(name) stops working at once and must be approved again. Its webhooks are deleted. The keys it made keep working.")
         if offersData {
-            message += " " + String(localized: "Its data stays unless you also remove it. Removing it deletes it for good, and only a backup brings it back.")
+            message += " " + String(localized: "Its data stays unless you also remove it. Removing it deletes it permanently, and only a backup brings it back.")
         }
         question = Question(
             action: .disconnect(appID: app.id), title: String(localized: "Disconnect \(name)?"), message: message,
@@ -136,7 +136,7 @@ import Observation
         let name = Self.name(of: app)
         question = Question(
             action: .removeData(appID: app.id, vendor: vendor), title: String(localized: "Remove the Data \(name) Keeps?"),
-            message: String(localized: "This deletes it for good, the items in the trash too. Only a backup brings it back. \(name) stays connected and may make new data."),
+            message: String(localized: "This deletes it permanently, the items in the trash too. Only a backup brings it back. \(name) stays connected and may make new data."),
             confirm: String(localized: "Remove"))
     }
 

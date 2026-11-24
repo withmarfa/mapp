@@ -188,7 +188,7 @@ extension TypesModel {
             .filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 
-    var canMakeField: Bool { !trimmedFieldName.isEmpty && (newFieldKind != .choice || !typedChoices.isEmpty) }
+    var canMakeField: Bool { !isWorking && !trimmedFieldName.isEmpty && (newFieldKind != .choice || !typedChoices.isEmpty) }
 
     /// The name a new field gets on the server, made from what was typed and different from every field the type holds.
     func key(forNamed text: String, in id: String) -> String {

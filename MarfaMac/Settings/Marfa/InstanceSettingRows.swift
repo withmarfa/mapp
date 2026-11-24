@@ -140,7 +140,7 @@ struct InstanceToggleRow: View {
     }
 }
 
-/// A number typed in a field with its unit inside, sent when the person presses Return or leaves the field.
+/// A number sent when the person presses Return or leaves the field.
 struct InstanceNumberRow: View {
     let model: InstanceSettingsModel
     let setting: InstanceSetting

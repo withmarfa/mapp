@@ -133,9 +133,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
     ]
 }
 
-/// The Limits page: the limits the server lets the owner change, each a number with its unit inside. A value is sent when
-/// the field is left or Return is pressed, and only if it differs from what the server holds. A value out of range, or one
-/// the server refuses, stays in its field with one line under its title.
+/// Sends changed limits on Return or when the field loses focus. A refused value stays in its field with an explanation.
 @Observable @MainActor final class LimitsModel: OwnerDraftHolding {
     private let store: StoredSettings
 

@@ -21,14 +21,12 @@ nonisolated final class ScriptedSignIns: SignIns {
         /// Whether the sign-ins that succeed leave a replaced approval standing at the server.
         var replacedStands = false
         var calls: [String] = []
-        /// The permissions the next browser sign-in grants of those asked, first to last; the last is repeated. Empty
-        /// grants everything asked.
+        /// The permissions the next browser or code sign-in grants of those asked, first to last; the last is repeated.
+        /// Empty grants everything asked.
         var approving: [Set<InstancePermission>] = []
         /// Whether the sign-ins that succeed are approved the read of the owner's name they ask for.
         var approvesProfile = true
-        /// The permissions each browser or code sign-in was asked for, in order.
-        var asked: [Set<InstancePermission>] = []
-        /// The scopes each sign-in asked for besides those, as `SystemSignIns` asks them.
+        /// The scopes each browser or code sign-in asked for, as `SystemSignIns` asks them, in order.
         var askedScopes: [[String]] = []
     }
 
@@ -74,10 +72,10 @@ nonisolated final class ScriptedSignIns: SignIns {
             profile: (try? readsProfile(for: connection)) ?? false, scopes: scopes)
     }
 
-    /// The permissions each browser or code sign-in asked for, in order.
-    var asked: [Set<InstancePermission>] { state.withLock { $0.asked } }
+    /// The permissions each browser or code sign-in asked for, read from the scopes it asked for, in order.
+    var asked: [Set<InstancePermission>] { askedScopes.map { scopes in Set(scopes.compactMap(InstancePermission.init(rawValue:))) } }
 
-    /// What the next browser sign-ins grant of the permissions they ask for, so a test can approve fewer than asked.
+    /// What the next browser or code sign-ins grant of the permissions they ask for.
     func script(approving: [Set<InstancePermission>]) {
         state.withLock { $0.approving = approving }
     }
@@ -164,10 +162,10 @@ nonisolated final class ScriptedSignIns: SignIns {
         try held(connection.address)
     }
 
-    @MainActor func signInWithBrowser(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> SignedIn {
+    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws -> SignedIn {
         let (next, granted, profile): (Result<String, any Error>, Set<InstancePermission>, Bool) = state.withLock { state in
             state.calls.append("browser \(connection.address.absoluteString)")
-            let granted = Self.take(asking: permissions, in: &state)
+            let granted = Self.take(in: &state)
             return (
                 state.browser.count > 1 ? state.browser.removeFirst() : (state.browser.first ?? .success(signedInKey)), granted,
                 state.approvesProfile)
@@ -180,18 +178,17 @@ nonisolated final class ScriptedSignIns: SignIns {
     }
 
     /// Records what a sign-in asked for and answers which of it the owner approves.
-    private static func take(asking permissions: Set<InstancePermission>, in state: inout State) -> Set<InstancePermission> {
-        state.asked.append(permissions)
+    private static func take(in state: inout State) -> Set<InstancePermission> {
         state.askedScopes.append(SystemSignIns.scopes)
         let approving = state.approving.count > 1 ? state.approving.removeFirst() : state.approving.first
-        let asked = SystemSignIns.askedAtSignIn.union(permissions)
+        let asked = SystemSignIns.askedAtSignIn
         return approving.map { asked.intersection($0) } ?? asked
     }
 
-    func startCodeSignIn(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> CodeSignIn {
+    func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn {
         let (next, granted, key, profile): (Result<CodeSignIn, any Error>?, Set<InstancePermission>, String?, Bool) = state.withLock { state in
             state.calls.append("code \(connection.address.absoluteString)")
-            let granted = Self.take(asking: permissions, in: &state)
+            let granted = Self.take(in: &state)
             return (state.code.count > 1 ? state.code.removeFirst() : state.code.first, granted, state.codeKey, state.approvesProfile)
         }
         if let next { return try next.get() }

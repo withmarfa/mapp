@@ -2,8 +2,8 @@ import Marfa
 import SwiftUI
 
 extension MarfaSettingsHost {
-    /// Asks the owner for the permission the server named, or for nothing in particular where it named none. Every page's
-    /// Allow More… for a refusal goes through here.
+    /// Asks the owner for everything the sign-in lacks, judging the answer by the permission the server named, where it
+    /// named one. Every page's Allow More… for a refusal goes through here.
     func askForMore(naming scope: String?) {
         let asked = scope.flatMap { InstancePermission(rawValue: $0) }
         Task { _ = await allowMore(asked.map { [$0] } ?? []) }
