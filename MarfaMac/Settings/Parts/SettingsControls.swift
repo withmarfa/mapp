@@ -298,9 +298,7 @@ struct SettingsField: View {
     }
 }
 
-/// A value shown in a field's place that can be selected and copied but not changed, such as a key shown once. It is
-/// at least as tall as a field and as wide as the space it is given. It wraps onto as many lines as it needs, so every
-/// character of a value that is shown once is shown, unless a line limit set around it says otherwise.
+/// A read-only value shown in a field's place. The text is selectable by default and wraps unless the caller sets a line limit.
 struct SettingsReadOnlyValue: View {
     let text: String
     /// False for a value that leaves only through its own button, such as a command that holds a key.
