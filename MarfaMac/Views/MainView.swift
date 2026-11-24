@@ -39,11 +39,14 @@ struct MainView: View {
 
     /// The window's editor, holding the window's title drafts.
     private var editor: EditorController {
-        editorSlot.editor {
-            let editor = EditorController(library: library)
-            editor.titleDrafts = details
-            return editor
-        }
+        editorSlot.editor { Self.makeEditor(library: library, details: details) }
+    }
+
+    /// An editor that holds `details` as its window's title drafts, so a quit saves a title typed and not left.
+    static func makeEditor(library: any ItemLibrary, details: DetailsPresentation) -> EditorController {
+        let editor = EditorController(library: library)
+        editor.titleDrafts = details
+        return editor
     }
 
     var body: some View { lifecycleWindow }

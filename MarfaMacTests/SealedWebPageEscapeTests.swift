@@ -5,12 +5,13 @@ import WebKit
 
 /// A few ways a script might still reach WebRTC from inside the sealed page, tried on its own against a UDP listener
 /// that counts the datagrams that arrive. This is the access rule that a sealed page reaches nothing, so each kind of
-/// escape has a representative: a frame the page makes, a frame with its own document, a sandboxed frame and a worker.
+/// escape has a representative: a frame the page makes, a frame with its own document (srcdoc, data: or blob:), an
+/// object-embedded context, a sandboxed frame and a worker.
 /// Each costs a web process and the page's 2.5 s wait, so one is added for a new kind of way out, not for another
 /// document that takes a known way.
 @Suite(.serialized, .hangLimit) @MainActor struct SealedWebPageEscapeTests {
     enum Escape: String, CaseIterable, CustomTestStringConvertible {
-        case blankFrameAtOnce, srcdocFrame, sandboxedSrcdocFrame, blobWorker
+        case blankFrameAtOnce, srcdocFrame, dataFrame, blobFrame, sandboxedSrcdocFrame, objectFrame, blobWorker
 
         var testDescription: String { rawValue }
     }
@@ -44,6 +45,12 @@ import WebKit
             body = "const f = document.createElement('iframe'); document.body.append(f); report(connect(f.contentWindow.RTCPeerConnection));"
         case .srcdocFrame:
             body = "const f = document.createElement('iframe'); f.srcdoc = \(try literal(inner)); document.body.append(f);"
+        case .dataFrame:
+            body = "const f = document.createElement('iframe'); f.src = 'data:text/html;base64,' + btoa(\(try literal(inner))); document.body.append(f);"
+        case .blobFrame:
+            body = "const f = document.createElement('iframe'); f.src = URL.createObjectURL(new Blob([\(try literal(inner))], { type: 'text/html' })); document.body.append(f);"
+        case .objectFrame:
+            body = "const o = document.createElement('object'); o.data = 'about:blank'; document.body.append(o); report(connect(o.contentWindow && o.contentWindow.RTCPeerConnection));"
         case .blobWorker:
             body = """
                 try { const w = new Worker(URL.createObjectURL(new Blob([\(try literal(worker))], { type: 'text/javascript' })));

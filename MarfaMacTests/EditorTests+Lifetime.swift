@@ -134,6 +134,22 @@ extension EditorTests {
         return (made, shown, drafts)
     }
 
+    /// Quitting saves a title typed and not left only if the main window's editor holds the window's drafts, and with
+    /// none it reports success. The window's own wiring needs no page to check.
+    @Test func aMainWindowsEditorHoldsItsTitleDraftsAndSavesThem() async throws {
+        let library = ItemPreviewFixtures.library
+        try #require(await eventually { library.isLoaded })
+        let details = DetailsPresentation()
+        let editor = MainView.makeEditor(library: library, details: details)
+        #expect(editor.titleDrafts === details)
+        let draft = details.draft(for: ItemPreviewFixtures.ticketID, key: "title")
+        draft.text = "Review before quitting"
+        draft.isDirty = true
+        #expect(editor.saveTitles(tellingRefusal: false))
+        #expect(await eventually { library.item(ItemPreviewFixtures.ticketID)?.title == "Review before quitting" })
+        withExtendedLifetime(library) {}
+    }
+
     /// An editor is a web view with a page process of its own, so a window makes one, however often SwiftUI makes
     /// the window's view again.
     @Test func anItemWindowMakesOneEditorHoweverOftenItsViewIsMadeAgain() async throws {

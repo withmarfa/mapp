@@ -170,6 +170,7 @@ nonisolated final class FakeServers: Sendable {
             if let failure = self.failure.withLock({ $0 }) { throw failure }
             self.opening.withLock { $0 = true }
             await self.slow.wait()
+            try Task.checkCancellation()
             guard try signIns.server(for: connection) != nil else {
                 throw SourceFailure(kind: .denied, message: "There’s no key for this Marfa server.")
             }

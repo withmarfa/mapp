@@ -22,8 +22,8 @@ nonisolated enum Gesture: Sendable {
 /// reaches it. `TARGET` in the document stands for that server's address, and `BOX` for a style with room to click.
 ///
 /// This is the access rule that a sealed page reaches nothing, so each kind of route has a few representatives: a
-/// script that activates a link by itself, a real link or control the person acts on, and a link inside a sandboxed
-/// frame. Every route costs a web process and a wait, so a route is added for a new kind of way in, not for another
+/// script that activates a link by itself or sends it an event, a real link or control the person acts on (also in a
+/// document the page replaces), and a link inside a sandboxed frame. Every route costs a web process and a wait, so a route is added for a new kind of way in, not for another
 /// document that takes a known way.
 nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
     let name: String
@@ -47,6 +47,7 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
     }
 
     static let newWindowLink = "<a target=_blank href='TARGET/x' style='BOX'>x</a>"
+    static let click = "new MouseEvent('click',{bubbles:true,cancelable:true})"
     static let closedLink = "<div id=t style='BOX'><template shadowrootmode=closed><a href='TARGET/x' style='BOX'>x</a></template></div>"
 
     static let plainLink = ActivationRoute(name: "a link", runsScripts: false, document: "<a id=t href='TARGET/x' style='BOX'>x</a>")
@@ -54,6 +55,9 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
     static let scripted: [ActivationRoute] = [
         .init(name: "click on a link in no document", gesture: .none, document: """
             <script>const a=document.createElement('a');a.href='TARGET/x';a.click()</script>
+            """),
+        .init(name: "event on a link in no document", gesture: .none, document: """
+            <script>const a=document.createElement('a');a.href='TARGET/x';a.dispatchEvent(\(click))</script>
             """),
         .init(name: "click on a link in a closed root", gesture: .none, document: """
             <div id=h></div><script>const r=h.attachShadow({mode:'closed'});r.innerHTML="<a href='TARGET/x'>x</a>";r.firstChild.click()</script>
@@ -80,6 +84,9 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
         .init(name: "a link, in a document that replaces what the seal calls", document: """
             <a id=t href='TARGET/x' style='BOX'>x</a><script>window.Element=null;Function.prototype.call=function(){};
             Function.prototype.apply=function(){};Event.prototype.preventDefault=function(){}</script>
+            """),
+        .init(name: "a link after document.open", document: """
+            <script>setTimeout(()=>{document.open();document.write("<a id=t href='TARGET/x' style='BOX'>x</a>");document.close()},0)</script>
             """),
         .init(name: "a new-window link in a frame", document: frame("", newWindowLink))
     ]
