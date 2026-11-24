@@ -1315,6 +1315,9 @@
     "%lld settings are set on the machine %@ runs on." : {
 
     },
+    "%lld settings were applied." : {
+
+    },
     "%lld shortcuts were imported." : {
 
     },
@@ -1426,6 +1429,9 @@
 
     },
     "%lld were skipped: the app no longer has their commands, or their keys can’t be used." : {
+
+    },
+    "%lld were skipped: this version of the app can’t use them." : {
 
     },
     "%lld with no status" : {
@@ -1731,6 +1737,9 @@
           }
         }
       }
+    },
+    "A restore point could not be saved first, so no settings were changed." : {
+
     },
     "A restore point couldn’t be saved first, so nothing was changed. Check that this Mac has free space, then try again." : {
 
@@ -3060,6 +3069,12 @@
     "Choose the machine that runs it." : {
 
     },
+    "Choose the settings to go back to." : {
+
+    },
+    "Choose what to replace with the settings in “%@”." : {
+
+    },
     "Choose where to keep backups first." : {
 
     },
@@ -3379,6 +3394,9 @@
     "Couldn’t Export Layouts" : {
 
     },
+    "Couldn’t Export Settings" : {
+
+    },
     "Couldn’t Export Shortcuts" : {
 
     },
@@ -3389,6 +3407,9 @@
       "extractionState" : "manual"
     },
     "Couldn’t Import Layouts" : {
+
+    },
+    "Couldn’t Import Settings" : {
 
     },
     "Couldn’t Import Shortcuts" : {
@@ -3455,6 +3476,9 @@
 
     },
     "Couldn’t Remove the Field" : {
+
+    },
+    "Couldn’t Restore Settings" : {
 
     },
     "Couldn’t Save Item" : {
@@ -4120,7 +4144,7 @@
     "Every item of this type, and of any type based on it, can hold it." : {
 
     },
-    "Every setting on this Mac starts over. Your items and sign-in stay." : {
+    "Every setting on this Mac starts over. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back." : {
 
     },
     "Every setting on this Mac. Your items stay." : {
@@ -4172,6 +4196,9 @@
 
     },
     "Export Layouts…" : {
+
+    },
+    "Export Settings" : {
 
     },
     "Export Shortcuts" : {
@@ -4545,6 +4572,9 @@
     "Go To" : {
 
     },
+    "Go back to settings saved before a change." : {
+
+    },
     "Go back to the item" : {
 
     },
@@ -4777,7 +4807,13 @@
     "Images Weren’t Added to the Item" : {
       "extractionState" : "manual"
     },
+    "Import" : {
+
+    },
     "Import Layouts…" : {
+
+    },
+    "Import Settings" : {
 
     },
     "Import Shortcuts" : {
@@ -4789,7 +4825,19 @@
     "Important" : {
 
     },
+    "Imported Settings" : {
+
+    },
     "Imported Shortcuts" : {
+
+    },
+    "Importing changes these settings on every Mac connected to %@. A restore point is saved first." : {
+
+    },
+    "Importing changes these settings on every Mac connected to this Marfa. A restore point is saved first." : {
+
+    },
+    "Importing changes these settings on this Mac only. A restore point is saved first." : {
 
     },
     "Import…" : {
@@ -5781,6 +5829,9 @@
     "Marfa Layouts" : {
 
     },
+    "Marfa Settings" : {
+
+    },
     "Marfa Shortcuts" : {
 
     },
@@ -6341,6 +6392,9 @@
     "No places found." : {
       "extractionState" : "manual"
     },
+    "No settings changed." : {
+
+    },
     "No sign-in has reported keeping this folder yet." : {
 
     },
@@ -6354,6 +6408,9 @@
 
     },
     "None are left to change." : {
+
+    },
+    "None saved yet." : {
 
     },
     "None selected" : {
@@ -6666,6 +6723,9 @@
     "One or more of these items can’t become this type." : {
       "extractionState" : "manual"
     },
+    "One setting was applied." : {
+
+    },
     "One shortcut was imported." : {
 
     },
@@ -6688,6 +6748,9 @@
       "extractionState" : "manual"
     },
     "One was skipped: the app no longer has its command, or its keys can’t be used." : {
+
+    },
+    "One was skipped: this version of the app can’t use it." : {
 
     },
     "Only %@ and you can read it." : {
@@ -7549,6 +7612,9 @@
     "Replace" : {
 
     },
+    "Replace settings with those in a file." : {
+
+    },
     "Replace the Shortcut?" : {
 
     },
@@ -7621,6 +7687,12 @@
     "Restore Defaults…" : {
 
     },
+    "Restore Earlier Settings" : {
+
+    },
+    "Restore Points" : {
+
+    },
     "Restore Version" : {
       "extractionState" : "manual"
     },
@@ -7628,6 +7700,9 @@
 
     },
     "Restored" : {
+
+    },
+    "Restored Settings" : {
 
     },
     "Restored an archive" : {
@@ -7640,6 +7715,15 @@
 
     },
     "Restore…" : {
+
+    },
+    "Restoring changes the settings on every Mac connected to %@. A restore point is saved first." : {
+
+    },
+    "Restoring changes the settings on every Mac connected to this Marfa. A restore point is saved first." : {
+
+    },
+    "Restoring changes the settings on this Mac only. A restore point is saved first." : {
 
     },
     "Restoring…" : {
@@ -7745,6 +7829,9 @@
       "extractionState" : "manual"
     },
     "Save as View…" : {
+
+    },
+    "Save every setting to a file." : {
 
     },
     "Save the text as %@.md beside %@.json." : {
@@ -8664,6 +8751,9 @@
     "That key can’t be used." : {
 
     },
+    "That restore point can’t be read. No settings were changed." : {
+
+    },
     "The Code Expired" : {
       "extractionState" : "manual"
     },
@@ -9480,6 +9570,9 @@
     "The server’s own check found a problem." : {
 
     },
+    "The settings could not be written to “%@”. Choose another place and try again." : {
+
+    },
     "The shortcuts could not be written to “%@”. Choose another place and try again." : {
 
     },
@@ -9786,10 +9879,10 @@
     "This address reaches a different Marfa server from the one this library was made for, so the app left the library as it was." : {
 
     },
-    "This app’s settings start over on every Mac that connects to %@. Your items and sign-in stay." : {
+    "This app’s settings start over on every Mac that connects to %@. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back." : {
 
     },
-    "This app’s settings start over on every Mac that connects to this Marfa. Your items and sign-in stay." : {
+    "This app’s settings start over on every Mac that connects to this Marfa. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back." : {
 
     },
     "This change came from a copy that the app could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it." : {
@@ -10913,7 +11006,28 @@
     "Your changes were saved as a copy" : {
       "extractionState" : "manual"
     },
+    "Your earlier settings are back." : {
+
+    },
     "Your items are still loading." : {
+
+    },
+    "Your settings are back as they were before Import, %@." : {
+
+    },
+    "Your settings are back as they were before Reset, %@." : {
+
+    },
+    "Your settings are back as they were before restoring, %@." : {
+
+    },
+    "Your settings are back as they were before switching Marfa, %@." : {
+
+    },
+    "Your settings are back as they were before taking another Mac’s settings, %@." : {
+
+    },
+    "Your settings are back as they were before the first sync, %@." : {
 
     },
     "Your sign-in is sent to %@ without encryption, so anyone on the network can read it. Use an https address unless this network is private." : {
@@ -11301,6 +11415,9 @@
     "“%@” could not be read. No layouts were changed." : {
 
     },
+    "“%@” could not be read. No settings were changed." : {
+
+    },
     "“%@” could not be read. No shortcuts were changed." : {
 
     },
@@ -11313,6 +11430,9 @@
     "“%@” has changed since, so that can’t be put back here. Earlier versions are in Version History." : {
       "extractionState" : "manual"
     },
+    "“%@” holds no settings. No settings were changed." : {
+
+    },
     "“%@” is already a choice." : {
 
     },
@@ -11323,6 +11443,9 @@
       "extractionState" : "manual"
     },
     "“%@” is not a layouts file that the app can read. No layouts were changed." : {
+
+    },
+    "“%@” is not a settings file that the app can read. No settings were changed." : {
 
     },
     "“%@” is not a shortcuts file that the app can read. No shortcuts were changed." : {
@@ -11357,6 +11480,9 @@
       "extractionState" : "manual"
     },
     "“%@” was attached to “%@” but isn’t in its text. It was meant for a folded section or text not yet shown." : {
+
+    },
+    "“%@” was made by a newer version of the app. Update the app to import it. No settings were changed." : {
 
     },
     "“%@” was made by a newer version of the app. Update the app to import it. No shortcuts were changed." : {
