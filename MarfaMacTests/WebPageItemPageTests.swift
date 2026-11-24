@@ -173,8 +173,8 @@ struct WebPageItemPageTests {
         try #require(await settled(view) { !elements(of: view).contains { answer($0, "accessibilityRole") as? String == "AXProgressIndicator" } })
         #expect(visit.details.pageLook == nil)
 
-        // Time for the first item's article to be analyzed, which nothing signals when it is dropped.
-        try await Task.sleep(for: .seconds(8))
+        // Time for the first item's article to be analyzed, which nothing signals when it is dropped. Analyzing it alone takes under a second.
+        try await Task.sleep(for: .seconds(4))
         #expect(visit.details.pageLook == nil, "the first item's article is on the second item's page")
     }
 }
