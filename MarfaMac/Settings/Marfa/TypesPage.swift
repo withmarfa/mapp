@@ -117,6 +117,7 @@ struct TypesPage: View {
             SettingsSection("Built In", line: "Every Marfa has these. Base a type on one to add to it.") {
                 ForEach(model.builtIn) { row($0) }
             }
+            LinksSection(host: host)
         }
     }
 

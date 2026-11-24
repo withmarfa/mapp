@@ -666,6 +666,12 @@ import os
     /// Whether the kept sign-in may read the owner's name, once `grantsRead`: a sign-in made before the app asked for it
     /// cannot, and Allow More… or signing in again gives it.
     private(set) var readsProfile = false
+    /// Whether the kept sign-in lacks something the app asks for at sign-in (`SystemSignIns.lacksAsked`), once `grantsRead`:
+    /// an owner permission the owner left out, or a scope added since the sign-in was made. Allow More… then has something
+    /// to ask for.
+    private(set) var lacksAsked = false
+    /// The scopes the kept sign-in holds, once `grantsRead`.
+    private(set) var heldScopes: Set<String> = []
 
     /// Reads what the kept sign-in holds, where the main actor never waits on the Keychain. A sign-in the Keychain
     /// cannot give is not read: the grants last read stand and `grantsRead` is false, so nothing reads as holding none.
@@ -674,16 +680,20 @@ import os
             grants = []
             grantsRead = false
             readsProfile = false
+            lacksAsked = false
+            heldScopes = []
             return
         }
         let held: Set<InstancePermission>?
         let profile: Bool?
+        let scopes: [String]?
         do {
             let read = try await Self.offMain { [signIns] in
-                (try signIns.grants(for: connection), try signIns.readsProfile(for: connection))
+                (try signIns.grants(for: connection), try signIns.readsProfile(for: connection), try signIns.scopes(for: connection))
             }
             held = read.0
             profile = read.1
+            scopes = read.2
         } catch {
             guard configuredConnection == connection else { return }
             grantsRead = false
@@ -692,6 +702,8 @@ import os
         guard configuredConnection == connection else { return }
         grants = held ?? []
         readsProfile = profile ?? false
+        lacksAsked = SystemSignIns.lacksAsked(scopes ?? [])
+        heldScopes = Set(scopes ?? [])
         grantsRead = true
     }
 
@@ -757,6 +769,8 @@ import os
         grants = []
         grantsRead = false
         readsProfile = false
+        lacksAsked = false
+        heldScopes = []
     }
 
     /// What to tell of an error a step met. What a package error or the system said is never shown: the detail goes

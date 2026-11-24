@@ -74,6 +74,30 @@ import Testing
         #expect(adapter.grants == SystemSignIns.askedAtSignIn, "what was held is kept")
     }
 
+    /// A sign-in made before the app asked to register link types holds all 14 owner permissions and lacks only that scope.
+    @Test func aSignInHoldingEveryPermissionButAScopeAskedSinceIsOfferedAllowMoreOnBothPages() async throws {
+        let bench = HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        #expect(!adapter.lacksAsked, "a sign-in approved in full lacks nothing")
+        bench.signIns.save(
+            "old", for: first.address,
+            scopes: ScriptedSignIns.approvedBeyondPermissions.filter { $0 != ClientOwnerCalls.registeringLinkTypes })
+        await libraries.host.refreshGrants()
+        #expect(adapter.grants == SystemSignIns.askedAtSignIn && libraries.host.readsProfile)
+        #expect(adapter.lacksAsked, "Overview offers Allow More…")
+        func account() -> ConnectionAccount {
+            ConnectionAccount(
+                state: .online, grants: adapter.grants, grantsRead: true, readsProfile: libraries.host.readsProfile,
+                lacksAsked: libraries.host.lacksAsked, waiting: 0, serverName: "X")
+        }
+        #expect(account().offersMore, "Connection offers Allow More…")
+        #expect(account().permissionsLine == "The app holds all 14 of the owner’s permissions, but not all the access it asks for.")
+
+        bench.signIns.script(browser: [.success("again")])
+        #expect(await adapter.allowMore(Set(InstancePermission.allCases)) == .allowed)
+        #expect(!adapter.lacksAsked && !account().offersMore)
+    }
+
     @Test func signingInAgainGivesTheNameToASignInThatLackedItAndKeepsItAfter() async throws {
         let bench = HostBench()
         let (_, libraries, _) = try await connected(bench)
@@ -114,7 +138,9 @@ import Testing
         let outcome = await adapter.allowMore([.backupsManage])
         #expect(outcome == .cancelled)
         #expect(adapter.grants == Self.older)
-        #expect(libraries.host.notices.waiting.isEmpty, "a sign-in the person stopped needs no telling")
+        // The plain-HTTP notice is told once per address per process, to whichever test connects first.
+        let told = libraries.host.notices.waiting.filter { $0.title != Words.plainHTTPTitle }
+        #expect(told.isEmpty, "a sign-in the person stopped needs no telling")
     }
 
     /// One page's Allow More… asks for everything the sign-in lacks, so one approval opens every page.

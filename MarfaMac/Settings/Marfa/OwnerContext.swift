@@ -6,18 +6,21 @@ import Marfa
 @MainActor struct OwnerContext {
     let calls: any OwnerCalls
     let grants: () -> Set<InstancePermission>
+    /// Whether the sign-in holds a scope beyond the owner's permissions, such as `metadata.edge_types:write`.
+    let holds: (String) -> Bool
     let allowMore: (Set<InstancePermission>) async -> MarfaAllowMoreOutcome
     let refreshGrants: () async -> Void
     /// Hands a draft over that was left behind after Settings closed, such as a key whose call ended then.
     let lateDraft: (OwnerDraft) -> Void
 
     init(
-        calls: any OwnerCalls, grants: @escaping () -> Set<InstancePermission>,
+        calls: any OwnerCalls, grants: @escaping () -> Set<InstancePermission>, holds: @escaping (String) -> Bool = { _ in false },
         allowMore: @escaping (Set<InstancePermission>) async -> MarfaAllowMoreOutcome = { _ in .cancelled },
         refreshGrants: @escaping () async -> Void = {}, lateDraft: @escaping (OwnerDraft) -> Void = { _ in }
     ) {
         self.calls = calls
         self.grants = grants
+        self.holds = holds
         self.allowMore = allowMore
         self.refreshGrants = refreshGrants
         self.lateDraft = lateDraft
@@ -25,7 +28,7 @@ import Marfa
 
     init(host: any MarfaSettingsHost) {
         self.init(
-            calls: host.ownerCalls, grants: { host.grants }, allowMore: { await host.allowMore($0) },
+            calls: host.ownerCalls, grants: { host.grants }, holds: { host.holds($0) }, allowMore: { await host.allowMore($0) },
             refreshGrants: { await host.refreshGrants() }, lateDraft: { host.ownerDrafts.arrive($0) })
     }
 

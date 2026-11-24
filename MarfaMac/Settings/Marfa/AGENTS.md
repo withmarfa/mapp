@@ -4,7 +4,7 @@ These pages stand alone, so another app can take them without the app. They impo
 
 ## The host
 
-- `MarfaSettingsHost` gives the package's `Client` over the current server (as `MarfaServerCalls` builds it; build no second client), the server's name and address, the connection (`opening`, `connected`, `notConnected`, `signedOut`, `notAnswering`), the permissions the sign-in holds (`Credential.grants`), `allowMore(_:)`, Try Again, the way back to Connection, an optional `openInApp` that the app may leave out, This Marfa's draft model, `ownerDrafts` (where a page's model registers to hand back what was typed when Settings closes) and the bin. A page that needs more asks there, naming what it needs.
+- `MarfaSettingsHost` gives the package's `Client` over the current server (as `MarfaServerCalls` builds it; build no second client), the server's name and address, the connection (`opening`, `connected`, `notConnected`, `signedOut`, `notAnswering`), the permissions the sign-in holds (`Credential.grants`), whether it lacks anything a sign-in asks for (`lacksAsked`), `allowMore(_:)`, Try Again, the way back to Connection, an optional `openInApp` that the app may leave out, This Marfa's draft model, `ownerDrafts` (where a page's model registers to hand back what was typed when Settings closes) and the bin. A page that needs more asks there, naming what it needs.
 - `host.health` is the one `ServerHealthModel` that Overview, Backups and Housekeeping read; a page reads no health of its own and never shows a server's `error` text.
 - A new page adds a case to `MarfaSettingsPage` and its view to `MarfaSettingsPageView`; what it needs from the app is added to the host first.
 

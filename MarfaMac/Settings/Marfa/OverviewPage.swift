@@ -54,9 +54,9 @@ struct OverviewPage: View {
     private var holdsAll: Bool { host.grants.count >= InstancePermission.allCases.count }
 
     @ViewBuilder private var attention: some View {
-        if !model.concerns.isEmpty || !holdsAll {
+        if !model.concerns.isEmpty || host.lacksAsked {
             SettingsSection("Needs Attention") {
-                if !holdsAll { permissionsRow }
+                if host.lacksAsked { permissionsRow }
                 ForEach(model.concerns) { concern in
                     SettingsProblemRow(title: Text(verbatim: concern.shownTitle), line: concern.shownLine.map { Text(verbatim: $0) }, actions: actions(for: concern))
                 }
@@ -67,7 +67,9 @@ struct OverviewPage: View {
     private var permissionsRow: some View {
         SettingsProblemRow(
             title: Text("This App Can Look After Part of \(host.serverName)"),
-            line: Text("It holds \(host.grants.count) of the owner’s \(InstancePermission.allCases.count) permissions."),
+            line: holdsAll
+                ? Text("It holds all \(InstancePermission.allCases.count) of the owner’s permissions, but not all the access it asks for.")
+                : Text("It holds \(host.grants.count) of the owner’s \(InstancePermission.allCases.count) permissions."),
             actions: [
                 SettingsProblemAction("Allow More…", isPrimary: true) {
                     let host = host

@@ -174,15 +174,21 @@ nonisolated struct SystemSignIns: SignIns {
     /// never does, and registering the type where the Marfa holds none (`metadata.types:write`). The app asks for
     /// `app.*:write`: the vendor scope is unavailable before its first type exists (`keys-and-oauth/app-vendor-not-named`),
     /// and discovery never lists it afterward. This reaches every app's types; withmarfa/marfa#3522 would let the app ask
-    /// for its vendor alone. The owner may approve less, and what is missing is told where it is needed.
+    /// for its vendor alone. Settings > Types > Links registers the owner's link types (`metadata.edge_types:write`). The
+    /// owner may approve less, and what is missing is told where it is needed.
     static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write"]
         + askedAtSignIn.map(\.rawValue).sorted() + profileScopes + [PreferencesType.rootScope, PreferencesType.registeringScope]
+        + [ClientOwnerCalls.registeringLinkTypes]
 
     /// What Signed In As needs: the owner's name (`instance-claim/profile-read`).
     static let profileScopes = ["profile.name:read"]
 
     /// Whether `scopes`, as a sign-in holds them, let it read the owner's name.
     static func readsProfile(_ scopes: [String]) -> Bool { profileScopes.allSatisfy(scopes.contains) }
+
+    /// Whether `held`, as a sign-in holds them, lacks any of `scopes`: an owner permission the owner left out, or a scope the
+    /// app began to ask for after the sign-in was made. Allow More… asks for them all again.
+    static func lacksAsked(_ held: [String]) -> Bool { !Set(held).isSuperset(of: scopes) }
 
     /// Every owner permission, which every sign-in asks for and a sign-in holds unless the owner approved fewer. The
     /// package's list is the contract's but `connectors.host`, which only a connector host's own key holds.

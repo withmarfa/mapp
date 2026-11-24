@@ -75,6 +75,11 @@ struct MarfaMarkSet: Identifiable, Hashable {
     var connection: MarfaSettingsConnection { get }
     /// The permissions the sign-in holds (`Credential.grants`).
     var grants: Set<InstancePermission> { get }
+    /// Whether the sign-in lacks something the app asks for at sign-in (`SystemSignIns.lacksAsked`): an owner permission,
+    /// or a scope the app began to ask for after the sign-in was made. Overview offers Allow More… while it does.
+    var lacksAsked: Bool { get }
+    /// Whether the sign-in holds `scope`, one the app asks for beyond the owner's permissions.
+    func holds(_ scope: String) -> Bool
 
     /// Signs in again with the full request. The new sign-in holds what the owner approves.
     /// Returns `.allowed` when the new sign-in holds every permission in `permissions`.
@@ -331,6 +336,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
                 String(localized: "Yours"), String(localized: "From Plugins"), String(localized: "Built In"), String(localized: "New Type"),
                 String(localized: "New Child Type"), String(localized: "Statuses"), String(localized: "Guidance"), String(localized: "Icon"),
                 String(localized: "Based On"), String(localized: "Plural"), String(localized: "Description"),
+                String(localized: "Links Between Items"), String(localized: "Links"), String(localized: "New Link Type"),
             ]
         case .plugins:
             [
