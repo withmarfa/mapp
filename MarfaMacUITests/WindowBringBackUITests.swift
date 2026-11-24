@@ -21,7 +21,7 @@ nonisolated final class WindowBringBackUITests: XCTestCase {
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 5))
         app.menuBars.menuBarItems["View"].click()
-        app.menuBars.menuItems["as Gallery"].click()
+        app.menuBars.menuItems["View as Gallery"].click()
         XCTAssertTrue(gallery(app).waitForExistence(timeout: 3))
         window.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "GalleryItem-")).element(boundBy: 0).click()
         app.typeKey(.return, modifierFlags: [])

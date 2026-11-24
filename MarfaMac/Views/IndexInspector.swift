@@ -48,7 +48,7 @@ private struct IndexInspectorContent: View {
                         HStack {
                             Text(verbatim: item.displayTitle).lineLimit(1)
                             Spacer(minLength: 8)
-                            Text(item.modified, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                            Text(.currentDate, format: .reference(to: item.modified))
                                 .foregroundStyle(.secondary)
                         }
                     }

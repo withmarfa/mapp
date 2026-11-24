@@ -1,30 +1,64 @@
 import SwiftUI
 
-/// What a button is for. `outline` is the menu button's look, a white button with a hairline and a chevron.
 enum AppButtonRole {
-    case primary, secondary, plain, destructive, outline
+    case primary, secondary, plain, destructive
 }
 
+/// How a menu button reads: a pop-up that chooses a value shows two arrows, a pull-down menu of commands shows one.
+enum AppMenuKind {
+    case value, commands
+
+    fileprivate var symbol: String { self == .value ? "chevron.up.chevron.down" : "chevron.down" }
+}
+
+/// The three heights of the button rule: a capsule at `regular` and `large`, 7-point corners at `small`.
 enum AppButtonSize {
-    case small, regular
+    case small, regular, large
 
-    /// Height, corner radius, side padding and text size at the default interface text size.
-    fileprivate var height: CGFloat { self == .small ? 22 : 28 }
-    fileprivate var radius: CGFloat { self == .small ? 7 : 9 }
-    fileprivate var padding: CGFloat { self == .small ? 9 : 12 }
+    /// Height, side padding and text size at the default interface text size.
+    fileprivate var height: CGFloat {
+        switch self {
+        case .small: 24
+        case .regular: 28
+        case .large: 36
+        }
+    }
+    fileprivate var padding: CGFloat {
+        switch self {
+        case .small: 9
+        case .regular: 12
+        case .large: 18
+        }
+    }
     fileprivate var textSize: CGFloat { self == .small ? 12 : 13 }
+    fileprivate var isCapsule: Bool { self != .small }
+    fileprivate var cornerRadius: CGFloat { 7 }
 }
 
-/// The one button the app draws itself (`docs/components.md`): a rounded rectangle, or a circle for an icon-only button,
-/// in the fills of the design system's `.m-b`. The toolbar's glass buttons and the system's menus, alerts and
-/// controls stay the system's.
+/// The one button the app draws itself (`docs/components.md`): a capsule at 28 and 36 points, a rounded rectangle at 24,
+/// and a circle for a button whose label is only a symbol, in the fills of the design system's `.m-b`. The toolbar's glass
+/// buttons and the system's menus, alerts and controls stay the system's.
 struct AppButtonStyle: ButtonStyle {
     let role: AppButtonRole
     let size: AppButtonSize
     let isIcon: Bool
+    /// Set for a menu button: the arrow it ends in.
+    var menu: AppMenuKind?
 
     func makeBody(configuration: Configuration) -> some View {
-        Content(configuration: configuration, role: role, size: size, isIcon: isIcon)
+        Content(configuration: configuration, role: role, size: size, isIcon: isIcon, menu: menu)
+    }
+
+    /// The edge of a button and of its keyboard focus ring, which follows it: a circle, a capsule or 7-point corners.
+    static func shape(size: AppButtonSize, isIcon: Bool, scale: CGFloat = 1) -> AnyShape {
+        if isIcon { return AnyShape(Circle()) }
+        if size.isCapsule { return AnyShape(Capsule(style: .circular)) }
+        return AnyShape(.rect(cornerRadius: size.cornerRadius * scale, style: .continuous))
+    }
+
+    /// A gray ring of 3 points drawn outside the button's edge, as the design system's focus state draws it.
+    static func focusRing(_ shape: AnyShape) -> some View {
+        shape.stroke(Color.primary.opacity(0.26), lineWidth: 3).padding(-1.5)
     }
 
     private struct Content: View {
@@ -32,52 +66,42 @@ struct AppButtonStyle: ButtonStyle {
         let role: AppButtonRole
         let size: AppButtonSize
         let isIcon: Bool
+        let menu: AppMenuKind?
         @State private var isHovered = false
         @Environment(\.isEnabled) private var isEnabled
         @Environment(\.isFocused) private var isFocused
         @Environment(\.colorScheme) private var colorScheme
         @Environment(\.interfaceTextSize) private var textSize
 
+        /// A menu's label is regular, as the system's pop-ups are; a button's is medium.
+        private var weight: Font.Weight { menu == nil ? .medium : .regular }
+
         var body: some View {
             let scale = InterfaceStyle.scale(for: textSize)
             let height = size.height * scale
-            let shape = isIcon ? AnyShape(Circle()) : AnyShape(.rect(cornerRadius: size.radius * scale, style: .continuous))
+            let shape = AppButtonStyle.shape(size: size, isIcon: isIcon, scale: scale)
             let pressed = configuration.isPressed
             let hovered = isHovered && isEnabled
-            HStack(spacing: 6) {
+            HStack(spacing: 6 * scale) {
                 configuration.label
-                if role == .outline {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9 * scale, weight: .semibold))
+                if let menu {
+                    Image(systemName: menu.symbol)
+                        .font(.system(size: size.textSize * 0.8 * scale, weight: weight))
                         .foregroundStyle(.secondary)
                 }
             }
-                .font(.system(size: size.textSize * scale, weight: role == .outline ? .regular : .medium))
+                .font(.system(size: size.textSize * scale, weight: weight))
                 .foregroundStyle(foreground(hovered: hovered || pressed))
                 .padding(.horizontal, isIcon ? 0 : size.padding * scale)
                 .frame(minWidth: isIcon ? height : nil)
                 .frame(height: height)
                 .background(shape.fill(fill(hovered: hovered, pressed: pressed)))
-                .overlay {
-                    if role == .outline { shape.stroke(Color.primary.opacity(0.12), lineWidth: 1) }
-                }
                 .contentShape(shape)
                 .overlay {
-                    if isFocused { focusRing(radius: size.radius * scale) }
+                    if isFocused { AppButtonStyle.focusRing(shape) }
                 }
                 .opacity(isEnabled ? 1 : 0.4)
                 .onHover { isHovered = $0 }
-        }
-
-        /// A gray ring of 3 points drawn outside the button's edge, as the design system's focus state draws it.
-        @ViewBuilder
-        private func focusRing(radius: CGFloat) -> some View {
-            let color = Color.primary.opacity(0.26)
-            if isIcon {
-                Circle().stroke(color, lineWidth: 3).padding(-1.5)
-            } else {
-                RoundedRectangle(cornerRadius: radius + 1.5, style: .continuous).stroke(color, lineWidth: 3).padding(-1.5)
-            }
         }
 
         private var isDark: Bool { colorScheme == .dark }
@@ -89,7 +113,7 @@ struct AppButtonStyle: ButtonStyle {
             case .primary: .white
             case .destructive: redText
             case .plain: hovered ? Color.primary.opacity(0.847) : Color.primary.opacity(0.5)
-            case .secondary, .outline: Color.primary.opacity(0.847)
+            case .secondary: Color.primary.opacity(0.847)
             }
         }
 
@@ -103,8 +127,6 @@ struct AppButtonStyle: ButtonStyle {
                 Color.primary.opacity(pressed ? 0.098 : hovered ? 0.047 : 0)
             case .destructive:
                 red.opacity(pressed ? 0.22 : hovered ? 0.16 : 0.11)
-            case .outline:
-                (isDark ? Color.white.opacity(0.1) : .white).mix(with: .primary, by: pressed ? 0.09 : hovered ? 0.04 : 0)
             }
         }
     }
@@ -117,11 +139,13 @@ extension View {
             .focusEffectDisabled()
     }
 
-    /// Draws a menu as the outlined button among the app's buttons: its label and a chevron, as tall as the buttons beside it.
-    func appMenu(size: AppButtonSize = .regular) -> some View {
+    /// Draws a menu as a gray button with a label and an arrow, as tall as the buttons beside it. The caller says what the
+    /// menu does: `.value` for a pop-up that chooses a value, `.commands` for a menu of commands.
+    func appMenu(_ kind: AppMenuKind, role: AppButtonRole = .secondary, size: AppButtonSize = .regular) -> some View {
         menuStyle(.button)
             .menuIndicator(.hidden)
-            .appButton(.outline, size: size)
+            .buttonStyle(AppButtonStyle(role: role, size: size, isIcon: false, menu: kind))
+            .focusEffectDisabled()
             .fixedSize()
     }
 }

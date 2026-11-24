@@ -7,6 +7,7 @@ import WebKit
 private let log = Telemetry.logger(.editor)
 
 /// One window's Markdown editor. Its web page loads when the window opens and serves every item the window shows.
+/// Page loads and edit callbacks stay together so both can check which item and generation an edit belongs to.
 @Observable
 final class EditorController: NSObject {
     var caret = CaretState()

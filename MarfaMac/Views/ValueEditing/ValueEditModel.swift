@@ -33,6 +33,7 @@ struct ValueEditRequest {
 
 /// The state of one open editor: what is typed, which row the keyboard is on, and why a write was refused. Closing is
 /// the presenter's, which gives the model a way to ask for it.
+/// Row selection, keyboard navigation, and writes stay together because they share the same pending edit.
 @MainActor @Observable
 final class ValueEditModel {
     let request: ValueEditRequest

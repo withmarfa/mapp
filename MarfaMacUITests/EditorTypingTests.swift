@@ -57,7 +57,8 @@ nonisolated final class EditorTypingTests: XCTestCase {
         app.typeText("/link")
         XCTAssertTrue(menuRow("Link to Item").waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(app.sheets.firstMatch.textFields["ItemLinkField"].waitForExistence(timeout: 3))
+        let field = app.sheets.firstMatch.descendants(matching: .any)["ItemLinkField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
         XCTAssertTrue(waitForText("CONTAINS", "/link"))

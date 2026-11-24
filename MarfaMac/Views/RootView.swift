@@ -83,7 +83,7 @@ struct LibraryUnavailableView: View {
             Text(detail ?? String(localized: "The app can’t open the copy of your library on this Mac."))
         } actions: {
             Button("Open Settings…") { browser.showSettings(.connection) }
-                .buttonStyle(.borderedProminent)
+                .appButton(.primary)
                 .accessibilityIdentifier("LibraryUnavailableSettings")
         }
         .frame(minWidth: 480, minHeight: 360)
@@ -111,7 +111,7 @@ struct WelcomeView: View {
             }
         } actions: {
             Button("Connect…") { browser.showSettings(.connection) }
-                .buttonStyle(.borderedProminent)
+                .appButton(.primary, size: .large)
                 .accessibilityIdentifier("WelcomeConnect")
         }
         .frame(minWidth: 480, minHeight: 360)
