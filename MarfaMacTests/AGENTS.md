@@ -10,7 +10,7 @@
 
 ## Commands
 
-For the owner-page `Live` tests, use a key with `instance.read`, `audit.read`, `backups.manage`, `sign_ins.manage`, `keys.mint` and `webhooks.manage`, such as the test instance's admin key from `Tools/test-instance/secrets.zsh --instance <name> get MARFA_TEST_ADMIN_KEY` in the workbench.
+For the owner-page `Live` tests, use a key with `instance.read`, `audit.read`, `backups.manage`, `sign_ins.manage`, `keys.mint` and `webhooks.manage`, such as the test instance's admin key.
 
 ```sh
 # Unit tests: no window, no Dock icon, so they can run while the Mac is in use.
