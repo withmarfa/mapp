@@ -19,6 +19,7 @@ PATH_RULES = {
 }
 
 ALL_REGULAR_CHECKS = (set(PATH_RULES) - {"uitests"}) | {"logic"}
+EVERY_CHECK = set(PATH_RULES) | {"logic"}
 
 
 def classify(paths):
@@ -30,6 +31,10 @@ def classify(paths):
             path_lanes.add("instructions")
         if not path_lanes:
             lanes.update(ALL_REGULAR_CHECKS)
+            continue
+        # A change to the rules themselves cannot be judged by them.
+        if "classifier" in path_lanes:
+            lanes.update(EVERY_CHECK)
             continue
 
         if "swift" in path_lanes and not (

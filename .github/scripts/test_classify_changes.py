@@ -19,8 +19,12 @@ class ClassifyChangesTests(unittest.TestCase):
                 "classifier", "editor", "instructions", "logic", "scripts", "swift", "uitests", "workflows",
             },
             ".github/workflows/release.yml": {"workflows"},
-            ".github/scripts/classify_changes.py": {"classifier"},
-            ".github/scripts/test_classify_changes.py": {"classifier"},
+            ".github/scripts/classify_changes.py": {
+                "classifier", "editor", "instructions", "logic", "scripts", "swift", "uitests", "workflows",
+            },
+            ".github/scripts/test_classify_changes.py": {
+                "classifier", "editor", "instructions", "logic", "scripts", "swift", "uitests", "workflows",
+            },
             ".github/scripts/run-unit-tests.sh": {"swift", "logic"},
         }
         for path, expected in cases.items():
