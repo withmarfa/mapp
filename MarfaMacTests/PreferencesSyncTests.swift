@@ -4,18 +4,28 @@ import Testing
 @testable import MarfaMac
 
 @MainActor @Suite(.hangLimit) final class PreferencesSyncTests {
-    let defaults: UserDefaults
+    let defaults = ThrowawayDefaults.make("MarfaMacTests.PreferencesSync")
+    /// The defaults' own domain, which a restore point reads.
+    var suite: String { defaults.suite }
     var reloads = 0
     let theme = PreferenceUnit.member(.appearance, AppearanceKey.theme)
     let accent = PreferenceUnit.member(.appearance, AppearanceKey.accent)
     let placement = PreferenceUnit.row(.types, setting: "pagePlacements", key: "core.note")
+    let points = RestorePoints(folder: URL.temporaryDirectory.appending(path: "PreferencesSyncTests-\(UUID().uuidString)"))
 
-    init() {
-        defaults = ThrowawayDefaults.make("MarfaMacTests.PreferencesSync")
+    deinit {
+        try? FileManager.default.removeItem(at: points.folder)
+    }
+
+    /// The restore points saved, oldest first, with the theme each holds.
+    private func saved() throws -> [(RestorePoint.Reason, String?)] {
+        try points.list().reversed().map { ($0.reason, try points.snapshot(of: $0.id).value(forKey: AppearanceKey.theme) as? String) }
     }
 
     private func sync(_ copy: FakePreferencesCopy, library: String = "marfa:https://one") async -> PreferencesSync {
-        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50)) { [weak self] in self?.reloads += 1 }
+        let sync = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), restorePoints: points) {
+            [weak self] in self?.reloads += 1
+        }
         sync.attach(copy, library: library, name: { "Demo" })
         await sync.flush()
         return sync
@@ -26,7 +36,7 @@ import Testing
         let stores = (
             SidebarLayouts(defaults: defaults), TypeLooks(defaults: defaults), SearchLeaveOuts(defaults: defaults),
             ShortcutBindings(defaults: defaults), AnyAppShortcuts(defaults: defaults, registrar: NoHotKeys()))
-        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50)) {
+        let sync = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), restorePoints: points) {
             stores.0.reload()
             stores.1.reload()
             stores.2.reload()
@@ -40,7 +50,7 @@ import Testing
 
     // MARK: The first launch
 
-    @Test func aMarfaWithNoSettingsTakesThisMacsAndKeepsACopyFirst() async throws {
+    @Test func aMarfaWithNoSettingsTakesThisMacsAndSavesARestorePointFirst() async throws {
         defaults.set("dark", forKey: AppearanceKey.theme)
         defaults.set(#"{"core.note":{"pins":["due_at"]}}"#, forKey: PagePlacements.key)
         let copy = FakePreferencesCopy()
@@ -51,8 +61,8 @@ import Testing
         let held = await copy.unitsHeld(item)
         #expect(held[theme] == #""dark""#)
         #expect(held[placement] == #"{"pins":["due_at"]}"#)
-        let kept = try #require(defaults.string(forKey: PreferencesSync.beforeSyncKey))
-        #expect(kept.contains(#""theme":"dark""#))
+        #expect(try saved().map(\.0) == [.firstSync])
+        #expect(try saved().map(\.1) == ["dark"])
         #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
     }
 
@@ -64,7 +74,7 @@ import Testing
         #expect(sync.standing == .off(.needsPermission))
         #expect(await copy.creates == 0)
         #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
-        #expect(defaults.object(forKey: PreferencesSync.beforeSyncKey) == nil)
+        #expect(points.list().isEmpty)
     }
 
     @Test func aCopyThatIsNotWholeDecidesNothing() async {
@@ -82,7 +92,7 @@ import Testing
         }
         #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
         #expect(await copy.updates.isEmpty)
-        #expect(defaults.object(forKey: PreferencesSync.beforeSyncKey) == nil)
+        #expect(points.list().isEmpty)
     }
 
     @Test func anItemAnotherMacMadeWinsAndIsFilledFromThisMac() async throws {
@@ -96,7 +106,9 @@ import Testing
         #expect(await copy.unitsHeld(item)[accent] == #""blue""#)
         #expect(await copy.unitsHeld(item)[theme] == #""light""#)
         #expect(reloads == 1)
-        #expect(defaults.object(forKey: PreferencesSync.beforeSyncKey) != nil)
+        // The point holds this Mac's settings from before it took the other Mac's.
+        #expect(try saved().map(\.0) == [.adoption])
+        #expect(try saved().map(\.1) == ["dark"])
     }
 
     @Test func twoItemsUseTheOneMadeFirstFilledFromTheOther() async throws {
@@ -121,7 +133,8 @@ import Testing
         #expect(defaults.object(forKey: AppearanceKey.theme) == nil)
         let item = try #require(await copy.activeIDs.first)
         #expect(await copy.unitsHeld(item).isEmpty)
-        #expect(try #require(defaults.string(forKey: PreferencesSync.beforeSyncKey)).contains("dark"))
+        #expect(try saved().map(\.0) == [.firstSync])
+        #expect(try saved().map(\.1) == ["dark"])
     }
 
     // MARK: Following
@@ -333,13 +346,13 @@ import Testing
         let copy = FakePreferencesCopy()
         let item = await copy.add([look: #""later""#])
         let looks = TypeLooks(defaults: defaults)
-        let first = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50), build: "1") { looks.reload() }
+        let first = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") { looks.reload() }
         first.attach(copy, library: "marfa:https://one", name: { nil })
         await first.flush()
         #expect(defaults.data(forKey: TypeLooks.defaultsKey).map { String(decoding: $0, as: UTF8.self) }?.contains("later") != true)
         first.detach()
         // A build whose store reads the value keeps it.
-        let second = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50), build: "2") {}
+        let second = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "2") {}
         second.attach(copy, library: "marfa:https://one", name: { nil })
         await second.flush()
         #expect(defaults.data(forKey: TypeLooks.defaultsKey).map { String(decoding: $0, as: UTF8.self) }?.contains("later") == true)
@@ -406,6 +419,7 @@ import Testing
 
     @Test func switchingMarfasLoadsEachOnesSettings() async throws {
         defaults.set("dark", forKey: AppearanceKey.theme)
+        defaults.set(Data(#"{"marfa:https://one":{"core.note":{"date":"created"}}}"#.utf8), forKey: TypeLooks.defaultsKey)
         let one = FakePreferencesCopy()
         let sync = await sync(one)
         let other = FakePreferencesCopy()
@@ -418,6 +432,173 @@ import Testing
         await sync.flush()
         #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
         #expect(await one.updates.isEmpty)
+        // Each switch saved the settings of the Marfa followed before it.
+        #expect(try saved().map(\.0) == [.firstSync, .adoption, .switching])
+        #expect(try saved().map(\.1) == ["dark", "dark", "light"])
+        // A setting kept for each server is held whole, so no point mixes one Marfa's entry with another's settings.
+        for point in points.list() {
+            let looks = try #require(try points.snapshot(of: point.id).value(forKey: TypeLooks.defaultsKey) as? Data)
+            #expect((try JSONSerialization.jsonObject(with: looks) as? [String: Any])?["marfa:https://one"] != nil)
+        }
+    }
+
+    @Test func aStepWhoseRestorePointCannotBeSavedChangesNothingAndTriesAgain() async throws {
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        // A file where the points' folder would go.
+        try Data().write(to: points.folder)
+        let copy = FakePreferencesCopy()
+        await copy.add([theme: #""light""#])
+        let sync = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), restorePoints: points) {}
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        #expect(sync.standing != .syncing)
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+        #expect(await copy.updates.isEmpty)
+        try FileManager.default.removeItem(at: points.folder)
+        await sync.flush()
+        #expect(sync.standing == .syncing)
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "light")
+        #expect(try saved().map(\.0) == [.adoption])
+    }
+
+    /// What an import wrote wins at the next step, even over another Mac's change this Mac had not taken.
+    @Test func anImportWinsOverAChangeNotYetTaken() async throws {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([accent: #""blue""#])
+        var record = PreferencesSync.Record()
+        record.marfas["instance-1"] = .init(item: item, base: [:])
+        record.last = "instance-1"
+        record.save(defaults)
+        let sync = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), restorePoints: points) {}
+        try await sync.importSettings(SettingsFile(units: [:], build: "", date: .now), sections: [.appearance])
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        #expect(defaults.object(forKey: AppearanceKey.accent) == nil)
+        #expect(await copy.unitsHeld(item)[accent] == nil)
+        #expect(PreferencesSync.Record.read(defaults).winning == nil)
+    }
+
+    /// An import's write the copy refuses is sent again alone: what the writes before it carried no longer wins, so
+    /// another Mac's later change to it stands.
+    @Test func aPartlyWrittenImportSendsAgainOnlyWhatWasNotWritten() async throws {
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        await copy.refuseNextWrite(to: .types)
+        let file = SettingsFile(units: [theme: #""light""#, placement: #"{"pins":["due_at"]}"#], build: "", date: .now)
+        try await sync.importSettings(file, sections: [SettingsFile.Section(theme), SettingsFile.Section(placement)])
+        #expect(await copy.unitsHeld(item)[placement] == nil)
+        await copy.change(item, [theme: #""dark""#])
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+        #expect(await copy.unitsHeld(item)[theme] == #""dark""#)
+        #expect(await copy.unitsHeld(item)[placement] == #"{"pins":["due_at"]}"#)
+        #expect(PreferencesSync.Record.read(defaults).winning == nil)
+    }
+
+    /// Another Mac's value that a step wrote into the defaults stays the Marfa's when the copy then refuses this Mac's
+    /// write: the retry takes that Mac's later change and never sends the earlier value back as this Mac's.
+    @Test func anotherMacsValueTakenBeforeARefusedWriteIsNotSentBack() async throws {
+        defaults.set("system", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        sync.detach()
+        await copy.change(item, [theme: #""dark""#])
+        let file = SettingsFile(units: [placement: #"{"pins":["due_at"]}"#], build: "", date: .now)
+        try await sync.importSettings(file, sections: [SettingsFile.Section(placement)])
+        await copy.refuseNextWrite(to: .types)
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+        #expect(await copy.unitsHeld(item)[placement] == nil)
+        await copy.change(item, [theme: #""light""#])
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "light")
+        #expect(await copy.unitsHeld(item)[theme] == #""light""#)
+        #expect(await copy.unitsHeld(item)[placement] == #"{"pins":["due_at"]}"#)
+    }
+
+    /// A value an import skipped is what this Mac held, not the import's, so it does not win over another Mac's change.
+    @Test func aValueAnImportSkippedDoesNotWin() async throws {
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        sync.detach()
+        await copy.change(item, [theme: #""light""#])
+        // The defaults cannot keep a null inside a value.
+        try await sync.importSettings(
+            SettingsFile(units: [theme: #"{"nested":[null]}"#], build: "", date: .now), sections: [.appearance])
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "light")
+        #expect(await copy.unitsHeld(item)[theme] == #""light""#)
+    }
+
+    /// Reset waits for a step under way, so the step does not write what it read over the defaults, and Reset wins.
+    @Test func resetWhileAStepAwaitsTheCopyIsResetOnBothSides() async throws {
+        let bench = HostBench()
+        let libraries = Libraries(
+            host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, syncsPreferences: true, restorePoints: points,
+            defaultsDomain: suite)
+        let sync = libraries.preferences
+        let copy = FakePreferencesCopy()
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        let item = try #require(await copy.activeIDs.first)
+        var followed = false
+        await copy.whileReading { libraries.resetMacSettings { followed = true } }
+        await copy.change(item, [theme: #""light""#])
+        await sync.flush()
+        let reset = try await eventuallyAsking {
+            guard defaults.object(forKey: AppearanceKey.theme) == nil else { return false }
+            return await copy.unitsHeld(item)[theme] == nil
+        }
+        #expect(reset)
+        #expect(followed)
+        #expect(try saved().map(\.0) == [.firstSync, .reset])
+    }
+
+    /// Reset that waits for a step and then cannot save its point changes nothing, and what follows it does not run.
+    @Test func resetThatWaitsAndCannotSaveItsPointRunsNothingAfter() async throws {
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        let bench = HostBench()
+        let libraries = Libraries(
+            host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, syncsPreferences: true, restorePoints: points,
+            defaultsDomain: suite)
+        let sync = libraries.preferences
+        let copy = FakePreferencesCopy()
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        var followed = false
+        await copy.whileReading { [points] in
+            // A file where the points' folder was, so the point Reset saves after the step cannot be written.
+            try? FileManager.default.removeItem(at: points.folder)
+            try? Data().write(to: points.folder)
+            libraries.resetMacSettings { followed = true }
+        }
+        let item = try #require(await copy.activeIDs.first)
+        await copy.change(item, [accent: #""blue""#])
+        await sync.flush()
+        let told = await eventually { libraries.host.notices.waiting.map(\.title) == [String(localized: "Settings Not Reset")] }
+        #expect(told)
+        #expect(!followed)
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+    }
+
+    /// A step that tries again after a refused write saves no second copy of the same point, which would push a real
+    /// one out of the ten.
+    @Test func aStepThatTriesAgainSavesOnePoint() async throws {
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        await copy.refuseNextCreate()
+        let sync = await sync(copy)
+        #expect(sync.standing != .syncing)
+        await sync.flush()
+        #expect(sync.standing == .syncing)
+        #expect(try saved().map(\.0) == [.firstSync])
     }
 
     @Test func aDroppedSettingThePersonChangesAndThenClearsIsDeletedFromTheMarfa() async throws {
@@ -425,7 +606,7 @@ import Testing
         let copy = FakePreferencesCopy()
         let item = await copy.add([look: #""later""#])
         let looks = TypeLooks(defaults: defaults)
-        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50), build: "1") { looks.reload() }
+        let sync = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") { looks.reload() }
         sync.attach(copy, library: "marfa:https://one", name: { nil })
         await sync.flush()
         await sync.flush()
@@ -442,7 +623,7 @@ import Testing
     @Test func removedSettingsStayRemovedOnceTheBinIsEmptied() async throws {
         defaults.set("dark", forKey: AppearanceKey.theme)
         let copy = FakePreferencesCopy()
-        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50)) {}
+        let sync = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50)) {}
         sync.attach(copy, library: "marfa:https://one", name: { nil })
         await sync.flush()
         let first = try #require(await copy.activeIDs.first)
@@ -462,7 +643,7 @@ import Testing
     @Test func theSettingsFollowTheOpenLibrary() async throws {
         let bench = HostBench()
         let host = bench.host(opener: { connection, _, _ in SampleLibrary.open(connection) })
-        let libraries = Libraries(host: host, defaults: bench.defaults, syncsPreferences: true)
+        let libraries = Libraries(host: host, defaults: bench.defaults, syncsPreferences: true, defaultsDomain: bench.suite)
         bench.defaults.set("dark", forKey: AppearanceKey.theme)
         #expect(libraries.preferences.standing == .off(.noMarfa))
         try await host.connect(address: SampleLibrary.connection.address.absoluteString, key: "sample")
@@ -470,7 +651,6 @@ import Testing
         await libraries.preferences.flush()
         #expect(libraries.preferences.standing != .syncing)
         #expect(bench.defaults.string(forKey: AppearanceKey.theme) == "dark")
-        #expect(bench.defaults.object(forKey: PreferencesSync.beforeSyncKey) == nil)
         try await host.disconnect()
         #expect(libraries.preferences.standing == .off(.noMarfa))
     }

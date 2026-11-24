@@ -41,6 +41,12 @@ extension PreferencesSync {
         var last: String?
         /// The Marfas whose settings were started again, whose next item is made from this Mac's settings.
         var restarting: Set<String> = []
+        /// The settings, by defaults key, that an import, a restore or Reset replaced on this Mac, whose value here wins
+        /// at the next step that follows the Marfa, even over another Mac's change this Mac has not taken; each with the
+        /// units it does not win, as an import left the value this Mac held for them. A mark clears once the write that
+        /// carries the setting is queued (`PreferencesSync.apply`). A step that switches Marfa or adopts one clears the
+        /// marks it read, as the Marfa's settings win whole there.
+        var winning: [String: Set<PreferenceUnit>]?
 
         static func read(_ defaults: UserDefaults) -> Record {
             defaults.data(forKey: PreferencesSync.recordKey).flatMap { try? JSONDecoder().decode(Record.self, from: $0) } ?? Record()

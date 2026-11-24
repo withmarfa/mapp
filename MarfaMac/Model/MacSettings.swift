@@ -14,7 +14,7 @@ enum MacSettings {
                 QuickAdd.lastTypeKey, NewRowTypes.key, RemotePictureSetting.key, Reporting.switchKey, UpdateSettings.betaKey, SidebarTypeRow.subtypeIconsKey,
                 SourceViewMode.key, PlaceDensities.key, PlaceDefaults.key, ItemTableColumnLayouts.key, ViewLayouts.key,
                 PagePlacements.key, IncludedSubtypes.key, SidebarLayouts.defaultsKey, TypeLooks.defaultsKey, SearchLeaveOuts.defaultsKey,
-                ShortcutBindings.defaultsKey, AnyAppShortcuts.defaultsKey, CalendarHourHeight.key, PreferencesSync.beforeSyncKey,
+                ShortcutBindings.defaultsKey, AnyAppShortcuts.defaultsKey, CalendarHourHeight.key,
             ] + SearchOptions.keys
     }
 

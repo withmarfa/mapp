@@ -52,6 +52,14 @@ nonisolated enum PreferenceJSON {
         }
     }
 
+    /// The value the defaults keep for the JSON `text`, or nil where it is not JSON or not a property list, such as one
+    /// holding `null`, which the defaults refuse by raising.
+    static func defaultsValue(_ text: String) -> Any? {
+        guard let json = value(text) else { return nil }
+        let value = defaultsValue(fromJSON: json)
+        return PropertyListSerialization.propertyList(value, isValidFor: .binary) ? value : nil
+    }
+
     /// A list of words in a stable order, for a value that is a set however the store ordered it.
     static func sortingWordLists(_ value: Any) -> Any {
         guard let object = value as? [String: Any] else { return value }
@@ -87,7 +95,8 @@ nonisolated extension SyncedSetting {
         }
     }
 
-    /// What this Mac holds of the setting, for `library` where it is kept for each server.
+    /// What this Mac holds of the setting, for `library` where it is kept for each server. A stored value of another kind
+    /// than the store keeps, such as text where it keeps data, is unreadable, so it is set aside rather than written over.
     func read(_ defaults: UserDefaults, library: String) -> PreferenceReading {
         switch place {
         case .member(let field):
@@ -95,12 +104,12 @@ nonisolated extension SyncedSetting {
             guard let text = PreferenceJSON.text(PreferenceJSON.json(fromDefaults: value)) else { return .unreadable }
             return .units([.member(field, key): text])
         case .serverMember(let field, _):
-            guard let servers = Self.object(defaults.data(forKey: key)) else { return .unreadable }
+            guard let servers = Self.storedObject(defaults, key, .data) else { return .unreadable }
             guard let entry = servers[library] else { return .units([:]) }
             guard let text = PreferenceJSON.text(PreferenceJSON.sortingWordLists(entry)) else { return .unreadable }
             return .units([.member(field, key): text])
         case .rows(let table, let setting, let storage, let wrapper, let local, _):
-            guard let stored = Self.object(Self.stored(defaults, key, storage)) else { return .unreadable }
+            guard let stored = Self.storedObject(defaults, key, storage) else { return .unreadable }
             var entries = stored
             if let wrapper {
                 guard let inner = stored[wrapper].map({ $0 as? [String: Any] }) ?? [:] else { return .unreadable }
@@ -108,13 +117,13 @@ nonisolated extension SyncedSetting {
             }
             return Self.rows(entries, table: table, setting: setting, dropping: local)
         case .serverRows(let table, let setting, _):
-            guard let servers = Self.object(defaults.data(forKey: key)) else { return .unreadable }
+            guard let servers = Self.storedObject(defaults, key, .data) else { return .unreadable }
             guard let entry = servers[library] else { return .units([:]) }
             guard let entries = entry as? [String: Any] else { return .unreadable }
             return Self.rows(entries, table: table, setting: setting, dropping: [])
         case .set(let table, let setting):
-            guard let text = defaults.string(forKey: key) else { return .units([:]) }
-            guard let words = PreferenceJSON.value(text) as? [String] else { return .unreadable }
+            guard let stored = defaults.object(forKey: key) else { return .units([:]) }
+            guard let text = stored as? String, let words = PreferenceJSON.value(text) as? [String] else { return .unreadable }
             return .units(Dictionary(words.map { (.row(table, setting: setting, key: $0), "true") }) { first, _ in first })
         case .placeRows(let table, let setting, let places):
             var units: PreferenceUnits = [:]
@@ -125,26 +134,44 @@ nonisolated extension SyncedSetting {
             }
             return .units(units)
         case .sidebar:
-            guard let servers = Self.object(defaults.data(forKey: key)) else { return .unreadable }
+            guard let servers = Self.storedObject(defaults, key, .data) else { return .unreadable }
             guard let entry = servers[library] else { return .units([:]) }
             guard let layout = entry as? [String: Any], let units = PreferencesSidebar.rows(of: layout) else { return .unreadable }
             return .units(units)
         }
     }
 
+    /// Whether `text` is a value this setting can store: JSON, and a property list where the defaults keep the value
+    /// itself rather than JSON text. A member's `null` stands for no value.
+    func accepts(_ text: String) -> Bool {
+        switch place {
+        case .member, .placeRows: PreferenceJSON.value(text) is NSNull || PreferenceJSON.defaultsValue(text) != nil
+        case .serverMember, .rows, .serverRows, .set, .sidebar: PreferenceJSON.value(text) != nil
+        }
+    }
+
     /// Makes what this Mac holds of the setting what `units` say, for `library` where it is kept for each server. A
-    /// value that cannot be read is set aside under the store's own key, never dropped, and the store keeps its default.
+    /// value the setting does not accept (`accepts`) is skipped, so this Mac keeps what it held there, and set aside
+    /// under the store's own key where it has one.
     func write(_ units: PreferenceUnits, to defaults: UserDefaults, library: String) {
-        let mine = units.filter { owns($0.key) }
+        var mine = units.filter { owns($0.key) }
+        let refused = mine.filter { !accepts($0.value) }
+        if !refused.isEmpty {
+            let held = if case .units(let held) = read(defaults, library: library) { held } else { PreferenceUnits() }
+            for (unit, text) in refused {
+                if let setAsideKind { Self.setAside(text, in: setAsideKind, defaults) }
+                mine[unit] = held[unit]
+            }
+        }
         switch place {
         case .member(let field):
-            if let text = mine[.member(field, key)], let value = PreferenceJSON.value(text), !(value is NSNull) {
-                defaults.set(PreferenceJSON.defaultsValue(fromJSON: value), forKey: key)
+            if let text = mine[.member(field, key)], let value = PreferenceJSON.defaultsValue(text) {
+                defaults.set(value, forKey: key)
             } else {
                 defaults.removeObject(forKey: key)
             }
         case .serverMember(let field, let setAside):
-            var servers = Self.object(defaults.data(forKey: key)) ?? [:]
+            var servers = Self.storedObject(defaults, key, .data) ?? [:]
             if let text = mine[.member(field, key)] {
                 if let value = PreferenceJSON.value(text), !(value is NSNull) {
                     servers[library] = value
@@ -156,11 +183,11 @@ nonisolated extension SyncedSetting {
                 servers[library] = nil
             }
             Self.store(servers, as: .data, key, defaults)
-        case .rows(_, _, let storage, let wrapper, let local, let setAside):
-            let current = Self.object(Self.stored(defaults, key, storage)).map { stored in
+        case .rows(_, _, let storage, let wrapper, let local, _):
+            let current = Self.storedObject(defaults, key, storage).map { stored in
                 wrapper.map { stored[$0] as? [String: Any] ?? [:] } ?? stored
             } ?? [:]
-            var entries = Self.entries(mine, setAside: setAside, defaults)
+            var entries = Self.entries(mine)
             for (name, entry) in entries {
                 guard var object = entry as? [String: Any], let kept = current[name] as? [String: Any] else { continue }
                 for member in local { object[member] = kept[member] }
@@ -171,9 +198,9 @@ nonisolated extension SyncedSetting {
             } else {
                 Self.store(entries, as: storage, key, defaults)
             }
-        case .serverRows(_, _, let setAside):
-            var servers = Self.object(defaults.data(forKey: key)) ?? [:]
-            let entries = Self.entries(mine, setAside: setAside, defaults)
+        case .serverRows:
+            var servers = Self.storedObject(defaults, key, .data) ?? [:]
+            let entries = Self.entries(mine)
             servers[library] = entries.isEmpty ? nil : entries
             Self.store(servers, as: .data, key, defaults)
         case .set:
@@ -188,15 +215,14 @@ nonisolated extension SyncedSetting {
         case .placeRows(_, _, let places):
             var written: Set<String> = []
             for (unit, text) in mine {
-                guard case .row(_, _, let place) = unit, let value = PreferenceJSON.value(text), !(value is NSNull) else { continue }
-                defaults.set(PreferenceJSON.defaultsValue(fromJSON: value), forKey: "\(key).\(place)")
+                guard case .row(_, _, let place) = unit, let value = PreferenceJSON.defaultsValue(text) else { continue }
+                defaults.set(value, forKey: "\(key).\(place)")
                 written.insert(place)
             }
             for place in places where !written.contains(place) { defaults.removeObject(forKey: "\(key).\(place)") }
-        case .sidebar(let setAside):
-            var servers = Self.object(defaults.data(forKey: key)) ?? [:]
-            let (layout, unreadable) = PreferencesSidebar.layout(from: mine)
-            for text in unreadable { Self.setAside(text, in: setAside, defaults) }
+        case .sidebar:
+            var servers = Self.storedObject(defaults, key, .data) ?? [:]
+            let layout = PreferencesSidebar.layout(from: mine)
             servers[library] = layout.isEmpty ? nil : layout
             Self.store(servers, as: .data, key, defaults)
         }
@@ -204,16 +230,15 @@ nonisolated extension SyncedSetting {
 
     // MARK: Parts
 
-    private static func stored(_ defaults: UserDefaults, _ key: String, _ storage: Storage) -> Data? {
-        switch storage {
-        case .data: defaults.data(forKey: key)
-        case .string: defaults.string(forKey: key).map { Data($0.utf8) }
+    /// The JSON object stored under `key` as `storage` keeps it: an empty one where nothing is stored, nil where what is
+    /// stored is not one, or is of another kind than `storage`.
+    private static func storedObject(_ defaults: UserDefaults, _ key: String, _ storage: Storage) -> [String: Any]? {
+        guard let stored = defaults.object(forKey: key) else { return [:] }
+        let data: Data? = switch storage {
+        case .data: stored as? Data
+        case .string: (stored as? String).map { Data($0.utf8) }
         }
-    }
-
-    /// The JSON object `data` holds: an empty one where nothing is stored, nil where it is not an object.
-    private static func object(_ data: Data?) -> [String: Any]? {
-        guard let data else { return [:] }
+        guard let data else { return nil }
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
@@ -233,16 +258,12 @@ nonisolated extension SyncedSetting {
         return .units(units)
     }
 
-    /// Each row's value as JSON by its key; a value that is not JSON is set aside.
-    private static func entries(_ units: PreferenceUnits, setAside: SetAside, _ defaults: UserDefaults) -> [String: Any] {
+    /// Each row's value as JSON by its key.
+    private static func entries(_ units: PreferenceUnits) -> [String: Any] {
         var entries: [String: Any] = [:]
         for (unit, text) in units {
-            guard case .row(_, _, let name) = unit else { continue }
-            if let value = PreferenceJSON.value(text) {
-                entries[name] = value
-            } else {
-                Self.setAside(text, in: setAside, defaults)
-            }
+            guard case .row(_, _, let name) = unit, let value = PreferenceJSON.value(text) else { continue }
+            entries[name] = value
         }
         return entries
     }
@@ -300,16 +321,11 @@ nonisolated enum PreferencesSidebar {
         return units
     }
 
-    /// The layout the rows make, and the values that are not JSON.
-    static func layout(from units: PreferenceUnits) -> (layout: [String: Any], unreadable: [String]) {
+    /// The layout the rows make; a row that is not JSON is left out.
+    static func layout(from units: PreferenceUnits) -> [String: Any] {
         var layout: [String: Any] = [:]
-        var unreadable: [String] = []
         for (unit, text) in units {
-            guard case .row(.sidebar, let setting, let key) = unit else { continue }
-            guard let value = PreferenceJSON.value(text) else {
-                unreadable.append(text)
-                continue
-            }
+            guard case .row(.sidebar, let setting, let key) = unit, let value = PreferenceJSON.value(text) else { continue }
             if let member = split.first(where: { $0.value == setting })?.key {
                 var places = layout[member] as? [String: Any] ?? [:]
                 places[key] = value
@@ -318,6 +334,6 @@ nonisolated enum PreferencesSidebar {
                 layout[key] = value
             }
         }
-        return (layout, unreadable)
+        return layout
     }
 }

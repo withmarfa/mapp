@@ -43,7 +43,7 @@ extension LiveMarfaTests {
             signIns.save(try LiveMarfa.key(), for: connection.address, scopes: [PreferencesType.vendorScope])
             let source = try await MarfaSource.open(connection, signIns: signIns, location: MarfaStoreLocation(root: root))
             let defaults = ThrowawayDefaults.make("MarfaMacTests.PreferencesLive")
-            let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(100)) {}
+            let sync = PreferencesSync(defaults: defaults, domain: defaults.suite, enabled: true, coalescing: .milliseconds(100)) {}
             let mac = Mac(source: source, defaults: defaults, sync: sync, root: root)
             macs.append(mac)
             return mac

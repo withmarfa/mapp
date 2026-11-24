@@ -216,9 +216,12 @@ struct GeneralPage: View {
     }
 
     private func resetSettings() {
-        libraries.resetMacSettings()
-        updater?.resetChoices()
-        Reporting.shared.switchChanged(to: true)
+        // Only once the settings are reset, so a Reset that waits for a sync step and then cannot save its restore point
+        // leaves the updater and reporting as their switches still read.
+        libraries.resetMacSettings { [updater] in
+            updater?.resetChoices()
+            Reporting.shared.switchChanged(to: true)
+        }
     }
 }
 

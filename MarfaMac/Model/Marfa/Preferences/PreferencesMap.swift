@@ -84,8 +84,6 @@ enum PreferencesMap {
     private static let tables: [SyncedSetting] = [
         SyncedSetting(key: ShortcutBindings.defaultsKey, place: .rows(
             .commands, setting: "shortcut", .data, wrapper: "shortcuts", local: [], .data(ShortcutBindings.setAsideKey))),
-        SyncedSetting(key: AnyAppShortcuts.defaultsKey, place: .rows(
-            .commands, setting: "anyAppShortcut", .data, wrapper: nil, local: [], .data(AnyAppShortcuts.setAsideKey))),
         SyncedSetting(key: PagePlacements.key, place: .rows(
             .types, setting: "pagePlacements", .string, wrapper: nil, local: [], .string(PagePlacements.setAsideKey))),
         SyncedSetting(key: TypeLooks.defaultsKey, place: .serverRows(.types, setting: "look", .data(TypeLooks.setAsideKey))),
@@ -102,16 +100,28 @@ enum PreferencesMap {
         SyncedSetting(key: SidebarLayouts.defaultsKey, place: .sidebar(.data(SidebarLayouts.setAsideKey))),
     ]
 
+    /// Settings that stay on this Mac but that a settings file and a restore point carry, placed as they would be synced:
+    /// the shortcuts that work in any app, since a system-wide shortcut can clash with an app one Mac alone has. Rows
+    /// other Macs wrote under their place are left in the Marfa and owned by no setting the sync reads.
+    static let inFilesOnly: [SyncedSetting] = [anyAppShortcuts]
+
+    /// The shortcuts that work in any app, one row for each command, by the command's raw value.
+    static let anyAppShortcuts = SyncedSetting(key: AnyAppShortcuts.defaultsKey, place: .rows(
+        .commands, setting: "anyAppShortcut", .data, wrapper: nil, local: [], .data(AnyAppShortcuts.setAsideKey)))
+
+    /// Every setting a settings file carries (`SettingsFile`).
+    static let inFiles: [SyncedSetting] = synced + inFilesOnly
+
     /// The settings that stay on this Mac: window sizes and column widths, what is open in the right sidebar, where the
     /// last window and quick add were, Reopen Windows (the Mac's own answer), consent to error reports, Beta Versions
-    /// (Sparkle keeps its own keys, which are never synced either), a table's columns (mostly widths), and the copy of
-    /// this Mac's settings kept from before the first sync.
+    /// (Sparkle keeps its own keys, which are never synced either), a table's columns (mostly widths), and the shortcuts
+    /// that work in any app (`inFilesOnly`).
     static let staysOnMac: [String] = [
         StartWith.lastPlaceKey, ReopenWindows.key, QuickAdd.lastTypeKey, Reporting.switchKey, UpdateSettings.betaKey, ItemTableColumnLayouts.key,
         InterfaceKey.inspectorWidth, InterfaceKey.inspectorDetailsOpen, InterfaceKey.inspectorPropertiesOpen,
         InterfaceKey.inspectorRelationshipsOpen, InterfaceKey.inspectorLinksInPageOpen, InterfaceKey.inspectorLinkedFromOpen,
         InterfaceKey.inspectorTagsOpen, InterfaceKey.inspectorOutlineOpen, InterfaceKey.inspectorAttachmentsOpen,
-        InterfaceKey.inspectorCollectionsOpen, InterfaceKey.inspectorAppOpen, PreferencesSync.beforeSyncKey,
+        InterfaceKey.inspectorCollectionsOpen, InterfaceKey.inspectorAppOpen, AnyAppShortcuts.defaultsKey,
     ] + ColumnWidth.allCases.map(\.key)
 
     /// Every defaults key a synced setting reads or writes.

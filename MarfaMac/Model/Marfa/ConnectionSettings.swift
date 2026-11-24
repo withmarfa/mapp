@@ -58,7 +58,7 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
 
     /// What stays on each Mac, whatever the state.
     static var footer: String {
-        String(localized: "Window sizes and positions, column widths and On This Mac stay on each Mac.")
+        String(localized: "Each Mac keeps its own window sizes and positions, column widths, global shortcuts, and On This Mac settings.")
     }
 
     /// The question before Remove… takes the settings out of the Marfa.
