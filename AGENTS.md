@@ -33,7 +33,7 @@ Marfa for Mac is a macOS app for a Marfa server's items, with a sidebar, a list 
 
 - Target macOS 27 and Xcode 27 only, with no `#available` checks. Swift 6 language mode, main-actor isolation by default. Unit tests use Swift Testing; UI tests use XCTest.
 - Use SwiftUI with native containers and controls, and AppKit only where SwiftUI cannot express something. Check API questions against Apple's documentation.
-- Every user-facing string goes through the String Catalog. Building in Xcode updates `MarfaMac/Localizable.xcstrings`; `xcodebuild` alone does not.
+- Every user-facing string goes through the String Catalog. Building in Xcode updates `MarfaMac/Localizable.xcstrings`; after an `xcodebuild` build, `Scripts/sync-strings.sh <derived data>` does the same.
 - The app is not sandboxed. Release keeps the hardened runtime with no exceptions; Debug leaves it off. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting`, the plugins release reader (`PluginRelease`) and Sparkle may connect out. Neither the item page nor a sealed web page loads from the network itself.
 
 ## Data rules
