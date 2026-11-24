@@ -99,7 +99,7 @@ A page opens with the permission here (`MarfaSettingsPage.permission`). A part t
 - **The server's own error texts are never shown**, because they name settings by key and requests by path. Pages word a title and one line; details go to the app's log. A field may show the server's reason where it holds no key, code or route.
 - **A setting with no name in the app is counted or described**, never shown by its key.
 - **Needs Attention offers only an action the sign-in may take**: a concern opens its page, or says what is wrong.
-- **A problem row's title is a sentence**, in sentence case.
+- **A problem row's title is a sentence.**
 
 ## Plugins, types and connectors
 
@@ -117,7 +117,6 @@ A page opens with the permission here (`MarfaSettingsPage.permission`). A part t
 - **A folder's record is pinned by the working copy** (`CopyFolderCalls`), because the copy's slice leaves out `system.folder`. A pin goes only with Stop Syncing.
 - **Stop Syncing cannot be undone**, and leaves items in Marfa and files on disk.
 - **A restore adds what a backup holds and changes nothing that is there**, and says what it leaves out.
-- **A backup folder is typed**, because the app cannot browse the server's machine.
 
 ## What the server does not offer yet
 
