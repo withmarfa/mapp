@@ -95,7 +95,8 @@ struct InlineSearchField: NSViewRepresentable {
         /// person moved on.
         var onClickElsewhere: (() -> Void)?
         private var monitor: Any?
-        private var isClickElsewhere = false
+        /// The button of a click that began outside the open, empty field, so only its own release closes the field.
+        private var clickElsewhereButton: Int?
 
         isolated deinit { removeMonitor() }
 
@@ -130,17 +131,17 @@ struct InlineSearchField: NSViewRepresentable {
         private func removeMonitor() {
             if let monitor { NSEvent.removeMonitor(monitor) }
             monitor = nil
-            isClickElsewhere = false
+            clickElsewhereButton = nil
         }
 
         private func watch(_ event: NSEvent) {
             guard event.window != nil, event.window === window else { return }
             switch event.type {
             case .leftMouseDown, .rightMouseDown, .otherMouseDown:
-                isClickElsewhere = isOpenAndEmpty && !isOverField(event)
+                clickElsewhereButton = isOpenAndEmpty && !isOverField(event) ? event.buttonNumber : nil
             case .leftMouseUp, .rightMouseUp, .otherMouseUp:
-                guard isClickElsewhere else { return }
-                isClickElsewhere = false
+                guard clickElsewhereButton == event.buttonNumber else { return }
+                clickElsewhereButton = nil
                 // After the click's own action, which may run as the event is delivered.
                 DispatchQueue.main.async { [weak self] in
                     if let self, self.isOpenAndEmpty { self.onClickElsewhere?() }
