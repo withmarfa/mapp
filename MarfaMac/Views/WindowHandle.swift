@@ -1,15 +1,34 @@
 import AppKit
 import SwiftUI
 
-/// The window a view is in, for a step SwiftUI has no way to take: bringing that window forward, as an item link does.
-@MainActor final class WindowHandle {
-    fileprivate(set) weak var window: NSWindow?
+/// The window a view is in, for what SwiftUI cannot tell or do: whether that window has closed, and bringing it
+/// forward, as an item link does.
+@MainActor final class WindowHandle: ItemLinkWindow {
+    private weak var window: NSWindow?
+    private var isClosed = false
+    private var closing: (any NSObjectProtocol)?
+
+    /// True from before the view reaches its window until the window closes.
+    var isOpen: Bool { !isClosed }
 
     /// Shows the window in front of the app's others and makes it key, bringing it back from the Dock first.
     func bringForward() {
-        guard let window else { return }
+        guard let window, !isClosed else { return }
         if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
+    }
+
+    fileprivate func attach(to window: NSWindow?) {
+        guard let window, window !== self.window else { return }
+        self.window = window
+        if let closing { NotificationCenter.default.removeObserver(closing) }
+        closing = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) {
+            [weak self] _ in MainActor.assumeIsolated { self?.isClosed = true }
+        }
+    }
+
+    isolated deinit {
+        if let closing { NotificationCenter.default.removeObserver(closing) }
     }
 }
 
@@ -39,7 +58,7 @@ private struct WindowHandleProbe: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            handle.window = window
+            handle.attach(to: window)
         }
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }

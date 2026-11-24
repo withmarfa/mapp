@@ -3,8 +3,17 @@ import Foundation
 import Observation
 import os
 
-/// Routes external item links against the working copy and hands accepted requests to a main window.
-/// Only the latest link waits for the library to open.
+/// A main window as the opener sees it: whether it is still open, and a way to bring it in front of the others.
+protocol ItemLinkWindow: AnyObject {
+    /// False once the window has closed, though its browser may live on.
+    var isOpen: Bool { get }
+    /// Shows the window in front, brought back from the Dock where it was minimized.
+    func bringForward()
+}
+
+/// Routes external item links against the working copy and hands accepted requests to a main window, the one in front
+/// or one it opens, never a window of the item's own. Only the latest link counts: a newer one, whatever it opens,
+/// replaces one waiting for the library and one no window has taken yet.
 @Observable @MainActor final class ItemLinkOpener {
     /// What the opener reads of the app: what the windows show, and the library they read.
     struct Standing {
@@ -12,13 +21,16 @@ import os
         let library: (any ItemLibrary)?
     }
 
-    /// An item for a main window to open: the window last in front when the link was decided, or another main window
-    /// where none was, or, where no main window was open, the first to show the library the link was checked against.
+    /// An item for a main window to open: the window last in front when the link was decided, or another open main
+    /// window where none was, or, where no main window was open, the first to show `library`, the one the link was
+    /// checked against.
     struct Request: Equatable {
         let id = UUID()
         let item: ItemID
-        let target: ObjectIdentifier?
-        let library: ObjectIdentifier
+        weak var target: Browser?
+        weak var library: (any ItemLibrary)?
+
+        static func == (lhs: Request, rhs: Request) -> Bool { lhs.id == rhs.id }
     }
 
     /// The item waiting for a window to open it.
@@ -27,9 +39,6 @@ import os
     /// Opens a main window, for a link that comes while none is open. A window sets it, as only a view can open one.
     @ObservationIgnored var openMainWindow: (() -> Void)?
 
-    /// What a window shows over an item in Recently Deleted that a link opened.
-    static var inRecentlyDeleted: String { String(localized: "This item is in Recently Deleted.") }
-
     @ObservationIgnored private let standing: @MainActor () -> Standing
     @ObservationIgnored private let notices: Notices
     @ObservationIgnored private let front: @MainActor () -> Browser?
@@ -37,8 +46,16 @@ import os
     @ObservationIgnored private let limit: Duration
     @ObservationIgnored private var waiting: ItemAppLink?
     @ObservationIgnored private var routing: Task<Void, Never>?
-    @ObservationIgnored private var pause: Once?
-    @ObservationIgnored private let windows = NSHashTable<Browser>.weakObjects()
+    /// Ends the route's current wait, for a newer link.
+    @ObservationIgnored private var interrupt: (() -> Void)?
+    @ObservationIgnored private var windows: [Registered] = []
+    /// When a main window was last asked for that has not yet appeared, so a run of links opens only one.
+    @ObservationIgnored private var windowAsked: ContinuousClock.Instant?
+
+    private struct Registered {
+        weak var browser: Browser?
+        let window: any ItemLinkWindow
+    }
 
     convenience init(libraries: Libraries) {
         self.init(notices: libraries.host.notices) { Standing(mode: libraries.mode, library: libraries.current) }
@@ -59,8 +76,9 @@ import os
     /// sign-in's answer, is not a link to an item and is left alone.
     func receive(_ urls: [URL]) {
         guard let url = urls.last(where: { $0.scheme?.lowercased() == ItemAppLink.scheme }) else { return }
+        request = nil
         waiting = ItemAppLink(url)
-        pause?.resume()
+        interrupt?()
         guard waiting != nil else {
             refuse(.malformed)
             return
@@ -68,28 +86,35 @@ import os
         if routing == nil { routing = Task { await route() } }
     }
 
-    /// Counts `browser`'s window among the main windows open, for as long as the browser lives.
-    func register(_ browser: Browser) {
-        windows.add(browser)
+    /// Counts `browser`'s main window among those open, until `window` closes.
+    func register(_ browser: Browser, window: any ItemLinkWindow) {
+        windows.removeAll { $0.browser == nil || $0.browser === browser }
+        windows.append(Registered(browser: browser, window: window))
+        windowAsked = nil
     }
 
     /// The item `browser`'s window is to open, once, while it shows `library`: nil where the request is another
     /// window's. A request for a library the windows have since left is dropped, as its check was against that one;
-    /// an item gone since it was checked is told.
+    /// an item gone or deleted since it was checked is told. The window that takes it comes forward.
     func take(for browser: Browser, in library: any ItemLibrary) -> Item? {
         guard let request, library.isLoaded else { return nil }
-        guard request.library == ObjectIdentifier(library) else {
+        guard let checked = request.library, checked === standing().library else {
             self.request = nil
             return nil
         }
+        guard checked === library else { return nil }
         // A window the link was meant for that has since closed leaves it to any other.
-        if let target = request.target, target != ObjectIdentifier(browser),
-           windows.allObjects.contains(where: { ObjectIdentifier($0) == target }) { return nil }
+        if let target = request.target, target !== browser, window(of: target) != nil { return nil }
         self.request = nil
-        guard let item = library.item(request.item) else {
+        guard let item = checked.item(request.item) else {
             refuse(.notFound)
             return nil
         }
+        guard item.state != .trashed else {
+            refuse(.inRecentlyDeleted)
+            return nil
+        }
+        window(of: browser)?.bringForward()
         return item
     }
 
@@ -102,13 +127,13 @@ import os
                 current = link
                 deadline = .now + limit
             }
-            guard let (route, library) = await decide(link), waiting == link else { continue }
+            guard ContinuousClock.now < deadline else {
+                waiting = nil
+                refuse(.stillOpening)
+                return
+            }
+            guard let (route, library) = await decide(link, until: deadline), waiting == link else { continue }
             if route == .wait {
-                guard ContinuousClock.now < deadline else {
-                    waiting = nil
-                    refuse(.stillOpening)
-                    return
-                }
                 await standingChanges(until: deadline)
                 continue
             }
@@ -118,9 +143,9 @@ import os
                 guard let library else { continue }
                 Telemetry.logger(.navigation).info("item link opens an item")
                 activate()
-                let target = front() ?? windows.allObjects.first
-                request = Request(item: item, target: target.map(ObjectIdentifier.init), library: ObjectIdentifier(library))
-                if target == nil { openMainWindow?() }
+                let target = frontWindow()?.browser
+                request = Request(item: item, target: target, library: library)
+                if target == nil { askForMainWindow() }
             case .refuse(let refusal):
                 refuse(refusal)
             case .wait:
@@ -130,57 +155,106 @@ import os
     }
 
     /// The route for `link` and the library it was decided on; nil where the library changed while its copy was asked
-    /// which Marfa it is, so the link is decided again.
-    private func decide(_ link: ItemAppLink) async -> (ItemLinkRoute, (any ItemLibrary)?)? {
+    /// which Marfa it is, where a newer link came meanwhile, or where `deadline` passed first.
+    private func decide(_ link: ItemAppLink, until deadline: ContinuousClock.Instant) async -> (ItemLinkRoute, (any ItemLibrary)?)? {
         let before = standing()
         guard before.mode == .marfa, let library = before.library, library.isLoaded else {
-            let route = ItemLinkRoute.decide(link, mode: before.mode, isLoaded: false, instanceID: nil, holds: false)
+            let route = ItemLinkRoute.decide(link, mode: before.mode, isLoaded: false, instanceID: nil, held: nil)
             return (route, nil)
         }
-        let instanceID = await library.instanceID()
+        guard case .answered(let instanceID) = await instanceID(of: library, until: deadline) else { return nil }
         let after = standing()
-        guard after.mode == .marfa, let still = after.library, ObjectIdentifier(still) == ObjectIdentifier(library) else { return nil }
+        guard after.mode == .marfa, let still = after.library, still === library else { return nil }
         let route = ItemLinkRoute.decide(
-            link, mode: after.mode, isLoaded: library.isLoaded, instanceID: instanceID, holds: library.item(link.item) != nil)
+            link, mode: after.mode, isLoaded: library.isLoaded, instanceID: instanceID, held: library.item(link.item)?.state)
         return (route, library)
     }
 
-    private func refuse(_ refusal: ItemLinkRefusal) {
-        Telemetry.logger(.navigation).info("item link refused: \(String(describing: refusal), privacy: .public)")
-        activate()
-        notices.tell(refusal.title, refusal.message, action: refusal.action)
+    private nonisolated enum Asked: Sendable { case answered(String?), stopped }
+
+    /// The copy's instance id, unless `deadline` passes or a newer link comes first. The copy asks again while its
+    /// key changes, so its answer can take any time.
+    private func instanceID(of library: any ItemLibrary, until deadline: ContinuousClock.Instant) async -> Asked {
+        defer { interrupt = nil }
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Asked, Never>) in
+            let race = Race(continuation)
+            interrupt = { race.finish(.stopped) }
+            race.add(Task { @MainActor in race.finish(.answered(await library.instanceID())) })
+            race.add(Task { @MainActor in
+                try? await Task.sleep(until: deadline)
+                race.finish(.stopped)
+            })
+        }
     }
 
     /// Returns once what the windows show changes, a newer link comes, or at `deadline`.
     private func standingChanges(until deadline: ContinuousClock.Instant) async {
+        defer { interrupt = nil }
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            let once = Once(continuation)
-            pause = once
+            let race = Race(continuation)
+            interrupt = { race.finish(()) }
             withObservationTracking {
                 _ = standing().library?.isLoaded
             } onChange: {
-                Task { @MainActor in once.resume() }
+                Task { @MainActor in race.finish(()) }
             }
-            once.sleeper = Task { @MainActor in
+            race.add(Task { @MainActor in
                 try? await Task.sleep(until: deadline)
-                once.resume()
-            }
+                race.finish(())
+            })
         }
-        pause = nil
     }
 
-    /// Resumes a wait once, by whichever comes first, and stops the other.
-    private final class Once {
-        private var continuation: CheckedContinuation<Void, Never>?
-        var sleeper: Task<Void, Never>?
+    /// Tells the person, in the main window in front, which comes forward so the alert is seen; with no main window
+    /// open, in the one it opens.
+    private func refuse(_ refusal: ItemLinkRefusal) {
+        Telemetry.logger(.navigation).info("item link refused: \(String(describing: refusal), privacy: .public)")
+        activate()
+        if let window = frontWindow()?.window { window.bringForward() } else { askForMainWindow() }
+        notices.tell(refusal.title, refusal.message, action: refusal.action)
+    }
 
-        init(_ continuation: CheckedContinuation<Void, Never>) { self.continuation = continuation }
+    /// The main windows still open, forgetting those closed.
+    private func openWindows() -> [(browser: Browser, window: any ItemLinkWindow)] {
+        windows.removeAll { $0.browser == nil || !$0.window.isOpen }
+        return windows.compactMap { entry in entry.browser.map { ($0, entry.window) } }
+    }
 
-        func resume() {
-            sleeper?.cancel()
-            sleeper = nil
-            continuation?.resume()
-            continuation = nil
+    private func window(of browser: Browser) -> (any ItemLinkWindow)? {
+        openWindows().first { $0.browser === browser }?.window
+    }
+
+    /// The open main window last in front, or another open one.
+    private func frontWindow() -> (browser: Browser, window: any ItemLinkWindow)? {
+        let open = openWindows()
+        let front = front()
+        return open.first { $0.browser === front } ?? open.last
+    }
+
+    /// Opens one main window, unless one asked for lately has yet to appear.
+    private func askForMainWindow() {
+        if let windowAsked, ContinuousClock.now - windowAsked < .seconds(10) { return }
+        windowAsked = .now
+        openMainWindow?()
+    }
+
+    /// Resumes a wait once, with whichever answer comes first, and stops the rest.
+    private final class Race<Value: Sendable> {
+        private var continuation: CheckedContinuation<Value, Never>?
+        private var tasks: [Task<Void, Never>] = []
+
+        init(_ continuation: CheckedContinuation<Value, Never>) { self.continuation = continuation }
+
+        func add(_ task: Task<Void, Never>) {
+            if continuation == nil { task.cancel() } else { tasks.append(task) }
+        }
+
+        func finish(_ value: Value) {
+            guard let continuation else { return }
+            self.continuation = nil
+            for task in tasks { task.cancel() }
+            tasks = []
+            continuation.resume(returning: value)
         }
     }
 }

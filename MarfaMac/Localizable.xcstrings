@@ -9289,6 +9289,9 @@
     },
     "This item is in Recently Deleted." : {
 
+    },
+    "Marfa for Mac can’t check this link yet. Try again once your Marfa has finished syncing." : {
+
     }
   },
   "version" : "1.1"

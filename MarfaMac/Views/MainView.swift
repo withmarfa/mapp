@@ -22,7 +22,6 @@ struct MainView: View {
     @Environment(\.appearsActive) private var appearsActive
     /// Absent in previews and tests that build the window alone.
     @Environment(ItemLinkOpener.self) private var itemLinks: ItemLinkOpener?
-    @State private var windowHandle = WindowHandle()
     /// Whether the window has restored what it showed, before which an item link waits, so the restore does not
     /// replace the item the link opened.
     @State private var isRestored = false
@@ -85,7 +84,6 @@ struct MainView: View {
             ColumnWidthRegistry.shared.windowBecame(active: appearsActive, tracker: measuredWidths)
             if appearsActive { FrontBrowser.shared.last = browser }
         }
-        .windowHandle(windowHandle)
         .onChange(of: itemLinks?.request) { takeItemLink() }
         // Customizing happens in the sidebar, so a command that starts it brings the sidebar back.
         .onChange(of: browser.customizesSidebar) {
@@ -343,7 +341,6 @@ struct MainView: View {
                 else if browser.isModalPresented { browser.closeModal() }
                 else { browser.focusRequest = .list }
             }
-            itemLinks?.register(browser)
             browser.windowOpener = { [library, openWindow] ids in
                 ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
             }
@@ -413,13 +410,13 @@ struct MainView: View {
 
     private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }
 
-    /// Opens the item a `marfa://` link named, as following a link in an item's text does, once this window has
-    /// restored what it showed. The opener checked the link; this window only shows the item.
+    /// Opens the item a `marfa://` link named in this window (`Browser.open(itemLink:)`), once it has restored what it
+    /// showed. The opener checked the link against this window's library; this window only shows the item.
     private func takeItemLink() {
         guard isRestored, let itemLinks, let item = itemLinks.take(for: browser, in: library) else { return }
-        windowHandle.bringForward()
-        browser.follow(link: item, in: library, order: order)
-        if item.state == .trashed { details.toasts.show(ItemLinkOpener.inRecentlyDeleted, symbol: "trash") }
+        // Version History takes the whole window, which would hide the item.
+        details.leaveHistory()
+        browser.open(itemLink: item, in: library, order: order)
     }
 
     #if DEBUG

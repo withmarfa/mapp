@@ -9,18 +9,23 @@ nonisolated enum ItemLinkRoute: Equatable, Sendable {
     /// Tells the person why the link opens nothing.
     case refuse(ItemLinkRefusal)
 
-    /// `instanceID` is the one the library's copy holds, nil while the copy has none; `holds` is whether the copy holds
-    /// the item.
-    static func decide(_ link: ItemAppLink, mode: Libraries.Mode, isLoaded: Bool, instanceID: String?, holds: Bool) -> ItemLinkRoute {
+    /// `instanceID` is the one the library's copy holds, nil while the copy has none; `held` is the state of the item
+    /// in the copy, nil where the copy doesn't hold it.
+    static func decide(_ link: ItemAppLink, mode: Libraries.Mode, isLoaded: Bool, instanceID: String?, held: ItemState?) -> ItemLinkRoute {
         switch mode {
         case .unconfigured: return .refuse(.notConnected)
         case .failed: return .refuse(.unavailable)
         case .opening: return .wait
         case .marfa:
             guard isLoaded else { return .wait }
-            guard let instanceID else { return .refuse(.notFound) }
+            guard let instanceID else { return .refuse(.instanceUnknown) }
             guard instanceID.lowercased() == link.instanceID else { return .refuse(.otherMarfa) }
-            return holds ? .open(link.item) : .refuse(.notFound)
+            switch held {
+            case nil: return .refuse(.notFound)
+            // Showing it would open Settings at Recently Deleted, which reads the server; the person chooses that.
+            case .trashed: return .refuse(.inRecentlyDeleted)
+            case .active, .archived: return .open(link.item)
+            }
         }
     }
 }
@@ -35,10 +40,14 @@ nonisolated enum ItemLinkRefusal: Equatable, Sendable, CaseIterable {
     case notConnected
     /// A Marfa is connected but its library can't be opened: its sign-in was refused or its copy failed.
     case unavailable
-    /// The library was still opening when the link stopped waiting.
+    /// The library was still opening, or its copy hadn't said which Marfa it is, when the link stopped waiting.
     case stillOpening
-    /// The copy doesn't hold the item, or doesn't yet know which Marfa it is.
+    /// The copy doesn't hold the item.
     case notFound
+    /// The copy doesn't yet know which Marfa it is, so the link can't be checked.
+    case instanceUnknown
+    /// The item is in Recently Deleted.
+    case inRecentlyDeleted
 
     var title: String { String(localized: "Can’t Open Link") }
 
@@ -50,14 +59,18 @@ nonisolated enum ItemLinkRefusal: Equatable, Sendable, CaseIterable {
         case .unavailable: String(localized: "Your Marfa library can’t be opened right now. Check the connection in Settings, then open the link again.")
         case .stillOpening: String(localized: "Your Marfa library is still opening. Open the link again in a moment.")
         case .notFound: String(localized: "This item can’t be found in this Mac’s copy of your Marfa. It may have been deleted, or it may not have synced to this Mac yet.")
+        case .instanceUnknown: String(localized: "Marfa for Mac can’t check this link yet. Try again once your Marfa has finished syncing.")
+        case .inRecentlyDeleted: String(localized: "This item is in Recently Deleted.")
         }
     }
 
-    /// Settings > Connection where connecting is the way forward. The person opens it; the link never does.
+    /// The Settings page where the person can go on: Connection to connect, Recently Deleted to find the item. The
+    /// person opens it; the link never does.
     var action: Notices.Action? {
         switch self {
         case .notConnected, .unavailable: .openSettings(.connection)
-        case .malformed, .otherMarfa, .stillOpening, .notFound: nil
+        case .inRecentlyDeleted: .openSettings(.recentlyDeleted)
+        case .malformed, .otherMarfa, .stillOpening, .notFound, .instanceUnknown: nil
         }
     }
 }
