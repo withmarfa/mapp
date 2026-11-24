@@ -5,7 +5,8 @@ import OpenAPIRuntime
 import os
 
 /// The calls that ask the Marfa server itself instead of the working copy: an item's snapshots (Version History),
-/// the server's own settings (This Marfa), the owner's icon for a type, changes to a type's fields and the names, marks and counts of sources.
+/// the server's own settings (This Marfa), the owner's icon for a type, changes to a type's fields, the names, marks and counts of sources
+/// and an item's `https` link.
 /// They need a connection, so they fail while the server cannot be reached. Every call goes through the package's `Server`
 /// (This Marfa's through the generated `Client` made from it), with the address and the sign-in read
 /// from the Keychain on each call, so a sign-in the person has since made again is the one used. Both go over
