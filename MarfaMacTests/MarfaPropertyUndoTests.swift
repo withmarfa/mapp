@@ -228,11 +228,36 @@ import Testing
         }
     }
 
-    @Test func anUndoOfAnEditWhoseAnswerCantBeReadIsNotMade() async throws {
+    /// An acceptance with no item, as the package's fake copy gives, counts as made as the copy stored it.
+    @Test func anUndoOfAnAcceptedEditWithNoItemInItsAnswerIsMade() async throws {
         let scene = try await loaded()
         let edit = try scene.set("Ada L")
         try await scene.take(edit, showing: "Ada L", version: 2)
         scene.answer(edit, .accepted, unread: true)
+        try await scene.show("Ada L", version: 3)
+
+        scene.undo.undo()
+        #expect(scene.lastWrite == name("Ada", base: 3))
+    }
+
+    /// The Undo of an acceptance with no item still compares what the copy shows, so another device's value stays.
+    @Test func anUndoOfAnAcceptedEditWithNoItemAfterAnotherDeviceChangedItIsNotMade() async throws {
+        let scene = try await loaded()
+        let edit = try scene.set("Ada L")
+        try await scene.take(edit, showing: "Ada L", version: 2)
+        scene.answer(edit, .accepted, unread: true)
+        try await scene.show("Ada X", version: 3)
+
+        scene.undo.undo()
+        #expect(scene.source.writes.count == 1)
+        #expect(scene.lastMessage == MarfaLibrary.changedSince(undoing: true))
+    }
+
+    @Test func anUndoOfAConflictWhoseAnswerCantBeReadIsNotMade() async throws {
+        let scene = try await loaded()
+        let edit = try scene.set("Ada L")
+        try await scene.take(edit, showing: "Ada L", version: 2)
+        scene.answer(edit, .conflicted(sibling: ItemID("copy"), fields: ["name"]), unread: true)
         try await scene.show("Ada L", version: 3)
 
         scene.undo.undo()
@@ -242,13 +267,13 @@ import Testing
         #expect(!scene.undo.canUndo, "a step that can't be made is not put back")
     }
 
-    @Test func anUndoBuiltOnAnEarlierEditWhoseAnswerCantBeReadIsNotMade() async throws {
+    @Test func anUndoBuiltOnAnEarlierConflictWhoseAnswerCantBeReadIsNotMade() async throws {
         let scene = try await loaded()
         let earlier = try scene.set("Ada L", undoable: false)
         try await scene.take(earlier, showing: "Ada L", version: 2)
         let later = try scene.set("Ada K")
         try await scene.take(later, showing: "Ada K", version: 3)
-        scene.answer(earlier, .accepted, unread: true)
+        scene.answer(earlier, .conflicted(sibling: ItemID("copy"), fields: ["name"]), unread: true)
         try await scene.answer(later, .accepted, showing: "Ada K", version: 4)
 
         scene.undo.undo()

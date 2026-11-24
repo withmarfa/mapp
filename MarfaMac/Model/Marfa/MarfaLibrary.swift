@@ -976,7 +976,7 @@ import Observation
     }
 
     private func propertyAnswered(_ id: WriteID, _ outcome: WriteOutcome, holding: [String: PropertyValue]?) {
-        guard let edit = propertyEdits[id], let kept = PropertyEdit.kept(edit.changes.keys, after: outcome, holding: holding) else { return }
+        guard let edit = propertyEdits[id], let kept = PropertyEdit.kept(edit.changes.keys, after: outcome, holding: holding, left: edit.left) else { return }
         edit.kept = kept
         propertyEdits[id] = nil
     }

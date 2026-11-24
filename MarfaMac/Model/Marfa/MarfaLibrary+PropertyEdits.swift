@@ -65,10 +65,17 @@ extension MarfaLibrary {
         }
 
         /// What a final answer left of each key: the server's answer alone says what a merge, a conflict or an edit
-        /// it moved onto a newer version left, so each key is read from the item it answers with.
-        static func kept(_ keys: some Collection<String>, after outcome: WriteOutcome, holding: [String: PropertyValue]?) -> [String: Kept]? {
+        /// it moved onto a newer version left, so each key is read from the item it answers with. An acceptance with no
+        /// item, as the package's fake copy gives, is taken as `left`, what the copy stored; an Undo still compares what
+        /// the copy shows (`undo(_:name:undoManager:)`). A conflict with none says nothing of which value stood.
+        static func kept(
+            _ keys: some Collection<String>, after outcome: WriteOutcome, holding: [String: PropertyValue]?,
+            left: [String: PropertyValue?]
+        ) -> [String: Kept]? {
             switch outcome {
-            case .accepted, .merged, .conflicted:
+            case .accepted, .merged:
+                return Dictionary(uniqueKeysWithValues: keys.map { key in (key, Kept.set(holding.map { $0[key] } ?? left[key] ?? nil)) })
+            case .conflicted:
                 return Dictionary(uniqueKeysWithValues: keys.map { key in (key, holding.map { Kept.set($0[key]) } ?? .unknown) })
             case .refused:
                 return Dictionary(uniqueKeysWithValues: keys.map { ($0, Kept.notMade) })
