@@ -219,16 +219,33 @@ import Testing
         try Data().write(to: points.folder)
         defaults.set("dark", forKey: AppearanceKey.theme)
         let libraries = libraries()
-        libraries.resetMacSettings()
+        var followed = false
+        libraries.resetMacSettings { followed = true }
         #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
         #expect(libraries.host.notices.waiting.map(\.title) == [String(localized: "Settings Not Reset")])
+        #expect(!followed)
     }
 
     @Test func resetShowsTheDefaultsInTheStoresAtOnce() throws {
         let libraries = libraries()
         libraries.sidebarLayouts.update(libraries.libraryKey) { $0.setHidden(.favorites, true) }
-        libraries.resetMacSettings()
+        var followed = false
+        libraries.resetMacSettings { followed = true }
         #expect(!libraries.sidebarLayouts.layout(for: libraries.libraryKey).isHidden(.favorites))
+        #expect(followed)
+    }
+
+    /// The defaults call `true` and `1` equal, so a point is told from the newest by its bytes.
+    @Test func aPointThatDiffersOnlyInAValuesTypeIsSaved() throws {
+        func snapshot(_ value: Any) throws -> SettingsSnapshot {
+            SettingsSnapshot(values: [InterfaceKey.textSize: try PropertyListSerialization.data(fromPropertyList: value, format: .binary, options: 0)])
+        }
+        try points.save(try snapshot(true), reason: .reset, build: "")
+        #expect(try points.save(try snapshot(1), reason: .reset, build: "") != nil)
+        #expect(try points.save(try snapshot(1), reason: .reset, build: "") == nil)
+        #expect(points.list().count == 2)
+        #expect(try points.snapshot(of: points.list()[0].id) == (try snapshot(1)))
+        #expect(try points.snapshot(of: points.list()[1].id) == (try snapshot(true)))
     }
 
     @Test func theNewestTenAreKeptAndAnUnreadablePointIsLeftOut() throws {

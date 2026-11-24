@@ -43,7 +43,10 @@ nonisolated struct RestorePoint: Equatable, Identifiable, Sendable {
 /// is, and the settings that stay on this Mac are held too, so a restore puts back whatever Reset, an import or a sync
 /// step replaced.
 nonisolated struct SettingsSnapshot: Equatable, Sendable {
-    /// Each value as a binary property list, by defaults key.
+    /// Each value as a binary property list, by defaults key. Two snapshots are equal only where these bytes are: decoded
+    /// values compare `true` equal to `1` and `1.0`, so a point that differs only in a value's type would be taken for the
+    /// same and not saved. The app's settings are scalars, data and arrays, whose bytes do not change while they do; a
+    /// dictionary's may follow the order of its keys, which at worst saves a second point, never drops one.
     let values: [String: Data]
 
     init(values: [String: Data]) { self.values = values }
@@ -64,14 +67,6 @@ nonisolated struct SettingsSnapshot: Equatable, Sendable {
     /// The value the snapshot holds for `key`, as the defaults keep it.
     func value(forKey key: String) -> Any? {
         values[key].flatMap { try? PropertyListSerialization.propertyList(from: $0, format: nil) }
-    }
-
-    /// Two snapshots are the same where they hold the same values, however each was written.
-    static func == (lhs: SettingsSnapshot, rhs: SettingsSnapshot) -> Bool {
-        guard lhs.values.keys == rhs.values.keys, let left = lhs.decoded(), let right = rhs.decoded() else {
-            return lhs.values == rhs.values
-        }
-        return NSDictionary(dictionary: left).isEqual(to: right)
     }
 
     /// Every value as the defaults keep it, or nil where any cannot be read.

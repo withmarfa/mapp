@@ -112,14 +112,16 @@ import MarfaTesting
     /// which Restore Earlier Settings… brings back; where it cannot be, nothing changes and the person is told.
     ///
     /// It runs between sync steps (`PreferencesSync.resetBetweenSteps`): at once where none is under way, else as soon as
-    /// the one under way ends, so no step writes what it read before over the defaults.
-    func resetMacSettings() {
+    /// the one under way ends, so no step writes what it read before over the defaults. `then` runs once the settings
+    /// are reset, and never where they are not, so what follows Reset outside the defaults never runs without it.
+    func resetMacSettings(then done: @escaping @MainActor () -> Void = {}) {
         preferences.resetBetweenSteps { [preferences, shortcuts, anyAppShortcuts, defaults] () throws(RestorePoints.Failure) in
             try preferences.saveRestorePoint(.reset)
             shortcuts.restoreDefaults()
             anyAppShortcuts.clearAll()
             MacSettings.reset(in: defaults)
             preferences.replaced(PreferencesMap.synced)
+            done()
         } notSaved: { [notices = host.notices] in
             notices.tell(
                 String(localized: "Settings Not Reset"),

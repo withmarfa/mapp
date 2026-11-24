@@ -497,6 +497,29 @@ import Testing
         #expect(PreferencesSync.Record.read(defaults).winning == nil)
     }
 
+    /// Another Mac's value that a step wrote into the defaults stays the Marfa's when the copy then refuses this Mac's
+    /// write: the retry takes that Mac's later change and never sends the earlier value back as this Mac's.
+    @Test func anotherMacsValueTakenBeforeARefusedWriteIsNotSentBack() async throws {
+        defaults.set("system", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        sync.detach()
+        await copy.change(item, [theme: #""dark""#])
+        let file = SettingsFile(units: [placement: #"{"pins":["due_at"]}"#], build: "", date: .now)
+        try await sync.importSettings(file, sections: [SettingsFile.Section(placement)])
+        await copy.refuseNextWrite(to: .types)
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+        #expect(await copy.unitsHeld(item)[placement] == nil)
+        await copy.change(item, [theme: #""light""#])
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "light")
+        #expect(await copy.unitsHeld(item)[theme] == #""light""#)
+        #expect(await copy.unitsHeld(item)[placement] == #"{"pins":["due_at"]}"#)
+    }
+
     /// A value an import skipped is what this Mac held, not the import's, so it does not win over another Mac's change.
     @Test func aValueAnImportSkippedDoesNotWin() async throws {
         defaults.set("dark", forKey: AppearanceKey.theme)
@@ -525,7 +548,8 @@ import Testing
         sync.attach(copy, library: "marfa:https://one", name: { nil })
         await sync.flush()
         let item = try #require(await copy.activeIDs.first)
-        await copy.whileReading { libraries.resetMacSettings() }
+        var followed = false
+        await copy.whileReading { libraries.resetMacSettings { followed = true } }
         await copy.change(item, [theme: #""light""#])
         await sync.flush()
         let reset = try await eventuallyAsking {
@@ -533,7 +557,35 @@ import Testing
             return await copy.unitsHeld(item)[theme] == nil
         }
         #expect(reset)
+        #expect(followed)
         #expect(try saved().map(\.0) == [.firstSync, .reset])
+    }
+
+    /// Reset that waits for a step and then cannot save its point changes nothing, and what follows it does not run.
+    @Test func resetThatWaitsAndCannotSaveItsPointRunsNothingAfter() async throws {
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        let bench = HostBench()
+        let libraries = Libraries(
+            host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, syncsPreferences: true, restorePoints: points,
+            defaultsDomain: suite)
+        let sync = libraries.preferences
+        let copy = FakePreferencesCopy()
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        var followed = false
+        await copy.whileReading { [points] in
+            // A file where the points' folder was, so the point Reset saves after the step cannot be written.
+            try? FileManager.default.removeItem(at: points.folder)
+            try? Data().write(to: points.folder)
+            libraries.resetMacSettings { followed = true }
+        }
+        let item = try #require(await copy.activeIDs.first)
+        await copy.change(item, [accent: #""blue""#])
+        await sync.flush()
+        let told = await eventually { libraries.host.notices.waiting.map(\.title) == [String(localized: "Settings Not Reset")] }
+        #expect(told)
+        #expect(!followed)
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
     }
 
     /// A step that tries again after a refused write saves no second copy of the same point, which would push a real

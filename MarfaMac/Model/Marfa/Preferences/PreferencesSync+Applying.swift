@@ -5,14 +5,15 @@ extension PreferencesSync {
     /// Writes `outcome` to this Mac and the item, and records in `adopted` what both now hold, the field write that
     /// waits for its answer, and each setting a store dropped when it read it again.
     ///
-    /// `queued` is told after each write to the item is queued, with `adopted` as it stands then, whose base holds
-    /// what was read before for each unit still to be written, and with those units, so a write the copy refuses later
-    /// leaves a record that sends only what that write carried again.
+    /// `progress` is told once the defaults hold what this step wrote into them, before any write to the item, and again
+    /// after each write to the item is queued: with `adopted` as it stands then, whose base is `outcome.merged`, and with
+    /// the units still to be written, whose base the caller keeps as it reconciled them. A write the copy refuses later then
+    /// leaves a record that sends only what that write carried again, and never takes another Mac's value this step wrote
+    /// into the defaults for a change of this Mac's.
     func apply(_ outcome: PreferencesMerge.Outcome, to item: PreferencesItem, local: Local, adopted: inout Record.Adopted,
                retrying: Set<PreferenceUnit>, in copy: any PreferencesCopy,
-               queued: ((Record.Adopted, Set<PreferenceUnit>) -> Void)? = nil) async throws
+               progress: ((Record.Adopted, Set<PreferenceUnit>) -> Void)? = nil) async throws
     {
-        let earlier = adopted.base
         // A dropped setting the Marfa has not changed keeps what the store left, so it is not set aside again.
         let kept = adopted.frozen.filter { unit, _ in !retrying.contains(unit) && outcome.merged[unit] == adopted.base[unit] }
         var written = outcome.merged.filter { PreferenceJSON.value($0.value) != nil }
@@ -36,6 +37,7 @@ extension PreferencesSync {
         adopted.frozenBuild = build
         adopted.base = outcome.merged
         var unsent = outcome.toRemote
+        if !settings.isEmpty { progress?(adopted, unsent) }
         let fields = Self.fields(of: outcome.merged, changing: outcome.toRemote)
         if !fields.isEmpty {
             let write = try await copy.update(item.id, fields: fields, readAt: item.version)
@@ -43,20 +45,12 @@ extension PreferencesSync {
                 run: copy.run, order: adopted.writes, members: Self.members(outcome.merged, in: outcome.toRemote))
             adopted.writes += 1
             unsent = unsent.filter { if case .member = $0 { false } else { true } }
-        }
-        guard let queued else {
-            return try await writeRows(outcome.toRemote, of: outcome.merged, to: item, in: copy)
+            progress?(adopted, unsent)
         }
         let sent = adopted
-        func tell() {
-            var partial = sent
-            for unit in unsent { partial.base[unit] = earlier[unit] }
-            queued(partial, unsent)
-        }
-        if !fields.isEmpty { tell() }
         try await writeRows(outcome.toRemote, of: outcome.merged, to: item, in: copy) { table in
             unsent = unsent.filter { if case .row(table, _, _) = $0 { false } else { true } }
-            tell()
+            progress?(sent, unsent)
         }
     }
 

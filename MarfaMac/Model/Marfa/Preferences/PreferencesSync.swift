@@ -452,8 +452,9 @@ final class PreferencesSync {
     /// switch from another Marfa the defaults hold that Marfa's settings, which are no change of this Mac's, so this
     /// Marfa's settings are written into them whole. Otherwise this Mac's value of each setting in `winning`
     /// (`Record.winning`) is written wherever it differs from the Marfa's, but for the units its mark leaves out. Once
-    /// each write to the item is queued, the record is saved with what it carried and the marks of the settings it
-    /// finished cleared, so a later write the copy refuses sends only its own again, never over a change made since.
+    /// another Mac's values are in the defaults, and again once each write to the item is queued, the record is saved
+    /// with what both hold and the marks of the settings finished cleared, so a later write the copy refuses sends only
+    /// its own again, never over a change made since, and never sends another Mac's value back as this Mac's.
     ///
     /// A field write this Mac queued is judged by its answer, not by what reaches the copy first: until it is answered,
     /// no other Mac's value of a member it carries is taken; once the server answers that it kept another Mac's field
@@ -522,8 +523,12 @@ final class PreferencesSync {
         outcome.toLocal.formUnion(retrying)
         if switched { outcome.toLocal.formUnion(Set(local.units.keys).union(outcome.merged.keys)) }
         try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: retrying, in: copy) {
-            [defaults] partial, unsent in
+            [defaults, before] partial, unsent in
             var record = Record.read(defaults)
+            var partial = partial
+            // What is still to be written keeps the base it was reconciled against, so the next step decides it as this
+            // one did: a member another Mac's write beat is still sent again, though its answer is taken.
+            for unit in unsent { partial.base[unit] = before[unit] }
             record.marfas[instance] = partial
             // A switch wrote this Marfa's settings into the defaults before any write to the item.
             if switched { record.last = instance }
