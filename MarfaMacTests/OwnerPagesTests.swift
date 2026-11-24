@@ -58,10 +58,12 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var fileStores = FileStores(stores: [], orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
         var sources: [OwnerSource] = []
         var sourceLimit = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: nil)
-        /// What each Limit Sources write sent: the filter, or nil for turning it off.
-        var limitsSent: [SourceRuleValue?] = []
-        /// What each Who May Write write sent: the allow-list, or nil for turning it off.
-        var allowlistsSent: [SourceRuleValue?] = []
+        /// The levers each enforcement write sent.
+        var leversSent: [SourceLimit] = []
+        /// What each enforcement write sent as Limit Sources, nil for off.
+        var filtersSent: [SourceRuleValue?] { leversSent.map { $0.value(of: .filter) } }
+        /// What each enforcement write sent as Who May Write, nil for off.
+        var allowlistsSent: [SourceRuleValue?] { leversSent.map { $0.value(of: .allowlist) } }
         /// Run as a source limit write arrives, to let a test move the server under it.
         var beforeLimitWrite: (@Sendable () -> Void)?
         var webhooks: [OwnerWebhook] = []
@@ -426,42 +428,16 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return state.withLock { $0.sourceLimit }
     }
 
-    func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit {
+    func setSourceLimit(_ levers: SourceLimit) async throws(OwnerFailure) -> SourceLimit {
         try enter("setSourceLimit")
         await held("setSourceLimit")
         state.withLock { $0.beforeLimitWrite }?()
         return try state.withLock { state throws(OwnerFailure) in
-            guard state.sourceLimit.instanceID == limit.instanceID else { throw .instanceChanged }
-            state.limitsSent.append(filter.map { SourceRuleValue(types: $0.types, sources: $0.sources) })
+            guard state.sourceLimit.instanceID == levers.instanceID else { throw .instanceChanged }
             // The server replaces the enforcement whole, so every lever becomes what was sent.
-            var written = limit
-            written.isOn = filter != nil
-            written.types = filter?.types ?? []
-            written.sources = filter?.sources ?? []
-            state.sourceLimit = written
-            return written
-        }
-    }
-
-    func setSourceRule(_ rule: SourceRule, of limit: SourceLimit, to value: SourceRuleValue?) async throws(OwnerFailure) -> SourceLimit {
-        try enter("setSourceRule")
-        state.withLock { $0.beforeLimitWrite }?()
-        return try state.withLock { state throws(OwnerFailure) in
-            guard state.sourceLimit.instanceID == limit.instanceID else { throw .instanceChanged }
-            // The server replaces the enforcement whole, so every lever becomes what was sent.
-            var written = limit
-            switch rule {
-            case .filter:
-                state.limitsSent.append(value)
-                written.isOn = value != nil
-                written.types = value?.types ?? []
-                written.sources = value?.sources ?? []
-            case .allowlist:
-                state.allowlistsSent.append(value)
-                written.allowlist = value.map { ($0.types, $0.sources) }
-            }
-            state.sourceLimit = written
-            return written
+            state.leversSent.append(levers)
+            state.sourceLimit = levers
+            return levers
         }
     }
 

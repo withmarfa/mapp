@@ -27,23 +27,36 @@ import Testing
         return SourceLimitModel(rule: .allowlist, context: bench.context)
     }
 
-    @Test func eachRuleIsSentWithTheOtherLeversAsTheyWereRead() throws {
-        let allowlist = try #require(ClientOwnerCalls.enforcement(read, setting: .allowlist, to: SourceRuleValue(types: ["core.bookmark"], sources: ["readwise"])).value)
-        #expect(allowlist.sourceAllowlist?.types == ["core.bookmark"])
-        #expect(allowlist.sourceAllowlist?.sources == ["readwise"])
-        #expect(allowlist.sourceFilter?.types == ["core.highlight"])
-        #expect(allowlist.sourceFilter?.sources == ["readwise"])
-        #expect(allowlist.strictMode?.types == ["core.task"])
+    /// Each rule is written through the one enforcement writer, which sends the other levers as it read them.
+    @Test func eachRuleIsSentWithTheOtherLeversAsTheyWereRead() async throws {
+        let bench = OwnerBench(grants: [.configManage])
+        bench.calls.state.withLock { [read] in $0.sourceLimit = read }
+        let writers = model(bench)
+        await writers.load()
+        writers.types = ["core.bookmark"]
+        writers.checkedSources = ["readwise"]
+        await writers.save()
+        let allowlist = try #require(bench.calls.state.withLock { $0.leversSent.last })
+        let allowlistBody = try #require(ClientOwnerCalls.enforcement(allowlist).value)
+        #expect(allowlistBody.sourceAllowlist?.types == ["core.bookmark"])
+        #expect(allowlistBody.sourceAllowlist?.sources == ["readwise"])
+        #expect(allowlistBody.sourceFilter?.types == ["core.highlight"])
+        #expect(allowlistBody.sourceFilter?.sources == ["readwise"])
+        #expect(allowlistBody.strictMode?.types == ["core.task"])
 
-        let filter = try #require(ClientOwnerCalls.enforcement(read, setting: .filter, to: nil).value)
-        #expect(filter.sourceFilter == nil)
-        #expect(filter.sourceAllowlist?.types == ["core.note"])
-        #expect(filter.sourceAllowlist?.sources == ["rss"])
-        #expect(filter.strictMode?.types == ["core.task"])
+        let limit = SourceLimitModel(rule: .filter, context: bench.context)
+        await limit.load()
+        await limit.turnOff()
+        let filter = try #require(bench.calls.state.withLock { $0.leversSent.last })
+        let filterBody = try #require(ClientOwnerCalls.enforcement(filter).value)
+        #expect(filterBody.sourceFilter == nil)
+        #expect(filterBody.sourceAllowlist?.types == ["core.bookmark"])
+        #expect(filterBody.sourceAllowlist?.sources == ["readwise"])
+        #expect(filterBody.strictMode?.types == ["core.task"])
 
         // Turning off the last lever sends no enforcement at all.
-        let alone = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: (["core.note"], ["rss"]))
-        #expect(ClientOwnerCalls.enforcement(alone, setting: .allowlist, to: nil) == .null)
+        let alone = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: nil)
+        #expect(ClientOwnerCalls.enforcement(alone) == .null)
     }
 
     @Test func savingSendsTheAllowListAndLeavesLimitSourcesAsItWas() async {
@@ -60,7 +73,6 @@ import Testing
         let sent = bench.calls.state.withLock { $0.allowlistsSent }
         let held = bench.calls.state.withLock { $0.sourceLimit }
         #expect(sent == [SourceRuleValue(types: ["core.bookmark", "core.note"], sources: ["readwise", "rss"])])
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
         #expect(held.value(of: .filter) == SourceRuleValue(types: ["core.highlight"], sources: ["readwise"]))
         #expect(held.strictTypes == ["core.task"])
         #expect(!model.hasEdits)
@@ -95,7 +107,7 @@ import Testing
         bench.calls.state.withLock { $0.sourceLimit.allowlist = (["core.note"], ["github"]) }
         await model.save()
 
-        #expect(bench.calls.state.withLock { $0.allowlistsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
         #expect(model.line?.hasPrefix("Who May Write was changed somewhere else") == true)
         #expect(model.value?.sources == ["github"])
     }
@@ -113,7 +125,7 @@ import Testing
         #expect(model.waitsFor != nil)
         #expect(!model.canSave)
         await model.save()
-        #expect(bench.calls.state.withLock { $0.allowlistsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
     }
 
     @Test func theChoicesHoldKeysAndAppsThatHaveWrittenNothingAndALimitedSource() async {
@@ -138,7 +150,7 @@ import Testing
         #expect(model.canSave)
         bench.calls.state.withLock { $0.keys = [Self.key("rss")] }
         await model.save()
-        #expect(bench.calls.state.withLock { $0.allowlistsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
         #expect(model.line != nil)
         #expect(model.checkedSources == ["readwise"])
     }
@@ -151,7 +163,7 @@ import Testing
         #expect(model.waitsFor != nil)
         #expect(!model.canSave)
         await model.save()
-        #expect(bench.calls.state.withLock { $0.allowlistsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
     }
 }
 

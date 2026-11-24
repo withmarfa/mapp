@@ -78,19 +78,23 @@ extension LiveMarfaTests {
             let before = try await calls.sourceLimit()
             var result: Result<Void, any Error> = .success(())
             do {
-                let written = try await calls.setSourceRule(.filter, of: before, to: SourceRuleValue(types: ["core.bookmark"], sources: ["demo-seed"]))
+                var filter = before
+                filter.set(.filter, to: SourceRuleValue(types: ["core.bookmark"], sources: ["demo-seed"]))
+                let written = try await calls.setSourceLimit(filter)
                 #expect(written.isOn)
                 #expect(written.types == ["core.bookmark"])
                 #expect(written.sources == ["demo-seed"])
                 #expect(written.strictTypes == before.strictTypes, "the levers not changed went back as they were")
                 #expect(written.allowlist?.types == before.allowlist?.types)
-                let off = try await calls.setSourceRule(.filter, of: written, to: nil)
-                #expect(!off.isOn)
+                var off = written
+                off.set(.filter, to: nil)
+                #expect(try await !calls.setSourceLimit(off).isOn)
             } catch {
                 result = .failure(error)
             }
-            let now = try await calls.sourceLimit()
-            _ = try await calls.setSourceRule(.filter, of: now, to: before.value(of: .filter))
+            var now = try await calls.sourceLimit()
+            now.set(.filter, to: before.value(of: .filter))
+            _ = try await calls.setSourceLimit(now)
             try result.get()
         }
     }

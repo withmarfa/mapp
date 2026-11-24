@@ -50,12 +50,24 @@ nonisolated struct SourceRuleValue: Hashable, Sendable {
     var sources: [String]
 }
 
-extension SourceLimit {
+nonisolated extension SourceLimit {
     /// What `rule` holds as read, or nil where it is not set.
     func value(of rule: SourceRule) -> SourceRuleValue? {
         switch rule {
         case .filter: isOn ? SourceRuleValue(types: types, sources: sources) : nil
         case .allowlist: allowlist.map { SourceRuleValue(types: $0.types, sources: $0.sources) }
+        }
+    }
+
+    /// Sets `rule` alone, or turns it off with nil.
+    mutating func set(_ rule: SourceRule, to value: SourceRuleValue?) {
+        switch rule {
+        case .filter:
+            isOn = value != nil
+            types = value?.types ?? []
+            sources = value?.sources ?? []
+        case .allowlist:
+            allowlist = value.map { ($0.types, $0.sources) }
         }
     }
 }
@@ -64,9 +76,10 @@ extension SourceLimit {
 /// lists, search, exports and webhooks; Who May Write, for exactly the types checked every app and key adds items only under
 /// the sources checked. Its sources are every one the instance holds and those of every current key and app, so a source a
 /// filter hides can be checked again, and Who May Write refuses a list no current key or app could write under. Each is
-/// written whole after a fresh read: a change made elsewhere to the rule before the write is told and
-/// not written over, and the other levers are sent as that read found them. Another Marfa answering at the address is told in the settings page's words and the
-/// draft starts again from it, so what was chosen for one Marfa is never written to another. Turning a rule off removes it.
+/// written through `EnforcementSettings`: a change made elsewhere to the rule since the page read it is told and not written
+/// over, and the other levers go back as the server then holds them. Another Marfa answering at the address is told in the
+/// settings page's words and the draft starts again from it, so what was chosen for one Marfa is never written to another.
+/// Turning a rule off removes it.
 @Observable @MainActor final class SourceLimitModel: OwnerDraftHolding {
     struct Choice: Identifiable, Hashable {
         let code: String
@@ -208,35 +221,37 @@ extension SourceLimit {
         isSaving = true
         line = nil
         defer { isSaving = false }
-        do {
-            // The server guards only which instance is written, not the levers, so they are read again just before: this rule
-            // changed elsewhere since is told, not written over, and the other levers go back as they are now, as a type's Strict
-            // switch sends these rules back.
-            let current = try await context.calls.sourceLimit()
-            if let was = limit.instanceID, let now = current.instanceID, was != now {
-                await anotherMarfa()
-                return
-            }
-            guard current.value(of: rule) == limit.value(of: rule) else {
-                self.limit = current
-                line = changedElsewhere
-                return
-            }
-            // A key or app may have ended since the page read them, so who could still write is read again too.
-            if rule == .allowlist, let value {
+        // A key or app may have ended since the page read them, so who could still write is read again first.
+        if rule == .allowlist, let value {
+            do {
                 let now = try await readWriters()
                 writers = now
                 if let lockout = Self.lockout(now, Set(value.sources)) {
                     line = lockout
                     return
                 }
+            } catch {
+                await refused(error)
+                return
             }
-            let written = try await context.calls.setSourceRule(rule, of: current, to: value)
+        }
+        let rule = rule
+        let shown = limit.value(of: rule)
+        do throws(EnforcementSettings.Failure) {
+            let written = try await context.writeEnforcement(
+                readFrom: limit.instanceID, unchangedSince: { $0.value(of: rule) == shown }
+            ) { $0.set(rule, to: value) }
             self.limit = written
             types = Set(written.value(of: rule)?.types ?? [])
             checkedSources = Set(written.value(of: rule)?.sources ?? [])
         } catch {
-            await refused(error)
+            switch error {
+            case .owner(let failure): await refused(failure)
+            case .changedElsewhere(let levers):
+                self.limit = levers
+                line = changedElsewhere
+            case .anotherMarfa: await anotherMarfa()
+            }
         }
     }
 

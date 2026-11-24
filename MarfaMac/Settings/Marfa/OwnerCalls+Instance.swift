@@ -65,31 +65,22 @@ extension ClientOwnerCalls {
         try await run { client in Self.limit(try await client.getConfig().ok.body.json) }
     }
 
-    func setSourceRule(_ rule: SourceRule, of limit: SourceLimit, to value: SourceRuleValue?) async throws(OwnerFailure) -> SourceLimit {
+    func setSourceLimit(_ levers: SourceLimit) async throws(OwnerFailure) -> SourceLimit {
         try await run(plainConflict: Self.configConflict) { client in
             var body = Operations.UpdateConfig.Input.Body.JsonPayload()
-            body.enforcement = Self.enforcement(limit, setting: rule, to: value)
+            body.enforcement = Self.enforcement(levers)
             return Self.limit(
-                try await client.updateConfig(headers: .init(xMarfaInstanceId: limit.instanceID), body: .json(body)).ok.body.json)
+                try await client.updateConfig(headers: .init(xMarfaInstanceId: levers.instanceID), body: .json(body)).ok.body.json)
         }
     }
 
-    /// The enforcement a write sends: `rule` as given and the other levers as `limit` read them, since sending the enforcement
-    /// replaces all three.
-    static func enforcement(
-        _ limit: SourceLimit, setting rule: SourceRule, to value: SourceRuleValue?
-    ) -> MarfaNullable<Components.Schemas.MarfaInlineaeb0b69539bcab54> {
-        var filter = limit.isOn ? SourceRuleValue(types: limit.types, sources: limit.sources) : nil
-        var allowlist = limit.allowlist.map { SourceRuleValue(types: $0.types, sources: $0.sources) }
-        switch rule {
-        case .filter: filter = value
-        case .allowlist: allowlist = value
-        }
-        var levers = Components.Schemas.MarfaInlineaeb0b69539bcab54()
-        levers.strictMode = limit.strictTypes.map { .init(types: $0) }
-        levers.sourceAllowlist = allowlist.map { .init(types: $0.types, sources: $0.sources) }
-        levers.sourceFilter = filter.map { .init(types: $0.types, sources: $0.sources) }
-        let empty = levers.strictMode == nil && levers.sourceAllowlist == nil && levers.sourceFilter == nil
-        return empty ? .null : .value(levers)
+    /// The enforcement a write sends: all three levers as `levers` holds them, or none where none is set.
+    static func enforcement(_ levers: SourceLimit) -> MarfaNullable<Components.Schemas.MarfaInlineaeb0b69539bcab54> {
+        var sent = Components.Schemas.MarfaInlineaeb0b69539bcab54()
+        sent.strictMode = levers.strictTypes.map { .init(types: $0) }
+        sent.sourceAllowlist = levers.allowlist.map { .init(types: $0.types, sources: $0.sources) }
+        sent.sourceFilter = levers.isOn ? .init(types: levers.types, sources: levers.sources) : nil
+        let empty = sent.strictMode == nil && sent.sourceAllowlist == nil && sent.sourceFilter == nil
+        return empty ? .null : .value(sent)
     }
 }

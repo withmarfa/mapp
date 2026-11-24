@@ -13,11 +13,11 @@ import Marfa
 /// 4. stops, sending nothing, where the sign-in no longer holds `config.manage`;
 /// 5. sends what was just read with only `change` made to it, so the other levers go back as the server holds them.
 ///
-/// Strict writes through it now. A source rule (the filter, the allow-list) joins by calling
-/// `context.writeEnforcement(readFrom:unchangedSince:_:)` with the instance its page was read from, an `unchangedSince` that
-/// compares only its own lever with what the page showed, and a `change` that sets only that lever on the levers it is
-/// handed; the page then shows the `SourceLimit` it answers. The window between the read and the write stays open across
-/// clients, as the API has no precondition for a configuration write (withmarfa/marfa#3535).
+/// Strict, Limit Sources and Who May Write each call `context.writeEnforcement(readFrom:unchangedSince:_:)` with the instance
+/// its page was read from, an `unchangedSince` that compares only its own lever with what the page showed, and a `change`
+/// that sets only that lever on the levers it is handed; the page then shows the `SourceLimit` it answers. No other code
+/// sends the enforcement. The window between the read and the write stays open across clients, as the API has no
+/// precondition for a configuration write (withmarfa/marfa#3535).
 @MainActor final class EnforcementSettings {
     /// The writer every page of the app shares. A test's context makes its own.
     static let app = EnforcementSettings()
@@ -48,7 +48,7 @@ import Marfa
         guard context.grants().contains(.configManage) else { throw .owner(.notPermitted(InstancePermission.configManage.rawValue)) }
         change(&levers)
         do {
-            return try await context.calls.setSourceLimit(levers, to: levers.isOn ? (levers.types, levers.sources) : nil)
+            return try await context.calls.setSourceLimit(levers)
         } catch {
             throw Self.failure(error)
         }

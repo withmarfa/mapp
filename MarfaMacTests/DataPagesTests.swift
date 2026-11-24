@@ -464,7 +464,7 @@ import Testing
         model.checkedSources = ["rss", "readwise"]
         #expect(model.canSave)
         await model.save()
-        let sent = bench.calls.state.withLock { $0.limitsSent }
+        let sent = bench.calls.state.withLock { $0.filtersSent }
         #expect(sent.count == 1)
         #expect(sent.first??.types == ["core.note"])
         #expect(sent.first??.sources == ["readwise", "rss"])
@@ -479,7 +479,7 @@ import Testing
         model.types = ["core.note"]
         #expect(!model.canSave)
         await model.save()
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
     }
 
     @Test func savingWithEveryTypeUncheckedAsksFirstAndSendsNothing() async {
@@ -493,7 +493,7 @@ import Testing
         #expect(model.canSave)
         #expect(model.saveTurnsOff)
         await model.save()
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
         #expect(model.isOn)
     }
 
@@ -505,7 +505,7 @@ import Testing
         let model = model(bench, sources: rows)
         await model.load()
         await model.turnOff()
-        let sent = bench.calls.state.withLock { $0.limitsSent }
+        let sent = bench.calls.state.withLock { $0.filtersSent }
         #expect(sent.count == 1)
         #expect(sent.first! == nil)
         #expect(!model.isOn)
@@ -529,7 +529,7 @@ import Testing
         #expect(model.types == ["core.note"])
         #expect(model.checkedSources == ["rss"])
         #expect(model.limit?.types == ["core.highlight"])
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
     }
 
     @Test func anotherMarfaAnsweringAtTheWriteIsToldAndTheDraftStartsAgainFromIt() async {
@@ -560,7 +560,7 @@ import Testing
         #expect(model.checkedSources == ["readwise"])
         #expect(!model.hasEdits)
         #expect(model.typeChoices.map(\.code) == ["core.highlight"])
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
     }
 
     @Test func anotherMarfaFoundWhenTheLimitIsReadBeforeTheWriteGetsNoWrite() async {
@@ -578,7 +578,7 @@ import Testing
         #expect(model.types == ["core.highlight"])
         #expect(model.checkedSources == ["readwise"])
         #expect(!model.hasEdits)
-        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        #expect(bench.calls.state.withLock { $0.leversSent.isEmpty })
         // Saving again sends nothing of the first instance's choice.
         #expect(!model.canSave)
     }
@@ -589,7 +589,7 @@ import Testing
         await model.load()
         model.types = ["core.note"]
         model.checkedSources = ["rss"]
-        bench.calls.fail("setSourceRule", with: .notPermitted("config.manage"))
+        bench.calls.fail("setSourceLimit", with: .notPermitted("config.manage"))
         await model.save()
         #expect(bench.refreshed == 1)
         #expect(model.line == OwnerWording.line(.notPermitted("config.manage")))
