@@ -7,9 +7,8 @@ import Foundation
 /// with evidence that this sign-in reaches it. A hydration refused all the same is made again without it, and the type
 /// stays out until the sign-in changes (`MarfaSync`).
 ///
-/// - The server holds the type: the sign-in holds a scope that names the vendor or `app.*:write`, whichever the server
-///   offered when it asked (`SystemSignIns.scopes(offered:)`); or the copy already holds the type, as the sign-in that registered it does, since the
-///   vendor's holder reaches it without naming it (`keys-and-oauth/app-reaches-own-vendor`).
+/// - The server holds the type: the sign-in holds the vendor scope or `app.*:write`, or the copy already holds the type.
+///   The vendor's holder reaches it without naming it (`keys-and-oauth/app-reaches-own-vendor`).
 /// - The server holds no type yet: the sign-in may register it (`PreferencesType.registeringScope`). The server offers no
 ///   scope naming the vendor while no type sits under it (`keys-and-oauth/app-vendor-not-named`), so the first Mac asks for
 ///   `app.*:write`; registering makes it the vendor's holder.
