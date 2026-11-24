@@ -115,6 +115,9 @@
         }
       }
     },
+    "%@ answered a link that can’t be pasted safely." : {
+
+    },
     "%@ answers on it too." : {
 
     },
@@ -211,6 +214,16 @@
     },
     "%@ is required." : {
       "extractionState" : "manual"
+    },
+    "%@ is set to run on “%@”, and its one-time link can’t be shown again. If you didn’t paste its command there, choose No Machine on %@’s page, then add it again on “%@”." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is set to run on “%2$@”, and its one-time link can’t be shown again. If you didn’t paste its command there, choose No Machine on %3$@’s page, then add it again on “%4$@”."
+          }
+        }
+      }
     },
     "%@ is still connected." : {
 
@@ -1825,6 +1838,9 @@
     "Add Column Before" : {
 
     },
+    "Add Connector" : {
+
+    },
     "Add Entry" : {
       "extractionState" : "manual"
     },
@@ -1883,6 +1899,12 @@
 
     },
     "Add a Choice" : {
+
+    },
+    "Add a Connector" : {
+
+    },
+    "Add a Connector…" : {
 
     },
     "Add a Fact" : {
@@ -3089,6 +3111,9 @@
     "Command Palette, Search Items and Quick Add." : {
 
     },
+    "Command to Paste There" : {
+
+    },
     "Commands" : {
 
     },
@@ -3153,6 +3178,9 @@
 
     },
     "Connector Deliveries, Waiting" : {
+
+    },
+    "Connector Link Not Shown Again" : {
 
     },
     "Connectors" : {
@@ -3963,6 +3991,9 @@
     "Every group with items is hidden. Show a group in Edit View to see its items." : {
 
     },
+    "Every installed connector has a machine. A new one comes with its plugin." : {
+
+    },
     "Every item of this type, and of any type based on it, can hold it." : {
 
     },
@@ -4294,6 +4325,9 @@
 
     },
     "From a list or a search." : {
+
+    },
+    "From a plugin you’ve installed." : {
 
     },
     "From a web address, or one a chat attached." : {
@@ -4803,6 +4837,9 @@
     "It starts with the words and fields of the type it is based on, and adds its own." : {
 
     },
+    "It stops running until you choose a machine for it. Its settings and mapping are kept." : {
+
+    },
     "It stops running." : {
 
     },
@@ -4969,6 +5006,9 @@
 
     },
     "Its last run, %@, failed." : {
+
+    },
+    "Its link has ended." : {
 
     },
     "Its machine" : {
@@ -5398,6 +5438,9 @@
     "MB" : {
 
     },
+    "Machine Name" : {
+
+    },
     "Made %@." : {
 
     },
@@ -5759,6 +5802,9 @@
     "New Key…" : {
 
     },
+    "New Link" : {
+
+    },
     "New Password" : {
 
     },
@@ -6045,7 +6091,7 @@
     "No machine" : {
 
     },
-    "No machine is linked to run connectors yet." : {
+    "No machine runs connectors yet. Add a Connector… on Connectors links one." : {
 
     },
     "No more values" : {
@@ -6338,6 +6384,15 @@
 
     },
     "On" : {
+
+    },
+    "On %@" : {
+
+    },
+    "On Another Machine" : {
+
+    },
+    "On That Machine" : {
 
     },
     "On This Mac" : {
@@ -7371,6 +7426,9 @@
     "Running" : {
 
     },
+    "Runs" : {
+
+    },
     "Runs On" : {
 
     },
@@ -7748,6 +7806,9 @@
 
     },
     "Show Plugin" : {
+
+    },
+    "Show Plugins" : {
 
     },
     "Show Property" : {
@@ -8202,6 +8263,22 @@
     },
     "Tags: %@" : {
       "extractionState" : "manual"
+    },
+    "Take %@ off its machine?" : {
+
+    },
+    "Take %@ off “%@”?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Take %1$@ off “%2$@”?"
+          }
+        }
+      }
+    },
+    "Take Off" : {
+
     },
     "Taken" : {
 
@@ -8813,6 +8890,9 @@
 
     },
     "The limit was changed somewhere else. Nothing was sent. Check what you chose, then save again." : {
+
+    },
+    "The link works once and gives this machine its own key." : {
 
     },
     "The list can’t be saved while it holds an entry it doesn’t take. Correct or remove the entries marked in this list." : {
@@ -10226,6 +10306,9 @@
     "What %@ Means" : {
 
     },
+    "What %@ calls it." : {
+
+    },
     "What %@ may read and change." : {
 
     },
@@ -10325,6 +10408,9 @@
     "Where files are kept." : {
 
     },
+    "Where it can reach what it reads." : {
+
+    },
     "Where it put things, and any rewrite it asked for. Map it again if you install it later." : {
 
     },
@@ -10335,6 +10421,9 @@
 
     },
     "Where you sign in, and where apps connect." : {
+
+    },
+    "Which and Where" : {
 
     },
     "Who" : {

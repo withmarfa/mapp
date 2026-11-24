@@ -457,7 +457,7 @@ struct AddConnectorSheet: View {
                     }
                 }
                 if let placed = model.placed {
-                    SettingsSection(name: Text("On That Machine"), footer: Text("Its link works once and gives the connector its own key.")) {
+                    SettingsSection(name: Text("On That Machine"), footer: Text("The link works once and gives this machine its own key.")) {
                         if let command = model.command {
                             SettingsStackRow(title: Text("Command to Paste There")) {
                                 SettingsReadOnlyValue(text: command)
