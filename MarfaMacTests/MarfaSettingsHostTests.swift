@@ -53,7 +53,7 @@ import Testing
     /// `GET /profile` answers a field only to a credential holding its profile read scope, so Signed In As needs it at
     /// sign-in. It is a scope, not an owner permission.
     @Test func aSignInAsksForTheReadOfTheOwnersNameAndItIsNoOwnerPermission() async throws {
-        #expect(SystemSignIns.scopes.contains("profile.name:read"))
+        #expect(SystemSignIns.scopes(offered: []).contains("profile.name:read"))
         #expect(SystemSignIns.profileScopes.allSatisfy { InstancePermission(rawValue: $0) == nil })
         let bench = try HostBench()
         let (adapter, libraries, _) = try await connected(bench)
@@ -231,7 +231,7 @@ import Testing
         let bench = try HostBench()
         let (_, _, _) = try await connected(bench)
         #expect(!SystemSignIns.askedAtSignIn.contains(.signInsManage))
-        #expect(!SystemSignIns.scopes.contains(InstancePermission.signInsManage.rawValue))
+        #expect(!SystemSignIns.scopes(offered: []).contains(InstancePermission.signInsManage.rawValue))
     }
 
     @Test func closingSettingsHandsAnUnsavedDraftToTheNoticesAndDropsIt() async throws {

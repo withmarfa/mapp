@@ -30,6 +30,8 @@ nonisolated final class ScriptedSignIns: SignIns {
         var asked: [Set<InstancePermission>] = []
         /// The scopes each sign-in asked for besides those, as `SystemSignIns` asks them.
         var askedScopes: [[String]] = []
+        /// The scopes the server offers, which decide the scopes a sign-in asks for (`SystemSignIns.scopes(offered:)`).
+        var offered: Set<String> = []
     }
 
     private static let service = "\(AppPaths.bundleIdentifier).scripted-sign-ins"
@@ -85,6 +87,11 @@ nonisolated final class ScriptedSignIns: SignIns {
     /// Whether the sign-ins that follow are approved the read of the owner's name; the owner may leave it out.
     func script(approvingProfile: Bool) {
         state.withLock { $0.approvesProfile = approvingProfile }
+    }
+
+    /// The scopes the next sign-ins find the server offers; none, as a Marfa with no type under the app's vendor.
+    func script(offering scopes: Set<String>) {
+        state.withLock { $0.offered = scopes }
     }
 
     /// The scopes every browser or code sign-in asked for, as `SystemSignIns` asks them, in order.
@@ -186,7 +193,7 @@ nonisolated final class ScriptedSignIns: SignIns {
     /// Records what a sign-in asked for and answers which of it the owner approves.
     private static func take(asking permissions: Set<InstancePermission>, in state: inout State) -> Set<InstancePermission> {
         state.asked.append(permissions)
-        state.askedScopes.append(SystemSignIns.scopes)
+        state.askedScopes.append(SystemSignIns.scopes(offered: state.offered))
         let approving = state.approving.count > 1 ? state.approving.removeFirst() : state.approving.first
         let asked = SystemSignIns.askedAtSignIn.union(permissions)
         return approving.map { asked.intersection($0) } ?? asked

@@ -49,7 +49,7 @@ Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `in
 
 Nothing is decided until the hydration is complete, the sign-in reaches the type and every table is held whole; until then the defaults stay as they are and Connection says the settings are not ready.
 
-- **The sign-in lacks the permission** (a sign-in made before the settings synced holds neither `app.marfa-mac.*:write` nor `metadata.types:write`): nothing syncs, the defaults are untouched and Connection offers Allow More….
+- **The sign-in lacks the permission** (a sign-in made before the settings synced holds none of `app.marfa-mac.*:write`, `app.*:write` or `metadata.types:write`): nothing syncs, the defaults are untouched and Connection offers Allow More….
 - **Before the first write or adoption**, every synced key's value on this Mac is copied once into `preferencesBeforeSync`, kept until Reset.
 - **The Marfa holds no item, and this Mac never adopted a Marfa:** the item is made from this Mac's settings.
 - **The Marfa holds no item, and this Mac adopted another Marfa before:** the synced settings go back to the app's defaults and an empty item is made, so a new Marfa does not take another's arrangement.
