@@ -1,6 +1,93 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Apps and keys will read items from every source for the types you limited." : {
+
+    },
+    "Can’t Change Automatic Update Settings" : {
+
+    },
+    "Couldn’t Check the Webhook’s Key" : {
+
+    },
+    "Couldn’t Check Webhook Deliveries" : {
+
+    },
+    "Couldn’t Check Webhook Keys" : {
+
+    },
+    "Couldn’t Read Automatic Update Settings" : {
+
+    },
+    "Couldn’t Read Available Types" : {
+
+    },
+    "Couldn’t Read Backup Settings" : {
+
+    },
+    "Couldn’t Read Connector Machines" : {
+
+    },
+    "Couldn’t Read Database and File Sizes" : {
+
+    },
+    "Couldn’t Read Limit Sources" : {
+
+    },
+    "Couldn’t Read the Keys This App Made" : {
+
+    },
+    "Couldn’t Read the Last Backup" : {
+
+    },
+    "Couldn’t Check for Updates" : {
+
+    },
+    "Check your connection and try again." : {
+
+    },
+    "Try again in a moment." : {
+
+    },
+    "Couldn’t load that page of activity. %@" : {
+
+    },
+    "Only failed deliveries can be sent again." : {
+
+    },
+    "The app couldn’t read “%@” on this Mac. Choose another plugin bundle." : {
+
+    },
+    "The connector is paused. Resume it, then choose Run Now." : {
+
+    },
+    "The key or app that created this webhook no longer has access. Create a new webhook for future deliveries." : {
+
+    },
+    "This delivery expired and can’t be sent again." : {
+
+    },
+    "Turn on Sending to send this delivery again." : {
+
+    },
+    "Couldn’t Read the Total File Size" : {
+
+    },
+    "Couldn’t Read This Type’s Guidance" : {
+
+    },
+    "the key %@ (status unknown)" : {
+
+    },
+    "Turn Off Limit Sources?" : {
+
+    },
+    "Update %@?" : {
+
+    },
+    "%@ restarts to finish the update. The app reconnects when it’s back." : {
+
+    },
     "An earlier change to this item hasn’t reached the server yet." : {
       "extractionState" : "manual"
     },

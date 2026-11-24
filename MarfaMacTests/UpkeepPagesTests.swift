@@ -529,6 +529,32 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(bench.calls.calls.filter { $0 == "updateStatus" }.count == reads, "no read is made after the page has gone")
     }
 
+    @Test func closingDuringTheSettingsReadDoesNotStartAnotherFollower() async {
+        let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain, .configManage])
+        var running = ready()
+        running.progress = UpdateProgress(stage: .swapping, release: "0.0.85")
+        var finished = running
+        finished.running = "0.0.85"
+        finished.available = false
+        finished.progress = nil
+        bench.calls.state.withLock { $0.updateReads = [running, finished] }
+        let settings = bench.calls.hold("upkeepSettings")
+        let model = UpdatesModel(context: bench.context, pause: .zero)
+        let loading = Task { await model.load() }
+
+        #expect(await eventually { bench.calls.state.withLock { $0.waiting["upkeepSettings"] == 1 } })
+        #expect(model.hasLoaded)
+        #expect(model.status?.running == "0.0.85", "the update is followed before reading settings")
+        model.stop()
+        loading.cancel()
+        let reads = bench.calls.calls.filter { $0 == "updateStatus" }.count
+        settings.open()
+        await loading.value
+
+        #expect(!model.isFollowing)
+        #expect(bench.calls.calls.filter { $0 == "updateStatus" }.count == reads)
+    }
+
     @Test func anUpdateStartedWhileAnotherRunsFollowsTheOneThatRuns() async {
         let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain, .configManage])
         var running = ready()

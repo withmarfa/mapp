@@ -102,6 +102,11 @@ struct ConnectorsPage: View {
                 SettingsSection(
                     name: Text("Connectors"), footer: Text("A connector comes with its plugin. Its settings and secrets are kept in \(host.serverName).")
                 ) {
+                    if let failure = model.hostsFailure {
+                        OwnerProblemRow(
+                            title: "Couldn’t Read Connector Machines", failure: failure, page: .connectors, host: host,
+                            retry: { Task { await model.load() } })
+                    }
                     ForEach(model.entries) { entry in
                         let health = model.health(of: entry)
                         SettingsLinkRow(
@@ -220,8 +225,15 @@ private struct ConnectorDetail: View {
     }
 
     @ViewBuilder private var machine: some View {
+        if let failure = model.hostsFailure {
+            OwnerProblemRow(
+                title: "Couldn’t Read Connector Machines", failure: failure, page: .connectors, host: host,
+                retry: { Task { await model.reload(summary.name) } })
+        }
         if model.hosts.isEmpty {
-            SettingsRow("Runs On", line: "No machine is linked to run connectors yet.") { SettingsValue("No Machine") }
+            if model.hostsFailure == nil {
+                SettingsRow("Runs On", line: "No machine is linked to run connectors yet.") { SettingsValue("No Machine") }
+            }
         } else {
             SettingsRow("Runs On") {
                 SettingsPopUp(
@@ -236,7 +248,7 @@ private struct ConnectorDetail: View {
                     if entry.control?.host == nil || !model.hosts.isEmpty { Divider() }
                     ForEach(model.hosts) { Text(verbatim: $0.name).tag(String?.some($0.id)) }
                 }
-                .disabled(isWorking)
+                .disabled(isWorking || model.hostsFailure != nil)
             }
         }
     }

@@ -9,6 +9,7 @@ struct OverviewPage: View {
     private var model: OverviewModel { host.overview }
     private var settings: InstanceSettingsModel { host.instanceSettings }
     private var canChangeSettings: Bool { host.grants.contains(.configManage) }
+    private var metrics: InstanceMetricsReading? { model.metricsFailure == nil ? model.metrics : nil }
 
     var body: some View {
         content
@@ -31,7 +32,7 @@ struct OverviewPage: View {
                     symbol: MarfaSettingsPage.overview.symbol, tone: MarfaSettingsPage.overview.tone, title: Text(verbatim: host.serverName),
                     line: Text(verbatim: headLine))
                 attention
-                if canChangeSettings { thisMarfa }
+                thisMarfa
                 health
             }
         }
@@ -42,7 +43,7 @@ struct OverviewPage: View {
     private var headLine: String {
         let address = host.serverAddress.map { URL(string: $0).map(SettingsWording.hostName(of:)) ?? $0 }
         let tail: String? =
-            if let owner = model.reading?.owner { String(localized: "Owned by \(owner).") }
+            if let owner = model.owner { String(localized: "Owned by \(owner).") }
             else if let version = model.releaseVersion { String(localized: "Marfa \(version).") }
             else { nil }
         return [address.map { $0 + "." }, tail].compactMap { $0 }.joined(separator: " ")
@@ -98,23 +99,23 @@ struct OverviewPage: View {
     // MARK: This Marfa
 
     @ViewBuilder private var thisMarfa: some View {
-        if settings.isAvailable || settings.isLoading {
+        if (canChangeSettings && (settings.isAvailable || settings.isLoading || settings.failure != nil))
+            || model.releaseVersion != nil || model.updateReady != nil || model.releaseFailure != nil
+        {
             SettingsSection("This Marfa") {
-                nameRow
+                if canChangeSettings { nameSetting }
                 versionRow
             }
+        }
+    }
+
+    @ViewBuilder private var nameSetting: some View {
+        if settings.isAvailable || settings.isLoading {
+            nameRow
         } else if let failure = settings.failure {
-            SettingsSection("This Marfa") {
-                if failure == .notPermitted {
-                    OwnerProblemRow(
-                        title: "Couldn’t Read \(host.serverName)’s Settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
-                        page: .overview, host: host)
-                } else {
-                    SettingsProblemRow(
-                        title: Text("Couldn’t Read \(host.serverName)’s Settings"), line: Text(verbatim: failure.message),
-                        actions: failure == .unsupported ? [] : [SettingsProblemAction("Try Again") { Task { await settings.load() } }])
-                }
-            }
+            OwnerProblemRow(
+                title: "Couldn’t Read \(host.serverName)’s Settings", failure: OwnerFailure(failure), page: .overview, host: host,
+                retry: failure == .unsupported ? nil : { Task { await settings.load() } })
         }
     }
 
@@ -137,9 +138,12 @@ struct OverviewPage: View {
     /// The release and, where one is ready, the update; a development build has no release, so only the update line shows.
     @ViewBuilder private var versionRow: some View {
         if let version = model.releaseVersion {
-            SettingsRow(title: Text("Marfa \(version)"), line: model.reading?.updateReady.map { Text("Marfa \($0) is ready.") }) { showUpdates }
-        } else if let ready = model.reading?.updateReady {
+            SettingsRow(title: Text("Marfa \(version)"), line: model.updateReady.map { Text("Marfa \($0) is ready.") }) { showUpdates }
+        } else if let ready = model.updateReady {
             SettingsRow(title: Text("Marfa \(ready) is ready")) { showUpdates }
+        }
+        if let failure = model.releaseFailure {
+            readProblem("Couldn’t Check for Updates", failure: failure)
         }
     }
 
@@ -149,13 +153,16 @@ struct OverviewPage: View {
         SettingsSection("Health") {
             let database = model.health(of: .database)
             SettingsRow("Database") {
-                SettingsValue(verbatim: bytes(model.reading?.databaseBytes) ?? Self.word(database.condition), dot: Self.dot(database.condition))
+                SettingsValue(verbatim: bytes(metrics?.databaseBytes) ?? Self.word(database.condition), dot: Self.dot(database.condition))
             }
             let disk = model.health(of: .disk)
             SettingsRow("Disk") {
                 SettingsValue(verbatim: Self.word(disk.condition), dot: Self.dot(disk.condition))
             }
             filesRow(model.health(of: .files))
+            if let failure = model.metricsFailure {
+                readProblem("Couldn’t Read Database and File Sizes", failure: failure)
+            }
             let backups = model.backups
             if host.grants.contains(.backupsManage) {
                 SettingsLinkRow(
@@ -166,11 +173,18 @@ struct OverviewPage: View {
                     SettingsValue(verbatim: Self.backupsWord(backups), dot: Self.dot(backups))
                 }
             }
+            if let failure = model.lastBackupFailure, host.grants.contains(.backupsManage) {
+                readProblem("Couldn’t Read the Last Backup", failure: failure)
+            }
         }
     }
 
+    private func readProblem(_ title: LocalizedStringKey, failure: OwnerFailure) -> some View {
+        OwnerProblemRow(title: title, failure: failure, page: .overview, host: host, retry: { Task { await model.load() } })
+    }
+
     @ViewBuilder private func filesRow(_ files: HealthPart) -> some View {
-        let value = bytes(model.reading?.fileBytes).map { String(localized: "\($0) on its disk") } ?? Self.word(files.condition)
+        let value = bytes(metrics?.fileBytes).map { String(localized: "\($0) on its disk") } ?? Self.word(files.condition)
         if host.grants.contains(.configManage) {
             SettingsLinkRow(
                 verbatim: String(localized: "Files"), value: value, dot: Self.dot(files.condition)
@@ -184,7 +198,7 @@ struct OverviewPage: View {
 
     /// Update beside the release, where one is ready: it opens Updates, where the update is started and followed.
     @ViewBuilder private var showUpdates: some View {
-        if model.reading?.updateReady != nil {
+        if model.updateReady != nil {
             SettingsButton("Show Updates") { host.show(.updates) }
         }
     }

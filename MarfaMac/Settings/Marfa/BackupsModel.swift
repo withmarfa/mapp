@@ -17,9 +17,11 @@ import Observation
     /// Where and how often, which only a sign-in holding `config.manage` reads; nil without it.
     private(set) var settings: UpkeepSettings?
     /// Why the backups could not be read: the page says so in place of itself.
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    private let settingsRead = OwnerLoader.ReadStatus()
+    var settingsFailure: OwnerFailure? { settingsRead.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
 
     private(set) var sheet: Sheet?
     var folderDraft = ""
@@ -42,32 +44,25 @@ import Observation
     // MARK: Reading
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
-            backups = try await context.calls.backups()
-            failure = nil
-        } catch {
-            let error = UpkeepWording.owned(error)
-            failure = error
-            await context.learn(from: error)
-            return
-        }
-        guard context.grants().contains(.configManage) else {
-            settings = nil
-            return
-        }
-        do {
-            settings = try await context.calls.upkeepSettings()
-        } catch {
-            let error = UpkeepWording.owned(error)
-            settings = nil
-            await context.learn(from: error)
-        }
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+            do throws(OwnerFailure) {
+                backups = try await context.calls.backups()
+            } catch {
+                throw UpkeepWording.owned(error)
+            }
+        }, secondary: [
+            .required(settingsRead) { [self] () throws(OwnerFailure) in
+                guard context.grants().contains(.configManage) else {
+                    settings = nil
+                    return
+                }
+                do throws(OwnerFailure) {
+                    settings = try await context.calls.upkeepSettings()
+                } catch {
+                    throw UpkeepWording.owned(error)
+                }
+            },
+        ])
     }
 
     /// The newest backup, which Last Backup tells.

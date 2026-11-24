@@ -67,6 +67,16 @@ struct WebhooksPage: View {
 
     private var list: some View {
         SettingsPageColumn {
+            if let failure = model.keysFailure {
+                OwnerProblem(title: "Couldn’t Check Webhook Keys", failure: failure, page: .webhooks, host: host) {
+                    Task { await model.load() }
+                }
+            }
+            if let failure = model.webhooks.lazy.filter(\.active).compactMap({ model.sendingFailures[$0.id] }).first {
+                OwnerProblem(title: "Couldn’t Check Webhook Deliveries", failure: failure, page: .webhooks, host: host) {
+                    Task { await model.load() }
+                }
+            }
             if model.webhooks.isEmpty {
                 SettingsSection(name: Text("Webhooks")) {
                     SettingsEmptyCard(
@@ -119,6 +129,7 @@ struct WebhooksPage: View {
         case .sending: String(localized: "Sending")
         case .off: String(localized: "Off")
         case .failing: String(localized: "Failing")
+        case .unread: String(localized: "Couldn’t Check")
         }
     }
 
@@ -126,7 +137,7 @@ struct WebhooksPage: View {
         switch state {
         case .sending: SettingsTokens.ok
         case .off: SettingsTokens.tertiaryText
-        case .failing: SettingsTokens.warning
+        case .failing, .unread: SettingsTokens.warning
         }
     }
 }
@@ -172,6 +183,11 @@ private struct WebhookDetail: View {
             SettingsHead(
                 wellSymbol: "dot.radiowaves.up.forward", title: Text(verbatim: WebhooksModel.display(webhook.url)),
                 line: line.isEmpty ? nil : Text(verbatim: line))
+            if webhook.maker?.kind == .key, let failure = model.keysFailure {
+                OwnerProblem(title: "Couldn’t Check the Webhook’s Key", failure: failure, page: .webhooks, host: host) {
+                    Task { await model.load() }
+                }
+            }
             if let failure = model.rowErrors[webhook.id] { OwnerProblem(title: "Not Changed", failure: failure, page: .webhooks, host: host) }
             if isOwn { settings } else { readOnly }
             deliveries
@@ -264,12 +280,15 @@ private struct WebhookDetail: View {
                     ? Text("The latest events sent to this address. Only a failed one can be sent again.")
                     : Text("The latest events sent to this address. A failed one can be sent again once this webhook is on.")
         ) {
-            if let failure = model.deliveriesFailure[webhook.id], all.isEmpty {
+            if let failure = model.deliveriesFailure[webhook.id] {
                 OwnerProblemRow(
                     title: "Deliveries Couldn’t Be Read", failure: failure, page: .webhooks, host: host,
                     retry: { Task { await model.loadDeliveries(of: webhook.id) } })
-            } else if all.isEmpty {
-                SettingsEmptyCard(symbol: "paperplane", title: Text("No Deliveries"), line: Text("Nothing has been sent to this address yet."))
+            }
+            if all.isEmpty {
+                if model.deliveriesFailure[webhook.id] == nil {
+                    SettingsEmptyCard(symbol: "paperplane", title: Text("No Deliveries"), line: Text("Nothing has been sent to this address yet."))
+                }
             } else {
                 SettingsSectionTable(
                     rows: showsAllDeliveries ? all : Array(all.prefix(Self.firstDeliveries)),

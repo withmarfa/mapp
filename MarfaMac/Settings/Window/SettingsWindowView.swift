@@ -28,7 +28,7 @@ struct SettingsWindowView: View {
                 selection: Binding { navigation.page } set: { navigation.show($0) }, search: $search,
                 badges: { page in
                     if page == .overview, host.overview.attentionCount > 0 { return host.overview.attentionCount }
-                    if page == .updates, host.overview.reading?.updateReady != nil { return 1 }
+                    if page == .updates, host.overview.releaseFailure == nil, host.overview.updateReady != nil { return 1 }
                     return nil
                 }
             )

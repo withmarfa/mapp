@@ -33,11 +33,12 @@ import Observation
     private(set) var passkeys: [OwnerPasskey] = []
     private(set) var browsers: [BrowserSignIn] = []
     /// Why the page can't be shown at all.
-    private(set) var failure: OwnerFailure?
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
     /// Why the passkeys and browsers couldn't be read, where the profile could.
-    private(set) var listsFailure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let signInsRead = OwnerLoader.ReadStatus()
+    var listsFailure: OwnerFailure? { signInsRead.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
     /// One line under a passkey or a browser whose change was refused, by its id.
     private(set) var rowErrors: [String: OwnerFailure] = [:]
     /// One line under the page's rows, such as why Add Passkey… did not open.
@@ -64,34 +65,19 @@ import Observation
     // MARK: Reading
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
             profile = try await context.calls.profile()
-            failure = nil
-        } catch {
-            failure = error
-            await context.learn(from: error)
-            return
-        }
-        guard canManageSignIns else {
-            passkeys = []
-            browsers = []
-            listsFailure = nil
-            return
-        }
-        do {
-            passkeys = try await context.calls.passkeys()
-            browsers = try await context.calls.browserSignIns()
-            listsFailure = nil
-        } catch {
-            listsFailure = error
-            await context.learn(from: error)
-        }
+        }, secondary: [
+            .required(signInsRead) { [self] () throws(OwnerFailure) in
+                guard canManageSignIns else {
+                    passkeys = []
+                    browsers = []
+                    return
+                }
+                passkeys = try await context.calls.passkeys()
+                browsers = try await context.calls.browserSignIns()
+            },
+        ])
     }
 
     // MARK: Password

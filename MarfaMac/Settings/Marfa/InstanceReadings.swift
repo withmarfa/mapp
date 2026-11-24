@@ -27,18 +27,11 @@ nonisolated struct HealthPart: Hashable, Sendable {
     var condition: Condition
 }
 
-/// What the Overview reads of the server besides what needs attention. Every part is optional: a part the server did not give
-/// is left out, never guessed.
-nonisolated struct InstanceReading: Hashable, Sendable {
-    /// The release the server runs.
-    var version: String?
-    /// A later release the server says is ready, if one is.
-    var updateReady: String?
+/// The version and sizes returned by the server's metrics endpoint.
+nonisolated struct InstanceMetricsReading: Hashable, Sendable {
+    var version: String
     var databaseBytes: Int?
-    var fileBytes: Int?
-    var lastBackup: Date?
-    /// The owner's username, where the sign-in may read it.
-    var owner: String?
+    var fileBytes: Int
 }
 
 nonisolated struct FileStoreRow: Identifiable, Hashable, Sendable {
@@ -55,8 +48,6 @@ nonisolated struct FileStoreRow: Identifiable, Hashable, Sendable {
 /// Where the server keeps files, and what nothing uses.
 nonisolated struct FileStores: Hashable, Sendable {
     var stores: [FileStoreRow]
-    /// What the files take on the server's disk.
-    var fileBytes: Int?
     var orphanCount: Int
     var orphanBytes: Int
     /// The oldest time the server found a file that nothing uses.

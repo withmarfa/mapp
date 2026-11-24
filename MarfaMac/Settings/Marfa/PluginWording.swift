@@ -64,6 +64,8 @@ nonisolated enum PluginWording {
     static func line(_ failure: PluginFailure, title: String? = nil) -> String {
         switch failure {
         case .owner(let failure): OwnerWording.line(failure)
+        case .bundleFileUnreadable(let name):
+            String(localized: "The app couldn’t read “\(name)” on this Mac. Choose another plugin bundle.")
         case .releaseUnreadable(let line): line
         case .digestMismatch:
             String(localized: "What the release served isn’t what it lists, so the app used none of it.")

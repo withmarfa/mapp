@@ -7,23 +7,21 @@ import Observation
     private let context: OwnerContext
 
     private(set) var stores: FileStores?
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    private(set) var fileBytes: Int?
+    private let metricsRead = OwnerLoader.ReadStatus()
+    var fileBytesFailure: OwnerFailure? { metricsRead.failure }
 
     init(context: OwnerContext) {
         self.context = context
     }
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer { isLoading = false }
-        do {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
             stores = try await context.calls.fileStores()
-            failure = nil
-        } catch {
-            failure = error
-            await context.learn(from: error)
-        }
+        }, secondary: [
+            .required(metricsRead) { [self] () throws(OwnerFailure) in fileBytes = try await context.calls.instanceMetrics().fileBytes },
+        ])
     }
 }

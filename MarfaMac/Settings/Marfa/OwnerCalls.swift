@@ -2,6 +2,7 @@ import Foundation
 import Marfa
 import MarfaAPI
 import OpenAPIRuntime
+import OSLog
 
 // What the owner's pages (Account, Apps, Keys, Addresses) ask of the server, in values of their own so the pages and
 // their models read nothing generated, and a test can script every answer.
@@ -177,6 +178,13 @@ nonisolated enum PasswordOutcome: Hashable, Sendable {
 
 /// Why an owner's call did not do what was asked, in terms a page can word.
 nonisolated enum OwnerFailure: Error, Hashable, Sendable {
+    enum RedeliveryRefusal: String, Hashable, Sendable {
+        case webhookInactive = "webhook_inactive"
+        case credentialUnavailable = "credential_unavailable"
+        case deliveryNotFailed = "delivery_not_failed"
+        case deliveryExpired = "delivery_expired"
+    }
+
     case unreachable
     case signedOut
     /// The server refused for want of a permission, which it names where it does.
@@ -193,6 +201,8 @@ nonisolated enum OwnerFailure: Error, Hashable, Sendable {
     /// The owner closed, or did not pass, the sign-in the server asked for.
     case notConfirmed
     case refused(String)
+    case redeliveryRefused(RedeliveryRefusal)
+    case connectorPaused
     /// A new key's source is another key's own, in the server's words.
     case sourceHeld(String)
     /// A connector's sign-in cannot start until these of its settings, named as the server names them, hold a value.
@@ -237,9 +247,8 @@ nonisolated protocol OwnerCalls: Sendable {
 
     /// What needs the owner's attention (`instance.read`).
     func attention() async throws(OwnerFailure) -> [AttentionConcern]
-    /// How the server stands: its health, what it holds and whether an update is ready (`instance.read`). A part the server
-    /// does not give is left out.
-    func reading() async throws(OwnerFailure) -> InstanceReading
+    /// The running version, database size, and total file size (`instance.read`).
+    func instanceMetrics() async throws(OwnerFailure) -> InstanceMetricsReading
     /// Where files are kept and the files nothing uses (`instance.read`).
     func fileStores() async throws(OwnerFailure) -> FileStores
     /// The source filter, with the instance that holds it (`config.manage`).
@@ -376,7 +385,10 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
     /// What the package's error stands for, unwrapping the generated client's own wrapper. A `409` that names no cause of
     /// its own (the codes below) is the server refusing the call, which `plainConflict` words for the call that made it.
     static func failure(_ error: any Error, plainConflict: (String) -> OwnerFailure = { .refused($0) }) -> OwnerFailure {
-        guard let error = marfaError(error) else { return .failed(String(localized: "The server’s answer couldn’t be read.")) }
+        guard let error = marfaError(error) else {
+            OwnerSettingsLog.failure(error.localizedDescription)
+            return .failed(String(localized: "The server’s answer couldn’t be read."))
+        }
         if error.isOffline { return .unreachable }
         if error.isKeyRefusal { return .signedOut }
         switch error {
@@ -386,12 +398,24 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         case .notFound: return .notFound
         case .versionConflict: return .conflict
         case .instanceChanged: return .instanceChanged
-        case .server(let status, let code, let message, _, _) where status == 409:
+        case .server(409, let code, let message, let details, let server):
+            OwnerSettingsLog.failure(error.localizedDescription)
+            if code == "connector_paused" { return .connectorPaused }
+            if code == "conflict", let reason = (details ?? server?.details)?.object?["reason"]?.string,
+                let refusal = OwnerFailure.RedeliveryRefusal(rawValue: reason)
+            {
+                return .redeliveryRefused(refusal)
+            }
             let refusals: Set<String> = ["sign_in_address_check_failed", "sign_in_address_change_unconfirmed"]
             return refusals.contains(code) ? .refused(message) : plainConflict(message)
-        case .validation(_, let message, _, _): return .refused(message)
+        case .validation(_, let message, _, _):
+            OwnerSettingsLog.failure(error.localizedDescription)
+            return .refused(message)
         case .confirmationRequired, .appSignInRequired, .canceled: return .notConfirmed
-        default: return .failed(error.localizedDescription)
+        default:
+            let detail = error.localizedDescription
+            OwnerSettingsLog.failure(detail)
+            return .failed(detail)
         }
     }
 
@@ -421,4 +445,12 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
 
     /// Whether the server's text names a time of day, not only a day.
     static func hasTime(_ text: String?) -> Bool { text?.contains("T") ?? true }
+}
+
+nonisolated enum OwnerSettingsLog {
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Marfa", category: "OwnerSettings")
+
+    static func failure(_ detail: String) {
+        logger.error("Settings request failed: \(detail, privacy: .private)")
+    }
 }

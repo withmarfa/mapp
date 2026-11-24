@@ -22,9 +22,9 @@ import Observation
     private(set) var reports: [String: FolderReport] = [:]
     /// Why a folder's report could not be read, by the folder's id.
     private(set) var reportFailures: [String: OwnerFailure] = [:]
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
 
     init(context: OwnerContext) {
         self.context = context
@@ -34,28 +34,19 @@ import Observation
 
     /// Reads the list, which the page shows at once, then each folder's report a few at a time.
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer { isLoading = false }
-        do {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
             let listing = try await context.calls.folders()
             folders = listing.folders
             total = listing.total
-            failure = nil
-            hasLoaded = true
-        } catch {
-            failure = error
-            hasLoaded = true
-            await context.learn(from: error)
-            return
-        }
-        let calls = context.calls
-        await readEach(
-            of: folders.map(\.id),
-            read: { id -> Result<FolderReport, OwnerFailure> in
-                do throws(OwnerFailure) { return .success(try await calls.folderReport(id)) } catch { return .failure(error) }
-            },
-            take: { id, answer in await take(answer, for: id) })
+        }, showBeforeFinishing: true, after: {
+            let calls = context.calls
+            await readEach(
+                of: folders.map(\.id),
+                read: { id -> Result<FolderReport, OwnerFailure> in
+                    do throws(OwnerFailure) { return .success(try await calls.folderReport(id)) } catch { return .failure(error) }
+                },
+                take: { id, answer in await take(answer, for: id) })
+        })
     }
 
     func loadReport(_ id: String) async {

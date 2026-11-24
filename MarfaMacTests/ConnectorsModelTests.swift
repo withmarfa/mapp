@@ -80,10 +80,12 @@ import Testing
 
     @Test func runNowWhilePausedIsRefusedAsTheServerSaysAndChangesNothing() async {
         let bench = OwnerBench(grants: [.connectorsManage])
-        let model = rss(bench, paused: true)
+        let model = rss(bench)
         await model.load()
+        bench.calls.state.withLock { $0.connectorControls["rss"]?.paused = true }
         await model.runNow("rss")
-        #expect(model.rowErrors["rss"] == .refused("The connector is paused. Resume it to run it."))
+        #expect(model.rowErrors["rss"] == .connectorPaused)
+        #expect(model.entry("rss")?.control?.paused == true)
         #expect(model.entry("rss")?.control?.runRequested == nil)
         await model.setPaused(false, for: "rss")
         #expect(model.rowErrors["rss"] == nil)

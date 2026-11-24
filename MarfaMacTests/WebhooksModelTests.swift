@@ -506,7 +506,12 @@ import Testing
         // Another app sent the first one again between the page's read and the click.
         bench.calls.state.withLock { $0.deliveries["a"]![0].status = .succeeded }
         await model.redeliver(model.deliveries["a"]![0], of: model.webhooks[0])
-        #expect(model.deliveryErrors["a"] == .refused("Only a failed delivery can be sent again."))
+        #expect(model.deliveryErrors["a"] == .redeliveryRefused(.deliveryNotFailed))
+        bench.calls.state.withLock { $0.webhooks[0].active = false }
+        await model.redeliver(model.deliveries["a"]![1], of: model.webhooks[0])
+        #expect(model.deliveryErrors["a"] == .redeliveryRefused(.webhookInactive))
+        #expect(model.webhooks[0].active == false)
+        await model.turnOn(model.webhooks[0])
         await model.redeliver(model.deliveries["a"]![1], of: model.webhooks[0])
         #expect(model.deliveryErrors["a"] == nil)
         #expect(model.deliveries["a"]?[1].status == .pending)

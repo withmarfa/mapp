@@ -41,9 +41,11 @@ import Observation
     private(set) var typeNames: [String: String] = [:]
     /// The keys each app made, by the app's client ID, where the app may list keys.
     private(set) var keysMade: [String: [KeyInfo]] = [:]
-    private(set) var failure: OwnerFailure?
-    private(set) var isLoading = false
-    private(set) var hasLoaded = false
+    private let loader = OwnerLoader()
+    var failure: OwnerFailure? { loader.failure }
+    private let keysRead = OwnerLoader.ReadStatus()
+    var keysFailure: OwnerFailure? { keysRead.failure }
+    var hasLoaded: Bool { loader.hasLoaded }
     /// One line under a row whose change was refused, by the app's id.
     private(set) var rowErrors: [String: OwnerFailure] = [:]
     /// What each app keeps, by the app's id, read when its page opens and after a removal.
@@ -75,27 +77,19 @@ import Observation
     }
 
     func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
             apps = try await context.calls.apps()
-            failure = nil
-        } catch {
-            failure = error
-            await context.learn(from: error)
-            return
-        }
-        // What the access is called is a nicety: without the names the patterns say it.
-        typeNames = (try? await context.calls.typeNames()) ?? typeNames
-        if context.grants().contains(.keysManage), let keys = try? await context.calls.keys() {
-            keysMade = Dictionary(grouping: keys.filter { $0.appClientID != nil }, by: { $0.appClientID ?? "" })
-        } else {
-            keysMade = [:]
-        }
+        }, secondary: [
+            .quiet { [self] () throws(OwnerFailure) in typeNames = try await context.calls.typeNames() },
+            .required(keysRead) { [self] () throws(OwnerFailure) in
+                guard context.grants().contains(.keysManage) else {
+                    keysMade = [:]
+                    return
+                }
+                let keys = try await context.calls.keys()
+                keysMade = Dictionary(grouping: keys.filter { $0.appClientID != nil }, by: { $0.appClientID ?? "" })
+            },
+        ])
     }
 
     // MARK: Narrowing
