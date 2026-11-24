@@ -32,7 +32,7 @@ import Testing
         let syncing = words(.syncing)
         #expect(syncing.removeTitle == "Remove This App’s Settings from Home?")
         #expect(syncing.removeMessage == "Every Mac that connects to Home loses them. This Mac keeps its own, and your items stay.")
-        #expect(ConnectionSettings.footer == "Window sizes and positions, column widths and On This Mac stay on each Mac.")
+        #expect(ConnectionSettings.footer == "Each Mac keeps its own window sizes and positions, column widths, global shortcuts, and On This Mac settings.")
     }
 
     /// The section's state is the sync's own, so Allow More… moving it on needs nothing else.
@@ -40,7 +40,7 @@ import Testing
         let defaults = ThrowawayDefaults.make("ConnectionSettingsTests")
         let copy = FakePreferencesCopy()
         await copy.set(PreferencesReadiness(filled: true, holdsType: false, tablesWhole: false, instance: "instance-1"))
-        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(10), reload: {})
+        let sync = PreferencesSync(defaults: defaults, domain: defaults.suite, enabled: true, coalescing: .milliseconds(10), reload: {})
         sync.attach(copy, library: "marfa:https://home", name: { "Home" })
         await sync.flush()
         #expect(ConnectionSettings(standing: sync.standing, name: "Home").action == .allowMore)
@@ -201,7 +201,7 @@ import Testing
     /// What each step of a disconnect sent, over a real sync on a copy that holds a change of the library's.
     private func overSync(_ copy: FakePreferencesCopy, delivers: Bool = true) async throws -> (MarfaSettingsModel, PreferencesSync, HostBench) {
         let defaults = ThrowawayDefaults.make("ConnectionSettingsTests")
-        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(10), reload: {})
+        let sync = PreferencesSync(defaults: defaults, domain: defaults.suite, enabled: true, coalescing: .milliseconds(10), reload: {})
         sync.attach(copy, library: "marfa:https://home", name: { "Home" })
         await sync.flush()
         await copy.setDelivers(delivers)
@@ -274,7 +274,7 @@ import Testing
     @Test func aRemovalQueuedAndNeverDeliveredIsFoundAmongTheUnsentWrites() async throws {
         let defaults = ThrowawayDefaults.make("ConnectionSettingsTests")
         let copy = FakePreferencesCopy()
-        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(10), reload: {})
+        let sync = PreferencesSync(defaults: defaults, domain: defaults.suite, enabled: true, coalescing: .milliseconds(10), reload: {})
         sync.attach(copy, library: "marfa:https://home", name: { "Home" })
         await sync.flush()
         await copy.setDelivers(false)
@@ -289,7 +289,7 @@ import Testing
 
     private func syncing(_ copy: FakePreferencesCopy) async throws -> (PreferencesSync, UserDefaults) {
         let defaults = ThrowawayDefaults.make("ConnectionSettingsTests")
-        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(10), reload: {})
+        let sync = PreferencesSync(defaults: defaults, domain: defaults.suite, enabled: true, coalescing: .milliseconds(10), reload: {})
         sync.attach(copy, library: "marfa:https://home", name: { "Home" })
         await sync.flush()
         return (sync, defaults)

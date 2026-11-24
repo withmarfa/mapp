@@ -12,11 +12,14 @@ import Marfa
     let refreshGrants: () async -> Void
     /// Hands a draft over that was left behind after Settings closed, such as a key whose call ended then.
     let lateDraft: (OwnerDraft) -> Void
+    /// The one writer of the instance's enforcement, shared by every page of the app.
+    let enforcement: EnforcementSettings
 
     init(
         calls: any OwnerCalls, grants: @escaping () -> Set<InstancePermission>, holds: @escaping (String) -> Bool = { _ in false },
         allowMore: @escaping (Set<InstancePermission>) async -> MarfaAllowMoreOutcome = { _ in .cancelled },
-        refreshGrants: @escaping () async -> Void = {}, lateDraft: @escaping (OwnerDraft) -> Void = { _ in }
+        refreshGrants: @escaping () async -> Void = {}, lateDraft: @escaping (OwnerDraft) -> Void = { _ in },
+        enforcement: EnforcementSettings = EnforcementSettings()
     ) {
         self.calls = calls
         self.grants = grants
@@ -24,12 +27,13 @@ import Marfa
         self.allowMore = allowMore
         self.refreshGrants = refreshGrants
         self.lateDraft = lateDraft
+        self.enforcement = enforcement
     }
 
     init(host: any MarfaSettingsHost) {
         self.init(
             calls: host.ownerCalls, grants: { host.grants }, holds: { host.holds($0) }, allowMore: { await host.allowMore($0) },
-            refreshGrants: { await host.refreshGrants() }, lateDraft: { host.ownerDrafts.arrive($0) })
+            refreshGrants: { await host.refreshGrants() }, lateDraft: { host.ownerDrafts.arrive($0) }, enforcement: .app)
     }
 
     /// What a failed call asks of the page: the grants are read again where the server says one is missing, since the owner

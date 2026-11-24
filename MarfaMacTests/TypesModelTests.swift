@@ -33,12 +33,17 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         var types: [TypeRecord] = []
         var readings: [String: TypeReading] = [:]
         var changes: [(type: String, edit: TypeEdit)] = []
-        var children: [(id: String, label: String, parent: String)] = []
+        var made: [NewTypeRecord] = []
         var started: [TypeEdit] = []
-        var deleted: [String] = []
+        var deleted: [(type: String, force: Bool)] = []
+        var moves: [(type: String, target: String)] = []
+        var preview = TypeMovePreview(items: 0, settings: [])
+        var moveResult = TypeMoveResult(remaining: 0, remainingHidden: false)
         var refusal: TypeFailure?
         var deleteRefusal: TypeFailure?
         var gate: TypeCallGate?
+        /// A refusal of the move's preview, as the server answers a move a setting stops.
+        var previewRefusal: TypeFailure?
     }
 
     let state = Mutex(State())
@@ -85,6 +90,8 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
                 guard var field = record.fields[key], field.choices.contains(word), field.choices.count > 1 else { return }
                 field.choices.removeAll { $0 == word }
                 record.fields[key] = field
+            case .versionWindow(let days):
+                record.versionWindow = days.map(VersionWindow.days)
             default:
                 break
             }
@@ -93,21 +100,36 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
         }
     }
 
-    func delete(_ type: String) async throws(TypeFailure) {
-        if let refusal = state.withLock({ $0.deleteRefusal }) { throw refusal }
+    func delete(_ type: String, force: Bool) async throws(TypeFailure) {
+        if !force, let refusal = state.withLock({ $0.deleteRefusal }) { throw refusal }
         state.withLock {
-            $0.deleted.append(type)
+            $0.deleted.append((type, force))
             $0.types.removeAll { $0.id == type }
         }
     }
 
-    func addChild(id: String, label: String, below parent: String) async throws(TypeFailure) {
+    func addType(_ type: NewTypeRecord) async throws(TypeFailure) {
         if let refusal = state.withLock({ $0.refusal }) { throw refusal }
         state.withLock {
-            $0.children.append((id, label, parent))
-            $0.types.append(TypeRecord(id: id, label: label, parent: parent, origin: .registered, fields: [:]))
+            $0.made.append(type)
+            $0.types.append(
+                TypeRecord(id: type.id, label: type.label, plural: type.plural.isEmpty ? nil : type.plural, parent: type.parent, origin: .registered, icon: type.icon, fields: [:]))
         }
     }
+
+    func previewMove(of type: String, to target: String) async throws(TypeFailure) -> TypeMovePreview {
+        if let refusal = state.withLock({ $0.previewRefusal }) { throw refusal }
+        return state.withLock { $0.preview }
+    }
+
+    func move(_ type: String, to target: String) async throws(TypeFailure) -> TypeMoveResult {
+        state.withLock { state in
+            state.moves.append((type, target))
+            if state.moveResult.isDone { state.deleteRefusal = nil }
+            return state.moveResult
+        }
+    }
+
 }
 
 private func record(
@@ -130,12 +152,13 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 @Suite(.hangLimit) struct TypesModelTests {
     private func model(
         _ calls: FakeTypeCalls, counts: [String: Int] = [:], late: LateDrafts = LateDrafts(),
+        grants: Set<InstancePermission> = [.schemaWrite], owner: FakeOwnerCalls = FakeOwnerCalls(),
         setIcon: @escaping (String?, String) async -> OwnerFailure? = { _, _ in nil }
     ) -> TypesModel {
         let access = TypeAccess(
             ownItems: { counts[$0] ?? 0 }, currentIcon: { _ in nil }, setIcon: setIcon,
             markSets: [MarfaMarkSet(id: "lucide", title: "Lucide")], marks: { _, _ in [] }, plural: { _ in nil })
-        let context = OwnerContext(calls: FakeOwnerCalls(), grants: { [.schemaWrite] }, lateDraft: { draft in late.drafts.withLock { $0.append(draft) } })
+        let context = OwnerContext(calls: owner, grants: { grants }, lateDraft: { draft in late.drafts.withLock { $0.append(draft) } })
         return TypesModel(context: context, calls: calls, access: access)
     }
 
@@ -293,8 +316,8 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.identifier(forNamed: "Job") == "user.job_2")
         model.childName = "Café Hours"
         await model.makeChild()
-        #expect(calls.state.withLock { $0.children.map(\.id) } == ["user.cafe_hours"])
-        #expect(calls.state.withLock { $0.children.map(\.parent) } == ["common.ticket"])
+        #expect(calls.state.withLock { $0.made.map(\.id) } == ["user.cafe_hours"])
+        #expect(calls.state.withLock { $0.made.map(\.parent) } == ["common.ticket"])
         #expect(model.made == "user.cafe_hours")
         #expect(model.identifier(forNamed: "2nd Fitting") == "user.type_2nd_fitting")
     }
@@ -508,6 +531,13 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.title(of: "user.job") == "Jobs")
     }
 
+    /// Jobs with no type based on it, so it can be deleted.
+    private func deletable() -> FakeTypeCalls {
+        let calls = withFields()
+        calls.state.withLock { $0.types.removeAll { $0.id == "user.rework" } }
+        return calls
+    }
+
     private func withFields() -> FakeTypeCalls {
         let calls = listing()
         calls.state.withLock {
@@ -547,7 +577,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.fieldErrors[.newField] != nil)
         model.newFieldName = "Site Address"
         await model.makeField()
-        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.addField(key: "site_address", label: "Site Address", kind: .choice, choices: ["Gold", "Silver"])])
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.addField(NewFieldRecord(key: "site_address", label: "Site Address", kind: .choice, choices: ["Gold", "Silver"]))])
         #expect(!model.isAddingField)
     }
 
@@ -698,16 +728,25 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 
     @Test func deletingATypeLeavesItsPageAndTellsAServerRefusalInWords() async {
         let calls = withFields()
-        calls.state.withLock { $0.deleteRefusal = .inUse(items: 18, settings: 0) }
-        let model = model(calls, counts: ["user.job": 18])
+        let model = model(calls)
         await model.load()
         model.open("user.job")
-        await model.deleteType()
-        #expect(model.deleteFailure == "Jobs still holds 18 items, in the bin too. Move them to another type first.")
-        #expect(model.deleted == nil)
-        calls.state.withLock { $0.deleteRefusal = .hasSubtypes(["user.rework"]) }
-        await model.deleteType()
+        // Rework is based on Jobs, so neither way of deleting is offered and the row says why.
+        model.beginDelete()
+        #expect(!model.isConfirmingDelete)
         #expect(model.deleteFailure == "Types are based on Jobs: Rework. Change or delete those first.")
+        calls.state.withLock {
+            $0.types.removeAll { $0.id == "user.rework" }
+            $0.deleteRefusal = .inUse(items: 2, settings: 1)
+        }
+        await model.reread()
+        await model.deleteType()
+        // Something uses it, in the bin or a setting, so the sheet asks what happens to it, and nothing is deleted yet.
+        #expect(model.isConfirmingDelete)
+        #expect(model.refusedUse?.items == 2)
+        #expect(model.deleted == nil)
+        #expect(calls.state.withLock { $0.deleted.isEmpty })
+        model.cancelDelete()
         calls.state.withLock { $0.deleteRefusal = nil }
         await model.deleteType()
         #expect(model.deleted == "user.job")
@@ -724,6 +763,255 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         model.open("core.task")
         await model.deleteType()
         #expect(calls.state.withLock { $0.deleted.isEmpty })
+    }
+
+    @Test func aMoveThatLeavesItemsBehindKeepsTheTypeAndSaysWhy() async {
+        let calls = deletable()
+        calls.state.withLock {
+            $0.deleteRefusal = .inUse(items: 18, settings: 0)
+            $0.preview = TypeMovePreview(items: 18, settings: [])
+            $0.moveResult = TypeMoveResult(moved: 15, failed: 3, remaining: 3, remainingHidden: false)
+        }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(model.moveTarget == "core.task")
+        #expect(await eventually { model.movePreview != nil })
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.map(\.target) } == ["core.task"])
+        #expect(calls.state.withLock { $0.deleted.isEmpty })
+        #expect(model.deleted == nil)
+        #expect(model.isConfirmingDelete)
+        #expect(model.deleteSheetFailure == "15 items moved. 3 items couldn’t move, so Jobs was kept.")
+    }
+
+    /// A job with any failed item is partial, even where none is left of the type.
+    @Test func aMoveWithFailuresAndNothingLeftStillKeepsTheType() async {
+        let calls = deletable()
+        calls.state.withLock {
+            $0.preview = TypeMovePreview(items: 18, settings: [])
+            $0.moveResult = TypeMoveResult(moved: 16, failed: 2, remaining: 0, remainingHidden: false)
+        }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(await eventually { model.movePreview != nil })
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.deleted.isEmpty })
+        #expect(model.deleted == nil && model.isConfirmingDelete)
+        #expect(model.deleteSheetFailure == "16 items moved. 2 items couldn’t move, so Jobs was kept.")
+    }
+
+    @Test func itemsMadeWhileTheMoveRanAreNotToldAsFailures() async {
+        let calls = deletable()
+        calls.state.withLock {
+            $0.preview = TypeMovePreview(items: 18, settings: [])
+            $0.moveResult = TypeMoveResult(moved: 18, failed: 0, remaining: 2, remainingHidden: false)
+        }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(await eventually { model.movePreview != nil })
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.deleted.isEmpty })
+        #expect(model.deleteSheetFailure == "18 items moved. Jobs got 2 new items while they moved, so it was kept. Delete again to move them too.")
+    }
+
+    /// The server takes no precondition on a move, so the move is previewed again just before it starts: other items with the
+    /// same count, or a webhook made since the person agreed, are shown and agreed to before anything moves.
+    @Test func aMoveWhosePreviewChangedSinceTheOwnerAgreedAsksAgain() async {
+        let calls = deletable()
+        calls.state.withLock { $0.preview = TypeMovePreview(items: 2, ids: ["i1", "i2"], settings: []) }
+        let model = model(calls, counts: ["user.job": 2])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(await eventually { model.movePreview != nil })
+        calls.state.withLock { $0.preview = TypeMovePreview(items: 2, ids: ["i1", "i3"], settings: []) }
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.isEmpty && $0.deleted.isEmpty })
+        #expect(model.movePreview?.ids == ["i1", "i3"])
+        let webhook = TypeSettingRecord(kind: .webhook, id: "w1", field: "type_filter")
+        calls.state.withLock { $0.preview = TypeMovePreview(items: 2, ids: ["i1", "i3"], settings: [webhook]) }
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.isEmpty && $0.deleted.isEmpty })
+        #expect(model.movePreview?.settings == [webhook])
+        #expect(model.deleteSheetFailure != nil)
+        #expect(model.isConfirmingDelete)
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.count } == 1)
+        #expect(model.deleted == "user.job")
+    }
+
+    @Test func aTypeIsDeletedUnforcedOnlyOnceItsItemsHaveMoved() async {
+        let calls = deletable()
+        calls.state.withLock {
+            $0.deleteRefusal = .inUse(items: 18, settings: 1)
+            $0.preview = TypeMovePreview(items: 18, settings: [TypeSettingRecord(kind: .view, id: "v1")])
+        }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(await eventually { model.movePreview != nil })
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.count } == 1)
+        #expect(calls.state.withLock { $0.deleted.map(\.force) } == [false])
+        #expect(model.deleted == "user.job")
+        #expect(!model.isConfirmingDelete)
+    }
+
+    @Test func leavingTheItemsDeletesTheTypeForcedAndMovesNothing() async {
+        let calls = deletable()
+        calls.state.withLock { $0.preview = TypeMovePreview(items: 18, settings: []) }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        model.deleteChoice = .leave
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.isEmpty })
+        #expect(calls.state.withLock { $0.deleted.map(\.force) } == [true])
+        #expect(model.deleted == "user.job")
+    }
+
+    @Test func aSettingAMoveCannotChangeHoldsTheMoveBack() async {
+        let calls = deletable()
+        // The server refuses the preview itself, naming the setting and why (`types/move-blocked`).
+        let folder = TypeSettingRecord(kind: .folder, id: "f1", field: "query.filter", blocked: .filterTerm)
+        calls.state.withLock { $0.previewRefusal = .moveBlocked(settings: [folder], tables: []) }
+        let model = model(calls, counts: ["user.job": 18])
+        await model.load()
+        model.open("user.job")
+        model.beginDelete()
+        #expect(await eventually { model.movePreview != nil })
+        #expect(model.blockedSettings == [folder])
+        #expect(model.movePreviewFailure == nil)
+        #expect(!model.canConfirmDelete)
+        await model.confirmDelete()
+        #expect(calls.state.withLock { $0.moves.isEmpty && $0.deleted.isEmpty })
+    }
+
+    @Test func aNewTypeBasedOnNothingIsSentWithItsPluralAndIcon() async {
+        let calls = listing()
+        let model = model(calls)
+        await model.load()
+        model.beginChild(of: nil)
+        #expect(model.childParent == nil)
+        model.childName = "Quote"
+        model.childPlural = " Quotes "
+        model.beginChildIcon()
+        await model.chooseIcon("lucide:quote")
+        #expect(!model.isChoosingChildIcon && model.isMakingChild)
+        await model.makeChild()
+        #expect(calls.state.withLock { $0.made } == [NewTypeRecord(id: "user.quote", label: "Quote", plural: "Quotes", icon: "lucide:quote", parent: nil)])
+        #expect(model.made == "user.quote")
+        #expect(TypesModel.regularPlural(of: "Story") == "Stories")
+        #expect(TypesModel.regularPlural(of: "Day") == "Days")
+        #expect(TypesModel.regularPlural(of: "Box") == "Boxes")
+        #expect(TypesModel.regularPlural(of: "URL") == "URLs")
+    }
+
+    @Test func aFieldIsAddedRequiredAndNotSearchableAsChosen() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        model.open("user.job")
+        model.beginField()
+        model.newFieldName = "Site"
+        model.newFieldRequired = true
+        model.newFieldSearchable = false
+        await model.makeField()
+        #expect(
+            calls.state.withLock { $0.changes.map(\.edit) }
+                == [.addField(NewFieldRecord(key: "site", label: "Site", kind: .text, isRequired: true, isSearchable: false))])
+    }
+
+    /// Any change to how long versions stay can let the server delete versions, longer or shorter, so every one asks first
+    /// and is sent only once agreed.
+    @Test func everyChangeToKeepVersionsAsksFirst() async {
+        let calls = withFields()
+        let model = model(calls)
+        await model.load()
+        var asked: [[VersionWindow?]] = []
+        await model.setVersionWindow(.days(90), of: "user.job") { asked.append([$0, $1]); return false }
+        #expect(calls.state.withLock { $0.changes.isEmpty })
+        await model.setVersionWindow(.days(90), of: "user.job") { asked.append([$0, $1]); return true }
+        await model.setVersionWindow(.days(7), of: "user.job") { asked.append([$0, $1]); return true }
+        await model.setVersionWindow(nil, of: "user.job") { asked.append([$0, $1]); return true }
+        #expect(asked == [[nil, .days(90)], [nil, .days(90)], [.days(90), .days(7)], [.days(7), nil]])
+        #expect(calls.state.withLock { $0.changes.map(\.edit) } == [.versionWindow(90), .versionWindow(7), .versionWindow(nil)])
+    }
+
+    @Test func aStrictSwitchTheServerRefusesShowsWhatTheServerHolds() async {
+        let calls = listing()
+        let owner = FakeOwnerCalls()
+        owner.state.withLock { $0.sourceLimit.strictTypes = ["user.job"] }
+        let model = model(calls, grants: [.schemaWrite, .configManage], owner: owner)
+        await model.load()
+        #expect(model.isStrict("user.job"))
+        owner.fail("setSourceLimit", with: .refused("No."))
+        await model.setStrict(false, of: "user.job")
+        #expect(model.isStrict("user.job"))
+        #expect(model.fieldErrors[.strict] != nil)
+        let unread = self.model(calls, owner: owner)
+        await unread.load()
+        #expect(unread.strictTypes == nil)
+    }
+
+    /// Strict changes only this type's place in strict mode: a source limit or allow-list set elsewhere since the page read
+    /// it goes back as the server holds it.
+    @Test func strictChangesOnlyItsOwnTypeAndKeepsTheOtherLevers() async {
+        let calls = listing()
+        let owner = FakeOwnerCalls()
+        owner.state.withLock { $0.sourceLimit.strictTypes = ["user.quote"] }
+        let model = model(calls, grants: [.schemaWrite, .configManage], owner: owner)
+        await model.load()
+        owner.state.withLock {
+            $0.sourceLimit.isOn = true
+            $0.sourceLimit.types = ["core.highlight"]
+            $0.sourceLimit.sources = ["readwise"]
+            $0.sourceLimit.allowlist = (["core.task"], ["github"])
+            $0.sourceLimit.strictTypes = ["user.quote", "user.rework"]
+        }
+        await model.setStrict(true, of: "user.job")
+        let held = owner.state.withLock { $0.sourceLimit }
+        #expect(owner.state.withLock { $0.limitsSent.count } == 1)
+        #expect(held.isOn && held.types == ["core.highlight"] && held.sources == ["readwise"])
+        #expect(held.allowlist?.types == ["core.task"] && held.allowlist?.sources == ["github"])
+        #expect(held.strictTypes == ["user.quote", "user.rework", "user.job"])
+        #expect(model.strictTypes == ["user.quote", "user.rework", "user.job"])
+    }
+
+    /// The switch is sent only while the type's place in strict mode is as the switch showed it.
+    @Test func aStrictSwitchChangedElsewhereIsToldAndSendsNothing() async {
+        let calls = listing()
+        let owner = FakeOwnerCalls()
+        let model = model(calls, grants: [.schemaWrite, .configManage], owner: owner)
+        await model.load()
+        #expect(!model.isStrict("user.job"))
+        owner.state.withLock { $0.sourceLimit.strictTypes = ["user.job"] }
+        await model.setStrict(true, of: "user.job")
+        #expect(owner.state.withLock { $0.limitsSent.isEmpty })
+        #expect(model.fieldErrors[.strict] == "Strict was changed somewhere else. Nothing was sent.")
+        #expect(model.isStrict("user.job"))
+    }
+
+    @Test func aSignInThatNoLongerHoldsConfigManageSendsNoStrictSwitch() async {
+        let calls = listing()
+        let owner = FakeOwnerCalls()
+        var grants: Set<InstancePermission> = [.schemaWrite, .configManage]
+        let access = TypeAccess(
+            ownItems: { _ in 0 }, currentIcon: { _ in nil }, setIcon: { _, _ in nil }, markSets: [], marks: { _, _ in [] }, plural: { _ in nil })
+        let model = TypesModel(context: OwnerContext(calls: owner, grants: { grants }), calls: calls, access: access)
+        await model.load()
+        grants = [.schemaWrite]
+        await model.setStrict(true, of: "user.job")
+        #expect(owner.state.withLock { $0.limitsSent.isEmpty })
+        #expect(model.fieldErrors[.strict] == OwnerWording.line(.notPermitted("config.manage"), on: .types))
     }
 
     @Test func aNameTypedInTheNewTypeSheetIsHandedBackWhenSettingsCloses() async {
@@ -853,11 +1141,11 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 
     @Test func aFieldIsAddedAndAChoiceFieldCarriesItsChoices() throws {
         let job = listed("user.job", parent: "core.task")
-        let text = try TypeDefinitionEdit.update(job, applying: .addField(key: "client", label: "Client", kind: .text, choices: []), in: [job, task])
+        let text = try TypeDefinitionEdit.update(job, applying: .addField(NewFieldRecord(key: "client", label: "Client", kind: .text)), in: [job, task])
         #expect(text.fields.additionalProperties["client"]?._type == .string)
         #expect(text.fields.additionalProperties["client"]?.label == "Client")
         #expect(text.fields.additionalProperties["client"]?.enumValues == nil)
-        let choice = try TypeDefinitionEdit.update(job, applying: .addField(key: "tier", label: "Tier", kind: .choice, choices: ["gold"]), in: [job, task])
+        let choice = try TypeDefinitionEdit.update(job, applying: .addField(NewFieldRecord(key: "tier", label: "Tier", kind: .choice, choices: ["gold"])), in: [job, task])
         #expect(choice.fields.additionalProperties["tier"]?._type == ._enum)
         #expect(choice.fields.additionalProperties["tier"]?.enumValues == ["gold"])
     }
@@ -865,7 +1153,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     @Test func aFieldAParentDeclaresCannotBeAddedOrChangedHere() {
         let job = listed("user.job", parent: "core.task")
         #expect(throws: TypeSchemaFailure.self) {
-            try TypeDefinitionEdit.update(job, applying: .addField(key: "status", label: "Status", kind: .text, choices: []), in: [job, task])
+            try TypeDefinitionEdit.update(job, applying: .addField(NewFieldRecord(key: "status", label: "Status", kind: .text)), in: [job, task])
         }
         #expect(throws: TypeSchemaFailure.changedOnServer) {
             try TypeDefinitionEdit.update(job, applying: .field(key: "status", .required(true)), in: [job, task])
@@ -894,6 +1182,34 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(Set(removed.fields.additionalProperties.keys) == ["site"])
     }
 
+    @Test func addingAFieldOrSettingVersionsSendsTheRestOfTheTypeBackAsItWas() throws {
+        let job = listed(
+            "user.job", parent: "core.task", guidance: "One job is one piece of paid work.", fields: [
+                "status": Definition(_type: .status, statusValues: [Word(value: "waiting", group: .notStarted, description: "Parts ordered.")]),
+                "client": Definition(_type: .string, label: "Client", required: true, searchable: false),
+            ])
+        let added = try TypeDefinitionEdit.update(
+            job, applying: .addField(NewFieldRecord(key: "site", label: "Site", kind: .text, isRequired: true, isSearchable: false)), in: [job, task])
+        #expect(added.fields.additionalProperties["site"] == Definition(_type: .string, label: "Site", required: true, searchable: false))
+        var versioned = job
+        versioned.value1.versionPolicy = .init(maxVersions: 200)
+        let windows = try TypeDefinitionEdit.update(versioned, applying: .versionWindow(90), in: [versioned, task])
+        #expect(windows.versionPolicy == .init(recentDays: 90, dailySnapshotDays: 90, weeklySnapshotDays: 90, maxVersions: 200))
+        let back = try TypeDefinitionEdit.update(versioned, applying: .versionWindow(nil), in: [versioned, task])
+        #expect(back.versionPolicy == .init(maxVersions: 200))
+        for update in [added, windows, back] {
+            #expect(update.fields.additionalProperties["status"] == job.value1.fields.additionalProperties["status"])
+            #expect(update.fields.additionalProperties["client"] == job.value1.fields.additionalProperties["client"])
+            #expect(update.guidance == "One job is one piece of paid work.")
+            #expect(update.label == "Job" && update.plural == "Jobs" && update.description == "Kitchens" && update.parent == "core.task")
+            #expect(update.version == 3)
+        }
+        #expect(try TypeDefinitionEdit.update(job, applying: .versionWindow(nil), in: [job, task]).versionPolicy == nil)
+        #expect(ServerTypeCalls.versionWindow(.init(recentDays: 30, dailySnapshotDays: 30, weeklySnapshotDays: 30)) == .days(30))
+        #expect(ServerTypeCalls.versionWindow(.init(recentDays: 30, dailySnapshotDays: 90, weeklySnapshotDays: 365)) == .custom)
+        #expect(ServerTypeCalls.versionWindow(.init(maxVersions: 10)) == nil)
+    }
+
     @Test func aFeedWindowAndAMergeStrategyAreSetNeverAndLeftToTheTypeAbove() throws {
         let job = listed("user.job")
         let days = try TypeDefinitionEdit.update(job, applying: .feedWindow(.days(30)), in: [job])
@@ -905,6 +1221,47 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let merge = try TypeDefinitionEdit.update(job, applying: .mergeStrategy("keep_both_copies"), in: [job])
         #expect(merge.mergePolicy?._default == .keepBothCopies)
         #expect(try TypeDefinitionEdit.update(job, applying: .mergeStrategy(nil), in: [job]).mergePolicy == nil)
+    }
+}
+
+/// The one writer of the instance's enforcement.
+@MainActor
+@Suite(.hangLimit) struct EnforcementSettingsTests {
+    /// Two writes of different levers at once: the second reads only once the first has written, so it sends the first's
+    /// lever back as the server then holds it, never as it was before.
+    @Test func writesRunOneAtATimeSoNoneUndoesAnother() async throws {
+        let bench = OwnerBench(grants: [.configManage])
+        let context = bench.context
+        let gate = bench.calls.hold("setSourceLimit")
+        let strict = Task {
+            try await context.writeEnforcement(readFrom: "instance-1", unchangedSince: { _ in true }) { $0.strictTypes = ["user.job"] }
+        }
+        #expect(await eventually { bench.calls.calls.contains("setSourceLimit") })
+        let filter = Task {
+            try await context.writeEnforcement(readFrom: "instance-1", unchangedSince: { _ in true }) {
+                $0.isOn = true
+                $0.types = ["core.note"]
+                $0.sources = ["rss"]
+            }
+        }
+        // Given time to run, the second write still waits for the first rather than reading under it.
+        let readUnder = await eventually(within: .milliseconds(300)) { bench.calls.calls.filter { $0 == "sourceLimit" }.count > 1 }
+        #expect(!readUnder)
+        gate.open()
+        _ = try await strict.value
+        gate.open()
+        let last = try await filter.value
+        #expect(last.strictTypes == ["user.job"])
+        #expect(last.isOn && last.types == ["core.note"] && last.sources == ["rss"])
+    }
+
+    @Test func anotherMarfaAnsweringIsToldAndNothingIsSent() async {
+        let bench = OwnerBench(grants: [.configManage])
+        bench.calls.state.withLock { $0.sourceLimit.instanceID = "instance-2" }
+        await #expect(throws: EnforcementSettings.Failure.anotherMarfa) {
+            try await bench.context.writeEnforcement(readFrom: "instance-1", unchangedSince: { _ in true }) { $0.strictTypes = ["user.job"] }
+        }
+        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
     }
 }
 
@@ -947,6 +1304,40 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let below = try answer(#"{"subtype_ids":["user.rework"]}"#, status: 409, code: "type_has_subtypes")
         let children = MarfaError.server(status: 409, code: "type_has_subtypes", message: "Has subtypes", details: nil, server: below)
         #expect(ServerTypeCalls.failure(children) == .hasSubtypes(["user.rework"]))
+    }
+
+    /// Hidden settings have no ID in the refusal (`types/move-settings-authority`).
+    @Test func aBlockedMoveNamesEachSettingAndWhy() throws {
+        let blocked = try answer(
+            """
+            {"settings":[
+              {"kind":"view","id":"v1","field":"query.filter","reason":"filter_term",
+               "message":"Its filter tests the type in a way a move can't rewrite. Change the filter, then move."},
+              {"kind":"webhook","field":"type_filter","reason":"not_permitted",
+               "message":"This credential can't change this setting. Change it with a credential that can, then move."}
+            ]}
+            """,
+            status: 409, code: "type_move_blocked")
+        let error = MarfaError.server(
+            status: 409, code: "type_move_blocked",
+            message: #"A folder, view or webhook names "user.job" in a way the move can't rewrite. Change each setting listed, then move."#,
+            details: nil, server: blocked)
+        #expect(
+            ServerTypeCalls.failure(error)
+                == .moveBlocked(
+                    settings: [
+                        TypeSettingRecord(kind: .view, id: "v1", field: "query.filter", blocked: .filterTerm),
+                        TypeSettingRecord(kind: .webhook, id: nil, field: "type_filter", blocked: .notPermitted),
+                    ], tables: []))
+    }
+
+    @Test func aBlockedMoveNamesTheTablesTheTargetLacks() throws {
+        let blocked = try answer(#"{"tables":["rooms"]}"#, status: 409, code: "type_move_blocked")
+        let error = MarfaError.server(
+            status: 409, code: "type_move_blocked",
+            message: "The target type does not declare rooms, which items hold rows in. Declare them on the target first.",
+            details: nil, server: blocked)
+        #expect(ServerTypeCalls.failure(error) == .moveBlocked(settings: [], tables: ["rooms"]))
     }
 }
 

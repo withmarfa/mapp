@@ -23,29 +23,41 @@ enum LibraryDescription {
     private(set) var isAllowingMore = false
     let instanceSettings: InstanceSettingsModel
     var ownerDrafts: OwnerDrafts { libraries.ownerDrafts }
+    /// The main windows open, which `openInApp` shows a place in; without it Settings offers none.
+    private let mainWindows: ItemLinkOpener?
 
     /// `instanceSettings` is the model the app keeps for This Marfa's fields, unless a test brings its own.
-    init(libraries: Libraries, launcher: SettingsLauncher, instanceSettings: InstanceSettingsModel? = nil) {
+    init(
+        libraries: Libraries, launcher: SettingsLauncher, instanceSettings: InstanceSettingsModel? = nil, mainWindows: ItemLinkOpener? = nil
+    ) {
         self.libraries = libraries
         self.launcher = launcher
         self.instanceSettings = instanceSettings ?? libraries.instanceSettings
+        self.mainWindows = mainWindows
     }
 
     private var host: MarfaHost { libraries.host }
 
     // MARK: Overview
 
-    @ObservationIgnored private var overviewModels: (address: String?, overview: OverviewModel, health: ServerHealthModel)?
+    private typealias Shared = (address: String?, overview: OverviewModel, health: ServerHealthModel, updates: UpdatesModel)
+    @ObservationIgnored private var overviewModels: Shared?
 
-    /// What the Overview and the sidebar's badge read, and the one reader of health that Overview, Backups and Housekeeping
-    /// share. Both are made again for another server, since their calls are bound to one.
+    /// What the Overview and the sidebar's badge read, the one reader of health that Overview, Backups and Housekeeping
+    /// share, and the one updates model that Overview and Updates share. All are made again for another server, since their
+    /// calls are bound to one.
     var overview: OverviewModel { models.overview }
     var health: ServerHealthModel { models.health }
+    var updates: UpdatesModel { models.updates }
 
-    private var models: (address: String?, overview: OverviewModel, health: ServerHealthModel) {
+    private var models: Shared {
         if let held = overviewModels, held.address == serverAddress { return held }
+        overviewModels?.updates.stop()
         let health = ServerHealthModel(context: OwnerContext(host: self))
-        let made = (serverAddress, OverviewModel(context: OwnerContext(host: self), health: health), health)
+        let made = (
+            serverAddress, OverviewModel(context: OwnerContext(host: self), health: health), health,
+            UpdatesModel(context: OwnerContext(host: self))
+        )
         overviewModels = made
         return made
     }
@@ -274,7 +286,14 @@ enum LibraryDescription {
         }
     }
 
-    var openInApp: ((String) -> Void)? { nil }
+    /// Shows the type's items in the main window last in front, as the Go menu does; offered only while a main window is open.
+    var openInApp: ((String) -> Void)? {
+        guard let mainWindows, mainWindows.hasMainWindow, libraries.current != nil else { return nil }
+        return { [libraries] id in
+            guard let library = libraries.current, let browser = mainWindows.mainWindowForward() else { return }
+            browser.show(.itemType(id), in: library, order: browser.storedOrder)
+        }
+    }
 
     var ownAppVendor: String? { PreferencesType.vendor }
 

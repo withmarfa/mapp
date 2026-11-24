@@ -46,7 +46,8 @@ struct NoHotKeys: HotKeyRegistrar {
 
 /// The shortcuts that work in any app, while the app is running. Every one is off until the person sets it, and is registered
 /// with the system only while it is set: setting one registers it, clearing it unregisters it, and none is registered
-/// before `start`. A shortcut needs ⌘ or ⌃ (`Shortcut.anyAppProblem`). They are kept in the defaults and sync through the connected Marfa (`PreferencesMap`).
+/// before `start`. A shortcut needs ⌘ or ⌃ (`Shortcut.anyAppProblem`). They are kept in the defaults and stay on this Mac,
+/// though a settings file and a restore point carry them (`PreferencesMap.inFilesOnly`).
 ///
 /// Stored text that cannot be read is moved aside under a key of its own, kept and never removed, and every shortcut starts
 /// off.
@@ -70,15 +71,27 @@ final class AnyAppShortcuts {
         reload()
     }
 
-    /// Reads the stored value again, as when another Mac's change has reached the defaults (`PreferencesSync`), and
-    /// registers what changed once the shortcuts have started.
+    /// Reads the stored value again, as after an import or a restore has written the defaults (`PreferencesSync`), and
+    /// once the shortcuts have started, registers each one set that is not registered, a refused one again too. A
+    /// shortcut the system refuses is kept and listed in `refused`, so an import can count it as skipped.
     func reload() {
-        let before = chosen
         read()
         guard isStarted else { return }
-        for (command, shortcut) in before where chosen[command] != shortcut { registrar.unregister(command) }
-        for (command, shortcut) in chosen where before[command] != shortcut { _ = register(shortcut, for: command) }
+        for (command, shortcut) in registered where chosen[command] != shortcut {
+            registrar.unregister(command)
+            registered[command] = nil
+        }
+        for (command, shortcut) in chosen where registered[command] != shortcut { _ = register(shortcut, for: command) }
     }
+
+    /// The commands whose shortcut is set but not registered, as the system refused it because another app holds the keys.
+    var refused: Set<AnyAppCommand> {
+        guard isStarted else { return [] }
+        return Set(chosen.compactMap { command, shortcut in registered[command] == shortcut ? nil : command })
+    }
+
+    /// What the system holds for each command, as the registrar last answered.
+    @ObservationIgnored private var registered: [AnyAppCommand: Shortcut] = [:]
 
     private func read() {
         unknown = [:]
@@ -138,12 +151,13 @@ final class AnyAppShortcuts {
     func set(_ shortcut: Shortcut?, for command: AnyAppCommand) -> Refusal? {
         if let shortcut {
             if let refusal = refusal(of: shortcut, for: command) { return refusal }
-            if chosen[command] == shortcut, isStarted { return nil }
+            if registered[command] == shortcut, isStarted { return nil }
             if isStarted, !register(shortcut, for: command) { return .unavailable }
             chosen[command] = shortcut
         } else {
             chosen.removeValue(forKey: command)
             if isStarted { registrar.unregister(command) }
+            registered[command] = nil
         }
         save()
         return nil
@@ -151,7 +165,8 @@ final class AnyAppShortcuts {
 
     /// Clears every shortcut, which unregisters them all.
     func clearAll() {
-        for command in chosen.keys where isStarted { registrar.unregister(command) }
+        for command in registered.keys { registrar.unregister(command) }
+        registered = [:]
         chosen = [:]
         save()
     }
@@ -179,8 +194,11 @@ final class AnyAppShortcuts {
     /// does not run its command. Called with false when the wait ends, however it ends.
     func setSuspended(_ suspended: Bool) { registrar.setSuspended(suspended) }
 
+    /// A refusal leaves the command with what the system held before.
     private func register(_ shortcut: Shortcut, for command: AnyAppCommand) -> Bool {
-        registrar.register(shortcut, for: command) { [weak self] in self?.perform(command) }
+        guard registrar.register(shortcut, for: command, action: { [weak self] in self?.perform(command) }) else { return false }
+        registered[command] = shortcut
+        return true
     }
 
     private func save() {

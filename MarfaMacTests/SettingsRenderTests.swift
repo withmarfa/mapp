@@ -25,7 +25,7 @@ import Testing
     var deletedCount = 0
     var deletedRetentionDays: Int? = 60
     var canDeletePermanently = true
-    var openInApp: ((String) -> Void)? { nil }
+    var openInApp: ((String) -> Void)?
     var ownAppVendor: String? { "app.marfa-mac" }
 
     var webSignInReturn: String { "com.withmarfa.marfa.test:/signed-in" }
@@ -42,6 +42,7 @@ import Testing
     var folderCalls: any FolderCalls = FakeFolderCalls()
     var overview: OverviewModel
     var health: ServerHealthModel
+    var updates: UpdatesModel
     var shown: [MarfaSettingsPage] = []
     var shownSubpages: [SettingsSubpage?] = []
     var sources: [MarfaSourceRow] = []
@@ -57,12 +58,14 @@ import Testing
         let reader = ServerHealthModel(context: context)
         health = reader
         overview = OverviewModel(context: context, health: reader)
+        updates = UpdatesModel(context: context)
     }
 
     /// Binds the Overview and the health reader to the host's own calls and grants, as the app does.
     func bindOverview() {
         health = ServerHealthModel(context: OwnerContext(host: self))
         overview = OverviewModel(context: OwnerContext(host: self), health: health)
+        updates = UpdatesModel(context: OwnerContext(host: self))
     }
 
     func show(_ page: MarfaSettingsPage, subpage: SettingsSubpage?) {

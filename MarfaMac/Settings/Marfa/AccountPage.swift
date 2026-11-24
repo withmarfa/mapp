@@ -1,10 +1,13 @@
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// The Account page: the owner's username and email as the server holds them, Change Password…, the passkeys with Add a
-/// Passkey…, and the browsers signed in, each with Sign Out.
+/// The Account page: the owner's picture and name, which can be changed, the username and email as the server holds them,
+/// Change Password…, the passkeys with Add a Passkey…, and the browsers signed in, each with Sign Out.
 struct AccountPage: View {
     let host: any MarfaSettingsHost
     @State private var model: AccountModel
+    @State private var choosesPicture = false
     @Environment(\.openURL) private var openURL
 
     init(host: any MarfaSettingsHost) {
@@ -17,6 +20,12 @@ struct AccountPage: View {
             .task(id: host.serverAddress) { await model.load() }
             .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: dismissSheet) { AccountSheet(model: model) }
+            .fileImporter(isPresented: $choosesPicture, allowedContentTypes: [.image]) { chosen in
+                switch chosen {
+                case .success(let file): Task { await model.setPicture(from: file) }
+                case .failure: model.pictureNotChosen()
+                }
+            }
             .alert(
                 model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
                 presenting: model.question
@@ -46,7 +55,7 @@ struct AccountPage: View {
             OwnerLoading()
         } else {
             SettingsPageColumn {
-                if let profile = model.profile, !profile.isEmpty { profileSection(profile) }
+                if let profile = model.profile { profileSection(profile) }
                 passwordSection
                 if model.canManageSignIns {
                     if let failure = model.listsFailure {
@@ -72,8 +81,54 @@ struct AccountPage: View {
         }
     }
 
-    private func profileSection(_ profile: OwnerProfile) -> some View {
+    /// Profile, and below it, in a section of its own since it has a mark, what the sign-in may not change, or may not read:
+    /// a name or picture the sign-in may not see is shown only there, locked. Where it may read nothing of the profile, the
+    /// locked row stands as Profile.
+    @ViewBuilder private func profileSection(_ profile: OwnerProfile) -> some View {
+        if !profile.isEmpty { profileRows(profile) }
+        let locked = model.lockedProfile
+        if !locked.isEmpty {
+            SettingsSection(name: profile.isEmpty ? Text("Profile") : nil) {
+                SettingsProblemRow(
+                    title: lockedTitle(locked), line: lockedLine(locked, of: profile), symbol: "lock", tone: nil,
+                    actions: [
+                        SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { Task { await model.allowProfileChanges() } }
+                    ]
+                )
+                .disabled(host.isAllowingMore)
+                .accessibilityIdentifier("AccountProfileLocked")
+            }
+        }
+    }
+
+    private func profileRows(_ profile: OwnerProfile) -> some View {
         SettingsSection("Profile") {
+            if profile.pictureIsReadable {
+                SettingsRow(
+                    "Picture", error: model.pictureError,
+                    lead: .custom(AnyView(ProfilePictureMark(picture: model.picture, name: profile.name ?? profile.username)))
+                ) {
+                    if model.changeable.contains(.avatar) {
+                        SettingsButton(model.isSendingPicture ? "Sending…" : "Change…", reserving: "Change…") { choosesPicture = true }
+                            .disabled(model.isSendingPicture)
+                            .accessibilityIdentifier("AccountChangePicture")
+                    }
+                }
+            }
+            if let name = profile.name {
+                SettingsRow("Name", error: model.nameError) {
+                    if model.changeable.contains(.name) {
+                        SettingsField(
+                            title: "Name", text: $model.nameDraft, isError: model.nameError != nil,
+                            onSubmit: { Task { await model.saveName() } }, onEndEditing: { Task { await model.saveName() } }
+                        )
+                        .disabled(model.isSavingName)
+                        .accessibilityIdentifier("AccountName")
+                    } else {
+                        SettingsValue(verbatim: name)
+                    }
+                }
+            }
             if let username = profile.username {
                 SettingsRow("Username", line: "You sign in with it.") { SettingsValue(verbatim: username) }
             }
@@ -82,6 +137,31 @@ struct AccountPage: View {
                     if let email = profile.email { SettingsValue(verbatim: email) } else { SettingsValue("Not Set") }
                 }
             }
+        }
+    }
+
+    private func lockedTitle(_ locked: Set<ProfileField>) -> Text {
+        switch (locked.contains(.name), locked.contains(.avatar)) {
+        case (true, true): Text("Name and Picture")
+        case (true, false): Text("Name")
+        default: Text("Picture")
+        }
+    }
+
+    /// What is locked of each: nil where it is free, false where it can be read and not changed, true where it is hidden.
+    private func lockedLine(_ locked: Set<ProfileField>, of profile: OwnerProfile) -> Text {
+        let name = locked.contains(.name) ? profile.name == nil : nil
+        let picture = locked.contains(.avatar) ? !profile.pictureIsReadable : nil
+        switch (name, picture) {
+        case (false?, nil): return Text("The app isn’t allowed to change your name.")
+        case (true?, nil): return Text("The app isn’t allowed to show or change your name.")
+        case (nil, false?): return Text("The app isn’t allowed to change your picture.")
+        case (nil, true?): return Text("The app isn’t allowed to show or change your picture.")
+        case (false?, false?): return Text("The app isn’t allowed to change your name and picture.")
+        case (true?, true?): return Text("The app isn’t allowed to show or change your name and picture.")
+        case (false?, true?): return Text("The app isn’t allowed to change your name, or to show or change your picture.")
+        case (true?, false?): return Text("The app isn’t allowed to show or change your name, or to change your picture.")
+        case (nil, nil): return Text(verbatim: "")
         }
     }
 
@@ -138,6 +218,36 @@ struct AccountPage: View {
         }
         parts.append(OwnerWording.used(used, now: now, calendar: calendar) + ".")
         return parts.joined(separator: " ")
+    }
+}
+
+/// The owner's picture in a circle, or the first letters of their name where there is none.
+private struct ProfilePictureMark: View {
+    let picture: Data?
+    let name: String?
+
+    private var initials: String {
+        String((name ?? "").split(separator: " ").prefix(2).compactMap(\.first)).uppercased()
+    }
+
+    var body: some View {
+        Group {
+            if let picture, let image = NSImage(data: picture) {
+                Image(nsImage: image).resizable().scaledToFill()
+            } else {
+                Circle().fill(SettingsTokens.Tone.purple.color).overlay {
+                    if initials.isEmpty {
+                        SettingsTileGlyph(symbol: "person.fill", tileSize: SettingsTokens.Metric.tile)
+                    } else {
+                        Text(verbatim: initials).settingsFont(.small)
+                    }
+                }
+                .foregroundStyle(SettingsTokens.tileForeground)
+            }
+        }
+        .frame(width: SettingsTokens.Metric.tile, height: SettingsTokens.Metric.tile)
+        .clipShape(Circle())
+        .accessibilityHidden(true)
     }
 }
 

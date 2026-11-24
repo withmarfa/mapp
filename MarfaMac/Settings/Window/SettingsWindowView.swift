@@ -14,10 +14,10 @@ struct SettingsWindowView: View {
     @State private var sheets = SettingsSheetPresenter()
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
 
-    init(launcher: SettingsLauncher, libraries: Libraries) {
+    init(launcher: SettingsLauncher, libraries: Libraries, mainWindows: ItemLinkOpener? = nil) {
         self.launcher = launcher
         self.libraries = libraries
-        _host = State(initialValue: AppSettingsHost(libraries: libraries, launcher: launcher))
+        _host = State(initialValue: AppSettingsHost(libraries: libraries, launcher: launcher, mainWindows: mainWindows))
     }
 
     private var navigation: SettingsNavigation { launcher.navigation }
@@ -82,10 +82,11 @@ struct SettingsWindowView: View {
         .accessibilityIdentifier("SettingsWindow")
     }
 
-    /// Closing Settings hands over what was typed and not saved, and drops a question about changes that wait, which is
-    /// put again when Settings is next opened.
+    /// Closing Settings hands over what was typed and not saved, stops following an update (the server carries on), and drops
+    /// a question about changes that wait, which is put again when Settings is next opened.
     private func closed() {
         host.handOverDrafts()
+        host.updates.stop()
         libraries.marfaSettings.cancelDeparture()
     }
 }

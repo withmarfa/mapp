@@ -42,6 +42,14 @@ nonisolated enum FeedWindow: Hashable, Sendable {
     case never
 }
 
+/// How long a type keeps its items' versions, where the type sets it.
+nonisolated enum VersionWindow: Hashable, Sendable {
+    /// Every version for this many days, then only each item's newest.
+    case days(Int)
+    /// Windows set another way, such as from the command line, which the page shows and does not change.
+    case custom
+}
+
 /// The kinds of field an owner adds. Marfa has more (lists, status words, thumbnails); those come from a plugin or the
 /// command line.
 nonisolated enum FieldKind: String, CaseIterable, Hashable, Sendable {
@@ -73,6 +81,8 @@ nonisolated struct TypeRecord: Identifiable, Hashable, Sendable {
     var feedWindow: FeedWindow?
     /// The strategy the type declares for a field it names no strategy for: `last_writer_wins` or `keep_both_copies`.
     var mergeStrategy: String?
+    /// The version windows the type declares itself.
+    var versionWindow: VersionWindow?
 
     struct PluginOrigin: Hashable, Sendable {
         var name: String
@@ -113,13 +123,95 @@ nonisolated enum TypeEdit: Hashable, Sendable {
     case parent(String?)
     case addWord(group: String, value: String)
     case wordMeaning(value: String, text: String)
-    case addField(key: String, label: String, kind: FieldKind, choices: [String])
+    case addField(NewFieldRecord)
     case field(key: String, TypeFieldChange)
     case removeField(key: String)
     /// Nil leaves the window to the type above.
     case feedWindow(FeedWindow?)
     /// Nil leaves the strategy to the type above.
     case mergeStrategy(String?)
+    /// Keeps every version for this many days, then only each item's newest. Nil leaves the windows to the type above.
+    case versionWindow(Int?)
+}
+
+/// A field the owner adds to a type.
+nonisolated struct NewFieldRecord: Hashable, Sendable {
+    var key: String
+    var label: String
+    var kind: FieldKind
+    /// The words a choice field offers; empty for any other kind.
+    var choices: [String] = []
+    var isRequired = false
+    var isSearchable = true
+}
+
+/// A type the owner makes, under `user.`.
+nonisolated struct NewTypeRecord: Hashable, Sendable {
+    var id: String
+    var label: String
+    /// Empty leaves it to the server, which makes one from the label.
+    var plural: String
+    var icon: String?
+    /// Nil makes a type based on nothing.
+    var parent: String?
+}
+
+/// A folder, view or webhook that names a type, as a move of its items reads it.
+nonisolated struct TypeSettingRecord: Hashable, Sendable {
+    enum Kind: Hashable, Sendable { case folder, view, webhook }
+    /// Why a move can't change a setting (`types/move-blocked`, `types/move-settings-authority`).
+    enum Block: Hashable, Sendable {
+        /// This sign-in may not change the setting.
+        case notPermitted
+        /// Its filter names the type in a way a move can't rewrite, or rewriting would make it too long.
+        case filterTerm
+        /// It places the two types in different folders.
+        case placementConflict
+        /// A webhook's type filter names a type with subtypes.
+        case subtypes
+        /// A reason this app doesn't know, in the server's words.
+        case other(String)
+    }
+
+    var kind: Kind
+    var id: String?
+    /// Where the setting names the type, such as `query.types` or `type_filter`.
+    var field: String = ""
+    /// Why a move can't change it. Nil where a move changes it to name the new type.
+    var blocked: Block?
+}
+
+/// What moving a type's items would do: the items it moves and the settings that name the type.
+nonisolated struct TypeMovePreview: Hashable, Sendable {
+    /// Nil where the server refused the move before counting them.
+    var items: Int?
+    /// The items it moves.
+    var ids: [String] = []
+    var settings: [TypeSettingRecord]
+    /// Tables items hold rows in that the target type doesn't declare, which stop the move.
+    var tables: [String] = []
+
+    /// Whether a move would do what `other` said it would: the same items, settings and tables.
+    func isSame(as other: TypeMovePreview) -> Bool {
+        Set(ids) == Set(other.ids) && Set(settings) == Set(other.settings) && Set(tables) == Set(other.tables)
+    }
+}
+
+/// How a move of a type's items ended.
+nonisolated struct TypeMoveResult: Hashable, Sendable {
+    /// Items the job moved.
+    var moved: Int = 0
+    /// Items the job tried and left unmoved. Items made while it ran are not among them.
+    var failed: Int = 0
+    /// Items still of the old type that the sign-in can see.
+    var remaining: Int
+    /// Whether items the sign-in can't see are still of the old type.
+    var remainingHidden: Bool
+    /// Why the move stopped or left the settings as they were, in the server's words.
+    var problem: String?
+
+    /// Whether every item moved: a move with any item left or failed is partial.
+    var isDone: Bool { failed == 0 && remaining == 0 && !remainingHidden && problem == nil }
 }
 
 /// A change to one field a type declares itself.
@@ -155,6 +247,9 @@ nonisolated enum TypeFailure: Error, Hashable, Sendable {
     case inUse(items: Int?, settings: Int)
     /// Types are based on it (`types/delete-subtypes`).
     case hasSubtypes([String])
+    /// Settings name the type in a way a move can't change, or items hold rows in tables the target lacks
+    /// (`type_move_blocked`), so nothing moved.
+    case moveBlocked(settings: [TypeSettingRecord], tables: [String])
 }
 
 /// What the Types page asks of the server. Every call needs the server and is never queued.
@@ -162,13 +257,18 @@ nonisolated protocol TypeCalls: Sendable {
     func types() async throws(TypeFailure) -> TypeListing
     /// The type's guidance and its ancestors' (`GET /types/{id}`).
     func reading(of type: String) async throws(TypeFailure) -> TypeReading
-    /// Reads the type's own definition again and sends it back with `edit` made, so what another app changed meanwhile is
-    /// kept (`PUT /types/{id}` replaces the whole definition and has no version).
+    /// Reads the type's own definition again and sends it back with `edit` applied. The replacement keeps the other fields
+    /// from that read (`PUT /types/{id}` replaces the whole definition and has no write precondition).
     func change(_ type: String, _ edit: TypeEdit) async throws(TypeFailure)
-    /// Registers `id`, a `user.*` type, below `parent` (`POST /types`).
-    func addChild(id: String, label: String, below parent: String) async throws(TypeFailure)
-    /// Deletes a type of the owner's that no item holds and no type is based on (`DELETE /types/{id}`, never forced).
-    func delete(_ type: String) async throws(TypeFailure)
+    /// Registers a `user.*` type with its plural and icon, below its parent or based on nothing (`POST /types`).
+    func addType(_ type: NewTypeRecord) async throws(TypeFailure)
+    /// Deletes a type of the owner's that no type is based on (`DELETE /types/{id}`). Unforced, a type an item or a setting
+    /// uses is refused; forced, its items and settings stay as they are, naming a type that is gone (`types/delete-force`).
+    func delete(_ type: String, force: Bool) async throws(TypeFailure)
+    /// What moving every item of `type` to `target` would do, changing nothing (`POST /types/{id}/move`, `dry_run`).
+    func previewMove(of type: String, to target: String) async throws(TypeFailure) -> TypeMovePreview
+    /// Moves every item of `type` to `target` and waits for the server's job to end (`types/move`, `types/move-settings`).
+    func move(_ type: String, to target: String) async throws(TypeFailure) -> TypeMoveResult
 }
 
 nonisolated extension FieldKind {

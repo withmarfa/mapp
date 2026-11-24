@@ -5,7 +5,6 @@ import SwiftUI
 /// updates, and how the last update ended. Where the server cannot update itself it says how, with Copy Steps.
 struct UpdatesPage: View {
     let host: any MarfaSettingsHost
-    @State private var model: UpdatesModel
     @State private var copied = false
     @State private var asksToUpdate = false
 
@@ -16,16 +15,20 @@ struct UpdatesPage: View {
 
     init(host: any MarfaSettingsHost) {
         self.host = host
-        _model = State(initialValue: UpdatesModel(context: OwnerContext(host: host)))
     }
+
+    /// The host's one updates model, which Overview reads too.
+    private var model: UpdatesModel { host.updates }
 
     var body: some View {
         content
             .task(id: LoadID(address: host.serverAddress, canChangeSettings: model.canChangeSettings)) { await model.load() }
-            .onDisappear { model.stop() }
             .alert("Update \(host.serverName)?", isPresented: $asksToUpdate) {
                 Button("Cancel", role: .cancel) {}
-                Button("Update") { Task { await model.update() } }
+                Button("Update") {
+                    let model = model
+                    Task { await model.confirmUpdate() }
+                }
             } message: {
                 Text("\(host.serverName) restarts to finish the update. The app reconnects when it’s back.")
             }

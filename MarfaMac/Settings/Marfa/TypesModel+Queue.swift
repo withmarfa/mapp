@@ -81,7 +81,7 @@ extension TypesModel {
         return took
     }
 
-    private func send(_ edit: TypeEdit, to id: String, field: Field) async -> Bool {
+    func send(_ edit: TypeEdit, to id: String, field: Field) async -> Bool {
         do {
             try await calls.change(id, edit)
         } catch {
@@ -101,12 +101,15 @@ extension TypesModel {
         return true
     }
 
-    private func refused(_ error: TypeFailure, field: Field) async {
+    func refused(_ error: TypeFailure, field: Field) async {
         switch error {
         case .invalid(let path, let message):
             let named = field == .newField ? nil : Self.field(named: path)
             let target = named ?? field
-            fieldErrors[target] = Self.isLengthRule(message) ? Self.line(for: target) ?? message : message
+            var line = Self.isLengthRule(message) ? Self.line(for: target) ?? message : message
+            // The server's sentence names its pattern; a word that doesn't start with a letter is told in the page's words.
+            if target == .word, let first = Self.value(ofTyped: wordDraft).first, !first.isLetter { line = Self.line(for: .word) ?? message }
+            fieldErrors[target] = line
         case .changedOnServer:
             pageFailure = .conflict
             await reread()
@@ -119,7 +122,7 @@ extension TypesModel {
         case .canceled:
             // The owner closed the sign-in: nothing was sent and nothing is said.
             break
-        case .pluginType, .inUse, .hasSubtypes:
+        case .pluginType, .inUse, .hasSubtypes, .moveBlocked:
             pageFailure = Self.owner(error)
         }
     }
@@ -147,11 +150,11 @@ extension TypesModel {
         case .description: String(localized: "A description can be \(descriptionLimit) characters at most.")
         case .guidance: String(localized: "Guidance can be \(guidanceLimit) characters at most.")
         case .meaning: String(localized: "What a word means can be \(wordMeaningLimit) characters at most.")
-        case .word: String(localized: "A status word starts with a letter, then letters, numbers and spaces.")
+        case .word: String(localized: "A status word starts with a letter.")
         case .fieldName: String(localized: "A field’s name can be 100 characters at most.")
         case .fieldMeaning: String(localized: "What a field means can be \(fieldMeaningLimit) characters at most.")
         case .fieldLongest: String(localized: "The longest a field can be is a whole number of at least 1.")
-        case .basedOn, .newType, .newField, .fieldRule, .fieldSearchable, .fieldRemove, .choice, .feed, .merge: nil
+        case .basedOn, .newType, .newField, .fieldRule, .fieldSearchable, .fieldRemove, .choice, .feed, .merge, .versions, .strict: nil
         }
     }
 
@@ -167,6 +170,7 @@ extension TypesModel {
         }
         if path.hasPrefix("retention_policy") { return .feed }
         if path.hasPrefix("merge_policy") { return .merge }
+        if path.hasPrefix("version_policy") { return .versions }
         switch path {
         case "label": return .name
         case "plural": return .plural

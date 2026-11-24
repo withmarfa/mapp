@@ -77,6 +77,19 @@ nonisolated enum PreferencesMerge {
         return adjusted
     }
 
+    /// The base to reconcile against when this Mac replaced settings on purpose (an import, a restore, Reset): each
+    /// unit `wins` names where this Mac's value differs from the Marfa's counts as changed here and unchanged there, so
+    /// this Mac's value is written, even over another Mac's change this Mac had not taken.
+    static func base(_ base: PreferenceUnits, winning wins: (PreferenceUnit) -> Bool, local: PreferenceUnits,
+                     remote: PreferenceUnits) -> PreferenceUnits
+    {
+        var adjusted = base
+        for unit in Set(local.keys).union(remote.keys).union(base.keys) where wins(unit) && local[unit] != remote[unit] {
+            adjusted[unit] = remote[unit]
+        }
+        return adjusted
+    }
+
     /// A row's id: the same on every Mac for the same table, setting and key, so two Macs writing one setting write one
     /// row. Shaped as the lowercase UUIDv7 a row id must be, from a hash rather than a time.
     static func rowID(_ table: PreferencesTable, setting: String, key: String) -> String {

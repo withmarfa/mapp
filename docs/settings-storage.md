@@ -1,8 +1,8 @@
 # Settings storage
 
-Status: Built. This app's settings are kept in the connected Marfa so every Mac that connects uses them; window sizes, column widths and On This Mac stay on each Mac. The store of type looks and the list density are built in v0.0.44. See [Looks](looks.md).
+Each Mac keeps its own window sizes and positions, column widths, global shortcuts, and On This Mac settings. The connected Marfa holds the app settings shared by its Macs. See [Looks](looks.md).
 
-Where it lives: `ListKey`, `PageKey`, `OrderKey`, `InterfaceKey` and `AppearanceKey` under `MarfaMac/Views/`, and `MacSettings`, `StartWith`, `ReopenWindows`, `NewItemType`, `NewRowTypes`, `WeekStart`, `CalendarHourHeight`, `PagePlacements`, `ViewLayouts`, `PlaceDefaults`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `SearchLeaveOuts`, `SearchOptions`, `DateFormat` and `RemotePictureSetting` under `MarfaMac/Model/`, `ShortcutBindings` and `AnyAppShortcuts` under `MarfaMac/Model/Shortcuts/`, and `PreferencesType`, `PreferencesMap`, `PreferencesMerge`, `PreferencesSync`, `PreferencesCopy` and `ConnectionSettings` under `MarfaMac/Model/Marfa/`.
+Where it lives: `ListKey`, `PageKey`, `OrderKey`, `InterfaceKey` and `AppearanceKey` under `MarfaMac/Views/`, and `MacSettings`, `StartWith`, `ReopenWindows`, `NewItemType`, `NewRowTypes`, `WeekStart`, `CalendarHourHeight`, `PagePlacements`, `ViewLayouts`, `PlaceDefaults`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `SearchLeaveOuts`, `SearchOptions`, `DateFormat` and `RemotePictureSetting` under `MarfaMac/Model/`, `ShortcutBindings` and `AnyAppShortcuts` under `MarfaMac/Model/Shortcuts/`, and `PreferencesType`, `PreferencesMap`, `PreferencesMerge`, `PreferencesSync`, `PreferencesCopy`, `SettingsFile`, `RestorePoints` and `ConnectionSettings` under `MarfaMac/Model/Marfa/`.
 
 This app's settings have three homes. A setting belongs in the narrowest one that matches what the person would expect.
 
@@ -12,7 +12,7 @@ This app's settings have three homes. A setting belongs in the narrowest one tha
 | --- | --- | --- |
 | The Marfa's own data | Items, types, views, the sign-in's grants. Never an app setting. | The Marfa. |
 | This app's settings | Every setting that should follow the person to another Mac. | One hidden item per Marfa, of type `app.marfa-mac.preferences`. |
-| This Mac only | Window sizes and positions, column widths, On This Mac, the connection and the sync's own bookkeeping. | The defaults on this Mac. |
+| This Mac only | Window sizes and positions, column widths, the shortcuts that work in any app, On This Mac, the connection and the sync's own bookkeeping. | The defaults on this Mac. |
 
 The defaults on this Mac stay the store the app's code reads, so a launch reads nothing from the network and `@AppStorage` keeps working. Where the settings sync, the defaults are this Mac's copy of the Marfa's settings, and `PreferencesSync` keeps the two together.
 
@@ -27,7 +27,7 @@ The defaults on this Mac stay the store the app's code reads, so a launch reads 
 | `editor` field | every `PageKey`, and `sourceViewMode` |
 | `lists` field | `listDensity`, `showsQuickAddOptions`, `calendarHourHeight`, `indexNewTypes`, `noteSort`, `groupsByDate` |
 | `search` field | `searchIncludesArchived`, `searchIncludesInbox`, `searchOrder`, `searchShowsSnippets`, and this server's entry of `searchLeaveOuts` |
-| `commands` table | `keyboardShortcuts` (one row per command), `anyAppShortcuts` |
+| `commands` table | `keyboardShortcuts` (one row per command) |
 | `types` table | `pagePlacements`, this server's `typeLooks`, `includedSubtypes` |
 | `views` table | `viewLayouts`, without the table's widths |
 | `places` table | `placeDefaults`, `placeDensities`, `indexTab.<place>`, `indexSort.<place>` |
@@ -47,14 +47,16 @@ Every sign-in asks for `app.*:write`, never `app.marfa-mac.*:write`, and never b
 
 ## What stays on this Mac
 
-Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `inspector*Open` keys, `inspectorAppOpen.*`, window scene storage), a table's column widths (`itemTableColumns`), `startLastPlace`, `quickAddLastType`, `sendErrorReports`, `betaVersions`, `NSQuitAlwaysKeepsWindows`, everything on On This Mac, the `Marfa*` connection keys and the sync's own keys: `preferencesBeforeSync` and `preferencesSync`.
+Window sizes and positions (`interfaceDefaultWidth.*`, `inspectorWidth`, the `inspector*Open` keys, `inspectorAppOpen.*`, window scene storage), a table's column widths (`itemTableColumns`), the shortcuts that work in any app (`anyAppShortcuts`), `startLastPlace`, `quickAddLastType`, `sendErrorReports`, `betaVersions`, `NSQuitAlwaysKeepsWindows`, everything on On This Mac, the `Marfa*` connection keys, the sync's own key `preferencesSync` and the restore points.
+
+The shortcuts that work in any app are not synced, but a settings file and a restore point carry them. A Marfa that holds them from an earlier version keeps those rows, and the sync neither reads nor deletes them.
 
 ## The first launch
 
 Nothing is decided until the hydration is complete, the sign-in reaches the type and every table is held whole; until then the defaults stay as they are and Connection says the settings are not ready.
 
 - **The sign-in lacks the permission** (a sign-in made before the settings synced holds neither `app.*:write` nor `metadata.types:write`): nothing syncs, the defaults are untouched and Connection offers Allow More….
-- **Before the first write or adoption**, every synced key's value on this Mac is copied once into `preferencesBeforeSync`, kept until Reset.
+- **Before the first write or adoption**, and before switching Marfa, this Mac's settings are saved as a restore point ([Restore points, export and import](#restore-points-export-and-import)). If the point can't be saved, the step changes nothing, the failure is logged, and the next step tries again.
 - **The Marfa holds no item, and this Mac never adopted a Marfa:** the item is made from this Mac's settings.
 - **The Marfa holds no item, and this Mac adopted another Marfa before:** the synced settings go back to the app's defaults and an empty item is made, so a new Marfa does not take another's arrangement.
 - **The item exists:** what it holds wins, and what it lacks is filled from this Mac, once. The adoption is recorded for the Marfa's instance.
@@ -63,7 +65,7 @@ Nothing is decided until the hydration is complete, the sign-in reaches the type
 
 ## A change on one Mac reaching another
 
-One step compares this Mac's settings and the item's with what both held after the last step. A change on this Mac is written to the item, and a change from another Mac is written into the defaults, after which the observable stores read them again and open windows follow. A change on this Mac waits one second, so a slider's drag is one write, and the sync asks the library to send it at once, so another Mac sees it without waiting for the next connection. Nothing is written for what was just applied, so there is no echo.
+One step compares this Mac's settings and the item's with what both held after the last step. A change on this Mac is written to the item, and a change from another Mac is written into the defaults, after which the observable stores read them again and open windows follow. A change on this Mac waits one second, so a slider's drag is one write, and the sync asks the library to send it at once, so another Mac sees it without waiting for the next connection. Nothing is written for what was just applied, so there is no echo. The sync's record of what both hold is saved as soon as another Mac's change is in the defaults, before anything is written to the item, so if the copy then refuses a write, the next step still knows that change came from another Mac and never sends it back as this Mac's.
 
 Fields are written by member. Where two Macs change different members, both changes stand; where the server keeps another Mac's member and writes this Mac's to a conflicted copy, the app writes the members it sent again, takes the members the other Mac changed, and bins the copy.
 
@@ -73,8 +75,8 @@ The later write wins, row by row and member by member, and nothing is lost: each
 
 ## Unreadable settings
 
-- **A Marfa row whose value is not JSON** is set aside once under its store's `...SetAside` key and is never deleted from the Marfa by this Mac.
-- **Stored text this Mac cannot read** is neither sent nor written over.
+- **A Marfa row whose value is not JSON** is set aside once under its store's `...SetAside` key and is never deleted from the Marfa by this Mac. A value the defaults can't keep, such as one with `null` inside it, is skipped the same way: every value is checked before it is written (`SyncedSetting.write`), and this Mac keeps what it held there.
+- **Stored text this Mac cannot read** is neither sent nor written over. A stored value of another kind than its store keeps, such as text where the store keeps data, counts as unreadable.
 - **A store's older value** that no longer decodes (`pagePlacementsSetAside`, `viewLayoutsSetAside`, `sidebarLayoutsSetAside`, `typeLooksSetAside`, `placeDensitiesSetAside`, `placeDefaultsSetAside`, `itemTableColumnsSetAside`, `searchLeaveOutsSetAside`, `keyboardShortcutsSetAside`, `anyAppShortcutsSetAside`, `dateFormatSetAside`) is kept under that key and the store starts from its defaults, so a person's arrangement can be recovered. An older Date Format value that no longer reads is set aside the same way at launch and never translated.
 - **A new field on a stored value is optional.** A value saved before the field existed must still decode.
 
@@ -96,7 +98,25 @@ Disconnect's alert has a checkbox, "Also remove this app's settings from <name>"
 
 ## Reset
 
-Settings > General > Reset This App's Settings… clears every key in `MacSettings.keys`, and the keys that come one for each app's inspector, and so removes the app's own `NSQuitAlwaysKeepsWindows`, which puts Reopen Windows back to the Mac's answer. Where the settings sync, the Marfa's settings are put back with them, for every Mac, as one write for each changed field and one batch for each table, and the alert says so. It leaves the copy of the library, its queue, the sign-in, the connection (the server's address and its names), the sync's bookkeeping and any value set aside under a `...SetAside` key. The shortcuts held in memory are put back with it (`Libraries.resetMacSettings`), so the menus and the hot keys follow at once. One list holds the keys, which the Reset and the sample library's clean start both read: a new setting stored on this Mac is added to `MacSettings.keys` in the same change, and a test checks that each group of keys is in it.
+Settings > General > Reset This App's Settings… saves a restore point first. If the save fails, the app tells the person and stops. Otherwise, Reset clears the keys in `MacSettings.keys` and `MacSettings.prefixes`, including each app's inspector state. Clearing the app's `NSQuitAlwaysKeepsWindows` override makes Reopen Windows follow the system setting again. The sample library uses the same key lists for a clean start.
+
+`Libraries.resetMacSettings` reloads the settings stores, so menus, global shortcuts, and open windows reflect the reset immediately; if a sync step is under way, Reset waits for it to end first. Settings > General turns update checks and error reports back on only once the reset has happened, so a Reset that can't save its point leaves both as their switches read. When settings sync, the confirmation alert explains that Reset affects every Mac connected to this Marfa. The sync groups changed fields in one item update and changed rows in one batch per table. Reset preserves the library copy, its queue, the sign-in, the connection, the sync record, and values in `...SetAside` keys.
+
+## Restore points, export and import
+
+A restore point is this app's settings as they were before something replaced many of them. The app saves one before the first sync, before taking another Mac's settings, before Reset, before Import, before switching Marfa and before restoring, each titled for its reason, such as "Before Reset". Nothing is replaced until its point is saved. Points are files in `Restore Points` in the app's Application Support folder, so they stay on this Mac; the newest ten are kept. A point with the same reason as the newest one and the same settings, byte for byte, is not saved again, so a step that tries again leaves one point. A point that can't be read is left out of the list. The unit tests and previews keep points of their own, each in a temporary folder removed with it, and the sample library keeps its points beside its copy and clears them at launch with it.
+
+A point is the app's own defaults themselves (`SettingsSnapshot`): every key in `MacSettings.keys` and the keys that come one for each app's inspector, each value as a binary property list (base64 in the file), with the reason and the date, so a date, data or a number JSON can't hold comes back as it was. If a value can't be kept, the point isn't saved and nothing is replaced. A point reads only the app's own domain, never a value the defaults inherit, such as the system's `NSQuitAlwaysKeepsWindows`, so a restore never makes a system setting the app's own. It holds every Marfa's entry of a setting kept for each server, the settings that stay on this Mac, and a stored value its store can't read, so it puts back exactly what was replaced.
+
+A settings file (`SettingsFile`) groups settings into General, Appearance, Keyboard, Editor, Lists, Layouts, Search, and Sidebar. The JSON file identifies its format as `marfa-mac-settings`, version 1. Each value uses the same JSON text as the sync. For settings kept by server, the file carries the connected Marfa's entry, or this Mac's entry when disconnected. Export omits unreadable settings. Keyboard includes global shortcuts.
+
+- **Export** includes each section that has stored values.
+- **Import** reads a file and replaces each chosen section whole: a setting of the section that the file lacks goes back to its default, and the other sections are untouched. A file that is not the app's, or comes from a later version, is refused and changes nothing. Every value is checked before any is written; one the setting can't store is skipped and counted. A stored value in a chosen section that this Mac can't read is set aside under its `...SetAside` key before it is written over. A shortcut that works in any app that the system won't register, because another app holds the keys, is kept and counted as skipped, judged by what the system holds after the stores read the defaults again.
+- **Restore** puts back exactly the keys a point holds and removes the ones it lacks, after checking every value and saving a point of its own, so the restore can be undone.
+
+Settings > General holds the rows that use them (Export Settings…, Import Settings…, Restore Earlier Settings…, and Reset This App's Settings…, whose alert says a point is saved first; see [Settings](settings.md#general)). Import offers only the sections the file holds, and Restore asks for one point and puts back all its sections.
+
+Import, Restore and Reset run between sync steps: steps stop, a step under way ends first, and a step runs after, so no step writes what it read before over them. After each, the stores read the defaults again, so the open windows and the shortcuts follow at once. Where the settings sync, each setting they wrote is marked in the sync's bookkeeping (`preferencesSync`) and wins at the next step for every Mac, even over another Mac's change this Mac has not taken; a value Import skipped is left out of its setting's mark, since it is what this Mac held. The marks survive a relaunch. A setting's mark clears once the write that carries it is queued, with the record of what it carried, so if a later write of the step is refused, only what that write carried is sent again; a switch of Marfa clears them too. With no Marfa connected, they change this Mac only. If the point before them can't be saved, they change nothing and say so.
 
 ## Rules
 

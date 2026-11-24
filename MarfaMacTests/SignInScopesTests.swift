@@ -15,6 +15,7 @@ struct SignInScopesTests {
         "instance.read", "items.purge", "keys.manage", "keys.mint", "schema.write", "sign_ins.manage", "webhooks.manage",
     ]
     nonisolated private static let common = ["*:read", "*:write", "edge.*:read", "edge.*:write"] + ownerPermissions + ["profile.name:read"]
+        + ["profile.username:read", "profile.email:read", "profile.name:write", "profile.avatar:read", "profile.avatar:write"]
     nonisolated private static let vendor = "app.marfa-mac.*:write"
     nonisolated private static let root = "app.*:write"
     nonisolated private static let registering = "metadata.types:write"
