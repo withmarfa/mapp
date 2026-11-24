@@ -422,12 +422,14 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try await open(root)
+        let log = ChangeLog(source)
         let library = MarfaLibrary(source: source, notices: Notices())
         try #require(await eventually { library.isLoaded })
+        let write = WriteID()
         let child = ItemID.mint()
         source.submit(
             .create(id: child, ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST child", body: "Queued", parent: ItemID("not-an-item"))),
-            as: WriteID())
+            as: write)
         let told = await eventually {
             library.notices.waiting.contains {
                 $0.title == "Can’t Put Item Under Its Parent" && $0.message.contains("couldn’t be put under its parent")
@@ -435,6 +437,8 @@ struct MarfaSourceOfflineTests {
         }
         #expect(told, "told: \(library.notices.waiting.map(\.message))")
         #expect(library.item(child)?.title == "MARFAMACTEST child")
+        // The create waits for the server, neither answered nor refused by the link that failed beside it.
+        #expect(log.current.answer(to: write) == nil)
         let creates = try await source.copy.queue.all().filter { $0.kind == .createItem }
         #expect(creates.map(\.itemId) == [child.rawValue])
         await source.close()
