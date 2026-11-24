@@ -555,26 +555,24 @@ nonisolated enum MarfaMapping {
 
     /// `afterRefusal`: a write the refused one waited on was refused or died, which only the queue can tell
     /// (`MarfaProblems.waitsOnStopped`).
-    /// `answer` is the server's whole answer to the write, which alone says what the item holds of each field the
-    /// verdict names.
-    static func outcome(_ verdict: Marfa.Verdict, answer: JSONValue? = nil, afterRefusal: Bool = false) -> WriteOutcome {
+    static func outcome(_ verdict: Marfa.Verdict, afterRefusal: Bool = false) -> WriteOutcome {
         switch verdict {
         case .accepted: .accepted
-        case .merged(let fields): .merged(fields: fields, resolved: resolved(fields, in: answer))
-        case .conflicted(let sibling?, let fields, _):
-            .conflicted(sibling: ItemID(sibling), fields: fields, resolved: resolved(fields, in: answer))
+        case .merged(let fields): .merged(fields: fields)
+        case .conflicted(let sibling?, let fields, _): .conflicted(sibling: ItemID(sibling), fields: fields)
         // An item conflict always names the copy it wrote; one that names none is a table row's, which the app never writes.
-        case .conflicted(nil, let fields, _): .merged(fields: fields, resolved: resolved(fields, in: answer))
+        case .conflicted(nil, let fields, _): .merged(fields: fields)
         case .refused(let refusal): .refused(problem(refusal, afterRefusal: afterRefusal))
         case .blocked(let reason, let refusal): .blocked(blockedReason(reason), refusal.map { problem($0) })
         case .dead: .dead
         }
     }
 
-    /// What the answered item holds of each of `fields`, a field it does not hold being nil.
-    static func resolved(_ fields: [String], in answer: JSONValue?) -> [String: PropertyValue?]? {
+    /// What the item holds of every property after an item edit, read from the server's whole answer to it, which
+    /// alone says what a merge, a conflict or a rebased edit left. Nil where the answer carries no item.
+    static func holding(answeredBy answer: JSONValue?) -> [String: PropertyValue]? {
         guard let properties = answer?.object?["item"]?.object?["properties"]?.object else { return nil }
-        return Dictionary(fields.map { ($0, properties[$0].map(value)) }, uniquingKeysWith: { first, _ in first })
+        return Dictionary(properties.map { ($0.key, value($0.value)) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// A refusal with no code is either the server's answer with none, stored as a one-word reason, or the copy's

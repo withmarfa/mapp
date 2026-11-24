@@ -53,11 +53,10 @@ nonisolated enum BlockedReason: String, Hashable, Sendable, CaseIterable {
 /// One of the contract's six verdicts on a write.
 nonisolated enum WriteOutcome: Hashable, Sendable {
     case accepted
-    /// Applied over changes made since, field by field. `resolved` is what the item holds of each of `fields` after
-    /// the write, read from the server's answer; nil where the answer could not be read.
-    case merged(fields: [String], resolved: [String: PropertyValue?]? = nil)
-    /// The server kept its own value and wrote the losing one to `sibling`. `resolved` is as for `merged`.
-    case conflicted(sibling: ItemID, fields: [String], resolved: [String: PropertyValue?]? = nil)
+    /// Applied over changes made since, field by field.
+    case merged(fields: [String])
+    /// The server kept its own value and wrote the losing one to `sibling`.
+    case conflicted(sibling: ItemID, fields: [String])
     /// Terminal: the write is not sent again.
     case refused(SyncProblem)
     /// Stopped until something outside the queue changes, then sent again when released.
@@ -69,7 +68,7 @@ nonisolated enum WriteOutcome: Hashable, Sendable {
     var syncState: SyncState {
         switch self {
         case .accepted, .merged: .settled
-        case .conflicted(let sibling, let fields, _): .conflicted(sibling: sibling, fields: fields)
+        case .conflicted(let sibling, let fields): .conflicted(sibling: sibling, fields: fields)
         case .refused(let problem): .refused(problem)
         case .blocked(let reason, let problem):
             .blocked(SyncProblem(

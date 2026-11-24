@@ -28,10 +28,10 @@ extension LiveMarfaTests {
                     // As a property editor still showing the item saves, by the library, which follows the answer.
                     library.submitPropertyEdit(id, ["title": .string(typed)], base: version, failing: "Can’t Edit This Property")
                     let answered = try #require(await log.wait { state in
-                        state.changes.contains { if case .answered(_, .refused) = $0 { true } else { false } }
+                        state.changes.contains { if case .answered(_, .refused, _) = $0 { true } else { false } }
                     })
                     guard let problem = answered.changes.lazy.compactMap({ change -> SyncProblem? in
-                        if case .answered(_, .refused(let problem)) = change { problem } else { nil }
+                        if case .answered(_, .refused(let problem), _) = change { problem } else { nil }
                     }).first else { return }
                     #expect(problem.notQueued, "the package refused it before queueing, so no queue holds the text")
                     #expect(await eventually { notices.waiting.contains { $0.isNotKept && $0.text?.contains(typed) == true } },

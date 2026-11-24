@@ -55,17 +55,17 @@ extension MarfaEngine {
             // finds it again.
             if case .refused = verdict { refusals[answer.id] = answer }
             let outcome = MarfaMapping.outcome(
-                verdict, answer: answer.answer, afterRefusal: MarfaProblems.waitsOnStopped(answer, among: { answeredNow[$0] ?? refusals[$0] }))
+                verdict, afterRefusal: MarfaProblems.waitsOnStopped(answer, among: { answeredNow[$0] ?? refusals[$0] }))
             ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
             if let itemID = answer.itemId {
                 ids.insert(itemID)
                 remember(outcome, of: answer.kind, for: ItemID(itemID))
             }
-            if case .conflicted(let sibling, _, _) = outcome {
+            if case .conflicted(let sibling, _) = outcome {
                 ids.insert(sibling.rawValue)
                 if let itemID = answer.itemId { originals[sibling.rawValue] = itemID }
             }
-            answered(answer.id, outcome)
+            answered(answer.id, outcome, holding: answer.kind == .updateItem ? MarfaMapping.holding(answeredBy: answer.answer) : nil)
         }
         await reread(ids.union(await settledLinks()))
         // An answer the person's text cannot yet be moved past is held, to be counted by the next save or the next
@@ -115,9 +115,9 @@ extension MarfaEngine {
     }
 
     /// A write the app made as several queued writes is answered once, when the last of them is (`MarfaWriteRecord`).
-    func answered(_ queued: String, _ outcome: WriteOutcome) {
-        guard let (id, outcome) = writes.answer(queued, outcome) else { return }
-        hub.publish(.answered(id, outcome))
+    func answered(_ queued: String, _ outcome: WriteOutcome, holding: [String: PropertyValue]? = nil) {
+        guard let answer = writes.answer(queued, outcome, holding: holding) else { return }
+        hub.publish(.answered(answer.id, answer.outcome, holding: answer.holding))
     }
 
     private func hasLeft(_ raw: String) async -> Bool {

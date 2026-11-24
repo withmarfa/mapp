@@ -23,7 +23,7 @@ nonisolated final class ChangeLog: Sendable {
         }
 
         func answer(to id: WriteID) -> WriteOutcome? {
-            for case .answered(id, let outcome) in changes { return outcome }
+            for case .answered(id, let outcome, _) in changes { return outcome }
             return nil
         }
     }
