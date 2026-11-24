@@ -89,6 +89,7 @@ struct AppCommands: Commands {
         // Print has ⌘P, as everywhere; the print panel sets the paper.
         // Where Notes keeps Attach File, after the pasteboard's commands.
         CommandGroup(after: .pasteboard) {
+            command(.copyLink)
             command(.addAttachment)
         }
 

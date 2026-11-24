@@ -223,7 +223,7 @@ struct ItemOpeningTests {
     @Test func theRowMenuHasOneOrderWhereverItIsOpened() {
         #expect(RowMenuEntry.entries(opening: .modal, inBin: false) == [
             .open, .openAs(.fullPage), .openAs(.newWindow),
-            .divider, .quickLook, .share,
+            .divider, .quickLook, .share, .copyLink,
             .divider, .favorite, .tag, .collection, .layoutActions, .changeType, .customizeLayout, .editLayouts, .versionHistory,
             .divider, .delete,
         ])
@@ -234,6 +234,7 @@ struct ItemOpeningTests {
     @Test func theRowMenuOfDeletedItemsRecoversInsteadOfOrganizing() {
         let entries = RowMenuEntry.entries(opening: .modal, inBin: true)
         #expect(entries.contains(.recover) && !entries.contains(.favorite) && !entries.contains(.tag))
+        #expect(entries.contains(.copyLink))
         #expect(entries.last == .delete)
     }
 }

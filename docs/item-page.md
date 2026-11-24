@@ -60,6 +60,10 @@ The right sidebar (`ItemInspector`) always lists every property, in sections: De
 - With nothing chosen the sidebar is one quiet line (`InspectorPromptView`), worded for what the place lists: an item, an event in the calendar layout, a collection or a source. A place with no items, and the list layout, whose page column already says nothing is chosen, leave it blank; several rows chosen say how many, and an item still being read shows a small progress indicator only after half a second.
 - Agreed, not built: a place is a name and an arrow with no extra copy, and bento cells may sit among the sections.
 
+## Copy the item's link
+
+For a single item, choose **Copy Link** from the toolbar's **More** menu, the **Edit** menu (Shift-Command-C by default), the item's row menu, or the command palette. If the working copy hasn't read the instance ID yet, the app asks you to try again after syncing.
+
 ## Customize Layout
 
 Customize Layout turns the right sidebar into the editor of the page's layout, for the item's type, and it applies to every item of that type. It is in the menu bar, the toolbar's More menu and the context menu.

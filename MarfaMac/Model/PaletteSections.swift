@@ -140,7 +140,7 @@ extension PaletteSections.Section: Equatable where Row: Equatable {}
 /// One thing Actions can do for the chosen row.
 nonisolated struct PaletteAction: Identifiable, Equatable, Sendable {
     nonisolated enum Kind: Hashable, Sendable {
-        case open, openInNewWindow, copyLink, addToFavorites, removeFromFavorites, versionHistory, delete
+        case open, openInNewWindow, copyLink, copyWikiLink, addToFavorites, removeFromFavorites, versionHistory, delete
         /// A command row's only action.
         case run
     }
@@ -162,15 +162,16 @@ nonisolated struct PaletteAction: Identifiable, Equatable, Sendable {
         self.isDestructive = isDestructive
     }
 
-    /// What Actions offers for an item, by the same rules as the menus: the favorite toggle and Delete only for an
-    /// item that is not in the bin, Version History and Copy Link only for a note. Never Delete Immediately.
+    /// Actions can copy any item's link. Wiki links and version history apply to non-file items only.
+    /// Only active items can be favorited or moved to Recently Deleted from Actions.
     static func forItem(isFile: Bool, isFavorite: Bool, isActive: Bool) -> [PaletteAction] {
         var actions = [
             PaletteAction(.open, String(localized: "Open"), "arrow.up.right", keys: ["↩"]),
             PaletteAction(.openInNewWindow, String(localized: "Open in New Window"), "macwindow", keys: ["⌘", "↩"]),
         ]
+        actions.append(PaletteAction(.copyLink, String(localized: "Copy Link"), "link", keys: ["⇧", "⌘", "C"]))
         if !isFile {
-            actions.append(PaletteAction(.copyLink, String(localized: "Copy Link"), "link", keys: ["⇧", "⌘", "C"]))
+            actions.append(PaletteAction(.copyWikiLink, String(localized: "Copy Wiki Link"), "link.badge.plus"))
         }
         if isActive {
             actions.append(isFavorite

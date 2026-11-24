@@ -51,6 +51,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// The instance id of the Marfa the library's copy holds, as its `GET /` names it, which an item's `marfa://` link
     /// is checked against; nil until the copy has read it. Reads only the copy.
     func instanceID() async -> String?
+    /// Builds the link from the IDs alone, without reading the item.
+    func itemLink(_ id: ItemID) async -> ItemLinkCopy?
     /// The item as a page header shows it. A change to only its version, preview, sync or bound embeds is not one.
     func headerItem(_ id: ItemID) -> Item?
     /// The item's version alone. It changes only when the version does, not when the text, preview, sync or embeds do.
@@ -289,6 +291,11 @@ extension ItemLibrary {
     var downloadedFiles: (any DownloadedFiles)? { nil }
     func downloadEverythingAgain() {}
     func instanceID() async -> String? { nil }
+    /// The item's `marfa://` link (`ItemAppLink`), once the copy knows its instance id.
+    func itemLink(_ id: ItemID) async -> ItemLinkCopy? {
+        guard let instance = await instanceID(), let link = ItemAppLink(instanceID: instance, item: id) else { return nil }
+        return ItemLinkCopy(url: link.url)
+    }
     func isWritingProperties(of id: ItemID) -> Bool { false }
     func sendWaitingText() {}
     var lastPropertyWrite: Int? { nil }

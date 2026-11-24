@@ -81,6 +81,8 @@ nonisolated enum RowMenuEntry: Equatable, Sendable {
     /// One of the other ways to open.
     case openAs(ItemOpening)
     case quickLook, share
+    /// The item's link, for one item.
+    case copyLink
     case favorite, tag, collection
     /// What the layout adds, such as a board's Move To.
     case layoutActions
@@ -94,9 +96,9 @@ nonisolated enum RowMenuEntry: Equatable, Sendable {
     /// The menu for items that are in use, or, for items all in Recently Deleted, the menu of the bin.
     static func entries(opening: ItemOpening, inBin: Bool) -> [RowMenuEntry] {
         let open: [RowMenuEntry] = [.open] + opening.others.map(RowMenuEntry.openAs)
-        if inBin { return open + [.divider, .quickLook, .share, .divider, .recover, .versionHistory, .divider, .delete] }
+        if inBin { return open + [.divider, .quickLook, .share, .copyLink, .divider, .recover, .versionHistory, .divider, .delete] }
         return open + [
-            .divider, .quickLook, .share,
+            .divider, .quickLook, .share, .copyLink,
             .divider, .favorite, .tag, .collection, .layoutActions, .changeType, .customizeLayout, .editLayouts, .versionHistory,
             .divider, .delete,
         ]
