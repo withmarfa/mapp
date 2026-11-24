@@ -52,30 +52,145 @@ import Testing
         #expect(model.stopped == "a")
     }
 
-    @Test func aLimitChangedElsewhereIsToldAndNotWrittenOver() async throws {
-        let bench = OwnerBench()
-        let calls = FakeFolderCalls(FakeFolderCalls.folder("a", "Studio Notes"))
+    /// One folder, its page open.
+    private func opened(_ bench: OwnerBench, _ calls: FakeFolderCalls) async -> FoldersModel {
         let model = model(bench, folders: [(OwnerFolder(id: "a", title: "Studio Notes"), FolderReport(copies: []))], calls: calls)
         await model.load()
         model.open("a")
+        return model
+    }
+
+    @Test func aReadWhileALimitIsTypedKeepsItAndItIsSentOnTheVersionSeen() async throws {
+        let bench = OwnerBench()
+        let calls = FakeFolderCalls(FakeFolderCalls.folder("a", "Studio Notes"))
+        let model = await opened(bench, calls)
         #expect(model.removalDraft == "10")
 
-        calls.changeElsewhere("a", .removalThreshold(RemovalThreshold(files: 25)))
-        model.removalDraft = "40"
+        model.removalDraft = "5"
+        calls.changeElsewhere("a", .removalThreshold(RemovalThreshold(files: 8)))
+        await model.loadFolder("a")
+        #expect(model.settings["a"]?.version == 2)
+        #expect(model.removalDraft == "5")
+
         await model.commitLimit(.removalLimit)
         #expect(calls.changes.map(\.baseVersion) == [1])
-        #expect(try await calls.settings(of: "a").removalThreshold.files == 25)
-        #expect(model.removalDraft == "40")
-        #expect(model.errors[.removalLimit]?.contains("25") == true)
-        #expect(model.settings["a"]?.version == 2)
+        #expect(try await calls.settings(of: "a").removalThreshold.files == 8)
+        #expect(model.removalDraft == "5")
+        #expect(model.errors[.removalLimit]?.contains("8") == true)
 
         // Leaving the field sends nothing more; only Return sends the owner's value, on the version now read.
         await model.commitLimit(.removalLimit, explicitly: false)
         #expect(calls.changes.count == 1)
         await model.commitLimit(.removalLimit)
         #expect(calls.changes.last?.baseVersion == 2)
-        #expect(try await calls.settings(of: "a").removalThreshold.files == 40)
+        #expect(try await calls.settings(of: "a").removalThreshold.files == 5)
         #expect(model.errors[.removalLimit] == nil)
+    }
+
+    @Test func aReadLeavesAnUntouchedLimitShowingWhatItReads() async {
+        let bench = OwnerBench()
+        let calls = FakeFolderCalls(FakeFolderCalls.folder("a", "Studio Notes"))
+        let model = await opened(bench, calls)
+        calls.changeElsewhere("a", .additionThreshold(AdditionThreshold(files: 30)))
+        await model.loadFolder("a")
+        #expect(model.additionDraft == "30")
+        await model.commitLimit(.additionLimit, explicitly: false)
+        #expect(calls.changes.isEmpty)
+    }
+
+    @Test func aRenameIsSentOnTheVersionSeenWhenItBegan() async throws {
+        let bench = OwnerBench()
+        let calls = FakeFolderCalls(FakeFolderCalls.folder("a", "Studio Notes"))
+        let model = await opened(bench, calls)
+
+        model.beginRename()
+        model.renameDraft = "Mine"
+        calls.changeElsewhere("a", .title("Theirs"))
+        await model.loadFolder("a")
+        await model.rename()
+        #expect(calls.changes.map(\.baseVersion) == [1])
+        #expect(try await calls.settings(of: "a").title == "Theirs")
+        #expect(model.isRenaming)
+        #expect(model.renameDraft == "Mine")
+        #expect(model.errors[.title]?.contains("Theirs") == true)
+
+        await model.rename()
+        #expect(calls.changes.last?.baseVersion == 2)
+        #expect(try await calls.settings(of: "a").title == "Mine")
+        #expect(!model.isRenaming)
+    }
+
+    @Test func aPatternIsSentExactlyAsTyped() async throws {
+        let bench = OwnerBench()
+        let calls = FakeFolderCalls(FakeFolderCalls.folder("a", "Studio Notes"))
+        let model = await opened(bench, calls)
+
+        model.beginAdding(to: .ignore)
+        model.ignoreDraft = ""
+        await model.addPattern(to: .ignore)
+        #expect(calls.changes.isEmpty)
+        #expect(model.ignoreDraft == nil)
+
+        model.beginAdding(to: .ignore)
+        model.ignoreDraft = " draft\\ "
+        await model.addPattern(to: .ignore)
+        #expect(try await calls.settings(of: "a").ignore == [" draft\\ "])
+        #expect(model.ignoreDraft == nil)
+    }
+
+    @Test func removingAPatternRemovesThatEntryAlone() async throws {
+        let bench = OwnerBench()
+        let calls = FakeFolderCalls(FakeFolderCalls.folder("a", "Studio Notes", ignore: ["*.tmp", "build", "*.tmp"]))
+        let model = await opened(bench, calls)
+        let shown = try #require(model.settings["a"])
+
+        await model.removePattern(at: 2, from: .ignore, in: shown)
+        #expect(try await calls.settings(of: "a").ignore == ["*.tmp", "build"])
+    }
+
+    @Test func aLooserLimitIsSentOnlyOnceTheOwnerAgrees() async throws {
+        let bench = OwnerBench()
+        let calls = FakeFolderCalls(FakeFolderCalls.folder("a", "Studio Notes"))
+        let model = await opened(bench, calls)
+
+        model.removalDraft = "40"
+        await model.commitLimit(.removalLimit, explicitly: false)
+        let asked = try #require(model.question)
+        #expect(asked.kind == .loosen(.removalLimit, files: 40))
+        #expect(asked.message.contains("10") && asked.message.contains("40"))
+        await model.commitLimit(.removalLimit)
+        #expect(calls.changes.isEmpty)
+
+        model.cancelQuestion()
+        #expect(model.question == nil)
+        #expect(model.removalDraft == "10")
+        #expect(calls.changes.isEmpty)
+
+        model.additionDraft = "200"
+        await model.commitLimit(.additionLimit)
+        await model.confirm(try #require(model.question))
+        #expect(try await calls.settings(of: "a").additionThreshold.files == 200)
+
+        // A tighter limit is sent at once.
+        model.removalDraft = "4"
+        await model.commitLimit(.removalLimit, explicitly: false)
+        #expect(model.question == nil)
+        #expect(try await calls.settings(of: "a").removalThreshold.files == 4)
+    }
+
+    @Test func aLimitOutsideTheContractsRangeIsRefusedBeforeItIsSent() async {
+        let bench = OwnerBench()
+        let calls = FakeFolderCalls(FakeFolderCalls.folder("a", "Studio Notes"))
+        let model = await opened(bench, calls)
+
+        for typed in ["9007199254740992", "-1", "2.5", ""] {
+            model.removalDraft = typed
+            await model.commitLimit(.removalLimit)
+            #expect(model.errors[.removalLimit] == FoldersModel.rangeLine)
+            #expect(model.removalDraft == typed)
+        }
+        #expect(model.question == nil)
+        #expect(calls.changes.isEmpty)
     }
 
     @Test func aRefusedListNamesThePermissionAndReadsTheGrantsAgain() async {

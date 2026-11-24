@@ -3,8 +3,9 @@ import Marfa
 import Observation
 
 /// The Folders page: the synced folders the server lists, each with what its copies last reported and its settings, which
-/// the page changes in place through the working copy. Each change names the version it was typed on: a change made
-/// somewhere else since is told and never written over, and a refused change keeps what was typed.
+/// the page changes in place through the working copy. Each change is sent on the version the person saw when they began
+/// it: a change made somewhere else since is told and never written over, a read arriving meanwhile leaves what is being
+/// typed alone, and a refused change keeps what was typed.
 @Observable @MainActor final class FoldersModel: OwnerDraftHolding {
     /// How a folder or a copy stands, in the words a row says at its trailing edge.
     struct Condition: Equatable {
@@ -19,12 +20,20 @@ import Observation
         case title, ignore, include, removalLimit, additionLimit, stopSyncing
     }
 
-    /// Stop Syncing, waiting on the owner's answer. Nothing is sent before it.
+    /// Stop Syncing, or a looser safety limit, waiting on the owner's answer. Nothing is sent before it.
     struct Question: Identifiable, Equatable {
+        enum Kind: Equatable {
+            case stop
+            /// A limit raised to `files`, which pauses less.
+            case loosen(Setting, files: UInt64)
+        }
+
         let id = UUID()
         let folder: String
+        let kind: Kind
         let title: String
         let message: String
+        let button: String
     }
 
     private let context: OwnerContext
@@ -52,8 +61,12 @@ import Observation
     var additionDraft = ""
     var renameDraft = ""
     private(set) var isRenaming = false
+    /// The reading each change under way began on, whose version it is sent on.
+    private var bases: [Setting: FolderSettingsReading] = [:]
     /// Why a change was not kept, by the setting it was made in.
     private(set) var errors: [Setting: String] = [:]
+    /// The settings whose change was refused, which only Return sends again.
+    private var refused: Set<Setting> = []
     private(set) var sending: Set<Setting> = []
     private(set) var question: Question?
     /// The folder just stopped here, so its page goes back.
@@ -136,7 +149,7 @@ import Observation
             settings[id] = read
             settingsFailures[id] = nil
             if let index = folders.firstIndex(where: { $0.id == id }), !read.title.isEmpty { folders[index].title = read.title }
-            if editing == id { fillDrafts(from: read) }
+            if editing == id { fillLimits(from: read) }
         case .failure(let error):
             settingsFailures[id] = error
             if error == .notFound { forget(id) }
@@ -159,25 +172,48 @@ import Observation
         ignoreDraft = nil
         includeDraft = nil
         errors = [:]
+        refused = []
+        bases = [:]
         isRenaming = false
-        if let read = settings[id] { fillDrafts(from: read) }
+        question = nil
+        if let read = settings[id] { fillLimits(from: read) }
     }
 
-    /// Shows the limits as read, but where a refused value waits to be sent again.
-    private func fillDrafts(from read: FolderSettingsReading) {
-        if errors[.removalLimit] == nil { removalDraft = String(read.removalLimit) }
-        if errors[.additionLimit] == nil { additionDraft = String(read.additionLimit) }
+    /// Shows each limit as read, but where the person has typed one: what they typed stays, with the reading they began on.
+    private func fillLimits(from read: FolderSettingsReading) {
+        for setting in [Setting.removalLimit, .additionLimit] {
+            let now = String(Self.limit(setting, of: read))
+            if let base = bases[setting], limitDraft(setting) != String(Self.limit(setting, of: base)), limitDraft(setting) != now {
+                continue
+            }
+            setLimitDraft(setting, now)
+            bases[setting] = read
+            errors[setting] = nil
+            refused.remove(setting)
+        }
+    }
+
+    private func limitDraft(_ setting: Setting) -> String { setting == .removalLimit ? removalDraft : additionDraft }
+
+    private func setLimitDraft(_ setting: Setting, _ text: String) {
+        if setting == .removalLimit { removalDraft = text } else { additionDraft = text }
+    }
+
+    private static func limit(_ setting: Setting, of read: FolderSettingsReading) -> UInt64 {
+        setting == .removalLimit ? read.removalLimit : read.additionLimit
     }
 
     func beginRename() {
-        guard let id = editing else { return }
-        renameDraft = settings[id]?.title ?? folder(id)?.title ?? ""
+        guard let id = editing, let read = settings[id] else { return }
+        renameDraft = read.title
+        bases[.title] = read
         errors[.title] = nil
         isRenaming = true
     }
 
     func cancelRename() {
         isRenaming = false
+        bases[.title] = nil
         errors[.title] = nil
     }
 
@@ -185,97 +221,126 @@ import Observation
 
     func rename() async {
         let title = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard canRename, let read = editingSettings else { return }
-        guard title != read.title else { return cancelRename() }
-        if await send(.title(title), in: .title, on: read) { isRenaming = false }
+        guard canRename, let base = bases[.title] else { return }
+        guard title != base.title else { return cancelRename() }
+        if await send(.title(title), in: .title, on: base) { cancelRename() }
     }
 
     func beginAdding(to setting: Setting) {
+        guard let read = editingSettings else { return }
         switch setting {
         case .ignore: ignoreDraft = ignoreDraft ?? ""
         case .include: includeDraft = includeDraft ?? ""
         default: return
         }
+        if bases[setting] == nil { bases[setting] = read }
         errors[setting] = nil
+        refused.remove(setting)
     }
 
-    /// Adds what was typed to Ignore or Include. An empty pattern adds nothing and ends the adding. Leaving the field
-    /// (`explicitly` false) sends nothing a refusal holds, which only Return sends again.
+    /// Adds what was typed to Ignore or Include, exactly as typed: a space in a pattern is part of it. An empty pattern
+    /// adds nothing and ends the adding. Leaving the field (`explicitly` false) sends nothing a refusal holds, which only
+    /// Return sends again.
     func addPattern(to setting: Setting, explicitly: Bool = true) async {
-        guard let read = editingSettings else { return }
-        let typed = (setting == .ignore ? ignoreDraft : includeDraft) ?? ""
-        let pattern = typed.trimmingCharacters(in: .whitespaces)
+        guard let base = bases[setting] else { return }
+        let pattern = (setting == .ignore ? ignoreDraft : includeDraft) ?? ""
         guard !pattern.isEmpty else { return endAdding(setting) }
-        guard explicitly || errors[setting] == nil else { return }
-        let held = setting == .ignore ? read.ignore : read.include
+        guard explicitly || !refused.contains(setting) else { return }
+        let held = Self.patterns(setting, of: base)
         guard !held.contains(pattern) else {
             errors[setting] = String(localized: "It’s in the list already.")
             return
         }
         let change: FolderSettingChange = setting == .ignore ? .ignore(held + [pattern]) : .include(held + [pattern])
-        if await send(change, in: setting, on: read) { endAdding(setting) }
+        if await send(change, in: setting, on: base) { endAdding(setting) }
     }
 
     func endAdding(_ setting: Setting) {
         if setting == .ignore { ignoreDraft = nil } else { includeDraft = nil }
+        bases[setting] = nil
         errors[setting] = nil
+        refused.remove(setting)
     }
 
-    func removePattern(_ pattern: String, from setting: Setting) async {
-        guard let read = editingSettings else { return }
-        let held = setting == .ignore ? read.ignore : read.include
-        guard held.contains(pattern) else { return }
-        let kept = held.filter { $0 != pattern }
-        await send(setting == .ignore ? .ignore(kept) : .include(kept), in: setting, on: read)
+    /// Removes the one entry at `index` of the list `shown` holds, on its version, leaving any equal entry.
+    func removePattern(at index: Int, from setting: Setting, in shown: FolderSettingsReading) async {
+        var kept = Self.patterns(setting, of: shown)
+        guard kept.indices.contains(index) else { return }
+        kept.remove(at: index)
+        await send(setting == .ignore ? .ignore(kept) : .include(kept), in: setting, on: shown)
     }
 
-    /// Sends the limit typed, where it differs from the one read; a number the server cannot take is refused before. Leaving
-    /// the field (`explicitly` false) sends nothing a refusal holds, so a change made elsewhere is written over only by Return.
+    private static func patterns(_ setting: Setting, of read: FolderSettingsReading) -> [String] {
+        setting == .ignore ? read.ignore : read.include
+    }
+
+    /// Sends the limit typed, where it differs from the one the person began on; a number the server cannot take is refused
+    /// before. A larger limit pauses less, so it asks first. Leaving the field (`explicitly` false) sends nothing a refusal
+    /// holds, so a change made elsewhere is written over only by Return.
     func commitLimit(_ setting: Setting, explicitly: Bool = true) async {
-        guard let read = editingSettings, setting == .removalLimit || setting == .additionLimit else { return }
-        guard explicitly || errors[setting] == nil else { return }
-        let typed = (setting == .removalLimit ? removalDraft : additionDraft).trimmingCharacters(in: .whitespaces)
-        guard let files = UInt64(typed), files <= Self.largestLimit else {
-            errors[setting] = String(localized: "Enter a whole number of files.")
+        guard let id = editing, setting == .removalLimit || setting == .additionLimit, let base = bases[setting] ?? settings[id] else {
             return
         }
-        let current = setting == .removalLimit ? read.removalLimit : read.additionLimit
-        guard files != current else {
+        guard explicitly || !refused.contains(setting) else { return }
+        guard let files = UInt64(limitDraft(setting).trimmingCharacters(in: .whitespaces)), files <= Self.largestLimit else {
+            errors[setting] = Self.rangeLine
+            return
+        }
+        let held = Self.limit(setting, of: base)
+        guard files != held else {
             errors[setting] = nil
-            fillDrafts(from: read)
+            refused.remove(setting)
+            if let read = settings[id] { fillLimits(from: read) }
             return
         }
-        // Only the number of files changes; the rest of the threshold is sent as it was read.
+        guard files < held else {
+            let kind = Question.Kind.loosen(setting, files: files)
+            if question?.kind != kind { question = Self.loosening(setting, folder: id, from: held, to: files) }
+            return
+        }
+        await sendLimit(setting, files: files, on: base)
+    }
+
+    /// Only the number of files changes; the rest of the threshold is sent as the person saw it.
+    private func sendLimit(_ setting: Setting, files: UInt64, on base: FolderSettingsReading) async {
         let change: FolderSettingChange =
             if setting == .removalLimit {
-                .removalThreshold(RemovalThreshold(files: files, fraction: read.removalThreshold.fraction, ceiling: read.removalThreshold.ceiling))
+                .removalThreshold(RemovalThreshold(files: files, fraction: base.removalThreshold.fraction, ceiling: base.removalThreshold.ceiling))
             } else {
-                .additionThreshold(AdditionThreshold(files: files, fraction: read.additionThreshold.fraction))
+                .additionThreshold(AdditionThreshold(files: files, fraction: base.additionThreshold.fraction))
             }
-        await send(change, in: setting, on: read)
+        await send(change, in: setting, on: base)
     }
 
     /// The largest whole number a folder's limit takes.
     static let largestLimit: UInt64 = 9_007_199_254_740_991
 
-    /// Sends one change on the version `read` holds and takes the answer. A change made elsewhere since is told with what
-    /// it is now, and what was typed stays to be sent again.
+    static var rangeLine: String { String(localized: "Enter a whole number from 0 to \(largestLimit.formatted()).") }
+
+    /// Sends one change on the version `base` holds and takes the answer. A change made elsewhere since is told with what
+    /// it is now, which the next send is based on, and what was typed stays to be sent again.
     @discardableResult
-    private func send(_ change: FolderSettingChange, in setting: Setting, on read: FolderSettingsReading) async -> Bool {
+    private func send(_ change: FolderSettingChange, in setting: Setting, on base: FolderSettingsReading) async -> Bool {
         guard !sending.contains(setting) else { return false }
         sending.insert(setting)
         defer { sending.remove(setting) }
         errors[setting] = nil
+        refused.remove(setting)
         do throws(OwnerFailure) {
-            let answer = try await folderCalls.change(read.id, change, baseVersion: read.version)
-            await takeSettings(.success(answer), for: read.id)
+            let answer = try await folderCalls.change(base.id, change, baseVersion: base.version)
+            if bases[setting] != nil { bases[setting] = answer }
+            await takeSettings(.success(answer), for: base.id)
             return true
         } catch {
             errors[setting] = Self.line(error)
-            if error == .notFound { forget(read.id) }
+            refused.insert(setting)
+            if error == .notFound { forget(base.id) }
             if error == .conflict {
-                await readSettings(read.id)
-                if let now = settings[read.id] { errors[setting] = Self.conflictLine(setting, now: now) }
+                await readSettings(base.id)
+                if let now = settings[base.id] {
+                    errors[setting] = Self.conflictLine(setting, now: now)
+                    if bases[setting] != nil { bases[setting] = now }
+                }
             }
             await context.learn(from: error)
             return false
@@ -291,14 +356,46 @@ import Observation
         guard let id = editing, let title = settings[id]?.title ?? folder(id)?.title else { return }
         errors[.stopSyncing] = nil
         question = Question(
-            folder: id, title: String(localized: "Stop syncing \(title)?"),
-            message: String(localized: "Each copy stops the next time it syncs. You can’t sync this folder again. Its items stay in Marfa and its files stay on disk. Push any unsent changes from each copy before stopping. Afterward, use marfa folders remove to detach each directory and keep its files as plain files."))
+            folder: id, kind: .stop, title: String(localized: "Stop syncing \(title)?"),
+            message: String(localized: "Each copy stops the next time it syncs. You can’t sync this folder again. Its items stay in Marfa and its files stay on disk. Push any unsent changes from each copy before stopping. Afterward, use marfa folders remove to detach each directory and keep its files as plain files."),
+            button: String(localized: "Stop Syncing"))
     }
 
-    func cancelQuestion() { question = nil }
+    /// The question before a limit is raised, naming the limit the person saw and the one typed.
+    private static func loosening(_ setting: Setting, folder: String, from held: UInt64, to files: UInt64) -> Question {
+        let kind = Question.Kind.loosen(setting, files: files)
+        let button = String(localized: "Raise Limit")
+        return if setting == .removalLimit {
+            Question(
+                folder: folder, kind: kind, title: String(localized: "Allow more removals before pausing?"),
+                message: String(localized: "Pause Removals Over changes from \(held) to \(files) files. More files can then be removed at once before a copy stops to ask."),
+                button: button)
+        } else {
+            Question(
+                folder: folder, kind: kind, title: String(localized: "Allow more additions before pausing?"),
+                message: String(localized: "Pause Additions Over changes from \(held) to \(files) files. More new files can then be added at once before a copy stops to ask."),
+                button: button)
+        }
+    }
+
+    /// Keeping things as they were puts a raised limit back as it was read.
+    func cancelQuestion() {
+        guard let asked = question else { return }
+        question = nil
+        if case .loosen(let setting, _) = asked.kind, asked.folder == editing {
+            errors[setting] = nil
+            refused.remove(setting)
+            if let base = bases[setting] { setLimitDraft(setting, String(Self.limit(setting, of: base))) }
+            if let id = editing, let read = settings[id] { fillLimits(from: read) }
+        }
+    }
 
     func confirm(_ asked: Question) async {
         question = nil
+        if case .loosen(let setting, let files) = asked.kind {
+            guard asked.folder == editing, let base = bases[setting] else { return }
+            return await sendLimit(setting, files: files, on: base)
+        }
         guard !sending.contains(.stopSyncing) else { return }
         sending.insert(.stopSyncing)
         defer { sending.remove(.stopSyncing) }
@@ -328,20 +425,22 @@ import Observation
         if isRenaming, !name.isEmpty, name != read.title {
             drafts.append(.typed(title: String(localized: "Folder Not Renamed"), text: name))
         }
-        for typed in [ignoreDraft, includeDraft].compactMap({ $0?.trimmingCharacters(in: .whitespaces) }) where !typed.isEmpty {
+        for typed in [ignoreDraft, includeDraft].compactMap(\.self) where !typed.isEmpty {
             drafts.append(.typed(title: String(localized: "Pattern Not Added"), text: typed))
         }
-        if removalDraft != String(read.removalLimit), !removalDraft.isEmpty {
-            drafts.append(.typed(title: String(localized: "Limit Not Changed"), text: removalDraft))
-        }
-        if additionDraft != String(read.additionLimit), !additionDraft.isEmpty {
-            drafts.append(.typed(title: String(localized: "Limit Not Changed"), text: additionDraft))
+        for setting in [Setting.removalLimit, .additionLimit] {
+            let typed = limitDraft(setting)
+            let held = String(Self.limit(setting, of: bases[setting] ?? read))
+            if typed != held, !typed.isEmpty { drafts.append(.typed(title: String(localized: "Limit Not Changed"), text: typed)) }
         }
         isRenaming = false
         ignoreDraft = nil
         includeDraft = nil
+        question = nil
         errors = [:]
-        fillDrafts(from: read)
+        refused = []
+        bases = [:]
+        fillLimits(from: read)
         return drafts
     }
 

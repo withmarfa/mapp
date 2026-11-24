@@ -33,7 +33,7 @@ struct FoldersPage: View {
                 presenting: model.question
             ) { asked in
                 Button("Cancel", role: .cancel) {}
-                Button("Stop Syncing", role: .destructive) { Task { await model.confirm(asked) } }
+                Button(asked.button, role: .destructive) { Task { await model.confirm(asked) } }
             } message: { asked in
                 Text(verbatim: asked.message)
             }
@@ -176,11 +176,11 @@ private struct FolderDetail: View {
                 }
             }
             patterns(
-                .ignore, name: "Ignore", line: "Files and folders Marfa leaves alone.", held: read.ignore,
+                .ignore, name: "Ignore", line: "Files and folders Marfa leaves alone.", read: read, held: read.ignore,
                 draft: $model.ignoreDraft)
             patterns(
                 .include, name: "Include", line: "Choose which paths can sync. Ignore rules still apply. Hidden paths need an explicit pattern.",
-                held: read.include, draft: $model.includeDraft)
+                read: read, held: read.include, draft: $model.includeDraft)
             SettingsSection("Safety", line: "Pauses also depend on the share of the folder. Removals have a separate ceiling.") {
                 limit(.removalLimit, title: "Pause Removals Over", text: $model.removalDraft)
                 limit(.additionLimit, title: "Pause Additions Over", text: $model.additionDraft)
@@ -195,12 +195,13 @@ private struct FolderDetail: View {
     }
 
     private func patterns(
-        _ setting: FoldersModel.Setting, name: LocalizedStringKey, line: LocalizedStringKey, held: [String], draft: Binding<String?>
+        _ setting: FoldersModel.Setting, name: LocalizedStringKey, line: LocalizedStringKey, read: FolderSettingsReading, held: [String],
+        draft: Binding<String?>
     ) -> some View {
         SettingsSection(name, line: line) {
-            ForEach(held, id: \.self) { pattern in
+            ForEach(Array(held.enumerated()), id: \.offset) { index, pattern in
                 SettingsRow(title: Text(verbatim: pattern).font(SettingsTokens.font(.mono, scale: scale))) {
-                    SettingsButton("Remove") { Task { await model.removePattern(pattern, from: setting) } }
+                    SettingsButton("Remove") { Task { await model.removePattern(at: index, from: setting, in: read) } }
                         .disabled(model.sending.contains(setting))
                 }
             }
