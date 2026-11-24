@@ -6,11 +6,12 @@ import Observation
 /// page of their own with Delete…, which asks first; a new one is made in a sheet. Nothing is changed before the server
 /// answers, and after any answer the list is read again, so it shows what the server holds.
 @Observable @MainActor final class LinksModel: OwnerDraftHolding {
-    /// A delete waiting for the owner's answer.
-    struct Question: Identifiable, Equatable {
-        let id: String
+    /// A delete waiting for the owner's answer, with the link type as the owner saw it. It is answered once.
+    struct Question: Equatable {
+        let shown: OwnerLinkType
         let title: String
         let message: String
+        fileprivate let token = UUID()
     }
 
     private let context: OwnerContext
@@ -38,6 +39,8 @@ import Observation
 
     // Deleting.
     private(set) var question: Question?
+    /// The question still to be answered; any other is ignored.
+    private var asking: UUID?
     private(set) var isDeleting = false
     /// Why the last delete was not done, in words.
     private(set) var deleteFailure: (id: String, line: String)?
@@ -262,42 +265,59 @@ import Observation
     /// Asks before anything is sent: the owner answers `confirmDelete` or `cancelDelete`.
     func askToDelete(_ id: String) {
         guard let type = linkType(id), isYours(type), !isDeleting else { return }
-        question = Question(
-            id: id, title: String(localized: "Delete \(type.label)?"),
+        let asked = Question(
+            shown: type, title: String(localized: "Delete \(type.label)?"),
             message: String(localized: "Marfa deletes a link type only while no item uses it. Deleting can’t be undone."))
+        asking = asked.token
+        question = asked
     }
 
-    func cancelDelete() { question = nil }
+    /// The alert closed; the question stays open for the button that closed it.
+    func dismissQuestion() { question = nil }
 
-    /// Deletes what `asked` names, the question the owner answered, which the alert gives back since closing it clears
-    /// `question`. The list is read again first, and nothing is sent unless the type is still listed and still the owner's.
-    func confirmDelete(_ asked: Question) async {
-        guard !isDeleting else { return }
+    /// The owner chose Cancel: the question can no longer delete anything.
+    func cancelDelete(_ asked: Question) {
+        if asking == asked.token { asking = nil }
         question = nil
+    }
+
+    /// Deletes what `asked` showed, the question the owner answered, which the alert gives back since closing it clears
+    /// `question`. A question is answered once. The list is read again first, and nothing is sent unless the type listed
+    /// under that ID is still the one the owner saw, and still theirs.
+    func confirmDelete(_ asked: Question) async {
+        guard asking == asked.token else { return }
+        asking = nil
+        question = nil
+        guard !isDeleting else { return }
+        let id = asked.shown.id
         isDeleting = true
         deleteFailure = nil
         defer { isDeleting = false }
         if let failure = await reread() {
-            deleteFailure = (asked.id, OwnerWording.line(failure, on: .types))
+            deleteFailure = (id, OwnerWording.line(failure, on: .types))
             return
         }
         // Deleted somewhere else: its page says it is gone.
-        guard let type = linkType(asked.id) else { return }
-        let name = type.label
+        guard let type = linkType(id) else { return }
+        let name = asked.shown.label
         guard isYours(type) else {
-            deleteFailure = (asked.id, String(localized: "\(name) now comes from a plugin or from Marfa, so it wasn’t deleted."))
+            deleteFailure = (id, String(localized: "\(name) now comes from a plugin or from Marfa, so it wasn’t deleted."))
+            return
+        }
+        guard type == asked.shown else {
+            deleteFailure = (id, String(localized: "\(name) changed since you chose Delete, so it wasn’t deleted. Check it, then try again."))
             return
         }
         do {
-            switch try await context.calls.deleteLinkType(asked.id) {
+            switch try await context.calls.deleteLinkType(id) {
             case .deleted, .gone:
-                deleted = asked.id
+                deleted = id
             case .inUse:
-                deleteFailure = (asked.id, String(localized: "Items still link with \(name), so it was kept. Remove those links first."))
+                deleteFailure = (id, String(localized: "Items still link with \(name), so it was kept. Remove those links first."))
             }
         } catch {
             await context.learn(from: error)
-            deleteFailure = (asked.id, OwnerWording.line(error, on: .types))
+            deleteFailure = (id, OwnerWording.line(error, on: .types))
         }
         await load()
     }

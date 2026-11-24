@@ -49,10 +49,10 @@ struct LinksPage: View {
                 navigation?.back()
             }
             .alert(
-                model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelDelete() } },
+                model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.dismissQuestion() } },
                 presenting: model.question
             ) { asked in
-                Button("Cancel", role: .cancel) { model.cancelDelete() }
+                Button("Cancel", role: .cancel) { model.cancelDelete(asked) }
                 Button("Delete Link Type", role: .destructive) { Task { await model.confirmDelete(asked) } }
             } message: { asked in
                 Text(verbatim: asked.message)

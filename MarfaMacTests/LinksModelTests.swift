@@ -41,14 +41,63 @@ import Testing
 
         model.askToDelete("user.supplied_by")
         let asked = try #require(model.question)
-        #expect(asked.id == "user.supplied_by")
-        model.cancelDelete()
+        #expect(asked.shown.id == "user.supplied_by")
+        model.dismissQuestion()
         #expect(!calls.calls.contains("deleteLinkType"))
 
         await model.confirmDelete(asked)
         #expect(calls.calls.filter { $0 == "deleteLinkType" }.count == 1)
         #expect(model.linkType("user.supplied_by") == nil)
         #expect(model.deleted == "user.supplied_by")
+    }
+
+    /// A question answered once, whatever the answer, sends nothing when answered again.
+    @Test func aQuestionIsAnsweredOnce() async throws {
+        let calls = listing()
+        calls.state.withLock { $0.linkTypesInUse = ["user.supplied_by"] }
+        let model = await loaded(calls)
+
+        model.askToDelete("user.supplied_by")
+        let refused = try #require(model.question)
+        await model.confirmDelete(refused)
+        #expect(calls.calls.filter { $0 == "deleteLinkType" }.count == 1)
+        calls.state.withLock { $0.linkTypesInUse = [] }
+        await model.confirmDelete(refused)
+        #expect(calls.calls.filter { $0 == "deleteLinkType" }.count == 1, "a refused answer replayed")
+
+        model.askToDelete("user.supplied_by")
+        let cancelled = try #require(model.question)
+        model.cancelDelete(cancelled)
+        await model.confirmDelete(cancelled)
+        #expect(calls.calls.filter { $0 == "deleteLinkType" }.count == 1, "a cancelled question")
+
+        model.askToDelete("user.supplied_by")
+        let skipped = try #require(model.question)
+        calls.fail("linkTypes", with: .unreachable)
+        await model.confirmDelete(skipped)
+        calls.fail("linkTypes", with: nil)
+        await model.confirmDelete(skipped)
+        #expect(calls.calls.filter { $0 == "deleteLinkType" }.count == 1, "a skipped answer replayed")
+        #expect(model.linkType("user.supplied_by") != nil)
+    }
+
+    /// Deleted somewhere else and registered again under the same ID: the owner never saw the new one.
+    @Test func aReplacementUnderTheSameIDIsNotDeleted() async throws {
+        let calls = listing()
+        let model = await loaded(calls)
+        model.askToDelete("user.supplied_by")
+        let asked = try #require(model.question)
+        calls.state.withLock { state in
+            if let index = state.linkTypes.firstIndex(where: { $0.id == "user.supplied_by" }) {
+                state.linkTypes[index].label = "Bought From"
+                state.linkTypes[index].toTypes = ["*"]
+            }
+        }
+
+        await model.confirmDelete(asked)
+        #expect(!calls.calls.contains("deleteLinkType"))
+        #expect(model.deleted == nil)
+        #expect(model.deleteLine(for: "user.supplied_by") == "Supplied By changed since you chose Delete, so it wasn’t deleted. Check it, then try again.")
     }
 
     @Test func aTypeThatStoppedBeingTheOwnersSinceTheQuestionIsNotDeleted() async throws {
@@ -104,6 +153,7 @@ import Testing
         calls.fail("deleteLinkType", with: .notPermitted("schema.write"))
         model.askToDelete("user.supplied_by")
         await model.confirmDelete(try #require(model.question))
+        #expect(calls.calls.filter { $0 == "deleteLinkType" }.count == 2)
         #expect(model.linkTypes == calls.state.withLock { $0.linkTypes })
         #expect(model.linkType("user.supplied_by") != nil)
         #expect(model.deleteLine(for: "user.supplied_by") != nil)
