@@ -255,17 +255,30 @@ struct OnThisMacPage: View {
         exported = nil
         let source = MarfaArchiveSource(calls: MarfaServerCalls(connection: connection, signIns: host.signIns))
         let server = name
+        let automatic = libraries.automaticExport
         Task {
             defer { isExporting = false }
-            do {
-                let export = try await LibraryExport.export(from: source, serverName: server, to: folder)
-                let saved = String(localized: "Saved as “\(export.file.lastPathComponent)”.")
-                exported = LibraryExport.lacking(export, serverName: server).map { "\(saved) \($0)" } ?? saved
-            } catch let failure as LibraryExport.Failure {
-                exportFailure = failure.message
-            } catch {
-                exportFailure = String(localized: "Couldn’t export.")
+            switch await Self.exportEverything(from: source, serverName: server, to: folder, instance: await automatic.learn()) {
+            case .success(let line): exported = line
+            case .failure(let failure): exportFailure = failure.message
             }
+        }
+    }
+
+    /// Exports into `folder` the archive of the Marfa the copy says it is, `instance`, so another Marfa answering at the
+    /// address is refused, and answers the line to show. Where the copy can't yet say which Marfa it is, it refuses.
+    static func exportEverything(
+        from source: any ArchiveSource, serverName: String, to folder: URL, instance: String?
+    ) async -> Result<String, LibraryExport.Failure> {
+        guard let instance else {
+            return .failure(.init(message: String(localized: "Couldn’t export. The app can’t yet tell which Marfa \(serverName) is.")))
+        }
+        do {
+            let export = try await LibraryExport.export(from: source, serverName: serverName, to: folder, instance: instance)
+            let saved = String(localized: "Saved as “\(export.file.lastPathComponent)”.")
+            return .success(LibraryExport.lacking(export, serverName: serverName).map { "\(saved) \($0)" } ?? saved)
+        } catch {
+            return .failure(error)
         }
     }
 

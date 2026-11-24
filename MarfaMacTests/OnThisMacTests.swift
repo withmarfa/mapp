@@ -392,12 +392,34 @@ private struct FakeArchive: ArchiveSource {
         #expect(LibraryExport.failure(MarfaServerCalls.Ending.notPermitted, serverName: "X").message.contains("isn’t allowed"))
     }
 
+    @Test func exportEverythingRefusesAnotherMarfaAndAnUnknownOne() async throws {
+        struct Unasked: ArchiveSource {
+            func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws { Issue.record("the server is not asked") }
+        }
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let other = await OnThisMacPage.exportEverything(
+            from: FakeArchive(bytes: archiveBytes(instance: "instance-two")), serverName: "Marfa", to: folder, instance: "instance-one")
+        #expect((try? other.get()) == nil && other.failureMessage?.contains("another Marfa") == true)
+        let unknown = await OnThisMacPage.exportEverything(from: Unasked(), serverName: "Marfa", to: folder, instance: nil)
+        #expect((try? unknown.get()) == nil)
+        #expect(try contents(folder).isEmpty)
+        let saved = await OnThisMacPage.exportEverything(from: FakeArchive(), serverName: "Marfa", to: folder, instance: "instance-one")
+        #expect((try? saved.get())?.hasPrefix("Saved as") == true)
+    }
+
     @Test func aFolderThatCannotBeWrittenToIsTold() async throws {
         let missing = URL.temporaryDirectory.appending(path: "nowhere-\(UUID())", directoryHint: .isDirectory)
         let failure = await #expect(throws: LibraryExport.Failure.self) {
             try await LibraryExport.export(from: FakeArchive(), serverName: "X", to: missing)
         }
         #expect(failure?.message.contains("folder") == true)
+    }
+}
+
+private extension Result where Failure == LibraryExport.Failure {
+    var failureMessage: String? {
+        if case .failure(let failure) = self { failure.message } else { nil }
     }
 }
 
