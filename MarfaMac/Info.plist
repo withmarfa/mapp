@@ -12,6 +12,16 @@
 				<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.withmarfa.item-link</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(ITEM_LINK_SCHEME)</string>
+			</array>
+		</dict>
 	</array>
 	<key>MARFA_MAC_POSTHOG_HOST</key>
 	<string>$(MARFA_MAC_POSTHOG_HOST)</string>

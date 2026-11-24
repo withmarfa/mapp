@@ -51,9 +51,12 @@ struct MarfaMacApp: App {
     @State private var settingsLauncher = SettingsLauncher()
     @AppStorage(InterfaceKey.toolbarLabelStyle) private var toolbarLabelStyle: ToolbarLabelStyle = .iconOnly
     private var libraries: Libraries { delegate.libraries }
+    static let mainWindowID = "main"
 
+    // No scene takes a URL the system hands the app (`handlesExternalEvents(matching: [])`), so none opens a window
+    // for one and each reaches `AppDelegate.application(_:open:)`.
     var body: some Scene {
-        WindowGroup(id: "main") {
+        WindowGroup(id: Self.mainWindowID) {
             RootView(settingsLauncher: settingsLauncher, libraries: libraries)
                 .interfaceTextStyle()
                 // The page's web view is backed by this color, which, unlike the window's default background, is
@@ -66,7 +69,10 @@ struct MarfaMacApp: App {
                 .environment(libraries)
                 .environment(libraries.host)
                 .environment(libraries.shortcuts)
+                .environment(delegate.itemLinks)
+                .opensItemLinks(delegate.itemLinks)
         }
+        .handlesExternalEvents(matching: [])
         .defaultSize(width: 1100, height: 720)
         .windowToolbarLabelStyle($toolbarLabelStyle)
         .commands {
@@ -88,7 +94,9 @@ struct MarfaMacApp: App {
         Window("Settings", id: SettingsLauncher.windowID) {
             SettingsWindowView(launcher: settingsLauncher, libraries: libraries)
                 .environment(\.appUpdater, delegate.updater)
+                .opensItemLinks(delegate.itemLinks)
         }
+        .handlesExternalEvents(matching: [])
         .defaultSize(width: SettingsTokens.Metric.windowWidth, height: SettingsTokens.Metric.windowHeight)
         .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.suppressed)
@@ -99,6 +107,7 @@ struct MarfaMacApp: App {
             TuningPanel()
                 .appAccent()
         }
+        .handlesExternalEvents(matching: [])
         .commandsRemoved()
         .restorationBehavior(.disabled)
         .defaultLaunchBehavior(.suppressed)
@@ -124,7 +133,9 @@ struct MarfaMacApp: App {
             .environment(libraries.shortcuts)
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
             .modifier(ItemWindowNotices(notices: libraries.host.notices, launcher: settingsLauncher))
+            .opensItemLinks(delegate.itemLinks)
         }
+        .handlesExternalEvents(matching: [])
         .defaultSize(width: 640, height: 720)
         .windowToolbarLabelStyle($toolbarLabelStyle)
     }
@@ -134,6 +145,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let libraries = Libraries.standard()
     /// Nil unless this build carries a feed and a key, so a build from the source never offers to replace itself.
     let updater = AppUpdater.standard()
+    /// Opens the items of the `marfa://` links other apps hand over (`application(_:open:)`).
+    private(set) lazy var itemLinks = ItemLinkOpener(libraries: libraries)
     private let separators = MenuSeparatorTidy()
     private var metrics: MetricsListener?
     private var themeObservation: (any NSObjectProtocol)?
@@ -180,6 +193,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         libraries.anyAppShortcuts.start()
         // The saved server's copy opens and paints before the network is asked anything.
         Task { await libraries.launch() }
+    }
+
+    /// The URLs the system hands the app, as when a `marfa://` item link is opened in another app. The sign-in's
+    /// answer never comes this way: `ASWebAuthenticationSession` takes it.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        itemLinks.receive(urls)
     }
 
     /// Nothing typed is lost to quitting: each page hands over its last edit and each library keeps its writes on

@@ -324,6 +324,13 @@ final class Browser {
         open([item.id], as: staysInModal ? .modal : nil, defaults: defaults)
     }
 
+    /// External links stay in this window even when Open Items is set to New Window.
+    func open(itemLink item: Item, in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
+        let way: ItemOpening = !isModalPresented && ItemOpening.stored(in: defaults) == .fullPage ? .fullPage : .modal
+        select(item, in: library, order: order)
+        open([item.id], as: way, defaults: defaults)
+    }
+
     /// Whether an earlier item the window showed can still be shown again.
     func canGoBack(in library: any ItemLibrary) -> Bool {
         history.target(.back, in: library, shown: selection) != nil

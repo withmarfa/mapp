@@ -8,6 +8,9 @@ struct RootView: View {
     @State private var browser: Browser
     let settingsLauncher: SettingsLauncher
     @Environment(\.openWindow) private var openWindow
+    /// Absent in previews and tests that build the window alone.
+    @Environment(ItemLinkOpener.self) private var itemLinks: ItemLinkOpener?
+    @State private var windowHandle = WindowHandle()
 
     /// The browser starts holding the looks the person chose, so the first draw of a gallery, a board or a table builds
     /// once and not again when the choices arrive.
@@ -30,9 +33,12 @@ struct RootView: View {
         .onChange(of: libraries.typeLooks.choices(for: libraries.libraryKey)) { _, choices in
             browser.lookChoices = choices
         }
+        .windowHandle(windowHandle)
         .onAppear {
             LaunchTrace.shared.mark(.windowShown)
             settingsLauncher.open = { openWindow(id: SettingsLauncher.windowID) }
+            // Here, above the library, so the window counts for item links whatever it shows.
+            itemLinks?.register(browser, window: windowHandle)
         }
         .notices(libraries.host.notices) { browser.showSettings($0) }
     }

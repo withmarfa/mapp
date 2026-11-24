@@ -715,6 +715,148 @@ import Testing
         await scene.close()
     }
 
+    /// The person's first save is sent as read and accepted. Before the engine counts that answer, another device's
+    /// body reaches the copy. The person's next save follows the first, and must not be sent on the version that
+    /// holds the other device's body, where the server would lay it over that body.
+    @Test @MainActor func aSaveAfterAnAnswerCountedLateLeavesAnotherDevicesBody() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("note", title: "Note", body: "Base")]))
+        let library = MarfaLibrary(
+            source: scene.source, notices: Notices(), textPause: MarfaLibrary.TextPause(quiet: .seconds(600), cap: .seconds(600)))
+        try #require(await eventually { library.isLoaded })
+        let id = ItemID("note")
+        func otherDevice(_ properties: JSONObject, on version: Int64) async throws {
+            let write = try await scene.copy.items.update("note", Edit(properties: properties, baseVersion: version))
+            scene.fake.verdict = { _ in .accepted }
+            _ = try await scene.copy.queue.drain()
+            _ = try await scene.copy.queue.forgetAnswered(ids: [write.id])
+        }
+
+        // The copy is ahead of the page, so the first save goes as read on version 1.
+        try await otherDevice(["title": .string("Their title")], on: 1)
+        library.updateBody(of: id, to: "Mine", readAt: ItemVersion(1))
+        library.sendWaitingText()
+        await scene.source.queueSubmitted()
+        let first = try #require(try await scene.copy.queue.all().first { $0.itemId == "note" })
+        try #require(first.baseVersion == 1)
+        library.updateBody(of: id, to: "Mine, more", readAt: ItemVersion(1))
+
+        scene.fake.verdict = { _ in .accepted }
+        _ = try await scene.copy.queue.drain()
+        let answered = try #require(try await scene.copy.items.get("note")?.version)
+        try await otherDevice(["body": .string("Theirs")], on: answered)
+        let theirs = try #require(try await scene.copy.items.get("note"))
+        try #require(theirs.properties["body"] == .string("Theirs"))
+        await scene.source.tellAnswers()
+        library.sendWaitingText()
+        await scene.source.queueSubmitted()
+        let second = try #require(try await scene.copy.queue.all().first { $0.itemId == "note" && $0.verdict == nil })
+        #expect(
+            (second.baseVersion ?? theirs.version) < theirs.version,
+            "the save went on version \(String(describing: second.baseVersion)), which holds the other device's body")
+        await scene.close()
+    }
+
+    /// An answer to the person's write, as the server sends it, which the fake copy records none of: the write carried
+    /// `sent` as the text, and the item is at `version` holding `held`.
+    private static func answer(
+        _ id: String, to item: String, carrying sent: String, made version: Int64, holding held: JSONObject, type: String
+    ) -> Marfa.QueuedWrite {
+        Marfa.QueuedWrite(
+            id: id, kind: .updateItem, itemId: item, idempotencyKey: id, verdict: .accepted,
+            body: ["properties": .object(["body": .string(sent)])],
+            answer: .object(["item": .object(["version": .integer(version), "type": .string(type), "properties": .object(held)])]),
+            queuedAt: stamp)
+    }
+
+    /// A proof that a version holds the person's text is for the property that text is in. After a retype that moves
+    /// the text to another property, a save that follows the person's last one goes on the version it was typed on,
+    /// not on a version that held their text in the old property, whatever the new one held there.
+    @Test func aSaveInAnotherPropertyAfterARetypeGoesOnTheVersionItWasTypedOn() async throws {
+        let fields = ["title", "body", "summary"].map { TypeField(name: $0, type: "string", declaredBy: "user.before") }
+        let types = SampleLibrary.itemTypes + [
+            ItemType(id: "user.before", label: "Before", description: "Text in body.", fields: fields, titleField: "title", bodyField: "body"),
+            ItemType(id: "user.after", label: "After", description: "Text in summary.", fields: fields, titleField: "title", bodyField: "summary"),
+        ]
+        var row = Self.row("item", title: "Item", body: "Base")
+        row.type = "user.before"
+        row.properties["summary"] = .string("Sum")
+        let scene = try await Self.open(WorkingCopy.fake(
+            items: [row], itemTypes: types, edgeTypes: SampleLibrary.edgeTypes, displays: SampleLibrary.display))
+        let id = ItemID("item")
+        func queued() async throws -> Marfa.QueuedWrite? {
+            try await scene.copy.queue.all().first { $0.itemId == "item" && $0.verdict == nil }
+        }
+
+        scene.source.submit(.editBody(id, "Mine", base: ItemVersion(1), merge: .asRead), as: WriteID())
+        await scene.source.queueSubmitted()
+        try #require(try await queued()?.baseVersion == 1)
+        try await scene.drainAccepting()
+        scene.source.engine.hooks.answers.set([Self.answer(
+            "proof", to: "item", carrying: "Mine", made: 2,
+            holding: ["title": .string("Item"), "body": .string("Mine"), "summary": .string("Sum")], type: "user.before")])
+        scene.source.submit(.retype(id, TypeID("user.after"), [:], base: ItemVersion(2)), as: WriteID())
+        await scene.source.queueSubmitted()
+        try await scene.drainAccepting()
+        await scene.hearServer("item")
+        await scene.source.engineTook()
+        try #require(try await scene.copy.items.get("item")?.type == "user.after")
+
+        scene.source.submit(.editBody(id, "Sum, mine", base: ItemVersion(3), merge: .following), as: WriteID())
+        await scene.source.queueSubmitted()
+        let save = try #require(try await queued())
+        #expect(save.body["properties"]?.object?["summary"] == .string("Sum, mine"))
+        #expect(save.baseVersion == 3, "the save went on version \(String(describing: save.baseVersion))")
+        await scene.close()
+    }
+
+    /// The copy can record the answer to the person's save before it reads the item back. A save that follows then
+    /// waits for the read-back and goes on that answer, not on the version before it, where a save that put the text
+    /// back as it was there, as an Undo does, would change nothing and be merged away.
+    @Test func aSaveThatFollowsWaitsForTheReadBackOfTheAnswerAhead() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("note", title: "Note", body: "Base")]))
+        let id = ItemID("note")
+        scene.source.submit(.editBody(id, "A", base: ItemVersion(1), merge: .asRead), as: WriteID())
+        await scene.source.queueSubmitted()
+        try #require(try await scene.copy.queue.all().first { $0.itemId == "note" }?.baseVersion == 1)
+        // Answered at version 2, which the copy still has to read back.
+        scene.source.engine.hooks.answers.set([Self.answer(
+            "answered", to: "note", carrying: "A", made: 2, holding: ["title": .string("Note"), "body": .string("A")],
+            type: "core.note")])
+
+        let waits = scene.source.engine.hooks.followWaits.current
+        scene.source.submit(.editBody(id, "Base", base: ItemVersion(1), merge: .following), as: WriteID())
+        try #require(
+            try await eventuallyAsking { scene.source.engine.hooks.followWaits.current > waits },
+            "the save did not wait for the read-back")
+        try await scene.drainAccepting()
+        await scene.source.queueSubmitted()
+        let save = try #require(try await scene.copy.queue.all().first { $0.itemId == "note" && $0.verdict == nil })
+        #expect(save.body["properties"]?.object?["body"] == .string("Base"))
+        #expect(save.baseVersion == 2, "the save went on version \(String(describing: save.baseVersion))")
+        await scene.close()
+    }
+
+    /// A read-back that does not come, as when the read after the answer failed, is waited for once: the drain that
+    /// brings it starts only after the save is queued, and the engine handles nothing else while it waits.
+    @Test func aReadBackThatDoesNotComeIsWaitedForOnce() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("note", title: "Note", body: "Base")]))
+        let id = ItemID("note")
+        scene.source.submit(.editBody(id, "A", base: ItemVersion(1), merge: .asRead), as: WriteID())
+        await scene.source.queueSubmitted()
+        scene.source.engine.hooks.answers.set([Self.answer(
+            "answered", to: "note", carrying: "A", made: 2, holding: ["title": .string("Note"), "body": .string("A")],
+            type: "core.note")])
+        scene.source.submit(.editBody(id, "AB", base: ItemVersion(1), merge: .following), as: WriteID())
+        await scene.source.queueSubmitted()
+        let waits = scene.source.engine.hooks.followWaits.current
+        try #require(waits > 0, "the first save did not wait for the read-back")
+
+        scene.source.submit(.editBody(id, "ABC", base: ItemVersion(1), merge: .following), as: WriteID())
+        await scene.source.queueSubmitted()
+        #expect(scene.source.engine.hooks.followWaits.current == waits, "a later save waited again")
+        await scene.close()
+    }
+
     /// Attaching a large file takes as long as the copy takes to read it. A save of the item's text made meanwhile
     /// is kept at once, and the attach's answer leaves it as it is.
     @Test @MainActor func aTextSaveIsKeptWhileALargeFileIsAttached() async throws {

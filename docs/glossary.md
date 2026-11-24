@@ -16,6 +16,7 @@ What is agreed and not built yet is in [Agreed designs](agreed-designs.md). This
 | Density | The app | How much room a row takes: Standard or Compact. Built in v0.0.44. | [Presets and densities](presets-and-densities.md) |
 | Edge | Marfa | A typed link from one item to another. The app shows an edge's name as Marfa words it. | [Marfa and the app](marfa-and-the-mac-app.md) |
 | Item | Marfa | A record in a library: a type, properties, a text body and edges. | [Marfa and the app](marfa-and-the-mac-app.md) |
+| Item link | Marfa | An item's `marfa://<instance id>/<item id>` link. The app opens the item it names only in the connected Marfa, and a link never changes anything (`ItemAppLink`). Built, not yet released. | [Marfa and the app](marfa-and-the-mac-app.md#item-links) |
 | Keycap | The app | A shortcut's glyph drawn as a small outlined cap, one glyph each, with no fill, wherever the app draws a shortcut itself (`KeyCap`). | [Components](components.md) |
 | Layout | The app | How a list of items is drawn: list, gallery, table, board or timeline (`ItemViewMode`). | [Views and lists](views-and-lists.md) |
 | Look | The app | How one type is drawn in every view: its date, the line under the title and its facts. The list row reads it in v0.0.44; the gallery, board and table read it in v0.0.45. | [Looks](looks.md) |

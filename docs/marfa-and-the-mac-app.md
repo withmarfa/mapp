@@ -52,6 +52,27 @@ For a list's density, the first of these that has a choice wins:
 
 What a row says comes from the type's look (`TypeLooks`), never from a choice of row. A person chooses a look for a type only by importing one; see [Looks](looks.md).
 
+## Item links
+
+Built, not yet released.
+
+Marfa gives each item a link of the form `marfa://<instance-id>/<item-id>`. The instance ID is the lowercase UUID returned by `GET /`. The item ID is a lowercase UUIDv7.
+
+A link opens its item in the main window that was last in front, never in a window of its own. The item opens as a full page when Settings > General > Open Items is set to Full Page, and over the list otherwise, including when it's set to New Window. If the window already shows an item over the list, the linked item takes its place. If no main window is open, the app opens one.
+
+A link only opens. It never creates, changes, deletes or restores an item, never signs in or changes the connection or a setting, and never reaches the server. The app opens the item only when all of these are true:
+
+- The URL macOS delivers has exactly that form. A query, fragment, port, percent-encoded digit, trailing slash, or uppercase ID makes it invalid.
+- The instance ID matches the one held by the copy of the connected Marfa. A link to another Marfa opens nothing and says only that it is to another Marfa. If the copy doesn't know its instance ID yet, the app says it can't check the link yet.
+- The copy holds the item. If it doesn't, the app says that the item can't be found in this Mac's copy.
+- The item is outside Recently Deleted. For an item in Recently Deleted, the app shows a message. Choose **Open Settings…** in the message to see Recently Deleted.
+
+The Debug and Release builds register the `marfa` scheme through the `ITEM_LINK_SCHEME` build setting. The Debug Tests build, which hosts the unit tests, registers a scheme no link uses, so it never becomes the app that opens links. macOS keeps the default app for `marfa://` links on each Mac, and Settings > Apps > Open Marfa Links In sets it.
+
+If no Marfa is connected, or its library can't be opened, the app says so and offers Settings. When a link opens nothing, the app shows why in a main window, and opens one if none is open. While the library is still opening, as at launch, the link waits for it for a short time. Only the newest link counts: it replaces a link that is still waiting or that no window has opened yet.
+
+Where it lives: `AppDelegate` receives the URL. In `MarfaMac/Model/`, `ItemAppLink` parses it, `ItemLinkRoute` checks it against the working copy, and `ItemLinkOpener` handles the result. `Browser.open(itemLink:in:order:defaults:)` opens the item in the window.
+
 ## Related pages
 
 - [Looks](looks.md)

@@ -78,7 +78,7 @@ def inline(text: str) -> str:
 
 
 def notes_to_html(notes: str) -> str:
-    """GitHub's generated release notes (headings, bullets, paragraphs) as simple HTML, with every character escaped."""
+    """Release notes in Markdown (headings, bullets, paragraphs) as simple HTML, with every character escaped."""
     notes = re.sub(r"<!--.*?-->", "", notes, flags=re.DOTALL)
     blocks: list[str] = []
     bullets: list[str] = []

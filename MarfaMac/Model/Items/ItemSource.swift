@@ -36,6 +36,8 @@ nonisolated struct SourceFailure: LocalizedError, Hashable, Sendable {
 
     var kind: Kind
     var message: String
+    /// The notice's title where the library can still be read, as for a link that could not be made.
+    var title: String?
 
     /// The message is already in the person's words, so it is what any alert shows.
     var errorDescription: String? { message }
@@ -121,6 +123,10 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// queued delete.
     func moreItemsTaken(with ids: [ItemID]) async -> Int?
 
+    /// The instance id of the Marfa the copy holds, as its `GET /` names it; nil until the copy has read it, or where
+    /// it can't be read. Reads only the copy.
+    func instanceID() async -> String?
+
     // MARK: Views, written to the server at once and never queued
 
     /// Each throws `ViewWriteFailure`. A write that failed for want of the server is sent again with the same
@@ -180,6 +186,8 @@ nonisolated extension ItemSource {
     func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer] { throw ItemCountUnavailable() }
 
     func moreItemsTaken(with ids: [ItemID]) async -> Int? { nil }
+
+    func instanceID() async -> String? { nil }
 
     var downloadedFiles: (any DownloadedFiles)? { nil }
 

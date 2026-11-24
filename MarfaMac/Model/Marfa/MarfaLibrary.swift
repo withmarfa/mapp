@@ -96,6 +96,7 @@ import Observation
     private(set) var syncReport: SyncReport
     var downloadedFiles: (any DownloadedFiles)? { source.downloadedFiles }
     func downloadEverythingAgain() { source.downloadEverythingAgain() }
+    func instanceID() async -> String? { await source.instanceID() }
     /// How the server stands, for the app to show beside the library. The library is the one subscriber to the
     /// source's states; the host reads this while the copy is open.
     private(set) var connection: MarfaConnectionState
@@ -673,7 +674,7 @@ import Observation
             if failure.kind == .denied {
                 notices.tell(String(localized: "Signed Out of Your Marfa Server"), failure.message, action: .openSettings(.connection))
             } else {
-                notices.tell(String(localized: "Can’t Read This Library"), failure.message)
+                notices.tell(failure.title ?? String(localized: "Can’t Read This Library"), failure.message)
             }
         }
     }

@@ -6,7 +6,10 @@ extension MarfaEngine {
     /// The queue as the engine counts the person's text against: what the copy holds, and the answers taken from
     /// it that an item's text has not yet been counted past (`answeredHeld`).
     func queueWithAnswers() async throws -> [Marfa.QueuedWrite] {
-        let queued = try await copy.queue.all()
+        var queued = try await copy.queue.all()
+        #if DEBUG
+        queued += hooks.answers.current ?? []
+        #endif
         let ids = Set(queued.map(\.id))
         return queued + answeredHeld.values.filter { !ids.contains($0.id) }.sorted { $0.id < $1.id }
     }
