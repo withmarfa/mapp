@@ -152,6 +152,21 @@ import Testing
         #expect(model.unplaced.map(\.name) == ["rss"])
     }
 
+    @Test func aReadBegunBeforeNoMachineNeverPutsTheMachineBack() async {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = rss(bench, paused: true)
+        await model.load()
+        let gate = bench.calls.hold("connectorControl")
+        let older = Task { await model.reload("rss") }
+        #expect(await eventually { bench.calls.state.withLock { $0.waiting["connectorControl"] ?? 0 } >= 1 })
+        bench.calls.state.withLock { $0.gates["connectorControl"] = nil }
+        await model.chooseNoMachine(for: "rss")
+        #expect(model.entry("rss")?.control?.host == nil)
+        gate.open()
+        await older.value
+        #expect(model.entry("rss")?.control?.host == nil)
+    }
+
     @Test func noMachineAsksAboutAConnectorResumedElsewhereSinceThePageRead() async throws {
         let bench = OwnerBench(grants: [.connectorsManage])
         let model = rss(bench, paused: true)

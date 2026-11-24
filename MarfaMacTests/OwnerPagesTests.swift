@@ -585,10 +585,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func connectorControl(of plugin: String) async throws(OwnerFailure) -> ConnectorControl {
         try enter("connectorControl")
-        return try state.withLock { state throws(OwnerFailure) in
-            guard let control = state.connectorControls[plugin] else { throw .notFound }
-            return control
-        }
+        let control = state.withLock { $0.connectorControls[plugin] }
+        // Held after the read, so a held read answers what the server held when it began.
+        await held("connectorControl")
+        guard let control else { throw .notFound }
+        return control
     }
 
     func connectorRegistration(_ id: String) async throws(OwnerFailure) -> ConnectorRegistration {

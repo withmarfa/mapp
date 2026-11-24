@@ -73,6 +73,9 @@ import Observation
     private(set) var gone: Set<String> = []
     /// Add a Connector, while its sheet is open.
     private(set) var adding: AddConnectorModel?
+    /// Counts each read of a connector and each change shown, by the plugin's name, so a read that began before a later one
+    /// or before a change is dropped and never puts back what was there.
+    private var readGeneration: [String: Int] = [:]
 
     init(context: OwnerContext) {
         self.context = context
@@ -125,10 +128,22 @@ import Observation
         ], after: {
             let calls = context.calls
             await readEach(
-                of: entries.map(\.id),
-                read: { name in await Self.read(name, with: calls) },
-                take: { name, read in take(read, for: name) })
+                of: entries.map { Started(plugin: $0.id, generation: startRead($0.id)) },
+                read: { started in await Self.read(started.plugin, with: calls) },
+                take: { started, read in take(read, for: started.plugin, startedAt: started.generation) })
         })
+    }
+
+    private struct Started: Sendable {
+        let plugin: String
+        let generation: Int
+    }
+
+    /// Starts a read, or marks a change just shown, so every read started before it is dropped.
+    @discardableResult private func startRead(_ plugin: String) -> Int {
+        let next = (readGeneration[plugin] ?? 0) + 1
+        readGeneration[plugin] = next
+        return next
     }
 
     private var readHosts: OwnerLoader.Secondary {
@@ -138,7 +153,8 @@ import Observation
     /// Reads one connector again, such as after a change or when its page opens.
     func reload(_ plugin: String) async {
         let calls = context.calls
-        take(await Self.read(plugin, with: calls), for: plugin)
+        let generation = startRead(plugin)
+        take(await Self.read(plugin, with: calls), for: plugin, startedAt: generation)
         await loader.read(readHosts, in: context)
     }
 
@@ -161,8 +177,8 @@ import Observation
         return read
     }
 
-    private func take(_ read: Read, for plugin: String) {
-        guard let index = index(plugin) else { return }
+    private func take(_ read: Read, for plugin: String, startedAt generation: Int) {
+        guard readGeneration[plugin] == generation, let index = index(plugin) else { return }
         if let failure = read.failure {
             if failure == .notFound { markGone(plugin) }
             Task { await context.learn(from: failure) }
@@ -183,12 +199,14 @@ import Observation
     // MARK: What the owner chooses
 
     private func change(_ plugin: String, _ call: (any OwnerCalls) async throws(OwnerFailure) -> ConnectorControl) async {
-        guard !working.contains(plugin), let index = index(plugin) else { return }
+        guard !working.contains(plugin), index(plugin) != nil else { return }
         working.insert(plugin)
         defer { working.remove(plugin) }
         rowErrors[plugin] = nil
         do {
-            entries[index].control = try await call(context.calls)
+            let control = try await call(context.calls)
+            startRead(plugin)
+            if let index = index(plugin) { entries[index].control = control }
         } catch {
             rowErrors[plugin] = error
             if error == .notFound { markGone(plugin) }
@@ -235,6 +253,7 @@ import Observation
             return
         }
         // Shown at once, so the machine it left never stands in for it while it is read again.
+        startRead(plugin)
         if let index = index(plugin) {
             entries[index].control?.host = host
             entries[index].summary.hostID = host
@@ -251,6 +270,7 @@ import Observation
         var paused = false
         do {
             let fresh = try await context.calls.connectorControl(of: plugin)
+            startRead(plugin)
             if let index = index(plugin) { entries[index].control = fresh }
             paused = fresh.paused
         } catch {
@@ -353,6 +373,7 @@ import Observation
         settingErrors[key] = nil
         do {
             let reading = try await context.calls.changeConnectorSettings(of: plugin, [setting.name: change])
+            startRead(plugin)
             if let index = index(plugin) { entries[index].settings = reading }
             return true
         } catch {
@@ -378,6 +399,7 @@ import Observation
         isSavingSecret = true
         do {
             let reading = try await context.calls.changeConnectorSettings(of: sheet.plugin, [sheet.setting: .set(.text(secretDraft))])
+            startRead(sheet.plugin)
             if let index = index(sheet.plugin) { entries[index].settings = reading }
             isSavingSecret = false
             closeSheet()
