@@ -301,6 +301,12 @@ nonisolated protocol OwnerCalls: Sendable {
     /// What the connector registered under `id` has reported itself.
     func connectorRegistration(_ id: String) async throws(OwnerFailure) -> ConnectorRegistration
     func connectorHosts() async throws(OwnerFailure) -> [ConnectorHostInfo]
+    /// One machine, read again, with the connectors on it.
+    func connectorHost(_ id: String) async throws(OwnerFailure) -> ConnectorHostInfo
+    /// Makes a machine that runs connectors, with its one-time link, which the server answers only this once.
+    func createConnectorHost(named name: String) async throws(OwnerFailure) -> ConnectorHostLink
+    /// A new one-time link for a machine, which ends the one it had.
+    func linkConnectorHost(_ id: String) async throws(OwnerFailure) -> ConnectorHostLink
     func connectorSettings(of plugin: String) async throws(OwnerFailure) -> ConnectorSettingsReading
     /// Sends only the settings `changes` names, and answers every setting as the server now holds it.
     func changeConnectorSettings(of plugin: String, _ changes: [String: ConnectorSettingChange]) async throws(OwnerFailure) -> ConnectorSettingsReading
@@ -309,7 +315,8 @@ nonisolated protocol OwnerCalls: Sendable {
     func resumeConnector(_ plugin: String) async throws(OwnerFailure) -> ConnectorControl
     /// Refused while the connector is paused.
     func runConnector(_ plugin: String) async throws(OwnerFailure) -> ConnectorControl
-    func assignConnector(_ plugin: String, toHost host: String) async throws(OwnerFailure)
+    /// Moves a connector to the machine `host`, or to none with nil.
+    func assignConnector(_ plugin: String, toHost host: String?) async throws(OwnerFailure)
     /// Starts the vendor sign-in, for the browser to be sent back to `address`, which the app registered.
     func startConnectorSignIn(of plugin: String, returningTo address: String) async throws(OwnerFailure) -> ConnectorSignInStart
     func connectorSignInStatus(of plugin: String) async throws(OwnerFailure) -> ConnectorSignInReading

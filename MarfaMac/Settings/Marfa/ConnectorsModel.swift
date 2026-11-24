@@ -18,9 +18,15 @@ import Observation
 
     /// A change waiting on the owner's answer.
     struct Question: Identifiable, Equatable {
+        enum Change: Equatable {
+            case removeSecret(setting: String)
+            /// Taking the connector off its machine.
+            case noMachine
+        }
+
         let id = UUID()
         let plugin: String
-        let setting: String
+        let change: Change
         let title: String
         let message: String
         let confirm: String
@@ -31,7 +37,8 @@ import Observation
         let plugin: String
         let setting: String
         let label: String
-        let isSet: Bool
+        /// Set, or set and unreadable, so it can be removed.
+        let hasValue: Bool
     }
 
     private let context: OwnerContext
@@ -64,6 +71,11 @@ import Observation
     private(set) var isSavingSecret = false
     /// The plugins found gone while their page was open.
     private(set) var gone: Set<String> = []
+    /// Add a Connector, while its sheet is open.
+    private(set) var adding: AddConnectorModel?
+    /// Counts each read of a connector and each change shown, by the plugin's name, so a read that began before a later one
+    /// or before a change is dropped and never puts back what was there.
+    private var readGeneration: [String: Int] = [:]
 
     init(context: OwnerContext) {
         self.context = context
@@ -75,7 +87,14 @@ import Observation
 
     func host(_ id: String?) -> ConnectorHostInfo? { id.flatMap { id in hosts.first { $0.id == id } } }
 
-    func hostName(of entry: Entry) -> String? { host(entry.control?.host ?? entry.summary.hostID)?.name }
+    func hostName(of entry: Entry) -> String? { host(hostID(of: entry))?.name }
+
+    /// The machine a connector is assigned to, as last read: its own state once read, which says nil for no machine, else
+    /// the list's.
+    func hostID(of entry: Entry) -> String? {
+        if let control = entry.control { return control.host }
+        return entry.summary.hostID
+    }
 
     func health(of entry: Entry, now: Date = .now) -> ConnectorHealth {
         if entry.control?.host != nil, hostsFailure != nil { return .unread }
@@ -109,10 +128,22 @@ import Observation
         ], after: {
             let calls = context.calls
             await readEach(
-                of: entries.map(\.id),
-                read: { name in await Self.read(name, with: calls) },
-                take: { name, read in take(read, for: name) })
+                of: entries.map { Started(plugin: $0.id, generation: startRead($0.id)) },
+                read: { started in await Self.read(started.plugin, with: calls) },
+                take: { started, read in take(read, for: started.plugin, startedAt: started.generation) })
         })
+    }
+
+    private struct Started: Sendable {
+        let plugin: String
+        let generation: Int
+    }
+
+    /// Starts a read, or marks a change just shown, so every read started before it is dropped.
+    @discardableResult private func startRead(_ plugin: String) -> Int {
+        let next = (readGeneration[plugin] ?? 0) + 1
+        readGeneration[plugin] = next
+        return next
     }
 
     private var readHosts: OwnerLoader.Secondary {
@@ -122,7 +153,8 @@ import Observation
     /// Reads one connector again, such as after a change or when its page opens.
     func reload(_ plugin: String) async {
         let calls = context.calls
-        take(await Self.read(plugin, with: calls), for: plugin)
+        let generation = startRead(plugin)
+        take(await Self.read(plugin, with: calls), for: plugin, startedAt: generation)
         await loader.read(readHosts, in: context)
     }
 
@@ -145,8 +177,8 @@ import Observation
         return read
     }
 
-    private func take(_ read: Read, for plugin: String) {
-        guard let index = index(plugin) else { return }
+    private func take(_ read: Read, for plugin: String, startedAt generation: Int) {
+        guard readGeneration[plugin] == generation, let index = index(plugin) else { return }
         if let failure = read.failure {
             if failure == .notFound { markGone(plugin) }
             Task { await context.learn(from: failure) }
@@ -167,12 +199,14 @@ import Observation
     // MARK: What the owner chooses
 
     private func change(_ plugin: String, _ call: (any OwnerCalls) async throws(OwnerFailure) -> ConnectorControl) async {
-        guard !working.contains(plugin), let index = index(plugin) else { return }
+        guard !working.contains(plugin), index(plugin) != nil else { return }
         working.insert(plugin)
         defer { working.remove(plugin) }
         rowErrors[plugin] = nil
         do {
-            entries[index].control = try await call(context.calls)
+            let control = try await call(context.calls)
+            startRead(plugin)
+            if let index = index(plugin) { entries[index].control = control }
         } catch {
             rowErrors[plugin] = error
             if error == .notFound { markGone(plugin) }
@@ -204,10 +238,9 @@ import Observation
         }
     }
 
-    /// Moves a connector to another machine. A connector can't be taken off its machine here: the package's call can't send the
-    /// `null` that does it.
-    func assign(_ plugin: String, toHost host: String) async {
-        guard !working.contains(plugin), entry(plugin)?.control?.host != host else { return }
+    /// Moves a connector to another machine, or to none with nil.
+    func assign(_ plugin: String, toHost host: String?) async {
+        guard !working.contains(plugin), let entry = entry(plugin), hostID(of: entry) != host else { return }
         working.insert(plugin)
         defer { working.remove(plugin) }
         rowErrors[plugin] = nil
@@ -219,7 +252,66 @@ import Observation
             await context.learn(from: error)
             return
         }
+        // Shown at once, so the machine it left never stands in for it while it is read again.
+        startRead(plugin)
+        if let index = index(plugin) {
+            entries[index].control?.host = host
+            entries[index].summary.hostID = host
+        }
         await reload(plugin)
+    }
+
+    /// No Machine: a connector that is running stops until a machine is chosen, so the owner is asked first; one paused is
+    /// moved at once. Whether it runs is read again first, so one another app resumed since is asked about; where that read
+    /// fails, the owner is asked.
+    func chooseNoMachine(for plugin: String) async {
+        guard !working.contains(plugin), let held = entry(plugin), hostID(of: held) != nil else { return }
+        working.insert(plugin)
+        var paused = false
+        do {
+            let fresh = try await context.calls.connectorControl(of: plugin)
+            startRead(plugin)
+            if let index = index(plugin) { entries[index].control = fresh }
+            paused = fresh.paused
+        } catch {
+            if error == .notFound { markGone(plugin) }
+            await context.learn(from: error)
+        }
+        working.remove(plugin)
+        guard let entry = entry(plugin), let host = hostID(of: entry) else { return }
+        if paused {
+            await assign(plugin, toHost: nil)
+            return
+        }
+        let title = entry.summary.title
+        let machine = self.host(host)?.name
+        question = Question(
+            plugin: plugin, change: .noMachine,
+            title: machine.map { String(localized: "Take \(title) off “\($0)”?") } ?? String(localized: "Take \(title) off its machine?"),
+            message: String(localized: "It stops running until you choose a machine for it. Its settings and mapping are kept."),
+            confirm: String(localized: "Take Off"))
+    }
+
+    // MARK: Add a Connector
+
+    /// The installed connectors no machine runs, which Add a Connector offers.
+    var unplaced: [PluginConnectorSummary] { entries.filter { hostID(of: $0) == nil }.map(\.summary) }
+
+    func beginAdding() {
+        guard !unplaced.isEmpty else { return }
+        adding = AddConnectorModel(context: context, candidates: unplaced, hosts: hosts) { [weak self] plugin in
+            guard let self else { return }
+            // A connector put on a machine already linked needs nothing more, so the sheet closes.
+            if let adding = self.adding, adding.placed == nil, adding.kept == nil { self.adding = nil }
+            await self.reload(plugin)
+        }
+    }
+
+    /// Closes Add a Connector; the link it showed goes with it.
+    func closeAdding() {
+        guard adding?.isWorking != true else { return }
+        adding?.close()
+        adding = nil
     }
 
     // MARK: Settings
@@ -281,6 +373,7 @@ import Observation
         settingErrors[key] = nil
         do {
             let reading = try await context.calls.changeConnectorSettings(of: plugin, [setting.name: change])
+            startRead(plugin)
             if let index = index(plugin) { entries[index].settings = reading }
             return true
         } catch {
@@ -296,7 +389,7 @@ import Observation
     func beginSecret(_ setting: ConnectorSetting, in plugin: String) {
         secretDraft = ""
         secretError = nil
-        sheet = SecretSheet(plugin: plugin, setting: setting.name, label: setting.label, isSet: setting.isSet)
+        sheet = SecretSheet(plugin: plugin, setting: setting.name, label: setting.label, hasValue: setting.isSet || setting.unreadable)
     }
 
     var canSaveSecret: Bool { !secretDraft.isEmpty && !isSavingSecret }
@@ -306,6 +399,7 @@ import Observation
         isSavingSecret = true
         do {
             let reading = try await context.calls.changeConnectorSettings(of: sheet.plugin, [sheet.setting: .set(.text(secretDraft))])
+            startRead(sheet.plugin)
             if let index = index(sheet.plugin) { entries[index].settings = reading }
             isSavingSecret = false
             closeSheet()
@@ -324,9 +418,12 @@ import Observation
         secretError = nil
     }
 
-    func askToRemoveSecret(_ setting: ConnectorSetting, in plugin: String) {
+    /// Remove… in the secret's sheet: the sheet closes and the owner is asked.
+    func askToRemoveSecret() {
+        guard let sheet, sheet.hasValue, !isSavingSecret else { return }
+        closeSheet()
         question = Question(
-            plugin: plugin, setting: setting.name, title: String(localized: "Remove “\(setting.label)”?"),
+            plugin: sheet.plugin, change: .removeSecret(setting: sheet.setting), title: String(localized: "Remove “\(sheet.label)”?"),
             message: String(localized: "The connector doesn’t have it at its next run. To use it again, you type it again."),
             confirm: String(localized: "Remove"))
     }
@@ -335,8 +432,13 @@ import Observation
 
     func confirm(_ asked: Question) async {
         question = nil
-        guard let setting = entry(asked.plugin)?.settings?.settings.first(where: { $0.name == asked.setting }) else { return }
-        _ = await send(.clear, for: setting, in: asked.plugin)
+        switch asked.change {
+        case .removeSecret(let name):
+            guard let setting = entry(asked.plugin)?.settings?.settings.first(where: { $0.name == name }) else { return }
+            _ = await send(.clear, for: setting, in: asked.plugin)
+        case .noMachine:
+            await assign(asked.plugin, toHost: nil)
+        }
     }
 
     // MARK: Vendor sign-in
@@ -398,15 +500,16 @@ import Observation
     // MARK: Closing
 
     /// What was typed in a setting's field and not sent, which the app gives back when Settings closes. A secret typed in its
-    /// sheet is dropped, never handed over.
+    /// sheet is dropped, never handed over, and so is a machine's link: only that it can't be shown again is told.
     func takeDrafts() -> [OwnerDraft] {
         defer {
             drafts = [:]
             sheet = nil
             secretDraft = ""
             secretError = nil
+            adding = nil
         }
-        var typed: [OwnerDraft] = []
+        var typed: [OwnerDraft] = adding?.takeDrafts() ?? []
         for entry in entries {
             for setting in entry.settings?.settings ?? [] where !setting.secret && isEdited(setting, in: entry.id) {
                 let text = drafts[Self.key(entry.id, setting.name)] ?? ""

@@ -77,6 +77,21 @@ nonisolated struct ConnectorHostInfo: Identifiable, Hashable, Sendable {
     let id: String
     var name: String
     var lastSeen: Date?
+    /// Whether the machine has used its one-time link and holds a key of its own.
+    var linked: Bool
+    /// The plugins whose connectors are assigned to it.
+    var connectors: [String] = []
+}
+
+/// A machine's one-time link, which the server answers once. It gives the machine a key, so it is shown only in the sheet
+/// that asked for it and never written anywhere: `description` leaves it out, so a stray print can't show it.
+nonisolated struct ConnectorHostLink: Hashable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
+    var host: ConnectorHostInfo
+    let link: String
+    var expires: Date
+
+    var description: String { "ConnectorHostLink(host: \(host.id), expires: \(expires))" }
+    var debugDescription: String { description }
 }
 
 /// What a setting holds, or is given.
@@ -244,12 +259,28 @@ extension ClientOwnerCalls {
         }
     }
 
+    private static func host(_ host: Components.Schemas.ConnectorHost) -> ConnectorHostInfo {
+        ConnectorHostInfo(id: host.id, name: host.name, lastSeen: host.lastSeenAt, linked: host.linked, connectors: host.connectors.map(\.plugin))
+    }
+
+    private static func link(_ answer: Components.Schemas.ConnectorHostLink) -> ConnectorHostLink {
+        ConnectorHostLink(host: host(answer.host.value1), link: answer.link, expires: answer.expiresAt)
+    }
+
     func connectorHosts() async throws(OwnerFailure) -> [ConnectorHostInfo] {
-        try await run { client in
-            try await client.listConnectorHosts().ok.body.json.data.map {
-                ConnectorHostInfo(id: $0.id, name: $0.name, lastSeen: $0.lastSeenAt)
-            }
-        }
+        try await run { client in try await client.listConnectorHosts().ok.body.json.data.map(Self.host) }
+    }
+
+    func connectorHost(_ id: String) async throws(OwnerFailure) -> ConnectorHostInfo {
+        try await run { client in Self.host(try await client.getConnectorHost(path: .init(id: id)).ok.body.json) }
+    }
+
+    func createConnectorHost(named name: String) async throws(OwnerFailure) -> ConnectorHostLink {
+        try await run { client in Self.link(try await client.createConnectorHost(body: .json(.init(name: name))).created.body.json) }
+    }
+
+    func linkConnectorHost(_ id: String) async throws(OwnerFailure) -> ConnectorHostLink {
+        try await run { client in Self.link(try await client.createConnectorHostLink(path: .init(id: id)).ok.body.json) }
     }
 
     func connectorSettings(of plugin: String) async throws(OwnerFailure) -> ConnectorSettingsReading {
@@ -281,9 +312,9 @@ extension ClientOwnerCalls {
         try await run { client in Self.control(try await client.runPluginConnector(path: .init(name: plugin)).ok.body.json) }
     }
 
-    func assignConnector(_ plugin: String, toHost host: String) async throws(OwnerFailure) {
+    func assignConnector(_ plugin: String, toHost host: String?) async throws(OwnerFailure) {
         try await run { client in
-            _ = try await client.replacePluginConnectorHost(path: .init(name: plugin), body: .json(.init(host: .value(host)))).ok
+            _ = try await client.replacePluginConnectorHost(path: .init(name: plugin), body: .json(.init(host: host.map { .value($0) } ?? .null))).ok
         }
     }
 

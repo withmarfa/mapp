@@ -95,7 +95,12 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         /// Each settings write, as the plugin and the changes it sent.
         var connectorSettingsSent: [(plugin: String, changes: [String: ConnectorSettingChange])] = []
         /// The machine each assignment named.
-        var connectorAssigned: [(plugin: String, host: String)] = []
+        var connectorAssigned: [(plugin: String, host: String?)] = []
+        /// The machines made, and the links answered, in order.
+        var hostsMade: [String] = []
+        var linksMade = 0
+        /// The next assignment holds on the server, but its answer is lost as this failure.
+        var assignAnswerLost: OwnerFailure?
         /// What the sign-in start answers, and the address the browser was asked to return to.
         var signInStart = ConnectorSignInStart(id: "sign-in-1", address: URL(string: "https://accounts.example.com/sign-in")!, expires: .now.addingTimeInterval(600))
         var signInReturnedTo: [String] = []
@@ -579,10 +584,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func connectorControl(of plugin: String) async throws(OwnerFailure) -> ConnectorControl {
         try enter("connectorControl")
-        return try state.withLock { state throws(OwnerFailure) in
-            guard let control = state.connectorControls[plugin] else { throw .notFound }
-            return control
-        }
+        let control = state.withLock { $0.connectorControls[plugin] }
+        // Held after the read, so a held read answers what the server held when it began.
+        await held("connectorControl")
+        guard let control else { throw .notFound }
+        return control
     }
 
     func connectorRegistration(_ id: String) async throws(OwnerFailure) -> ConnectorRegistration {
@@ -596,6 +602,40 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     func connectorHosts() async throws(OwnerFailure) -> [ConnectorHostInfo] {
         try enter("connectorHosts")
         return state.withLock { $0.connectorHosts }
+    }
+
+    func connectorHost(_ id: String) async throws(OwnerFailure) -> ConnectorHostInfo {
+        try enter("connectorHost")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard var host = state.connectorHosts.first(where: { $0.id == id }) else { throw .notFound }
+            host.connectors = state.connectorControls.filter { $0.value.host == id }.keys.sorted()
+            return host
+        }
+    }
+
+    private static func link(for host: ConnectorHostInfo, _ count: Int) -> ConnectorHostLink {
+        ConnectorHostLink(host: host, link: "https://marfa.castell.studio/connect#code-\(count)", expires: .now.addingTimeInterval(900))
+    }
+
+    func createConnectorHost(named name: String) async throws(OwnerFailure) -> ConnectorHostLink {
+        try enter("createConnectorHost")
+        await held("createConnectorHost")
+        return state.withLock { state in
+            state.linksMade += 1
+            let host = ConnectorHostInfo(id: "host-\(state.hostsMade.count + 1)", name: name, lastSeen: nil, linked: false)
+            state.hostsMade.append(name)
+            state.connectorHosts.append(host)
+            return Self.link(for: host, state.linksMade)
+        }
+    }
+
+    func linkConnectorHost(_ id: String) async throws(OwnerFailure) -> ConnectorHostLink {
+        try enter("linkConnectorHost")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let host = state.connectorHosts.first(where: { $0.id == id }) else { throw .notFound }
+            state.linksMade += 1
+            return Self.link(for: host, state.linksMade)
+        }
     }
 
     func connectorSettings(of plugin: String) async throws(OwnerFailure) -> ConnectorSettingsReading {
@@ -659,13 +699,17 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         }
     }
 
-    func assignConnector(_ plugin: String, toHost host: String) async throws(OwnerFailure) {
+    func assignConnector(_ plugin: String, toHost host: String?) async throws(OwnerFailure) {
         try enter("assignConnector")
         try state.withLock { state throws(OwnerFailure) in
             guard var control = state.connectorControls[plugin] else { throw .notFound }
             state.connectorAssigned.append((plugin, host))
             control.host = host
             state.connectorControls[plugin] = control
+            if let lost = state.assignAnswerLost {
+                state.assignAnswerLost = nil
+                throw lost
+            }
         }
     }
 

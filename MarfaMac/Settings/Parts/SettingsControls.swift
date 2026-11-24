@@ -298,22 +298,24 @@ struct SettingsField: View {
     }
 }
 
-/// A value shown in a field's place that can be selected and copied but not changed, such as a key shown once. It is
-/// at least as tall as a field and as wide as the space it is given. It wraps onto as many lines as it needs, so every
-/// character of a value that is shown once is shown.
+/// A read-only value shown in a field's place. The text is selectable by default and wraps unless the caller sets a line limit.
 struct SettingsReadOnlyValue: View {
     let text: String
+    /// False for a value that leaves only through its own button, such as a command that holds a key.
+    var isSelectable = true
 
     var body: some View {
-        Text(verbatim: text)
-            .settingsFont(.mono)
-            .textSelection(.enabled)
+        selectable(Text(verbatim: text).settingsFont(.mono))
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.controlHeight, alignment: .leading)
             .background(SettingsTokens.field, in: .rect(cornerRadius: SettingsTokens.Metric.controlRadius))
             .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius).strokeBorder(SettingsTokens.hairline) }
+    }
+
+    @ViewBuilder private func selectable(_ text: some View) -> some View {
+        if isSelectable { text.textSelection(.enabled) } else { text.textSelection(.disabled) }
     }
 }
 
