@@ -292,7 +292,7 @@ import Observation
         errors[.stopSyncing] = nil
         question = Question(
             folder: id, title: String(localized: "Stop syncing \(title)?"),
-            message: String(localized: "Every copy stops, and this folder can’t be synced again. Its items stay in Marfa, and its files stay as plain files where each copy keeps them. A change a copy hasn’t sent yet stays only in its files."))
+            message: String(localized: "Each copy stops the next time it syncs. You can’t sync this folder again. Its items stay in Marfa and its files stay on disk. Push any unsent changes from each copy before stopping. Afterward, use marfa folders remove to detach each directory and keep its files as plain files."))
     }
 
     func cancelQuestion() { question = nil }
@@ -401,11 +401,10 @@ import Observation
         count == 1 ? String(localized: "1 removal waits on \(signIn)") : String(localized: "\(count) removals wait on \(signIn)")
     }
 
-    /// The words under a copy's removals that wait: the limit they passed, where it is known, and where they are decided,
-    /// since only the copy that holds the files can.
+    /// The current file-count threshold may differ from the one used in the copy’s last report.
     static func removalsLine(limit: UInt64?) -> String {
         guard let limit else { return String(localized: "Review them where it runs.") }
-        return String(localized: "More than the limit of \(limit). Review them where it runs.")
+        return String(localized: "The current file-count threshold is \(limit). Review the removals where this copy runs.")
     }
 
     /// Whether a copy is listed under a folder's Needs Attention.

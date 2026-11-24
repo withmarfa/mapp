@@ -47,7 +47,7 @@
 - This Marfa changes settings with `PATCH /config` carrying only the changed fields (`null` removes one) and the instance it read in `X-Marfa-Instance-Id`. Never send `PUT`, `instance_id` in the body, or an unchanged field.
 - Permanently Delete is `purge`, never queued, offered only while the server can be reached, run after earlier writes, at the version the person was shown.
 - Saved views (`system.view`) are written through the package's `createView`, `changeView` and `deleteView`, never queued or as items, each on the version the window read.
-- A Marfa folder (`system.folder`) places no item. Only Settings > Folders uses the folder calls (`CopyFolderCalls`), sent at once on the version read.
+- Settings > Folders alone uses `CopyFolderCalls`. Writes send immediately. Changes carry a base version. Revocation names the folder ID.
 
 ## Edges and files
 

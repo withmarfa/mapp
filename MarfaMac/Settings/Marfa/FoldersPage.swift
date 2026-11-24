@@ -179,9 +179,9 @@ private struct FolderDetail: View {
                 .ignore, name: "Ignore", line: "Files and folders Marfa leaves alone.", held: read.ignore,
                 draft: $model.ignoreDraft)
             patterns(
-                .include, name: "Include", line: "Only these files and folders are kept in step. With none, every one is.",
+                .include, name: "Include", line: "Choose which paths can sync. Ignore rules still apply. Hidden paths need an explicit pattern.",
                 held: read.include, draft: $model.includeDraft)
-            SettingsSection("Safety") {
+            SettingsSection("Safety", line: "Pauses also depend on the share of the folder. Removals have a separate ceiling.") {
                 limit(.removalLimit, title: "Pause Removals Over", text: $model.removalDraft)
                 limit(.additionLimit, title: "Pause Additions Over", text: $model.additionDraft)
             }

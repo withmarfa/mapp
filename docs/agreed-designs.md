@@ -44,7 +44,7 @@ Agreed with August on 19 and 20 November 2026. The pages are drawn on the Settin
 
 The rules that are built (the window, the toolbar, rows, sections, changing things, numbers, problems and errors, buttons, tables, words and named values) are in [Views and lists](views-and-lists.md#settings). One is not built yet:
 
-- **A synced folder's page** shows what it holds as a tree of its folders, counted in files, which the app builds from the server's paths. Not built: the package's client offers no call for a folder's settings or paths (see [The Marfa's half of Settings](marfa-settings.md#left-out)).
+- **A synced folder's page** shows its settings and each copy's status. The planned tree of directories and file counts needs a server call. See [The Marfa's half of Settings](marfa-settings.md#left-out).
 - **Not now:** custom CSS, plugins for the app itself, AI providers and Vim keys. Themes come later; every color and font is already a named value.
 
 ### App pages

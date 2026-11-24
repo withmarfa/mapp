@@ -94,7 +94,7 @@ nonisolated struct FolderSettingsReading: Hashable, Sendable {
     /// A stopped folder changes no more, and no copy can follow it again.
     var isStopped: Bool
     var title: String
-    /// The types the folder holds, each with its subtypes; empty holds every type.
+    /// The types the folder holds, including subtypes. An empty list holds all nonhidden types.
     var types: [String]
     /// Nil holds the library.
     var tier: SliceTier?
@@ -107,9 +107,9 @@ nonisolated struct FolderSettingsReading: Hashable, Sendable {
     var removalThreshold: RemovalThreshold
     var additionThreshold: AdditionThreshold
 
-    /// How many files a removal may take before it waits, as a copy reads the setting.
+    /// The removal file-count threshold, independent of the fraction and ceiling.
     var removalLimit: UInt64 { removalThreshold.files ?? 10 }
-    /// How many new files an addition may bring before it waits, as a copy reads the setting.
+    /// The addition file-count threshold, independent of the fraction.
     var additionLimit: UInt64 { additionThreshold.files ?? 50 }
 }
 
