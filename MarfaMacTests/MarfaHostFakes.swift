@@ -94,23 +94,20 @@ nonisolated final class FakeMarfaSource: MarfaMac.ItemSource {
         throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")
     }
     /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
-    let queuing = Mutex(false)
+    let queuing = HeldSwitch()
     let queued = Mutex(0)
 
     func queueSubmitted() async {
-        while queuing.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(10)) }
+        await queuing.wait()
         queued.withLock { $0 += 1 }
     }
 
-    /// While set, closing waits, as a copy finishing its last step does.
-    let closesSlowly = Mutex(false)
     /// Run as a close begins, before it answers, to stand for a quit while the copy closes.
     let onClose = Mutex<(@Sendable () async -> Void)?>(nil)
 
     func close() async {
         record("close")
         await onClose.withLock { $0 }?()
-        while closesSlowly.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(10)) }
     }
 
     /// The tokens of the sign-ins the copy was given, in order. A sign-in given while it was not open is never here.
@@ -146,7 +143,7 @@ nonisolated extension UnsentChanges {
 nonisolated final class FakeServers: Sendable {
     let failure = Mutex<SourceFailure?>(nil)
     /// While set, an open waits, as one behind a keychain prompt would.
-    let slow = Mutex(false)
+    let slow = HeldSwitch()
     let opening = Mutex(false)
     private let made = Mutex<[FakeMarfaSource]>([])
     /// The name each address gives itself; an address with none cannot be read.
@@ -172,7 +169,7 @@ nonisolated final class FakeServers: Sendable {
         { connection, signIns, location in
             if let failure = self.failure.withLock({ $0 }) { throw failure }
             self.opening.withLock { $0 = true }
-            while self.slow.withLock({ $0 }) { try await Task.sleep(for: .milliseconds(10)) }
+            await self.slow.wait()
             guard try signIns.server(for: connection) != nil else {
                 throw SourceFailure(kind: .denied, message: "There’s no key for this Marfa server.")
             }

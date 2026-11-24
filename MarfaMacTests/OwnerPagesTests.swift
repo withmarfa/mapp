@@ -2182,7 +2182,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 }
 
 @MainActor
-@Suite struct OwnerWordingTests {
+@Suite(.hangLimit) struct OwnerWordingTests {
     @Test func everyFailureSaysSomethingInOneLine() {
         let failures: [OwnerFailure] = [
             .unreachable, .signedOut, .notPermitted("grants.manage"), .notPermitted(nil), .notPermitted("odd.scope"), .notFound,

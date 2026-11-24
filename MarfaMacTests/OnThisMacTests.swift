@@ -70,7 +70,7 @@ private struct FakeArchive: ArchiveSource {
     }
 }
 
-@Suite struct StoreSizeTests {
+@Suite(.hangLimit) struct StoreSizeTests {
     @Test func theSizeIsEveryFileInTheStoreFolder() throws {
         let folder = URL.temporaryDirectory.appending(path: "store-\(UUID())", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: folder.appending(path: "files"), withIntermediateDirectories: true)

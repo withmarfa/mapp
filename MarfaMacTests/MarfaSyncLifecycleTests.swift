@@ -199,6 +199,7 @@ struct MarfaSyncLifecycleTests {
         try #require(await eventually { refresh.hydrations == 1 })
         fake.sendUpdate(update(.offline(.network(message: "the network is down"))))
         #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
+        // Nothing to wait for: gives a new request time to be made, if one is going to.
         try await Task.sleep(for: .milliseconds(300))
         #expect(refresh.hydrations == 1, "nothing is asked again while the package waits")
 
@@ -228,6 +229,7 @@ struct MarfaSyncLifecycleTests {
         try #require(await eventually { refresh.hydrations == 1 })
         fake.sendUpdate(update(.needsHydration(refused)))
         fake.sendUpdate(update(.needsHydration(refused)))
+        // Nothing to wait for: gives a second fill time to start, if one is going to.
         try await Task.sleep(for: .milliseconds(400))
         #expect(refresh.hydrations == 1)
         await source.close()
@@ -246,6 +248,7 @@ struct MarfaSyncLifecycleTests {
         let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
         let (_, source, _) = try await scriptedSource(refreshing: refresh)
         await source.engine.sync.drain()
+        // Nothing to wait for: gives a fill time to start, if one is going to.
         try await Task.sleep(for: .milliseconds(300))
         #expect(refresh.hydrations == 0)
         await source.close()
@@ -278,6 +281,7 @@ struct MarfaSyncLifecycleTests {
 
         for _ in 0..<4 { fake.sendUpdate(fault) }
         _ = try #require(await log.wait { unavailable($0) == 1 })
+        // Nothing to wait for: gives a repeated stop or notice time to arrive, if one is going to.
         try await Task.sleep(for: .milliseconds(200))
         #expect(sync.hooks.stops == 1)
         #expect(unavailable(log.current) == 1)
@@ -362,6 +366,7 @@ struct MarfaSyncLifecycleTests {
 
         fake.sendUpdate(update(.following))
         fake.sendUpdate(update(.following))
+        // Nothing to wait for: gives the queued writes' library time to show online, if it is going to.
         try await Task.sleep(for: .milliseconds(200))
         #expect(source.connectionState != .online, "a following update showed a library with queued writes online")
         #expect(unavailable(log.current) == 1)
@@ -386,6 +391,7 @@ struct MarfaSyncLifecycleTests {
         await sync.refresh()
         _ = try #require(await log.wait { unavailable($0) == 1 })
         await sync.refresh()
+        // Nothing to wait for: gives a repeated notice time to arrive, if one is going to.
         try await Task.sleep(for: .milliseconds(200))
         #expect(unavailable(log.current) == 1)
         #expect(source.connectionState == .unavailable(message: Words.message(for: error)))
@@ -430,6 +436,7 @@ struct MarfaSyncLifecycleTests {
         fake.sendUpdate(update(.following, fill: FillProgress(listed: 1, expected: 9)))
         fake.sendUpdate(update(.following))
         try #require(await eventually { reads.statusReads > afterConnecting })
+        // Nothing to wait for: gives a second status read time to happen, if one is going to.
         try await Task.sleep(for: .milliseconds(300))
         #expect(reads.statusReads == afterConnecting + 1, "the end of a fill did not read the status once, or a local write's update did")
         await source.close()

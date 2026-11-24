@@ -84,7 +84,7 @@ nonisolated final class FakeItemSource: ItemSource {
     let resolved = Mutex<[SyncAction]>([])
     let queues = Mutex(0)
     /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
-    let queuing = Mutex(false)
+    let queuing = HeldSwitch()
     let isClosed = Mutex(false)
     private let held = Mutex<[ItemID: ItemBody]>([:])
     /// The version of each item last sent, to tell which items a change moved.
@@ -193,15 +193,15 @@ nonisolated final class FakeItemSource: ItemSource {
     }
 
     /// While set, `edgeVerdict` waits, as the core's check does for a moment.
-    let holdingChecks = Mutex(false)
+    let holdingChecks = HeldSwitch()
     func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict {
-        while holdingChecks.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(5)) }
+        await holdingChecks.wait()
         asked.withLock { $0.append(.added(draft)) }
         return refusals.withLock { $0[draft] }.map { .refused($0) } ?? .taken
     }
 
     func edgeVerdict(moving edge: EdgeID, end: EdgeTypeInfo.End, to: ItemID) async -> EdgeVerdict {
-        while holdingChecks.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(5)) }
+        await holdingChecks.wait()
         asked.withLock { $0.append(.moved(edge, end, to)) }
         return moveRefusals.withLock { $0[edge] }.map { .refused($0) } ?? .taken
     }
@@ -316,7 +316,7 @@ nonisolated final class FakeItemSource: ItemSource {
     }
 
     func queueSubmitted() async {
-        while queuing.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(10)) }
+        await queuing.wait()
         queues.withLock { $0 += 1 }
     }
 

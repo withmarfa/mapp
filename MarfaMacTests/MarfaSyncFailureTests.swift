@@ -234,6 +234,7 @@ struct MarfaSyncFailureTests {
         for _ in 0..<3 { fake.sendUpdate(update(.keyRefused(ended))) }
         #expect(await waitForConnection(source) { $0 == .keyRefused })
         try #require(await eventually { log.current.changes.contains { if case .unavailable = $0 { true } else { false } } })
+        // Nothing to wait for: gives a repeated notice time to arrive, if one is going to.
         try await Task.sleep(for: .milliseconds(200))
         #expect(unavailable(log.current) == 1)
         await source.close()

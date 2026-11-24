@@ -34,7 +34,7 @@ Replace `test` with `build` to build only. `Scripts/measure-ui.sh` times the win
 ## Waiting
 
 - A test waits with `eventually` or `eventuallyAsking` (`MarfaMacTests/Waiting.swift`), never a loop of short sleeps.
-- A suite with an `async` test carries `.hangLimit`, except a `Live` suite and `NavigationCostTests`. A test sets no limit of its own.
+- A suite with an `async` test carries `.hangLimit`, except a `Live` suite and a `measure` suite, which a person reads. A test sets no limit of its own.
 - A fixed sleep is only for checking that something did not happen, or letting an animation or scroll settle in a UI test. A comment says what it waits for.
 
 ## Fakes and sample data

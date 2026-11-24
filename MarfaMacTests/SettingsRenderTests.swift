@@ -198,14 +198,12 @@ struct RenderedWindow<Detail: View>: View {
 
     /// A font chosen once and uninstalled since, and a color of the person's own.
     @Test func appearanceWithAMissingFontAndACustomAccent() async throws {
-        let defaults = UserDefaults.standard
-        let keys = [AppearanceKey.textFont, AppearanceKey.accent, AppearanceKey.theme]
-        defer { for key in keys { defaults.removeObject(forKey: key) } }
+        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
         defaults.set("Uninstalled Sans", forKey: AppearanceKey.textFont)
         defaults.set(AccentChoice.custom("#B4468C").rawValue, forKey: AppearanceKey.accent)
         defaults.set(AppTheme.dark.rawValue, forKey: AppearanceKey.theme)
         try await SettingsRender.png(
-            RenderedWindow(selection: .appearance, detail: AppearancePage()),
+            RenderedWindow(selection: .appearance, detail: AppearancePage().defaultAppStorage(defaults)),
             size: CGSize(width: Self.size.width, height: 1_300), named: "Appearance, a missing font and a custom accent")
     }
 

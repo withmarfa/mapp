@@ -167,6 +167,7 @@ struct BrowserDerivedCacheTests {
 /// Where the window goes when the place it shows is gone, worked out without moving it, so a view can watch the
 /// answer (`Browser.placeFallback`) instead of a list of the library's items.
 @MainActor
+@Suite(.hangLimit)
 struct PlaceFallbackTests {
     private let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
 

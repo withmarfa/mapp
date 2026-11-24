@@ -10,12 +10,16 @@ struct WebPageItemPageTests {
     @MainActor @Observable final class Visit {
         var item: Item
         let details = DetailsPresentation()
+        /// The page's Reader or Original choice is kept here, so no other test or run sees it.
+        let defaults = UserDefaults(suiteName: "WebPageItemPageTests-\(UUID().uuidString)")!
         init(_ item: Item) { self.item = item }
     }
 
     struct Host: View {
         let visit: Visit
-        var body: some View { FileItemPage(item: visit.item, drafts: visit.details, open: { _ in }) }
+        var body: some View {
+            FileItemPage(item: visit.item, drafts: visit.details, open: { _ in }).defaultAppStorage(visit.defaults)
+        }
     }
 
     private static let article = "<html><head><title>The cliff path</title></head><body><article><h1>The cliff path</h1>"
@@ -56,10 +60,12 @@ struct WebPageItemPageTests {
         elements(of: view).first { answer($0, "accessibilityRole") as? String == "AXButton" && answer($0, "accessibilityLabel") as? String == label }
     }
 
-    private func host(_ visit: Visit, in library: FakeItemLibrary) -> (NSWindow, NSView) {
-        // SwiftUI builds its accessibility elements only once an assistive client is attached.
-        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXManualAccessibility"))
-        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
+    /// `assistive` says whether the test reads the page's accessibility elements. SwiftUI builds them only once an
+    /// assistive client is attached, which also slows the analysis of a large page, so a test that reads only what the
+    /// page presents hosts it with no client.
+    private func host(_ visit: Visit, in library: FakeItemLibrary, assistive: Bool = true) -> (NSWindow, NSView) {
+        NSApplication.shared.accessibilitySetValue(assistive, forAttribute: NSAccessibility.Attribute(rawValue: "AXManualAccessibility"))
+        NSApplication.shared.accessibilitySetValue(assistive, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 700), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         let view = NSHostingView(rootView: Host(visit: visit).environment(\.library, library))
@@ -82,11 +88,10 @@ struct WebPageItemPageTests {
     }
 
     /// The check below can only show an article on the wrong page if an article does show on a page that has one.
-    /// A page opens in Original until the person chooses Reader, and the choice is kept for the next page, so the test
-    /// starts and ends with no choice stored.
+    /// A page opens in Original until the person chooses Reader. The test reads what the page presents and no
+    /// accessibility element, so it is hosted with no assistive client, which can push the analysis past its limit and
+    /// leave a page with no article to offer.
     @Test func aPageWithAnArticleOffersTheSwitchToReader() async throws {
-        UserDefaults.standard.removeObject(forKey: SourceViewMode.key)
-        defer { UserDefaults.standard.removeObject(forKey: SourceViewMode.key) }
         let folder = try temporaryFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let item = file("A.html")
@@ -94,7 +99,7 @@ struct WebPageItemPageTests {
         let library = FakeItemLibrary(items: [item], now: .now)
         library.files[item.id] = folder.appending(path: "a.html")
         let visit = Visit(item)
-        let (window, view) = host(visit, in: library)
+        let (window, view) = host(visit, in: library, assistive: false)
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
 
         #expect(try await settled(view) { visit.details.pageLook?.mode == .original })

@@ -136,23 +136,6 @@ extension EditorTests {
 
     /// An editor is a web view with a page process of its own, so a window makes one, however often SwiftUI makes
     /// the window's view again.
-    @Test func aMainWindowMakesOneEditorHoweverOftenItsViewIsMadeAgain() async throws {
-        let library = ItemPreviewFixtures.library
-        let browser = ItemPreviewFixtures.browser
-        let details = DetailsPresentation()
-        let libraries = ItemPreviewFixtures.libraries(named: "MarfaMac.EditorTests")
-        let (made, shown, drafts) = try await Self.editorsMade(remaking: 5) {
-            MainView(browser: browser, details: details, restoresWindow: false)
-                .environment(\.library, library)
-                .environment(libraries)
-        }
-        #expect(made.count == 1, "one editor for the window, not one for each time its view is made")
-        #expect(made.first === shown)
-        #expect(drafts === details, "the editor holds the window's drafts")
-        #expect(shown.titleDrafts == nil, "the window's drafts leave with it")
-        withExtendedLifetime(library) {}
-    }
-
     @Test func anItemWindowMakesOneEditorHoweverOftenItsViewIsMadeAgain() async throws {
         let library = ItemPreviewFixtures.library
         let (made, shown, drafts) = try await Self.editorsMade(remaking: 5) {

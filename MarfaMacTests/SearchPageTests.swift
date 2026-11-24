@@ -19,7 +19,7 @@ private func item(
 }
 
 /// What the Search page's choices do to a search and to the items the palette matches by title.
-@Suite struct SearchOptionsTests {
+@Suite(.hangLimit) struct SearchOptionsTests {
     typealias F = LibraryFixture
 
     @Test func theChoicesAreMacSettingsThatResetClears() {

@@ -229,7 +229,7 @@ private func catalogue() -> Catalogue {
     }
 }
 
-@Suite struct TypeDefinitionEditTests {
+@Suite(.hangLimit) struct TypeDefinitionEditTests {
     private typealias Definition = Components.Schemas.FieldDefinition
 
     private func listed(genre: Definition? = nil) -> TypeDefinitionEdit.Listed {
