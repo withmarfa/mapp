@@ -48,6 +48,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// bumps `membershipRevision` for every item change may leave this as that.
     var namesRevision: Int { get }
     func item(_ id: ItemID) -> Item?
+    /// The instance id of the Marfa the library's copy holds, as its `GET /` names it, which an item's `marfa://` link
+    /// is checked against; nil until the copy has read it. Reads only the copy.
+    func instanceID() async -> String?
     /// The item as a page header shows it. A change to only its version, preview, sync or bound embeds is not one.
     func headerItem(_ id: ItemID) -> Item?
     /// The item's version alone. It changes only when the version does, not when the text, preview, sync or embeds do.
@@ -285,6 +288,7 @@ extension ItemLibrary {
     func boundEmbeds(of id: ItemID) -> [BoundEmbed] { item(id)?.boundEmbeds ?? [] }
     var downloadedFiles: (any DownloadedFiles)? { nil }
     func downloadEverythingAgain() {}
+    func instanceID() async -> String? { nil }
     func isWritingProperties(of id: ItemID) -> Bool { false }
     func sendWaitingText() {}
     var lastPropertyWrite: Int? { nil }

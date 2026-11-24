@@ -511,6 +511,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MarfaMac/Info.plist;
+				ITEM_LINK_SCHEME = marfa;
 				INFOPLIST_KEY_CFBundleDisplayName = Marfa;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -543,6 +544,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MarfaMac/Info.plist;
+				ITEM_LINK_SCHEME = "$(PRODUCT_BUNDLE_IDENTIFIER).test-host";
 				INFOPLIST_KEY_CFBundleDisplayName = Marfa;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSBackgroundOnly = YES;
@@ -576,6 +578,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MarfaMac/Info.plist;
+				ITEM_LINK_SCHEME = marfa;
 				INFOPLIST_KEY_CFBundleDisplayName = Marfa;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";

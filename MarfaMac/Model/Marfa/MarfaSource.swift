@@ -171,6 +171,11 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
+    func instanceID() async -> String? {
+        let copy = copy
+        return try? await MarfaEngine.asking { try await copy.status() }.instanceId
+    }
+
     /// Hydrates a new copy or catches up a held one, then sends what waits in the queue. Call it once the
     /// first paint is shown; the package refills a copy whose place the server let go, as after a long sleep.
     /// Writes go to the queue at once meanwhile; a refresh or a drain that fails is tried again later on its own.

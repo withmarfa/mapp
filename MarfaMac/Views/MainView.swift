@@ -20,6 +20,11 @@ struct MainView: View {
     @State private var snapshotSaver = DelayedAction()
     @State private var measuredWidths = ColumnWidthTracker()
     @Environment(\.appearsActive) private var appearsActive
+    /// Absent in previews and tests that build the window alone.
+    @Environment(ItemLinkOpener.self) private var itemLinks: ItemLinkOpener?
+    /// Whether the window has restored what it showed, before which an item link waits, so the restore does not
+    /// replace the item the link opened.
+    @State private var isRestored = false
     /// The shape kept while Customize Toolbar's tray is open: replacing a toolbar under its tray crashes, and menu
     /// commands still reach the window. A change made meanwhile shows once the tray closes.
     @State private var heldPresentation: WorkspacePresentation?
@@ -79,6 +84,7 @@ struct MainView: View {
             ColumnWidthRegistry.shared.windowBecame(active: appearsActive, tracker: measuredWidths)
             if appearsActive { FrontBrowser.shared.last = browser }
         }
+        .onChange(of: itemLinks?.request) { takeItemLink() }
         // Customizing happens in the sidebar, so a command that starts it brings the sidebar back.
         .onChange(of: browser.customizesSidebar) {
             if browser.customizesSidebar { isSidebarVisible = true }
@@ -372,6 +378,8 @@ struct MainView: View {
                 }
                 if let layout = SampleLibrary.launchLayout { browser.set(layout: layout) }
                 #endif
+                isRestored = true
+                takeItemLink()
             }
         }
         // A new item reaches a server's library when its source says so, which the window waits for to open it.
@@ -401,6 +409,19 @@ struct MainView: View {
     }
 
     private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }
+
+    /// Opens the item a `marfa://` link named in this window (`Browser.open(itemLink:)`), once it has restored what it
+    /// showed. The opener checks the link against this window's library; this window only shows the item.
+    private func takeItemLink() {
+        guard isRestored, let itemLinks else { return }
+        let library = library
+        Task {
+            guard let item = await itemLinks.take(for: browser, in: library), library === self.library else { return }
+            // Version History takes the whole window, which would hide the item.
+            details.leaveHistory()
+            browser.open(itemLink: item, in: library, order: order)
+        }
+    }
 
     #if DEBUG
     private var launchSelection: ItemID? {

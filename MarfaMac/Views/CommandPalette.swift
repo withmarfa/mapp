@@ -748,7 +748,7 @@ struct CommandPalette: View {
                 })
             }
             // After New Item and the typed ones, so the commands "new" finds lead with New Item.
-            add(String(localized: "New Window"), "macwindow.badge.plus", keys(.newWindow), in: .file) { openWindow(id: "main") }
+            add(String(localized: "New Window"), "macwindow.badge.plus", keys(.newWindow), in: .file) { openWindow(id: MarfaMacApp.mainWindowID) }
             if let host, host.canRefresh {
                 add(String(localized: "Refresh"), "arrow.clockwise", keys(.refresh), in: .file) { host.refresh() }
             }

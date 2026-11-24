@@ -29,6 +29,14 @@ final class FakeItemLibrary: ItemLibrary {
     var downloadedFiles: (any DownloadedFiles)?
     private(set) var downloadedAgain = 0
     func downloadEverythingAgain() { downloadedAgain += 1 }
+    /// The instance id the copy answers, which an item link is checked against.
+    var heldInstanceID: String?
+    /// How long the copy takes to answer its instance id, as when the engine asks again while the key changes.
+    var instanceIDDelay: Duration = .zero
+    func instanceID() async -> String? {
+        if instanceIDDelay > .zero { try? await Task.sleep(for: instanceIDDelay) }
+        return heldInstanceID
+    }
     /// Whether counts cannot be answered, as when the copy cannot be sure and the server is out of reach.
     var countsUnavailable = false
     /// The counts the library works out from its items the way Marfa does: only active items, the groups of each child's
