@@ -181,6 +181,11 @@ enum SettingsTokens {
         static let previewHeading: CGFloat = 0.55
         /// The space above and below the rows a preview card draws.
         static let previewCardInset: CGFloat = 4
+        /// The side margin of a picture of rows (a density tile) and the thickness of the rule between its rows.
+        static let previewRowSide: CGFloat = 10
+        static let ruleThickness: CGFloat = 1
+        /// The space between a table's columns.
+        static let tableColumnGap: CGFloat = 12
         /// The gap between buttons or a value and a button at a row's end, and between a head card and what sits under it.
         static let buttonGap: CGFloat = 8
         static let cardGap: CGFloat = 10
