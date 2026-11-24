@@ -52,6 +52,22 @@ For a list's density, the first of these that has a choice wins:
 
 What a row says comes from the type's look (`TypeLooks`), never from a choice of row. A person chooses a look for a type only by importing one; see [Looks](looks.md).
 
+## Item links
+
+Built, not yet released.
+
+Marfa gives each item a link, `marfa://<instance id>/<item id>`: the instance id is the lowercase UUID that the Marfa server's `GET /` returns, and the item id is the item's lowercase UUIDv7. When another app opens such a link, the app opens the item the same way it opens an item from the list, in the main window that was last in front, or in a new main window if none is open. An item in Recently Deleted opens as a followed link to it does, with a note that it is in Recently Deleted.
+
+A link only opens. It never creates, changes, deletes or restores an item, never signs in or changes the connection or a setting, and never reaches the server. The app opens the item only when all of these are true:
+
+- The link is exactly in that form. The app doesn't correct a link, so a link with a query, a fragment, a port, percent-encoding, a trailing slash, an uppercase id or any extra character opens nothing.
+- The instance id matches the one held by the copy of the connected Marfa. A link to another Marfa opens nothing and says only that it is to another Marfa.
+- The copy holds the item. If it doesn't, the app says that the item can't be found in this Mac's copy.
+
+If no Marfa is connected, or its library can't be opened, the app says so and offers Settings. While the library is still opening, as at launch, the link waits for it for a short time; a newer link replaces a waiting one.
+
+Where it lives: `ItemAppLink` reads and writes the link, `ItemLinkRoute` decides what it does, and `ItemLinkOpener` takes it from `AppDelegate` and hands the item to a main window, under `MarfaMac/Model/`.
+
 ## Related pages
 
 - [Looks](looks.md)
