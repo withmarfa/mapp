@@ -141,21 +141,24 @@ extension EditorController {
 
     /// Records that the page went down after it had been ready, as when its process ended or loading it again failed,
     /// and tells the person. Where it held no item they could edit, nothing typed can be missing. The notice's words
-    /// are worked out here, once, so it is still found waiting after its item is renamed or goes.
+    /// are worked out here, once, so it is still found waiting after its item is renamed or goes. A loss that becomes
+    /// one that cannot come back takes back the notice saying it would come back where no window has shown it yet, so
+    /// one true notice is told.
     func pageWentDown(comingBack: Bool) {
-        let title: String
-        if let pageLoss {
-            title = pageLoss.title
-        } else {
-            guard isEditable, let pageItemID else { return }
-            title = library?.item(pageItemID).map { String(localized: "Typing in “\($0.displayTitle)” Might Be Missing") }
-                ?? String(localized: "Some Typing Might Be Missing")
-        }
+        let earlier = pageLoss
+        guard earlier != nil || (isEditable && pageItemID != nil) else { return }
+        let title = earlier?.title
+            ?? pageItemID.flatMap { library?.item($0) }.map { String(localized: "Typing in “\($0.displayTitle)” Might Be Missing") }
+            ?? String(localized: "Some Typing Might Be Missing")
         let message = comingBack
             ? String(localized: "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing.")
             : String(localized: "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close the window that shows this item, then open the item again to check it.")
         pageLoss = PageLoss(title: title, message: message, comingBack: comingBack)
         pageLosses += 1
+        if let earlier, earlier.title != title || earlier.message != message, let notices = library?.notices,
+           let told = notices.waiting.first(where: { $0.title == earlier.title && $0.message == earlier.message }) {
+            notices.withdraw(told.id)
+        }
         tellPageLoss()
     }
 

@@ -69,7 +69,9 @@ extension EditorTests {
         page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
         page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
         #expect(page.editor.pageNavigation === reload, "not loaded again")
-        #expect(notices.waiting.count == 2, "told it is coming back, then that it cannot")
+        #expect(notices.waiting.count == 1, "the notice that it is coming back gives way to the one that it cannot")
+        #expect(notices.waiting.first?.message == page.editor.pageLoss?.message)
+        #expect(page.editor.pageLoss?.comingBack == false)
         Self.answerAll(notices)
         #expect(await Self.flushed(page, leaving: true))
     }
@@ -104,6 +106,19 @@ extension EditorTests {
         try await page.wait { page.editor.isReady }
     }
 
+    /// A shown notice may be on the person's screen or its text on their clipboard, so it stays.
+    @Test func aLossNoticeAlreadyShownStaysWhenThePageCannotComeBack() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        let notices = page.library.notices
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        let window = UUID()
+        _ = notices.show(in: window) { _ in }
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        #expect(notices.waiting.count == 2)
+        #expect(notices.shownIn == window)
+    }
+
     @Test func aWindowThatGoesStopsWatchingItsPageComeBack() async throws {
         let page = try await Page()
         try await page.load("Original\n")
@@ -123,8 +138,8 @@ extension EditorTests {
         let notices = page.library.notices
         page.editor.reloadLimit = .milliseconds(10)
         page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
-        try await page.wait { notices.waiting.count == 2 }
-        #expect(page.editor.pageLoss?.comingBack == false, "the person is told to close the window and open the item again")
+        try await page.wait { page.editor.pageLoss?.comingBack == false }
+        #expect(notices.waiting.map(\.message) == [page.editor.pageLoss?.message], "the person is told to close the window and open the item again")
         Self.answerAll(notices)
         #expect(await Self.flushed(page, leaving: true))
     }
