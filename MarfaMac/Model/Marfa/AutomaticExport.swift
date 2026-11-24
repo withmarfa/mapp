@@ -22,21 +22,21 @@ nonisolated enum ExportSchedule: String, CaseIterable, Codable, Sendable {
 nonisolated struct ExportPlan: Codable, Equatable, Sendable {
     var instance: String
     var schedule: ExportSchedule
-    var folder: String?
+    /// The folder as it was when chosen, so an export never writes to a folder moved or replaced since.
+    var folder: ExportFolder?
     var last: Date?
     /// Changes at every choice, so an export begun under an earlier choice writes nothing back.
     var revision = UUID()
-
-    var folderURL: URL? { folder.map { URL(filePath: $0, directoryHint: .isDirectory) } }
 }
 
 /// Export Automatically: the same archive Export Everything writes, into the folder the person chose for the Marfa that is
 /// open, when one is due. A plan belongs to one Marfa by its instance id, so another Marfa shows Never until it is set
 /// there, and an archive of another Marfa is never saved under it. It is checked at launch and then about every hour while
 /// the app runs, with no background agent, so a Mac that is off or an app that is closed exports at its next launch; until
-/// the copy knows its instance id or the server answers, it checks again within a minute. Each kind of failure is told
+/// the copy knows its instance id or the server answers, it checks again within a minute, also after a choice in Settings.
+/// A folder moved or replaced since it was chosen receives nothing until it is chosen again. Each kind of failure is told
 /// once until an export succeeds. Reset, a restore that changes the plans, Quit and a new choice close the running
-/// export's gate without waiting on the disk and prevent it from updating the plan.
+/// export's gate, waiting at most for a move under way, and prevent it from updating the plan.
 @Observable @MainActor final class AutomaticExport {
     /// The Marfa that is open.
     struct Marfa {
@@ -120,14 +120,14 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
 
     /// Sets the schedule of the Marfa `instance`, and its folder where one is given, while it is the one open. An export
     /// running under its earlier choice stops.
-    func set(_ schedule: ExportSchedule, folder: URL? = nil, for instance: String) {
+    func set(_ schedule: ExportSchedule, folder: ExportFolder? = nil, for instance: String) {
         guard openInstance == instance else { return }
         if let index = plans.firstIndex(where: { $0.instance == instance }) {
             plans[index].schedule = schedule
-            if let folder { plans[index].folder = folder.path }
+            if let folder { plans[index].folder = folder }
             plans[index].revision = UUID()
         } else {
-            plans.append(.init(instance: instance, schedule: schedule, folder: folder?.path))
+            plans.append(.init(instance: instance, schedule: schedule, folder: folder))
         }
         save()
         if let running, running.instance == instance { stop(running) }
@@ -136,18 +136,31 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
     /// Starts the checks, once.
     func start() {
         guard loop == nil, !stopped else { return }
+        checkLoop(after: .zero)
+    }
+
+    /// Checks after `delay`, and then again after the hour, or soon where the check could not judge.
+    private func checkLoop(after delay: Duration) {
+        loop?.cancel()
         loop = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self else { return }
-                let judged = await check()
-                try? await Task.sleep(for: judged ? Self.interval : Self.retryInterval)
+            var delay = delay
+            while true {
+                if delay > .zero {
+                    do { try await Task.sleep(for: delay) } catch { return }
+                }
+                guard let self, !Task.isCancelled else { return }
+                delay = await check() ? Self.interval : Self.retryInterval
             }
         }
     }
 
-    /// Checks now, as a choice in Settings does, without waiting for the hour.
+    /// Checks now, as a choice in Settings does, without waiting for the hour. Where it could not judge, the checks
+    /// started at launch come again after the short retry.
     func checkSoon() {
-        Task { await check() }
+        Task {
+            guard !(await check()), loop != nil, !stopped else { return }
+            checkLoop(after: Self.retryInterval)
+        }
     }
 
     /// Writes the archive if one is due. Answers whether it could judge: false while a plan is on and the open Marfa's
@@ -159,7 +172,7 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
         guard let instance = await learn() else { return era != self.era }
         // A reset, a quit, another Marfa or another check while the id was asked ends this one.
         guard era == self.era, running == nil, !stopped, let marfa = marfa(), marfa.address == address,
-            let plan = plan(for: instance), plan.schedule != .never, let folder = plan.folderURL
+            let plan = plan(for: instance), plan.schedule != .never, let folder = plan.folder
         else { return true }
         let moment = now()
         guard plan.schedule.isDue(last: plan.last, now: moment) else { return true }
@@ -169,7 +182,8 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
             do throws(LibraryExport.Failure) {
                 return .success(
                     try await LibraryExport.export(
-                        from: source, serverName: marfa.name, to: folder, now: moment, instance: instance, gate: gate))
+                        from: source, serverName: marfa.name, to: folder.url, expecting: folder, now: moment, instance: instance,
+                        gate: gate))
             } catch {
                 return .failure(error)
             }
@@ -187,7 +201,7 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
             // A saved export ends every failure told; a lack stays told until its count changes.
             told = exported.notCarried > 0 ? told.filter { $0 == "lacking \(exported.notCarried)" } : []
             if let lack = LibraryExport.lacking(exported, serverName: marfa.name) {
-                let line = String(localized: "Saved “\(exported.file.lastPathComponent)” in “\(folder.lastPathComponent)”.") + " " + lack
+                let line = String(localized: "Saved “\(exported.file.lastPathComponent)” in “\(folder.url.lastPathComponent)”.") + " " + lack
                 tellOnce(String(localized: "Exported Without Some Files"), line, kind: "lacking \(exported.notCarried)")
             }
         case .failure(let failure):
