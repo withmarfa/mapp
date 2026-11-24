@@ -35,8 +35,8 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
 /// there, and an archive of another Marfa is never saved under it. It is checked at launch and then about every hour while
 /// the app runs, with no background agent, so a Mac that is off or an app that is closed exports at its next launch; until
 /// the copy knows its instance id or the server answers, it checks again within a minute. Each kind of failure is told
-/// once until an export succeeds. Reset, Quit and a new choice close the running export's gate without waiting on the
-/// disk, after which it begins no move into the folder and writes nothing back.
+/// once until an export succeeds. Reset, a restore that changes the plans, Quit and a new choice close the running
+/// export's gate without waiting on the disk, after which it begins no move into the folder and writes nothing back.
 @Observable @MainActor final class AutomaticExport {
     /// The Marfa that is open.
     struct Marfa {
@@ -93,10 +93,13 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
         defaults.data(forKey: plansKey).flatMap { try? JSONDecoder().decode([ExportPlan].self, from: $0) } ?? []
     }
 
-    /// Reads the plans again, as a restore wrote them. An export running under a plan that changed stops.
+    /// Reads the plans again, as a restore or a settings file wrote them. Where they changed, a running export stops, as
+    /// for Reset, so it never writes its time over a restored plan. A sync that left them as they were changes nothing.
     func reload() {
-        plans = Self.plans(in: defaults)
-        if let running, plan(for: running.instance)?.revision != running.revision { stop(running) }
+        let read = Self.plans(in: defaults)
+        guard read != plans else { return }
+        plans = read
+        if let running { stop(running) }
     }
 
     /// The open Marfa's instance id, once learnt.
@@ -148,7 +151,7 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
     }
 
     /// Writes the archive if one is due. Answers whether it could judge: false while a plan is on and the open Marfa's
-    /// instance id or its server is not there yet, so the loop asks again soon.
+    /// instance id or its server is not there yet, or the server did not answer, so the loop asks again soon.
     @discardableResult func check() async -> Bool {
         guard running == nil, !stopped, plans.contains(where: { $0.schedule != .never }) else { return true }
         let era = era
@@ -189,6 +192,7 @@ nonisolated struct ExportPlan: Codable, Equatable, Sendable {
             }
         case .failure(let failure):
             tellOnce(String(localized: "Couldn’t Export Automatically"), failure.message, kind: failure.message)
+            if failure.unreachable { return false }
         }
         return true
     }

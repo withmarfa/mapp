@@ -25,6 +25,17 @@ import Testing
         }
     }
 
+    /// An archive that sends every byte but its end, then waits for its latch before it sends the end.
+    private final class Gated: ArchiveSource {
+        let latch = Latch()
+        func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
+            let bytes = archiveBytes()
+            try write(Array(bytes.dropLast(1024)))
+            await latch.wait()
+            try write(Array(bytes.suffix(1024)))
+        }
+    }
+
     private struct Down: ArchiveSource {
         func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws { throw URLError(.cannotConnectToHost) }
     }
@@ -116,6 +127,8 @@ import Testing
         open.source = nil
         open.instance = "instance-one"
         #expect(await launched.check() == false, "a server not answering is asked again soon")
+        open.source = Down()
+        #expect(await launched.check() == false, "a server that fails to answer at launch is asked again soon, not in an hour")
         open.source = Archive()
         #expect(await launched.check())
         #expect(try files(in: folder).count == 1)
@@ -278,6 +291,45 @@ import Testing
         #expect(try files(in: second).count == 1)
         let kept = try JSONDecoder().decode([ExportPlan].self, from: try #require(defaults.data(forKey: AutomaticExport.plansKey)))
         #expect(kept.map(\.folder) == [second.path], "saving the export's time keeps the restored plan")
+    }
+
+    @Test func aRestoreOfThePlanStopsARunningExportSoItsTimeIsNotWrittenOverIt() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let defaults = defaults()
+        let open = Open()
+        let gated = Gated()
+        open.source = gated
+        let export = await export(open, defaults: defaults, folder: folder)
+        let check = Task { await export.check() }
+        #expect(await eventually { gated.latch.isWaiting })
+
+        var restored = try #require(export.current)
+        restored.last = Date(timeIntervalSince1970: 1_700_000_000)
+        defaults.set(try JSONEncoder().encode([restored]), forKey: AutomaticExport.plansKey)
+        export.reload()
+        gated.latch.open()
+        _ = await check.value
+        #expect(export.current == restored)
+        let kept = try JSONDecoder().decode([ExportPlan].self, from: try #require(defaults.data(forKey: AutomaticExport.plansKey)))
+        #expect(kept == [restored], "the export under the plan as it was before the restore writes nothing back")
+        #expect(try files(in: folder).isEmpty)
+    }
+
+    @Test func aSyncThatLeavesThePlansAsTheyWereLetsAnExportFinish() async throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let open = Open()
+        let gated = Gated()
+        open.source = gated
+        let export = await export(open, folder: folder)
+        let check = Task { await export.check() }
+        #expect(await eventually { gated.latch.isWaiting })
+        export.reload()
+        gated.latch.open()
+        _ = await check.value
+        #expect(try files(in: folder).count == 1)
+        #expect(export.current?.last != nil)
     }
 
     @Test func aQuitStopsTheChecksAndPublishesNothing() async throws {
