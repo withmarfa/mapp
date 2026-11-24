@@ -10,7 +10,7 @@ struct SourcesPage: View {
     let subpage: SettingsSubpage?
     @State private var model: SourcesModel
     @State private var limit: SourceLimitModel
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -89,7 +89,7 @@ struct SourcesPage: View {
             SettingsLinkRow(
                 verbatim: String(localized: "Limit Sources"), line: String(localized: "Only items from the sources you name are read."),
                 value: limitValue
-            ) { push(Self.limitSources) }
+            ) { navigation?.push(Self.limitSources) }
         }
     }
 
@@ -127,11 +127,11 @@ private struct SourceSheet: View {
             SettingsSheetField(label: "Name", error: model.failure) {
                 SettingsField(title: "Name", text: $model.name, isError: model.failure != nil, width: nil, onSubmit: { Task { await model.rename() } })
             }
-        } buttons: {
+        } leading: {
             SettingsButton("Use Default Name") { Task { await model.useDefaultName() } }.disabled(!model.canUseDefaultName)
-            Spacer(minLength: 0)
+        } buttons: {
             SettingsButton("Cancel") { model.close() }.disabled(model.isWorking)
-            SettingsButton("Rename") { Task { await model.rename() } }.disabled(!model.canRename)
+            SettingsButton("Rename", role: .confirm) { Task { await model.rename() } }.disabled(!model.canRename)
         }
     }
 
@@ -170,9 +170,9 @@ private struct SourceSheet: View {
                     Text(verbatim: failure).settingsFont(.line).foregroundStyle(SettingsTokens.errorRed)
                 }
             }
-        } buttons: {
+        } leading: {
             SettingsButton("Remove Mark") { Task { await model.removeMark() } }.disabled(!model.canRemoveMark)
-            Spacer(minLength: 0)
+        } buttons: {
             SettingsButton("Cancel") { model.close() }.disabled(model.isWorking)
         }
     }
@@ -224,7 +224,7 @@ private struct LimitSourcesPage: View {
                 if model.isOn {
                     SettingsSection("Turn Off") {
                         SettingsRow("Turn Off Limit Sources", line: "Every source is read again.") {
-                            SettingsButton("Turn Off", role: .destructive) { asksToTurnOff = true }.disabled(model.isSaving)
+                            SettingsButton("Turn Off…", role: .destructive) { asksToTurnOff = true }.disabled(model.isSaving)
                         }
                     }
                 }

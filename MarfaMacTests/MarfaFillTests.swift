@@ -93,7 +93,7 @@ import Testing
         reads.hydrating.withLock { $0 = true }
         let created = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Arrived", "body": "First"]))
         await source.hear(Change(origin: .server(event: "item.created", cursor: "arrived"),
-                           itemId: try #require(created.itemId), edgeId: nil))
+                           itemId: created.itemId, edgeId: nil))
         _ = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
         #expect(reads.refused.withLock { $0 } > 0, "the change was read while the copy refused edge reads")
         #expect(!log.current.changes.contains { if case .unavailable = $0 { true } else { false } })

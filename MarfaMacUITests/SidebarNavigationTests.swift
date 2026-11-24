@@ -1,15 +1,14 @@
 import XCTest
 
-@MainActor
-final class SidebarNavigationTests: XCTestCase {
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
-    private var sidebar: XCUIElement { window.outlines["Sidebar"] }
-    private var list: XCUIElement { window.outlines["ItemList"] }
-    private var instanceName: XCUIElement { element("SidebarSettings") }
-    private var settingsPages: XCUIElement { element("SettingsSidebar") }
+nonisolated final class SidebarNavigationTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
+    @MainActor private var window: XCUIElement { app.windows.firstMatch }
+    @MainActor private var sidebar: XCUIElement { window.outlines["Sidebar"] }
+    @MainActor private var list: XCUIElement { window.outlines["ItemList"] }
+    @MainActor private var instanceName: XCUIElement { element("SidebarSettings") }
+    @MainActor private var settingsPages: XCUIElement { element("SettingsSidebar") }
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
         app.launch()
@@ -17,11 +16,11 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(element("ItemsIndex").waitForExistence(timeout: 5), "the window opens on the Items index")
     }
 
-    override func tearDown() async throws {
+    @MainActor override func tearDown() async throws {
         app.terminate()
     }
 
-    func testSidebarListsNewAndSearchThenTheLibraryGroupThenViewsAndTypes() {
+    @MainActor func testSidebarListsNewAndSearchThenTheLibraryGroupThenViewsAndTypes() {
         let destinations = ["New", "Search", "Library", "Items", "Sources", "Collections", "Views", "Inbox", "Recents", "Favorites", "Recent Notes", "Types"]
         for title in destinations {
             XCTAssertTrue(sidebarText(title).exists, "\(title) is available")
@@ -47,7 +46,7 @@ final class SidebarNavigationTests: XCTestCase {
         attachScreenshot("SidebarGroupedNavigation")
     }
 
-    func testFavoritesListsItsItemsForSelection() {
+    @MainActor func testFavoritesListsItsItemsForSelection() {
         choose("Favorites")
         let title = window.itemPageTitle
         for favorite in ["Kitchen quotes", "Reading list"] {
@@ -60,7 +59,7 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Garden ideas")).firstMatch.exists)
     }
 
-    func testSearchOpensFromTheKeyboardAndFromItsRow() {
+    @MainActor func testSearchOpensFromTheKeyboardAndFromItsRow() {
         app.typeKey("p", modifierFlags: [.command, .shift])
         XCTAssertTrue(element("CommandPaletteField").waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
@@ -70,7 +69,7 @@ final class SidebarNavigationTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    func testTheNewRowOpensQuickAddAndTakesNoSelection() {
+    @MainActor func testTheNewRowOpensQuickAddAndTakesNoSelection() {
         element("SidebarNew").click()
         XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
@@ -79,13 +78,13 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     /// A click near the sidebar's trailing edge, level with `row`, past the end of its words.
-    private func clickBeyondTheWords(of row: XCUIElement) {
+    @MainActor private func clickBeyondTheWords(of row: XCUIElement) {
         let edge = sidebar.frame
         sidebar.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: edge.width - 28, dy: row.frame.midY - edge.minY)).click()
     }
 
-    func testTheNewAndSearchRowsTakeAClickAnywhereAlongTheirWidth() {
+    @MainActor func testTheNewAndSearchRowsTakeAClickAnywhereAlongTheirWidth() {
         clickBeyondTheWords(of: element("SidebarNew"))
         XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3), "New opens from the end of its row")
         app.typeKey(.escape, modifierFlags: [])
@@ -95,14 +94,14 @@ final class SidebarNavigationTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    func testTheCogOpensSettingsWithNoMenu() {
+    @MainActor func testTheCogOpensSettingsWithNoMenu() {
         instanceName.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
         XCTAssertFalse(window.menuItems["Settings"].firstMatch.exists, "the cog opens Settings directly")
         XCTAssertTrue(element("SettingsPage-recentlyDeleted").exists)
     }
 
-    func testTheCogOpensSettingsInAWindowOfItsOwnAndTheMainWindowStays() {
+    @MainActor func testTheCogOpensSettingsInAWindowOfItsOwnAndTheMainWindowStays() {
         instanceName.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
         // The Settings window is the front one, so the main window's parts are asked of the whole app.
@@ -112,13 +111,13 @@ final class SidebarNavigationTests: XCTestCase {
         attachScreenshot("SettingsFromInstanceMenu")
     }
 
-    func testTheNewRowOpensQuickAdd() {
+    @MainActor func testTheNewRowOpensQuickAdd() {
         element("SidebarNew").click()
         XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    func testFavoritesRemainsAvailableAfterTheLastItemIsRemoved() {
+    @MainActor func testFavoritesRemainsAvailableAfterTheLastItemIsRemoved() {
         choose("Favorites")
         for favorite in ["Kitchen quotes", "Reading list"] {
             let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", favorite)).firstMatch
@@ -143,7 +142,7 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(note.waitForExistence(timeout: 3))
     }
 
-    func testTheCollectionsIndexListsTheLibrarysCollections() {
+    @MainActor func testTheCollectionsIndexListsTheLibrarysCollections() {
         XCTAssertTrue(sidebarText("Collections").waitForExistence(timeout: 3))
         XCTAssertLessThan(sidebarText("Sources").frame.maxY, sidebarText("Collections").frame.minY)
         XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY, "the indexes are in the Library group, above Views")
@@ -163,24 +162,24 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading list")).firstMatch.exists)
     }
 
-    private func element(_ identifier: String) -> XCUIElement {
+    @MainActor private func element(_ identifier: String) -> XCUIElement {
         window.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
     }
 
     /// Clicks a sidebar row at the middle of its words. The row's label is not "hittable" to UI testing, which wants the
     /// click to land on the label itself, while the list row around it takes the click.
-    private func choose(_ title: String) {
+    @MainActor private func choose(_ title: String) {
         sidebarText(title).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     }
 
-    private func sidebarText(_ title: String) -> XCUIElement {
+    @MainActor private func sidebarText(_ title: String) -> XCUIElement {
         // The visible name: a heading keeps the section's identifier, and a row keeps its own.
         sidebar.descendants(matching: .any)
             .matching(NSPredicate(format: "label == %@ OR value == %@", title, title))
             .element(boundBy: 0)
     }
 
-    private func attachScreenshot(_ name: String) {
+    @MainActor private func attachScreenshot(_ name: String) {
         let attachment = XCTAttachment(screenshot: window.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways

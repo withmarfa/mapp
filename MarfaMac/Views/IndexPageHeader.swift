@@ -26,9 +26,7 @@ struct IndexPageTop: View {
     }
 }
 
-/// Search, Filter and New as plain symbol buttons at the tabs' trailing end. Search opens into a field in place, which
-/// filters the page as it is typed in and closes on Escape or when it is cleared. Filter shows or hides the filter row,
-/// and is drawn gray while it is on, never in the accent color.
+/// Search, Filter and New at the tabs' trailing edge. Escape closes Search, as does leaving the field empty.
 struct IndexTools: View {
     @Bindable var browser: Browser
     let new: (() -> Void)?
@@ -39,16 +37,15 @@ struct IndexTools: View {
     var body: some View {
         HStack(spacing: 4) {
             if browser.isSearchExpanded, !browser.isIndexHeaderAway {
-                ColumnSearchField(
-                    text: $browser.searchText, prompt: String(localized: "Search"), focusRequests: browser.searchFocusRequests,
-                    trailingPadding: 8, onSubmit: {}, onDown: { browser.focusRequest = .list },
-                    restoresTitle: false
-                ) {
-                    browser.searchText = ""
-                    browser.isSearchExpanded = false
-                }
-                .frame(width: Self.fieldWidth, height: 28)
-                .background(Color.primary.opacity(0.065), in: .rect(cornerRadius: 9, style: .continuous))
+                InlineSearchField(
+                    text: $browser.searchText, prompt: String(localized: "Search"), identifier: "ColumnSearch", clearIdentifier: "ClearColumnSearch",
+                    focusRequests: browser.searchFocusRequests,
+                    onDown: { browser.focusRequest = .list },
+                    onCancel: closeSearch, onEnd: closeSearch
+                )
+                .frame(width: Self.fieldWidth)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("ColumnSearchField")
             } else {
                 symbol("Search", "magnifyingglass", id: "IndexSearch") { browser.showSearchField() }
             }
@@ -59,6 +56,11 @@ struct IndexTools: View {
                 symbol("New", "plus", id: "IndexNew", action: new)
             }
         }
+    }
+
+    private func closeSearch() {
+        browser.searchText = ""
+        browser.isSearchExpanded = false
     }
 
     private func symbol(

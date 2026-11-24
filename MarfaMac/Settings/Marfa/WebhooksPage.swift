@@ -8,8 +8,7 @@ struct WebhooksPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: WebhooksModel
-    @Environment(\.settingsPush) private var push
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -43,7 +42,7 @@ struct WebhooksPage: View {
             } message: { asked in
                 Text(verbatim: asked.message)
             }
-            .onChange(of: model.deleted) { if $1 != nil { back() } }
+            .onChange(of: model.deleted) { if $1 != nil { navigation?.back() } }
             .accessibilityIdentifier("WebhooksPage")
     }
 
@@ -58,7 +57,7 @@ struct WebhooksPage: View {
             } else {
                 SettingsPageState(
                     symbol: "dot.radiowaves.up.forward", title: Text("This Webhook Is Gone"),
-                    line: Text("It was deleted, here or somewhere else."), action: ("Back", back))
+                    line: Text("It was deleted, here or somewhere else."), action: ("Back", { navigation?.back() }))
             }
         } else {
             list
@@ -97,7 +96,7 @@ struct WebhooksPage: View {
                             SettingsLinkRow(
                                 verbatim: WebhooksModel.display(webhook.url), line: model.summary(of: webhook),
                                 lead: .well(symbol: "dot.radiowaves.up.forward"), value: Self.title(state), dot: Self.dot(state)
-                            ) { push(Self.subpage(for: webhook)) }
+                            ) { navigation?.push(Self.subpage(for: webhook)) }
                         }
                         if group.isOwn { addRow }
                     }
@@ -388,10 +387,9 @@ private struct NewWebhookSheet: View {
                 }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Create Webhook") { Task { await model.make() } }
-                .disabled(!model.canMakeDraft).keyboardShortcut(.defaultAction)
+            SettingsButton("Create Webhook", role: .confirm) { Task { await model.make() } }
+                .disabled(!model.canMakeDraft)
         }
     }
 }
@@ -408,13 +406,12 @@ private struct SecretSheet: View {
                 SettingsSheetField(verbatim: WebhooksModel.display(created.webhook.url)) { SettingsReadOnlyValue(text: created.secret) }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton(copied ? "Copied" : "Copy") {
                 guard let secret = model.created?.secret else { return }
                 OwnerClipboard.copySecret(secret)
                 copied = true
             }
-            SettingsButton("Done") { model.closeSheet() }.keyboardShortcut(.defaultAction)
+            SettingsButton("Done", role: .confirm) { model.closeSheet() }
         }
     }
 }
@@ -430,10 +427,9 @@ private struct AddressChangeSheet: View {
                     width: nil, onSubmit: { Task { await model.saveAddress() } })
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Change Address") { Task { await model.saveAddress() } }
-                .disabled(!model.canSaveAddress).keyboardShortcut(.defaultAction)
+            SettingsButton("Change Address", role: .confirm) { Task { await model.saveAddress() } }
+                .disabled(!model.canSaveAddress)
         }
     }
 }

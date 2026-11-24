@@ -1,35 +1,34 @@
 import AppKit
 import XCTest
 
-@MainActor
-final class GalleryTests: XCTestCase {
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
-    private var gallery: XCUIElement { window.descendants(matching: .any).matching(identifier: "ItemGallery").element(boundBy: 0) }
-    private var list: XCUIElement { window.outlines["ItemList"] }
-    private var sidebar: XCUIElement { window.outlines["Sidebar"] }
+nonisolated final class GalleryTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
+    @MainActor private var window: XCUIElement { app.windows.firstMatch }
+    @MainActor private var gallery: XCUIElement { window.descendants(matching: .any).matching(identifier: "ItemGallery").element(boundBy: 0) }
+    @MainActor private var list: XCUIElement { window.outlines["ItemList"] }
+    @MainActor private var sidebar: XCUIElement { window.outlines["Sidebar"] }
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(list.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() async throws { app.terminate() }
+    @MainActor override func tearDown() async throws { app.terminate() }
 
-    private func choose(_ mode: String) {
+    @MainActor private func choose(_ mode: String) {
         app.menuBars.menuBarItems["View"].click()
         let option = app.menuBars.menuItems["as \(mode)"]
         XCTAssertTrue(option.waitForExistence(timeout: 2))
         option.click()
     }
 
-    private func card(_ title: String) -> XCUIElement {
+    @MainActor private func card(_ title: String) -> XCUIElement {
         window.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@", "GalleryItem-", title)).element(boundBy: 0)
     }
 
-    func testGalleryReplacesTheListAndEditorWithAnAdaptiveGrid() throws {
+    @MainActor func testGalleryReplacesTheListAndEditorWithAnAdaptiveGrid() throws {
         choose("Gallery")
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         XCTAssertFalse(list.exists)
@@ -67,7 +66,7 @@ final class GalleryTests: XCTestCase {
         }
     }
 
-    func testOpeningReturningAndListViewKeepTheItemAndUndo() {
+    @MainActor func testOpeningReturningAndListViewKeepTheItemAndUndo() {
         choose("Gallery")
         let target = card("Kitchen quotes")
         XCTAssertTrue(target.waitForExistence(timeout: 3))
@@ -99,7 +98,7 @@ final class GalleryTests: XCTestCase {
         wait(for: [undone], timeout: 3)
     }
 
-    func testDeletingAnOpenedItemKeepsTheGallerySelectionCurrent() {
+    @MainActor func testDeletingAnOpenedItemKeepsTheGallerySelectionCurrent() {
         choose("Gallery")
         let first = card("Kitchen quotes")
         XCTAssertTrue(first.waitForExistence(timeout: 3))
@@ -120,7 +119,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertTrue(first.waitForExistence(timeout: 3))
     }
 
-    func testAnOpenedGalleryItemKeepsItsCompactTitleAndTrailingActions() {
+    @MainActor func testAnOpenedGalleryItemKeepsItsCompactTitleAndTrailingActions() {
         choose("Gallery")
         let target = card("Kitchen quotes")
         XCTAssertTrue(target.waitForExistence(timeout: 3))
@@ -144,7 +143,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertFalse(window.staticTexts["ScrolledItemTitle"].exists)
     }
 
-    func testGallerySearchAndEmptyResultsUseTheExistingSearch() {
+    @MainActor func testGallerySearchAndEmptyResultsUseTheExistingSearch() {
         choose("Gallery")
         XCTAssertTrue(card("Kitchen quotes").waitForExistence(timeout: 3))
         card("Kitchen quotes").doubleClick()
@@ -168,7 +167,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertEqual(card("Reading list").value as? String, "Selected")
     }
 
-    func testKeyboardSelectionDeletionAndUndoWorkInGallery() {
+    @MainActor func testKeyboardSelectionDeletionAndUndoWorkInGallery() {
         choose("Gallery")
         let first = card("Kitchen quotes")
         let second = card("Reading list")
@@ -192,7 +191,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertTrue(window.buttons["BackToGallery"].waitForExistence(timeout: 3))
     }
 
-    func testAnotherPlaceAndHiddenSidebarReturnToGallery() throws {
+    @MainActor func testAnotherPlaceAndHiddenSidebarReturnToGallery() throws {
         choose("Gallery")
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         let splitter = try XCTUnwrap(window.splitters.allElementsBoundByIndex.min { abs($0.frame.midX - sidebar.frame.maxX) < abs($1.frame.midX - sidebar.frame.maxX) })
@@ -218,7 +217,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertEqual(sidebar.frame.width, width, accuracy: 3)
     }
 
-    func testANewItemMadeInTheGalleryOpensInThePageAndAppearsAsACardOnReturning() {
+    @MainActor func testANewItemMadeInTheGalleryOpensInThePageAndAppearsAsACardOnReturning() {
         choose("Gallery")
         window.quickAdd(type: "Note", title: "Gallery item")
         let title = window.itemPageTitle
@@ -234,7 +233,7 @@ final class GalleryTests: XCTestCase {
         wait(for: [content], timeout: 3)
     }
 
-    func testPaletteOffersViewModesAndHidesEditorCommandsInGallery() {
+    @MainActor func testPaletteOffersViewModesAndHidesEditorCommandsInGallery() {
         let editor = app.itemPageBody
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         app.typeKey("k", modifierFlags: .command)

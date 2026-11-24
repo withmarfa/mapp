@@ -29,7 +29,7 @@ struct ListEntriesEditor: View {
             }
             if isEditable, editing.pending == nil {
                 Button { editing.startEntry() } label: { Label("Add Entry", systemImage: "plus") }
-                    .appButton(.plain, size: .small)
+                    .appButton(.secondary, size: .small)
                     // The row's own label names the list beside the button; a spoken one needs it said.
                     .accessibilityLabel("Add Entry to \(label)")
                     .accessibilityIdentifier("ItemListAdd.\(key)")
@@ -78,7 +78,7 @@ struct ListEntriesEditor: View {
                     if index ?? count == 0 { Text("Main").interfaceFont(.caption).foregroundStyle(.secondary) }
                     Spacer()
                     if let index { entryMenu(id, index: index, count: count) } else {
-                        Button("Cancel") { editing.cancelEntry() }.appButton(.plain, size: .small)
+                        Button("Cancel") { editing.cancelEntry() }.appButton(.secondary, size: .small)
                     }
                 }
                 ForEach(shape.members) { member in

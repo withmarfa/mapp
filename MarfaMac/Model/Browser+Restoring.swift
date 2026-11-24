@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Bringing a window back, by the identifiers of what it showed, when the app opens again.
 extension Browser {
@@ -24,6 +25,15 @@ extension Browser {
         return Snapshot(
             place: item, selection: kept, viewMode: viewMode, opensItem: isCollectionItemPresented,
             scrollOffset: listMemory.scrollOffset.map(Double.init))
+    }
+
+    /// Updates the stored window only after its new snapshot encodes successfully.
+    func saveSnapshot(_ store: (Data) -> Void) {
+        do {
+            store(try JSONEncoder().encode(snapshot()))
+        } catch {
+            Telemetry.logger(.navigation).error("Could not encode the window snapshot")
+        }
     }
 
     /// What a snapshot is made of, as it stands, so a window notices a change without sorting a selection that may

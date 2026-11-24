@@ -155,7 +155,7 @@ struct ItemPage: View {
 
 /// The server kept another device's text over the person's and saved theirs as a copy, which the page now shows
 /// beside the text the server kept. It stays above the page while the item scrolls.
-private struct SavedAsCopyBanner: View {
+struct SavedAsCopyBanner: View {
     @Environment(\.openWindow) private var openWindow
     let copy: ItemID
 

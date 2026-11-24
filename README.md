@@ -69,7 +69,7 @@ To rebuild a tag, re-run its workflow run. The run replaces the disk image and t
 
 ### Dry run
 
-A pull request that changes `.github/workflows/release.yml`, `Scripts/release/`, the project or `Config/`, and a manual run of the workflow, make a dry run. It archives with ad hoc signing, makes the disk image, signs it with a throwaway Sparkle key and builds an appcast from a fixture feed. It skips the export, notarizing and every upload, reads no secret, and keeps the disk image and the appcast as the `dry-run` artifact. A tag run stops if the environment lacks any value it needs.
+A ready pull request that changes `.github/workflows/release.yml`, `Scripts/release/`, `MarfaMac/Info.plist` or `Config/` runs the dry run. You can also run it manually. It archives with ad hoc signing, makes the disk image, signs it with a throwaway Sparkle key and builds an appcast from a fixture feed. It skips Developer ID export, notarization and publishing. It reads no release secrets and uploads the disk image and appcast as the `dry-run` artifact. A tag run stops if the environment lacks any value it needs.
 
 ### Release scripts
 

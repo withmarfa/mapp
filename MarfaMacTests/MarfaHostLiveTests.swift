@@ -49,7 +49,7 @@ extension LiveMarfaTests {
             try await withPurgedItem { connection, keys, location, id, version in
                 // The copy is not told what the server does, so the item is still held when the edits are made, and
                 // only the server's answer to each queued write says it is gone.
-                let copy = try await WorkingCopy.open(store: location.store(for: connection), server: try #require(try keys.server(for: connection)))
+                let copy = try await WorkingCopy.open(store: location.store(for: connection), server: keys.server(for: connection))
                 let source = MarfaSource(copy: copy, connection: connection)
                 await source.engine.sync.hooks.ignoringCopy.set(true)
                 let log = ChangeLog(source)

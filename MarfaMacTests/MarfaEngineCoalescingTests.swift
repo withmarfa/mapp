@@ -487,7 +487,7 @@ import Testing
         // A new edge arrives with the copy's answer, which names the rows at its ends, so no whole read is needed.
         let added = try await scene.copy.edges.create(from: "first", to: "other", type: MarfaMapping.parentEdge)
         try await scene.drainAccepting()
-        await scene.hear(Change(origin: .server(event: "edge.created", cursor: "2"), itemId: nil, edgeId: try #require(added.edgeId)))
+        await scene.hear(Change(origin: .server(event: "edge.created", cursor: "2"), itemId: nil, edgeId: added.edgeId))
         try #require(await eventually { scene.item("other")?.parentID == ItemID("first") })
         await scene.source.engineTook()
         #expect(scene.wholeReads == painted, "a new edge was read by a whole read")
@@ -541,7 +541,8 @@ import Testing
         await scene.hear(.forgotten)
         let queued = try #require(try await scene.copy.queue.all().first { $0.itemId == "blocked" })
         try #require(await eventually { scene.source.syncReport.problems.contains { $0.id == .write(queued.id) } })
-        #expect(scene.log.current.answer(to: write) == .blocked(.failingAlone, nil))
+        // The problem can be reported before the log records the write's answer.
+        #expect(await scene.log.wait { $0.answer(to: write) == .blocked(.failingAlone, nil) } != nil)
 
         #expect(try await scene.source.resolve(.write(queued.id), by: .withdraw))
         let answered = try #require(await scene.log.wait { state in

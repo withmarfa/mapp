@@ -9,7 +9,7 @@ struct ConnectorMappingPage: View {
     /// Whether the connector is running where a preview can be answered, and if not, why in words.
     let previewBlock: String?
     let host: any MarfaSettingsHost
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     private var name: String { kind.name }
     private var summary: PluginConnectorSummary { model.plugin }
@@ -26,7 +26,7 @@ struct ConnectorMappingPage: View {
             } else {
                 SettingsPageState(
                     symbol: "arrow.triangle.2.circlepath", title: Text("This Kind Is Gone"),
-                    line: Text("The connector no longer brings it."), action: ("Back", back))
+                    line: Text("The connector no longer brings it."), action: ("Back", { navigation?.back() }))
             }
         }
         .task { await model.load() }

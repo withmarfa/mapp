@@ -81,7 +81,7 @@ struct ItemPropertyRow: View {
                     editing: input.list, isWriting: isWriting, onChange: onChange)
                 if isEditable, editKind != nil {
                     Button { openEditor() } label: { Label("Add Person…", systemImage: "person.badge.plus") }
-                        .appButton(.plain, size: .small)
+                        .appButton(.secondary, size: .small)
                         .accessibilityLabel("Add Person to \(definition.label)")
                         .accessibilityIdentifier("ItemListAddPerson.\(definition.key)")
                 }

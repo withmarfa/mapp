@@ -8,8 +8,7 @@ struct KeysPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: KeysModel
-    @Environment(\.settingsPush) private var push
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
@@ -42,7 +41,7 @@ struct KeysPage: View {
             } message: { asked in
                 Text(verbatim: asked.message)
             }
-            .onChange(of: model.revoked) { if $1 != nil { back() } }
+            .onChange(of: model.revoked) { if $1 != nil { navigation?.back() } }
             .accessibilityIdentifier("KeysPage")
     }
 
@@ -61,7 +60,7 @@ struct KeysPage: View {
             } else {
                 SettingsPageState(
                     symbol: "key", title: Text("This Key Is Gone"), line: Text("It was revoked, or it expired, somewhere else."),
-                    action: ("Back", back))
+                    action: ("Back", { navigation?.back() }))
             }
         } else {
             list
@@ -99,7 +98,7 @@ struct KeysPage: View {
         SettingsLinkRow(
             verbatim: key.label, line: Self.line(key, names: model.typeNames), lead: .tile("key.fill", .amber),
             value: OwnerWording.used(key.lastUsed)
-        ) { push(Self.subpage(for: key)) }
+        ) { navigation?.push(Self.subpage(for: key)) }
     }
 
     /// What the key reaches, then when it ends.
@@ -124,7 +123,7 @@ private struct KeyDetail: View {
     let model: KeysModel
     let key: KeyInfo
     let host: any MarfaSettingsHost
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
 
     private var parsed: AccessScopes.Parsed { KeyAccess.parsed(key) }
 
@@ -190,18 +189,15 @@ private struct KeyDetail: View {
                 SettingsValue(verbatim: ends)
             }
         } else {
-            SettingsRow("Expires", line: "Extending keeps the same key, so nothing using it changes.") {
-                HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                    SettingsValue(verbatim: ends)
-                    SettingsButton("Extend…") { model.beginExtend(key) }
-                }
+            SettingsRow(title: Text("Expires"), line: Text("\(ends). Extending keeps the same key, so nothing using it changes.")) {
+                SettingsButton("Extend…") { model.beginExtend(key) }
             }
         }
     }
 
     private var ownerPermissions: some View {
         OwnerPermissionsRow(held: parsed.permissions.count, line: String(localized: "The owner’s permissions. Most keys need none.")) {
-            push(OwnerPermissions.subpage(of: KeysPage.subpage(for: key)))
+            navigation?.push(OwnerPermissions.subpage(of: KeysPage.subpage(for: key)))
         }
     }
 
@@ -316,11 +312,8 @@ private struct NewKeySheet: View {
                         }
                     }
                     if !model.givablePermissions.isEmpty {
-                        SettingsRow("Look After This Marfa") {
-                            HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                                SettingsValue(verbatim: permissionCount)
-                                SettingsButton("Choose…") { model.isChoosingPermissions = true }
-                            }
+                        SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: permissionCount)) {
+                            SettingsButton("Choose…") { model.isChoosingPermissions = true }
                         }
                     }
                     if !addable.isEmpty {
@@ -334,9 +327,8 @@ private struct NewKeySheet: View {
                 Text("The source can’t change later.").settingsFont(.footer).foregroundStyle(SettingsTokens.secondaryText)
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Create Key") { Task { await model.make() } }.disabled(!model.canMakeDraft).keyboardShortcut(.defaultAction)
+            SettingsButton("Create Key", role: .confirm) { Task { await model.make() } }.disabled(!model.canMakeDraft)
         }
     }
 
@@ -355,8 +347,7 @@ private struct NewKeySheet: View {
                 }
             }
         } buttons: {
-            Spacer(minLength: 0)
-            SettingsButton("Back") { model.isChoosingPermissions = false }.keyboardShortcut(.defaultAction)
+            SettingsButton("Back", role: .confirm) { model.isChoosingPermissions = false }
         }
     }
 }
@@ -371,13 +362,12 @@ private struct ShownKeySheet: View {
                 SettingsSheetField(verbatim: created.label) { SettingsReadOnlyValue(text: created.secret) }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton(copied ? "Copied" : "Copy") {
                 guard let secret = model.created?.secret else { return }
                 OwnerClipboard.copySecret(secret)
                 copied = true
             }
-            SettingsButton("Done") { model.closeSheet() }.keyboardShortcut(.defaultAction)
+            SettingsButton("Done", role: .confirm) { model.closeSheet() }
         }
     }
 }
@@ -393,9 +383,8 @@ private struct RenameKeySheet: View {
                     onSubmit: { Task { await model.rename() } })
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Rename") { Task { await model.rename() } }.disabled(!model.canRename).keyboardShortcut(.defaultAction)
+            SettingsButton("Rename", role: .confirm) { Task { await model.rename() } }.disabled(!model.canRename)
         }
     }
 }
@@ -426,9 +415,8 @@ private struct ExtendKeySheet: View {
                 }
             }
         } buttons: {
-            Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Extend") { Task { await model.extend() } }.disabled(model.isExtending).keyboardShortcut(.defaultAction)
+            SettingsButton("Extend", role: .confirm) { Task { await model.extend() } }.disabled(model.isExtending)
         }
     }
 }

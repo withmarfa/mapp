@@ -8,7 +8,7 @@ struct FieldDetail: View {
     let type: TypeRecord
     let field: TypeFieldRecord
     let host: any MarfaSettingsHost
-    @Environment(\.settingsBack) private var back
+    @Environment(\.settingsNavigation) private var navigation
 
     private var name: String { TypesModel.title(of: field) }
     private var kind: FieldKind? { FieldKind(rawValue: field.kind) }
@@ -83,7 +83,7 @@ struct FieldDetail: View {
             guard confirmed else { return }
             Task {
                 await model.removeField()
-                if model.openFieldKey == nil { back() }
+                if model.openFieldKey == nil { navigation?.back() }
             }
         }
     }

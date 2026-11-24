@@ -127,7 +127,7 @@ struct UpdatesPage: View {
                             copied = true
                         }
                     } else if model.ready != nil, !model.needsMaintain {
-                        SettingsButton("Update", role: .update) { asksToUpdate = true }
+                        SettingsButton("Update…", role: .update) { asksToUpdate = true }
                             .disabled(!model.canUpdate)
                     }
                 }

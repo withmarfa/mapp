@@ -151,8 +151,8 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
     }
 
     private static func date(_ text: String) -> Date? {
-        try? Date(text, strategy: .iso8601.year().month().day().time(includingFractionalSeconds: true).timeZone(separator: .omitted))
-            ?? Date(text, strategy: .iso8601)
+        (try? Date(text, strategy: .iso8601.year().month().day().time(includingFractionalSeconds: true).timeZone(separator: .omitted)))
+            ?? (try? Date(text, strategy: .iso8601))
     }
 
     func activity(_ query: ActivityQuery) async throws(OwnerFailure) -> ActivityBatch {

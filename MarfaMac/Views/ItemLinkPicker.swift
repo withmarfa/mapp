@@ -14,7 +14,6 @@ struct ItemLinkPicker: View {
     @State private var titles = PaletteMatch.Titles()
     /// An item was chosen that no link can name alone, so the person is asked for another.
     @State private var refused = false
-    @FocusState private var isFieldFocused: Bool
 
     private static let limit = 50
 
@@ -27,11 +26,13 @@ struct ItemLinkPicker: View {
         let matches = matches
         VStack(alignment: .leading, spacing: 12) {
             Text("Link to Item").interfaceFont(.title2.bold())
-            TextField("Search Items", text: $query)
-                .textFieldStyle(.roundedBorder)
-                .focused($isFieldFocused)
-                .onSubmit { choose(matches, at: highlighted) }
-                .accessibilityIdentifier("ItemLinkField")
+            InlineSearchField(
+                text: $query, prompt: String(localized: "Search Items"), identifier: "ItemLinkField",
+                onDown: { moveHighlight(by: 1, count: matches.count) },
+                onUp: { moveHighlight(by: -1, count: matches.count) },
+                onSubmit: { choose(matches, at: highlighted) },
+                onCancel: editor.cancelLinkRequest
+            )
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
@@ -61,17 +62,16 @@ struct ItemLinkPicker: View {
         .padding(20)
         .frame(width: 440, height: 460)
         .onKeyPress(.downArrow) {
-            highlighted = min(highlighted + 1, max(matches.count - 1, 0))
+            moveHighlight(by: 1, count: matches.count)
             return .handled
         }
         .onKeyPress(.upArrow) {
-            highlighted = max(highlighted - 1, 0)
+            moveHighlight(by: -1, count: matches.count)
             return .handled
         }
         .onChange(of: query) { highlighted = 0; refused = false }
         .task {
             candidates = library.itemsToLink(excluding: itemID)
-            isFieldFocused = true
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ItemLinkPicker")
@@ -79,24 +79,25 @@ struct ItemLinkPicker: View {
 
     private func row(_ item: Item, isHighlighted: Bool) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "note.text")
-                .frame(width: 20)
-                .foregroundStyle(isHighlighted ? .white : .secondary)
+            TypeMark(icon: library.catalogue.icon(for: item.type), size: .row)
             Text(item.displayTitle).lineLimit(1)
             Spacer(minLength: 8)
             Text(library.placeLabel(of: item))
-                .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
-        .foregroundStyle(isHighlighted ? .white : .primary)
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(isHighlighted ? Color.accentColor : .clear, in: .rect(cornerRadius: 6))
+        .background(isHighlighted ? Color.primary.opacity(0.08) : .clear, in: .rect(cornerRadius: 6, style: .continuous))
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(isHighlighted ? .isSelected : [])
         .accessibilityIdentifier("ItemLinkRow.\(item.id.rawValue)")
+    }
+
+    private func moveHighlight(by step: Int, count: Int) {
+        highlighted = min(max(highlighted + step, 0), max(count - 1, 0))
     }
 
     private func choose(_ matches: [Item], at index: Int) {

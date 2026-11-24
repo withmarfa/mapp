@@ -184,7 +184,7 @@ enum LibraryDescription {
         isAllowingMore = true
         defer { isAllowingMore = false }
         let model = libraries.marfaSettings
-        await model.start(.signInAgain(usingCode: false, permissions: host.grants.union(permissions))).value
+        await model.start(.signInAgain(usingCode: false)).value
         switch model.lastEnding {
         case .completed?:
             await host.refreshGrants()

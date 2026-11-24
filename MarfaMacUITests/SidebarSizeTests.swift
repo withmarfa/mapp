@@ -1,9 +1,8 @@
 import XCTest
 
 /// The sidebar's foot, its instance menu and its New Item button, stays reachable at every sidebar size chosen in System Settings.
-@MainActor
-final class SidebarSizeTests: XCTestCase {
-    func testTheInstanceMenuOpensSettingsAtEverySidebarSize() {
+nonisolated final class SidebarSizeTests: XCTestCase {
+    @MainActor func testTheInstanceMenuOpensSettingsAtEverySidebarSize() {
         for size in ["1", "2", "3"] {
             let app = XCUIApplication.sample(settings: ["NSTableViewDefaultSizeMode": size])
             app.launch()

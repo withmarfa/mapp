@@ -7,7 +7,7 @@ struct TypeDetail: View {
     let type: TypeRecord
     let host: any MarfaSettingsHost
 
-    @Environment(\.settingsPush) private var push
+    @Environment(\.settingsNavigation) private var navigation
 
     private var isEditable: Bool { model.isEditable(type) }
 
@@ -193,7 +193,7 @@ struct TypeDetail: View {
                 }
                 ForEach(own, id: \.key) { field in
                     SettingsLinkRow(verbatim: TypesModel.title(of: field), line: model.line(of: field)) {
-                        push(SettingsSubpage(id: "field:\(type.id):\(field.key)", title: TypesModel.title(of: field)))
+                        navigation?.push(SettingsSubpage(id: "field:\(type.id):\(field.key)", title: TypesModel.title(of: field)))
                     }
                 }
                 if isEditable { SettingsAddRow("Add a Field…") { model.beginField() } }

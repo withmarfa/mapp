@@ -1,21 +1,20 @@
 import XCTest
 
-@MainActor
-final class PersonPageTests: XCTestCase {
-    private var app: XCUIApplication!
+nonisolated final class PersonPageTests: XCTestCase {
+    @MainActor private var app: XCUIApplication!
 
-    override func setUp() async throws {
+    @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample(flags: ["-MarfaMacCollectionSample"])
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() async throws { app.terminate() }
+    @MainActor override func tearDown() async throws { app.terminate() }
 
     /// The header of a person's page, with the inspector open at the test window's size, keeps its title and contact
     /// lines readable: each is wider than a few characters, not set one character to a line.
-    func testPersonHeaderStaysReadableBesideTheInspector() {
+    @MainActor func testPersonHeaderStaysReadableBesideTheInspector() {
         // The sidebar lists a few types and folds the rest under Show More.
         let sidebar = app.outlines["Sidebar"]
         let person = sidebar.descendants(matching: .any).matching(identifier: "SidebarType-core.entity.person").element(boundBy: 0)
@@ -37,7 +36,7 @@ final class PersonPageTests: XCTestCase {
         XCTAssertLessThan(email.frame.height, 40)
     }
 
-    private func capture(_ name: String) {
+    @MainActor private func capture(_ name: String) {
         // AppKit's inspector animation continues after the accessibility action returns.
         Thread.sleep(forTimeInterval: 0.6)
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())

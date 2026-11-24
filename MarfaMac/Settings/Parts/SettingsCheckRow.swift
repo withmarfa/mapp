@@ -41,7 +41,7 @@ struct SettingsShowMoreRow: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 title
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).accessibilityHidden(true)
+                Image(systemName: "chevron.down").font(.system(size: 9)).accessibilityHidden(true)
             }
             .settingsFont(.title)
             .foregroundStyle(SettingsTokens.secondaryText)
@@ -50,5 +50,17 @@ struct SettingsShowMoreRow: View {
         }
         .buttonStyle(.plain)
         .containerValue(\.settingsRuleInset, SettingsTokens.Metric.inset)
+    }
+}
+
+/// A table's "Show All", which shows more of a list and so has no fill: its words only, in the secondary color.
+struct SettingsShowAllButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button("Show All", action: action)
+            .buttonStyle(.plain)
+            .settingsFont(.title)
+            .foregroundStyle(SettingsTokens.secondaryText)
     }
 }

@@ -133,9 +133,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
     ]
 }
 
-/// The Limits page: the limits the server lets the owner change, each a number with its unit inside. A value is sent when
-/// the field is left or Return is pressed, and only if it differs from what the server holds. A value out of range, or one
-/// the server refuses, stays in its field with one line under its title.
+/// Sends changed limits on Return or when the field loses focus. A refused value stays in its field with an explanation.
 @Observable @MainActor final class LimitsModel: OwnerDraftHolding {
     private let store: StoredSettings
 
@@ -178,7 +176,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     /// What is wrong with what was typed, before it is sent: the line to show under the title.
     func line(_ limit: LimitSetting) -> String? {
-        if case .invalid(let line)? = drafts[limit.key].map { limit.entry(from: $0) } { return line }
+        if let draft = drafts[limit.key], case .invalid(let line) = limit.entry(from: draft) { return line }
         return lines[limit.key]
     }
 

@@ -112,8 +112,7 @@ struct SettingsDetail: View {
             }
         }
         .environment(\.settingsSubpage, navigation.current.subpage)
-        .environment(\.settingsPush, { navigation.push($0) })
-        .environment(\.settingsBack, { navigation.back() })
+        .environment(\.settingsNavigation, SettingsNavigationActions(navigation: navigation))
         .id(navigation.current)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("SettingsDetail")
