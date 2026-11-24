@@ -66,15 +66,24 @@ import Testing
         ]
     }
 
+    private struct IndexHost: View {
+        let browser: Browser
+        let rows: [IndexRow]
+        @FocusState private var pane: Browser.Pane?
+
+        var body: some View {
+            IndexPage(
+                place: .collections, title: "Collections", browser: browser, pane: $pane, rows: rows,
+                tabs: [(.all, rows.count), (.yours, 3), (.fromApps, 1)], tab: .constant(.yours), choice: IndexChoice(), open: { _ in },
+                newCollection: {}, emptyTab: EmptyState("Nothing Here"))
+        }
+    }
+
     private func indexPage(searching: Bool) -> some View {
         let browser = Browser()
         browser.sidebarItem = .collections
         browser.isSearchExpanded = searching
-        let rows = indexRows()
-        return IndexPage(
-            place: .collections, title: "Collections", browser: browser, rows: rows,
-            tabs: [(.all, rows.count), (.yours, 3), (.fromApps, 1)], tab: .constant(.yours), choice: IndexChoice(), open: { _ in },
-            newCollection: {}, emptyTab: EmptyState("Nothing Here"))
+        return IndexHost(browser: browser, rows: indexRows())
     }
 
     @Test func indexPageWithSearch() async throws {
