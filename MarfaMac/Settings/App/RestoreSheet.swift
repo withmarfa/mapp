@@ -37,12 +37,12 @@ struct RestoreSettingsSheet: View {
             SettingsSection(name: Text("Restore Points"), footer: Text(verbatim: model.reach(false))) {
                 List(selection: Binding { restoring.chosen } set: { if let id = $0 { model.setRestore(id) } }) {
                     ForEach(restoring.points) { point in
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: SettingsTokens.Metric.choiceLineGap) {
                             Text(verbatim: point.reason.title).settingsFont(.title)
                             Text(verbatim: Self.when(point.date)).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
                         }
-                        .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+                        .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.choiceRowHeight, alignment: .leading)
+                        .listRowInsets(EdgeInsets(top: 0, leading: SettingsTokens.Metric.choiceRowInset, bottom: 0, trailing: SettingsTokens.Metric.choiceRowInset))
                         .tag(point.id)
                     }
                 }
@@ -65,11 +65,9 @@ struct RestoreSettingsSheet: View {
         .accessibilityIdentifier("RestoreSettingsSheet")
     }
 
-    private static let rowHeight: CGFloat = 48
-
     /// A list inside the sheet's scroll view has no height of its own, so it is given one: its rows, up to a few more than fit.
     private static func listHeight(for count: Int) -> CGFloat {
-        CGFloat(min(max(count, 1), 6)) * rowHeight
+        CGFloat(min(max(count, 1), 6)) * SettingsTokens.Metric.choiceRowHeight
     }
 
     /// "23 Nov 14:02", in the Mac's language and clock. The day and the time are formatted apart, since the system joins a
