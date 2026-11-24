@@ -8,4 +8,8 @@ final class TestWindow: NSWindow {
         super.init(contentRect: contentRect, styleMask: styleMask, backing: backing, defer: flag)
         alphaValue = 0
     }
+
+    /// Keeps the size a test asks for. AppKit fits a titled window to its screen, and a runner's screen can be narrower
+    /// than the window a test needs; this one is never seen.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
 }
