@@ -14,7 +14,8 @@ extension MarfaLibrary {
         }
 
         let item: ItemID
-        /// Its place among this Mac's property edits (`lastPropertyWrite`), which is the order the engine makes them.
+        /// Its place among this Mac's property edits (`lastPropertyWrite`), in the order the person made them. The engine
+        /// makes a held undo after edits made later.
         let mark: Int
         let changes: [String: PropertyValue?]
         /// The keys whose value it still decides: a later edit the copy took first decides the keys they share, as
