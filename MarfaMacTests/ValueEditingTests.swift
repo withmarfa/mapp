@@ -401,8 +401,7 @@ struct ValueEditingTests {
     }
 
     /// A people panel over an item holding `entries`, with other items in the library holding `others`.
-    private func peoplePanel(_ entries: [PropertyValue], others: [PropertyValue] = [], writing: Bool = false, written: Written) -> ValueEditModel {
-        let library = Self.library([])
+    private func peoplePanel(_ entries: [PropertyValue], others: [PropertyValue] = [], writing: Bool = false, in library: FakeItemLibrary = Self.library([]), written: Written) -> ValueEditModel {
         let item = Self.item(["assignees": .array(entries)])
         let more = others.enumerated().map { index, entry in
             Self.item(["assignees": .array([entry])], id: "10000000-0000-0000-0000-00000000010\(index)")
@@ -497,6 +496,54 @@ struct ValueEditingTests {
         model.commitTime()
         #expect(written.all.isEmpty)
         #expect(model.notice != nil)
+    }
+
+    @Test func aTimeTypedBeforeTheItemBecomesReadOnlyIsHandedBackNotDropped() {
+        let written = Written()
+        let item = Self.item(["due": .string("2026-11-07T09:30:00Z")])
+        let library = Self.library([item])
+        var request = Self.request(.date(Self.due), item: item, in: library, write: { written.all.append($0); return true })
+        request.calendar = Self.utc
+        let model = ValueEditModel(request)
+        model.timeDraft = "2:45 pm"
+        library.items[0].readOnly = true
+        model.commitTime()
+        #expect(written.all.isEmpty)
+        #expect(library.notices.waiting.first?.text == "Due: 2:45 pm")
+    }
+
+    @Test func aTimeTheLibraryRefusesStaysInTheFieldAndIsHandedBackWhenThePanelEnds() {
+        let item = Self.item(["due": .string("2026-11-07T09:30:00Z")])
+        let library = Self.library([item])
+        var request = Self.request(.date(Self.due), item: item, in: library, write: { _ in false })
+        request.calendar = Self.utc
+        let model = ValueEditModel(request)
+        model.timeDraft = "2:45 pm"
+        model.commitTime()
+        #expect(model.timeDraft == "2:45 pm" && model.notice != nil && library.notices.waiting.isEmpty)
+        model.finish(cancelled: false)
+        #expect(library.notices.waiting.first?.text == "Due: 2:45 pm")
+    }
+
+    @Test func aWordTypedBeforeTheItemBecomesReadOnlyIsHandedBackNotDropped() {
+        let (library, written) = (Self.library([]), Written())
+        let model = wordsPanel(["red"], in: library, written: written)
+        model.query = "blue"
+        library.items[0].readOnly = true
+        model.activate("create")
+        #expect(written.all.isEmpty)
+        #expect(library.notices.waiting.first?.text == "Labels: blue")
+    }
+
+    @Test func aPersonTypedBeforeTheItemBecomesReadOnlyIsHandedBackNotDropped() {
+        let written = Written()
+        let library = Self.library([])
+        let model = peoplePanel([], in: library, written: written)
+        model.query = "Sam"
+        library.items[0].readOnly = true
+        model.activate("create")
+        #expect(written.all.isEmpty)
+        #expect(library.notices.waiting.first?.text?.contains("Sam") == true)
     }
 
     @Test func timesAreReadAsPeopleTypeThem() {

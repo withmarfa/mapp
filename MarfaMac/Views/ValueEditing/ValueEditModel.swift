@@ -531,7 +531,12 @@ final class ValueEditModel {
     // MARK: Choosing
 
     func activate(_ id: String) {
-        guard isEditable else { close(); return }
+        guard isEditable else {
+            // A new word, tag or person typed in the search field has nowhere to go, so it goes back to the person.
+            if id == "create" { handBack(query.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            close()
+            return
+        }
         switch kind {
         case .status, .choice:
             guard let word = ValueEditOptions.word(of: id), commit(.string(word)), kind.closesOnChoice else { return }
@@ -892,8 +897,12 @@ final class ValueEditModel {
     func commitTime(isEnding: Bool = false) {
         guard let draft = timeDraft else { return }
         timeDraft = nil
-        guard allowsTime, isEditable else { return }
+        guard allowsTime else { return }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isEditable else {
+            handBack(text)
+            return
+        }
         if text.isEmpty {
             if hasTime, let date = storedDate?.date { write(date, withTime: false) }
             return
@@ -909,12 +918,22 @@ final class ValueEditModel {
         // Focus moving through the field leaves the time as it was, seconds included, and adds no undo step.
         if text == timeText { return }
         let day = storedDate?.date ?? library.now()
-        write(request.calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: day) ?? day, withTime: true)
+        guard !write(request.calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: day) ?? day, withTime: true) else { return }
+        // A refused time stays in the field while the panel is open, and goes back to the person as it ends.
+        if isEnding { handBack(text) } else { timeDraft = draft }
     }
 
-    private func write(_ date: Date, withTime: Bool) {
+    /// Gives the person text this panel cannot keep through the notices, which put it on the clipboard.
+    private func handBack(_ text: String) {
+        guard !text.isEmpty else { return }
+        let typed = kind.field.map { "\($0.label): \(text)" } ?? text
+        library.notices.notKept(String(localized: "Property Not Saved"), text: typed, reason: refusalReason(String(localized: "The value could not be saved.")))
+    }
+
+    @discardableResult
+    private func write(_ date: Date, withTime: Bool) -> Bool {
         let text = withTime ? ItemDate.instant(date) : ItemDate.day(date, calendar: request.calendar)
-        _ = commit(.string(text), failure: String(localized: "The date couldn’t be saved."))
+        return commit(.string(text), failure: String(localized: "The date couldn’t be saved."))
     }
 
     func clearDate() {
