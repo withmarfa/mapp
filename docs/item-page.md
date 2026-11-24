@@ -64,6 +64,8 @@ The right sidebar (`ItemInspector`) always lists every property, in sections: De
 
 Customize Layout turns the right sidebar into the editor of the page's layout, for the item's type, and it applies to every item of that type. It is in the menu bar, the toolbar's More menu and the context menu.
 
+Copy Link copies the link of the item on the page: in the menu bar's Edit menu (⇧⌘C), the toolbar's More menu, the context menu and the command palette. It is offered for one item at a time, for a file and for an item in Recently Deleted too. When the link can't be made yet, because the copy hasn't finished syncing, the app says so.
+
 - **Page** arranges the rows in three groups: Pinned (up to four), On the Page and Hidden. A person drags a row, uses the pin on a row, or chooses Move Up or Move Down.
 - **Sidebar** orders, removes and adds the sidebar's own sections.
 - Linked From has one setting that puts it at the foot of the page or in the sidebar. The sidebar's section order names it only while it is in the sidebar.
