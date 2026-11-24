@@ -1,8 +1,6 @@
 import Foundation
 
-/// What a `marfa://` link does, decided from the link and the library the windows show and nothing else, so no link
-/// opens an item in another Marfa or reaches the server. A link only opens: there is no outcome that writes, signs in,
-/// or changes the connection or a setting.
+/// Decides whether an external item link can open using the connected library's local state.
 nonisolated enum ItemLinkRoute: Equatable, Sendable {
     /// Opens the item, as opening it from the list does.
     case open(ItemID)

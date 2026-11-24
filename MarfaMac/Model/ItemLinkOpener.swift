@@ -3,10 +3,8 @@ import Foundation
 import Observation
 import os
 
-/// Takes the `marfa://` links other apps hand the app (`ItemAppLink`) and has the main window in front open each
-/// item as opening it from the list does. A link only opens: it never writes, signs in, or changes the connection or
-/// a setting, and it opens an item only in the Marfa whose instance id it names (`ItemLinkRoute`). A link that comes
-/// while the library opens, as at launch, waits for it at most `limit`; a newer link replaces a waiting one.
+/// Routes external item links against the working copy and hands accepted requests to a main window.
+/// Only the latest link waits for the library to open.
 @Observable @MainActor final class ItemLinkOpener {
     /// What the opener reads of the app: what the windows show, and the library they read.
     struct Standing {

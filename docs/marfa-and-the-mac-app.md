@@ -56,17 +56,17 @@ What a row says comes from the type's look (`TypeLooks`), never from a choice of
 
 Built, not yet released.
 
-Marfa gives each item a link, `marfa://<instance id>/<item id>`: the instance id is the lowercase UUID that the Marfa server's `GET /` returns, and the item id is the item's lowercase UUIDv7. When another app opens such a link, the app opens the item the same way it opens an item from the list, in the main window that was last in front, or in a new main window if none is open. An item in Recently Deleted opens as a followed link to it does, with a note that it is in Recently Deleted.
+Marfa gives each item a link of the form `marfa://<instance-id>/<item-id>`. The instance ID is the lowercase UUID returned by `GET /`. The item ID is a lowercase UUIDv7. Marfa for Mac routes the link through the last active main window. Settings > General > Open Items controls how items open from the list. If the item is in Recently Deleted, the app tells you.
 
 A link only opens. It never creates, changes, deletes or restores an item, never signs in or changes the connection or a setting, and never reaches the server. The app opens the item only when all of these are true:
 
-- The link is exactly in that form. The app doesn't correct a link, so a link with a query, a fragment, a port, percent-encoding, a trailing slash, an uppercase id or any extra character opens nothing.
+- The URL macOS delivers has exactly that form. A query, fragment, port, percent-encoded digit, trailing slash, or uppercase ID makes it invalid.
 - The instance id matches the one held by the copy of the connected Marfa. A link to another Marfa opens nothing and says only that it is to another Marfa.
 - The copy holds the item. If it doesn't, the app says that the item can't be found in this Mac's copy.
 
 If no Marfa is connected, or its library can't be opened, the app says so and offers Settings. While the library is still opening, as at launch, the link waits for it for a short time; a newer link replaces a waiting one.
 
-Where it lives: `ItemAppLink` reads and writes the link, `ItemLinkRoute` decides what it does, and `ItemLinkOpener` takes it from `AppDelegate` and hands the item to a main window, under `MarfaMac/Model/`.
+Where it lives: `AppDelegate` receives the URL. In `MarfaMac/Model/`, `ItemAppLink` parses it, `ItemLinkRoute` checks it against the working copy, and `ItemLinkOpener` handles the result.
 
 ## Related pages
 

@@ -2,9 +2,7 @@ import Foundation
 
 /// An item's `marfa://` link, Marfa's `app_url`: `marfa://<instance id>/<item id>`, where the instance id is the one
 /// `GET /` answers, a lowercase UUID, and the item id a lowercase UUIDv7, the only form `GET /items/{id}` accepts.
-/// Any app can hand this app such a link, so it is read from the text exactly as it came and never mended: anything
-/// but that form (another case in the ids, percent-encoding, a port, a query, a fragment, a trailing slash, a space or
-/// any other character) is not a link. Only the scheme is read in any case, as URL schemes are.
+/// Only the scheme is case-insensitive. Validate the serialized URL before extracting either ID.
 nonisolated struct ItemAppLink: Hashable, Sendable {
     static let scheme = "marfa"
 
@@ -19,7 +17,7 @@ nonisolated struct ItemAppLink: Hashable, Sendable {
         self.item = item
     }
 
-    /// The link `url` names, judged by its text as given rather than by the parts `URL` reads from it.
+    /// Foundation may already have normalized the host by the time the app receives the URL.
     init?(_ url: URL) {
         self.init(parsing: url.absoluteString)
     }

@@ -1,6 +1,6 @@
 # Model
 
-The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over a Marfa server's working copy, and `Libraries`.
+The model has no SwiftUI dependency. `MarfaLibrary` implements `ItemLibrary` over the working copy.
 
 ## Items and types
 
@@ -63,4 +63,4 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 - **Unflushed switch.** Flag a change of library or a quit that does not first flush the open pages (`Libraries.flushEditors`), or that goes ahead when the flush fails. A window close waits for its editor's flush the same way (`EditorCloseDelegate`).
 - **Picture fetched another way.** Flag a web picture fetched other than by `PictureFetcher` after `WebPictures.answer`, an address `PictureAddressPolicy` did not check at each redirect, or a claim that DNS rebinding is closed.
 - **Person's text logged or reported.** Flag a log, signpost or report that carries a person's text, a title, an item's id, a key or an error's message as public.
-- **Link does more.** A `marfa://` link only opens. Flag one that writes, signs in, changes settings or skips `ItemLinkRoute`.
+- **Link does more.** Flag a `marfa://` link that skips `ItemLinkRoute`, writes, changes settings or connections, signs in, or calls the server.
