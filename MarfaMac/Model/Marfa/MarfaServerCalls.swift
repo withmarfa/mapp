@@ -318,7 +318,7 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
     }
 
     static func info(_ source: Marfa.ItemSource) -> SourceInfo {
-        SourceInfo(code: source.code, name: source.name, mark: source.mark, hasChosenName: source.nameOrigin == .set)
+        SourceInfo(code: source.code, name: source.name, mark: source.mark, nameOrigin: source.nameOrigin)
     }
 
     static func change(_ change: SourceFieldChange) -> SettingChange<String> {

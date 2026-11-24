@@ -616,10 +616,10 @@ final class FakeItemLibrary: ItemLibrary {
         sourceChanges.append((code, name, mark))
         let old = sources.info(code)
         let newName: String
-        var chosen = old.hasChosenName
+        var origin = old.nameOrigin
         switch name {
-        case .set(let text)?: newName = text; chosen = true
-        case .clear?: newName = code; chosen = false
+        case .set(let text)?: newName = text; origin = .set
+        case .clear?: newName = code; origin = .code
         case nil: newName = old.name
         }
         let newMark: String?
@@ -628,7 +628,7 @@ final class FakeItemLibrary: ItemLibrary {
         case .clear?: newMark = nil
         case nil: newMark = old.mark
         }
-        sources = sources.updating(SourceInfo(code: code, name: newName, mark: newMark, hasChosenName: chosen))
+        sources = sources.updating(SourceInfo(code: code, name: newName, mark: newMark, nameOrigin: origin))
         return nil
     }
 

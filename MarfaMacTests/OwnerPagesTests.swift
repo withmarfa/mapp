@@ -57,8 +57,10 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var metrics = InstanceMetricsReading(version: "0.0.84", databaseBytes: nil, fileBytes: 0)
         var fileStores = FileStores(stores: [], orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
         var sourceLimit = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: nil)
-        /// What each source limit write sent: the filter, or nil for turning it off.
-        var limitsSent: [(types: [String], sources: [String])?] = []
+        /// What each Limit Sources write sent: the filter, or nil for turning it off.
+        var limitsSent: [SourceRuleValue?] = []
+        /// What each Who May Write write sent: the allow-list, or nil for turning it off.
+        var allowlistsSent: [SourceRuleValue?] = []
         /// Run as a source limit write arrives, to let a test move the server under it.
         var beforeLimitWrite: (@Sendable () -> Void)?
         var webhooks: [OwnerWebhook] = []
@@ -424,12 +426,34 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         state.withLock { $0.beforeLimitWrite }?()
         return try state.withLock { state throws(OwnerFailure) in
             guard state.sourceLimit.instanceID == limit.instanceID else { throw .instanceChanged }
-            state.limitsSent.append(filter)
+            state.limitsSent.append(filter.map { SourceRuleValue(types: $0.types, sources: $0.sources) })
             // The server replaces the enforcement whole, so every lever becomes what was sent.
             var written = limit
             written.isOn = filter != nil
             written.types = filter?.types ?? []
             written.sources = filter?.sources ?? []
+            state.sourceLimit = written
+            return written
+        }
+    }
+
+    func setSourceRule(_ rule: SourceRule, of limit: SourceLimit, to value: SourceRuleValue?) async throws(OwnerFailure) -> SourceLimit {
+        try enter("setSourceRule")
+        state.withLock { $0.beforeLimitWrite }?()
+        return try state.withLock { state throws(OwnerFailure) in
+            guard state.sourceLimit.instanceID == limit.instanceID else { throw .instanceChanged }
+            // The server replaces the enforcement whole, so every lever becomes what was sent.
+            var written = limit
+            switch rule {
+            case .filter:
+                state.limitsSent.append(value)
+                written.isOn = value != nil
+                written.types = value?.types ?? []
+                written.sources = value?.sources ?? []
+            case .allowlist:
+                state.allowlistsSent.append(value)
+                written.allowlist = value.map { ($0.types, $0.sources) }
+            }
             state.sourceLimit = written
             return written
         }

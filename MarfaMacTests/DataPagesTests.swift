@@ -424,12 +424,12 @@ import Testing
 @MainActor
 @Suite(.hangLimit) struct SourceLimitModelTests {
     private func model(_ bench: OwnerBench, sources: [MarfaSourceRow] = []) -> SourceLimitModel {
-        SourceLimitModel(context: bench.context, sources: { sources })
+        SourceLimitModel(rule: .filter, context: bench.context, sources: { sources })
     }
 
     private let rows = [
-        MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, hasChosenName: false),
-        MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, hasChosenName: false),
+        MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, nameOrigin: .key),
+        MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, nameOrigin: .key),
     ]
 
     @Test func theLimitIsReadWithTheTypesAndSourcesItNames() async {
@@ -572,7 +572,7 @@ import Testing
         await model.load()
         model.types = ["core.note"]
         model.checkedSources = ["rss"]
-        bench.calls.fail("setSourceLimit", with: .notPermitted("config.manage"))
+        bench.calls.fail("setSourceRule", with: .notPermitted("config.manage"))
         await model.save()
         #expect(bench.refreshed == 1)
         #expect(model.line == OwnerWording.line(.notPermitted("config.manage")))
@@ -606,8 +606,8 @@ import Testing
     /// A host's sources and the changes it was asked to make.
     @MainActor final class Server {
         var rows = [
-            MarfaSourceRow(code: "rss", name: "RSS", mark: "lucide:rss", count: 156, hasChosenName: false),
-            MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, hasChosenName: true),
+            MarfaSourceRow(code: "rss", name: "RSS", mark: "lucide:rss", count: 156, nameOrigin: .key),
+            MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, nameOrigin: .set),
         ]
         var refusal: OwnerFailure?
         var changes: [(String, MarfaSourceChange)] = []
@@ -620,7 +620,7 @@ import Testing
                     if let refusal = self.refusal { return refusal }
                     if case .rename(let name) = change, let index = self.rows.firstIndex(where: { $0.code == code }) {
                         let row = self.rows[index]
-                        self.rows[index] = MarfaSourceRow(code: row.code, name: name, mark: row.mark, count: row.count, hasChosenName: true)
+                        self.rows[index] = MarfaSourceRow(code: row.code, name: name, mark: row.mark, count: row.count, nameOrigin: .set)
                     }
                     return nil
                 },
@@ -702,11 +702,5 @@ import Testing
         // An unchanged name is nothing to hand back.
         model.beginRename("rss")
         #expect(model.takeDrafts().isEmpty)
-    }
-
-    @Test func howASourceGotItsNameIsToldInOneLine() {
-        #expect(SourcesPage.naming(MarfaSourceRow(code: "a", name: "A", mark: nil, count: 1, hasChosenName: true)) == "Named by you.")
-        #expect(SourcesPage.naming(MarfaSourceRow(code: "a", name: "a", mark: nil, count: 1, hasChosenName: false)) == "Not named yet.")
-        #expect(SourcesPage.naming(MarfaSourceRow(code: "a", name: "RSS", mark: nil, count: 1, hasChosenName: false)) == "Named by its app or key.")
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Observation
 
 /// What came of a write to the stored settings.
@@ -103,6 +104,40 @@ nonisolated enum StoredSettingWording {
         return names.count == 1
             ? String(localized: "\(list) was changed elsewhere. The app read the new value; yours wasn’t saved.")
             : String(localized: "\(list) were changed elsewhere. The app read the new values; yours weren’t saved.")
+    }
+
+    /// The server's refusal of settings that hold an address that is not public while private addresses are not allowed, such as
+    /// turning Private Addresses off while the heartbeat goes to this network, in one line naming each by the name its page gives
+    /// it. Nil for any other error.
+    static func notPublic(_ error: any Error) -> String? {
+        guard case .validation(_, _, let details, let server)? = ClientOwnerCalls.marfaError(error),
+            let breaches = (details ?? server?.details)?.object?["errors"]?.array
+        else { return nil }
+        var names: [String] = []
+        for breach in breaches {
+            guard let path = breach.object?["path"]?.string, breach.object?["message"]?.string?.contains("not public") == true,
+                let name = destination(path), !names.contains(name)
+            else { continue }
+            names.append(name)
+        }
+        guard !names.isEmpty else { return nil }
+        let list = names.formatted(.list(type: .and))
+        return names.count == 1
+            ? String(localized: "The \(list) isn’t public. Change it first, then turn this off.")
+            : String(localized: "The \(list) aren’t public. Change them first, then turn this off.")
+    }
+
+    /// What a destination setting is called in a sentence.
+    private static func destination(_ key: String) -> String? {
+        switch key {
+        case "heartbeat_url": MonitoringSecret.heartbeatAddress.removalName
+        case "posthog_host": MonitoringSecret.postHogHost.removalName
+        case "otel_exporter_otlp_endpoint", "otel_exporter_otlp_traces_endpoint", "otel_exporter_otlp_logs_endpoint",
+            "otel_exporter_otlp_metrics_endpoint":
+            MonitoringSecret.telemetryAddress.removalName
+        case "object_store_endpoint": String(localized: "object store address")
+        default: nil
+        }
     }
 
     private static func plain(_ text: String) -> Bool {

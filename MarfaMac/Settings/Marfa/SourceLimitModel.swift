@@ -2,11 +2,41 @@ import Foundation
 import Marfa
 import Observation
 
-/// Limit Sources: for the types checked, every app and key reads only items from the sources checked, in lists, search, exports
-/// and webhooks. It is the server's source filter, written whole with the other two levers as they were read, so a change
-/// made elsewhere before the write is told and not written over. Another Marfa answering at the address is told in the settings
-/// page's words and the draft starts again from it, so what was chosen for one Marfa is never written to another. Turning it
-/// off removes the filter.
+/// One of the two source rules for every app and key, each the types it covers and the sources it names.
+nonisolated enum SourceRule: Hashable, Sendable {
+    /// Limit Sources (`enforcement.source_filter`): for the types named, only items from the sources named are read.
+    case filter
+    /// Who May Write (`enforcement.source_allowlist`): for exactly the types named, only the sources named may add items.
+    case allowlist
+
+    var title: String {
+        switch self {
+        case .filter: String(localized: "Limit Sources")
+        case .allowlist: String(localized: "Who May Write")
+        }
+    }
+}
+
+nonisolated struct SourceRuleValue: Hashable, Sendable {
+    var types: [String]
+    var sources: [String]
+}
+
+extension SourceLimit {
+    /// What `rule` holds as read, or nil where it is not set.
+    func value(of rule: SourceRule) -> SourceRuleValue? {
+        switch rule {
+        case .filter: isOn ? SourceRuleValue(types: types, sources: sources) : nil
+        case .allowlist: allowlist.map { SourceRuleValue(types: $0.types, sources: $0.sources) }
+        }
+    }
+}
+
+/// A source rule's page: Limit Sources, for the types checked every app and key reads only items from the sources checked, in
+/// lists, search, exports and webhooks; Who May Write, for exactly the types checked every app and key adds items only under
+/// the sources checked. Each is written whole with the other levers as they were read, so a change made elsewhere before the
+/// write is told and not written over. Another Marfa answering at the address is told in the settings page's words and the
+/// draft starts again from it, so what was chosen for one Marfa is never written to another. Turning a rule off removes it.
 @Observable @MainActor final class SourceLimitModel: OwnerDraftHolding {
     struct Choice: Identifiable, Hashable {
         let code: String
@@ -14,8 +44,7 @@ import Observation
         var id: String { code }
     }
 
-    private static let changedElsewhere = String(localized: "The limit was changed somewhere else. Nothing was sent. Check what you chose, then save again.")
-
+    let rule: SourceRule
     private let context: OwnerContext
     private let sources: () -> [MarfaSourceRow]
 
@@ -32,37 +61,49 @@ import Observation
     private(set) var isSaving = false
     var hasLoaded: Bool { loader.hasLoaded }
 
-    init(context: OwnerContext, sources: @escaping () -> [MarfaSourceRow]) {
+    init(rule: SourceRule, context: OwnerContext, sources: @escaping () -> [MarfaSourceRow]) {
+        self.rule = rule
         self.context = context
         self.sources = sources
     }
 
-    var isOn: Bool { limit?.isOn ?? false }
+    /// The rule as read, or nil where it is not set.
+    var value: SourceRuleValue? { limit?.value(of: rule) }
+    var isOn: Bool { value != nil }
 
     /// The types a limit can name, by name: the server's own, with any the limit names that the server no longer lists.
     var typeChoices: [Choice] {
         let known = typeNames.filter { !$0.key.hasPrefix("system") }
         var codes = Set(known.keys)
-        codes.formUnion(limit?.types ?? [])
+        codes.formUnion(value?.types ?? [])
         return codes.map { Choice(code: $0, title: known[$0] ?? $0) }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     /// The sources a limit can name: those with items, and any the limit names that have none now.
     var sourceChoices: [Choice] {
         var choices = sources().map { Choice(code: $0.code, title: $0.name) }
-        for code in (limit?.sources ?? []) where !choices.contains(where: { $0.code == code }) {
+        for code in (value?.sources ?? []) where !choices.contains(where: { $0.code == code }) {
             choices.append(Choice(code: code, title: code))
         }
         return choices
     }
 
     var hasEdits: Bool {
-        guard let limit else { return false }
-        return types != Set(limit.types) || checkedSources != Set(limit.sources)
+        guard limit != nil else { return false }
+        return types != Set(value?.types ?? []) || checkedSources != Set(value?.sources ?? [])
     }
 
-    /// A limit that names types but no source would hide every item of those types from every app, so it waits for a source.
-    var canSave: Bool { hasEdits && !isSaving && (types.isEmpty || !checkedSources.isEmpty) }
+    /// Why what is checked can't be saved: a rule that names types and no source would hide every item of those types from every
+    /// app, or let no app or key add one.
+    var waitsFor: String? {
+        guard !types.isEmpty, checkedSources.isEmpty else { return nil }
+        return switch rule {
+        case .filter: String(localized: "Check a source too. With none, no app or key could read items of these types.")
+        case .allowlist: String(localized: "Check a source too. With none, no app or key could add items of these types.")
+        }
+    }
+
+    var canSave: Bool { hasEdits && !isSaving && waitsFor == nil }
 
     func load() async {
         await loader.load(in: context, primary: { () throws(OwnerFailure) in
@@ -71,8 +112,8 @@ import Observation
             let keepsDraft = hasEdits && hasLoaded
             limit = read
             if !keepsDraft {
-                types = Set(read.types)
-                checkedSources = Set(read.sources)
+                types = Set(read.value(of: rule)?.types ?? [])
+                checkedSources = Set(read.value(of: rule)?.sources ?? [])
             }
         }, secondary: [
             .required(typesRead) { [self] () throws(OwnerFailure) in typeNames = try await context.calls.typeNames() },
@@ -80,15 +121,15 @@ import Observation
     }
 
     func revert() {
-        guard let limit else { return }
-        types = Set(limit.types)
-        checkedSources = Set(limit.sources)
+        guard limit != nil else { return }
+        types = Set(value?.types ?? [])
+        checkedSources = Set(value?.sources ?? [])
         line = nil
     }
 
     func save() async {
         guard canSave, let limit else { return }
-        await write(limit, to: types.isEmpty ? nil : (types.sorted(), checkedSources.sorted()))
+        await write(limit, to: types.isEmpty ? nil : SourceRuleValue(types: types.sorted(), sources: checkedSources.sorted()))
     }
 
     func turnOff() async {
@@ -96,7 +137,7 @@ import Observation
         await write(limit, to: nil)
     }
 
-    private func write(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async {
+    private func write(_ limit: SourceLimit, to value: SourceRuleValue?) async {
         isSaving = true
         line = nil
         defer { isSaving = false }
@@ -110,16 +151,23 @@ import Observation
             }
             guard current == limit else {
                 self.limit = current
-                line = Self.changedElsewhere
+                line = changedElsewhere(own: current.value(of: rule) != limit.value(of: rule))
                 return
             }
-            let written = try await context.calls.setSourceLimit(current, to: filter)
+            let written = try await context.calls.setSourceRule(rule, of: current, to: value)
             self.limit = written
-            types = Set(written.types)
-            checkedSources = Set(written.sources)
+            types = Set(written.value(of: rule)?.types ?? [])
+            checkedSources = Set(written.value(of: rule)?.sources ?? [])
         } catch {
             await refused(error)
         }
+    }
+
+    /// What is told when the levers were found changed since they were read: this rule, or another written with it.
+    private func changedElsewhere(own: Bool) -> String {
+        own
+            ? String(localized: "\(rule.title) was changed somewhere else. Nothing was sent. Check what you chose, then save again.")
+            : String(localized: "Another source rule was changed somewhere else. Nothing was sent. Check what you chose, then save again.")
     }
 
     /// What was typed stays; the page says why, and where the limit changed elsewhere it is read again.
@@ -128,7 +176,7 @@ import Observation
             await anotherMarfa()
             return
         }
-        line = failure == .conflict ? Self.changedElsewhere : OwnerWording.line(failure)
+        line = failure == .conflict ? changedElsewhere(own: true) : OwnerWording.line(failure)
         await context.learn(from: failure)
         if failure == .conflict, let read = try? await context.calls.sourceLimit() { limit = read }
     }
@@ -150,6 +198,11 @@ import Observation
         let chosen = typeChoices.filter { types.contains($0.code) }.map(\.title).joined(separator: ", ")
         let from = sourceChoices.filter { checkedSources.contains($0.code) }.map(\.title).joined(separator: ", ")
         revert()
-        return [.typed(title: String(localized: "Limit Sources Not Saved"), text: "\(chosen)\n\(from)")]
+        let title =
+            switch rule {
+            case .filter: String(localized: "Limit Sources Not Saved")
+            case .allowlist: String(localized: "Who May Write Not Saved")
+            }
+        return [.typed(title: title, text: "\(chosen)\n\(from)")]
     }
 }

@@ -47,7 +47,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
             number("rate_limit_inbound_requests", 600), number("inbound_backlog_deliveries", 10_000),
             number("event_stream_max_viewers", 0), number("mcp_fetch_max_bytes", 52_428_800), number("mcp_fetch_timeout_seconds", 60),
             flag("rate_limit_enabled", true), flag("mcp_fetch_enabled", true), flag("heartbeat_enabled", true),
-            flag("error_reporting_enabled", true), flag("telemetry_enabled", true),
+            flag("error_reporting_enabled", true), flag("telemetry_enabled", true), flag("allow_private_addresses", false),
             secret("heartbeat_url"), secret("posthog_host"), secret("posthog_project_token"),
             secret("otel_exporter_otlp_endpoint"), secret("otel_exporter_otlp_headers"),
         ]

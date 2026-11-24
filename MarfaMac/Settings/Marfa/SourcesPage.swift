@@ -4,12 +4,14 @@ import SwiftUI
 /// The Sources page: every source that holds items, with the name and mark the server gives it, and the rules that reach every
 /// app and key. A name or mark is kept on the server for every app.
 struct SourcesPage: View {
-    static let limitSources = SettingsSubpage(id: "limit-sources", title: String(localized: "Limit Sources"))
+    static let limitSources = SettingsSubpage(id: "limit-sources", title: SourceRule.filter.title)
+    static let whoMayWrite = SettingsSubpage(id: "who-may-write", title: SourceRule.allowlist.title)
 
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: SourcesModel
     @State private var limit: SourceLimitModel
+    @State private var allowlist: SourceLimitModel
     @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
@@ -20,19 +22,24 @@ struct SourcesPage: View {
             change: { [host] code, change in await host.changeSource(code, change) },
             marks: { [host] query, set in host.marks(matching: query, in: set) })
         _model = State(initialValue: SourcesModel(access: access, markSets: host.markSets))
-        _limit = State(initialValue: SourceLimitModel(context: OwnerContext(host: host), sources: { [host] in host.sources }))
+        _limit = State(initialValue: SourceLimitModel(rule: .filter, context: OwnerContext(host: host), sources: { [host] in host.sources }))
+        _allowlist = State(initialValue: SourceLimitModel(rule: .allowlist, context: OwnerContext(host: host), sources: { [host] in host.sources }))
     }
 
     var body: some View {
         content
             .task(id: host.serverAddress) {
                 async let sources: Void = model.load()
-                if host.grants.contains(.configManage) { await limit.load() }
+                if host.grants.contains(.configManage) {
+                    await limit.load()
+                    await allowlist.load()
+                }
                 await sources
             }
             .onAppear {
                 host.ownerDrafts.register(model)
                 host.ownerDrafts.register(limit)
+                host.ownerDrafts.register(allowlist)
             }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.close() }) { SourceSheet(model: model, host: host) }
             .accessibilityIdentifier("SourcesPage")
@@ -40,7 +47,9 @@ struct SourcesPage: View {
 
     @ViewBuilder private var content: some View {
         if subpage?.id == Self.limitSources.id {
-            LimitSourcesPage(model: limit, host: host)
+            SourceRulePage(model: limit, host: host)
+        } else if subpage?.id == Self.whoMayWrite.id {
+            SourceRulePage(model: allowlist, host: host)
         } else {
             list
         }
@@ -81,28 +90,38 @@ struct SourcesPage: View {
 
     private var rules: some View {
         SettingsSection("Rules for Every App and Key", line: "A key can set its own instead.") {
-            if let failure = limit.failure {
-                OwnerProblemRow(title: "Couldn’t Read Limit Sources", failure: failure, page: .sources, host: host) {
-                    Task { await limit.load() }
+            if let failure = limit.failure ?? allowlist.failure {
+                OwnerProblemRow(title: "Couldn’t Read the Rules", failure: failure, page: .sources, host: host) {
+                    Task {
+                        await limit.load()
+                        await allowlist.load()
+                    }
                 }
             }
             SettingsLinkRow(
-                verbatim: String(localized: "Limit Sources"), line: String(localized: "Only items from the sources you name are read."),
-                value: limitValue
+                verbatim: SourceRule.allowlist.title, line: String(localized: "Only the sources you name may write these types."),
+                value: Self.value(of: allowlist)
+            ) { navigation?.push(Self.whoMayWrite) }
+            SettingsLinkRow(
+                verbatim: SourceRule.filter.title, line: String(localized: "Only items from the sources you name are read."),
+                value: Self.value(of: limit)
             ) { navigation?.push(Self.limitSources) }
         }
     }
 
-    private var limitValue: String? {
-        guard let reading = limit.limit else { return nil }
-        return reading.isOn ? String(localized: "On") : String(localized: "Not Set")
+    private static func value(of rule: SourceLimitModel) -> String? {
+        guard rule.limit != nil else { return nil }
+        return rule.isOn ? String(localized: "On") : String(localized: "Not Set")
     }
 
     /// How a source got its name, in a line.
     static func naming(_ row: MarfaSourceRow) -> String {
-        if row.hasChosenName { return String(localized: "Named by you.") }
-        if row.name == row.code { return String(localized: "Not named yet.") }
-        return String(localized: "Named by its app or key.")
+        switch row.nameOrigin {
+        case .set: String(localized: "Named by you.")
+        case .app: String(localized: "Named by the app.")
+        case .key: String(localized: "Named by its key.")
+        case .code, .other: String(localized: "Not named yet.")
+        }
     }
 }
 
@@ -178,14 +197,16 @@ private struct SourceSheet: View {
     }
 }
 
-/// The page Limit Sources opens (S65): the types and sources to check, then the button bar, then Turn Off.
-private struct LimitSourcesPage: View {
+/// The page a source rule opens, Limit Sources (S65) or Who May Write, which has no board of its own and is drawn the same way:
+/// the types and sources to check, then the button bar, then Turn Off.
+private struct SourceRulePage: View {
     let model: SourceLimitModel
     let host: any MarfaSettingsHost
     @State private var asksToTurnOff = false
 
     var body: some View {
         @Bindable var model = model
+        let words = SourceRuleWords(rule: model.rule)
         if let failure = model.failure, model.limit == nil {
             OwnerFailureState(page: .sources, failure: failure, host: host) { Task { await model.load() } }
         } else if model.limit == nil {
@@ -193,24 +214,28 @@ private struct LimitSourcesPage: View {
         } else {
             SettingsPageColumn {
                 if let failure = model.failure {
-                    OwnerProblem(title: "Couldn’t Read Limit Sources", failure: failure, page: .sources, host: host) {
+                    OwnerProblem(title: words.readFailure, failure: failure, page: .sources, host: host) {
                         Task { await model.load() }
                     }
                 }
-                Text("For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. The app too.")
+                Text(verbatim: words.intro)
                     .settingsFont(.sectionLine).foregroundStyle(SettingsTokens.secondaryText)
                     .padding(.horizontal, SettingsTokens.Metric.inset)
-                SettingsSection("Types", line: "Types with no limit read every source.") {
+                SettingsSection(name: Text("Types"), line: Text(verbatim: words.typesLine)) {
                     if let failure = model.typesFailure {
                         OwnerProblemRow(title: "Couldn’t Read Available Types", failure: failure, page: .sources, host: host) {
                             Task { await model.load() }
                         }
                     }
-                    ForEach(model.typeChoices) { choice in checkRow(choice, in: $model.types, id: "LimitType") }
+                    ForEach(model.typeChoices) { choice in checkRow(choice, in: $model.types, id: words.id + "Type") }
                 }
-                SettingsSection("Sources", line: "A new source is left out until you check it.") {
+                SettingsSection(name: Text("Sources"), line: Text(verbatim: words.sourcesLine)) {
                     if model.sourceChoices.isEmpty { SettingsRow("No Sources", look: .off) }
-                    ForEach(model.sourceChoices) { choice in checkRow(choice, in: $model.checkedSources, id: "LimitSource") }
+                    ForEach(model.sourceChoices) { choice in checkRow(choice, in: $model.checkedSources, id: words.id + "Source") }
+                }
+                if let waiting = model.waitsFor, model.hasEdits {
+                    Text(verbatim: waiting).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true).padding(.horizontal, SettingsTokens.Metric.inset)
                 }
                 if let line = model.line {
                     Text(verbatim: line).settingsFont(.line).foregroundStyle(SettingsTokens.errorRed)
@@ -219,23 +244,24 @@ private struct LimitSourcesPage: View {
                 SettingsBar {
                     if model.isSaving { ProgressView().controlSize(.small) }
                     SettingsButton("Revert") { model.revert() }.disabled(!model.hasEdits || model.isSaving)
-                    SettingsButton("Save") { Task { await model.save() } }.disabled(!model.canSave).accessibilityIdentifier("LimitSourcesSave")
+                    SettingsButton("Save") { Task { await model.save() } }.disabled(!model.canSave).accessibilityIdentifier(words.id + "Save")
                 }
                 if model.isOn {
                     SettingsSection("Turn Off") {
-                        SettingsRow("Turn Off Limit Sources", line: "Every source is read again.") {
+                        SettingsRow(verbatim: words.turnOff, line: words.turnOffLine) {
                             SettingsButton("Turn Off…", role: .destructive) { asksToTurnOff = true }.disabled(model.isSaving)
                         }
                     }
                 }
             }
-            .alert("Turn Off Limit Sources?", isPresented: $asksToTurnOff) {
+            .task { await model.load() }
+            .alert(Text(verbatim: words.turnOffQuestion), isPresented: $asksToTurnOff) {
                 Button("Cancel", role: .cancel) {}
                 Button("Turn Off", role: .destructive) { Task { await model.turnOff() } }
             } message: {
-                Text("Apps and keys will read items from every source for the types you limited.")
+                Text(verbatim: words.turnOffMessage)
             }
-            .accessibilityIdentifier("LimitSourcesPage")
+            .accessibilityIdentifier(words.id + "Page")
         }
     }
 
@@ -253,5 +279,53 @@ private struct LimitSourcesPage: View {
                 .toggleStyle(.checkbox)))
         ) {}
         .accessibilityIdentifier(id + "-" + choice.code)
+    }
+}
+
+/// What a source rule's page says.
+private struct SourceRuleWords {
+    let rule: SourceRule
+
+    var id: String { rule == .filter ? "LimitSources" : "WhoMayWrite" }
+
+    var intro: String {
+        switch rule {
+        case .filter:
+            String(localized: "For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. The app too.")
+        case .allowlist:
+            String(localized: "For these types, every app and key adds items only under the checked sources. The app too. Types made from them are not included.")
+        }
+    }
+
+    var typesLine: String {
+        switch rule {
+        case .filter: String(localized: "Types with no limit read every source.")
+        case .allowlist: String(localized: "Types left unchecked take items from every source.")
+        }
+    }
+
+    var sourcesLine: String {
+        switch rule {
+        case .filter: String(localized: "A new source is left out until you check it.")
+        case .allowlist: String(localized: "A new source can’t add these types until you check it.")
+        }
+    }
+
+    var readFailure: LocalizedStringKey { "Couldn’t Read \(rule.title)" }
+    var turnOff: String { String(localized: "Turn Off \(rule.title)") }
+    var turnOffQuestion: String { String(localized: "Turn Off \(rule.title)?") }
+
+    var turnOffLine: String {
+        switch rule {
+        case .filter: String(localized: "Every source is read again.")
+        case .allowlist: String(localized: "Every source can add items again.")
+        }
+    }
+
+    var turnOffMessage: String {
+        switch rule {
+        case .filter: String(localized: "Apps and keys will read items from every source for the types you limited.")
+        case .allowlist: String(localized: "Apps and keys will be able to add items of these types from every source.")
+        }
     }
 }

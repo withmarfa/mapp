@@ -5,15 +5,25 @@ import SwiftUI
 struct AddressesPage: View {
     let host: any MarfaSettingsHost
     @State private var model: AddressesModel
+    @State private var network: PrivateAddressesModel
 
     init(host: any MarfaSettingsHost) {
+        self.init(host: host, network: PrivateAddressesModel(context: OwnerContext(host: host), calls: host.instanceCalls))
+    }
+
+    init(host: any MarfaSettingsHost, network: PrivateAddressesModel) {
         self.host = host
         _model = State(initialValue: AddressesModel(context: OwnerContext(host: host)))
+        _network = State(initialValue: network)
     }
 
     var body: some View {
         content
-            .task(id: host.serverAddress) { await model.load() }
+            .task(id: host.serverAddress) {
+                async let network: Void = network.load()
+                await model.load()
+                await network
+            }
             .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.close() }) { AddressSheet(model: model, serverName: host.serverName) }
             .alert(
@@ -24,6 +34,12 @@ struct AddressesPage: View {
                 Button(asked.confirm, role: .destructive) { Task { await model.confirm(asked) } }
             } message: { asked in
                 Text(verbatim: asked.message)
+            }
+            .alert("Allow Private Addresses?", isPresented: $network.asksToAllow) {
+                Button("Cancel", role: .cancel) {}
+                Button("Allow") { Task { await network.allow() } }
+            } message: {
+                Text("\(host.serverName) will send webhooks, the heartbeat, error reports, telemetry and backups to addresses that aren’t public: the machine it runs on, and networks such as a home network or Tailscale.")
             }
             .accessibilityIdentifier("AddressesPage")
     }
@@ -59,9 +75,31 @@ struct AddressesPage: View {
                     }
                     SettingsAddRow("Add a Website…") { model.begin(.addWebsite) }
                 }
+                networkSection
             }
         } else {
             OwnerLoading()
+        }
+    }
+
+    @ViewBuilder private var networkSection: some View {
+        if let notice = network.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { network.dismissNotice() }) }
+        if network.isLoaded || network.failure != nil { networkRows }
+    }
+
+    private var networkRows: some View {
+        SettingsSection("Network") {
+            if network.isLoaded {
+                SettingsRow("Private Addresses", line: "Lets webhooks and the heartbeat reach this network.", error: network.line) {
+                    SettingsToggle(title: "Private Addresses", isOn: Binding { network.isOn } set: { on in Task { await network.set(on) } })
+                        .disabled(network.isWriting)
+                        .accessibilityIdentifier("PrivateAddresses")
+                }
+            } else if let failure = network.failure {
+                OwnerProblemRow(title: "Couldn’t Read Private Addresses", failure: failure, page: .addresses, host: host) {
+                    Task { await network.load() }
+                }
+            }
         }
     }
 }

@@ -150,7 +150,7 @@ struct SidebarSectionsTests {
         library.catalogue = Catalogue(itemTypes: Array(FakeItemLibrary.testCatalogue.itemTypes.values) + [
             ItemTypeInfo(id: pr, label: "Pull Request", plural: "Pull Requests", fields: [], titleField: "title", bodyField: nil, parent: nil, linkField: "github_id"),
         ], edgeTypes: Array(FakeItemLibrary.testCatalogue.edgeTypes.values))
-        library.sources = SourceDirectory(infos: ["gh": SourceInfo(code: "gh", name: "GitHub", mark: nil, hasChosenName: true)])
+        library.sources = SourceDirectory(infos: ["gh": SourceInfo(code: "gh", name: "GitHub", mark: nil, nameOrigin: .set)])
         let note = library.add("# Soil\n\ntext\n\n# Soil\n")
         var collection = FakeItemLibrary.collection("Garden")
         collection.name = "Garden"

@@ -269,11 +269,11 @@ nonisolated protocol OwnerCalls: Sendable {
     func instanceMetrics() async throws(OwnerFailure) -> InstanceMetricsReading
     /// Where files are kept and the files nothing uses (`instance.read`).
     func fileStores() async throws(OwnerFailure) -> FileStores
-    /// The source filter, with the instance that holds it (`config.manage`).
+    /// The instance's three enforcement levers, with the instance that holds them (`config.manage`).
     func sourceLimit() async throws(OwnerFailure) -> SourceLimit
-    /// Replaces the source filter, sending the other two levers as `limit` holds them, or turns it off with nil. The server
-    /// guards only the instance, so a caller reads the limit again just before.
-    func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit
+    /// Replaces one source rule, sending the other levers as `limit` holds them, or turns it off with nil. The server guards
+    /// only the instance, so a caller reads the levers again just before.
+    func setSourceRule(_ rule: SourceRule, of limit: SourceLimit, to value: SourceRuleValue?) async throws(OwnerFailure) -> SourceLimit
 
     func webhooks() async throws(OwnerFailure) -> [OwnerWebhook]
     /// One webhook as the server holds it now.

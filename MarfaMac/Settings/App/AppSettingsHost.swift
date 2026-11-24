@@ -70,7 +70,7 @@ enum LibraryDescription {
         guard let library = libraries.current else { return [] }
         return library.sources.listing(loaded: [:]).map { listed in
             let info = library.sources.info(listed.code)
-            return MarfaSourceRow(code: listed.code, name: listed.name, mark: info.mark, count: listed.count, hasChosenName: info.hasChosenName)
+            return MarfaSourceRow(code: listed.code, name: listed.name, mark: info.mark, count: listed.count, nameOrigin: info.nameOrigin)
         }
     }
 
