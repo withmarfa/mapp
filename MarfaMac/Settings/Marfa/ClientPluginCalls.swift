@@ -87,7 +87,11 @@ nonisolated struct ClientPluginCalls: PluginCalls {
 
     var releaseName: String {
         guard let address = releaseAddress?.trimmingCharacters(in: .whitespacesAndNewlines), !address.isEmpty else { return "withmarfa/plugins" }
-        return address.replacing(/^https?:\/\//, with: "")
+        // Only the host and path: an address may carry credentials or a token.
+        guard let parts = URLComponents(string: address), let host = parts.host, !host.isEmpty else {
+            return String(localized: "another plugins release")
+        }
+        return host + parts.path
     }
 
     func release() async throws(PluginFailure) -> [ReleasePlugin] {
