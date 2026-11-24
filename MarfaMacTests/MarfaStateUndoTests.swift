@@ -94,6 +94,22 @@ import Testing
         #expect(library.notices.waiting.last?.message == String(localized: "That change wasn’t made, so there is nothing to redo here."))
     }
 
+    @Test func anUndoOfAnItemAlreadyWhereItWouldPutItIsMadeQuietly() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        library.delete([F.n1], undoManager: undo)
+        try await accept(F.n1, .trashed, in: library, source)
+        // Another device restores the item.
+        try await show(F.n1, .active, in: library, source)
+        source.clearWrites()
+
+        undo.undo()
+        #expect(source.writes.isEmpty)
+        #expect(library.notices.waiting.isEmpty)
+        undo.redo()
+        #expect(source.writes == [.transition(F.n1, .trashed)])
+    }
+
     @Test func aRedoAfterThatMovesTheItemToTheBinAgain() async throws {
         let (library, source, undo) = try await binnedFromArchive()
         undo.undo()
