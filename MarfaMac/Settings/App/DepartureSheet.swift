@@ -85,7 +85,10 @@ struct DepartureSheet: View {
             SettingsButton("Cancel") { model.cancelDeparture() }
                 .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("DepartureCancel")
-            SettingsButton(isDisconnecting ? "Keep Copy and Disconnect" : "Keep Copy and Switch", role: .confirm) {
+            // With the settings' removal ticked it deletes from the Marfa, so Return must not press it.
+            SettingsButton(
+                isDisconnecting ? "Keep Copy and Disconnect" : "Keep Copy and Switch", role: model.alsoRemovesSettings ? .normal : .confirm
+            ) {
                 Task { await model.answer(.keepCopy) }
             }
             .accessibilityIdentifier("DepartureKeep")
