@@ -216,6 +216,18 @@ enum LibraryDescription {
     /// What Activity, Monitoring, Limits and Start-Up ask of the server, through the same client.
     var instanceCalls: any InstanceCalls { ClientInstanceCalls(client: confirmingClient) }
 
+    @ObservationIgnored private var heldFolderCalls: CopyFolderCalls?
+
+    /// A folder's settings, read and written through the open copy, which owns the folder doors. One for each copy, so its
+    /// pins run one at a time across Folders' pages.
+    var folderCalls: any FolderCalls {
+        let copy = (host.library?.source as? MarfaSource)?.copy
+        if let held = heldFolderCalls, held.copy === copy { return held }
+        let made = CopyFolderCalls(copy: copy)
+        heldFolderCalls = made
+        return made
+    }
+
     /// The package's server, for the one call the generated client does not hold (`Server.health()`).
     private var plainServer: (@Sendable () throws -> Server)? {
         guard let connection = host.configuredConnection else { return nil }

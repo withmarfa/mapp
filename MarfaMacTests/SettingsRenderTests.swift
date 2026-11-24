@@ -39,6 +39,7 @@ import Testing
     var allowed: [Set<InstancePermission>] = []
     var ownerCalls: any OwnerCalls = FakeOwnerCalls()
     var instanceCalls: any InstanceCalls = FakeInstanceCalls()
+    var folderCalls: any FolderCalls = FakeFolderCalls()
     var overview: OverviewModel
     var health: ServerHealthModel
     var shown: [MarfaSettingsPage] = []
@@ -597,6 +598,9 @@ struct RenderedWindow<Detail: View>: View {
         }
         let host = StubMarfaHost(settings: InstanceSettingsModel { nil })
         host.ownerCalls = calls
+        host.folderCalls = FakeFolderCalls(
+            FakeFolderCalls.folder("f1", "Studio Notes", types: ["core.note"], ignore: [".DS_Store", "*.tmp", "Exports/"]),
+            FakeFolderCalls.folder("f2", "Client Drawings", types: ["core.file"]))
         return host
     }
 
