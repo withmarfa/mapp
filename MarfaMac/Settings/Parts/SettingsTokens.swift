@@ -107,6 +107,12 @@ enum SettingsTokens {
         static let rowHeight: CGFloat = 44
         static let rowHeightWithLine: CGFloat = 56
         static let rowHeightCompact: CGFloat = 36
+        /// A row in a sheet's list of choices with a title and a line, such as a restore point.
+        static let choiceRowHeight: CGFloat = 48
+        /// The gap between a choice row's title and its line.
+        static let choiceLineGap: CGFloat = 2
+        /// A choice row's leading and trailing inset inside its list.
+        static let choiceRowInset: CGFloat = 12
         /// The space above and below a standard row's words beyond the row's own padding, which a line that wraps keeps by
         /// growing the row: a row of one line is then exactly its height.
         static let rowTextPadding: CGFloat = 1

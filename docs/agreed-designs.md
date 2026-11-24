@@ -27,9 +27,7 @@ Agreed with August on 21 November 2026, drawn as the Next boards of Marfa for Ma
 
 ## Buttons
 
-Agreed with August on 22 November 2026 (Marfa for Mac Pages, Foundations F7 to F10; the design system's Button, PopUp and Settings components). The rule is in [Components](components.md#buttons); the main window and Settings' shared controls are built, and this is what is left.
-
-- **Settings:** rows with a mark get their own section (Overview's This Marfa, New Key's Access).
+Agreed with August on 22 November 2026 (Marfa for Mac Pages, Foundations F7 to F10; the design system's Button, PopUp and Settings components). The rule is in [Components](components.md#buttons); the main window and Settings' shared controls are built.
 
 ## Pages
 
