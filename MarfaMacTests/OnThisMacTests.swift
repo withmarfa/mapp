@@ -45,6 +45,82 @@ private struct FakeArchive: ArchiveSource {
         #expect(try Data(contentsOf: first) == Data([1]))
     }
 
+    @Test func twoExportsAtOnceIntoOneFolderBothEndWholeAndKeepAnEarlierFile() async throws {
+        /// Holds each archive after its first piece until both have started, so their temporary files are open together.
+        actor Meeting {
+            private var waiting: [CheckedContinuation<Void, Never>] = []
+            func arrive() async {
+                await withCheckedContinuation { continuation in
+                    waiting.append(continuation)
+                    guard waiting.count == 2 else { return }
+                    for one in waiting { one.resume() }
+                    waiting = []
+                }
+            }
+        }
+        struct Met: ArchiveSource {
+            let meeting: Meeting
+            let byte: UInt8
+            func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
+                try write([byte])
+                await meeting.arrive()
+                try write([byte, byte])
+            }
+        }
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let now = Date(timeIntervalSince1970: 1_795_000_000)
+        let earlier = folder.appending(path: "Marfa 2026-11-18.tar")
+        try Data([9]).write(to: earlier)
+        let meeting = Meeting()
+        async let one = LibraryExport.export(from: Met(meeting: meeting, byte: 1), serverName: "Marfa", to: folder, now: now)
+        async let two = LibraryExport.export(from: Met(meeting: meeting, byte: 2), serverName: "Marfa", to: folder, now: now)
+        let files = try await [one, two]
+        #expect(Set(files.map(\.lastPathComponent)) == ["Marfa 2026-11-18 2.tar", "Marfa 2026-11-18 3.tar"])
+        #expect(Set(try files.map { try Data(contentsOf: $0) }) == [Data([1, 1, 1]), Data([2, 2, 2])])
+        #expect(try Data(contentsOf: earlier) == Data([9]))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).count == 3, "no temporary file is left")
+    }
+
+    @Test func aFileThatTakesTheNameDuringAnExportIsNotReplaced() async throws {
+        struct Taken: ArchiveSource {
+            let name: URL
+            func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
+                try write([1])
+                try Data([9]).write(to: name)
+            }
+        }
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let taken = folder.appending(path: "Marfa 2026-11-18.tar")
+        let file = try await LibraryExport.export(
+            from: Taken(name: taken), serverName: "Marfa", to: folder, now: Date(timeIntervalSince1970: 1_795_000_000))
+        #expect(file.lastPathComponent == "Marfa 2026-11-18 2.tar")
+        #expect(try Data(contentsOf: taken) == Data([9]))
+        #expect(try Data(contentsOf: file) == Data([1]))
+    }
+
+    @Test func aCancelledExportRemovesOnlyItsOwnTemporaryFile() async throws {
+        struct Endless: ArchiveSource {
+            func stream(into write: @Sendable ([UInt8]) throws -> Void) async throws {
+                while true {
+                    try write([1])
+                    try await Task.sleep(for: .milliseconds(5))
+                }
+            }
+        }
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let other = LibraryExport.partialFile(in: folder, id: UUID())
+        try Data([9]).write(to: other)
+        let id = UUID()
+        let export = Task { try await LibraryExport.export(from: Endless(), serverName: "Marfa", to: folder, id: id) }
+        #expect(await eventually { FileManager.default.fileExists(atPath: LibraryExport.partialFile(in: folder, id: id).path) })
+        export.cancel()
+        _ = await export.result
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == [other.lastPathComponent])
+    }
+
     @Test func aServerThatDoesNotAnswerFailsInOneLineAndLeavesNoFile() async throws {
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }
