@@ -967,11 +967,11 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
     @Test func aStrictSwitchTheServerRefusesShowsWhatTheServerHolds() async {
         let calls = listing()
         let owner = FakeOwnerCalls()
-        owner.state.withLock { $0.enforcement.strictTypes = ["user.job"] }
+        owner.state.withLock { $0.sourceLimit.strictTypes = ["user.job"] }
         let model = model(calls, grants: [.schemaWrite, .configManage], owner: owner)
         await model.load()
         #expect(model.isStrict("user.job"))
-        owner.fail("setEnforcement", with: .refused("No."))
+        owner.fail("setSourceLimit", with: .refused("No."))
         await model.setStrict(false, of: "user.job")
         #expect(model.isStrict("user.job"))
         #expect(model.fieldErrors[.strict] != nil)
@@ -980,23 +980,42 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(unread.strictTypes == nil)
     }
 
-    /// Strict changes only this type's place in strict mode: a source limit set elsewhere since the page read it goes back.
+    /// Strict changes only this type's place in strict mode: a source limit or allow-list set elsewhere since the page read
+    /// it goes back as the server holds it.
     @Test func strictChangesOnlyItsOwnTypeAndKeepsTheOtherLevers() async {
         let calls = listing()
         let owner = FakeOwnerCalls()
-        owner.state.withLock { $0.enforcement.strictTypes = ["user.quote"] }
+        owner.state.withLock { $0.sourceLimit.strictTypes = ["user.quote"] }
         let model = model(calls, grants: [.schemaWrite, .configManage], owner: owner)
         await model.load()
-        let filter = Enforcement.Lever(types: ["core.highlight"], sources: ["readwise"])
         owner.state.withLock {
-            $0.enforcement.filter = filter
-            $0.enforcement.strictTypes = ["user.quote", "user.rework"]
+            $0.sourceLimit.isOn = true
+            $0.sourceLimit.types = ["core.highlight"]
+            $0.sourceLimit.sources = ["readwise"]
+            $0.sourceLimit.allowlist = (["core.task"], ["github"])
+            $0.sourceLimit.strictTypes = ["user.quote", "user.rework"]
         }
         await model.setStrict(true, of: "user.job")
-        let sent = owner.state.withLock { $0.enforcementsSent }
-        #expect(sent.map(\.filter) == [filter])
-        #expect(sent.map(\.strictTypes) == [["user.quote", "user.rework", "user.job"]])
+        let held = owner.state.withLock { $0.sourceLimit }
+        #expect(owner.state.withLock { $0.limitsSent.count } == 1)
+        #expect(held.isOn && held.types == ["core.highlight"] && held.sources == ["readwise"])
+        #expect(held.allowlist?.types == ["core.task"] && held.allowlist?.sources == ["github"])
+        #expect(held.strictTypes == ["user.quote", "user.rework", "user.job"])
         #expect(model.strictTypes == ["user.quote", "user.rework", "user.job"])
+    }
+
+    @Test func aSignInThatNoLongerHoldsConfigManageSendsNoStrictSwitch() async {
+        let calls = listing()
+        let owner = FakeOwnerCalls()
+        var grants: Set<InstancePermission> = [.schemaWrite, .configManage]
+        let access = TypeAccess(
+            ownItems: { _ in 0 }, currentIcon: { _ in nil }, setIcon: { _, _ in nil }, markSets: [], marks: { _, _ in [] }, plural: { _ in nil })
+        let model = TypesModel(context: OwnerContext(calls: owner, grants: { grants }), calls: calls, access: access)
+        await model.load()
+        grants = [.schemaWrite]
+        await model.setStrict(true, of: "user.job")
+        #expect(owner.state.withLock { $0.limitsSent.isEmpty })
+        #expect(model.fieldErrors[.strict] == OwnerWording.line(.notPermitted("config.manage"), on: .types))
     }
 
     @Test func aNameTypedInTheNewTypeSheetIsHandedBackWhenSettingsCloses() async {
@@ -1195,21 +1214,6 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(ServerTypeCalls.versionWindow(.init(maxVersions: 10)) == nil)
     }
 
-    /// Sending the enforcement replaces all three levers: one dropped here would let writes through that the owner limited.
-    @Test func anEnforcementWriteSendsAllThreeLevers() {
-        let all = Enforcement(
-            instanceID: "instance-1", strictTypes: ["user.quote"], allowlist: .init(types: ["core.task"], sources: ["github"]),
-            filter: .init(types: ["core.highlight"], sources: ["readwise"]))
-        guard case .value(let levers) = ClientOwnerCalls.enforcementBody(all) else {
-            Issue.record("The levers were not sent")
-            return
-        }
-        #expect(levers.strictMode?.types == ["user.quote"])
-        #expect(levers.sourceAllowlist?.types == ["core.task"] && levers.sourceAllowlist?.sources == ["github"])
-        #expect(levers.sourceFilter?.types == ["core.highlight"] && levers.sourceFilter?.sources == ["readwise"])
-        #expect(ClientOwnerCalls.enforcementBody(Enforcement(instanceID: "instance-1")) == .null)
-    }
-
     @Test func aFeedWindowAndAMergeStrategyAreSetNeverAndLeftToTheTypeAbove() throws {
         let job = listed("user.job")
         let days = try TypeDefinitionEdit.update(job, applying: .feedWindow(.days(30)), in: [job])
@@ -1221,6 +1225,47 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let merge = try TypeDefinitionEdit.update(job, applying: .mergeStrategy("keep_both_copies"), in: [job])
         #expect(merge.mergePolicy?._default == .keepBothCopies)
         #expect(try TypeDefinitionEdit.update(job, applying: .mergeStrategy(nil), in: [job]).mergePolicy == nil)
+    }
+}
+
+/// The one writer of the instance's enforcement.
+@MainActor
+@Suite(.hangLimit) struct EnforcementSettingsTests {
+    /// Two writes of different levers at once: the second reads only once the first has written, so it sends the first's
+    /// lever back as the server then holds it, never as it was before.
+    @Test func writesRunOneAtATimeSoNoneUndoesAnother() async throws {
+        let bench = OwnerBench(grants: [.configManage])
+        let context = bench.context
+        let gate = bench.calls.hold("setSourceLimit")
+        let strict = Task {
+            try await context.writeEnforcement(readFrom: "instance-1") { $0.strictTypes = ["user.job"] }
+        }
+        #expect(await eventually { bench.calls.calls.contains("setSourceLimit") })
+        let filter = Task {
+            try await context.writeEnforcement(readFrom: "instance-1") {
+                $0.isOn = true
+                $0.types = ["core.note"]
+                $0.sources = ["rss"]
+            }
+        }
+        // Given time to run, the second write still waits for the first rather than reading under it.
+        let readUnder = await eventually(within: .milliseconds(300)) { bench.calls.calls.filter { $0 == "sourceLimit" }.count > 1 }
+        #expect(!readUnder)
+        gate.open()
+        _ = try await strict.value
+        gate.open()
+        let last = try await filter.value
+        #expect(last.strictTypes == ["user.job"])
+        #expect(last.isOn && last.types == ["core.note"] && last.sources == ["rss"])
+    }
+
+    @Test func anotherMarfaAnsweringIsToldAndNothingIsSent() async {
+        let bench = OwnerBench(grants: [.configManage])
+        bench.calls.state.withLock { $0.sourceLimit.instanceID = "instance-2" }
+        await #expect(throws: EnforcementSettings.Failure.anotherMarfa) {
+            try await bench.context.writeEnforcement(readFrom: "instance-1") { $0.strictTypes = ["user.job"] }
+        }
+        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
     }
 }
 

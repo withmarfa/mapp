@@ -311,7 +311,7 @@ extension TypesModel {
 
     /// Reads which types strict mode names, where the sign-in may read the configuration. A failed read leaves the switch out.
     func loadStrict() async {
-        guard context.grants().contains(.configManage), let read = try? await context.calls.enforcement() else {
+        guard context.grants().contains(.configManage), let read = try? await context.calls.sourceLimit() else {
             strictTypes = nil
             return
         }

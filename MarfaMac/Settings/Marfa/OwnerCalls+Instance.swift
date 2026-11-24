@@ -44,34 +44,30 @@ extension ClientOwnerCalls {
         }
     }
 
-    private static func enforcement(_ config: Components.Schemas.InstanceConfig) -> Enforcement {
-        let levers = config.enforcement
-        return Enforcement(
-            instanceID: config.instanceId, strictTypes: levers?.strictMode?.types,
-            allowlist: levers?.sourceAllowlist.map { .init(types: $0.types, sources: $0.sources) },
-            filter: levers?.sourceFilter.map { .init(types: $0.types, sources: $0.sources) })
+    private static func limit(_ config: Components.Schemas.InstanceConfig) -> SourceLimit {
+        let filter = config.enforcement?.sourceFilter
+        return SourceLimit(
+            instanceID: config.instanceId, isOn: filter != nil, types: filter?.types ?? [], sources: filter?.sources ?? [],
+            strictTypes: config.enforcement?.strictMode?.types,
+            allowlist: config.enforcement?.sourceAllowlist.map { ($0.types, $0.sources) })
     }
 
-    func enforcement() async throws(OwnerFailure) -> Enforcement {
-        try await run { client in Self.enforcement(try await client.getConfig().ok.body.json) }
+    func sourceLimit() async throws(OwnerFailure) -> SourceLimit {
+        try await run { client in Self.limit(try await client.getConfig().ok.body.json) }
     }
 
-    func setEnforcement(_ enforcement: Enforcement) async throws(OwnerFailure) -> Enforcement {
+    func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit {
         try await run(plainConflict: Self.configConflict) { client in
+            // Sending the enforcement replaces all three levers, so the other two go back as they were read.
+            var levers = Components.Schemas.MarfaInlineaeb0b69539bcab54()
+            levers.strictMode = limit.strictTypes.map { .init(types: $0) }
+            levers.sourceAllowlist = limit.allowlist.map { .init(types: $0.types, sources: $0.sources) }
+            levers.sourceFilter = filter.map { .init(types: $0.types, sources: $0.sources) }
             var body = Operations.UpdateConfig.Input.Body.JsonPayload()
-            body.enforcement = Self.enforcementBody(enforcement)
-            return Self.enforcement(
-                try await client.updateConfig(headers: .init(xMarfaInstanceId: enforcement.instanceID), body: .json(body)).ok.body.json)
+            let empty = levers.strictMode == nil && levers.sourceAllowlist == nil && levers.sourceFilter == nil
+            body.enforcement = empty ? .null : .value(levers)
+            return Self.limit(
+                try await client.updateConfig(headers: .init(xMarfaInstanceId: limit.instanceID), body: .json(body)).ok.body.json)
         }
-    }
-
-    /// All three levers, since the server replaces them together; with none, the enforcement is removed.
-    static func enforcementBody(_ enforcement: Enforcement) -> Components.Schemas.MarfaNullableMarfaInlineaeb0b69539bcab54 {
-        var levers = Components.Schemas.MarfaInlineaeb0b69539bcab54()
-        levers.strictMode = enforcement.strictTypes.map { .init(types: $0) }
-        levers.sourceAllowlist = enforcement.allowlist.map { .init(types: $0.types, sources: $0.sources) }
-        levers.sourceFilter = enforcement.filter.map { .init(types: $0.types, sources: $0.sources) }
-        let empty = levers.strictMode == nil && levers.sourceAllowlist == nil && levers.sourceFilter == nil
-        return empty ? .null : .value(levers)
     }
 }
