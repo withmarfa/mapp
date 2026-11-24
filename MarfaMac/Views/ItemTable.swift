@@ -107,7 +107,7 @@ struct ItemTable: View {
         .tableStyle(.inset)
         .onChange(of: browser.panelIsOut) { _, isOut in if isOut { hover.clear() } }
         .softSelection(rows: pages.shownIDs + collapsed.sorted(), hovers: true, inert: pages.headerPlaces(collapsed: collapsed), selection: { browser.selection })
-        .quietTableHeader(isUnderToolbar: $isUnderToolbar)
+        .quietTableHeader(isUnderToolbar: $isUnderToolbar, keepsWidths: true)
         .scrollEdgeEffectHidden(true, for: .top)
         .toolbarBand(isUnderToolbar: isUnderToolbar)
         .remembersScroll(in: browser.listMemory)
