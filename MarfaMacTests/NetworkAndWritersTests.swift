@@ -61,20 +61,24 @@ import Testing
         #expect(!model.hasEdits)
     }
 
-    @Test func limitSourcesChangedElsewhereIsToldAndNotWrittenOver() async {
+    @Test func anotherLeverChangedElsewhereIsSentAsItNowIsAndNotWrittenOver() async {
         let bench = OwnerBench(grants: [.configManage])
         bench.calls.state.withLock { [read] in $0.sourceLimit = read }
         let model = model(bench)
         await model.load()
         model.checkedSources = ["rss", "readwise"]
-        // Another app changes the read rule after the page read the levers.
-        bench.calls.state.withLock { $0.sourceLimit.sources = ["readwise", "rss"] }
+        // Another app changes Limit Sources and a type's Strict switch after the page read the levers.
+        bench.calls.state.withLock {
+            $0.sourceLimit.sources = ["readwise", "rss"]
+            $0.sourceLimit.strictTypes = ["core.task", "user.job"]
+        }
         await model.save()
 
-        #expect(bench.calls.state.withLock { $0.allowlistsSent.isEmpty && $0.limitsSent.isEmpty })
-        #expect(bench.calls.state.withLock { $0.sourceLimit.sources } == ["readwise", "rss"])
-        #expect(model.line?.contains("Another source rule was changed somewhere else") == true)
-        #expect(model.checkedSources == ["rss", "readwise"])
+        #expect(bench.calls.state.withLock { $0.allowlistsSent } == [SourceRuleValue(types: ["core.note"], sources: ["readwise", "rss"])])
+        let held = bench.calls.state.withLock { $0.sourceLimit }
+        #expect(held.value(of: .filter) == SourceRuleValue(types: ["core.highlight"], sources: ["readwise", "rss"]))
+        #expect(held.strictTypes == ["core.task", "user.job"])
+        #expect(model.line == nil)
     }
 
     @Test func theAllowListChangedElsewhereIsToldByName() async {

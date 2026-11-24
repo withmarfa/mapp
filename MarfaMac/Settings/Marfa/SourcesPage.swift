@@ -241,10 +241,12 @@ private struct SourceRulePage: View {
                     Text(verbatim: line).settingsFont(.line).foregroundStyle(SettingsTokens.errorRed)
                         .fixedSize(horizontal: false, vertical: true).padding(.horizontal, SettingsTokens.Metric.inset)
                 }
-                SettingsBar {
-                    if model.isSaving { ProgressView().controlSize(.small) }
-                    SettingsButton("Revert") { model.revert() }.disabled(!model.hasEdits || model.isSaving)
-                    SettingsButton("Save") { Task { await model.save() } }.disabled(!model.canSave).accessibilityIdentifier(words.id + "Save")
+                if model.hasEdits || model.isSaving {
+                    SettingsBar {
+                        if model.isSaving { ProgressView().controlSize(.small) }
+                        SettingsButton("Revert") { model.revert() }.disabled(!model.hasEdits || model.isSaving)
+                        SettingsButton("Save") { Task { await model.save() } }.disabled(!model.canSave).accessibilityIdentifier(words.id + "Save")
+                    }
                 }
                 if model.isOn {
                     SettingsSection("Turn Off") {

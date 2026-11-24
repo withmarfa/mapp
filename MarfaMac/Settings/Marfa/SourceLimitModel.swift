@@ -34,8 +34,8 @@ extension SourceLimit {
 
 /// A source rule's page: Limit Sources, for the types checked every app and key reads only items from the sources checked, in
 /// lists, search, exports and webhooks; Who May Write, for exactly the types checked every app and key adds items only under
-/// the sources checked. Each is written whole with the other levers as they were read, so a change made elsewhere before the
-/// write is told and not written over. Another Marfa answering at the address is told in the settings page's words and the
+/// the sources checked. Each is written whole after a fresh read: a change made elsewhere to the rule before the write is told and
+/// not written over, and the other levers are sent as that read found them. Another Marfa answering at the address is told in the settings page's words and the
 /// draft starts again from it, so what was chosen for one Marfa is never written to another. Turning a rule off removes it.
 @Observable @MainActor final class SourceLimitModel: OwnerDraftHolding {
     struct Choice: Identifiable, Hashable {
@@ -142,16 +142,17 @@ extension SourceLimit {
         line = nil
         defer { isSaving = false }
         do {
-            // The server guards only which instance is written, not the levers, so what was read is read again just before: a
-            // lever changed elsewhere since is told, not written over.
+            // The server guards only which instance is written, not the levers, so they are read again just before: this rule
+            // changed elsewhere since is told, not written over, and the other levers go back as they are now, as a type's Strict
+            // switch sends these rules back.
             let current = try await context.calls.sourceLimit()
             if let was = limit.instanceID, let now = current.instanceID, was != now {
                 await anotherMarfa()
                 return
             }
-            guard current == limit else {
+            guard current.value(of: rule) == limit.value(of: rule) else {
                 self.limit = current
-                line = changedElsewhere(own: current.value(of: rule) != limit.value(of: rule))
+                line = changedElsewhere
                 return
             }
             let written = try await context.calls.setSourceRule(rule, of: current, to: value)
@@ -163,11 +164,9 @@ extension SourceLimit {
         }
     }
 
-    /// What is told when the levers were found changed since they were read: this rule, or another written with it.
-    private func changedElsewhere(own: Bool) -> String {
-        own
-            ? String(localized: "\(rule.title) was changed somewhere else. Nothing was sent. Check what you chose, then save again.")
-            : String(localized: "Another source rule was changed somewhere else. Nothing was sent. Check what you chose, then save again.")
+    /// What is told when the rule was found changed since it was read.
+    private var changedElsewhere: String {
+        String(localized: "\(rule.title) was changed somewhere else. Nothing was sent. Check what you chose, then save again.")
     }
 
     /// What was typed stays; the page says why, and where the limit changed elsewhere it is read again.
@@ -176,7 +175,7 @@ extension SourceLimit {
             await anotherMarfa()
             return
         }
-        line = failure == .conflict ? changedElsewhere(own: true) : OwnerWording.line(failure)
+        line = failure == .conflict ? changedElsewhere : OwnerWording.line(failure)
         await context.learn(from: failure)
         if failure == .conflict, let read = try? await context.calls.sourceLimit() { limit = read }
     }

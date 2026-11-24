@@ -505,8 +505,12 @@ import Testing
         await model.load()
         model.types = ["core.note"]
         model.checkedSources = ["rss"]
-        // Another device changed the limit after it was read.
-        bench.calls.state.withLock { $0.sourceLimit.types = ["core.highlight"] }
+        // Another device set the limit after it was read.
+        bench.calls.state.withLock {
+            $0.sourceLimit.isOn = true
+            $0.sourceLimit.types = ["core.highlight"]
+            $0.sourceLimit.sources = ["readwise"]
+        }
         await model.save()
         #expect(model.line?.contains("changed somewhere else") == true)
         #expect(model.types == ["core.note"])

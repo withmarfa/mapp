@@ -142,10 +142,10 @@ struct AddressSheet: View {
                         title: "Address", text: $model.input, prompt: "https://", isError: model.inputError != nil, width: nil,
                         onSubmit: { Task { await model.confirm() } })
                 }
-                if model.sheet == .changeSignIn, let plan = model.currentPlan, !plan.consequences.isEmpty {
+                if model.sheet == .changeSignIn, let plan = model.currentPlan {
                     SettingsSection("What Happens") {
-                        ForEach(plan.consequences, id: \.code) { consequence in
-                            SettingsRow(verbatim: Self.title(of: consequence), line: consequence.sentence, lead: .symbol(Self.symbol(consequence.code)), lines: nil)
+                        ForEach(Self.happenings(plan.consequences)) { happening in
+                            SettingsRow(verbatim: happening.title, line: happening.line, lead: .symbol(happening.symbol), lines: nil)
                         }
                     }
                 }
@@ -174,21 +174,43 @@ struct AddressSheet: View {
         }
     }
 
-    static func title(of consequence: AddressPlan.Consequence) -> String {
-        switch consequence.code {
-        case "browser_sessions_end": String(localized: "Every browser signs out")
-        case "passkeys_unusable": String(localized: "Passkeys stop working")
-        case "apps_sign_in_again": String(localized: "Every app signs out")
-        case "address_removed": String(localized: "An address is removed")
-        default: consequence.sentence
-        }
+    /// One row of What Happens.
+    struct Happening: Identifiable {
+        let id: String
+        let title: String
+        let line: String?
+        let symbol: String
     }
 
-    static func symbol(_ code: String) -> String {
-        switch code {
-        case "browser_sessions_end", "apps_sign_in_again": "rectangle.portrait.and.arrow.right"
-        case "passkeys_unusable": "person.badge.key"
-        default: "link"
+    /// What moving the sign-in address does, in the app's words: browsers and apps signing out as one row, passkeys, any
+    /// consequence the app has no words for in the server's, and keys, which keep working whatever the server counts.
+    static func happenings(_ consequences: [AddressPlan.Consequence]) -> [Happening] {
+        let codes = Set(consequences.map(\.code))
+        var rows: [Happening] = []
+        let signOut: String? =
+            switch (codes.contains("browser_sessions_end"), codes.contains("apps_sign_in_again")) {
+            case (true, true): String(localized: "Every browser and app signs out")
+            case (true, false): String(localized: "Every browser signs out")
+            case (false, true): String(localized: "Every app signs out")
+            case (false, false): nil
+            }
+        if let signOut {
+            rows.append(Happening(
+                id: "sign_out", title: signOut, line: String(localized: "Each signs in again at the new address."),
+                symbol: "rectangle.portrait.and.arrow.right"))
         }
+        if codes.contains("passkeys_unusable") {
+            rows.append(Happening(
+                id: "passkeys_unusable", title: String(localized: "Passkeys stop working"),
+                line: String(localized: "A passkey works only where it was added. Add them again."), symbol: "person.badge.key"))
+        }
+        let worded: Set<String> = ["browser_sessions_end", "apps_sign_in_again", "passkeys_unusable"]
+        for consequence in consequences where !worded.contains(consequence.code) {
+            rows.append(Happening(id: consequence.code, title: consequence.sentence, line: nil, symbol: "link"))
+        }
+        rows.append(Happening(
+            id: "keys", title: String(localized: "Keys keep working"), line: String(localized: "Scripts change the address they call."),
+            symbol: "key"))
+        return rows
     }
 }
