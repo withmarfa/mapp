@@ -13,7 +13,7 @@ Windows, panes, toolbars and commands. Settings is a window of its own, in `Marf
 
 - Every toolbar action and every control in the window's corner (`WindowCorner`, [views-and-lists](../../docs/views-and-lists.md#the-bottom-right-corner)) is also a menu command, since a toolbar can be hidden.
 - A menu command that can have a shortcut is in the catalogue (`ShortcutCatalogue.swift`) and binds its key with `.shortcut(_:_:)` from `ShortcutBindings`, never `.keyboardShortcut` with a literal key, so the person's choice in Settings > Keyboard drives the menu, and the palette prints it with `ShortcutBindings.display`. The toolbar's copy of a command binds none ([keyboard shortcuts](../../docs/keyboard-shortcuts.md)).
-- The command palette (`CommandPalette.swift`) builds its own list, so add a new command there too.
+- The command palette (`CommandPalette+Commands.swift`) builds its own list, so add a new command there too.
 - With the gallery or table showing, the editor stays mounted but hidden. Offer an editor command in the palette only when `hasVisibleEditor`.
 
 ## Toolbars

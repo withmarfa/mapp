@@ -38,7 +38,7 @@ final class ValueEditModel {
     let request: ValueEditRequest
     var query = ""
     var notice: String?
-    private var highlight: String?
+    var highlight: String?
     /// Whether the highlighted row was reached with the keyboard, which the list then scrolls to.
     private(set) var viaKeyboard = false
     /// The room the panel has, which a list taller than it scrolls within.
@@ -58,17 +58,17 @@ final class ValueEditModel {
     @ObservationIgnored private var rowsCache: (key: RowsKey, rows: [ValueListRow])?
     /// How many times the rows were built, so a test can tell a cached read from a rebuild.
     @ObservationIgnored private(set) var rowsBuilt = 0
-    @ObservationIgnored private let pool: [PeopleSuggestions.Person]
+    @ObservationIgnored let pool: [PeopleSuggestions.Person]
     @ObservationIgnored private var typedAhead = (text: "", at: Date.distantPast)
-    @ObservationIgnored private let wordPool: [String]
+    @ObservationIgnored let wordPool: [String]
     /// What is typed into a text or a number, with the value it began from, so a change made elsewhere meanwhile is
     /// never written over.
     @ObservationIgnored let draft = ItemPropertyDraft()
     /// Whether the value changed under what was typed, which the person then settles.
-    private(set) var hasConflict = false
+    var hasConflict = false
     /// A change to the parent that has not been answered yet.
-    private(set) var isSaving = false
-    @ObservationIgnored private var isFinished = false
+    var isSaving = false
+    @ObservationIgnored private(set) var isFinished = false
     /// The Location panel's own state, for a request of that kind.
     @ObservationIgnored private(set) var location: LocationPanelModel?
 
@@ -96,8 +96,6 @@ final class ValueEditModel {
         }
     }
 
-    private static func text(of value: PropertyValue?) -> String { value.map(ItemValueText.editing) ?? "" }
-
     var kind: ValueEditKind { request.kind }
 
     /// The type whose words a status panel edits: the item's own, since a status panel is for one item.
@@ -111,7 +109,7 @@ final class ValueEditModel {
         close()
         ValueEditPresenter.shared.editType?(type)
     }
-    private var library: any ItemLibrary { request.library }
+    var library: any ItemLibrary { request.library }
 
     // MARK: Item
 
@@ -190,22 +188,6 @@ final class ValueEditModel {
         return kind == .tags ? item.canEditTags : item.isEditable
     }
 
-    /// What the field in a text or a number panel holds, as the person types it.
-    var typed: String {
-        get { draft.text }
-        set {
-            guard newValue != draft.text else { return }
-            if !draft.isDirty { draft.base = currentText }
-            draft.text = newValue
-            draft.isDirty = true
-            draft.rejected = false
-            hasConflict = false
-            notice = nil
-        }
-    }
-
-    private var currentText: String { Self.text(of: value) }
-
     /// The tags or the words the panel holds, which its search field shows as chips.
     var heldTokens: [String] {
         switch kind {
@@ -218,17 +200,6 @@ final class ValueEditModel {
         case .words: return heldWords
         default: return []
         }
-    }
-
-    private var heldWords: [String] { ListEntries.entries(of: value).compactMap(\.string) }
-
-    /// The parent the item has now, if any.
-    private var parentTarget: ItemRelationshipTarget? {
-        request.item.flatMap { library.relationships(for: $0).first { $0.field == PagePlacement.parent }?.targets.first }
-    }
-
-    private var isDate: Bool {
-        if case .date = kind { true } else { false }
     }
 
     var hasSearch: Bool {
@@ -337,119 +308,8 @@ final class ValueEditModel {
 
     static let typePrefix = "type:"
 
-    var quickDates: [QuickDates.Entry] { QuickDates.entries(now: library.now(), calendar: request.calendar) }
-
-    /// The quick dates above the calendar, then Not Set, which the panel draws below it.
-    private var quickRows: [ValueListRow] {
-        quickDates.map {
-            ValueListRow(
-                id: "quick:" + $0.id, role: .option, title: $0.title,
-                detail: QuickDates.detail(of: $0, now: library.now(), calendar: request.calendar, locale: .current, format: .stored()), mark: .symbol($0.symbol))
-        } + [ValueListRow(id: ValueEditOptions.notSetID, role: .option, title: String(localized: "Not Set"), isCurrent: value == nil)]
-    }
-
-    private func peopleRows(_ shape: ListShape) -> [ValueListRow] {
-        let held = PeopleSuggestions.held(in: value, shape: shape)
-        let matching = PeopleSuggestions.matching(query, in: pool, excluding: held)
-        func mark(_ person: PeopleSuggestions.Person) -> ValueListRow.Mark { .person(initials: PersonInitials.of(person.name) ?? "") }
-        // Two people can share a name; their address then tells them apart.
-        let names = Dictionary(grouping: held.map(\.person) + matching, by: { $0.name.lowercased() }).mapValues(\.count)
-        func detail(_ person: PeopleSuggestions.Person) -> String? { names[person.name.lowercased(), default: 0] > 1 ? person.address : nil }
-        var rows: [ValueListRow] = []
-        if !matching.isEmpty {
-            rows += matching.prefix(30).map {
-                ValueListRow(id: "person:" + $0.identity, role: .option, title: $0.name, detail: detail($0), mark: mark($0))
-            }
-        }
-        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let known = (held.map(\.person) + pool).contains { $0.isNamed(typed) }
-        if !typed.isEmpty, !known {
-            rows.append(ValueListRow(id: "create", role: .create, title: String(localized: "Add “\(typed)”"), detail: "↩", mark: .symbol("plus")))
-        }
-        return rows
-    }
-
-    private var tagRows: [ValueListRow] {
-        let held = heldTokens
-        let matching = library.tagSuggestions(matching: query, excluding: held)
-        var rows: [ValueListRow] = []
-        if !matching.isEmpty {
-            rows += matching.prefix(30).map { ValueListRow(id: "tag:" + $0, role: .option, title: $0, mark: .tag) }
-        }
-        let typed = ItemTag.normalized(query)
-        if !typed.isEmpty, !held.contains(typed), !library.knownTags.contains(typed) {
-            rows.append(ValueListRow(id: "create", role: .create, title: String(localized: "Create “\(typed)”"), detail: "↩", mark: .symbol("plus")))
-        }
-        return rows
-    }
-
-    /// The collections every item the panel is for is in, which it shows as chips.
-    private var heldCollections: [Item] {
-        let members = library.collectionMembers(request.targets).compactMap(library.item)
-        guard let first = members.first else { return [] }
-        let common = members.dropFirst().reduce(Set(first.collectionIDs)) { $0.intersection($1.collectionIDs) }
-        return library.collections.filter { common.contains($0.id) }
-    }
-
-    static let collectionPrefix = "collection:"
-
-    private var collectionRows: [ValueListRow] {
-        let held = Set(heldCollections.map(\.id))
-        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return library.collections
-            .filter { !held.contains($0.id) && (typed.isEmpty || $0.displayTitle.localizedStandardContains(typed)) }
-            .prefix(Self.parentLimit)
-            .map {
-                ValueListRow(
-                    id: Self.collectionPrefix + $0.id.rawValue, role: .option, title: $0.displayTitle,
-                    mark: .type(icon: library.catalogue.icon(for: $0.type)))
-            }
-    }
-
-    private var wordRows: [ValueListRow] {
-        let held = Set(heldWords.map { $0.lowercased() })
-        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matching = wordPool.filter { word in
-            !held.contains(word.lowercased()) && (typed.isEmpty || word.localizedStandardContains(typed))
-        }
-        var rows: [ValueListRow] = []
-        if !matching.isEmpty {
-            rows += matching.prefix(30).map { ValueListRow(id: "word:" + $0, role: .option, title: $0, mark: .tag) }
-        }
-        let known = held.contains(typed.lowercased()) || wordPool.contains { $0.lowercased() == typed.lowercased() }
-        if !typed.isEmpty, !known {
-            rows.append(ValueListRow(id: "create", role: .create, title: String(localized: "Add “\(typed)”"), detail: "↩", mark: .symbol("plus")))
-        }
-        return rows
-    }
-
-    /// The most items the parent's list shows before the person narrows it by typing.
-    static let parentLimit = 50
-    static let openID = "open"
-
-    private var parentRows: [ValueListRow] {
-        var rows: [ValueListRow] = []
-        let current = parentTarget
-        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let currentID = current?.itemID
-        let matching = parentCandidates.filter { $0.id != currentID && (typed.isEmpty || $0.title.localizedStandardContains(typed)) }
-        if !matching.isEmpty {
-            rows += matching.prefix(Self.parentLimit).map {
-                ValueListRow(id: "parent:" + $0.id.rawValue, role: .option, title: $0.displayTitle, detail: library.catalogue.label(for: $0.type))
-            }
-            if matching.count > Self.parentLimit {
-                rows.append(.header(String(localized: "Type to narrow the list"), id: "header:more"))
-            }
-        }
-        if typed.isEmpty, let current, current.itemID != nil, current.isOpenable {
-            rows.append(.separator)
-            rows.append(ValueListRow(id: Self.openID, role: .option, title: String(localized: "Open “\(current.displayTitle)”"), mark: .symbol("arrow.up.right")))
-        }
-        return rows
-    }
-
     /// The items the parent could be, read once for the panel.
-    @ObservationIgnored private lazy var parentCandidates: [Item] =
+    @ObservationIgnored private(set) lazy var parentCandidates: [Item] =
         request.item.map { library.relationshipCandidates(for: $0, field: PagePlacement.parent) } ?? []
 
     // MARK: Keyboard
@@ -571,134 +431,12 @@ final class ValueEditModel {
         }
     }
 
-    private func activatePerson(_ id: String, _ shape: ListShape) {
-        let held = PeopleSuggestions.held(in: value, shape: shape)
-        if id.hasPrefix(PeopleSuggestions.Held.prefix) {
-            // The index is the entry's place in the stored list, which holds entries `held` cannot read too.
-            guard let person = held.first(where: { $0.id == id }) else { return }
-            _ = commit(ListEntries.removing(at: person.index, from: value), failure: String(localized: "The list could not be saved."))
-            return
-        }
-        let entry: ListEntries.Entry?
-        if id == "create" {
-            entry = PeopleSuggestions.entry(from: query, shape: shape)
-        } else {
-            entry = pool.first { "person:" + $0.identity == id }?.entry
-        }
-        guard let entry else { return }
-        if let refusal = shape.refusal(of: entry) {
-            notice = refusal
-            return
-        }
-        // A tap on a row that was held by the last one is not a second person.
-        if let person = PeopleSuggestions.Person(entry: entry, shape: shape), held.contains(where: { $0.person.identity == person.identity }) {
-            query = ""
-            return
-        }
-        if let reason = limitReason(holding: ListEntries.entries(of: value).count + 1) {
-            notice = reason
-            return
-        }
-        if commit(ListEntries.appending(entry, to: value), failure: String(localized: "The list could not be saved.")) {
-            query = ""
-            highlight = nil
-        }
-    }
-
     /// Why the list cannot take `count` entries, in the person's words, or nil where its field takes them. Only a
     /// limit the catalogue declares is judged here; the server judges each entry's form (a web or mail address) and
     /// the library tells its reason when it refuses the write, as it does for any queued edit.
-    private func limitReason(holding count: Int) -> String? {
+    func limitReason(holding count: Int) -> String? {
         guard let field = kind.field, !field.holds(count), let limit = field.maxItems else { return nil }
         return String(localized: "\(field.label) can hold \(limit) at most.")
-    }
-
-    private func activateTag(_ id: String) {
-        guard !request.targets.isEmpty else { return }
-        let tag = id == "create" ? ItemTag.normalized(query) : String(id.dropFirst("tag:".count))
-        if let refusal = library.addTag(tag, to: request.targets, undoManager: request.undoManager) {
-            notice = refusal.message
-        } else {
-            notice = nil
-            query = ""
-            highlight = nil
-        }
-    }
-
-    /// Files every item the panel is for in the collection. The library tells the person which items it left alone.
-    private func activateCollection(_ id: String) {
-        guard id.hasPrefix(Self.collectionPrefix) else { return }
-        let collection = ItemID(String(id.dropFirst(Self.collectionPrefix.count)))
-        if library.addToCollection(request.targets, collection, undoManager: request.undoManager) {
-            query = ""
-            highlight = nil
-        }
-    }
-
-    private func activateWord(_ id: String) {
-        let word = id == "create" ? query.trimmingCharacters(in: .whitespacesAndNewlines) : String(id.dropFirst("word:".count))
-        guard !word.isEmpty else { return }
-        let held = heldWords
-        guard !held.contains(where: { $0.lowercased() == word.lowercased() }) else {
-            query = ""
-            return
-        }
-        if let reason = limitReason(holding: held.count + 1) {
-            notice = reason
-            return
-        }
-        if commitWords(held + [word]) {
-            query = ""
-            highlight = nil
-        }
-    }
-
-    private func activateParent(_ id: String) {
-        guard !isSaving, let item = request.item else { return }
-        let current = parentTarget
-        switch id {
-        case Self.openID:
-            if let target = current?.itemID { request.open(target) }
-            close()
-        default:
-            let target = ItemID(String(id.dropFirst("parent:".count)))
-            if target == current?.itemID { close() } else { changeParent(of: item, adding: target, removing: current?.itemID) }
-        }
-    }
-
-    /// Replaces the parent. The library judges the link, and may have to ask the server, so the panel waits without
-    /// holding anything up and says why when the change is refused. A change that is answered after the panel has
-    /// closed is told as a notice instead.
-    private func changeParent(of item: ItemID, adding: ItemID?, removing: ItemID?) {
-        isSaving = true
-        notice = nil
-        let (library, undoManager) = (library, request.undoManager)
-        let label = adding.flatMap(library.item)?.displayTitle ?? parentTarget?.displayTitle ?? ""
-        Task { [weak self] in
-            var refusal: String?
-            if let adding, case .refused(let message) = await library.relationshipVerdict(for: item, field: PagePlacement.parent, to: adding) {
-                refusal = message
-            }
-            let taken: Bool
-            if refusal == nil {
-                taken = await library.changeItemRelationship(
-                    item, field: PagePlacement.parent, adding: adding.map { [$0] } ?? [], removing: removing.map { [$0] } ?? [], undoManager: undoManager)
-            } else {
-                taken = false
-            }
-            guard let self else {
-                if !taken { library.notices.notKept(String(localized: "Parent Not Saved"), text: label, reason: refusal ?? String(localized: "The parent could not be saved.")) }
-                return
-            }
-            isSaving = false
-            if taken {
-                close()
-            } else if isFinished {
-                library.notices.notKept(String(localized: "Parent Not Saved"), text: label, reason: refusal ?? String(localized: "The parent could not be saved."))
-            } else {
-                notice = refusal ?? String(localized: "The parent could not be saved.")
-            }
-        }
     }
 
     /// What the value holds, as the chips in the search field: one for each tag, word or person, and the one value of a
@@ -789,55 +527,8 @@ final class ValueEditModel {
         }
     }
 
-    // MARK: Typed values
-
-    /// Writes what was typed, and closes on success. A refusal keeps the text and the panel and says why; a value that
-    /// changed under the text waits for the person to say which they mean.
-    func commitText(overwriting: Bool = false) {
-        guard let field = kind.field else { return }
-        guard isEditable else {
-            close()
-            return
-        }
-        switch draft.commit(as: field.kind, rule: field.numberRule, current: currentText, overwriting: overwriting) {
-        case .unchanged:
-            close()
-        case .alreadyCurrent:
-            draft.discard(toMatch: currentText)
-            close()
-        case .conflict:
-            hasConflict = true
-            notice = String(localized: "This value changed while you were editing. Your edit hasn’t been saved.")
-        case .invalid:
-            draft.rejected = true
-            notice = field.numberRule.requirement ?? String(localized: "The value isn’t a number.")
-        case .outOfRange:
-            draft.rejected = true
-            notice = field.numberRule.requirement ?? PropertyLoss.outOfRange.reason
-        case .write(let new):
-            if request.write(new) {
-                draft.isDirty = false
-                draft.base = Self.text(of: new)
-                close()
-            } else {
-                draft.rejected = true
-                notice = refusalReason(String(localized: "The value could not be saved. Your input has been kept."))
-            }
-        }
-    }
-
-    /// The person chose to keep their text over the value that changed.
-    func keepEdit() { commitText(overwriting: true) }
-
-    /// The person chose the value that changed over their text.
-    func useCurrentValue() {
-        draft.discard(toMatch: currentText)
-        hasConflict = false
-        notice = nil
-    }
-
     /// Why a write was refused: the item is gone or can no longer be edited, else `fallback`.
-    private func refusalReason(_ fallback: String) -> String {
+    func refusalReason(_ fallback: String) -> String {
         guard let id = request.item else { return fallback }
         guard let item = library.item(id) else { return String(localized: "This item is no longer available.") }
         return (kind == .tags ? item.canEditTags : item.isEditable) ? fallback : PropertyLoss.notEditable.reason
@@ -860,78 +551,13 @@ final class ValueEditModel {
             write: request.write, to: library.notices)
     }
 
-    // MARK: Dates
-
-    var storedDate: ItemDate? { value?.string.flatMap { ItemDate.parse($0) } }
-
-    /// A `datetime` field may hold a day or a moment; a `date` field never holds a time.
-    var allowsTime: Bool {
-        if case .date(let field) = kind, case .date(let includesTime) = field.kind { includesTime } else { false }
-    }
-
-    var hasTime: Bool { allowsTime && (storedDate?.hasTime ?? false) }
-
-    /// The person chose a day from the quick dates, which keeps the time the value already has.
-    func chooseDay(_ day: Date) {
-        write(hasTime ? QuickDates.moment(on: day, keepingTimeOf: storedDate?.date, calendar: request.calendar) : day, withTime: hasTime)
-    }
-
     /// What the time field is showing while the person types in it, nil while it shows the value's own time.
     var timeDraft: String?
-
-    /// The value's time as the person's locale writes it, or empty where the value holds none.
-    var timeText: String {
-        guard hasTime, let date = storedDate?.date else { return "" }
-        return DateDisplay.timeOfDay(of: date, format: .stored(), calendar: request.calendar)
-    }
-
-    /// Writes what was typed in the time field: a time sets it on the day the value holds (today where it holds none),
-    /// and nothing takes it away, leaving the day.
-    /// Ending the panel, a time that can't be read is reported where the person will see it, since the panel's own
-    /// notice goes with it.
-    func commitTime(isEnding: Bool = false) {
-        guard let draft = timeDraft else { return }
-        timeDraft = nil
-        guard allowsTime, isEditable else { return }
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.isEmpty {
-            if hasTime, let date = storedDate?.date { write(date, withTime: false) }
-            return
-        }
-        guard let time = TimeOfDay.parse(text) else {
-            if isEnding {
-                library.notices.tell(String(localized: "Time Not Saved"), String(localized: "“\(text)” isn’t a time, so the time wasn’t changed."))
-            } else {
-                notice = String(localized: "Enter a time such as 9:30.")
-            }
-            return
-        }
-        // Focus moving through the field leaves the time as it was, seconds included, and adds no undo step.
-        if text == timeText { return }
-        let day = storedDate?.date ?? library.now()
-        write(request.calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: day) ?? day, withTime: true)
-    }
-
-    private func write(_ date: Date, withTime: Bool) {
-        let text = withTime ? ItemDate.instant(date) : ItemDate.day(date, calendar: request.calendar)
-        _ = commit(.string(text), failure: String(localized: "The date couldn’t be saved."))
-    }
-
-    func clearDate() {
-        // A time typed and not yet written would otherwise set the date again as the panel closes.
-        timeDraft = nil
-        if commit(nil, failure: String(localized: "The date couldn’t be saved.")) { close() }
-    }
 
     // MARK: Writing
 
     @discardableResult
-    private func commitWords(_ words: [String]) -> Bool {
-        commit(words.isEmpty ? nil : .array(words.map { .string($0) }), failure: String(localized: "The list could not be saved."))
-    }
-
-    @discardableResult
-    private func commit(_ new: PropertyValue?, failure: String = String(localized: "The value could not be saved.")) -> Bool {
+    func commit(_ new: PropertyValue?, failure: String = String(localized: "The value could not be saved.")) -> Bool {
         guard isEditable else {
             close()
             return false

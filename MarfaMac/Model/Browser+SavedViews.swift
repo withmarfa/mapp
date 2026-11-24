@@ -4,6 +4,18 @@ import Foundation
 /// layout, columns, cards and rows from this Mac (`ViewLayouts`). What the person changes is written as they change it:
 /// to Marfa for what Marfa holds (`Browser+ViewWrites`), and to this Mac for what the Mac holds.
 extension Browser {
+    /// Whether the open place is a saved view, whose sort and group the list and the gallery take.
+    var isViewPlace: Bool {
+        if case .view = item { true } else { false }
+    }
+
+    static var initialDefaults: UserDefaults {
+        #if DEBUG
+        if TestHost.isRequested, let suite = UserDefaults(suiteName: "MarfaMac.Browser.\(UUID().uuidString)") { return suite }
+        #endif
+        return .standard
+    }
+
     /// The order, grouping and filters a view was last read with, the date its timeline showed, the types it showed as
     /// a Type filter, the version of the view they came from, which a write of them is based on, and the settings the
     /// Mac holds for it.
