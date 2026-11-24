@@ -304,14 +304,16 @@ extension TypesModel {
     func isStrict(_ id: String) -> Bool { strictTypes?.contains(id) ?? false }
 
     /// Adds the type to strict mode or takes it out, through the app's one enforcement writer, which changes only this type's
-    /// place in strict mode and sends the other levers back as the server holds them. A refusal leaves the switch as the server
-    /// holds it.
+    /// place in strict mode and sends the other levers back as the server holds them. Nothing is sent where the type's place
+    /// changed since the switch showed it. A refusal leaves the switch as the server holds it.
     func setStrict(_ isOn: Bool, of id: String) async {
         guard let type = record(id), isEditable(type), isOn != isStrict(id) else { return }
         fieldErrors[.strict] = nil
         strictTypes?.formSymmetricDifference([id])
         do throws(EnforcementSettings.Failure) {
-            let written = try await context.writeEnforcement(readFrom: strictInstance) { levers in
+            let written = try await context.writeEnforcement(
+                readFrom: strictInstance, unchangedSince: { ($0.strictTypes ?? []).contains(id) != isOn }
+            ) { levers in
                 var strict = levers.strictTypes ?? []
                 strict.removeAll { $0 == id }
                 if isOn { strict.append(id) }
@@ -323,7 +325,11 @@ extension TypesModel {
             case .owner(let failure):
                 await context.learn(from: failure)
                 fieldErrors[.strict] = OwnerWording.line(failure, on: .types)
-            case .anotherMarfa, .changedElsewhere:
+            case .changedElsewhere(let levers):
+                fieldErrors[.strict] = String(localized: "Strict was changed somewhere else. Nothing was sent.")
+                strictTypes = Set(levers.strictTypes ?? [])
+                return
+            case .anotherMarfa:
                 fieldErrors[.strict] = InstanceConfigFailure.instanceChanged.message
             }
             let shown = strictTypes

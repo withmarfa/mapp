@@ -36,7 +36,7 @@ import Marfa
 
     /// Changes one lever as the steps above say and answers the levers the server then holds.
     func write(
-        in context: OwnerContext, readFrom instanceID: String?, unchangedSince shown: (SourceLimit) -> Bool = { _ in true },
+        in context: OwnerContext, readFrom instanceID: String?, unchangedSince shown: (SourceLimit) -> Bool,
         _ change: (inout SourceLimit) -> Void
     ) async throws(Failure) -> SourceLimit {
         await begin()
@@ -74,7 +74,7 @@ import Marfa
 extension OwnerContext {
     /// Changes one enforcement lever through the app's one writer, as `EnforcementSettings` says.
     func writeEnforcement(
-        readFrom instanceID: String?, unchangedSince shown: (SourceLimit) -> Bool = { _ in true }, _ change: (inout SourceLimit) -> Void
+        readFrom instanceID: String?, unchangedSince shown: (SourceLimit) -> Bool, _ change: (inout SourceLimit) -> Void
     ) async throws(EnforcementSettings.Failure) -> SourceLimit {
         try await enforcement.write(in: self, readFrom: instanceID, unchangedSince: shown, change)
     }

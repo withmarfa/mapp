@@ -964,6 +964,20 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.strictTypes == ["user.quote", "user.rework", "user.job"])
     }
 
+    /// The switch is sent only while the type's place in strict mode is as the switch showed it.
+    @Test func aStrictSwitchChangedElsewhereIsToldAndSendsNothing() async {
+        let calls = listing()
+        let owner = FakeOwnerCalls()
+        let model = model(calls, grants: [.schemaWrite, .configManage], owner: owner)
+        await model.load()
+        #expect(!model.isStrict("user.job"))
+        owner.state.withLock { $0.sourceLimit.strictTypes = ["user.job"] }
+        await model.setStrict(true, of: "user.job")
+        #expect(owner.state.withLock { $0.limitsSent.isEmpty })
+        #expect(model.fieldErrors[.strict] == "Strict was changed somewhere else. Nothing was sent.")
+        #expect(model.isStrict("user.job"))
+    }
+
     @Test func aSignInThatNoLongerHoldsConfigManageSendsNoStrictSwitch() async {
         let calls = listing()
         let owner = FakeOwnerCalls()
@@ -1198,11 +1212,11 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let context = bench.context
         let gate = bench.calls.hold("setSourceLimit")
         let strict = Task {
-            try await context.writeEnforcement(readFrom: "instance-1") { $0.strictTypes = ["user.job"] }
+            try await context.writeEnforcement(readFrom: "instance-1", unchangedSince: { _ in true }) { $0.strictTypes = ["user.job"] }
         }
         #expect(await eventually { bench.calls.calls.contains("setSourceLimit") })
         let filter = Task {
-            try await context.writeEnforcement(readFrom: "instance-1") {
+            try await context.writeEnforcement(readFrom: "instance-1", unchangedSince: { _ in true }) {
                 $0.isOn = true
                 $0.types = ["core.note"]
                 $0.sources = ["rss"]
@@ -1223,7 +1237,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let bench = OwnerBench(grants: [.configManage])
         bench.calls.state.withLock { $0.sourceLimit.instanceID = "instance-2" }
         await #expect(throws: EnforcementSettings.Failure.anotherMarfa) {
-            try await bench.context.writeEnforcement(readFrom: "instance-1") { $0.strictTypes = ["user.job"] }
+            try await bench.context.writeEnforcement(readFrom: "instance-1", unchangedSince: { _ in true }) { $0.strictTypes = ["user.job"] }
         }
         #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
     }
