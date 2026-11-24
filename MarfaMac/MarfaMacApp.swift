@@ -188,6 +188,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
         // The sample library and the tests have no use of the system's reports of this app's real use.
         if !sampled { metrics = MetricsListener() }
+        // The saved server's archive is written to the chosen folder when one is due; the sample and the tests never export.
+        if !sampled { libraries.automaticExport.start() }
         // The shortcuts that work in any app are registered once the app can act on them, and only the ones set.
         libraries.anyAppShortcuts.perform = { [libraries] command in FrontBrowser.shared.perform(command, in: libraries) }
         libraries.anyAppShortcuts.start()
@@ -228,6 +230,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if told { await Reporting.shared.flush() }
             // The pages are still up and may have reported while the reports went out: that text joins the queue too.
             if told { await libraries.current?.finish() }
+            // An automatic export still running is stopped and leaves no half file.
+            if told { await libraries.automaticExport.stop(within: .seconds(2)) }
             NSApp.reply(toApplicationShouldTerminate: told)
         }
         return .terminateLater

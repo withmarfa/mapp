@@ -9,8 +9,12 @@ import UniformTypeIdentifiers
 @MainActor
 enum LibraryDescription {
     static func name(_ libraries: Libraries) -> String {
-        guard let connection = libraries.host.configuredConnection else { return String(localized: "Marfa") }
-        if let name = libraries.host.instanceName(for: connection) { return name }
+        name(of: libraries.host)
+    }
+
+    static func name(of host: MarfaHost) -> String {
+        guard let connection = host.configuredConnection else { return String(localized: "Marfa") }
+        if let name = host.instanceName(for: connection) { return name }
         return connection.address.host() ?? connection.address.absoluteString
     }
 }

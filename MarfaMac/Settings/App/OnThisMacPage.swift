@@ -1,9 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The On This Mac page: the copy of the library the app keeps on this Mac, and what can be done to it. The space it uses, the
-/// files opened and attachments kept offline, Export Everything to a folder, and Download Everything Again. What each file
-/// step does is `DownloadedFiles`', unchanged; a hydration keeps every change not yet sent (`MarfaSync.rehydrate`).
+/// Shows the space used by the local copy and its offline files, with controls for exports and downloads.
 struct OnThisMacPage: View {
     let openConnection: () -> Void
     @Environment(Libraries.self) private var libraries
@@ -16,6 +14,8 @@ struct OnThisMacPage: View {
     @State private var isExporting = false
     @State private var exportFailure: String?
     @State private var exported: String?
+    @State private var isChoosingExportFolder = false
+    @State private var automaticFailure: String?
     @State private var isConfirmingDownload = false
 
     private static let sizes: [UInt64] = [1, 5, 10, 25, 100].map { $0 * 1_000_000_000 }
@@ -154,46 +154,149 @@ struct OnThisMacPage: View {
             ) {
                 HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if isExporting { ProgressView().controlSize(.small) }
-                    SettingsButton("Export…") { chooseFolder(for: connection) }
-                        .disabled(isExporting)
+                    SettingsButton("Export…") { exportEverything(connection: connection) }
+                        .disabled(isExporting || isChoosingExportFolder)
                         .accessibilityIdentifier("ExportEverything")
                 }
             }
             .accessibilityIdentifier("ExportRow")
+            automaticRows
         }
     }
 
-    private func chooseFolder(for connection: MarfaConnection) {
+    // MARK: Export Automatically
+
+    @ViewBuilder private var automaticRows: some View {
+        let automatic = libraries.automaticExport
+        let instance = automatic.openInstance
+        let plan = automatic.current
+        let schedule = plan?.schedule ?? .never
+        SettingsRow(title: Text("Export Automatically"), line: Text(verbatim: automaticLine(plan)), error: automaticFailure) {
+            SettingsPopUp(
+                title: "Export Automatically",
+                selection: Binding(get: { schedule }, set: { new in if let instance { choose(new, plan: plan, for: instance) } })
+            ) {
+                Text("Never").tag(ExportSchedule.never)
+                Text("Every Day").tag(ExportSchedule.daily)
+                Text("Every Week").tag(ExportSchedule.weekly)
+            }
+            // A plan belongs to a Marfa by its instance id, so it can be set once the copy knows it.
+            .disabled(instance == nil)
+            .accessibilityIdentifier("ExportAutomatically")
+        }
+        .accessibilityIdentifier("ExportAutomaticallyRow")
+        .task(id: host.configuredConnection) { await automatic.learn() }
+        if schedule != .never, let folder = plan?.folder, let instance {
+            SettingsRow(title: Text("Export Folder"), line: Text(verbatim: (folder.path as NSString).abbreviatingWithTildeInPath)) {
+                SettingsButton("Choose…") {
+                    chooseAutomaticFolder { chosen in
+                        automatic.set(schedule, folder: chosen, for: instance)
+                        automatic.checkSoon()
+                    }
+                }
+                .accessibilityIdentifier("ExportFolder")
+            }
+        }
+    }
+
+    private func automaticLine(_ plan: ExportPlan?) -> String {
+        guard let plan, plan.schedule != .never, let folder = plan.folder else { return String(localized: "To a folder you choose.") }
+        let to = String(localized: "To “\(folder.url.lastPathComponent)”.")
+        guard let last = plan.last else { return to }
+        return to + " " + String(localized: "Last saved \(last.formatted(.dateTime.day().month().year())).")
+    }
+
+    /// A schedule is turned on only with a folder, asked for the first time for this Marfa; a cancelled or refused chooser
+    /// leaves it as it was, and a folder chosen after another Marfa opened is not kept.
+    private func choose(_ new: ExportSchedule, plan: ExportPlan?, for instance: String) {
+        let automatic = libraries.automaticExport
+        guard new != .never, plan?.folder == nil else {
+            automaticFailure = nil
+            automatic.set(new, for: instance)
+            automatic.checkSoon()
+            return
+        }
+        chooseAutomaticFolder { folder in
+            automatic.set(new, folder: folder, for: instance)
+            automatic.checkSoon()
+        }
+    }
+
+    /// Asks for the folder, checks it, and calls `done` only with one chosen that an export can write to; a refused folder
+    /// is told on the row.
+    private func chooseAutomaticFolder(then done: @escaping (ExportFolder) -> Void) {
+        Task {
+            guard let folder = await Self.chooseFolder(
+                prompt: String(localized: "Choose"), message: String(localized: "Choose where the app saves the archive."))
+            else { return }
+            switch await LibraryExport.choose(folder) {
+            case .success(let chosen):
+                automaticFailure = nil
+                done(chosen)
+            case .failure(let failure):
+                automaticFailure = failure.message
+            }
+        }
+    }
+
+    private static func chooseFolder(prompt: String, message: String) async -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.prompt = String(localized: "Export")
-        panel.message = String(localized: "Choose where to save the archive.")
-        panel.begin { response in
-            guard response == .OK, let folder = panel.url else { return }
-            run(exportTo: folder, connection: connection)
+        panel.prompt = prompt
+        panel.message = message
+        return await withCheckedContinuation { continuation in
+            panel.begin { response in continuation.resume(returning: response == .OK ? panel.url : nil) }
         }
     }
 
-    private func run(exportTo folder: URL, connection: MarfaConnection) {
-        guard !isExporting else { return }
-        isExporting = true
+    private func exportEverything(connection: MarfaConnection) {
+        guard !isExporting, !isChoosingExportFolder else { return }
+        isChoosingExportFolder = true
         exportFailure = nil
         exported = nil
         let source = MarfaArchiveSource(calls: MarfaServerCalls(connection: connection, signIns: host.signIns))
         let server = name
+        let automatic = libraries.automaticExport
         Task {
-            defer { isExporting = false }
-            do {
-                let file = try await LibraryExport.export(from: source, serverName: server, to: folder)
-                exported = String(localized: "Saved as “\(file.lastPathComponent)”.")
-            } catch let failure as LibraryExport.Failure {
-                exportFailure = failure.message
-            } catch {
-                exportFailure = String(localized: "Couldn’t export.")
+            defer {
+                isChoosingExportFolder = false
+                isExporting = false
             }
+            let result = await Self.exportEverything(
+                from: source, serverName: server, instance: { await automatic.learn() },
+                folder: {
+                    let folder = await Self.chooseFolder(
+                        prompt: String(localized: "Export"), message: String(localized: "Choose where to save the archive."))
+                    isExporting = folder != nil
+                    return folder
+                })
+            switch result {
+            case .success(let line): exported = line
+            case .failure(let failure): exportFailure = failure.message
+            case nil: break
+            }
+        }
+    }
+
+    /// Exports the archive of the Marfa the copy says it is when Export… is pressed, `instance`, asked before the
+    /// `folder` chooser opens, so a Marfa opened or answering at the address afterwards is refused. Answers the line to
+    /// show, or nil where no folder was chosen. Where the copy can't yet say which Marfa it is, it refuses before asking.
+    static func exportEverything(
+        from source: any ArchiveSource, serverName: String, instance: () async -> String?, folder: () async -> URL?
+    ) async -> Result<String, LibraryExport.Failure>? {
+        guard let instance = await instance() else {
+            return .failure(.init(message: String(localized: "Couldn’t export. The app can’t yet tell which Marfa \(serverName) is.")))
+        }
+        guard let folder = await folder() else { return nil }
+        do {
+            let export = try await LibraryExport.export(from: source, serverName: serverName, to: folder, instance: instance)
+            let saved = String(localized: "Saved as “\(export.file.lastPathComponent)”.")
+            return .success(LibraryExport.lacking(export, serverName: serverName).map { "\(saved) \($0)" } ?? saved)
+        } catch {
+            return .failure(error)
         }
     }
 
