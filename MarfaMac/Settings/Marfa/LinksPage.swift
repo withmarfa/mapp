@@ -154,24 +154,28 @@ struct NewLinkTypeSheet: View {
 
     var body: some View {
         @Bindable var model = model
-        let refusal = model.makeNeedsPermission ? nil : model.makeFailureLine
+        let refusal = model.makeNeedsPermission || model.makeFailedUnsent ? nil : model.makeFailureLine
         return SettingsSheet(title: Text("New Link Type"), line: Text("A way one item can point to another, which every app can use.")) {
             VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
-                SettingsSheetField(label: "Name", error: refusal) {
-                    SettingsField(
-                        title: "Name", text: $model.name, prompt: String(localized: "Supplied By"), isError: refusal != nil, width: nil,
-                        onSubmit: { Task { await model.make() } })
-                }
-                SettingsSheetField(label: "Name at the Other End") {
-                    SettingsField(title: "Name at the Other End", text: $model.otherEndName, prompt: String(localized: "Optional"), width: nil)
-                }
-                SettingsSheetField(label: "From") { typePopUp("From", selection: $model.fromType) }
-                SettingsSheetField(label: "To") { typePopUp("To", selection: $model.toType) }
-                SettingsSheetField(label: "How Many") {
-                    SettingsPopUp(title: "How Many", selection: $model.cardinality) {
-                        ForEach(LinkCardinality.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
+                // What was sent stays as typed until the server answers.
+                Group {
+                    SettingsSheetField(label: "Name", error: refusal) {
+                        SettingsField(
+                            title: "Name", text: $model.name, prompt: String(localized: "Supplied By"), isError: refusal != nil, width: nil,
+                            onSubmit: { Task { await model.make() } })
+                    }
+                    SettingsSheetField(label: "Name at the Other End") {
+                        SettingsField(title: "Name at the Other End", text: $model.otherEndName, prompt: String(localized: "Optional"), width: nil)
+                    }
+                    SettingsSheetField(label: "From") { typePopUp("From", selection: $model.fromType) }
+                    SettingsSheetField(label: "To") { typePopUp("To", selection: $model.toType) }
+                    SettingsSheetField(label: "How Many") {
+                        SettingsPopUp(title: "How Many", selection: $model.cardinality) {
+                            ForEach(LinkCardinality.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
+                        }
                     }
                 }
+                .disabled(model.isWorking)
                 if model.makeNeedsPermission, let line = model.makeFailureLine {
                     SettingsSection(name: nil) {
                         SettingsProblemRow(
@@ -180,6 +184,13 @@ struct NewLinkTypeSheet: View {
                                 SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { Task { await model.allowMore() } }
                             ])
                             .disabled(host.isAllowingMore)
+                    }
+                } else if model.makeFailedUnsent, let line = model.makeFailureLine {
+                    SettingsSection(name: nil) {
+                        SettingsProblemRow(
+                            title: Text("Not Made"), line: Text(verbatim: line),
+                            actions: [SettingsProblemAction("Try Again") { Task { await model.make() } }])
+                            .disabled(model.isWorking)
                     }
                 }
             }

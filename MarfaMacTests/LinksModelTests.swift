@@ -215,6 +215,25 @@ import Testing
         #expect(model.takeDrafts().isEmpty, "a choice of type alone is nothing typed")
     }
 
+    /// An ID chosen from a list that couldn't be read again may be one another app took since.
+    @Test func nothingIsRegisteredWhenTheListCannotBeReadAgain() async {
+        let calls = listing()
+        let model = await loaded(calls)
+        model.beginNew()
+        model.name = "Ordered From"
+        calls.fail("linkTypes", with: .unreachable)
+        await model.make()
+        #expect(calls.state.withLock { $0.linkTypesMade }.isEmpty)
+        #expect(model.isMaking && model.makeFailedUnsent && !model.makeNeedsPermission)
+        #expect(model.name == "Ordered From")
+        #expect(model.makeFailureLine?.hasPrefix("The link types couldn’t be read again") == true)
+
+        calls.fail("linkTypes", with: nil)
+        await model.make()
+        #expect(calls.state.withLock { $0.linkTypesMade.map(\.id) } == ["user.ordered_from"])
+        #expect(!model.isMaking)
+    }
+
     @Test func aNewIDAvoidsEveryNameHeldAndFitsTheServersLimit() async {
         let calls = listing()
         calls.state.withLock {

@@ -190,10 +190,20 @@ import Observation
     func make() async {
         guard canMake else { return }
         isWorking = true
-        makeFailure = nil
+        clearMakeFailure()
         let typed = typedDraft()
-        // The ID is made against the list as the server holds it now; a list that can't be read leaves the last one.
-        await reread()
+        // The ID is made against the list as the server holds it now; a stale list could name an ID another app took.
+        if let failure = await reread() {
+            isWorking = false
+            if closedWhileWorking {
+                closedWhileWorking = false
+                if let typed { context.lateDraft(typed) }
+            } else {
+                makeFailure = failure
+                makeFailedUnsent = true
+            }
+            return
+        }
         let new = NewLinkType(
             id: identifier(forNamed: trimmedName), label: trimmedName, reverseLabel: trimmedOtherEnd.isEmpty ? nil : trimmedOtherEnd,
             cardinality: cardinality, fromTypes: [fromType ?? "*"], toTypes: [toType ?? "*"])
