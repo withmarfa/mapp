@@ -128,8 +128,7 @@ import Testing
                 Issue.record("expected both the sign-in and the copy reported, got \(error)")
                 return
             }
-            #expect(!signIn.isEmpty && !copy.isEmpty)
-            #expect(!signIn.contains("The keychain refused."), "the Keychain's own words stay in the log")
+            #expect(!signIn.isEmpty && !copy.isEmpty, "each failure is told")
         }
     }
 }

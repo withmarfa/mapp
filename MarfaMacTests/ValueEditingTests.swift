@@ -6,6 +6,7 @@ import Testing
 
 /// What a value panel lists, where it opens, and that one is open at a time.
 @MainActor
+@Suite(.hangLimit)
 struct ValueEditingTests {
     private static let task = TypeID("core.task")
     private static let words: [StatusWord] = [

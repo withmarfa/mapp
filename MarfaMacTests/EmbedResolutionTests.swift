@@ -58,9 +58,9 @@ import Testing
         library.unreadSaves = []
 
         library.bindEmbed("![[Dr. Smith]]", in: note, bound: false)
-        let started = ContinuousClock.now
-        #expect(await open("![[Dr. Smith]]", waiting: .seconds(5)).file == nil)
-        #expect(ContinuousClock.now - started < .seconds(1), "an embed the read text holds but Marfa did not bind is no file")
+        // An embed the read text holds but Marfa did not bind is no file and is not waited on. The wait is far longer than
+        // a test lasts, so one that waited would hang here and fail at the suite's limit, without a clock to bound.
+        #expect(await open("![[Dr. Smith]]", waiting: .seconds(3_600)).file == nil)
     }
 
     @Test func aFileThatCanNotBeShownSaysWhy() async throws {

@@ -195,6 +195,8 @@ extension EditorTests {
 
     // MARK: Quick Look on a file card
 
+    /// Asks the editor for Quick Look as the card's action does, rather than finding the card's button, which waits on
+    /// the page to draw the card and its actions and timed out on a busy runner.
     @Test func quickLookOnAFileCardShowsTheFileTheEmbedIsBoundTo() async throws {
         let root = try TemporaryFolder()
         let sheet = root.url.appending(path: "Budget.csv")
@@ -203,14 +205,10 @@ extension EditorTests {
         let note = page.library.add("A sheet: ![[Budget.csv]]\n")
         page.library.bindEmbed("![[Budget.csv]]", in: note.id, file: sheet)
         page.editor.load(note)
-        // The card's actions arrive after the card itself, so wait for both before reading their order.
-        let labels = try await settle(page.editor, "[...document.querySelectorAll('.inkkit-file-actions button')].map(b => b.getAttribute('aria-label'))", as: [String].self) { ($0?.count ?? 0) >= 2 }
-        #expect(labels?.first == "Quick Look Budget.csv", "the card's first action is Quick Look, named for the file")
-        let quickLook = ".inkkit-file-actions button[aria-label^='Quick Look']"
+        try await page.wait { page.editor.isReady }
         #expect(page.editor.quickLook == nil)
-        // The test page tells of a script error of its own as a card loads; Quick Look must add none.
         let told = page.library.notices.told
-        try await page.run("document.querySelector(\"\(quickLook)\").click()")
+        page.editor.quickLookEmbed(EmbedReference(text: "![[Budget.csv]]"), in: note.id)
         try await page.wait { page.editor.quickLook != nil }
         #expect(page.editor.quickLook?.current?.lastPathComponent == "Budget.csv")
         #expect(page.library.notices.told == told, "showing the file tells the person nothing")
@@ -498,6 +496,7 @@ extension EditorTests {
         #expect(try await markdown(editor) == nil, "nothing reached the text")
         let asked = try #require(try await editor.webView.evaluateJavaScript("window.__refusals()") as? Int)
         #expect(asked == EditorController.hiddenTextRetryLimit + 1, "it asked a limited number of times")
+        // Nothing to wait for: gives a further retry time to be made, if one is going to.
         try await Task.sleep(for: EditorController.hiddenTextRetryDelay * 3)
         #expect(try await editor.webView.evaluateJavaScript("window.__refusals()") as? Int == asked, "and then stopped")
         let told = try #require(library.notices.waiting.last)

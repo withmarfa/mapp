@@ -9,7 +9,7 @@ import Testing
 /// How the calls to the server itself are made and how their failures are told. None reaches a server: the package's
 /// `Server` takes no transport that a test can replace, so what goes over the wire (the `PATCH`, the instance header,
 /// the paging query) is the package's own tests' to show, and the live plan runs these calls against a test instance.
-@Suite struct MarfaServerCallsTests {
+@Suite(.hangLimit) struct MarfaServerCallsTests {
     private func calls(_ keys: any SignIns) throws -> MarfaServerCalls {
         MarfaServerCalls(connection: try MarfaConnection(address: "https://marfa.test"), signIns: keys)
     }

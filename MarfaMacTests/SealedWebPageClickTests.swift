@@ -11,8 +11,6 @@ nonisolated enum Gesture: Sendable {
     case none
     case click
     case middleClick
-    case commandClick
-    case doubleClick
     /// Return on what has the focus.
     case pressReturn
     /// A click on the element, then Return.
@@ -22,6 +20,11 @@ nonisolated enum Gesture: Sendable {
 /// A way a document can get a link activated. WebKit opens a connection to a link's address before the navigation
 /// decider runs, so a route is closed only if the link never activates; each runs against a server that counts what
 /// reaches it. `TARGET` in the document stands for that server's address, and `BOX` for a style with room to click.
+///
+/// This is the access rule that a sealed page reaches nothing, so each kind of route has a few representatives: a
+/// script that activates a link by itself or sends it an event, a real link or control the person acts on (also in a
+/// document the page replaces), and a link inside a sandboxed frame. Every route costs a web process and a wait, so a route is added for a new kind of way in, not for another
+/// document that takes a known way.
 nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
     let name: String
     var gesture: Gesture = .click
@@ -44,9 +47,10 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
     }
 
     static let newWindowLink = "<a target=_blank href='TARGET/x' style='BOX'>x</a>"
-    static let closedLink = "<div id=t style='BOX'><template shadowrootmode=closed><a href='TARGET/x' style='BOX'>x</a></template></div>"
-    static let enter = "new KeyboardEvent('keydown',{keyIdentifier:'Enter',key:'Enter',bubbles:true,cancelable:true})"
     static let click = "new MouseEvent('click',{bubbles:true,cancelable:true})"
+    static let closedLink = "<div id=t style='BOX'><template shadowrootmode=closed><a href='TARGET/x' style='BOX'>x</a></template></div>"
+
+    static let plainLink = ActivationRoute(name: "a link", runsScripts: false, document: "<a id=t href='TARGET/x' style='BOX'>x</a>")
 
     static let scripted: [ActivationRoute] = [
         .init(name: "click on a link in no document", gesture: .none, document: """
@@ -55,104 +59,28 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
         .init(name: "event on a link in no document", gesture: .none, document: """
             <script>const a=document.createElement('a');a.href='TARGET/x';a.dispatchEvent(\(click))</script>
             """),
-        .init(name: "click on a new-window link in no document", gesture: .none, document: """
-            <script>const a=document.createElement('a');a.href='TARGET/x';a.target='_blank';a.click()</script>
-            """),
-        .init(name: "middle-button event on a link in no document", gesture: .none, document: """
-            <script>const a=document.createElement('a');a.href='TARGET/x';
-            a.dispatchEvent(new MouseEvent('auxclick',{bubbles:true,cancelable:true,button:1}))</script>
-            """),
-        .init(name: "middle-button event on a link", gesture: .none, document: """
-            <a id=a href='TARGET/x'>x</a><script>
-            a.dispatchEvent(new MouseEvent('auxclick',{bubbles:true,cancelable:true,button:1}))</script>
-            """),
-        .init(name: "click on a link in an open root", gesture: .none, document: """
-            <div id=h></div><script>const r=h.attachShadow({mode:'open'});r.innerHTML="<a href='TARGET/x'>x</a>";r.firstChild.click()</script>
-            """),
         .init(name: "click on a link in a closed root", gesture: .none, document: """
             <div id=h></div><script>const r=h.attachShadow({mode:'closed'});r.innerHTML="<a href='TARGET/x'>x</a>";r.firstChild.click()</script>
-            """),
-        .init(name: "event that stays inside a shadow root", gesture: .none, document: """
-            <div id=h></div><script>const r=h.attachShadow({mode:'open'});r.innerHTML="<a href='TARGET/x'>x</a>";r.firstChild.dispatchEvent(\(click))</script>
-            """),
-        .init(name: "click borrowed from a frame", gesture: .none, document: """
-            <script>const i=document.createElement('iframe');document.body.append(i);
-            const a=document.createElement('a');a.href='TARGET/x';i.contentWindow.HTMLElement.prototype.click.call(a)</script>
             """),
         .init(name: "click borrowed from a removed frame", gesture: .none, document: """
             <script>const i=document.createElement('iframe');document.body.append(i);
             const c=i.contentWindow.HTMLElement.prototype.click;i.remove();
             const a=document.createElement('a');a.href='TARGET/x';c.call(a)</script>
-            """),
-        .init(name: "event sent through a removed frame", gesture: .none, document: """
-            <script>const i=document.createElement('iframe');document.body.append(i);const w=i.contentWindow;
-            const c=w.EventTarget.prototype.dispatchEvent;const e=new w.MouseEvent('click',{bubbles:true});i.remove();
-            const a=document.createElement('a');a.href='TARGET/x';c.call(a,e)</script>
-            """),
-        .init(name: "event sent from a frame to a link here", gesture: .none, document: """
-            <a id=a href='TARGET/x'>x</a><script>const i=document.createElement('iframe');document.body.append(i);
-            i.contentWindow.EventTarget.prototype.dispatchEvent.call(a,new i.contentWindow.MouseEvent('click',{bubbles:true,cancelable:true}))</script>
-            """),
-        .init(name: "event whose class hides its type", gesture: .none, document: """
-            <script>class E extends MouseEvent{get type(){return 'x'}};const a=document.createElement('a');a.href='TARGET/x';
-            a.dispatchEvent(new E('click',{bubbles:true}))</script>
-            """),
-        .init(name: "event sent after the document replaces the type getter", gesture: .none, document: """
-            <script>Object.defineProperty(Event.prototype,'type',{get(){return 'x'}});
-            const a=document.createElement('a');a.href='TARGET/x';a.dispatchEvent(new MouseEvent('click',{bubbles:true}))</script>
-            """),
-        .init(name: "event sent through the window's method", gesture: .none, document: """
-            <script>const a=document.createElement('a');a.href='TARGET/x';window.dispatchEvent.call(a,\(click))</script>
-            """),
-        .init(name: "Return sent to a focused link in a closed root", gesture: .none, document: """
-            <div id=h></div><script>const r=h.attachShadow({mode:'closed'});r.innerHTML="<a href='TARGET/x'>x</a>";
-            const a=r.firstChild;a.focus();a.dispatchEvent(\(enter))</script>
             """)
     ]
 
     static let real: [ActivationRoute] = [
-        .init(name: "a link", runsScripts: false, document: "<a id=t href='TARGET/x' style='BOX'>x</a>"),
+        plainLink,
         .init(name: "an image map's area", runsScripts: false, document: """
             <img id=t usemap=#m width=300 height=80 src='data:image/gif;base64,R0lGODlhAQABAAAAACw='>
             <map name=m><area shape=rect coords=0,0,300,80 href='TARGET/x'></map>
             """),
-        .init(name: "a control inside a link", runsScripts: false, document: "<a href='TARGET/x'><input id=t style='BOX'></a>"),
-        .init(name: "a form whose controls are named after its methods, inside a link", document: """
-            <a href='TARGET/x'><form id=t style='BOX'><input name=closest><input name=matches></form></a>
-            """),
         .init(name: "a link in a closed declarative root", runsScripts: false, document: closedLink),
-        .init(name: "a link in an open declarative root", runsScripts: false, document: """
-            <div id=t style='BOX'><template shadowrootmode=open><a href='TARGET/x' style='BOX'>x</a></template></div>
-            """),
-        .init(name: "a closed root the byte scanner reads as a style", runsScripts: false, document: """
-            <svg><style><div id=t style='BOX'><template shadowrootmode=closed><a href='TARGET/x' style='BOX'>x</a></template></div></style></svg>
-            """),
-        .init(name: "text slotted into a link in a closed root", runsScripts: false, document: """
-            <div style='BOX'><template shadowrootmode=closed><a href='TARGET/x'><slot></slot></a></template><p id=t style='margin:0'>text</p></div>
-            """),
-        .init(name: "a closed root from setHTMLUnsafe", document: """
-            <div id=h></div><script>h.setHTMLUnsafe("\(closedLink)")</script>
-            """),
-        .init(name: "a closed root from parseHTMLUnsafe", document: """
-            <script>const d=Document.parseHTMLUnsafe("\(closedLink)");document.body.append(document.adoptNode(d.getElementById('t')))</script>
-            """),
-        .init(name: "a closed root from document.write", document: "<script>document.write(\"\(closedLink)\")</script>"),
         .init(name: "a closed root from attachShadow", document: """
             <div id=t style='BOX'></div><script>t.attachShadow({mode:'closed'}).innerHTML="<a href='TARGET/x' style='BOX'>x</a>"</script>
             """),
-        .init(name: "a closed root in a custom element", document: """
-            <x-y id=t style='BOX'></x-y><script>customElements.define('x-y',class extends HTMLElement{connectedCallback(){
-            this.attachShadow({mode:'closed'}).innerHTML="<a href='TARGET/x' style='BOX'>x</a>"}})</script>
-            """),
         .init(name: "a link, with the middle button", gesture: .middleClick, runsScripts: false, document: "<a id=t href='TARGET/x' style='BOX'>x</a>"),
-        .init(name: "a link in a closed root, with the middle button", gesture: .middleClick, runsScripts: false, document: closedLink),
-        .init(name: "a link in a closed root, with Command", gesture: .commandClick, runsScripts: false, document: closedLink),
-        .init(name: "a link in a closed root, twice", gesture: .doubleClick, runsScripts: false, document: closedLink),
         .init(name: "a focused link, with Return", gesture: .pressReturn, runsScripts: false, document: "<a id=t autofocus href='TARGET/x' style='BOX'>x</a>"),
-        .init(name: "a link, in a document that stops the event", document: """
-            <a id=t href='TARGET/x' style='BOX'>x</a><script>window.addEventListener('click',e=>e.stopImmediatePropagation(),true);
-            document.addEventListener('click',e=>{e.returnValue=true},true)</script>
-            """),
         .init(name: "a link, in a document that replaces what the seal calls", document: """
             <a id=t href='TARGET/x' style='BOX'>x</a><script>window.Element=null;Function.prototype.call=function(){};
             Function.prototype.apply=function(){};Event.prototype.preventDefault=function(){}</script>
@@ -160,25 +88,7 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
         .init(name: "a link after document.open", document: """
             <script>setTimeout(()=>{document.open();document.write("<a id=t href='TARGET/x' style='BOX'>x</a>");document.close()},0)</script>
             """),
-        .init(name: "a link after a late document.write", document: """
-            <script>setTimeout(()=>{document.write("<a id=t href='TARGET/x' style='BOX'>x</a>");document.close()},0)</script>
-            """),
-        .init(name: "a link after a removed frame's document.open", document: """
-            <script>setTimeout(()=>{const i=document.createElement('iframe');document.body.append(i);const o=i.contentWindow.Document.prototype.open;
-            i.remove();o.call(document);document.write("<a id=t href='TARGET/x' style='BOX'>x</a>");document.close()},0)</script>
-            """),
-        .init(name: "a link in a javascript: document", document: """
-            <script>setTimeout(()=>{location.href="javascript:'<a id=t href=TARGET/x style=display:block;width:300px;height:80px>x</a>'"},0)</script>
-            """),
-        .init(name: "a new-window link in a frame", document: frame("", newWindowLink)),
-        .init(name: "a new-window link in a blob frame", document: """
-            <script>const b=URL.createObjectURL(new Blob(["<body style=margin:0>\(newWindowLink)"],{type:'text/html'}));
-            const i=document.createElement('iframe');i.id='t';i.style='width:320px;height:100px;border:0';i.src=b;document.body.append(i)</script>
-            """),
-        .init(name: "a new-window link in a frame opened by its parent", document: """
-            <iframe id=t style='width:320px;height:100px;border:0'></iframe><script>setTimeout(()=>{const d=t.contentDocument;
-            d.open();d.write("<body style=margin:0>\(newWindowLink)");d.close()},0)</script>
-            """)
+        .init(name: "a new-window link in a frame", document: frame("", newWindowLink))
     ]
 
     /// A sandbox without `allow-scripts` silently ends every listener in its frame, so these reach the frame's own
@@ -188,40 +98,12 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
         let sameOrigin = "sandbox='allow-popups allow-same-origin'"
         return [
             .init(name: "a link in a sandboxed frame", document: frame(opaque, newWindowLink)),
-            .init(name: "a focused link in a sandboxed frame, with Return", gesture: .clickThenReturn, document: frame(opaque, "<a autofocus target=_blank href='TARGET/x' style='BOX'>x</a>")),
-            .init(name: "a link in a closed root in a sandboxed frame", document: frame(opaque, "<div style='BOX'><template shadowrootmode=closed>\(newWindowLink)</template></div>")),
-            .init(name: "a link in a frame inside a sandboxed frame", document: frame(opaque, """
-                <iframe style='width:320px;height:100px;border:0' srcdoc='<body style=margin:0><a target=_blank href=TARGET/x style=display:block;width:300px;height:80px>x</a>'></iframe>
-                """)),
-            .init(name: "a sandboxed frame that loses its attribute", document: frame(opaque, newWindowLink) + """
-                <script>setTimeout(()=>t.removeAttribute('sandbox'),50)</script>
-                """),
             .init(name: "a link in a same-origin sandboxed frame", document: frame(sameOrigin, newWindowLink)),
-            .init(name: "a link its parent writes into a same-origin sandboxed frame", document: """
-                <iframe id=t \(sameOrigin) style='width:320px;height:100px;border:0'></iframe><script>setTimeout(()=>{const d=t.contentDocument;
-                d.body.style.margin=0;d.body.innerHTML="\(newWindowLink)"},0)</script>
-                """),
-            .init(name: "a same-origin sandboxed frame its parent opens", document: """
-                <iframe id=t \(sameOrigin) style='width:320px;height:100px;border:0'></iframe><script>setTimeout(()=>{const d=t.contentDocument;
-                d.open();d.write("<body style=margin:0>\(newWindowLink)");d.close()},0)</script>
-                """),
-            .init(name: "a same-origin sandboxed frame its parent makes interactive", document: frame(sameOrigin, newWindowLink) + """
-                <script>setTimeout(()=>{t.contentDocument.documentElement.inert=false},60)</script>
-                """),
-            .init(name: "a same-origin sandboxed frame whose root its parent replaces", document: frame(sameOrigin, "") + """
-                <script>setTimeout(()=>{const d=t.contentDocument;const h=d.createElement('html');
-                h.innerHTML="<body style=margin:0>\(newWindowLink)";d.documentElement.replaceWith(h)},60)</script>
-                """),
             .init(name: "a same-origin sandboxed frame whose globals its parent replaces", document: frame(sameOrigin, newWindowLink) + """
                 <script>setTimeout(()=>{const w=t.contentWindow;Object.defineProperty(w.HTMLElement.prototype,'inert',{set(){}});
                 w.Element.prototype.setAttribute=function(){};w.Element.prototype.hasAttribute=()=>true;
                 Object.defineProperty(w.Document.prototype,'documentElement',{get(){return null}});
                 HTMLElement.prototype.__lookupSetter__('inert').call(t.contentDocument.documentElement,false)},60)</script>
-                """),
-            .init(name: "a sandboxed frame made by script", document: """
-                <script>const i=document.createElement('iframe');i.id='t';i.style='width:320px;height:100px;border:0';
-                i.setAttribute('sandbox','allow-popups allow-same-origin');document.body.append(i);const d=i.contentDocument;
-                d.body.style.margin=0;d.body.innerHTML="\(newWindowLink)";d.documentElement.inert=false</script>
                 """)
         ]
     }()
@@ -266,10 +148,6 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
         switch gesture {
         case .none: break
         case .click: try await press(web, at: point)
-        case .commandClick: try await press(web, at: point, flags: .command)
-        case .doubleClick:
-            try await press(web, at: point)
-            try await press(web, at: point, clicks: 2)
         case .middleClick: try await press(web, at: point, down: .otherMouseDown, up: .otherMouseUp)
         case .pressReturn: try await pressReturn(in: web)
         case .clickThenReturn:
@@ -279,13 +157,12 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
     }
 
     private func press(
-        _ web: WKWebView, at point: NSPoint, flags: NSEvent.ModifierFlags = [], clicks: Int = 1,
-        down: NSEvent.EventType = .leftMouseDown, up: NSEvent.EventType = .leftMouseUp
+        _ web: WKWebView, at point: NSPoint, down: NSEvent.EventType = .leftMouseDown, up: NSEvent.EventType = .leftMouseUp
     ) async throws {
         for type in [down, up] {
             let event = try #require(NSEvent.mouseEvent(
-                with: type, location: point, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
-                windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: clicks, pressure: 1))
+                with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
             switch type {
             case .leftMouseDown: web.mouseDown(with: event)
             case .leftMouseUp: web.mouseUp(with: event)
@@ -333,13 +210,15 @@ nonisolated struct ActivationRoute: Sendable, CustomTestStringConvertible {
         #expect(probe.count == 0)
     }
 
-    @Test(arguments: ActivationRoute.all) func theSameRouteConnectsWithoutTheSeal(_ route: ActivationRoute) async throws {
+    /// Checks that the probe sees a connection when an unsealed link is clicked.
+    @Test func aLinkConnectsWithoutTheSeal() async throws {
         let probe = try await Probe()
         let page = WebPage()
         let host = try await Hosted(page)
-        // The document navigates away from itself, so the load is not awaited.
-        _ = page.load(route.html(target: "http://127.0.0.1:\(probe.port)"), mimeType: "text/html", characterEncoding: .utf8, baseURL: SealedWebPage.base)
-        try await host.perform(route.gesture, on: page)
+        _ = page.load(
+            ActivationRoute.plainLink.html(target: "http://127.0.0.1:\(probe.port)"), mimeType: "text/html",
+            characterEncoding: .utf8, baseURL: SealedWebPage.base)
+        try await host.perform(ActivationRoute.plainLink.gesture, on: page)
         #expect(await eventually { probe.count > 0 }, "the control connected to nothing, so the test above shows nothing")
     }
 

@@ -433,6 +433,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(await eventually { calls.state.withLock { $0.started.count } == 1 })
         model.beginIcon(of: "user.job")
         let icon = Task { await model.chooseIcon("lucide:hammer") }
+        // Nothing to wait for: gives the icon change time to run ahead of the description's save, if it is going to.
         try? await Task.sleep(for: .milliseconds(200))
         #expect(order.withLock { $0 }.isEmpty)
         await gate.open()
@@ -736,7 +737,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 }
 
 /// What a type's replacement sends: the type as the server holds it, with the one change made.
-@Suite struct TypeReplacementTests {
+@Suite(.hangLimit) struct TypeReplacementTests {
     private typealias Definition = Components.Schemas.FieldDefinition
     private typealias Word = Components.Schemas.StatusValue
 
@@ -908,7 +909,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 }
 
 /// How the server's refusals of a type's replacement are read.
-@Suite struct TypeRefusalTests {
+@Suite(.hangLimit) struct TypeRefusalTests {
     private func answer(_ json: String, status: UInt16 = 400, code: String) throws -> ServerAnswer {
         ServerAnswer(status: status, code: code, details: try JSONValue(json: json), requestId: nil)
     }

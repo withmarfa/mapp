@@ -20,6 +20,7 @@ import Testing
                 group.addTask {
                     try await gate.run {
                         await tally.enter()
+                        // Stands for a picture's work, long enough for the others to queue behind it.
                         try? await Task.sleep(for: .milliseconds(20))
                         await tally.leave()
                     }
@@ -34,9 +35,12 @@ import Testing
     @Test func aCancelledWaiterNeverRunsAndHoldsNoPlace() async throws {
         let gate = PreviewGate(limit: 1)
         let tally = Tally()
+        // The holder's work, which keeps the gate's one place while the waiter queues.
         let holder = Task { try await gate.run { try? await Task.sleep(for: .milliseconds(200)) } }
+        // Lets the holder take the place first.
         try await Task.sleep(for: .milliseconds(30))
         let waiter = Task { try await gate.run { await tally.enter(); await tally.leave() } }
+        // Lets the waiter queue behind the holder before it is cancelled.
         try await Task.sleep(for: .milliseconds(30))
         waiter.cancel()
         await #expect(throws: CancellationError.self) { try await waiter.value }

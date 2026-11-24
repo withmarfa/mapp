@@ -134,25 +134,24 @@ extension EditorTests {
         return (made, shown, drafts)
     }
 
-    /// An editor is a web view with a page process of its own, so a window makes one, however often SwiftUI makes
-    /// the window's view again.
-    @Test func aMainWindowMakesOneEditorHoweverOftenItsViewIsMadeAgain() async throws {
+    /// Quitting saves a title typed and not left only if the main window's editor holds the window's drafts, and with
+    /// none it reports success. The window's own wiring needs no page to check.
+    @Test func aMainWindowsEditorHoldsItsTitleDraftsAndSavesThem() async throws {
         let library = ItemPreviewFixtures.library
-        let browser = ItemPreviewFixtures.browser
+        try #require(await eventually { library.isLoaded })
         let details = DetailsPresentation()
-        let libraries = ItemPreviewFixtures.libraries(named: "MarfaMac.EditorTests")
-        let (made, shown, drafts) = try await Self.editorsMade(remaking: 5) {
-            MainView(browser: browser, details: details, restoresWindow: false)
-                .environment(\.library, library)
-                .environment(libraries)
-        }
-        #expect(made.count == 1, "one editor for the window, not one for each time its view is made")
-        #expect(made.first === shown)
-        #expect(drafts === details, "the editor holds the window's drafts")
-        #expect(shown.titleDrafts == nil, "the window's drafts leave with it")
+        let editor = MainView.makeEditor(library: library, details: details)
+        #expect(editor.titleDrafts === details)
+        let draft = details.draft(for: ItemPreviewFixtures.ticketID, key: "title")
+        draft.text = "Review before quitting"
+        draft.isDirty = true
+        #expect(editor.saveTitles(tellingRefusal: false))
+        #expect(await eventually { library.item(ItemPreviewFixtures.ticketID)?.title == "Review before quitting" })
         withExtendedLifetime(library) {}
     }
 
+    /// An editor is a web view with a page process of its own, so a window makes one, however often SwiftUI makes
+    /// the window's view again.
     @Test func anItemWindowMakesOneEditorHoweverOftenItsViewIsMadeAgain() async throws {
         let library = ItemPreviewFixtures.library
         let (made, shown, drafts) = try await Self.editorsMade(remaking: 5) {
