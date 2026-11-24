@@ -47,11 +47,24 @@ struct SourcesPage: View {
 
     @ViewBuilder private var content: some View {
         if subpage?.id == Self.limitSources.id {
-            SourceRulePage(model: limit, host: host)
+            rulePage(limit)
         } else if subpage?.id == Self.whoMayWrite.id {
-            SourceRulePage(model: allowlist, host: host)
+            rulePage(allowlist)
         } else {
             list
+        }
+    }
+
+    /// A rule's page, which needs `config.manage` beside the Sources page's own permission: Forward can reach it after the
+    /// permission was taken away.
+    @ViewBuilder private func rulePage(_ model: SourceLimitModel) -> some View {
+        if host.grants.contains(.configManage) {
+            SourceRulePage(model: model, host: host)
+        } else {
+            SettingsPageState(
+                symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: model.rule.permissionLine),
+                action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: InstancePermission.configManage.rawValue) }))
+            .disabled(host.isAllowingMore)
         }
     }
 
@@ -203,6 +216,11 @@ private struct SourceRulePage: View {
     @State private var asksToTurnOff = false
 
     var body: some View {
+        // The rule and its choices are read however the page was reached, the list's read included.
+        state.task { await model.load() }
+    }
+
+    @ViewBuilder private var state: some View {
         @Bindable var model = model
         let words = SourceRuleWords(rule: model.rule)
         if let failure = model.failure, model.limit == nil {
@@ -262,7 +280,6 @@ private struct SourceRulePage: View {
                     }
                 }
             }
-            .task { await model.load() }
             .alert(Text(verbatim: words.turnOffQuestion), isPresented: $asksToTurnOff) {
                 Button("Cancel", role: .cancel) {}
                 Button("Turn Off", role: .destructive) { Task { await model.turnOff() } }
