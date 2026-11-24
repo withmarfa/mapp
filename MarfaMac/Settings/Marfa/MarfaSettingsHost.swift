@@ -90,6 +90,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     var ownerCalls: any OwnerCalls { get }
     /// What Activity, Monitoring, Limits and Start-Up ask of the server.
     var instanceCalls: any InstanceCalls { get }
+    /// What Folders asks of the open working copy, which reads, changes and stops a folder.
+    var folderCalls: any FolderCalls { get }
     /// Whether an Allow More… is waiting on the owner.
     var isAllowingMore: Bool { get }
     /// Asks the server again, for a server that did not answer.
@@ -366,7 +368,11 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
                 String(localized: "Signing Secret"), String(localized: "Sending"),
             ]
         case .folders:
-            [String(localized: "Copies"), String(localized: "Needs Attention"), String(localized: "Synced Folders")]
+            [
+                String(localized: "Copies"), String(localized: "Needs Attention"), String(localized: "Synced Folders"), String(localized: "Rename"),
+                String(localized: "Ignore"), String(localized: "Include"), String(localized: "Safety"), String(localized: "Pause Removals Over"),
+                String(localized: "Pause Additions Over"), String(localized: "Stop Syncing"),
+            ]
         case .backups:
             [
                 String(localized: "Keep Backups In"), String(localized: "Back Up Every"), String(localized: "Last Backup"), String(localized: "Back Up Now"),
