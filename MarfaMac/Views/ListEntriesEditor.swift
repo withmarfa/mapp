@@ -29,7 +29,7 @@ struct ListEntriesEditor: View {
             }
             if isEditable, editing.pending == nil {
                 Button { editing.startEntry() } label: { Label("Add Entry", systemImage: "plus") }
-                    .appButton(.plain, size: .small)
+                    .appButton(.secondary, size: .small)
                     // The row's own label names the list beside the button; a spoken one needs it said.
                     .accessibilityLabel("Add Entry to \(label)")
                     .accessibilityIdentifier("ItemListAdd.\(key)")
@@ -78,7 +78,7 @@ struct ListEntriesEditor: View {
                     if index ?? count == 0 { Text("Main").interfaceFont(.caption).foregroundStyle(.secondary) }
                     Spacer()
                     if let index { entryMenu(id, index: index, count: count) } else {
-                        Button("Cancel") { editing.cancelEntry() }.appButton(.plain, size: .small)
+                        Button("Cancel") { editing.cancelEntry() }.appButton(.secondary, size: .small)
                     }
                 }
                 ForEach(shape.members) { member in
@@ -109,18 +109,20 @@ struct ListEntriesEditor: View {
 
     /// A member the list does not declare, which Marfa refuses the list for: shown as it is, with Remove.
     private func undeclaredMember(_ name: String, holding stored: PropertyValue?, of id: UUID) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(verbatim: name).foregroundStyle(.secondary).interfaceFont(.caption)
-                .frame(width: 84, alignment: .leading).lineLimit(1)
-            InspectorText(text: stored.map(ItemValueText.string) ?? "")
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Button("Remove", systemImage: "minus.circle") {
-                editing.set(name, to: nil, of: id, in: shape, value: value, write: onChange)
+                .lineLimit(1)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                InspectorText(text: stored.map(ItemValueText.string) ?? "")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button("Remove", systemImage: "minus") {
+                    editing.set(name, to: nil, of: id, in: shape, value: value, write: onChange)
+                }
+                .labelStyle(.iconOnly)
+                .appButton(.secondary, size: .small, icon: true)
+                .help("Remove")
+                .accessibilityIdentifier("ItemListRemoveMember.\(key).\(name)")
             }
-            .labelStyle(.iconOnly)
-            .appButton(.plain, size: .small, icon: true)
-            .help("Remove")
-            .accessibilityIdentifier("ItemListRemoveMember.\(key).\(name)")
         }
     }
 
@@ -139,10 +141,11 @@ struct ListEntriesEditor: View {
             if index < count - 1 { Button("Move Down") { editing.move(id, to: index + 1, in: shape, value: value, write: onChange) } }
             Button("Remove", role: .destructive) { editing.remove(id, in: shape, value: value, write: onChange) }
         } label: {
-            Image(systemName: "ellipsis.circle")
+            Image(systemName: "ellipsis")
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
         .menuIndicator(.hidden)
+        .appButton(.secondary, size: .small, icon: true)
         .fixedSize()
         .accessibilityLabel("Entry Actions")
         .accessibilityIdentifier("ItemListEntryMenu.\(key).\(index)")
@@ -167,13 +170,22 @@ private struct MemberField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(LocalizedStringKey(member.label)).foregroundStyle(.secondary).interfaceFont(.caption)
-                    .frame(width: 84, alignment: .leading).lineLimit(1)
+            // The label sits above the value, so a name, an address or a response takes the sidebar's whole width.
+            if case .boolean = member.kind {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    control
+                    label
+                }
+            } else {
+                label
                 control.frame(maxWidth: .infinity, alignment: .leading)
             }
             if isConflict { conflictNotice }
         }
+    }
+
+    private var label: some View {
+        Text(LocalizedStringKey(member.label)).foregroundStyle(.secondary).interfaceFont(.caption).lineLimit(1)
     }
 
     @ViewBuilder private var control: some View {
