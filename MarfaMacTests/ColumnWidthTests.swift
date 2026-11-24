@@ -13,9 +13,7 @@ struct ColumnWidthTests {
 @MainActor
 struct ColumnWidthTrackerTests {
     private func tracker() -> ColumnWidthTracker {
-        let suite = "ColumnWidthTrackerTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("ColumnWidthTrackerTests")
         return ColumnWidthTracker(defaults: defaults)
     }
 

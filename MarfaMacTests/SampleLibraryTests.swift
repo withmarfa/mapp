@@ -65,10 +65,7 @@ import Testing
     /// A sample launch starts as a first launch does: a table's columns and a saved view's layout that an earlier run
     /// chose, which the defaults keep between runs, never decide which columns the table opens with.
     @Test func aSampleLaunchForgetsTheColumnsAndDefaultViewsAnEarlierRunChose() throws {
-        let suite = "MarfaMac.SampleLibraryTests.columns"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defaults.removePersistentDomain(forName: suite)
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("MarfaMac.SampleLibraryTests.columns")
         var layout = TableColumnCustomization<ItemTableRow>()
         layout[visibility: "field.status"] = .hidden
         let place = SidebarItem.itemType("core.task")

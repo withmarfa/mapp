@@ -48,9 +48,7 @@ struct IndexRowsTests {
 
 struct IndexPreferencesTests {
     private func defaults() -> UserDefaults {
-        let suite = "IndexPreferencesTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = ThrowawayDefaults.make("IndexPreferencesTests")
         return defaults
     }
 

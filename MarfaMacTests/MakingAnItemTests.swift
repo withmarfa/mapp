@@ -8,7 +8,7 @@ struct MakingAnItemTests {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
     private func defaults(_ stored: String? = nil) -> UserDefaults {
-        let suite = UserDefaults(suiteName: "MakingAnItemTests.\(UUID().uuidString)")!
+        let suite = ThrowawayDefaults.make("MakingAnItemTests")
         if let stored { suite.set(stored, forKey: ListKey.openItemsIn) }
         return suite
     }

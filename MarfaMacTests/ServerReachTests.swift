@@ -32,7 +32,7 @@ import Testing
 
     /// With no server set there is no library, so nothing that needs a server is offered.
     @Test func noInstanceHasNoLibraryToOfferThem() throws {
-        let host = try HostBench().host()
+        let host = HostBench().host()
         #expect(host.library == nil)
         #expect(host.state == .disconnected)
     }

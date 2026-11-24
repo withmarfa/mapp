@@ -77,10 +77,7 @@ struct ItemTableColumnsTests {
         let browser = Browser()
         browser.sidebarItem = inSavedView ? .view(ItemID("view-1")) : .allItems
         browser.viewMode = .table
-        let suite = "MarfaMac.ItemTableColumnsTests.wide.\(inSavedView ? "view" : "all")"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defaults.removePersistentDomain(forName: suite)
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("ItemTableColumnsTests.wide")
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 2600, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: Host(browser: browser).environment(\.library, library).defaultAppStorage(defaults))

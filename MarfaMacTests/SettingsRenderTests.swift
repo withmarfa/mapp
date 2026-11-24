@@ -169,8 +169,8 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     func connected() async throws -> (Libraries, HostBench) {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("SettingsRenderTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         try await libraries.host.connect(address: "https://marfa.castell.studio", key: "k")
         bench.servers.last?.state.set(.online)
@@ -198,7 +198,7 @@ struct RenderedWindow<Detail: View>: View {
 
     /// A font chosen once and uninstalled since, and a color of the person's own.
     @Test func appearanceWithAMissingFontAndACustomAccent() async throws {
-        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
+        let defaults = ThrowawayDefaults.make("SettingsRenderTests")
         defaults.set("Uninstalled Sans", forKey: AppearanceKey.textFont)
         defaults.set(AccentChoice.custom("#B4468C").rawValue, forKey: AppearanceKey.accent)
         defaults.set(AppTheme.dark.rawValue, forKey: AppearanceKey.theme)
@@ -208,8 +208,8 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     private func keyboard(_ prepare: (KeyboardPageModel) -> Void = { _ in }) async throws -> (SettingsPage, KeyboardPage) {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("SettingsRenderTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         let model = KeyboardPageModel(bindings: libraries.shortcuts, anyApp: libraries.anyAppShortcuts)
         prepare(model)
@@ -285,8 +285,8 @@ struct RenderedWindow<Detail: View>: View {
         named name: String, holding permissions: Set<InstancePermission> = SystemSignIns.askedAtSignIn, readsName: Bool = true,
         state: MarfaConnectionState = .online, waiting: Int = 0
     ) async throws {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("SettingsRenderTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         bench.servers.names.withLock { $0[try! MarfaConnection(address: "https://marfa.castell.studio")] = "Castell Studio" }
         try await libraries.host.connect(address: "https://marfa.castell.studio", key: "k")
@@ -315,8 +315,8 @@ struct RenderedWindow<Detail: View>: View {
     @Test func connectionSignedOut() async throws { try await connection(named: "Connection, signed out", state: .keyRefused, waiting: 3) }
 
     @Test func connectionNotConnected() async throws {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("SettingsRenderTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         try await SettingsRender.png(
             RenderedWindow(selection: .connection, detail: ConnectionPage(settingsHost: AppSettingsHost(libraries: libraries, launcher: SettingsLauncher())).environment(libraries).environment(libraries.host)),
@@ -367,8 +367,8 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     @Test func onThisMacWithNoMarfaOpen() async throws {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("SettingsRenderTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         try await SettingsRender.png(
             RenderedWindow(selection: .onThisMac, detail: OnThisMacPage(openConnection: {}).environment(libraries).environment(libraries.host)),

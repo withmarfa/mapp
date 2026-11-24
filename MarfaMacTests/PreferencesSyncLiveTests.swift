@@ -16,12 +16,10 @@ extension LiveMarfaTests {
             let defaults: UserDefaults
             let sync: PreferencesSync
             let root: URL
-            let suite: String
 
-            init(source: MarfaSource, defaults: UserDefaults, suite: String, sync: PreferencesSync, root: URL) {
+            init(source: MarfaSource, defaults: UserDefaults, sync: PreferencesSync, root: URL) {
                 self.source = source
                 self.defaults = defaults
-                self.suite = suite
                 self.sync = sync
                 self.root = root
             }
@@ -44,10 +42,9 @@ extension LiveMarfaTests {
             let signIns = ScriptedSignIns()
             signIns.save(try LiveMarfa.key(), for: connection.address, scopes: [PreferencesType.vendorScope])
             let source = try await MarfaSource.open(connection, signIns: signIns, location: MarfaStoreLocation(root: root))
-            let suite = "MarfaMacTests.PreferencesLive.\(UUID().uuidString)"
-            let defaults = try #require(UserDefaults(suiteName: suite))
+            let defaults = ThrowawayDefaults.make("MarfaMacTests.PreferencesLive")
             let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(100)) {}
-            let mac = Mac(source: source, defaults: defaults, suite: suite, sync: sync, root: root)
+            let mac = Mac(source: source, defaults: defaults, sync: sync, root: root)
             macs.append(mac)
             return mac
         }
@@ -65,7 +62,6 @@ extension LiveMarfaTests {
             for mac in macs {
                 mac.sync.detach()
                 await mac.source.close()
-                UserDefaults().removePersistentDomain(forName: mac.suite)
                 try? FileManager.default.removeItem(at: mac.root)
             }
             macs = []

@@ -56,8 +56,8 @@ extension SettingsRenderTests {
 
     /// The sign-in code's row and the row that opens the page it is typed on, each with one button.
     @Test func connectionWaitingForACode() async throws {
-        let bench = try HostBench()
-        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("SettingsRenderRuleTests")
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         let (never, hold) = AsyncStream<Void>.makeStream()
         defer { hold.finish() }

@@ -14,7 +14,7 @@ import WebKit
 
     init() throws {
         folder = try TemporaryFolder()
-        defaults = try #require(UserDefaults(suiteName: "SealedPicturesTests-\(UUID().uuidString)"))
+        defaults = ThrowawayDefaults.make("SealedPicturesTests")
         note = library.add("An article\n").id
     }
 

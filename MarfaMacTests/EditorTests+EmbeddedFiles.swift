@@ -20,9 +20,7 @@ extension EditorTests {
 
     @Test func webAddressPictureWaitsForTheOwnersChoiceThenLoadsThroughTheApp() async throws {
         let folder = try TemporaryFolder()
-        let suite = "EditorPictureTests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("EditorPictureTests")
         defaults.set(RemotePictureSetting.ask.rawValue, forKey: RemotePictureSetting.key)
         let host = PictureStub.newHost()
         let address = "https://\(host)/rss-picture.png"

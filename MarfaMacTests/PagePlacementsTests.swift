@@ -106,9 +106,7 @@ struct PagePlacementsTests {
     }
 
     @Test func theDefaultsHoldTheChoicesUnderOneKey() throws {
-        let suite = "MarfaMac.PagePlacementsTests"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("MarfaMac.PagePlacementsTests")
         #expect(PagePlacements.stored(in: defaults) == PagePlacements())
         PagePlacements.update(in: defaults) { $0.setShown(false, row: "repo", of: Self.ticket) }
         #expect(PagePlacements.stored(in: defaults).placement(of: Self.ticket, in: Self.catalogue).showsOnPage("repo") == false)
@@ -249,10 +247,7 @@ struct PagePlacementsTests {
     }
 
     @Test func storedTextThatCannotBeReadIsSetAsideBeforeItIsWrittenOver() throws {
-        let suite = "PagePlacementsTests.setAside"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defaults.removePersistentDomain(forName: suite)
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("PagePlacementsTests.setAside")
         let unreadable = #"{"aic.ticket":{"rows":{"repo":"not a flag"}}}"#
         defaults.set(unreadable, forKey: PagePlacements.key)
 

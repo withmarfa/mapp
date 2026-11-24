@@ -34,9 +34,7 @@ final class FakeHotKeys: HotKeyRegistrar {
 @MainActor
 struct ShortcutTests {
     private func defaults() -> UserDefaults {
-        let suite = "ShortcutTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = ThrowawayDefaults.make("ShortcutTests")
         return defaults
     }
 

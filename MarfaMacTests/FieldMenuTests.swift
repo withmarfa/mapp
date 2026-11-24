@@ -29,9 +29,7 @@ private func defaultLayout(of type: TypeID = entry, _ placements: PagePlacements
 
 @Suite struct FieldPlacementTests {
     private func stored(_ run: (UserDefaults) -> Void) throws -> PagePlacements {
-        let suite = "FieldPlacement-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = ThrowawayDefaults.make("FieldPlacement")
         run(defaults)
         return PagePlacements.stored(in: defaults)
     }

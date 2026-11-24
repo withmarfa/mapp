@@ -38,7 +38,7 @@ import Testing
     /// A discard marks the copy and forgets the address before the copy closes, so a quit at the close, at the end of
     /// the sign-in or at the removal finds nothing to open and the copy marked.
     @Test func aQuitAtAnyWaitOfADiscardingDisconnectNeverOpensTheCopy() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let suite = bench.suite
         let seen = Mutex<[String: Found]>([:])
         let remover: MarfaHost.Remover = { store, agreed in
@@ -64,7 +64,7 @@ import Testing
     /// With no discard chosen the address still goes before the files and pictures are removed, and the empty copy is
     /// marked to go before the cleaner runs.
     @Test func aDisconnectForgetsTheAddressBeforeTheCleanerRuns() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let suite = bench.suite
         let seen = Mutex<Found?>(nil)
         let host = bench.host(cleaner: { seen.withLock { $0 = Self.found(suite) } })
@@ -78,7 +78,7 @@ import Testing
     /// A close that refuses (a write landed after the person was shown the list) leaves the library as it was: the
     /// address saved, no mark, the copy open.
     @Test func aCloseThatRefusesRestoresTheAddressAndTheMark() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let (host, source, shown) = try await connected(bench)
         let held = try #require(shown.ids.sorted().first)
         do {
@@ -96,7 +96,7 @@ import Testing
     /// A switch to another address marks the old copy before it closes, so a quit while it closes never sends what
     /// was discarded. The old address is still the saved one until the new copy is shown.
     @Test func aQuitWhileASwitchClosesTheOldCopyFindsItMarked() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let suite = bench.suite
         let (host, old, shown) = try await connected(bench)
         let seen = Mutex<Found?>(nil)
@@ -110,7 +110,7 @@ import Testing
     /// The package removes the copy's files; the folder goes only if nothing is in it, so a copy another opener made in
     /// the gap is not taken with it.
     @Test func theCopysFolderIsKeptWhenSomethingIsInIt() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let directory = bench.location.directory(for: first)
         let gap: MarfaHost.Remover = { _, _ in
             try Data("opened in the gap".utf8).write(to: directory.appending(path: "other-copy"))
@@ -123,7 +123,7 @@ import Testing
     }
 
     @Test func theCopysFolderIsRemovedWhenItIsEmpty() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host(remover: { _, _ in })
         try await host.connect(address: firstAddress, key: "k")
         try await host.disconnect(.discardNothing)

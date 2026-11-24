@@ -9,7 +9,7 @@ import Testing
 
     init() throws {
         folder = try TemporaryFolder()
-        defaults = try #require(UserDefaults(suiteName: "PictureRequestsTests-\(UUID().uuidString)"))
+        defaults = ThrowawayDefaults.make("PictureRequestsTests")
     }
 
     private func requests() -> PictureRequests {

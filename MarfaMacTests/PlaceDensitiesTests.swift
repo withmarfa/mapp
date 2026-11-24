@@ -5,9 +5,7 @@ import Testing
 /// The density each place keeps on this Mac.
 struct PlaceDensitiesTests {
     private static func defaults() -> UserDefaults {
-        let suite = "MarfaMac.PlaceDensitiesTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite) ?? .standard
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = ThrowawayDefaults.make("MarfaMac.PlaceDensitiesTests")
         return defaults
     }
 

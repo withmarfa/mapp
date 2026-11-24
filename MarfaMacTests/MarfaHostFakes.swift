@@ -210,19 +210,16 @@ nonisolated extension MarfaHost.DisconnectChoice {
 /// A host on its own defaults, key store and store directory, all removed when the test ends.
 @MainActor final class HostBench {
     let root = URL.temporaryDirectory.appending(path: "MarfaHostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-    let suite = "MarfaHostTests-\(UUID().uuidString)"
-    let defaults: UserDefaults
+    let defaults = ThrowawayDefaults.make("MarfaHostTests")
     let signIns = ScriptedSignIns()
     let location: MarfaStoreLocation
     let servers = FakeServers()
 
-    init() throws {
-        defaults = try #require(UserDefaults(suiteName: suite))
+    init() {
         location = MarfaStoreLocation(root: root)
     }
 
     deinit {
-        UserDefaults().removePersistentDomain(forName: suite)
         try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: root.path)
         try? FileManager.default.removeItem(at: root)
     }
@@ -235,6 +232,9 @@ nonisolated extension MarfaHost.DisconnectChoice {
             defaults: defaults, signIns: signIns, location: location, opener: opener ?? servers.opener, describer: servers.describer,
             remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) }, cleaner: cleaner ?? {})
     }
+
+    /// The defaults' name, which another thread opens them by while the bench lives.
+    var suite: String { defaults.suite }
 
     var savedAddress: String? { defaults.string(forKey: "MarfaAddress") }
 

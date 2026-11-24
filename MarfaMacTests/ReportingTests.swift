@@ -11,9 +11,7 @@ struct ReportingTests {
     ]
 
     private func defaults(switchOn: Bool? = nil) -> UserDefaults {
-        let suite = "MarfaMac.ReportingTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
+        let defaults = ThrowawayDefaults.make("MarfaMac.ReportingTests")
         if let switchOn { defaults.set(switchOn, forKey: Reporting.switchKey) }
         return defaults
     }

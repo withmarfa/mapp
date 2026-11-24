@@ -20,7 +20,7 @@ import Testing
     }
 
     @Test func connectingKeepsTheAddressAndKeyAndPaintsBeforeTheServer() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: " HTTP://First.test:8210/ ", key: "key-1")
         #expect(host.connection == first)
@@ -41,7 +41,7 @@ import Testing
     /// The library is the one subscriber to the copy's connection states, so each change reaches it once; the host
     /// reads the state from the library, and reads the server's name again once for each return to the server.
     @Test func aConnectionChangeIsDeliveredOnceAndTheHostReadsItFromTheLibrary() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.names.withLock { $0[first] = "Home Marfa" }
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -67,7 +67,7 @@ import Testing
     /// The package names a server by its origin, which leaves out the scheme's own port, so the same server typed with
     /// it is the same connection: a sign in again, not a switch that signs out "the old" server and so the new sign-in.
     @Test func anAddressWithTheDefaultPortIsTheSameServerNotASwitch() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "https://marfa.test", key: "old")
         let source = try #require(bench.servers.last)
@@ -82,7 +82,7 @@ import Testing
     /// A save in This Marfa answers after the person has moved to another server: the answer is for the server it was
     /// sent to, so the library now open does not take it.
     @Test func aSaveInThisMarfaThatAnswersAfterASwitchLeavesTheNewLibraryAlone() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         try await host.changeAddress(to: "http://second.test:8210", key: "k")
@@ -99,7 +99,7 @@ import Testing
     @Test func aPlainHTTPAddressOnAnotherMachineIsToldOnce() async throws {
         let address = "http://plain-\(UUID().uuidString.lowercased()).test:8210"
         let switched = "http://plain-\(UUID().uuidString.lowercased()).test"
-        let host = try HostBench().host()
+        let host = HostBench().host()
         try await host.connect(address: address, key: "k")
         #expect(host.notices.waiting.map { [$0.title, $0.message] } == [[Words.plainHTTPTitle, Words.plainHTTP(origin: address)]])
         host.notices.answerAll()
@@ -107,7 +107,7 @@ import Testing
         try await host.changeAddress(to: switched, key: "k")
         #expect(host.notices.waiting.map(\.message) == [Words.plainHTTP(origin: switched)])
 
-        let again = try HostBench().host()
+        let again = HostBench().host()
         try await again.connect(address: address, key: "k")
         #expect(again.notices.waiting.isEmpty)
     }
@@ -115,7 +115,7 @@ import Testing
     @Test func aNoticeStillWaitingIsNotReplacedByTheNext() async throws {
         let first = "http://plain-\(UUID().uuidString.lowercased()).test:8210"
         let second = "http://plain-\(UUID().uuidString.lowercased()).test"
-        let host = try HostBench().host()
+        let host = HostBench().host()
         try await host.connect(address: first, key: "k")
         try await host.changeAddress(to: second, key: "k")
         #expect(host.notices.waiting.map(\.message) == [Words.plainHTTP(origin: first), Words.plainHTTP(origin: second)])
@@ -123,14 +123,14 @@ import Testing
 
     @Test func thisMachineAndHTTPSAreNotTold() async throws {
         for address in ["http://localhost:8210", "http://127.0.0.1:8210", "http://[::1]:8210", "https://\(UUID().uuidString.lowercased()).test"] {
-            let host = try HostBench().host()
+            let host = HostBench().host()
             try await host.connect(address: address, key: "k")
             #expect(host.notices.waiting.isEmpty, "\(address)")
         }
     }
 
     @Test func aBadAddressIsAPlainProblem() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         for address in ["not a server", "ftp://first.test", "http://user:pass@first.test", ""] {
             await expect(.notAServer) { () throws(MarfaHost.Problem) in try await host.connect(address: address, key: "k") }
@@ -142,7 +142,7 @@ import Testing
     }
 
     @Test func aSavedAddressWithAPathOpensNothingAndIsToldUntilAnAddressIsChosen() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("https://first.test/a", forKey: "MarfaAddress")
         let host = bench.host()
         await host.launch()
@@ -157,7 +157,7 @@ import Testing
     }
 
     @Test func aCopyThatCannotBeOpenedIsAPlainProblem() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
         await expect(.unavailable(message: "The store is damaged.")) { () throws(MarfaHost.Problem) in
@@ -172,7 +172,7 @@ import Testing
     /// The copy stays on disk and the person decides: keeping it loses nothing, and a discard needs the answer to
     /// the question about the changes in it, which lists them from the store this version can't open.
     @Test func aCopyADifferentVersionMadeKeepsItsChangesUntilThePersonChooses() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.signIns.save("k", for: first.address)
         let store = bench.location.store(for: first)
@@ -208,7 +208,7 @@ import Testing
     }
 
     @Test func aCopyAnotherCopyOfTheAppHoldsIsLeftForThePersonToQuitIt() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.signIns.save("k", for: first.address)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
@@ -225,7 +225,7 @@ import Testing
     /// Discarding the copy takes it from under nobody: while another process writes it, it stays, marked to go.
     @Test
     func discardingACopyAnotherProcessWritesLeavesIt() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.signIns.save("k", for: first.address)
         let store = bench.location.store(for: first)
@@ -248,7 +248,7 @@ import Testing
     /// changes nobody could count, is never discarded: the person is told where it is, and nothing is left.
     @Test
     func aCopyThatCannotBeOpenedIsNotDiscardedAndThePersonIsToldWhereItIs() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.signIns.save("k", for: first.address)
         let store = bench.location.store(for: first)
@@ -272,7 +272,7 @@ import Testing
     /// connection opens or refuses it as it did.
     @Test
     func aCopyThePackageCannotReadIsKeptWhateverWasShown() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.signIns.save("k", for: first.address)
         let store = bench.location.store(for: first)
@@ -293,7 +293,7 @@ import Testing
     /// kept, and they are told how many it holds.
     @Test
     func aCopyHoldingOtherChangesThanThePersonWasShownIsKept() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.signIns.save("k", for: first.address)
         let store = bench.location.store(for: first)
@@ -322,7 +322,7 @@ import Testing
     /// A copy marked to go that has since gained changes is not removed when its address is opened again either.
     @Test
     func aCopyMarkedToGoThatHoldsOtherChangesIsKeptWhenItsAddressIsOpened() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let store = bench.location.store(for: first)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         let copy = try await WorkingCopy.open(store: store)
@@ -343,7 +343,7 @@ import Testing
     /// whatever count was agreed, it is removed and the address opens.
     @Test
     func aMarkedCopyWhoseStoreIsAlreadyGoneIsRemovedWhateverWasAgreed() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let directory = bench.location.directory(for: first)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Data("left behind".utf8).write(to: directory.appending(path: "leftover"))
@@ -360,7 +360,7 @@ import Testing
     /// lose. Nothing beyond what they agreed is lost, so the discard goes through.
     @Test
     func aCopyHoldingFewerChangesThanThePersonAgreedToLoseIsRemoved() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let store = bench.location.store(for: first)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         let copy = try await WorkingCopy.open(store: store)
@@ -379,7 +379,7 @@ import Testing
     /// differs, not asked again without end.
     @Test
     func aRetryThatFindsMoreChangesKeepsTheCopy() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         bench.defaults.set(["http://first.test:8210": ["a", "b", "c"]], forKey: "MarfaDiscardedCopies")
         let asked = Mutex<[MarfaHost.Agreed]>([])
@@ -397,7 +397,7 @@ import Testing
     /// A mark that names no writes, such as a number, confirms none: a copy holding a change is kept with it.
     @Test
     func aMarkThatIsNotAListOfWritesConfirmsNone() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let store = bench.location.store(for: first)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         let copy = try await WorkingCopy.open(store: store)
@@ -419,7 +419,7 @@ import Testing
     /// copy stays, its mark is dropped, and the person is told it isn't the app's.
     @Test
     func aMarkedStoreThatIsAFoldersIsLeftAndToldSo() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let directory = bench.location.directory(for: first)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         bench.defaults.set(["http://first.test:8210": [String]()], forKey: "MarfaDiscardedCopies")
@@ -435,7 +435,7 @@ import Testing
     /// An earlier version of the app may still be writing a copy this version refuses, so it stays too.
     @Test
     func discardingACopyADifferentVersionWritesLeavesIt() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.signIns.save("k", for: first.address)
         let store = bench.location.store(for: first)
@@ -467,7 +467,7 @@ import Testing
     }
 
     @Test func connectingToAServerWhoseCopyADifferentVersionMadeIsAPlainProblem() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .otherVersion(unsent: nil), message: "The package’s words.") }
@@ -481,7 +481,7 @@ import Testing
     }
 
     @Test func aSignInThePersonCancelsChangesNothing() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -504,7 +504,7 @@ import Testing
         (.heldElsewhere, .inUse),
     ])
     func aSignInThatDoesNotFinishLeavesTheOldOneAndTheCopyAlone(_ error: SignInError, _ outcome: SignInOutcome) async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
@@ -518,7 +518,7 @@ import Testing
     /// Writes made while the person approves a switch on another server are counted again once the approval is
     /// in, and they are asked about with the sign-in kept, so the approval is not wasted.
     @Test func writesMadeDuringASwitchSignInAreAskedAboutWithoutLosingTheApproval() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "one")
         let old = try #require(bench.servers.last)
@@ -540,7 +540,7 @@ import Testing
     }
 
     @Test func aQuestionTheyDoNotAnswerEndsTheApprovalKeptForIt() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "one")
         let old = try #require(bench.servers.last)
@@ -556,7 +556,7 @@ import Testing
     /// The kept approval is out of the host's hands the moment an answer arrives, so a step that stops before using it
     /// ends it.
     @Test func anAnswerThatStopsBeforeUsingTheKeptApprovalEndsIt() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "one")
         let old = try #require(bench.servers.last)
@@ -576,7 +576,7 @@ import Testing
     }
 
     @Test func aKeptApprovalIsRecordedForALaunchUntilItIsUsedOrDropped() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "one")
         let old = try #require(bench.servers.last)
@@ -593,7 +593,7 @@ import Testing
     }
 
     @Test func aDroppedQuestionClearsItsRecord() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "one")
         let old = try #require(bench.servers.last)
@@ -608,7 +608,7 @@ import Testing
 
     /// Quitting with the question open leaves its approval in the Keychain; the next launch ends it.
     @Test func aLaunchEndsTheApprovalAQuitLeftForAQuestion() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.defaults.set("http://second.test:8210", forKey: "MarfaPendingSignIn")
         bench.signIns.save("one", for: first.address)
@@ -622,7 +622,7 @@ import Testing
     }
 
     @Test func aLaunchNeverEndsTheSignInOfTheAddressItConnectsTo() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.defaults.set("http://first.test:8210", forKey: "MarfaPendingSignIn")
         bench.signIns.save("one", for: first.address)
@@ -642,7 +642,7 @@ import Testing
     }
 
     @Test func aKeychainThatWillNotKeepTheSignInIsToldAsThat() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         bench.signIns.script(browser: [.failure(Keychain.Failure(status: errSecInteractionNotAllowed))])
         await expect(.signIn(.keychain)) { () throws(MarfaHost.Problem) in
@@ -654,7 +654,7 @@ import Testing
     }
 
     @Test func aFirstSignInThatIsCanceledLeavesNothingBehind() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         bench.signIns.script(browser: [.failure(SignInError.canceled)])
         await expect(.signIn(.canceled)) { () throws(MarfaHost.Problem) in
@@ -668,7 +668,7 @@ import Testing
     }
 
     @Test func aCodeIsShownWhileItWaitsAndTheSignInIsKeptOnceApproved() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         let shown = Mutex<[String]>([])
         let signIns = bench.signIns
@@ -684,7 +684,7 @@ import Testing
     }
 
     @Test func aCodeThatExpiresOrIsDeniedKeepsNothing() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         for (error, outcome) in [(SignInError.expired, SignInOutcome.expired), (.denied, .denied)] {
             bench.signIns.script(code: [.success(CodeSignIn(
@@ -700,7 +700,7 @@ import Testing
     }
 
     @Test func aSignInThatEndsWhileTheAppRunsIsSignedInAgainWithoutDiscardingAnything() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
@@ -715,7 +715,7 @@ import Testing
     }
 
     @Test func leavingWithWritesWaitingNeedsAChoice() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -750,7 +750,7 @@ import Testing
     /// Text a page hands over as the copy is left reaches the copy before it reads its queue and closes, so it is
     /// asked about rather than lost.
     @Test func editsHandedOverAsACopyIsLeftAreInItWhenItCloses() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let source = try #require(bench.servers.last)
@@ -768,7 +768,7 @@ import Testing
     }
 
     @Test func aRejectedEditorFlushKeepsTheCurrentLibraryOpen() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let source = try #require(host.source as? FakeMarfaSource)
@@ -781,7 +781,7 @@ import Testing
     }
 
     @Test func refusedWritesCountAsWaiting() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let refused = SyncProblemEntry(
@@ -793,7 +793,7 @@ import Testing
     }
 
     @Test func leavingWithNothingWaitingRemovesTheCopy() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         #expect(host.waitingChanges == 0)
@@ -804,7 +804,7 @@ import Testing
 
     /// Until the copy's queue is read, nothing is known of what waits in it.
     @Test func aCopyNotYetReadNeedsAChoice() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         try #require(bench.servers.last).report.set(SyncReport())
@@ -813,7 +813,7 @@ import Testing
     }
 
     @Test func anotherAddressWarnsAndKeepsTheFirstUntilTheSecondOpens() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "one")
         let old = try #require(bench.servers.last)
@@ -847,7 +847,7 @@ import Testing
     }
 
     @Test func aDebugTestServerIsOpenedByTheNextLaunchWithItsKeyHeldInMemory() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.signIns.save("test-key", for: first.address)
         let host = bench.host()
         host.presetTestServer(first)
@@ -859,7 +859,7 @@ import Testing
     }
 
     @Test func aLaunchReconnectsFromTheCopyWithoutWaitingOnTheServer() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.signIns.save("k", for: first.address)
         let host = bench.host()
@@ -875,7 +875,7 @@ import Testing
     }
 
     @Test func aLaunchWithoutASignInAsksForOne() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         let host = bench.host()
         await host.launch()
@@ -888,7 +888,7 @@ import Testing
     }
 
     @Test func aLaunchWithNothingSavedDoesNothing() async throws {
-        let bench = try HostBench()
+        let bench = HostBench()
         let host = bench.host()
         await host.launch()
         #expect(host.state == .disconnected)
