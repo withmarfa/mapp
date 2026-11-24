@@ -35,13 +35,13 @@ The app keeps all of this as its own settings, in one hidden item in the Marfa s
 
 A type's label, fields, parent, status words and icon come from the catalogue, so a type that a person or an app creates works with no change to the app.
 
-Three places read a type's ancestry because the page needs a starting point:
+The app reads type ancestry to decide how to show some items.
 
-- `Catalogue.isTask` treats a child of `core.task` as a task, so a task row can read its due date and priority.
-- `PageHeaderKind` walks up the parents to choose a header for the item page.
+- `Catalogue.isTask` recognizes `core.task` and its descendants, so a task row can read its due date and priority.
+- `Catalogue.isStartDate` recognizes start dates on tasks, events and their descendants.
+- `Catalogue.isFileType` recognizes `core.file` and its descendants.
+- `PageHeaderKind` checks the item type and then its ancestors for the nearest dedicated header.
 - `LookPreset.suggested` reads a type's fields, and walks up the parents for the highlight type, to choose a type's starting look.
-
-A type that nobody at WithMarfa defined takes the nearest built-in type above it through the `parent` chain.
 
 The New row has a starting set of types, and Quick Add can default to Note. Both use only types the library offers.
 

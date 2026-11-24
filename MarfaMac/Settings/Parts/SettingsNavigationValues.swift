@@ -17,7 +17,7 @@ struct SettingsSubpage: Hashable, Sendable {
     func back()
 }
 
-/// The sub-page actions compare by the identity of the window's navigation.
+/// Keeps the environment value stable as the window's history changes.
 nonisolated struct SettingsNavigationActions: Equatable, Sendable {
     let navigation: any SettingsSubpageNavigation
 
