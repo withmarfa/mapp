@@ -1,6 +1,5 @@
 import Foundation
 import Marfa
-import Synchronization
 import UniformTypeIdentifiers
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
@@ -66,7 +65,7 @@ nonisolated final class MarfaSource: ItemSource {
     let embeds: any EmbedResolver
     let copy: WorkingCopy
     let downloadedFiles: (any DownloadedFiles)?
-    private let hub = MarfaHub()
+    let hub = MarfaHub()
     let engine: MarfaEngine
     let events: MarfaEngine.Events
     /// The answers to the app's writes to its settings item, which the engine takes with the rest.
@@ -192,55 +191,6 @@ nonisolated final class MarfaSource: ItemSource {
         let event: MarfaEngine.Event = undoing.map { .undo(write, id, $0) } ?? .write(write, id)
         if case .terminated = events.yield(event) { return false }
         return true
-    }
-
-    // MARK: Sync problems
-
-    var syncReport: SyncReport { hub.report.value }
-
-    func syncReports() -> AsyncStream<SyncReport> {
-        hub.report.values()
-    }
-
-    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool {
-        guard let entry = hub.report.value.problems.first(where: { $0.id == problem }), entry.actions.contains(action)
-        else { return false }
-        switch (problem, action) {
-        case (.write(let id), .discard):
-            return try await ask { .discard(id, $0) }
-        case (.write(let id), .tryAgain):
-            return try await ask { .release(id, $0) }
-        case (.write(let id), .withdraw):
-            // It reads the server, so it runs beside the engine rather than holding up the writes behind it; the
-            // copy announces the withdrawal, which the engine reads again. The server never answers a write taken
-            // out, so the engine answers each as not made.
-            do {
-                // An empty answer means nothing was taken, as when the write was no longer withdrawable.
-                let withdrawn = try await MarfaEngine.asking { try await copy.queue.withdraw(id) }
-                guard !withdrawn.isEmpty else { return false }
-                events.yield(.withdrawn(withdrawn))
-                return true
-            } catch let error as MarfaError {
-                throw SourceFailure(kind: .failed, message: Words.message(for: error))
-            }
-        case (.conflictedCopy(let copy), .discard):
-            submit(.transition(copy, .trashed), as: WriteID())
-            return true
-        case (.conflictedCopy(let copy), .keep):
-            submit(.tag(copy, MarfaProblems.conflictedCopyTag, on: false), as: WriteID())
-            return true
-        default:
-            return false
-        }
-    }
-
-    private func ask(
-        _ event: (CheckedContinuation<Result<Bool, SourceFailure>, Never>) -> MarfaEngine.Event
-    ) async throws -> Bool {
-        let result = await withCheckedContinuation { continuation in
-            if case .terminated = events.yield(event(continuation)) { continuation.resume(returning: .success(false)) }
-        }
-        return try result.get()
     }
 
     func body(of item: ItemID) async throws -> ItemBody {
@@ -572,132 +522,5 @@ nonisolated struct MarfaEmbeds: EmbedResolver {
             }
         }
         return try result.get()
-    }
-}
-
-/// Keeps what every reader of the source has been told, so one that arrives late starts from `.loaded` with it.
-nonisolated final class MarfaHub: Sendable {
-    private struct State {
-        /// What readers were told, by item; nil until the first `.loaded`.
-        var held: Held?
-        var readers: [UUID: AsyncStream<SourceChange>.Continuation] = [:]
-        var finished = false
-    }
-
-    /// Kept by ID, so a change costs what it names rather than the whole library; a late reader's `.loaded` is
-    /// put in order only when it is asked for.
-    private struct Held {
-        var items: [ItemID: Item]
-        var bodies: [ItemID: ItemBody]
-        var catalogue: Catalogue
-        var views: [LibraryView]
-
-        init(_ snapshot: SourceSnapshot) {
-            items = Dictionary(snapshot.items.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
-            bodies = snapshot.bodies
-            catalogue = snapshot.catalogue
-            views = snapshot.views
-        }
-
-        var snapshot: SourceSnapshot {
-            SourceSnapshot(
-                items: items.values.sorted(by: MarfaHub.newestFirst), catalogue: catalogue, views: views, bodies: bodies)
-        }
-
-        mutating func apply(_ change: SourceChange) {
-            switch change {
-            case .loaded(let snapshot): self = Held(snapshot)
-            case .changed(let changes):
-                for id in changes.removed {
-                    items[id] = nil
-                    bodies[id] = nil
-                }
-                for item in changes.upserted { items[item.id] = item }
-                for body in changes.bodies { bodies[body.id] = body }
-            case .catalogue(let catalogue): self.catalogue = catalogue
-            case .views(let views): self.views = views
-            case .answered, .taken, .counts, .unavailable: break
-            }
-        }
-    }
-
-    /// The order of `.loaded`: newest first, by ID where two were made together, so every reader is told one order.
-    nonisolated static func newestFirst(_ lhs: Item, _ rhs: Item) -> Bool {
-        lhs.created != rhs.created ? lhs.created > rhs.created : lhs.id.rawValue < rhs.id.rawValue
-    }
-
-    private let state = Mutex(State())
-    /// What the engine is doing, readable without awaiting it.
-    let activity = EngineActivity()
-    private let connectionState = Latest(MarfaConnectionState.connecting)
-    let report = Latest(SyncReport())
-
-    var connection: MarfaConnectionState { connectionState.value }
-
-    var catalogue: Catalogue { state.withLock { $0.held?.catalogue ?? Catalogue() } }
-
-    /// What readers were last told of each of `ids` that they hold: the item and its text. The engine tells only
-    /// what differs from this, so the library's mapped items are held here, once, and not again in the engine.
-    func told(_ ids: some Collection<ItemID>) -> [ItemID: (item: Item, text: String?)] {
-        state.withLock { state in
-            guard let held = state.held else { return [:] }
-            var told: [ItemID: (item: Item, text: String?)] = [:]
-            told.reserveCapacity(ids.count)
-            for id in ids {
-                if let item = held.items[id] { told[id] = (item, held.bodies[id]?.text) }
-            }
-            return told
-        }
-    }
-
-    var itemsAndCatalogue: ([ItemID: Item], Catalogue) {
-        state.withLock { ($0.held?.items ?? [:], $0.held?.catalogue ?? Catalogue()) }
-    }
-
-    func changes() -> AsyncStream<SourceChange> {
-        let (stream, continuation) = AsyncStream<SourceChange>.makeStream()
-        let token = UUID()
-        continuation.onTermination = { [weak self] _ in self?.state.withLock { _ = $0.readers.removeValue(forKey: token) } }
-        let finished = state.withLock { state in
-            guard !state.finished else { return true }
-            if let held = state.held { continuation.yield(.loaded(held.snapshot)) }
-            state.readers[token] = continuation
-            return false
-        }
-        if finished { continuation.finish() }
-        return stream
-    }
-
-    func connectionStates() -> AsyncStream<MarfaConnectionState> {
-        connectionState.values()
-    }
-
-    /// The engine publishes item changes in order. The sync can also request a count refresh between item changes.
-    func publish(_ change: SourceChange) {
-        let readers = state.withLock { state -> [AsyncStream<SourceChange>.Continuation] in
-            switch change {
-            case .loaded(let snapshot): state.held = Held(snapshot)
-            default:
-                guard state.held != nil else { return [] }
-                state.held?.apply(change)
-            }
-            return Array(state.readers.values)
-        }
-        for reader in readers { reader.yield(change) }
-    }
-
-    func set(_ connection: MarfaConnectionState) {
-        connectionState.set(connection)
-    }
-
-    func finish() {
-        let readers = state.withLock { state in
-            state.finished = true
-            defer { state.readers = [:] }
-            return Array(state.readers.values)
-        }
-        for reader in readers { reader.finish() }
-        connectionState.finish()
-        report.finish()
     }
 }
