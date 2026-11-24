@@ -84,10 +84,14 @@ import Observation
 
     func host(_ id: String?) -> ConnectorHostInfo? { id.flatMap { id in hosts.first { $0.id == id } } }
 
-    func hostName(of entry: Entry) -> String? { host(entry.control?.host ?? entry.summary.hostID)?.name }
+    func hostName(of entry: Entry) -> String? { host(hostID(of: entry))?.name }
 
-    /// The machine a connector is assigned to, as last read.
-    func hostID(of entry: Entry) -> String? { entry.control?.host ?? entry.summary.hostID }
+    /// The machine a connector is assigned to, as last read: its own state once read, which says nil for no machine, else
+    /// the list's.
+    func hostID(of entry: Entry) -> String? {
+        if let control = entry.control { return control.host }
+        return entry.summary.hostID
+    }
 
     func health(of entry: Entry, now: Date = .now) -> ConnectorHealth {
         if entry.control?.host != nil, hostsFailure != nil { return .unread }
@@ -230,14 +234,32 @@ import Observation
             await context.learn(from: error)
             return
         }
+        // Shown at once, so the machine it left never stands in for it while it is read again.
+        if let index = index(plugin) {
+            entries[index].control?.host = host
+            entries[index].summary.hostID = host
+        }
         await reload(plugin)
     }
 
-    /// No Machine: a connector that is running stops until a machine is chosen, so the owner is asked first; one paused or
-    /// on no machine is moved at once.
+    /// No Machine: a connector that is running stops until a machine is chosen, so the owner is asked first; one paused is
+    /// moved at once. Whether it runs is read again first, so one another app resumed since is asked about; where that read
+    /// fails, the owner is asked.
     func chooseNoMachine(for plugin: String) async {
+        guard !working.contains(plugin), let held = entry(plugin), hostID(of: held) != nil else { return }
+        working.insert(plugin)
+        var paused = false
+        do {
+            let fresh = try await context.calls.connectorControl(of: plugin)
+            if let index = index(plugin) { entries[index].control = fresh }
+            paused = fresh.paused
+        } catch {
+            if error == .notFound { markGone(plugin) }
+            await context.learn(from: error)
+        }
+        working.remove(plugin)
         guard let entry = entry(plugin), let host = hostID(of: entry) else { return }
-        if entry.control?.paused == true {
+        if paused {
             await assign(plugin, toHost: nil)
             return
         }

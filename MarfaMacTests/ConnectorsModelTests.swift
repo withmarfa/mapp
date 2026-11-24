@@ -146,6 +146,20 @@ import Testing
         await model.confirm(try #require(model.question))
         #expect(bench.calls.state.withLock { $0.connectorAssigned.map(\.host) } == [nil])
         #expect(model.entry("rss")?.control?.host == nil)
+        // The list still names the machine it left, which never stands in for no machine.
+        let entry = try #require(model.entry("rss"))
+        #expect(model.hostID(of: entry) == nil)
+        #expect(model.unplaced.map(\.name) == ["rss"])
+    }
+
+    @Test func noMachineAsksAboutAConnectorResumedElsewhereSinceThePageRead() async throws {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = rss(bench, paused: true)
+        await model.load()
+        bench.calls.state.withLock { $0.connectorControls["rss"]?.paused = false }
+        await model.chooseNoMachine(for: "rss")
+        #expect(try #require(model.question).change == .noMachine)
+        #expect(bench.calls.state.withLock { $0.connectorAssigned.isEmpty })
     }
 
     @Test func noMachineOnAPausedConnectorIsSentWithoutAsking() async {
