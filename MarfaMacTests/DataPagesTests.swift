@@ -143,7 +143,8 @@ import Testing
     }
 
     @Test func noConcernsLeavesTheSectionToGoAndTheBadgeEmpty() async {
-        let model = OverviewModel(context: bench().context)
+        let bench = bench()
+        let model = OverviewModel(context: bench.context)
         await model.load()
         #expect(model.concerns.isEmpty)
         #expect(model.attentionCount == 0)
