@@ -43,8 +43,7 @@ nonisolated final class ScriptedSignIns: SignIns {
         for (address, token) in held { save(token, for: address, scopes: scopes) }
     }
 
-    /// What a sign-in approved in full holds beyond the owner's permissions and the read of the name, as
-    /// `SystemSignIns.scopes` asks for it; a browser or code sign-in here is approved them.
+    /// The additional scopes a scripted browser or code sign-in grants.
     static let approvedBeyondPermissions = SystemSignIns.scopes.filter {
         InstancePermission(rawValue: $0) == nil && !SystemSignIns.profileScopes.contains($0)
     }

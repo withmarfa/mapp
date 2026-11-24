@@ -33,7 +33,7 @@ import Observation
     private(set) var makeFailure: OwnerFailure?
     /// The link type just made, so the page can open it.
     private(set) var made: String?
-    /// The sheet was closed while its call ran, so what it typed was already handed over.
+    /// Settings closed during registration, so a refused draft goes through the late handover.
     private var closedWhileWorking = false
 
     // Deleting.
@@ -145,7 +145,7 @@ import Observation
         makeFailure = nil
     }
 
-    /// The longest ID the server takes (`types/id-grammar`), which an edge type's dotted ID follows (`edges/types-register-id`).
+    /// The server's 128-byte limit for dotted ASCII IDs (`edges/types-register-id`, `types/id-grammar`).
     static let identifierLimit = 128
     private static let identifierRoot = "user."
 
