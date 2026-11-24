@@ -85,6 +85,11 @@ nonisolated struct ClientPluginCalls: PluginCalls {
 
     // MARK: The release
 
+    var releaseName: String {
+        guard let address = releaseAddress?.trimmingCharacters(in: .whitespacesAndNewlines), !address.isEmpty else { return "withmarfa/plugins" }
+        return address.replacing(/^https?:\/\//, with: "")
+    }
+
     func release() async throws(PluginFailure) -> [ReleasePlugin] {
         do {
             return try await PluginRelease(address: releaseAddress).index().map(Self.listed)

@@ -60,22 +60,22 @@ struct HousekeepingPage: View {
             SettingsSection("Needs Attention") {
                 if let hold {
                     SettingsProblemRow(
-                        title: Text("Clean-Up Is Paused"),
+                        title: Text("Clean-up is paused"),
                         line: hold.clockAt.map { Text("\(host.serverName)’s clock jumped to \(Self.date($0)).") } ?? Text("\(host.serverName)’s clock jumped."),
                         actions: [confirmAction(hold)])
                 }
                 if let instead = model.confirmedInstead {
                     SettingsProblemRow(
-                        title: Text("\(host.serverName) Took Another Date"),
+                        title: Text("\(host.serverName) took another date"),
                         line: Text("You were shown \(Self.date(instead.shown)), and its clock read \(Self.date(instead.confirmed)) when it confirmed."),
                         actions: [])
                 }
                 if let error = model.confirmError {
-                    OwnerProblemRow(title: "Couldn’t Confirm the Date", failure: error, page: .housekeeping, host: host)
+                    OwnerProblemRow(title: "Couldn’t confirm the date", failure: error, page: .housekeeping, host: host)
                 }
                 ForEach(failed, id: \.name) { job in
                     SettingsProblemRow(
-                        title: Text("\(UpkeepWording.jobTitle(job.name)) Failed"), line: Text("Its last run failed."), actions: [])
+                        title: Text("\(UpkeepWording.jobTitle(job.name)) failed"), line: Text("Its last run failed."), actions: [])
                 }
             }
         }

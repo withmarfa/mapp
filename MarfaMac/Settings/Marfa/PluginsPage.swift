@@ -81,7 +81,7 @@ struct PluginsPage: View {
     }
 
     private var installedSection: some View {
-        SettingsSection(name: Text("Installed"), line: Text("What you added to \(host.serverName).")) {
+        SettingsSection(name: Text("Installed"), line: Text("What you added to \(host.serverName), from \(host.pluginCalls.releaseName).")) {
             if model.installed.isEmpty {
                 SettingsRow("No Plugins Installed", look: .off)
             }

@@ -37,7 +37,7 @@ struct StartUpPage: View {
         } else if let snapshot = store.snapshot {
             SettingsPageColumn {
                 SettingsSection(
-                    name: Text("Set Where \(host.serverName) Runs"), line: Text("Read when \(host.serverName) starts. Change them where it runs.")
+                    name: Text("Set Where \(host.serverName) Runs"), line: Text("Read when it starts. Change them there.")
                 ) {
                     if snapshot.startUp.isEmpty {
                         SettingsEmptyCard(symbol: "power", title: Text("Nothing listed"), line: Text("\(host.serverName) lists no start-up settings."))

@@ -24,6 +24,7 @@ actor ReleaseGate {
 }
 
 final class FakePluginCalls: PluginCalls, @unchecked Sendable {
+    let releaseName = "withmarfa/plugins"
     struct State {
         var installed: [InstalledPlugin] = []
         var typeInfo: [String: PluginTypeInfo] = [:]
