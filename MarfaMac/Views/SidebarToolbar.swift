@@ -44,15 +44,17 @@ private struct SidebarToggle: View {
     @Binding var isSidebarVisible: Bool
 
     var body: some View {
-        Button { withAnimation { isSidebarVisible.toggle() } } label: {
-            Label {
-                if isSidebarVisible { Text("Hide Sidebar") } else { Text("Show Sidebar") }
-            } icon: {
-                Image(systemName: "sidebar.left")
-            }
+        let action = isSidebarVisible ? Text("Hide Sidebar") : Text("Show Sidebar")
+        // Short, as Icon and Text takes room from Back and Forward, which then need a wider sidebar. The toolbar takes a lone button's own
+        // label for accessibility, so the button is in a container.
+        HStack(spacing: 0) {
+            Button("Sidebar", systemImage: "sidebar.left") { withAnimation { isSidebarVisible.toggle() } }
+                .help(action)
+                .accessibilityLabel(action)
+                .accessibilityIdentifier("SidebarToggle")
         }
-        .help(isSidebarVisible ? Text("Hide Sidebar") : Text("Show Sidebar"))
-        .accessibilityIdentifier("SidebarToggle")
+        .labelStyle(.iconOnly)
+        .accessibilityElement(children: .contain)
     }
 }
 
