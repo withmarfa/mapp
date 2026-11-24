@@ -212,7 +212,9 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
             do {
                 _ = try await client.updateConfig(headers: .init(xMarfaInstanceId: instanceID), body: .json(body)).ok
             } catch {
-                if let line = StoredSettingWording.notPublic(error) { throw OwnerFailure.refused(line) }
+                if changes["allow_private_addresses"] == .set(.bool(false)), let line = StoredSettingWording.notPublic(error) {
+                    throw OwnerFailure.refused(line)
+                }
                 throw error
             }
         }
