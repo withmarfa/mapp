@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, test } from 'vitest'
-import type { EditorMessage, ItemRequest, PictureAsk, PictureRequest } from '../src/bridge'
+import type {
+  EditorMessage,
+  EmbedRequest,
+  ItemRequest,
+  PictureAsk,
+  PictureRequest,
+} from '../src/bridge'
 
 /** `editor/bridge-messages.json` is the one list of what the page and the app say to each other. The Swift side reads
  *  it in `MarfaMacTests/EditorBridgeTests.swift`. Here the page's own types and its `window.editor` must match it, so a
@@ -10,6 +16,7 @@ const list = JSON.parse(
   readFileSync(resolve(import.meta.dirname, '../bridge-messages.json'), 'utf8'),
 ) as {
   host: Record<string, Record<string, unknown>>
+  embeds: Record<string, Record<string, unknown>>
   items: Record<string, Record<string, unknown>>
   pictures: Record<string, Record<string, unknown>>
   pictureAsks: string[]
@@ -19,10 +26,15 @@ const list = JSON.parse(
 type Tagged<K extends string, M> = M extends { type: infer T } ? (K extends T ? M : never) : never
 // The keys a message must carry: those not optional, apart from its `type`.
 type Required<M> = Exclude<{ [P in keyof M]-?: {} extends Pick<M, P> ? never : P }[keyof M], 'type'>
+/** Exactly these keys, each `true`. With no key, only an empty object: `Record<never, true>` is `{}`, which accepts
+ *  any object, so a field dropped from a message that then has none would still pass. */
+type Exact<Keys extends string> = [Keys] extends [never]
+  ? Record<string, never>
+  : Record<Keys, true>
 /** One entry for each message type, naming exactly its required fields: TypeScript refuses a type or a field the
  *  page's types have and this lacks, and one they lack. */
 type Fields<M extends { type: string }> = {
-  [K in M['type']]: Record<Required<Tagged<K, M>>, true>
+  [K in M['type']]: Exact<Required<Tagged<K, M>> & string>
 }
 
 const host: Fields<EditorMessage> = {
@@ -80,6 +92,9 @@ const host: Fields<EditorMessage> = {
     generation: true,
   },
 }
+const embeds: { request: Exact<Required<EmbedRequest> & string> } = {
+  request: { item: true, text: true },
+}
 const items: Fields<ItemRequest> = {
   suggest: { query: true, item: true },
   pick: { item: true },
@@ -109,6 +124,7 @@ test('the page sends the messages the list names, each with the fields it names'
 })
 
 test('the page asks the app the requests the list names', () => {
+  shapes(list.embeds, embeds)
   shapes(list.items, items)
   shapes(list.pictures, pictures)
   expect(sorted(list.pictureAsks)).toEqual(sorted(Object.keys(asks)))

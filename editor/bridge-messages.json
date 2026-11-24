@@ -67,6 +67,9 @@
       "generation": 1
     }
   },
+  "embeds": {
+    "request": { "item": "x", "text": "![[x.png]]" }
+  },
   "items": {
     "suggest": { "query": "x", "item": "x" },
     "pick": { "item": "x" },

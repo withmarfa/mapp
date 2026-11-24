@@ -6287,7 +6287,7 @@
     "The item can no longer be edited." : {
       "extractionState" : "manual"
     },
-    "The item could not be prepared for printing." : {
+    "The item couldn’t be prepared for printing. Open the item again, then try again." : {
 
     },
     "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back." : {

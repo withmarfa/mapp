@@ -29,6 +29,18 @@ import Testing
         return Set(lines.flatMap { $0.split(separator: "\"").enumerated().filter { $0.offset % 2 == 1 }.map { String($0.element) } })
     }
 
+    /// The page functions a source file names: `call("name"`, `as: "name"` and `window.editor.name(`, the first two
+    /// with the name on the next line as well.
+    private static func pageFunctions(in text: String) -> Set<String> {
+        guard let pattern = try? Regex(#"(?:\bcall\(\s*|\bas:\s*)"(\w+)"|window\.editor\.(\w+)\("#) else { return [] }
+        return Set(text.matches(of: pattern).compactMap { ($0.output[1].substring ?? $0.output[2].substring).map(String.init) })
+    }
+
+    @Test func aCallWithItsNameOnTheNextLineIsFound() {
+        let text = "call(\n    \"split\",\n    in: x)\nrun(as:\n \"merge\")\nwindow.editor.join("
+        #expect(Self.pageFunctions(in: text) == ["split", "merge", "join"])
+    }
+
     @Test func everyMessageTheListNamesDecodes() throws {
         let host = try Self.entries("host")
         #expect(!host.isEmpty)
@@ -41,6 +53,16 @@ import Testing
     @Test func everyMessageTheDecoderReadsIsOnTheList() throws {
         let read = try Self.decoded(in: "MarfaMac/Editor/EditorMessages.swift", from: "init?(body: Any)", to: "\n/// The link a menu")
         #expect(read == Set(try Self.entries("host").keys))
+    }
+
+    @Test func theEmbedRequestTheListNamesDecodesAndNeedsEachField() throws {
+        let embeds = try Self.entries("embeds")
+        #expect(Set(embeds.keys) == ["request"])
+        let fields = try #require(embeds["request"])
+        #expect(EmbedReference.request(fields) != nil, "the embed request did not decode")
+        for key in fields.keys {
+            #expect(EmbedReference.request(fields.filter { $0.key != key }) == nil, "\(key) is not required")
+        }
     }
 
     @Test func everyItemRequestTheListNamesDecodes() throws {
@@ -67,14 +89,8 @@ import Testing
     @Test func everyPageFunctionTheAppCallsIsOnTheList() throws {
         let editor = Self.root.appending(path: "MarfaMac/Editor")
         let files = try FileManager.default.contentsOfDirectory(at: editor, includingPropertiesForKeys: nil).filter { $0.pathExtension == "swift" }
-        let pattern = try Regex(#"(?:\bcall\(|\bas: )"(\w+)"|window\.editor\.(\w+)\("#)
         var called: Set<String> = []
-        for file in files {
-            let text = try String(contentsOf: file, encoding: .utf8)
-            for match in text.matches(of: pattern) {
-                if let name = match.output[1].substring ?? match.output[2].substring { called.insert(String(name)) }
-            }
-        }
+        for file in files { called.formUnion(Self.pageFunctions(in: try String(contentsOf: file, encoding: .utf8))) }
         let listed = Set(try #require(Self.list()["pageFunctions"] as? [String]))
         #expect(!called.isEmpty)
         #expect(called.subtracting(listed).isEmpty, "the page does not offer \(called.subtracting(listed).sorted())")
