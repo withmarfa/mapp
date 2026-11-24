@@ -31,6 +31,16 @@ struct ViewCardsTests {
         #expect(!written.contains("subtext") && !written.contains("properties"))
     }
 
+    @Test func choicesThatDifferInCardsAreDifferentChoices() {
+        var other = ViewMacSettings()
+        other.cards.size = .small
+        #expect(!ViewMacSettings().sameChoices(as: other))
+        var taken = ViewMacSettings(widths: Data([1]))
+        taken.take(choicesOf: other)
+        #expect(taken.cards.size == .small)
+        #expect(taken.widths == Data([1]))
+    }
+
     @Test func settingsStoredBeforeCardsExistOpenWithTheDefaults() throws {
         let settings = try JSONDecoder().decode(ViewMacSettings.self, from: Data(#"{"layout":"gallery"}"#.utf8))
         #expect(settings.cards == ViewCards())

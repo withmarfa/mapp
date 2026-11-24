@@ -23,6 +23,20 @@ import Testing
         #expect(model.failure == nil)
     }
 
+    @Test func theGridAndCancelAreOffWhileAChoiceIsBeingWritten() async {
+        let library = FakeItemLibrary(items: [])
+        library.holdsIconAnswers = true
+        let model = TypeIconPickerModel(type: TypeID("core.task"), library: library, ids: [.lucide: ["lucide:zap"]])
+        #expect(model.canChoose && model.canCancel)
+        let choice = Task { await model.choose("lucide:zap") }
+        #expect(await eventually { model.isWorking })
+        #expect(!model.canChoose, "a second choice cannot start")
+        #expect(!model.canCancel, "the sheet stays open until the server answers")
+        library.answerIcon()
+        #expect(await choice.value)
+        #expect(model.canChoose && model.canCancel)
+    }
+
     @Test func aRefusalIsKeptForThePickerToShow() async {
         let library = FakeItemLibrary(items: [])
         library.iconFailure = .notPermitted

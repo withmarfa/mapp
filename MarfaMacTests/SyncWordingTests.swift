@@ -19,6 +19,13 @@ struct SyncStatusTests {
             actions: MarfaProblems.actions(for: kind))
     }
 
+    @Test func theReasonOfBeingOfflineIsNotInTheNotice() throws {
+        let note = try #require(SyncStatus(state: .offline(reason: "network: refused"), report: report(waiting: 1, oldest: 2), now: now).primary)
+        #expect(note.kind == .offline)
+        #expect(!note.detail.contains("network"), "the reason is the package's, not the person's")
+        #expect(!note.line.contains("refused"))
+    }
+
     @Test func aRefusedKeyPointsToSettingsAndSaysWhatWaits() throws {
         let status = SyncStatus(state: .keyRefused, report: report(waiting: 2, oldest: 60), now: now)
         let note = try #require(status.primary)
@@ -178,5 +185,11 @@ struct ConnectionStatusTests {
                 #expect(!text.localizedCaseInsensitiveContains(raw), "“\(text)” says “\(raw)”")
             }
         }
+    }
+
+    @Test func theReasonOfBeingOfflineIsNotShown() {
+        let status = ConnectionStatus(.offline(reason: "network: connection refused (os error 61)"))
+        #expect(status.detail?.contains("os error") == false)
+        #expect(!status.isProblem)
     }
 }

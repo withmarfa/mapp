@@ -119,6 +119,20 @@ struct MarfaSyncFailureTests {
         await source.close()
     }
 
+    /// A change the server may or may not have made is told apart, and neither version carries the package's text.
+    @Test func aContractMismatchIsToldWhetherTheChangeWasSentAndKeepsTheRawTextOut() {
+        let raw = "https://marfa.example.test refused"
+        let unsent = MarfaError.contractMismatch(served: "9", expected: 1, status: 412, writeSent: false, message: raw, server: nil)
+        let sent = MarfaError.contractMismatch(served: "9", expected: 1, status: nil, writeSent: true, message: raw, server: nil)
+        let unsentWords = Words.message(for: unsent)
+        let sentWords = Words.message(for: sent)
+        #expect(unsentWords != sentWords, "a change that may already have been made is not told as one that was not")
+        for words in [unsentWords, sentWords] {
+            #expect(words != Words.syncFailed)
+            #expect(!words.contains("example.test"))
+        }
+    }
+
     /// The package reports it as a stopped follow, or as a copy that needs hydration when its first fill met it.
     @Test(arguments: [false, true])
     func aServerThatIsAnotherOneIsToldWithTheChangesThatWillNotBeSent(duringTheFirstFill: Bool) async throws {
@@ -129,6 +143,29 @@ struct MarfaSyncFailureTests {
         fake.sendUpdate(update(duringTheFirstFill ? .needsHydration(other) : .stopped(other)))
         #expect(await waitForConnection(source) { $0 == .unavailable(message: Words.otherServer(unsent: 1)) })
         #expect(Words.otherServer(unsent: 1).contains("1 change"))
+        await source.close()
+    }
+
+    /// The package reports a server too old as a stopped follow, or as a copy whose first fill met it: each is shown
+    /// in the app's words, with none of the server's text, and the sidebar stops saying it is syncing.
+    @Test(arguments: [false, true])
+    func aServerTooOldIsToldInTheAppsWordsAndNotTheServersText(duringTheFirstFill: Bool) async throws {
+        let raw = "Copy streams require exactly edges=all&copy=1"
+        let tooOld = MarfaError.serverTooOld(served: "0.0.77", oldest: "0.0.78", message: raw)
+        let (fake, source, _, log) = try await open(failing: [])
+        fake.sendUpdate(update(duringTheFirstFill ? .needsHydration(tooOld) : .stopped(tooOld)))
+        let words = Words.message(for: tooOld)
+        #expect(!words.contains("edges=all"), "the server's text is never shown")
+        let state = try #require(await log.wait { unavailable($0) == 1 })
+        let told = state.changes.compactMap { change -> String? in
+            if case .unavailable(let failure) = change { failure.message } else { nil }
+        }
+        #expect(told == [words])
+        #expect(await waitForConnection(source) { $0 == .unavailable(message: words) })
+        let foot = try #require(SyncFootLine(state: source.connectionState, report: source.syncReport, lastSynced: nil, now: Date()))
+        #expect(foot.kind == .failed, "the sidebar kept syncing")
+        #expect(foot.help == words)
+        #expect(ConnectionStatus(source.connectionState).detail?.hasSuffix(words) == true)
         await source.close()
     }
 

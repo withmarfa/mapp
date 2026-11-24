@@ -35,6 +35,20 @@ import Testing
         #expect(MarfaServerCalls.patch(InstanceConfigPatch(values: [:], clear: [])) == Operations.UpdateConfig.Input.Body.JsonPayload())
     }
 
+    /// The read side keeps the daily and weekly retention windows apart: distinct values would show a swap.
+    @Test func theServersSettingsAreReadByTheirNames() {
+        let answer = Components.Schemas.InstanceConfig(
+            instanceId: "i-1", versionRecentDays: 7, versionDailySnapshotDays: 30, versionWeeklySnapshotDays: 90,
+            name: "Home", trashRetentionDays: 30)
+        let config = MarfaServerCalls.config(answer)
+        #expect(config.instanceID == "i-1")
+        #expect(config.values[.name] == .text("Home"))
+        #expect(config.values[.trashRetentionDays] == .number(30))
+        #expect(config.values[.versionDailyDays] == .number(30))
+        #expect(config.values[.versionWeeklyDays] == .number(90))
+        #expect(config.values[.versionMaxVersions] == nil)
+    }
+
     // MARK: The sign-in
 
     @Test func anUnreadableSignInIsToldAsUnreadableAndNothingIsSent() async throws {
@@ -89,5 +103,23 @@ import Testing
         let ending = MarfaServerCalls.ending(MarfaError.notFound(code: "not_found", message: "gone", server: nil))
         #expect(MarfaServerCalls.historyFailure(ending) == .unavailable)
         #expect(MarfaServerCalls.iconFailure(ending) == .failed(Words.syncFailed))
+    }
+
+    /// What the package says, sometimes with the server's address, is logged and never shown.
+    @Test func aFailureIsToldInTheAppsWordsNeverThePackagesText() {
+        let raw = "https://marfa.example.test answered 500 for getConfig"
+        for error in [MarfaError.notFound(code: "not_found", message: raw, server: nil), .instanceChanged(message: raw, server: nil), .versionConflict(message: raw, server: nil)] {
+            #expect(!Words.message(for: error).contains("example.test"))
+        }
+        #expect(MarfaServerCalls.ending(MarfaError.versionConflict(message: raw, server: nil)) == .failed(Words.syncFailed))
+        #expect(MarfaServerCalls.ending(MarfaError.notFound(code: "not_found", message: raw, server: nil)) == .notFound(Words.syncFailed))
+        // Exercise the fallback with a synthetic OpenAPI wrapper.
+        let wrapped = ClientError(operationID: "getConfig", operationInput: "", causeDescription: "", underlyingError: MarfaError.noConnection(message: raw))
+        #expect(MarfaServerCalls.ending(wrapped) == .unreachable)
+        let view = MarfaMapping.viewFailure(MarfaError.versionConflict(message: raw, server: nil))
+        #expect(!view.message.contains("example.test"))
+        struct Other: LocalizedError { var errorDescription: String? { "https://marfa.example.test went wrong" } }
+        #expect(MarfaServerCalls.ending(Other()) == .failed(Words.syncFailed))
+        #expect(MarfaMapping.viewFailure(Other()).message == Words.syncFailed)
     }
 }

@@ -24,6 +24,15 @@ import Testing
         #expect(!without.holdsAll && without.permissionsLine == "The app holds 13 of the owner’s 14 permissions.")
     }
 
+    /// Signed In As is shown while the sign-in is held, answered or not, and not once it has ended.
+    @Test func signedInAsIsShownWheneverTheSignInIsHeld() {
+        func account(_ state: MarfaConnectionState, readsProfile: Bool = true) -> ConnectionAccount {
+            ConnectionAccount(state: state, grants: [], grantsRead: true, readsProfile: readsProfile, waiting: 0, serverName: "X")
+        }
+        #expect(account(.online).showsName && account(.connecting).showsName && account(.offline(reason: nil)).showsName)
+        #expect(!account(.keyRefused).showsName && !account(.disconnected).showsName)
+    }
+
     @Test func withoutTheNameScopeSignedInAsIsEmptyAndPointsToTheOneAllowMore() {
         let without = ConnectionAccount(state: .online, grants: [], grantsRead: true, readsProfile: false, waiting: 0, serverName: "X")
         #expect(without.showsName && without.offersName)

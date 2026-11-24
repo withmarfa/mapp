@@ -46,6 +46,9 @@ final class FakeItemLibrary: ItemLibrary {
     var fieldFailure: TypeSchemaFailure?
     private(set) var editedFields: [FieldEditPlan] = []
     private(set) var chosenIcons: [(type: TypeID, icon: String?)] = []
+    /// While set, an icon choice waits for `answerIcon()` before it answers.
+    var holdsIconAnswers = false
+    private var heldIconAnswer: CheckedContinuation<Void, Never>?
     /// What the server last gave for sources; `serverSources` is what the next refresh reads.
     var sources = SourceDirectory()
     var serverSources: SourceDirectory?
@@ -590,7 +593,13 @@ final class FakeItemLibrary: ItemLibrary {
         return nil
     }
 
+    func answerIcon() {
+        heldIconAnswer?.resume()
+        heldIconAnswer = nil
+    }
+
     func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure? {
+        if holdsIconAnswers { await withCheckedContinuation { heldIconAnswer = $0 } }
         if let iconFailure { return iconFailure }
         chosenIcons.append((type, icon))
         catalogue = catalogue.choosingIcon(icon, ofType: type)

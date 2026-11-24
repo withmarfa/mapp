@@ -195,6 +195,24 @@ import Testing
         #expect(try bench.signIns.key(for: first.address) == "key-2")
     }
 
+    /// A switch that is done but for removing the old server's sign-in says it switched rather than disconnected, and tells
+    /// the person where to remove what is left.
+    @Test func aSwitchThatLeavesTheOldSignInBehindSaysItSwitched() async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        await connect(model)
+        bench.signIns.script(signOut: .failure(SourceFailure(kind: .denied, message: "The keychain refused.")))
+        model.otherAddress = "http://second.test:8210"
+        _ = model.host.scripted("key-2")
+        await model.switchServer()
+
+        #expect(model.host.connection == second)
+        #expect(model.otherAddress == "")
+        let notice = try #require(model.notice)
+        #expect(notice.title.contains("Switched"))
+        #expect(notice.message.contains("Keychain Access"))
+    }
+
     // MARK: Leaving a copy
 
     @Test func disconnectingWithNothingWaitingAsksOnceThenRemovesTheCopy() async throws {

@@ -184,3 +184,10 @@ private let github = SourceInfo(code: "gh", name: "GitHub", mark: nil, hasChosen
         #expect(!model.canRemoveMark)
     }
 }
+
+struct SourceServerMappingTests {
+    @Test func aChangeIsASetOrAClear() {
+        #expect(MarfaServerCalls.change(.set("x")) == .set("x"))
+        #expect(MarfaServerCalls.change(.clear) == .clear)
+    }
+}
