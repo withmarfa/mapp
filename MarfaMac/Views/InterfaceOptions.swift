@@ -20,6 +20,8 @@ enum InterfaceKey {
     static let inspectorAppOpen = "inspectorAppOpen"
     /// Whether the window's toolbar shows an item's title once the page's header has scrolled away.
     static let showsScrolledTitle = "showsScrolledTitle"
+    /// Whether Back and Forward stand over the sidebar.
+    static let showsSidebarHistory = "showsSidebarHistory"
     /// What the toolbar's items show, chosen under Show in Customize Toolbar.
     static let toolbarLabelStyle = "toolbarLabelStyle"
     /// Whether an item's page backs the toolbar with a blurred band while content scrolls under it.
@@ -28,7 +30,7 @@ enum InterfaceKey {
     static let valuePanelStyle = "valuePanelStyle"
     /// What the command palette, Search Items and quick add stand on.
     static let paletteMaterial = "paletteMaterial"
-    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, inspectorOutlineOpen, inspectorAttachmentsOpen, inspectorCollectionsOpen, inspectorAppOpen, showsScrolledTitle, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, inspectorOutlineOpen, inspectorAttachmentsOpen, inspectorCollectionsOpen, inspectorAppOpen, showsScrolledTitle, showsSidebarHistory, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 /// What a value panel is made of. Glass lets the page show through; Solid is the window's own color.

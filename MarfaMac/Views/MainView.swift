@@ -16,6 +16,7 @@ struct MainView: View {
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     /// Kept with the window for the next launch, as the selection and the details are.
+    @AppStorage(InterfaceKey.showsSidebarHistory) private var showsSidebarHistory = true
     @SceneStorage("sidebarHidden") private var isSidebarHidden = false
     @State private var snapshotSaver = DelayedAction()
     @State private var measuredWidths = ColumnWidthTracker()
@@ -139,7 +140,7 @@ struct MainView: View {
     private func windowToolbar(hasListColumn: Bool = false) -> WindowToolbar {
         WindowToolbar(
             browser: browser, items: browser.selectedHeaderItems(in: library), editor: editor, details: details,
-            hasListColumn: hasListColumn)
+            hasListColumn: hasListColumn, hasSidebarBack: isSidebarVisible && showsSidebarHistory)
     }
 
     /// Only the three-column split has a list column to measure.

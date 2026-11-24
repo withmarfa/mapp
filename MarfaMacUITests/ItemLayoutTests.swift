@@ -39,7 +39,7 @@ nonisolated final class ItemLayoutTests: XCTestCase {
         app.completeQuickAdd(type: "Note", title: "Narrow item")
         XCTAssertTrue(app.itemPageTitle.waitForExistence(timeout: 3))
         capture("New item narrow width")
-        XCTAssertFalse(app.buttons["Back"].exists)
+        XCTAssertFalse(app.buttons["BackToGallery"].exists)
     }
 
     @MainActor func testSearchFieldStartsAtTheColumnAndEndsBeforeTheOptions() {

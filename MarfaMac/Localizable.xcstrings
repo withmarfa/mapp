@@ -2345,6 +2345,9 @@
     "Back" : {
 
     },
+    "Back and Forward" : {
+
+    },
     "Back Up" : {
 
     },
@@ -4483,6 +4486,9 @@
     "Hide Section" : {
 
     },
+    "Hide Sidebar" : {
+
+    },
     "Hide Views from Sidebar" : {
 
     },
@@ -6552,6 +6558,9 @@
     "Over the List" : {
 
     },
+    "Over the sidebar." : {
+
+    },
     "Overview" : {
 
     },
@@ -7751,6 +7760,9 @@
 
     },
     "Show Reader or Original" : {
+
+    },
+    "Show Sidebar" : {
 
     },
     "Show Snippets" : {

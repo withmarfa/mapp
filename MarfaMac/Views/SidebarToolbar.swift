@@ -15,21 +15,27 @@ import SwiftUI
 ///   button in one capsule once the sidebar has been hidden and shown: the system drops the space while the sidebar is
 ///   still narrow, and does not put it back.
 /// - The sidebar is never narrower than these need (`ColumnWidth.sidebar`).
-/// - With the sidebar hidden only its button is declared. Items that do not fit are sent to an overflow menu at the far end
-///   of the window, which would show for these alone.
+/// - All of it is always declared, and Back and Forward are hidden while they do not show: a layout the person has
+///   customized never takes back an item that left it. Shown beside a hidden sidebar, they would go to an overflow menu at
+///   the far end of the window.
 struct SidebarToolbar: CustomizableToolbarContent {
     let browser: Browser
     @Binding var isSidebarVisible: Bool
+    @AppStorage(InterfaceKey.showsSidebarHistory) private var showsHistory = true
+
+    private var showsPair: Bool { isSidebarVisible && showsHistory }
 
     var body: some CustomizableToolbarContent {
-        if isSidebarVisible { ToolbarSpacer(.flexible).customizationBehavior(.disabled) }
+        ToolbarSpacer(.flexible).customizationBehavior(.disabled)
         ToolbarItem(id: "sidebarToggle") { SidebarToggle(isSidebarVisible: $isSidebarVisible) }
             .customizationBehavior(.disabled)
-        if isSidebarVisible {
-            ToolbarItem(id: "sidebarHistory") { SidebarHistory(browser: browser) }
-                .sharedBackgroundVisibility(.hidden)
-                .customizationBehavior(.disabled)
+        ToolbarItem(id: "sidebarHistory") {
+            // A hidden item keeps its content's width, which would hold the sidebar button off the traffic lights.
+            if showsPair { SidebarHistory(browser: browser) }
         }
+            .sharedBackgroundVisibility(.hidden)
+            .customizationBehavior(.disabled)
+            .hidden(!showsPair)
     }
 }
 

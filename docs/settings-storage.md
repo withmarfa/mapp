@@ -22,7 +22,7 @@ The defaults on this Mac stay the store the app's code reads, so a launch reads 
 
 | Place | Keys |
 | --- | --- |
-| `appearance` field | `theme`, `accentColor`, `highlightColor`, `textFont`, `codeFont`, `interfaceTextSize`, `valuePanelStyle`, `paletteMaterial`, `showsScrolledTitle`, `showsPageToolbarBackground`, `toolbarLabelStyle`, `sidebarSubtypeIcons` |
+| `appearance` field | `theme`, `accentColor`, `highlightColor`, `textFont`, `codeFont`, `interfaceTextSize`, `valuePanelStyle`, `paletteMaterial`, `showsScrolledTitle`, `showsPageToolbarBackground`, `showsSidebarHistory`, `toolbarLabelStyle`, `sidebarSubtypeIcons` |
 | `general` field | `dateFormat`, `weekStart`, `startWith`, `newItemType`, `openItemsIn`, `remotePictures` |
 | `editor` field | every `PageKey`, and `sourceViewMode` |
 | `lists` field | `listDensity`, `showsQuickAddOptions`, `calendarHourHeight`, `indexNewTypes`, `noteSort`, `groupsByDate` |
