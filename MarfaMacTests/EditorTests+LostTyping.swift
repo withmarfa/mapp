@@ -106,6 +106,21 @@ extension EditorTests {
         try await page.wait { page.editor.isReady }
     }
 
+    /// The person may have chosen another item while the page came back, and that is the one to check.
+    @Test func aPageThatCannotComeBackNamesTheItemItHolds() async throws {
+        let library = FakeItemLibrary()
+        let first = library.add("First\n")
+        let second = library.add("Second\n")
+        let page = try await Page(library: library)
+        try await page.show(first.id)
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        page.editor.select(try #require(library.item(second.id)))
+        try await page.wait { page.editor.isReady }
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        #expect(library.notices.waiting.count == 1)
+        #expect(library.notices.waiting.first?.title.contains("Second") == true)
+    }
+
     /// A shown notice may be on the person's screen or its text on their clipboard, so it stays.
     @Test func aLossNoticeAlreadyShownStaysWhenThePageCannotComeBack() async throws {
         let page = try await Page()

@@ -142,13 +142,13 @@ extension EditorController {
     /// Records that the page went down after it had been ready, as when its process ended or loading it again failed,
     /// and tells the person. Where it held no item they could edit, nothing typed can be missing. The notice's words
     /// are worked out here, once, so it is still found waiting after its item is renamed or goes. A loss that becomes
-    /// one that cannot come back takes back the notice saying it would come back where no window has shown it yet, so
-    /// one true notice is told.
+    /// one that cannot come back names the item on the page now, which the person may have chosen meanwhile, and takes
+    /// back the notice saying it would come back where no window has shown it yet, so one true notice is told.
     func pageWentDown(comingBack: Bool) {
         let earlier = pageLoss
         guard earlier != nil || (isEditable && pageItemID != nil) else { return }
-        let title = earlier?.title
-            ?? pageItemID.flatMap { library?.item($0) }.map { String(localized: "Typing in “\($0.displayTitle)” Might Be Missing") }
+        let title = pageItemID.flatMap { library?.item($0) }.map { String(localized: "Typing in “\($0.displayTitle)” Might Be Missing") }
+            ?? earlier?.title
             ?? String(localized: "Some Typing Might Be Missing")
         let message = comingBack
             ? String(localized: "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing.")
