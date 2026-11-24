@@ -437,10 +437,14 @@ struct MarfaSourceOfflineTests {
         }
         #expect(told, "told: \(library.notices.waiting.map(\.message))")
         #expect(library.item(child)?.title == "MARFAMACTEST child")
-        // The create waits for the server, neither answered nor refused by the link that failed beside it.
-        #expect(log.current.answer(to: write) == nil)
+        // The create waits for the server, neither answered nor refused by the link that failed beside it. The source
+        // tells a write it queued taken once the link was tried, and answers one it refused in its place.
+        await source.queueSubmitted()
+        let settled = try #require(await log.wait { $0.changes.contains(.taken(write)) || $0.answer(to: write) != nil })
+        #expect(settled.answer(to: write) == nil)
         let creates = try await source.copy.queue.all().filter { $0.kind == .createItem }
         #expect(creates.map(\.itemId) == [child.rawValue])
+        #expect(creates.first?.verdict == nil)
         await source.close()
     }
 
