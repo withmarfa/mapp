@@ -58,6 +58,48 @@ extension EditorTests {
         #expect(await Self.flushed(page, leaving: true))
     }
 
+    /// A page that ends every time it shows the item would otherwise reload, and tell the person, for ever.
+    @Test func aPageThatEndsAgainBeforeItShowsTheItemIsNotLoadedAgain() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        let notices = page.library.notices
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        try await page.wait { page.editor.isReady }
+        let reload = page.editor.pageNavigation
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        #expect(page.editor.pageNavigation === reload, "not loaded again")
+        #expect(notices.waiting.count <= 2)
+        Self.answerAll(notices)
+        #expect(await Self.flushed(page, leaving: true))
+    }
+
+    @Test func aPageThatShowedTheItemAgainComesBackFromAnotherEnd() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        try await page.wait { page.editor.isReady }
+        try await Self.post("{ type: 'painted', generation: \(page.editor.generation) }", to: page)
+        try await page.wait { page.editor.pageLoss == nil }
+        let reload = page.editor.pageNavigation
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        #expect(page.editor.pageNavigation !== reload)
+        #expect(page.editor.pageLoss?.comingBack == true)
+        try await page.wait { page.editor.isReady }
+    }
+
+    @Test func aReloadThatIsNotReadyInTimeCountsAsUnableToComeBack() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        let notices = page.library.notices
+        page.editor.reloadLimit = .milliseconds(10)
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        try await page.wait { notices.waiting.count == 2 }
+        #expect(page.editor.pageLoss?.comingBack == false, "the person is told to close the window and open the item again")
+        Self.answerAll(notices)
+        #expect(await Self.flushed(page, leaving: true))
+    }
+
     /// Choosing another item stays in the window, so it waits for no answer: what was lost is already told.
     @Test func anItemChosenWhileThePageComesBackShowsOnceItIsBack() async throws {
         let library = FakeItemLibrary()
@@ -93,6 +135,17 @@ extension EditorTests {
         page.editor.close()
         try await page.wait { page.editor.isReady }
         #expect(page.editor.pageItemID == nil)
+    }
+
+    /// The notice keeps the words it was told with, so it is still found when its item is renamed or goes.
+    @Test func aWaitingLossNoticeIsFoundAfterItsItemGoes() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        let id = try #require(page.editor.pageItemID)
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        page.library.items.removeAll { $0.id == id }
+        #expect(await Self.flushed(page, leaving: true) == false)
+        #expect(page.library.notices.waiting.count == 1, "told once")
     }
 
     @Test func aPageThatFailsToLoadAfterItWasReadyTellsThePersonAndHoldsLeaving() async throws {

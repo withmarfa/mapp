@@ -140,12 +140,30 @@ extension EditorController {
     }
 
     /// Records that the page went down after it had been ready, as when its process ended or loading it again failed,
-    /// and tells the person. Where it held no item they could edit, nothing typed can be missing.
+    /// and tells the person. Where it held no item they could edit, nothing typed can be missing. The notice's words
+    /// are worked out here, once, so it is still found waiting after its item is renamed or goes.
     func pageWentDown(comingBack: Bool) {
-        guard let item = pageLoss?.item ?? (isEditable ? pageItemID : nil) else { return }
-        pageLoss = PageLoss(item: item, comingBack: comingBack)
+        let title: String
+        if let pageLoss {
+            title = pageLoss.title
+        } else {
+            guard isEditable, let pageItemID else { return }
+            title = library?.item(pageItemID).map { String(localized: "Typing in “\($0.displayTitle)” Might Be Missing") }
+                ?? String(localized: "Some Typing Might Be Missing")
+        }
+        let message = comingBack
+            ? String(localized: "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing.")
+            : String(localized: "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close the window that shows this item, then open the item again to check it.")
+        pageLoss = PageLoss(title: title, message: message, comingBack: comingBack)
         pageLosses += 1
         tellPageLoss()
+    }
+
+    /// The page showed the item again after a loss (`painted`, or the person typed), so it came back, and a later end
+    /// is a loss of its own.
+    func pageWorks(in generation: Int) {
+        guard let loadedAgain = pageLoss?.loadedAgain, generation >= loadedAgain else { return }
+        pageLoss = nil
     }
 
     /// Whether a flush fails because the page is down after a loss: while it is coming back, so the person can check
@@ -162,22 +180,11 @@ extension EditorController {
     /// Tells the person the page went down, unless that notice still waits for their answer.
     func tellPageLoss() {
         guard let pageLoss, let notices = library?.notices, !isLossNoticeWaiting(pageLoss) else { return }
-        let notice = lossNotice(pageLoss)
-        notices.notKept(notice.title, text: nil, reason: notice.message, standsAlone: true)
+        notices.notKept(pageLoss.title, text: nil, reason: pageLoss.message, standsAlone: true)
     }
 
     private func isLossNoticeWaiting(_ loss: PageLoss) -> Bool {
-        let notice = lossNotice(loss)
-        return library?.notices.waiting.contains { $0.title == notice.title && $0.message == notice.message } == true
-    }
-
-    private func lossNotice(_ loss: PageLoss) -> (title: String, message: String) {
-        let title = library?.item(loss.item).map { String(localized: "Typing in “\($0.displayTitle)” Might Be Missing") }
-            ?? String(localized: "Some Typing Might Be Missing")
-        let message = loss.comingBack
-            ? String(localized: "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing.")
-            : String(localized: "The editor stopped unexpectedly and couldn’t start again, so the last thing you typed in this item might not be saved. Close the window that shows this item, then open the item again to check it.")
-        return (title, message)
+        library?.notices.waiting.contains { $0.title == loss.title && $0.message == loss.message } == true
     }
 
     /// The page reports each change as it is made, so what it never reported is not on the page to give back.
@@ -202,11 +209,16 @@ extension EditorController {
     }
 
     /// The page went down after it had been ready, holding an item the person could edit, so what they typed last may
-    /// not have reached the app.
+    /// not have reached the app. It lasts until the page has shown the item again (`pageWorks`).
     struct PageLoss {
-        let item: ItemID
-        /// Whether the page is loading again. One that ended again before it was ready, or failed to load, is not.
+        /// The notice that tells the person, as it was told.
+        let title: String
+        let message: String
+        /// Whether the page is loading again. One that ended again before it showed the item, failed to load, or was
+        /// not ready within `reloadLimit` is not.
         let comingBack: Bool
+        /// The generation the page loaded the item under once ready again.
+        var loadedAgain: Int?
     }
 
     /// Destructive transitions proceed only once every editor has handed over its current text and its window's

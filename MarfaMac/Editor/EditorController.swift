@@ -14,16 +14,21 @@ final class EditorController: NSObject {
     private(set) var isReady = false
     /// The load whose page stopped answering a flush and was given up on, so the next flush goes ahead without it.
     @ObservationIgnored var abandonedGeneration: Int?
-    /// The page went down after it had been ready, holding an item the person could edit (`pageWentDown`). Cleared when
-    /// the page is ready again.
+    /// The page went down after it had been ready, holding an item the person could edit (`pageWentDown`). Cleared once
+    /// the page has shown the item again (`pageWorks`).
     @ObservationIgnored var pageLoss: PageLoss?
     /// How many losses were recorded, so a flush under way when the page goes down fails even if the page is back.
     @ObservationIgnored var pageLosses = 0
     /// How long a flush waits for the page before giving it up (`flush`). Only a test changes it.
     @ObservationIgnored var flushLimit = Duration.seconds(2)
+    /// How long a page coming back after its process ended has to be ready again before it counts as unable to come
+    /// back (`pageWentDown`). Only a test changes it.
+    @ObservationIgnored var reloadLimit = Duration.seconds(10)
     /// Whether a flush has its turn with the page, and the flushes waiting for theirs (`flush`).
     @ObservationIgnored var isFlushing = false
     @ObservationIgnored var waitingFlushes: [(leaving: Bool, done: (Bool) -> Void)] = []
+    /// Gives up on a page coming back that is not ready within `reloadLimit`.
+    @ObservationIgnored private var reloadWatch: Task<Void, Never>?
     private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false {
@@ -655,7 +660,7 @@ final class EditorController: NSObject {
             releaseHeldEdit()
             outline = nil
             isReady = true
-            pageLoss = nil
+            reloadWatch?.cancel()
             sendHostActivation()
             applyAccent()
             applyKeymap()
@@ -675,18 +680,22 @@ final class EditorController: NSObject {
                 call("load", json(markdown), String(generation), String(isEditable))
                 applyEditingMode()
             }
+            // A page that ends again before it has shown the item cannot come back: the item may be what ends it.
+            if pageItemID == nil { pageLoss = nil } else { pageLoss?.loadedAgain = generation }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
             appendPendingEmbeds()
         case .headings(let headings, let generation):
             let accepted = PageOutline.accepting(headings, generation: generation, current: self.generation, item: shown[generation]?.id)
             if accepted != outline { outline = accepted }
         case .painted(let generation):
+            pageWorks(in: generation)
             guard let open = opening, open.generation == generation else { return }
             open.interval.end()
             opening = nil
         case .changed(let markdown, let generation):
             // A page that reports again is answering, so the next flush waits for it as before.
             if generation == abandonedGeneration { abandonedGeneration = nil }
+            pageWorks(in: generation)
             if isWritingToolsActive() { return holdEdit(markdown, of: generation) }
             report(markdown, of: generation)
         case .state(let state):
@@ -801,18 +810,25 @@ extension EditorController: WKNavigationDelegate {
     }
 
     /// A page that crashes after working comes back with the item it held, as last reported. One that never got
-    /// going is not retried, since it would only fail again, and neither is one that ended again on its way back.
+    /// going is not retried, since it would only fail again, and neither is one that ended again before it showed the
+    /// item, since the item may be what ends it.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         Telemetry.editorProcessEnded(wasReady: isReady)
-        guard isReady, let pageURL else {
-            if pageLoss != nil { pageWentDown(comingBack: false) }
-            return
-        }
+        guard isReady || pageLoss != nil else { return }
+        let comingBack = isReady && pageLoss == nil
         releaseHeldEdit()
         cancelRequests()
         isReady = false
-        pageWentDown(comingBack: true)
+        reloadWatch?.cancel()
+        pageWentDown(comingBack: comingBack)
+        guard comingBack, let pageURL else { return }
         pageNavigation = webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL.deletingLastPathComponent())
+        let losses = pageLosses
+        reloadWatch = Task { [weak self, reloadLimit] in
+            try? await Task.sleep(for: reloadLimit)
+            guard let self, !Task.isCancelled, !isReady, pageLosses == losses else { return }
+            pageWentDown(comingBack: false)
+        }
     }
 
     /// Only the page's own load counts, and only after the page had been ready: one that never got going held nothing
@@ -825,6 +841,7 @@ extension EditorController: WKNavigationDelegate {
         releaseHeldEdit()
         cancelRequests()
         isReady = false
+        reloadWatch?.cancel()
         pageWentDown(comingBack: false)
     }
 }
