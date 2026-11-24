@@ -140,17 +140,17 @@ import Testing
         #expect(libraries.host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty)
     }
 
-    /// Limited gives `instance.read`, `blobs.manage` and `audit.read` of what is asked (`keys-and-oauth/approval-admin-grants`):
-    /// a page that needs one of them opens, and one that needs more still says what is missing.
     @Test func allowMoreApprovedAtLimitedOpensOnlyThePagesItCovers() async throws {
         let bench = try HostBench()
         let (adapter, libraries, _) = try await connected(bench)
         await holdingOlder(bench, libraries)
-        bench.signIns.script(approving: [Self.older.union([.instanceRead, .blobsManage, .auditRead])])
+        // Limited grants these three permissions to the new authorization client.
+        let limited: Set<InstancePermission> = [.instanceRead, .blobsManage, .auditRead]
+        bench.signIns.script(approving: [limited])
         bench.signIns.script(browser: [.success("limited")])
         #expect(await adapter.allowMore([.instanceRead]) == .allowed)
-        #expect(adapter.grants.contains(.auditRead))
-        #expect(!adapter.grants.contains(.backupsManage))
+        #expect(adapter.grants == limited)
+        #expect(libraries.host.notices.waiting.contains { $0.title == Words.permissionsLostTitle })
         bench.signIns.script(approving: [])
         bench.signIns.script(browser: [.success("full")])
         #expect(await adapter.allowMore([.backupsManage]) == .allowed)

@@ -75,7 +75,7 @@ nonisolated final class ScriptedSignIns: SignIns {
     /// The permissions each browser or code sign-in asked for, read from the scopes it asked for, in order.
     var asked: [Set<InstancePermission>] { askedScopes.map { scopes in Set(scopes.compactMap(InstancePermission.init(rawValue:))) } }
 
-    /// What the next browser sign-ins grant of the permissions they ask for, so a test can approve fewer than asked.
+    /// What the next browser or code sign-ins grant of the permissions they ask for.
     func script(approving: [Set<InstancePermission>]) {
         state.withLock { $0.approving = approving }
     }

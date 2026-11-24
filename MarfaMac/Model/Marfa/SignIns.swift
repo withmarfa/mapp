@@ -168,10 +168,9 @@ nonisolated struct SystemSignIns: SignIns {
     static let clientName = "Marfa for Mac"
 
     /// What the app asks the owner to approve: every item to read and write, and every edge (relationships, links
-    /// and attachments), which the server grants apart from items (`edge.*`). With them every owner permission
-    /// (`askedAtSignIn`), so Full Access on the approval page opens every Settings page, and the read of the owner's own
-    /// name for Signed In As, which `GET /profile` gives a credential only with its profile read scope. That read is no
-    /// owner permission. The app's own settings (`PreferencesType`) need a scope that reaches the type, which `*:write`
+    /// and attachments), which the server grants apart from items (`edge.*`). Full Access grants every owner permission
+    /// the app can hold (`askedAtSignIn`). Signed In As reads the owner's name from `GET /profile` with its own scope.
+    /// The app's own settings (`PreferencesType`) need a scope that reaches the type, which `*:write`
     /// never does, and registering the type where the Marfa holds none (`metadata.types:write`). The app asks for
     /// `app.*:write`: the vendor scope is unavailable before its first type exists (`keys-and-oauth/app-vendor-not-named`),
     /// and discovery never lists it afterward. This reaches every app's types; withmarfa/marfa#3522 would let the app ask

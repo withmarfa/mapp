@@ -25,8 +25,6 @@ struct SignInScopesTests {
         #expect(SystemSignIns.scopes.filter { $0.hasPrefix("app.") } == [Self.root])
     }
 
-    /// Full Access on the approval page then gives every Settings page what it needs. `connectors.host` is never asked:
-    /// the server refuses a sign-in that asks for it.
     @Test func aSignInAsksForEveryOwnerPermissionButTheConnectorHosts() {
         #expect(SystemSignIns.askedAtSignIn.map(\.rawValue).sorted() == Self.ownerPermissions)
         #expect(SystemSignIns.scopes.filter { InstancePermission(rawValue: $0) != nil } == Self.ownerPermissions)

@@ -368,8 +368,6 @@ import os
         await dropPendingSignIn()
         // Nothing the sign-in or the copy's change can do may close the library over edits still being typed.
         if source != nil { try await handOver() }
-        // Every sign-in asks for every owner permission (`SystemSignIns.scopes`), so what the owner allowed before is asked
-        // again and one approval gives everything the sign-in lacked.
         await refreshGrants()
         let held = grantsRead ? grants : nil
         try await signIn(to: connection, via: method)

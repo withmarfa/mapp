@@ -82,7 +82,7 @@ import Observation
 
     // MARK: Password
 
-    /// Asks for everything the sign-in lacks, `sign_ins.manage` among it. Cancelled, or approved without it, the page says so.
+    /// Requests access for the sign-in controls and shows their missing permission after an insufficient approval.
     @discardableResult func allowSignIns() async -> Bool {
         note = nil
         let outcome = await context.allowMore([.signInsManage])
@@ -90,8 +90,7 @@ import Observation
         return outcome == .allowed
     }
 
-    /// Opens the sheet that changes the password, asking first for everything the sign-in lacks where it lacks
-    /// `sign_ins.manage`. Cancelled, or approved without it, nothing opens and the page says so.
+    /// Opens the password sheet once the sign-in holds `sign_ins.manage`.
     func beginChangePassword() async {
         note = nil
         if !canManageSignIns {

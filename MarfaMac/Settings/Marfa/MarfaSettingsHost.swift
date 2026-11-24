@@ -76,9 +76,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// The permissions the sign-in holds (`Credential.grants`).
     var grants: Set<InstancePermission> { get }
 
-    /// Signs in again, asking for every permission the sign-in lacks, so one approval opens every page that needs one.
-    /// `permissions` are what the caller needs, which decide whether the answer is `.allowed`. Cancelled, or approved with
-    /// fewer than asked, nothing is added; an approval that drops a permission held before is told to the owner.
+    /// Signs in again with the full request. The new sign-in holds what the owner approves.
+    /// Returns `.allowed` when the new sign-in holds every permission in `permissions`.
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome
     /// Reads what the sign-in holds again, where the server refused for want of a permission the app thought it held.
     func refreshGrants() async
