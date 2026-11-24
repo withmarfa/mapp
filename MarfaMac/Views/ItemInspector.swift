@@ -332,7 +332,8 @@ struct ItemInspector: View {
         ValueEditPresenter.shared.dismiss(restoringFocus: false)
         UserDefaults.standard.set(true, forKey: InspectorSectionKind.tags.key)
         let model = ValueEditModel(ValueEditRequest(kind: .tags, library: library, item: item.id, undoManager: undoManager))
-        model.close = { tagEditor = nil }
+        // The model closes the box itself where the item can no longer take tags, which ends it as leaving it does.
+        model.close = { finishTags() }
         tagEditor = model
     }
 

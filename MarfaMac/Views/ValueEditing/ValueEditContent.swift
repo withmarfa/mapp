@@ -180,7 +180,7 @@ struct ValueEditContent: View {
                 .multilineTextAlignment(.trailing)
                 .focused($timeFocused)
                 .onSubmit { model.commitTime() }
-                .onChange(of: timeFocused) { _, focused in if !focused { model.commitTime() } }
+                .onChange(of: timeFocused) { _, focused in if focused { model.beginTime() } else { model.commitTime() } }
                 .frame(width: 64 * scale)
                 .padding(.horizontal, 6 * scale)
                 .frame(height: 22 * scale)

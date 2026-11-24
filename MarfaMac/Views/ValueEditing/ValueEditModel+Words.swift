@@ -30,12 +30,14 @@ extension ValueEditModel {
             return
         }
         if let reason = limitReason(holding: held.count + 1) {
-            notice = reason
+            refuse(reason, typed: isTypedEntry(id))
             return
         }
         if commitWords(held + [word]) {
             query = ""
             highlight = nil
+        } else {
+            refuse(notice, typed: isTypedEntry(id))
         }
     }
 
