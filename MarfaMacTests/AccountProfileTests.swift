@@ -26,17 +26,17 @@ import Testing
         #expect(account.profile?.name == "Mira Castell")
     }
 
-    @Test func aNameTypedWhileOneIsSentIsSentAfterIt() async throws {
+    @Test func aNameTypedWhileOneIsSentIsSentAfterIt() async {
         let bench = OwnerBench()
         let account = await loaded(bench)
         let gate = bench.calls.hold("setProfileName")
         account.nameDraft = "Mira C"
         let first = Task { await account.saveName() }
-        try await eventually { bench.calls.state.withLock { $0.waiting["setProfileName"] == 1 } }
+        #expect(await eventually { bench.calls.state.withLock { $0.waiting["setProfileName"] == 1 } })
         account.nameDraft = "Mira Castell-Owen"
         await account.saveName()
         gate.open()
-        try await eventually { bench.calls.state.withLock { $0.waiting["setProfileName"] == 1 } }
+        #expect(await eventually { bench.calls.state.withLock { $0.waiting["setProfileName"] == 1 } })
         gate.open()
         await first.value
         #expect(bench.calls.state.withLock { $0.namesSent } == ["Mira C", "Mira Castell-Owen"])

@@ -81,7 +81,8 @@ struct AccountPage: View {
         }
     }
 
-    private func profileSection(_ profile: OwnerProfile) -> some View {
+    /// Profile, and below it, in a section of its own since it has a mark, what the sign-in may not change.
+    @ViewBuilder private func profileSection(_ profile: OwnerProfile) -> some View {
         SettingsSection("Profile") {
             if profile.pictureIsReadable {
                 SettingsRow(
@@ -116,7 +117,9 @@ struct AccountPage: View {
                     if let email = profile.email { SettingsValue(verbatim: email) } else { SettingsValue("Not Set") }
                 }
             }
-            if model.profileNeedsMore {
+        }
+        if model.profileNeedsMore {
+            SettingsSection(name: nil) {
                 SettingsProblemRow(
                     title: Text("Name and Picture"), line: Text("The app isn’t allowed to change your name and picture."), symbol: "lock",
                     tone: nil,

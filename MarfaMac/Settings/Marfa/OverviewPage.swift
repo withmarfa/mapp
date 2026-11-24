@@ -172,10 +172,16 @@ struct OverviewPage: View {
         if updates.isUpdating {
             updatingRow
         } else if let version = model.releaseVersion {
-            SettingsRow(title: Text("Marfa \(version)"), line: model.updateReady.map { Text("Marfa \($0) is ready.") }) { updateButton }
+            SettingsRow(title: Text("Marfa \(version)"), line: readyLine) { updateButton }
         } else if let ready = model.updateReady {
             SettingsRow(title: Text("Marfa \(ready) is ready")) { updateButton }
         }
+    }
+
+    private var readyLine: Text? {
+        guard let ready = model.updateReady else { return nil }
+        guard let published = OwnerWording.when(model.update?.latest?.published) else { return Text("\(ready) is ready.") }
+        return Text("\(ready) is ready. Published \(published).")
     }
 
     private var updatingRow: some View {
