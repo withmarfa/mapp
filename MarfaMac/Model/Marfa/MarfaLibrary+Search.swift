@@ -1,6 +1,6 @@
 import Foundation
 
-/// Link answers and search, which the copy answers beside the views: until an answer returns, the last results stand.
+/// Link answers and search, which the copy answers beside the views: until a search returns, its last results stand.
 extension MarfaLibrary {
     /// What the core says each link target names (`Items.linkCandidates`), from the copy alone and read as a link in
     /// `itemID` when given, so an answer is whatever saving that link there would do. Nil where the core cannot ask,

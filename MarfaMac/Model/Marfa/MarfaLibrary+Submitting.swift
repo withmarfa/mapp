@@ -1,7 +1,7 @@
 import Foundation
 
-/// Writing through the source: every write the library makes goes through `submit`, which follows it to its answer, and
-/// the property edits and link replacements that follow their writes further.
+/// Writing through the source: `submit` hands the source each `ItemWrite` and follows it to its answer, and the
+/// property edits and link replacements follow their writes further. Saved views and attachments are written elsewhere.
 extension MarfaLibrary {
     func awaitLinks(_ links: Set<WriteID>, thenUnlink unlinks: [EdgeDraft]) {
         let group = UUID()
