@@ -51,7 +51,6 @@ extension EditorController {
                     NSLocalizedDescriptionKey: String(localized: "The item couldn’t be prepared for printing. Open the item again, then try again."),
                 ])
                 if let result = value as? [String: Any], let code = result["snapshotError"] {
-                    // What the page said goes to the log; the person gets the app's words and a next step.
                     log.error("the page could not prepare the item for printing: \(String(describing: code), privacy: .public)")
                     throw unprepared
                 }
@@ -66,7 +65,13 @@ extension EditorController {
                 else { _ = await renderer.printDocument(in: window, title: title) }
             } catch {
                 guard pageItemID == id, self.generation == generation else { return }
-                library?.notices.tell(String(localized: "Couldn’t Print Item"), error.localizedDescription)
+                // WebKit's own words for a failed script say nothing the person can act on.
+                let fromThePage = (error as NSError).domain == WKError.errorDomain
+                if fromThePage { log.error("the page failed while preparing the item for printing: \(error, privacy: .public)") }
+                let message = fromThePage
+                    ? String(localized: "The item couldn’t be prepared for printing. Open the item again, then try again.")
+                    : error.localizedDescription
+                library?.notices.tell(String(localized: "Couldn’t Print Item"), message)
             }
         }
     }
