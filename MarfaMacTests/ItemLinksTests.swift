@@ -157,7 +157,7 @@ struct ItemLinksTests {
 }
 
 extension MarfaMac.ItemLinks.Index {
-    func titles(matching text: String, among items: [MarfaMac.Item], limit: Int) async -> [String] {
-        await matches(for: text, among: items, limit: limit).map(\.title)
+    func titles(matching text: String, among items: [MarfaMac.Item], limit: Int) -> [String] {
+        matches(for: text, among: items, limit: limit).map(\.title)
     }
 }
