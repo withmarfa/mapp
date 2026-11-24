@@ -473,6 +473,7 @@ extension MarfaLibrary {
                 made.moves[id] = (from: change.from, to: .active)
                 return notices.tell(name, BatchSkips.sentence(.changedSince, count: 1))
             }
+            movingTo[id] = nil
             // Held like the step's own writes while the copy catches up, but the restore was made, so an archive the
             // engine gives back is told as not made rather than putting the step back.
             within(run) {
@@ -507,7 +508,8 @@ extension MarfaLibrary {
     }
 
     /// A restore that is blocked or dead may still be made once released, but the archive waiting for it is not sent
-    /// after it, so the person is told the item comes back active.
+    /// after it, so the person is told the item comes back active. A block of the whole queue answers every restore
+    /// in it, so those are counted and told once no restore waits any longer.
     func stateWriteAnswered(_ write: WriteID, _ outcome: WriteOutcome) {
         let answer = StateAnswer(outcome)
         let moving = movingTo.first(where: { $0.value.write == write })
@@ -515,11 +517,13 @@ extension MarfaLibrary {
             movingTo[id] = nil
         }
         stateAnswers.removeValue(forKey: write)?(write, answer)
-        if answer == .mayBeMade, moving?.value.awaitsArchive == true { tellArchivesDropped(1) }
+        if answer == .mayBeMade, moving?.value.awaitsArchive == true { archivesDropped += 1 }
+        if archivesDropped > 0, !movingTo.values.contains(where: \.awaitsArchive) { tellArchivesDropped() }
     }
 
     /// The library is closing or changing, so no archive waits any longer for its restore's answer. Each such item
-    /// comes back active if its restore is made, which the person is told, and the steps registered record that move.
+    /// comes back active if its restore is made, which the person is told with any restores already answered blocked
+    /// or dead, and the steps registered record that move.
     /// The library may stay open after all, as when a change of library is canceled; the archive is still not sent,
     /// so what the person was told stays true.
     func dropWaitingArchives() {
@@ -529,10 +533,13 @@ extension MarfaLibrary {
             movingTo[id] = StateMoving(write: moving.write, sent: moving.sent, to: moving.sent)
             stateAnswers.removeValue(forKey: moving.write)?(moving.write, .mayBeMade)
         }
-        tellArchivesDropped(waiting.count)
+        archivesDropped += waiting.count
+        tellArchivesDropped()
     }
 
-    private func tellArchivesDropped(_ count: Int) {
+    private func tellArchivesDropped() {
+        let count = archivesDropped
+        archivesDropped = 0
         notices.tell(
             String(localized: "Couldn’t Finish Undo"),
             String(localized: "\(count) items will come back active, not archived, if they are recovered."))

@@ -108,6 +108,32 @@ import Testing
         #expect(source.writes == [.transition(F.n1, .active), .transition(F.n1, .trashed)])
     }
 
+    @Test func restoresBlockedTogetherAreToldInOneNoticeWithTheirCount() async throws {
+        let (library, source) = try await loaded()
+        try await show(F.n1, .archived, in: library, source)
+        try await show(F.n2, .archived, in: library, source)
+        let undo = UndoManager()
+        library.delete([F.n1, F.n2], undoManager: undo)
+        let bins = source.submitted
+        try #require(bins.count == 2)
+        try await show(F.n1, .trashed, in: library, source)
+        try await show(F.n2, .trashed, in: library, source)
+        for bin in bins {
+            source.send(.taken(bin.id))
+            source.send(.answered(bin.id, .accepted))
+        }
+        source.clearWrites()
+
+        undo.undo()
+        let restores = source.submitted
+        try #require(restores.count == 2)
+        // A block of the whole queue answers every write in it.
+        for restore in restores { source.send(.answered(restore.id, .blocked(.instanceChanged, nil))) }
+        #expect(await eventually { library.notices.waiting.last?.message == Self.comesBackActive(2) })
+        #expect(library.notices.waiting.count { $0.title == String(localized: "Couldn’t Finish Undo") } == 1)
+        #expect(source.writes.count == 2)
+    }
+
     @Test func closingTheLibraryBeforeTheRestoreIsAnsweredSaysTheItemComesBackActive() async throws {
         let (library, source, undo) = try await binnedFromArchive()
         undo.undo()

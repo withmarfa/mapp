@@ -201,6 +201,8 @@ import Observation
     @ObservationIgnored var movingTo: [ItemID: StateMoving] = [:]
     /// What follows the answer to each write of a state change, told what the answer means for the move (`setStates`).
     @ObservationIgnored var stateAnswers: [WriteID: (WriteID, StateAnswer) -> Void] = [:]
+    /// Restores answered blocked or dead whose archive will not follow, told together once no restore waits.
+    @ObservationIgnored var archivesDropped = 0
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
