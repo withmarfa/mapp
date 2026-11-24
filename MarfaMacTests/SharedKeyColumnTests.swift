@@ -5,12 +5,9 @@ import Testing
 /// What a table column, a board lane and a gallery card read where types share a key or inherit a core field.
 @Suite(.hangLimit)
 struct SharedKeyColumnTests {
-    private static let task = TypeID("core.task")
-    private static let event = TypeID("core.event")
     private static let ticket = TypeID("example.ticket")
     private static let meeting = TypeID("example.meeting")
     private static let plain = TypeID("example.plain")
-    private static let other = TypeID("example.other")
 
     private static func status(_ words: [(String, StatusGroup)], by type: TypeID) -> ItemTypeInfo.Field {
         .init(key: "state", label: "State", kind: .status(words.map { StatusWord(value: $0.0, group: $0.1) }), declaredBy: type)

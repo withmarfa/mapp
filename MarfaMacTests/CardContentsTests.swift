@@ -21,15 +21,6 @@ struct CardContentsTests {
             preview: preview, tags: tags, version: ItemVersion(1), created: now, modified: now)
     }
 
-    private static let task = item("core.task", [Property(key: "status", value: .string("todo")), Property(key: "priority", value: .string("high"))])
-    private static func card(
-        _ item: Item, look: TypeLook, mixed: Bool = false, shape: CardShape = CardShape()
-    ) -> RowContent {
-        RowContent.card(
-            for: item, look: look, catalogue: catalogue, list: RowList(mixesTypes: mixed, day: calendar.startOfDay(for: now)),
-            shape: shape, calendar: calendar, locale: Locale(identifier: "en_GB"))
-    }
-
     // MARK: Worked out once for each item
 
     @Test func aChangeOfSelectionOrOfAnotherItemLeavesACardsContentAsItWas() {

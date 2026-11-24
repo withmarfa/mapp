@@ -12,24 +12,16 @@ import Testing
     /// What the package would put in a sentence: an OAuth code, an HTTP status, a system domain.
     private static let raw = ["invalid_grant", "invalid_client", "401", "NSURL", "NSCocoa", "-1009", "errSec", "Domain", "OSStatus", "refused (", "HTTP"]
 
-    private static let cases: [(error: SignInError, outcome: SignInOutcome)] = [
-        (.canceled, .canceled),
-        (.denied, .denied),
-        (.expired, .expired),
-        (.stateMismatch, .notVerified),
-        (.issuerMismatch, .notVerified),
-        (.notSignedIn, .failed),
-        (.notAServer, .notMarfa),
-        (.otherServer, .failed),
-        (.noRedirect, .failed),
-        (.refused(code: "invalid_client", message: "Unknown client, HTTP 401"), .refused),
-        (.unavailable(message: "The Internet connection appears to be offline. (NSURLErrorDomain -1009)"), .couldNotFinish),
-        (.heldElsewhere, .inUse),
-        (.unreadable(message: "The server answered 401 with invalid_grant."), .notMarfa),
+    private static let cases: [SignInError] = [
+        .canceled, .denied, .expired, .stateMismatch, .issuerMismatch, .notSignedIn, .notAServer, .otherServer, .noRedirect,
+        .refused(code: "invalid_client", message: "Unknown client, HTTP 401"),
+        .unavailable(message: "The Internet connection appears to be offline. (NSURLErrorDomain -1009)"),
+        .heldElsewhere,
+        .unreadable(message: "The server answered 401 with invalid_grant."),
     ]
 
     @Test func noSignInErrorsWordsReachTheNotice() throws {
-        for (error, _) in Self.cases {
+        for error in Self.cases {
             guard let notice = MarfaSettingsModel.notice(for: .signIn(SignInOutcome(error))) else {
                 #expect(error == .canceled, "\(error) is told as nothing")
                 continue

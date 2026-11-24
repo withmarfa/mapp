@@ -1,13 +1,8 @@
 @testable import MarfaMac
-import MarfaBrandIcons
-import MarfaIcons
 import Testing
 
 @Suite(.hangLimit)
 @MainActor struct TypeIconPickerTests {
-    private let names = ["arrow-down", "arrow-up", "book", "book-open", "bookmark", "folder", "folder-open", "square-arrow-up"].map { "lucide:" + $0 }
-    private func ids(_ names: [String]) -> [String] { names.map { "lucide:" + $0 } }
-
     @Test func thePickerSavesTheFullIDOfABrandIcon() async {
         let library = FakeItemLibrary(items: [])
         let model = TypeIconPickerModel(type: TypeID("core.task"), library: library, ids: [.simpleIcons: ["simple-icons:github"]])

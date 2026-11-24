@@ -4,10 +4,6 @@ import Testing
 @testable import MarfaMac
 
 struct PageHeaderKindTests {
-    private static func type(_ id: String, parent: String? = nil) -> ItemTypeInfo {
-        ItemTypeInfo(id: TypeID(id), label: id, fields: [], titleField: "title", bodyField: "body", parent: parent.map { TypeID($0) })
-    }
-
     // MARK: Person
 
     private static func item(_ type: String, title: String = "Title", _ properties: [String: PropertyValue] = [:]) -> MarfaMac.Item {

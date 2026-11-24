@@ -7,12 +7,6 @@ import Testing
 struct ViewPropertiesTests {
     private static let catalogue = LookFixture.catalogue()
     private static let now = Date(timeIntervalSince1970: 1_794_000_000)
-    private static let calendar: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
-        return calendar
-    }()
-
     private static func item(_ type: String, _ properties: [String: String] = [:], tags: Set<String> = []) -> Item {
         Item(
             id: .mint(), type: TypeID(type), title: "Title", name: "Title", titleRule: .firstLine,

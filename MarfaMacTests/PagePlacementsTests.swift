@@ -8,7 +8,6 @@ struct PagePlacementsTests {
     private static let ticket = TypeID("aic.ticket")
     private static let comment = TypeID("aic.comment")
     private static let person = TypeID("core.entity.person")
-    private static let folder = TypeID("aic.folder")
 
     private static func field(_ name: String, _ owner: String) -> TypeField {
         TypeField(name: name, type: "string", declaredBy: owner)
@@ -36,12 +35,6 @@ struct PagePlacementsTests {
     ])
     private static let task = TypeID("aic.task")
     private static let subtask = TypeID("aic.subtask")
-
-    private static func item(_ type: TypeID, _ properties: [String: PropertyValue] = [:]) -> MarfaMac.Item {
-        MarfaMac.Item(
-            id: ItemID("10000000-0000-0000-0000-000000000001"), type: type, title: "Title", titleRule: .property("title"),
-            properties: properties.map { Property(key: $0, value: $1) }, version: ItemVersion(1), created: .now, modified: .now)
-    }
 
     // MARK: Choices
 

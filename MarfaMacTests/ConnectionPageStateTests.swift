@@ -1,16 +1,9 @@
-import Foundation
 import Marfa
 import Testing
 @testable import MarfaMac
 
-/// The head and the Account section of Connection in each state the boards draw (S26 to S30), as words in and out.
+/// How Connection shows owner permissions and unsent changes.
 @Suite struct ConnectionPageStateTests {
-    private static let calendar: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return calendar
-    }()
-
     @Test func accountWithoutEveryPermissionSaysHowManyAndOffersMore() {
         let grants: Set<InstancePermission> = [.itemsPurge, .configManage, .schemaWrite, .auditRead, .keysMint]
         let account = ConnectionAccount(state: .online, grants: grants, grantsRead: true, waiting: 0, serverName: "X")

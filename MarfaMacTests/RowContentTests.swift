@@ -1,5 +1,4 @@
 import Foundation
-import struct Marfa.ItemDate
 import Testing
 @testable import MarfaMac
 
@@ -11,36 +10,9 @@ struct RowContentTests {
         calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
         return calendar
     }()
-    private static let locale = Locale(identifier: "en_GB")
     /// Friday 13 November 2026, mid-afternoon.
     private static let now = Date(timeIntervalSince1970: 1_794_000_000)
     private static let longAgo = now.addingTimeInterval(-86_400 * 90)
-
-    private static let people = ItemTypeInfo.Field.Kind.list(ListShape(members: [
-        ListShape.Member(key: "name", label: "Name", kind: .text(nil)),
-        ListShape.Member(key: "email", label: "Email", kind: .text(.email)),
-    ]))
-
-    private static let catalogue: Catalogue = {
-        var specs = LookFixture.specs.map { spec -> LookFixture.Spec in
-            var spec = spec
-            spec.fields = spec.fields.map { field in
-                ["attendees", "assignees"].contains(field.key) ? LookFixture.field(field.key, people) : field
-            }
-            return spec
-        }
-        specs.append(LookFixture.make("test.bare"))
-        specs.append(LookFixture.make("test.board", [
-            LookFixture.field("location", label: "Location"), LookFixture.field("due", LookFixture.day, label: "Due"),
-            LookFixture.field("archived", .boolean, label: "Archived"), LookFixture.field("size", .number, label: "Size"),
-            LookFixture.field("kind", .choice(["a"]), label: "Kind"),
-        ]))
-        specs.append(LookFixture.make("test.ledger", [
-            LookFixture.field("amount", .number), LookFixture.field("currency", format: .currency), LookFixture.field("fee", .number),
-            LookFixture.field("category"),
-        ]))
-        return LookFixture.catalogue(specs)
-    }()
 
     private static func item(
         _ type: String, title: String = "Title", _ properties: [Property] = [], modified: Date = longAgo, tags: Set<String> = [],
@@ -51,19 +23,6 @@ struct RowContentTests {
             tags: tags, version: ItemVersion(1), created: modified, modified: modified)
         item.occurred = nil
         return item
-    }
-
-    private static func people(_ names: [String]) -> PropertyValue {
-        .array(names.map { .object(["name": .string($0)]) })
-    }
-
-    private static func make(
-        _ item: Item, look: TypeLook? = nil, mixed: Bool = false, date: RowDateSource = .look, showsTime: Bool = false
-    ) -> RowContent {
-        let look = look ?? LookFixture.look(item.type.rawValue, in: catalogue)
-        let list = RowList(mixesTypes: mixed, date: date, day: calendar.startOfDay(for: now))
-        return RowContent.make(
-            for: item, look: look, catalogue: catalogue, list: list, showsTime: showsTime, calendar: calendar, locale: locale)
     }
 
     // MARK: The list
