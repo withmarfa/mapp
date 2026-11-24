@@ -315,7 +315,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
                 String(localized: "Change Password"), String(localized: "Passkeys"), String(localized: "Browsers"),
             ]
         case .apps:
-            [String(localized: "Connected"), String(localized: "Disconnect"), String(localized: "Access"), String(localized: "Narrow")]
+            [
+                String(localized: "Connected"), String(localized: "Disconnect"), String(localized: "Access"), String(localized: "Narrow"),
+                String(localized: "Open Marfa Links In"),
+            ]
         case .keys:
             [String(localized: "New Key"), String(localized: "Revoke"), String(localized: "Expires"), String(localized: "Source")]
         case .addresses:

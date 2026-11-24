@@ -76,13 +76,15 @@ struct MarfaSettingsPageView: View {
     let page: MarfaSettingsPage
     let host: any MarfaSettingsHost
     @Environment(\.settingsSubpage) private var subpage
+    /// One for the gate's states and the Apps page both, so a choice still waiting on macOS survives one replacing the other.
+    @State private var links = OpenLinksModel()
 
     var body: some View {
-        MarfaPageGate(page: page, host: host, above: page == .apps && subpage == nil ? AnyView(OpenLinksSection()) : nil) {
+        MarfaPageGate(page: page, host: host, above: page == .apps && subpage == nil ? AnyView(OpenLinksSection(model: links)) : nil) {
             switch page {
             case .overview: OverviewPage(host: host)
             case .account: AccountPage(host: host)
-            case .apps: AppsPage(host: host, subpage: subpage)
+            case .apps: AppsPage(host: host, subpage: subpage, links: links)
             case .keys: KeysPage(host: host, subpage: subpage)
             case .addresses: AddressesPage(host: host)
             case .plugins: PluginsPage(host: host, subpage: subpage)

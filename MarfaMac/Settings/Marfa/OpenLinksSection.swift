@@ -4,7 +4,7 @@ import SwiftUI
 /// Open Marfa Links In: the app macOS opens a `marfa://` link with. It needs no Marfa and no permission, so the Apps page
 /// shows it even where its own state (a missing permission, no copy open) stands in place of the apps.
 struct OpenLinksSection: View {
-    @State private var model = OpenLinksModel()
+    let model: OpenLinksModel
 
     var body: some View {
         SettingsSection("On This Mac") {
@@ -19,6 +19,8 @@ struct OpenLinksSection: View {
                         Label { Text(verbatim: app.title) } icon: { Image(nsImage: app.icon) }.tag(URL?.some(app.url))
                     }
                 }
+                // One question to macOS at a time.
+                .disabled(model.isChanging)
             }
         }
         .onAppear { model.refresh() }
