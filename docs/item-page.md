@@ -26,7 +26,9 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 - **One head, built once.** `PageHead` decides the kicker, pins and rows; `editor/src/header.ts` draws them on a page with text, `PageHeadView` on a saved web page, which has no menu or drag. A rule added in one drawing must be added in the other.
 - **The kicker** is the type's mark and name, then Read Only, Feed or Archived where true. Its name opens Change Type where the item can change type.
 - **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset and hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
-- **A type that keeps no text shows its first six rows.**
+- **A type that keeps no text shows its first six rows,** empty or not.
+- **Every link the type may hold is a row** (`RelationField`): the item's own with the other rows, the rest Empty under Show N More, so an item in no collection has an empty In Collection row. A link Marfa will not change (the text's `references`, a folder) is read only, its help tag saying why.
+- **Links that point at the item wait under Show N More,** since Linked From lists them. Values no field describes are the last rows there, read only, under Other.
 - **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
 - **An event's time is one row, When,** always first, with how far off it is or All Day in grey.
 - **Long text stops after two lines;** an email, a phone and a number to call open.
@@ -88,7 +90,6 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 
 - **Every control in the corner is also a command in the View menu**, and the corner's own menus bind no keys, because a key registered twice works for neither.
 - **A person can turn off formats, text size and Focus** (`PageCornerChoice`). One turned off is in the page's More menu.
-- **Zoom keys size the file or the text, never both** (`FileViewCommands`, `TextZoomCommands`).
 - **A size belongs to one file.** Another item's page opens fitted.
 - **Focus belongs to one window and one item.** It hides the head only, so Linked From stays.
 - **Escape closes the formats bar first, then leaves Focus.** A sheet, the palette and quick add keep Escape for themselves.
@@ -96,7 +97,7 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 ## Text and links
 
 - **A plain click on a link places the caret**, because the page is for writing. Command-click, or Open Link at the caret, opens it.
-- **A link to an item opens as Settings says** (`ItemOpening`), and one followed in the modal stays there. A link in the property block or in Linked From shows the item in the list.
+- **A link to an item opens as Settings says** (`ItemOpening`), and one followed in the modal stays there. So does a link in a row, the foot or a panel, through one function (`EditorController.follow`).
 - **Opening is refused for an address that may not be opened**, such as a script, and the rest of the link's menu stays.
 - **Every look of a link reads the same under the pointer** (`LinkLook`), and a link to nothing keeps its dashes in all of them.
 - **Removing a link keeps its words.**
@@ -105,7 +106,6 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 
 - **A file's text is never edited here**, and its page is drawn around a viewer (`FileViewing`).
 - **A saved web page loads nothing from the network by itself.** Its pictures wait until the person asks (`PicturesWaitingCallout`), and asking changes only what is shown, never the file.
-- **A picture larger than the bitmap that the app keeps is softer when enlarged**, because a decoded picture must not take the window's memory.
 
 ## Version history
 

@@ -114,7 +114,7 @@ private struct WhenLoaded<Content: View>: View {
                           catalogue: library.catalogue,
                           hiddenKeys: library.hiddenPropertyKeys(of: item),
                           relationships: [.init(field: "child-of", label: library.catalogue.edgeTypes[MarfaMapping.parentEdge]?.reverseLabel ?? "", targets: [.init(title: "Missing project", itemID: nil, resolution: .missing)], isEditable: true, allowsMultiple: false)],
-                          onProperty: { _, _ in true }, onOpen: { _ in }, onEdit: { _ in }, onRemove: { _, _ in true })
+                          onProperty: { _, _ in true }, onOpen: { _ in }, onRemove: { _, _ in true })
         }
     }
     .interfaceTextStyle()

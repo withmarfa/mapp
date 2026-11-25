@@ -1,5 +1,5 @@
 ---
-summary: How a value is edited in its panel: the rows, counts, conflicts, an event's time, lists with labels and the location map.
+summary: How a value is edited in its panel: the rows, counts, links, conflicts, an event's time, lists with labels and the location map.
 paths:
   - MarfaMac/Views/ValueEditing/*.swift
   - MarfaMac/Model/Items/EventTime.swift
@@ -24,17 +24,18 @@ paths:
 - **A people panel offers the people the lists already name and the people the library holds as items,** each added with their first address.
 - **An event's time is one panel** (`EventTime`, `EventTimePanelModel`): a calendar, the start and the end each with a day and a time, All Day, and the zone. A change writes only the fields the action changes, so a stored value the person did not touch stays byte for byte.
 - **A day chosen or typed keeps the whole clock time,** seconds and fractions included. Moving the start keeps the length, and an end before the start is refused.
-- **A time the zone does not have on that day is refused,** never moved to one it has. What was typed stays in the field with the reason, and is given back where the panel ends or the start or end changed meanwhile.
+- **A time the zone does not have on that day is refused,** never moved to one it has. What was typed stays in the field with the reason, and is given back where the panel ends.
 - **A list of entries is edited in one panel** (`EntriesEditor`): a block for each entry, its members in rows named by the core's labels. The first is the main one. Add, Return and leaving write the new entry whole, or hand back all of it; a refused Add keeps it to try again.
 - **A conflict is a question, not an error,** so it has no red: "This value changed while you were editing." and "Your edit hasn’t been saved.", with Keep My Edit, the main button, and Use Current Value. Any other refusal is one red line at the foot, and what was typed stays.
 - **A web address is a link, and a click opens it.** Its row's menu has Open, Copy, Edit, then Clear.
 - **Unsaved text is kept when a panel loses its place**, and the person is told where it is.
 - **A panel writes the one property it shows**, on the version it read, so it never writes over another app's change to another property.
+- **A link's panel** (`ValueEditKind.relation`) serves every edge field, inverses too: ten rows narrowed by typing, each a mark and a name (a task its status), an archived item saying Archived. A field of several links shows them as chips, eight lines at most; a field of one replaces its link and closes.
+- **Marfa's answer is obeyed** (`ItemLibrary.changeLinks`): a refusal, or a copy not yet whole, is one red line and the panel stays, with what was typed. One commit is one undo step.
 - **Change Type, Add Tag and Add to Collection are panels too** (`CommandValuePanels`), never sheets. What a command cannot change is left alone and counted (`BatchSkips`).
 
 ## Location
 
-- **The panel is 360 points wide and its map has a zoom stepper.**
 - **The person places the pin.** Apple's license (Developer Program License Agreement, Attachment 6, section 2.5) forbids keeping what a map search returned. A search result only moves the map; what is written is the point the person chose (`LocationPanelModel`).
 - **One edit and one undo write both numbers** and the name the person typed. Clear Location keeps the name.
 - **A name that cannot be written goes to the clipboard**, and the person is told.
