@@ -124,7 +124,7 @@ struct MainView: View {
         } content: {
             ItemList(browser: browser, order: order, pane: $pane).equatable()
                 .filterChips(browser)
-                .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, signal: topRowSignal)
+                .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, isBesidePage: true, signal: topRowSignal)
                 // The split view reads the ideal only as it is built, so it comes from the tracker as it stands then.
                 .navigationSplitViewColumnWidth(
                     min: ColumnWidth.list.range.lowerBound, ideal: measuredWidths.width(of: .list),
@@ -542,6 +542,21 @@ private struct TopRowSignal: Hashable {
     let layout: ItemViewMode
 }
 
+/// The line between the page and the panel, drawn up through the toolbar's height as well. The system draws it only below
+/// the toolbar, where the panel's content starts, while the boards draw the panel as a column of the full window height.
+private struct PanelEdgeThroughToolbar: ViewModifier {
+    @Environment(\.displayScale) private var displayScale
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .topLeading) {
+                Rectangle().fill(.separator).frame(width: 1 / displayScale, height: TopRowMetrics.lineHeight)
+                    .ignoresSafeArea(.container, edges: .top)
+                    .allowsHitTesting(false).accessibilityHidden(true)
+            }
+    }
+}
+
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every
 /// resize of the window lay out every column again, which made live resizing several times slower, and one applied
 /// after the column's toolbar raises an exception during layout when a new window opens.
@@ -564,6 +579,7 @@ private struct ItemInspectorColumn: ViewModifier {
         // While the modal is open its own sidebar shows the details, so this one is out and only one is mounted.
         content.inspector(isPresented: Binding { details.isPresented && !browser.isModalPresented } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details, editor: editor)
+                .modifier(PanelEdgeThroughToolbar())
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newWidth in
                     guard details.isPresented, Self.isDraggingEdge(ofSidebarWidth: newWidth) else { return }
                     UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)

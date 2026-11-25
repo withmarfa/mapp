@@ -130,9 +130,9 @@ private struct TopRowStack<Line: View, Rest: View>: View {
 }
 
 extension TopRowRoom {
-    /// The title's inset at the column's start: the usual one, or further where the traffic lights, the sidebar's button
-    /// and Back and Forward stand over it.
-    var titleLead: CGFloat { max(TopRowMetrics.lead, leading > 0 ? leading + TopRowMetrics.clearance : 0) }
+    /// The title's inset at the column's start: `base`, or further where the traffic lights, the sidebar's button and Back
+    /// and Forward stand over it.
+    func titleLead(base: CGFloat = TopRowMetrics.lead) -> CGFloat { max(base, leading > 0 ? leading + TopRowMetrics.leadingClearance : 0) }
     /// What the line keeps for the buttons at the column's end.
     var titleTrail: CGFloat { max(14, trailing > 0 ? trailing + TopRowMetrics.clearance : 14) }
 }
@@ -466,9 +466,11 @@ private struct ToolbarRoomProbe: NSViewRepresentable {
         }
 
         /// The items that stand in a row from each end of the column: each begins within a gap of the one before it, as the
-        /// toolbar's groups do, and the first begins near the column's edge. Items in the middle are another group's.
+        /// toolbar's groups do, and the first begins near the column's edge. Items in the middle are another group's. The
+        /// gap is wider than the space between the items of one group and narrower than the one between the leading group
+        /// and the list's own buttons.
         static func room(of rects: [NSRect], in column: NSRect) -> (leading: CGFloat, trailing: CGFloat) {
-            let gap: CGFloat = 48
+            let gap: CGFloat = 24
             let inside = rects.filter { $0.maxX > column.minX && $0.minX < column.maxX }
             var leading: CGFloat = 0
             var edge = column.minX
