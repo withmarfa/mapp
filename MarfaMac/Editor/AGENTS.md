@@ -39,7 +39,7 @@ The Swift side of the item editor. The page is in `editor/`; read `editor/AGENTS
 
 - **The page draws the head and the app builds its data** (`PageHead`, sent by `ItemPageHeader`) and carries out its events. Swift alone decides which rows show, which are editable and what a row's menu holds (`FieldMenu`).
 - **A value opens in `ValueEditPresenter` under the rectangle the page sends,** and is written through the library as in the panel. A refusal is told in the panel, never on the page.
-- **A dragged row stores the whole order the page lists** in `PagePlacements`: it sets the order for the type and changes no item.
+- **A dragged row is merged into the type's saved order** (`PagePlacements.moveRow`), so rows the item lacks keep their places.
 - **Customize Layout belongs to the window** (`DetailsPresentation.isCustomizingLayout`), and Escape from the page ends it.
 - **Build the header only when what it reads changes** (`EditorController.showHeader`). Reading `contentRevision` or a whole list there rebuilds it at an edit anywhere.
 - **A title is editable only where `ItemLibrary.canSetTitle(of:)` says so.** Unsaved and refused titles stay in `EditorController.titleDrafts`, and one still refused stops a quit, a library change or a close and names the item.

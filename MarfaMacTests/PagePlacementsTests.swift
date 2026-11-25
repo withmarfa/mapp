@@ -209,11 +209,66 @@ struct PagePlacementsTests {
         // A row shown that would be hidden by default, a connector's identifier, stays shown.
         #expect(placements.placement(of: Self.comment, in: Self.catalogue).shows("github_id") == .whenSet)
         #expect(placements.placement(of: Self.comment, in: Self.catalogue).shows("other_id") == .whenSet)
-        // Written back in the new form only, and read the same way again.
+        // Written with `shows`, and `rows` beside it for an older copy, and read the same way again.
         let written = placements.rawValue
-        #expect(!written.contains(#""rows""#))
         #expect(written.contains(#""shows":{"repo":"hidden"}"#))
+        #expect(written.contains(#""rows":{"repo":false}"#))
         #expect(PagePlacements(rawValue: written) == placements)
+    }
+
+    @Test func aChoiceWithOnlyShowsStillCarriesTheRowsAnOlderCopyRequires() throws {
+        var placements = PagePlacements()
+        placements.setShows(.always, row: "repo", of: Self.ticket)
+        placements.setShows(.hidden, row: "state", of: Self.ticket)
+        let written = placements.rawValue
+        #expect(written.contains(#""rows":{"repo":true,"state":false}"#))
+        // A choice with no placed row has one too, and a later `rows` that disagrees does not win over `shows`.
+        placements.setPins([], of: Self.task)
+        #expect(placements.rawValue.contains(#""aic.task":{"pins":[],"rows":{}}"#))
+        let both = try #require(PagePlacements(rawValue: #"{"aic.ticket":{"rows":{"repo":false},"shows":{"repo":"always"}}}"#))
+        #expect(both.choices["aic.ticket"]?.shows == ["repo": .always])
+    }
+
+    @Test func everyMemberAnotherCopyWroteSurvivesReadingAndWritingAgain() throws {
+        let stored = #"{"aic.ticket":{"future":[1,{"a":null}],"labelOverrides":{"repo":"Repository"},"shows":{"repo":"always"},"sidebar":["history"]}}"#
+        var placements = try #require(PagePlacements(rawValue: stored))
+        placements.setPins(["repo"], of: Self.ticket)
+        let again = try #require(PagePlacements(rawValue: placements.rawValue))
+        let choice = try #require(again.choices["aic.ticket"])
+        #expect(choice.others["labelOverrides"] == .object(["repo": .string("Repository")]))
+        #expect(choice.others["future"] != nil)
+        #expect(choice.sidebar == ["history"])
+        #expect(choice.pins == ["repo"])
+        // A choice that holds only what this version does not name is not dropped as empty.
+        let alone = try #require(PagePlacements(rawValue: #"{"aic.ticket":{"labelOverrides":{"repo":"Repository"}}}"#))
+        #expect(alone.hasChoice(for: Self.ticket))
+        #expect(alone.rawValue.contains("labelOverrides"))
+    }
+
+    @Test func aMoveKeepsTheSavedPlaceOfEveryRowThePageDoesNotList() {
+        var placements = PagePlacements()
+        // `pinned` and `absent` are saved rows this item does not list.
+        placements.setRowOrder(["pinned", "a", "absent", "b", "c"], of: Self.ticket)
+        // The page lists a, b, c; c moves above a.
+        placements.moveRow("c", among: ["c", "a", "b"], of: Self.ticket)
+        #expect(placements.choices["aic.ticket"]?.rowOrder == ["pinned", "c", "a", "absent", "b"])
+        // a moves below b.
+        placements.moveRow("a", among: ["c", "b", "a"], of: Self.ticket)
+        #expect(placements.choices["aic.ticket"]?.rowOrder == ["pinned", "c", "absent", "b", "a"])
+        // Move Down in the row's menu works the same way.
+        placements.setRowOrder(["pinned", "a", "absent", "b"], of: Self.ticket)
+        let moved = placements.move("a", by: 1, in: ["a", "b"], of: Self.ticket)
+        #expect(moved)
+        #expect(placements.choices["aic.ticket"]?.rowOrder == ["pinned", "absent", "b", "a"])
+    }
+
+    @Test func aMoveNamesTheRowsTheSavedOrderLacks() {
+        var placements = PagePlacements()
+        placements.moveRow("b", among: ["b", "a", "c"], of: Self.ticket)
+        #expect(placements.choices["aic.ticket"]?.rowOrder == ["b", "a", "c"])
+        placements.setRowOrder(["z"], of: Self.ticket)
+        placements.moveRow("c", among: ["a", "c", "b"], of: Self.ticket)
+        #expect(placements.choices["aic.ticket"]?.rowOrder == ["z", "a", "c", "b"])
     }
 
     @Test func aWordALaterVersionAddsIsSkippedAndTheRestIsKept() throws {

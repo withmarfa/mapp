@@ -40,8 +40,8 @@ nonisolated struct PagePlacements: Equatable, Sendable {
 
         private static let known: Set<String> = ["shows", "rows", "linkedFrom", "pins", "rowOrder"]
 
-        /// Every member is optional on reading. A choice saved as shown or hidden (`rows`, true or false) is read as
-        /// When It Has a Value or Hidden, and is written back only as `shows`. A word a later version adds is skipped.
+        /// Every member is optional on reading, and `shows` is read first. A choice saved as shown or hidden (`rows`,
+        /// true or false) is read as When It Has a Value or Hidden. A word a later version adds to `shows` is skipped.
         init(from decoder: any Decoder) throws {
             let container = try decoder.container(keyedBy: DynamicKey.self)
             if let words = try container.decodeIfPresent([String: String].self, forKey: DynamicKey("shows")) {
@@ -55,9 +55,13 @@ nonisolated struct PagePlacements: Equatable, Sendable {
             others = try container.members(except: Self.known)
         }
 
+        /// Writes `rows` (true unless hidden) beside `shows`, always, even with none placed. A copy from before `shows`
+        /// requires `rows`, and one that does not find it sets the whole document aside, so a stored shape must never
+        /// lose a member an older copy requires. This version reads `shows` and ignores `rows` when both are there.
         func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: DynamicKey.self)
             if !shows.isEmpty { try container.encode(shows, forKey: DynamicKey("shows")) }
+            try container.encode(shows.mapValues { $0 != .hidden }, forKey: DynamicKey("rows"))
             try container.encodeIfPresent(linkedFrom, forKey: DynamicKey("linkedFrom"))
             try container.encodeIfPresent(pins, forKey: DynamicKey("pins"))
             try container.encodeIfPresent(rowOrder, forKey: DynamicKey("rowOrder"))
@@ -138,15 +142,35 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         }
     }
 
-    /// Moves `row` up (negative) or down by `offset` in `order`, the order the page lists the type's rows in, and keeps
-    /// that order. Returns false at either end, or for a row not in `order`.
+    /// Moves `row` up (negative) or down by `offset` among `visible`, the rows the page lists in the order it lists them,
+    /// and keeps that move in the type's order. Returns false at either end, or for a row not in `visible`.
     @discardableResult
-    mutating func move(_ row: String, by offset: Int, in order: [String], of type: TypeID) -> Bool {
-        var order = PagePlacement.unique(order)
+    mutating func move(_ row: String, by offset: Int, in visible: [String], of type: TypeID) -> Bool {
+        var order = PagePlacement.unique(visible)
         guard let from = order.firstIndex(of: row), order.indices.contains(from + offset) else { return false }
         order.swapAt(from, from + offset)
-        setRowOrder(order, of: type)
+        moveRow(row, among: order, of: type)
         return true
+    }
+
+    /// Keeps the move of `row` in the type's order. `visible` is the rows the page lists, in the order they are in after
+    /// the move: the row goes where it stands among them, and every other row, shown or not, keeps its saved place, so a
+    /// pinned row or one this item lacks keeps its position for the items that have it. A row the saved order does not
+    /// name takes the place the page lists it in, after the named ones.
+    mutating func moveRow(_ row: String, among visible: [String], of type: TypeID) {
+        let visible = PagePlacement.unique(visible)
+        guard let at = visible.firstIndex(of: row) else { return }
+        var order = PagePlacement.unique((choices[type.rawValue]?.rowOrder ?? []) + visible)
+        order.removeAll { $0 == row }
+        // After the row it now follows on the page, or, first of all, before the one it now precedes.
+        if at > 0, let after = order.firstIndex(of: visible[at - 1]) {
+            order.insert(row, at: after + 1)
+        } else if at + 1 < visible.count, let before = order.firstIndex(of: visible[at + 1]) {
+            order.insert(row, at: before)
+        } else {
+            order.append(row)
+        }
+        setRowOrder(order, of: type)
     }
 
     /// Chooses where Linked From goes. A place equal to the type's default is not kept, so the type follows its default
