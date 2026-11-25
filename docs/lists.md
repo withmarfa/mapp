@@ -13,7 +13,8 @@ paths:
   - MarfaMac/Views/ItemBoard*.swift
   - MarfaMac/Views/ItemTimeline*.swift
   - MarfaMac/Views/ItemCalendar*.swift
-  - MarfaMac/Views/Index*.swift
+  - MarfaMac/Views/PlaceIndex.swift
+  - MarfaMac/Model/Items/IndexRow.swift
 ---
 
 # Views and lists
@@ -22,7 +23,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 ## Two kinds of view
 
-- **A place's default view is the app's** (`PlaceDefaults`). Every change is kept as it is made, and Reset View puts the place back. The index pages have none: they keep a tab and a sort (`IndexPreferences`).
+- **A place's default view is the app's** (`PlaceDefaults`). Every change is kept as it is made, and Reset View puts the place back. Types, Collections and Sources have none.
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest (`ViewMacSettings` in `ViewLayouts`): layout, properties, cards, density, week or month and column widths.
 - **A change to a saved view is written as it is made** (`Browser+ViewWrites`), naming only the settings that changed, so it never writes over another app's.
 - **A write that Marfa has not taken stays in the window.** Until it is taken, Save View sends it again and Revert View drops it (`hasViewChanges`).
@@ -35,11 +36,12 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
 - **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
-- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`), at launch and after each settings sync, where the new keys leave it unset. Each earlier entry is read in once on each Mac, and stays for those copies. The Library takes All Items' settings, filled from Recents'. Include Subtypes is not read in.
+- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`), at launch and after each settings sync, where the new keys leave it unset. Each earlier entry is read in once on each Mac, and stays for those copies.
 
 ## Layouts
 
-- **The Archive, reached from the Library page's tabs and Go, opens as a table of Name, Type, Source and Edited.** Its title is the Library's, with its count ("10 of 213" when narrowed); empty, it says "Nothing is archived."
+- **The Library opens as a table, and as a list while it holds ten items or fewer** (`Browser.naturalLayout`).
+- **The Archive, reached from the Library's row and Go, opens as a table of Name, Type, Source and Edited.**
 - **Unarchive and Delete stand on an Archive row under the pointer** (`RowQuickActions`).
 - **A layout draws the list it is given** (`ItemViewMode`) and never changes which items show.
 - **One row menu, one density and one drag serve every layout.**
@@ -96,13 +98,15 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 ## Indexes
 
-- **The Library's index, Collections and Sources are lists of things, not of items of one view** (`IndexPage`). The Library's tabs are All, Library and Feed. A long list of items is worked out off the main actor (`ItemIndexModel`).
-- **Trap:** an index page's body must not read the choice, or choosing a row draws every row.
-- **A row's count is of what the place lists.** A file attached to an item the library holds shows on that item's page, so no list or count but search takes it, Archive, a collection and Favorites included. The Feed's row has none. Counts are worked out once for each change of membership (`MarfaLibrary.scopeCounts`).
-- **The Library's Feed tab holds what a search finds there.** An Items page left on From Apps opens on All once.
+- **Library › Types, Collections and Sources list places** (`PlaceIndex`), under the Library's title, count and views, with the place chosen. Search narrows the rows by name.
+- **Types nest kinds under their type.** Made By waits for the package's provenance; a type has no link to copy.
+- **A source's Kind** is Connector where `GET /plugins` names it, App for an `oauth:` code, else empty (`SourceKind`).
+- **A table of more than 2,000 items is ordered off the main actor** (`Browser.tableContent`), its last table showing meanwhile. Edits settle 300 ms first, and the chosen row keeps its place.
+- **Trap:** a table's body must not read the choice, or choosing a row draws every row.
+- **A row's count is of what the place lists.** A file attached to an item the library holds shows on that item's page, so no list or count but search takes it, Archive, a collection and Favorites included. The Feed's row has none.
 
 ## Search
 
 - **A search is narrowed in the query, never after it** (`SearchNarrowing`), because Marfa limits how many it answers, and a limit counted first would hide matches. More conditions than a query takes are refused and named.
 - **What a search leaves out is said** (`SearchLeaveOuts`), with a way to include it.
-- **A search in the list and in Items is sorted by relevance until the person sorts it.** The gallery and the table keep their own sorts until relevance is picked (`Browser.ordersByRelevance`).
+- **A search in the list is sorted by relevance until the person sorts it.** The gallery and the table keep their own sorts until relevance is picked (`Browser.ordersByRelevance`).

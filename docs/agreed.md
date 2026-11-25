@@ -20,16 +20,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | --- | --- | --- | --- |
 | The Marfa's panel | The foot opens a panel: the Marfa's name and count, its latest sources, and the Marfas the app has signed in to, with a tick and a plus on the heading. Switching signs out of nothing. Pages flush first, and changes that were not sent stay queued. | `SidebarFoot.swift`, `MarfaHost` | `Rethink-Marfa` |
 
-## Library and its places
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-| Library | Lists active library items in the one table every place uses, with a row of views and, at its end, Types, Collections, Sources and Archive. Its first view is named All. It opens as a table, and as a list with ten items or fewer. Its off-main arrangement of rows (`ItemIndexModel`) moves into the shared list and is not lost. | `ItemsIndex.swift`, `IndexPage.swift`, `ItemTable.swift` | `Rethink-Library`, `Rethink-Library-New`, `Rethink-Library-Heavy` |
-| Types | A table of Name (nested), Items, Views, Made By, Latest. Its row menu has Open, Open in New Window, New, New View…, Add to Sidebar, Copy Link, Edit Type…. Made By waits for the package to give a type's provenance, and Copy Link for a link form (`ItemLinkRoute` has only items). | `SidebarIndex.swift`, `ItemLinkRoute` | `Rethink-Types`, `Rethink-Types-Ordinary`, `Rethink-Types-Agents` |
-| Collections | Name, Items, Source, Edited. The tabs, the source filter and the index's sidebar go. A collection can be archived, and cannot be moved to the Feed. | `SidebarIndex.swift`, `IndexInspector.swift` | `Rethink-Collections`, `Rethink-Collections-Full` |
-| Sources | Name, Items, Latest, and the types a source writes as marks and names, three and a count. Its page's panel has the facts. A source's Kind can be read by any app today: `GET /plugins` names each connector's source and the direction of its kinds, and an app's source starts with `oauth:`. Only New Items Go To waits, because it needs the owner's permission and the main window makes no owner calls. | `SidebarIndex.swift`, `SourceLook.swift` | `Rethink-Sources`, `Rethink-Sources-Full`, `Rethink-Source`, `Rethink-Sources-Waiting` |
-| Index pages go | The tabs, the New tiles, the index's own toolbar and filters. | `IndexPage.swift`, `NewTiles.swift`, `IndexToolbar.swift` | `Rethink-Library` |
-
 ## Feed, and moving between the two
 
 | Part | What it is | Lands in | Boards |

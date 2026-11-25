@@ -45,7 +45,8 @@ struct TopRowContent {
     var showsScope: Bool { !scopes.isEmpty }
     /// Whether the control says what Settings does, which is when it is quiet and the first thing to give way.
     var isDefaultScope: Bool { scope == defaultScope }
-    var chosenChoice: Choice? { views.first { $0.id == chosen } ?? views.first }
+    /// The view chosen; none while the window shows one of the Library's places.
+    var chosenChoice: Choice? { views.first { $0.id == chosen } ?? (chosen.isEmpty ? nil : views.first) }
 
     /// The title's count as it is read: "1,205", and "38 of 48,312" while searching or narrowing the Archive.
     var countText: String {
@@ -64,16 +65,20 @@ struct TopRowContent {
         let shown = browser.shown
         let place = shown.savedView.map { id in library.views.first { $0.id == id }.map { Place.home(of: $0.query, catalogue: library.catalogue) } ?? .library } ?? shown.place
         let listing = browser.listing
-        let views = choices(in: place, library: library)
+        // Types, Collections, Sources and the Archive are pages of the Library: its title, its views with none chosen,
+        // and its places with theirs.
+        let ofLibrary = Self.libraryPages.contains(place)
+        let views = choices(in: ofLibrary ? .library : place, library: library)
         let chosenWord = shown.view.word
-        let chosen = views.first { $0.target.view.word == chosenWord }?.id ?? views.first?.id ?? ""
+        let chosen = ofLibrary && place != .library ? "" : views.first { $0.target.view.word == chosenWord }?.id ?? views.first?.id ?? ""
 
         let base: Int
         if shown.view != .own { base = library.count(in: shown, favoritesScope: listing.scope) }
         else { base = library.count(in: place, scope: listing.scope) }
         // A filter or an arrangement leaves fewer in the list than the place holds, and the count says what is listed.
         let listed = browser.listShape == nil ? base : browser.listedCount(in: library) ?? browser.filteredItems(in: library).count
-        let results = browser.searchResults(in: library)
+        // A search of Types, Collections or Sources narrows their rows, not the items.
+        let results = browser.showsPlaceIndex ? nil : browser.searchResults(in: library)
         // A search of everything finds items beyond the place, so it is counted against all of them.
         let everything = browser.searchScope(in: library) == .everywhere
             ? library.count(in: .library) + library.count(in: .feed) : library.count(in: shown, favoritesScope: listing.scope)
@@ -82,7 +87,9 @@ struct TopRowContent {
         // holds and how many of them a search or a filter leaves.
         var count = results == nil ? listed : everything
         var narrowed = results.map(\.items.count)
-        if browser.listsArchive {
+        if browser.showsPlaceIndex {
+            (count, narrowed) = (library.count(in: .library), nil)
+        } else if browser.listsArchive {
             let held = library.count(in: .archive, scope: .all)
             let leaves = results?.items.count ?? browser.listedCount(in: library) ?? browser.filteredItems(in: library).count
             (count, narrowed) = (held, leaves == held ? nil : leaves)
@@ -92,11 +99,14 @@ struct TopRowContent {
         let offers = shown.view == .own && ListScope.showsScopeControl(place: place, counts: counts)
         let scopes = offers ? ListScope.allCases.map { ScopeChoice(scope: $0, title: $0.title, count: counts.count(in: $0)) } : []
         return TopRowContent(
-            place: place, title: browser.listsArchive ? String(localized: "Library") : library.name(of: place), count: count,
+            place: place, title: ofLibrary ? library.name(of: .library) : library.name(of: place), count: count,
             narrowed: narrowed, views: views, chosen: chosen,
-            places: place == .library ? browsed(in: library) : [], isChanged: browser.hasViewChanges,
+            places: ofLibrary ? browsed(in: library) : [], isChanged: ofLibrary && place != .library ? false : browser.hasViewChanges,
             scopes: scopes, scope: listing.scope, defaultScope: ListScope.defaultScope(in: browser.defaults))
     }
+
+    /// The Library and the places that are pages of it.
+    private static let libraryPages: [Place] = [.library, .types, .collections, .sources, .archive]
 
     /// The place's views in the order the person arranged them, the ones they did not place after it.
     @MainActor

@@ -25,7 +25,7 @@ private struct TopRowOverList: ViewModifier {
 
     /// The layouts that stand the views beside the title from the start: the calendar has a header of its own and the
     /// board's lanes scroll by themselves, so neither has rows to scroll a row of views away.
-    private var isAlwaysBeside: Bool { browser.viewMode == .calendar || browser.viewMode == .board }
+    private var isAlwaysBeside: Bool { !browser.showsPlaceIndex && (browser.viewMode == .calendar || browser.viewMode == .board) }
 
     func body(content: Content) -> some View {
         let row = TopRowContent.make(browser: browser, library: library)
