@@ -24,7 +24,6 @@ nonisolated extension ShortcutCommand {
     static let favorite = ShortcutCommand("favorite", in: .file, String(localized: "Add to Favorites"))
     static let addTag = ShortcutCommand("addTag", in: .file, String(localized: "Add Tag…"))
     static let changeType = ShortcutCommand("changeType", in: .file, String(localized: "Change Type…"))
-    static let customizeLayout = ShortcutCommand("customizeLayout", in: .file, String(localized: "Customize Layout…"))
     static let versionHistory = ShortcutCommand("versionHistory", in: .file, String(localized: "Version History…"))
     static let keepInLibrary = ShortcutCommand("keepInLibrary", in: .file, String(localized: "Keep in Library"), "k", [.control, .command])
     static let moveToFeed = ShortcutCommand("moveToFeed", in: .file, String(localized: "Move to Feed"))
@@ -94,7 +93,7 @@ nonisolated extension ShortcutCommand {
     static var all: [ShortcutCommand] {
         let commands: [ShortcutCommand] = [
             settings, newItem, newWindow, refresh, open, openBesideList, openAsModal, openAsFullPage, openInNewWindow, quickLook, openOutside,
-            favorite, addTag, changeType, customizeLayout, versionHistory, keepInLibrary, moveToFeed, archive, delete, exportPDF, print,
+            favorite, addTag, changeType, versionHistory, keepInLibrary, moveToFeed, archive, delete, exportPDF, print,
             copyLink, addAttachment, searchItems, commandPalette, paletteActions, searchList, find, findNext, findPrevious, useSelectionForFind,
             toggleSource, toggleReader, toggleFormats, focus, viewAsList, viewAsGallery, viewAsTable, viewAsBoard, viewAsTimeline, viewAsCalendar,
             toggleFilters, addFilter, clearFilters, today, previousPeriod, nextPeriod, showWeek, showMonthScale, toggleMonth,

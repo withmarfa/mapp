@@ -587,18 +587,6 @@ import Testing
         #expect(notices.waiting.first?.text == "Emails: Tag: work")
     }
 
-    @Test func theInspectorGivesBackAListLeftUnfinishedWhenTheSelectionMoves() throws {
-        let field = try Self.field(Self.emailsField)
-        guard case .list = field.kind else { return }
-        let presentation = DetailsPresentation()
-        let item = ItemID("10000000-0000-0000-0000-000000000001")
-        let draft = presentation.draft(for: item, key: "emails")
-        draft.field = field
-        draft.list.startEntry()
-        draft.list.type("work", into: ListEditing.Slot(entry: draft.list.pendingID, member: "label"), in: nil)
-        #expect(presentation.unsavedProperties(of: item).map(\.key) == ["emails"])
-    }
-
     // MARK: Quick add
 
     @Test func quickAddKeepsAnUnfinishedEntryAndGivesItBackWhenItCloses() throws {

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One type's Layouts page: how its items read in a row, which facts follow the status, and what its page pins under the
 /// title. Every change is written to the stores that already hold it, the type's look (`TypeLooks`) and what its page
-/// shows (`PagePlacements`, the same store as Customize Layout on an item), which sync through the Marfa (`PreferencesSync`).
+/// shows (`PagePlacements`, the same store as a row's menu on an item's page), which sync through the Marfa (`PreferencesSync`).
 struct LayoutTypePage: View {
     let type: TypeID
     @Environment(Libraries.self) private var libraries
@@ -149,7 +149,7 @@ struct LayoutTypePage: View {
         let rows = rows
         let pins = placements.pins(of: type, in: catalogue)
         let pinned = pins.compactMap { id in rows.first { $0.id == id } }
-        return SettingsSection("Page", line: "Pinned under the title. Customize Layout on an item of this type changes the same.") {
+        return SettingsSection("Page", line: "Pinned under the title.") {
             SettingsOrderedList(
                 entries: Binding {
                     pinned.map { SettingsListEntry(id: $0.id, title: $0.label) }
@@ -161,6 +161,18 @@ struct LayoutTypePage: View {
                 addTitle: "Pin a Property…",
                 isFull: pins.count >= PagePlacement.pinLimit,
                 onAdd: { added in placements.pin(added.id, of: type, in: catalogue) })
+            SettingsRow("Linked From", line: "What links to an item of this type.") {
+                SettingsPopUp(
+                    title: "Linked From",
+                    selection: Binding {
+                        placements.placement(of: type, in: catalogue).linkedFromPlace
+                    } set: { placements.setLinkedFrom($0, of: type, in: catalogue) }
+                ) {
+                    Text("At the Foot of the Page").tag(LinkedFromPlace.page)
+                    Text("In the Panel").tag(LinkedFromPlace.inspector)
+                }
+                .accessibilityIdentifier("LayoutLinkedFrom")
+            }
         }
         .accessibilityIdentifier("LayoutPage")
     }

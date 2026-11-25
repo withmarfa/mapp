@@ -65,7 +65,7 @@ struct TypeValuesSheet: View {
         .accessibilityIdentifier("TypeChangeSheet")
     }
 
-    /// A text or a number is typed into a field of the board's look; any other kind is the row the inspector draws.
+    /// A text or a number is typed into a field of the board's look; any other kind is the form row.
     @ViewBuilder private func valueRow(_ field: ItemTypeInfo.Field) -> some View {
         switch field.kind {
         case .text, .number:

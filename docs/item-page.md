@@ -41,7 +41,8 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 
 `FieldMenu` is the rule, and a row's name or a right-click opens it.
 
-- **How a row shows belongs to the type** (`PagePlacements`, `RowShows`) and changes no item, so a read-only item can be arranged.
+- **How a row shows belongs to the type** (`PagePlacements`, `RowShows`) and changes no item, so a read-only item can be arranged. A type nobody changed has no entry, so a better default reaches it; Settings › Layouts › Restore Defaults removes the entry.
+- **Linked From has one place,** the page's foot or the panel's Links, chosen for a type in Settings › Layouts.
 - **Text is 15 points by default** (title 28 on 34), in steps of 13 to 24; a stored 11 or 12 reads as the nearest.
 - **Pinned properties are a setting, off** (Settings › Editor). While on, the status and the parent are pinned unless the person chose others, at most four, and a pinned row leaves the rows.
 
@@ -50,12 +51,11 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 - **It is white behind a hairline and closed by default,** with a pill for each of Outline, Links and Info the item has. One part has no pills.
 - **A type remembers its pill** (`PanelParts`). A part the item lacks is not shown. With none remembered, one is chosen when the item opens.
 - **Outline shows only for an item with headings, or a PDF.**
+- **A group whose field the item may change has a plus on its heading and Remove in each link's menu** (`PanelLinkGroup.editableField`): In Collection, Excerpts and Attachments. The plus opens the page's own relation panel, and a removal is one undo step. Referenced By, Links in the Text, More From This Book and Thread are read only.
 - **Links asks the server for nothing.** It uses edges the copy holds. A child, a collection's member and a file are left out of Referenced By, because each has a place. A link follows Open Items (`Browser.follow(link:)`).
 - **In ends Info's facts,** a menu that moves the item between Library and Feed (`ItemLibrary.perform`), plain where it may not. Leaves the Feed can follow.
 - **Who keeps the item is said once at the top of Info:** the Read Only reason (`Item.obstacle(to:)`), or Synced With a connector's name (`GET /plugins`, read once for a library).
 - **History is asked for only while Info shows** (`PanelHistory`), one read for each version while the item is among the eight latest.
-- **Properties, Relationships and Tags stay in Info** until the page's rows carry them.
-- **What has been typed and not saved is kept** when the item changes or the panel closes (`ItemPropertyDraft`).
 
 ## What the page locks
 
@@ -83,14 +83,6 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 
 - **The first row that holds leads,** and a write that only waits says nothing. Unreadable text, a held write and a missing file are never hidden: each has its line under the first.
 - **An action carries its item from the app,** and none writes or drops text. A write refused as too large never tells the person to shorten the older text: the latest is kept in the copy.
-
-## Customize Layout
-
-- **A layout belongs to a type.** Every item of the type follows it, and a child type has its own.
-- **Linked From has one place,** the page's foot or the panel's Links.
-- **A type nobody customized has no entry** (`PagePlacements`), so a better default reaches it. Use Defaults removes the entry.
-- **Escape ends it, and Focus waits for it**, because Focus hides what it arranges.
-- **Trap:** `Choice.pins` of nil means the default pins and an empty list means no pins. Treating one as the other pins properties that a person removed. `PagePlacement` gives the defaults.
 
 ## The corner
 

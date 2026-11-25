@@ -273,7 +273,7 @@ struct ItemPageHeader: ViewModifier {
         editor.popUp(popup, under: rect, keeping: keeping)
     }
 
-    /// The editor for one of the item's values, which writes as the property row in the inspector does: through the
+    /// The editor for one of the item's values, which writes as a form row does: through the
     /// library. The panel says why a write is refused.
     private static func request(
         _ kind: ValueEditKind, of id: ItemID, in library: any ItemLibrary, undoManager: UndoManager?, editor: EditorController

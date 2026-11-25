@@ -50,15 +50,6 @@ nonisolated struct RelationField: Identifiable, Sendable {
     var id: String { field }
 }
 
-/// One list of links in an item's inspector: a relationship, or the links in its content.
-nonisolated struct LinkGroup: Hashable, Sendable {
-    let item: ItemID
-    let field: String
-
-    /// The group of links in the item's content, which no relationship field names.
-    static func content(of item: ItemID) -> LinkGroup { LinkGroup(item: item, field: "#content") }
-}
-
 /// A group of links draws this many before the person asks for the rest, so an item that hundreds of others link
 /// to does not become hundreds of rows.
 nonisolated enum LinkLimit {

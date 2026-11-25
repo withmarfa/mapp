@@ -1,7 +1,7 @@
 import Foundation
 import Marfa
 
-/// The values that open in a panel under them, in the inspector and on the page: what the field is, whatever it is
+/// The values that open in a panel under them, in a form and on the page: what the field is, whatever it is
 /// called. A yes or no is two rows, a list of people or words adds and takes away, and any other list of entries is
 /// edited member by member in the same panel.
 nonisolated enum ValueEditKind: Hashable, Sendable {

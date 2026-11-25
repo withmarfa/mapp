@@ -18,18 +18,9 @@ struct PageChip: View {
         case plain
     }
 
-    /// The button a chip carries where the person can take its value away: a tag in the right sidebar.
-    struct Removal {
-        let help: LocalizedStringKey
-        let label: LocalizedStringKey
-        let identifier: String
-        let action: () -> Void
-    }
-
     let text: String
     let kind: Kind
     var size: ChipSize = .page
-    var removal: Removal?
 
     @Environment(\.colorScheme) private var scheme
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
@@ -48,18 +39,6 @@ struct PageChip: View {
             Text(verbatim: text)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            if let removal {
-                Button(action: removal.action) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9 * scale, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .help(removal.help)
-                .accessibilityLabel(removal.label)
-                .accessibilityIdentifier(removal.identifier)
-            }
             if case .status(_, true) = kind {
                 Image(systemName: "chevron.down")
                     .font(.system(size: looks.textSize(for: size) * CGFloat(textSize) / 13 * 0.6, weight: .semibold))

@@ -5,7 +5,7 @@ import Testing
 @testable import MarfaMac
 
 @MainActor
-struct InspectorEditingTests {
+struct PropertyDraftTests {
     private static func draft(base: String, typed: String) -> ItemPropertyDraft {
         let draft = ItemPropertyDraft()
         draft.text = base
@@ -170,91 +170,12 @@ struct InspectorEditingTests {
 
     // MARK: The window's drafts
 
-    private static func presentation(typing text: String, into id: ItemID, key: String = "assignee") -> DetailsPresentation {
-        let presentation = DetailsPresentation()
-        let draft = presentation.draft(for: id, key: key)
-        draft.field = field
-        draft.base = ""
-        draft.text = text
-        draft.isDirty = true
-        return presentation
-    }
-
-    @Test func aDraftOnAnItemDeletedElsewhereIsHandedBackWhenTheRowGoes() throws {
-        let library = FakeItemLibrary()
-        let gone = ItemID.mint()
-        let presentation = Self.presentation(typing: "mine", into: gone)
-        presentation.handOffProperties(in: library, undoManager: nil)
-        #expect(try #require(library.notices.waiting.first).text == "Assignee: mine")
-        #expect(presentation.unsavedProperties().isEmpty)
-    }
-
-    @Test func aFieldTheLibraryNoLongerTakesIsHandedBackAsNotSaved() throws {
-        // The fake refuses every property write, as the library does for a field a type change removed.
-        let library = FakeItemLibrary()
-        let item = FakeItemLibrary.note("Task", modified: .now)
-        library.items = [item]
-        let presentation = Self.presentation(typing: "mine", into: item.id)
-        presentation.handOffProperties(in: library, undoManager: nil)
-        let notice = try #require(library.notices.waiting.first)
-        #expect(notice.text == "Assignee: mine")
-        #expect(notice.message.contains("could not be saved"))
-    }
-
-    @Test func foldingASectionKeepsADraftButAnItemSwitchHandsItBack() throws {
-        let library = FakeItemLibrary()
-        let first = ItemID.mint()
-        let second = ItemID.mint()
-        let presentation = Self.presentation(typing: "mine", into: first)
-        // A fold or a hidden inspector reaches no hand-off, so the draft waits.
-        #expect(presentation.unsavedProperties(of: first).count == 1)
-        presentation.handOffProperties(of: second, in: library, undoManager: nil)
-        #expect(presentation.unsavedProperties(of: first).count == 1 && library.notices.waiting.isEmpty)
-        presentation.handOffProperties(of: first, in: library, undoManager: nil)
-        #expect(presentation.unsavedProperties().isEmpty)
-        #expect(library.notices.waiting.count == 1)
-    }
-
-    @Test func aSelectionChangeHandsBackEveryDraftButTheShownItemsWhetherOrNotTheInspectorShows() throws {
-        let library = FakeItemLibrary()
-        let shown = ItemID.mint()
-        let left = ItemID.mint()
-        let presentation = Self.presentation(typing: "kept", into: shown)
-        let draft = presentation.draft(for: left, key: "assignee")
-        draft.field = Self.field
-        draft.base = ""
-        draft.text = "held back"
-        draft.isDirty = true
-        presentation.handOffProperties(except: shown, in: library, undoManager: nil)
-        #expect(presentation.unsavedProperties(of: shown).count == 1)
-        #expect(presentation.unsavedProperties(of: left).isEmpty)
-        #expect(try #require(library.notices.waiting.first).text == "Assignee: held back")
-        // Again, as the next change of selection would: a draft is told once.
-        presentation.handOffProperties(except: shown, in: library, undoManager: nil)
-        #expect(library.notices.waiting.count == 1)
-        // With nothing shown, the rest goes too.
-        presentation.handOffProperties(except: nil, in: library, undoManager: nil)
-        #expect(presentation.unsavedProperties().isEmpty)
-    }
-
-    @Test func quittingHandsBackTheDraftsOfEveryWindow() throws {
-        let library = FakeItemLibrary()
-        let one = Self.presentation(typing: "one", into: ItemID.mint())
-        let two = Self.presentation(typing: "two", into: ItemID.mint())
-        DetailsPresentation.handOffAllProperties(in: library)
-        #expect(one.unsavedProperties().isEmpty && two.unsavedProperties().isEmpty)
-        let text = try #require(library.notices.waiting.first?.text)
-        #expect(text.contains("Assignee: one") && text.contains("Assignee: two"))
-    }
-
-    @Test func titlesAreNotPropertyDrafts() {
+    @Test func aTitleTypedAndNotSavedIsAnUnsavedTitle() {
         let id = ItemID.mint()
         let presentation = DetailsPresentation()
         let draft = presentation.draft(for: id, key: "title")
         draft.text = "x"
         draft.isDirty = true
-        #expect(presentation.unsavedProperties().isEmpty)
         #expect(presentation.unsavedTitles == [id])
     }
-
 }

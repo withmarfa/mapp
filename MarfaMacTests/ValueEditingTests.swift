@@ -524,16 +524,6 @@ struct ValueEditingTests {
         #expect(library.notices.waiting.first?.text?.contains("Sam") == true)
     }
 
-    @Test func aNewTagTheItemCanNoLongerTakeIsHandedBackOnceWhenTheTagsBoxEnds() {
-        let item = Self.item()
-        let library = Self.library([item])
-        let model = ValueEditModel(Self.request(.tags, item: item, in: library))
-        model.query = "fresh"
-        library.items[0].state = .trashed
-        model.finishTagField()
-        #expect(library.notices.told == 1 && library.notices.waiting.first?.text == "fresh")
-    }
-
     @Test func aTimeAlreadySavedFromElsewhereIsNotHandedBackWhenTheItemBecomesReadOnly() {
         let item = Self.item(["due": .string("2026-11-07T09:30:00Z")])
         let library = Self.library([item])
@@ -659,19 +649,6 @@ struct ValueEditingTests {
         #expect(library.notices.waiting.first?.text == "Labels: blue")
     }
 
-    @Test func aTagTheTagsBoxCanNoLongerTakeIsHandedBackBeforeTheBoxCloses() {
-        let item = Self.item()
-        let library = Self.library([item])
-        let model = ValueEditModel(Self.request(.tags, item: item, in: library))
-        var toldAtClose: Int?
-        model.close = { if toldAtClose == nil { toldAtClose = library.notices.told } }
-        model.query = "bluer"
-        library.items[0].state = .trashed
-        model.activate("tag:bluer")
-        model.finishTagField()
-        #expect(toldAtClose == 1 && library.notices.told == 1 && library.notices.waiting.first?.text == "bluer")
-    }
-
     @Test func choosingNotSetHandsBackATimeTypedAndNotYetWritten() throws {
         let written = Written()
         let model = datePanel(Self.due, holding: "2026-11-07T09:30:00Z", written: written)
@@ -700,17 +677,6 @@ struct ValueEditingTests {
         library.items[0] = Self.item(["due": .string("2026-11-07")])
         model.finish(cancelled: false)
         #expect(written.all.isEmpty && library.notices.told == 0)
-    }
-
-    @Test func aTagThatArrivedBeforeTheItemBecameReadOnlyIsNotHandedBack() {
-        let item = Self.item()
-        let library = Self.library([item])
-        let model = ValueEditModel(Self.request(.tags, item: item, in: library))
-        model.query = "blue"
-        library.items[0].tags.insert("blue")
-        library.items[0].readOnly = true
-        model.finishTagField()
-        #expect(library.notices.told == 0)
     }
 
     @Test func timesAreReadAsPeopleTypeThem() {

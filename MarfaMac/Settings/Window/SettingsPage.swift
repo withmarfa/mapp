@@ -135,7 +135,8 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .layouts:
             [
                 String(localized: "Preview"), String(localized: "Row"), String(localized: "Facts"), String(localized: "Page"),
-                String(localized: "Restore Defaults"), String(localized: "Import…"), String(localized: "Export…"),
+                String(localized: "Linked From"), String(localized: "Restore Defaults"), String(localized: "Import…"),
+                String(localized: "Export…"),
             ]
         case .search:
             [

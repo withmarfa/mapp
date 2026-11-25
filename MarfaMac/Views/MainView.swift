@@ -276,7 +276,7 @@ struct MainView: View {
             return nil
         }
         if let folds = crossed(Self.panelFoldsBelow) {
-            // A panel opened for the moment, as by Customize Layout, is not the person's, so it is not opened again.
+            // A panel opened for the moment, as by the view panel, is not the person's, so it is not opened again.
             if folds, details.isPresented { foldedPanel = details.isPresentedByPerson; details.isPresented = false }
             else if !folds, foldedPanel { foldedPanel = false; details.isPresented = true }
         }
@@ -319,13 +319,6 @@ struct MainView: View {
             if restoresWindow { storedDetailsPresented = details.isPresentedByPerson }
         }
         .onChange(of: isSidebarVisible) { if isSidebarVisible { foldedSidebar = false } }
-        // Closing the sidebar by hand finishes Customize Layout, which has nowhere else to show.
-        .onChange(of: details.isPresented) { if !details.isPresented { details.endLayout() } }
-        // Leaving the page finishes it too, as there is nothing left to arrange.
-        .onChange(of: browser.showsPage, initial: true) {
-            details.showsPage = browser.showsPage
-            if !browser.showsPage { details.endLayout() }
-        }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
                 FloatingPanel {
@@ -357,12 +350,9 @@ struct MainView: View {
         .watchesPlace(browser, order: order)
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
-        // A draft the inspector held back is given back when the selection moves off its item, shown or not. Folding
-        // a section or hiding the inspector keep it, and the item still shown keeps its own.
         .onChange(of: browser.selection) {
             // Selecting another item, or following a link, leaves the history of the one it was opened for.
             if let history = details.history, browser.selection != [history.item] { details.leaveHistory() }
-            details.handOffProperties(except: browser.selection.count == 1 ? browser.selection.first : nil, in: library, undoManager: undoManager)
         }
         .onChange(of: browser.snapshotParts) {
             if restoresWindow {
@@ -377,7 +367,6 @@ struct MainView: View {
             editorSlot.made?.flush()
             editorSlot.made?.windowWent()
             let changed = libraries.current.map { ObjectIdentifier($0) != ObjectIdentifier(library) } ?? true
-            details.handOffProperties(in: library, undoManager: nil)
             browser.quickAdd.handOff(to: library.notices, because: changed ? .libraryChanged : .closed, in: library)
             browser.giveUpNewItem(because: .windowLeft)
             browser.viewPanel?.handOff(because: changed ? .libraryChanged : .closed)
@@ -397,7 +386,6 @@ struct MainView: View {
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onEscape = { [browser, details, library] in
                 if details.isEditingView { browser.escapeViewPanel(in: library) }
-                else if details.isCustomizingLayout { details.endLayout() }
                 else if details.escapeFromPage() { return }
                 else if browser.isModalPresented { browser.closeModal() }
                 else { browser.focusRequest = .list }

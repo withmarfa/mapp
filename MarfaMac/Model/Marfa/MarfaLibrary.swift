@@ -18,7 +18,7 @@ import Observation
     private(set) var hasBody = false
     /// Changes when a field the page header shows changes, not when only the version, preview, sync or embeds move.
     private(set) var headerStamp = 0
-    /// Changes only when `version` changes. The inspector's Version cell follows this, not the whole item.
+    /// Changes only when `version` changes. The panel's Version fact follows this, not the whole item.
     private(set) var versionStamp = 0
     /// Changes when an edge touching this item comes, goes or changes, including one another item holds.
     private(set) var linkStamp = 0

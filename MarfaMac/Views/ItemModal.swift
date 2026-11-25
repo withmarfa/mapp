@@ -59,8 +59,7 @@ struct ItemModal: View {
         .focusable()
         .focusEffectDisabled()
         .focused($hasKeyboard)
-        // The modal has no panel to arrange a layout in, so one under way ends as it opens.
-        .onAppear { hasKeyboard = true; details.endLayout() }
+        .onAppear { hasKeyboard = true }
         .onExitCommand { escape() }
         // An item that is gone from the library has nothing left to show.
         .onChange(of: browser.modalItem.map { library.item($0) == nil } ?? true) { _, isGone in
@@ -80,7 +79,7 @@ struct ItemModal: View {
     }
 
     private func escape() {
-        if details.isCustomizingLayout { details.endLayout() } else if !details.escapeFromPage() { browser.closeModal() }
+        if !details.escapeFromPage() { browser.closeModal() }
     }
 
     // MARK: The toolbar

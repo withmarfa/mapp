@@ -58,23 +58,8 @@ final class DetailsPresentation {
     var fieldEdit: FieldEditRequest?
     /// Version History, while the window shows it in place of its page.
     private(set) var history: VersionHistoryMode?
-    /// Whether the window's right sidebar is arranging the page's layout (Customize Layout) in place of the inspector.
-    /// It belongs to the window, not to an item: another item shows its own type's rows, and a file, which cannot be
-    /// arranged, shows the inspector until an item is back.
-    private(set) var isCustomizingLayout = false
-    /// Whether the window shows an item's page, which is what Customize Layout arranges. A gallery, table, board or
-    /// timeline with no item opened has none, nor do Settings and an index.
-    var showsPage = true
-
-    /// Whether Customize Layout can start for `item`: the window shows a page, and the item has rows to arrange. Finishing
-    /// it needs neither, so the menus offer that whenever `isCustomizingLayout` is on.
-    func canBeginLayout(for item: Item?) -> Bool {
-        showsPage && PageCustomization.isAvailable(for: item)
-    }
-    /// Whether ending Customize Layout closes the sidebar, because starting it opened the sidebar.
-    @ObservationIgnored private var closesSidebarAtEnd = false
-    /// Whether the window's right sidebar is editing a view (`ViewPanel`), in place of the inspector and of Customize
-    /// Layout. The panel itself is the browser's; this holds the sidebar for it and gives it back.
+    /// Whether the window's right sidebar is editing a view (`ViewPanel`), in place of the item's panel. The panel itself
+    /// is the browser's; this holds the sidebar for it and gives it back.
     private(set) var isEditingView = false
     /// Whether closing the view panel closes the sidebar, because opening it opened the sidebar.
     @ObservationIgnored private var closesSidebarAtViewEnd = false
@@ -119,12 +104,7 @@ final class DetailsPresentation {
 
     /// The window's toast, which lives here with the rest of what the window presents, above its split view.
     let toasts = ToastPresenter()
-    /// The groups of links the person has shown in full. They stay shown while the window lives, whichever item it
-    /// shows meanwhile.
-    private(set) var expandedLinks: Set<LinkGroup> = []
     @ObservationIgnored private var drafts: [ItemID: [String: ItemPropertyDraft]] = [:]
-
-    init() { Self.open.add(self) }
 
     /// Gives the window `item`'s switch, or takes `item`'s away. Another item's is left alone, since a page going away
     /// can be told after the next one has arrived.
@@ -176,10 +156,8 @@ final class DetailsPresentation {
 
     func isFormatsOpen(on item: ItemID?) -> Bool { item != nil && formatsItem == item }
 
-    /// Turns Focus on for `item`, or off if it is on. Customize Layout arranges the header Focus hides, so it has Focus
-    /// to itself.
+    /// Turns Focus on for `item`, or off if it is on.
     func toggleFocus(on item: ItemID) {
-        guard !isCustomizingLayout else { return }
         focusedItem = focusedItem == item ? nil : item
     }
 
@@ -230,17 +208,6 @@ final class DetailsPresentation {
         return false
     }
 
-    /// Every window's presentation, so a quit can reach the drafts each holds.
-    private static let open = NSHashTable<DetailsPresentation>.weakObjects()
-
-    /// Hands every window's unsaved property drafts to `library`, as the app quits.
-    static func handOffAllProperties(in library: (any ItemLibrary)?) {
-        guard let library else { return }
-        for presentation in open.allObjects { presentation.handOffProperties(in: library, undoManager: nil) }
-    }
-
-    func expandLinks(_ group: LinkGroup) { expandedLinks.insert(group) }
-
     /// Shows the item's versions in place of the window's page, once every open page has handed over what was just
     /// typed, so the version shown as current is the text the person sees. Nothing happens while one is shown.
     func showHistory(of id: ItemID, in library: any ItemLibrary) {
@@ -271,32 +238,9 @@ final class DetailsPresentation {
         history = nil
     }
 
-    /// Starts or ends Customize Layout.
-    func toggleLayout() {
-        if isCustomizingLayout { endLayout() } else { beginLayout() }
-    }
-
-    /// Shows the sidebar, which takes the layout, and remembers to close it again if it was closed.
-    func beginLayout() {
-        guard !isCustomizingLayout else { return }
-        focusedItem = nil
-        formatsItem = nil
-        closesSidebarAtEnd = !isPresented
-        isCustomizingLayout = true
-        isPresented = true
-    }
-
-    func endLayout() {
-        guard isCustomizingLayout else { return }
-        isCustomizingLayout = false
-        if closesSidebarAtEnd { isPresented = false }
-        closesSidebarAtEnd = false
-    }
-
     /// Shows the sidebar, which takes the view panel, and remembers to close it again if it was closed.
     func beginViewPanel() {
         guard !isEditingView else { return }
-        endLayout()
         closesSidebarAtViewEnd = !isPresented
         isEditingView = true
         isPresented = true
@@ -309,10 +253,9 @@ final class DetailsPresentation {
         closesSidebarAtViewEnd = false
     }
 
-    /// Whether the person has the sidebar open, for the next launch: a sidebar only Customize Layout or the view panel
-    /// opened is not.
+    /// Whether the person has the sidebar open, for the next launch: a sidebar only the view panel opened is not.
     var isPresentedByPerson: Bool {
-        isPresented && !(isCustomizingLayout && closesSidebarAtEnd) && !(isEditingView && closesSidebarAtViewEnd)
+        isPresented && !(isEditingView && closesSidebarAtViewEnd)
     }
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
@@ -325,18 +268,6 @@ final class DetailsPresentation {
     /// The items whose title the person typed and has not saved, in a steady order.
     var unsavedTitles: [ItemID] {
         drafts.filter { $0.value["title"]?.isDirty == true }.map(\.key).sorted { $0.rawValue < $1.rawValue }
-    }
-
-    /// The property drafts the person typed and has not saved, for `itemID` or for every item, in a steady order. The
-    /// title has a home of its own.
-    func unsavedProperties(of itemID: ItemID? = nil) -> [(item: ItemID, key: String, draft: ItemPropertyDraft)] {
-        drafts.filter { itemID == nil || $0.key == itemID }
-            .sorted { $0.key.rawValue < $1.key.rawValue }
-            .flatMap { item, keyed in
-                keyed.filter { ($0.value.isDirty || $0.value.holdsUnsavedList) && $0.value.field != nil }
-                    .sorted { $0.key < $1.key }
-                    .map { (item, $0.key, $0.value) }
-            }
     }
 
     /// Saves the title typed for the item, if there is one; whether the title the page shows is saved.
