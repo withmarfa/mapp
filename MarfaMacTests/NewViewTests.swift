@@ -422,7 +422,8 @@ struct NewViewTests {
             for start in starts where browser.existingView(for: start, in: library) == nil {
                 let anchor = browser.viewMode
                 #expect(browser.pickStart(start, in: library, order: Self.order) == nil)
-                browser.viewPanelPopoverClosed(anchoredIn: anchor, in: library)
+                // Only a layout that changed replaced the button.
+                if browser.viewMode != anchor { browser.viewPanelPopoverClosed(anchoredIn: anchor, in: library) }
                 #expect(browser.viewPanel === panel, "\(place) \(start)")
                 #expect(panel.start == start, "\(place) \(start)")
                 #expect(panel.form?.isBusy == false, "\(place) \(start)")
@@ -430,6 +431,7 @@ struct NewViewTests {
             }
             browser.chooseStart(.recentlyAdded, in: library)
             #expect(browser.viewMode == .list)
+            #expect(browser.viewPanel === panel)
             browser.viewPanelPopoverClosed(anchoredIn: browser.viewMode, in: library)
             #expect(browser.viewPanel == nil)
             #expect(!library.notices.waiting.contains { $0.isNotKept })
