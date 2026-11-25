@@ -152,6 +152,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Edges as rows | Each edge field a type may hold gets a row and a value panel: filled ones in place, the rest under Show More, and inverses where Marfa allows. The panel obeys Marfa's answer. One commit is one undo. Only a reference in the text is not editable. An item in no collection has an empty In Collection row. | `ValueEditKind`, `ItemRelationshipPicker`, `PropertyRow` | `Rethink-Properties-Rule`, `Rethink-Edit-Values` |
+| Undo of a link in one call | Undo checks a link's id, type and ends, then deletes it by id in a second package call, so a move synced between the two is lost, as with state moves. **Waits for Marfa:** one package call that checks and deletes. | `MarfaEngine+Writing.swift` | – |
 | Conflict | A calm line with Keep My Edit and Use Current Value. | `ValueEditModel` | `Rethink-Edit-Conflict` |
 | Status where it is seen | A click on a status in a row or a lane opens its panel; the row stays until it is left. | `StatusSymbol`, `ItemRow.swift` | `Rethink-Status-In-List` |
 | Every link follows Open Items | In the text, rows, foot and panel, through one function of the browser. A picture in the text has Open Item and Copy Link on its menu. | `Browser`, `EditorController` | – |

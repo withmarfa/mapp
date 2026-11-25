@@ -511,6 +511,9 @@
         }
       }
     },
+    "%@, Archived" : {
+
+    },
     "%@, edited" : {
       "extractionState" : "manual"
     },
@@ -2496,6 +2499,9 @@
         }
       }
     },
+    "Archived" : {
+
+    },
     "Archived Items" : {
 
     },
@@ -4239,9 +4245,6 @@
 
     },
     "Edit Property" : {
-      "extractionState" : "manual"
-    },
-    "Edit Relationship" : {
       "extractionState" : "manual"
     },
     "Edit Statuses…" : {
@@ -6219,6 +6222,9 @@
 
     },
     "Marfa for Mac couldn’t check this link in time. Try opening it again." : {
+
+    },
+    "Marfa keeps this link itself." : {
 
     },
     "Marfa’s" : {

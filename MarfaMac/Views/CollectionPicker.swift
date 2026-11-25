@@ -14,7 +14,7 @@ struct CollectionActions: View {
             Button("Add to Collection…", systemImage: "rectangle.stack.badge.plus") {
                 details?.collectionPick = CollectionPickRequest(ids: selection, undoManager: undoManager)
             }
-            .disabled(details == nil || library.collections.isEmpty)
+            .disabled(details == nil || library.joinableCollections.isEmpty)
             let holding = library.collections(holding: members)
             if holding.count > 1 {
                 Menu("Remove from Collection", systemImage: "rectangle.stack.badge.minus") {

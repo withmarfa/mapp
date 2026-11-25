@@ -73,6 +73,13 @@ actor MarfaEngine {
         }
     }
 
+    /// Whether a refusal's code says the copy was not whole or could not be kept current (`problem(for:)`).
+    nonisolated static func isNotCurrent(_ code: String) -> Bool { notCurrentCodes.contains(code) }
+
+    private nonisolated static let notCurrentCodes: Set<String> = [
+        MarfaError.hydrationIncomplete(message: "").code(), MarfaError.copyExpired(reason: "", message: "", server: nil).code(),
+    ]
+
     nonisolated static var notCurrent: String {
         String(localized: "This library is being brought up to date. Try again in a moment.")
     }

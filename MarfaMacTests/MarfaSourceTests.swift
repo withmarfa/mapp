@@ -649,7 +649,7 @@ struct MarfaSourceOfflineTests {
         let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
 
         let write = WriteID()
-        source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: second), as: write)
+        source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: second, from: first, stays: child), as: write)
         let moved = try #require(await log.wait { state in
             state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.to == .item(second) } == true
         })
@@ -678,7 +678,7 @@ struct MarfaSourceOfflineTests {
         let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
         for step in 0..<16 {
             let parent = step.isMultiple(of: 2) ? second : first
-            source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: parent), as: WriteID())
+            source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: parent, from: parent == second ? first : second, stays: child), as: WriteID())
             let shown = await log.wait { state in
                 state.snapshot?.items.first { $0.id == child }?.edgesOut.map(\.to) == [.item(parent)]
             }
@@ -704,10 +704,10 @@ struct MarfaSourceOfflineTests {
 
         // A type whose end that stays can hold many has no end to replace.
         let notReplaceable = WriteID()
-        source.submit(.moveEdge(EdgeID(references.id), end: .to, to: child), as: notReplaceable)
+        source.submit(.moveEdge(EdgeID(references.id), end: .to, to: child, from: other, stays: parent), as: notReplaceable)
         // A move that would leave the edge running from an item to itself.
         let selfLoop = WriteID()
-        source.submit(.moveEdge(EdgeID(parentOf.id), end: .from, to: child), as: selfLoop)
+        source.submit(.moveEdge(EdgeID(parentOf.id), end: .from, to: child, from: parent, stays: child), as: selfLoop)
         let answered = try #require(await log.wait { $0.answer(to: notReplaceable) != nil && $0.answer(to: selfLoop) != nil })
         var validation = try #require(MarfaEngine.moveProblem(.validation(code: "validation_error", message: "", details: nil, server: nil)))
         var cycle = try #require(MarfaEngine.moveProblem(.validation(code: "edge_cycle", message: "", details: nil, server: nil)))
@@ -723,10 +723,9 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
-    /// A move to the end the edge already holds, as an undo after a refused move makes, is taken at once and
-    /// queues nothing, since the server refuses an update that changes nothing.
+    /// The copy queues nothing for a move to the end it already holds. The engine reports the move as skipped.
     @Test
-    func aMoveToTheEndTheEdgeHoldsIsTakenAndQueuesNothing() async throws {
+    func aMoveToTheEndTheEdgeHoldsIsSkippedAndQueuesNothing() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try await open(root)
@@ -738,9 +737,13 @@ struct MarfaSourceOfflineTests {
         let before = try await source.copy.queue.all()
 
         let write = WriteID()
-        source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: parent), as: write)
+        source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: parent, from: parent, stays: child), as: write)
         let answered = try #require(await log.wait { $0.answer(to: write) != nil })
-        #expect(answered.answer(to: write) == .accepted)
+        guard case .refused(let problem)? = answered.answer(to: write) else {
+            Issue.record("the move was answered \(String(describing: answered.answer(to: write)))")
+            return
+        }
+        #expect(MarfaEngine.skipReason(problem.code) == .changedSince)
         #expect(try await source.copy.queue.all().map(\.id) == before.map(\.id))
         let held = try #require(answered.snapshot?.items.first { $0.id == child }?.edgesOut)
         #expect(held.contains { $0.to == .item(parent) })
@@ -920,7 +923,7 @@ struct MarfaSourceOfflineTests {
         let (first, second, child) = (ids[0], ids[1], ids[2])
         let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
         let write = WriteID()
-        source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: second), as: write)
+        source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: second, from: first, stays: child), as: write)
         _ = try #require(await log.wait { state in
             state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.to == .item(second) } == true
         })
@@ -1427,7 +1430,7 @@ extension LiveMarfaTests {
                 let edge = try #require(held)
 
                 let move = WriteID(), tagged = WriteID()
-                source.submit(.moveEdge(EdgeID(edge), end: .from, to: second), as: move)
+                source.submit(.moveEdge(EdgeID(edge), end: .from, to: second, from: first, stays: child), as: move)
                 source.submit(.tag(child, ItemTag.favorite, on: true), as: tagged)
                 let done = try #require(await log.wait { state in
                     state.answer(to: move) != nil && state.answer(to: tagged) != nil
@@ -1471,7 +1474,7 @@ extension LiveMarfaTests {
                 let edge = try #require(try await source.copy.edges.from(a.rawValue).first { $0.toId == b.rawValue })
                 // `c` is below `b`, so it cannot become `b`'s parent.
                 let move = WriteID()
-                source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: c), as: move)
+                source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: c, from: a, stays: b), as: move)
                 let refused = try #require(await log.wait { $0.answer(to: move) != nil })
                 guard case .refused(let problem)? = refused.answer(to: move) else {
                     Issue.record("the move was answered \(String(describing: refused.answer(to: move)))")

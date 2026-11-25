@@ -106,11 +106,14 @@ import Testing
             try await copy.edges.from(parent.id.rawValue).count
         }
 
+        /// The link as this Mac saw it, which an Undo removes.
+        var removal: EdgeDraft { EdgeDraft(type: MarfaMapping.parentEdge, from: parent.id, to: item.id, id: edge) }
+
         /// What an Undo of the link writes, made as the library makes it.
         @discardableResult
         func unlink(as group: UndoGroup) -> WriteID {
             let id = WriteID()
-            source.submit(.unlink(edge), as: id, undoing: group)
+            source.submit(.unlink(removal), as: id, undoing: group)
             return id
         }
 
@@ -199,7 +202,7 @@ import Testing
         // Time for a second reading to make the write again, which it must not.
         await scene.becomeWhole()
         try await Task.sleep(for: .milliseconds(300))
-        #expect(scene.reads.attempts.withLock { $0 } == [.unlink(scene.edge), .unlink(scene.edge)], "refused once, made once")
+        #expect(scene.reads.attempts.withLock { $0 } == [.unlink(scene.removal), .unlink(scene.removal)], "refused once, made once")
         await finish(scene)
     }
 
@@ -253,7 +256,7 @@ import Testing
         // The package would queue the edit at once, which would leave the step made in part and out of order.
         #expect(try await scene.title() == "Second")
         #expect(try await scene.links() == 1)
-        #expect(scene.reads.attempts.withLock { $0 } == [.unlink(scene.edge)], "the edit waits unattempted behind the link")
+        #expect(scene.reads.attempts.withLock { $0 } == [.unlink(scene.removal)], "the edit waits unattempted behind the link")
 
         await scene.becomeWhole()
         try #require(try await eventuallyAsking { await scene.held() == 0 })
@@ -265,7 +268,7 @@ import Testing
         try await Task.sleep(for: .milliseconds(300))
         let attempts = scene.reads.attempts.withLock { $0 }
         #expect(attempts.count == 3, "each made once: \(attempts)")
-        #expect(attempts.first == .unlink(scene.edge) && attempts.dropFirst().first == .unlink(scene.edge))
+        #expect(attempts.first == .unlink(scene.removal) && attempts.dropFirst().first == .unlink(scene.removal))
         if case .editProperties(let id, _, _)? = attempts.last { #expect(id == scene.item.id) } else { Issue.record("\(attempts)") }
         #expect(scene.log.current.answer(to: unlink) == nil && scene.log.current.answer(to: edit) == nil)
         await finish(scene)
