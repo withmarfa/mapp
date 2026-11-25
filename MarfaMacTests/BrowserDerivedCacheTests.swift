@@ -129,7 +129,7 @@ struct BrowserDerivedCacheTests {
         let view = LibraryView(id: .mint(), title: "Some")
         library.views = [view]
         let browser = Browser()
-        browser.show(.view(view.id), in: library, order: ItemOrder())
+        browser.show(.saved(view.id), in: library, order: ItemOrder())
         #expect(browser.sections(in: library, order: ItemOrder(), now: date).isEmpty)
         library.viewMembers[view.id] = [library.items[0].id]
         let titles = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.title) }

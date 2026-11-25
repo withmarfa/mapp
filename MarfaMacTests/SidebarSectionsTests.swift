@@ -9,9 +9,9 @@ struct SidebarSectionsTests {
     private static let other = TypeID("aic.other")
     private static let person = TypeID("core.entity.person")
     private static let catalogue = Catalogue(itemTypes: [
-        MarfaMapping.type(TypeID(ItemType(id: "aic.ticket", label: "Ticket", fields: [], titleField: nil))),
-        MarfaMapping.type(TypeID(ItemType(id: "aic.other", label: "Other", fields: [], titleField: nil))),
-        MarfaMapping.type(TypeID(ItemType(id: "core.entity.person", label: "Person", fields: [], icon: "lucide:user"))),
+        MarfaMapping.itemType(ItemType(id: "aic.ticket", label: "Ticket", fields: [], titleField: nil)),
+        MarfaMapping.itemType(ItemType(id: "aic.other", label: "Other", fields: [], titleField: nil)),
+        MarfaMapping.itemType(ItemType(id: "core.entity.person", label: "Person", fields: [], icon: "lucide:user")),
     ])
     private static let defaults = ["details", "properties", "relationships", "links-in-page", "#linked", "tags"]
 

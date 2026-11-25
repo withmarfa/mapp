@@ -33,7 +33,7 @@ struct WindowRestorationTests {
         let notes = items(1_000)
         let library = FakeItemLibrary(items: notes)
         let saved = Browser()
-        saved.show(.recents, in: library, order: ItemOrder())
+        saved.show(.feed, in: library, order: ItemOrder())
         saved.selection = Set(notes.map(\.id))
         let restored = Browser()
         restored.restore(saved.snapshot(), in: library, order: ItemOrder())

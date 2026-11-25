@@ -287,12 +287,12 @@ struct EngineCostTests {
         try #require(await eventually { opened.library.isLoaded })
         let loaded = ContinuousClock.now - start
         line("\(label)_to_first_loaded", loaded)
-        line("\(label)_first_loaded_items", Double(opened.library.count(in: .library)), "count")
+        line("\(label)_first_loaded_items", Double(opened.library.count(in: Place.library)), "count")
         try #require(await eventually { self.whole(opened.library) })
         line("\(label)_to_complete", ContinuousClock.now - start)
         await opened.source.engineTook()
         line("\(label)_to_engine_idle", ContinuousClock.now - start)
-        line("\(label)_library_items", Double(opened.library.count(in: .library)), "count")
+        line("\(label)_library_items", Double(opened.library.count(in: Place.library)), "count")
         return opened
     }
 
@@ -366,7 +366,7 @@ struct EngineCostTests {
             bench.made.add(id)
             try #require(await eventually { library.item(id)?.sync == .settled })
 
-            let places: [(String, PlaceView)] = [("all_items", .library), ("inbox", .inbox)]
+            let places: [(String, Place)] = [("library", .library), ("feed", .feed)]
                 + library.catalogue.itemTypes.keys.sorted { $0.rawValue < $1.rawValue }.map { ("type_\($0.rawValue)", .type($0)) }
             var itemsTimes: [String: [Double]] = [:]
             var countTimes: [String: [Double]] = [:]

@@ -103,8 +103,8 @@ struct SidebarTests {
         var layout = SidebarLayout()
         layout.setHidden(.sources, true)
         let plan = SidebarPlan(library, layout: layout)
-        #expect(plan.shownDestinations == [.all, .collections])
-        #expect(plan.destinations == [.all, .sources, .collections])
+        #expect(plan.shownDestinations == [.library, .collections])
+        #expect(plan.destinations == [.library, .sources, .collections])
     }
 
     @Test func hidingARowHidesWhatIsUnderIt() async throws {
@@ -119,10 +119,10 @@ struct SidebarTests {
 
     @Test func movingPlacesReordersThemWithinTheirGroup() {
         var layout = SidebarLayout()
-        layout.move([.inbox, .all], fromOffsets: IndexSet(integer: 1), toOffset: 0)
-        #expect(layout.ordered([.inbox, .all]) == [.all, .inbox])
-        layout.move([.all, .inbox], fromOffsets: IndexSet(integer: 0), toOffset: 2)
-        #expect(layout.ordered([.inbox, .all]) == [.inbox, .all])
+        layout.move([.feed, .library], fromOffsets: IndexSet(integer: 1), toOffset: 0)
+        #expect(layout.ordered([.feed, .library]) == [.library, .feed])
+        layout.move([.library, .feed], fromOffsets: IndexSet(integer: 0), toOffset: 2)
+        #expect(layout.ordered([.feed, .library]) == [.feed, .library])
     }
 
     @Test func aLayoutKeptForOneLibraryDoesNotChangeAnother() {
@@ -137,11 +137,11 @@ struct SidebarTests {
         let defaults = ThrowawayDefaults.make("SidebarTests.persist")
         SidebarLayouts(defaults: defaults).update("marfa:one") {
             $0.setHidden(.type(LibraryFixture.entity.rawValue), true)
-            $0.move([.inbox, .all], fromOffsets: IndexSet(integer: 1), toOffset: 0)
+            $0.move([.feed, .library], fromOffsets: IndexSet(integer: 1), toOffset: 0)
         }
         let layout = SidebarLayouts(defaults: defaults).layout(for: "marfa:one")
         #expect(layout.isHidden(.type(LibraryFixture.entity.rawValue)))
-        #expect(layout.ordered([.inbox, .all]) == [.all, .inbox])
+        #expect(layout.ordered([.feed, .library]) == [.library, .feed])
     }
 
     @Test func aStoredLayoutThatCannotBeReadLeavesTheDefault() {

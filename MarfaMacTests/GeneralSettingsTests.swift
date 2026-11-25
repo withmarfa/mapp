@@ -26,7 +26,7 @@ struct GeneralSettingsTests {
     @Test func aChoiceOfPlaceIsReadBackAndAnythingElseIsWhereIWasLeft() throws {
         let defaults = ThrowawayDefaults.make("GeneralSettingsTests")
         #expect(StartWith.stored(in: defaults) == .leftOff)
-        for choice in [StartWith.leftOff, .place(.inbox), .place(.type(TypeID("core.task"))), .place(.library)] {
+        for choice in [StartWith.leftOff, .place(.feed), .place(.type(TypeID("core.task"))), .place(.library)] {
             defaults.set(choice.rawValue, forKey: StartWith.key)
             #expect(StartWith.stored(in: defaults) == choice)
         }

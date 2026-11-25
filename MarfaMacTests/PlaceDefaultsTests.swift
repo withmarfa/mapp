@@ -38,9 +38,9 @@ struct PlaceDefaultsTests {
 
     @Test func aWindowModelUnderTestKeepsItsDefaultViewsApart() {
         let first = Browser()
-        first.updatePlaceDefault(.recents) { $0.layout = .timeline }
-        #expect(PlaceDefaults.stored(in: first.defaults).default(for: .recents)?.layout == .timeline)
-        #expect(PlaceDefaults.stored(in: Browser().defaults).default(for: .recents) == nil)
+        first.updatePlaceDefault(.feed) { $0.layout = .timeline }
+        #expect(PlaceDefaults.stored(in: first.defaults).default(for: .feed)?.layout == .timeline)
+        #expect(PlaceDefaults.stored(in: Browser().defaults).default(for: .feed) == nil)
     }
 
     @Test func aPlaceOpensAsThePersonLeftIt() {
@@ -48,29 +48,29 @@ struct PlaceDefaultsTests {
         let library = Self.library()
         let first = Self.window(defaults, library: library)
         first.setFilter(Self.status, values: ["todo"], negated: true)
-        first.tableOptions[first.item, default: .init()].sort = [ItemTableComparator(column: .title, order: .forward)]
-        first.tableOptions[first.item, default: .init()].grouping = .none
+        first.tableOptions[first.shown, default: .init()].sort = [ItemTableComparator(column: .title, order: .forward)]
+        first.tableOptions[first.shown, default: .init()].grouping = .none
         first.choicesChanged()
         first.viewMode = .table
-        first.timelineFields[first.item] = "due_at"
+        first.timelineFields[first.shown] = "due_at"
         first.choicesChanged()
-        first.setCompactBoard(true, in: first.item)
+        first.setCompactBoard(true, in: first.shown)
         first.changeCards { $0.size = .large }
         first.changeCalendarScale(.month)
 
         let second = Self.window(defaults, library: library)
-        let options = second.tableOptions[second.item]
+        let options = second.tableOptions[second.shown]
         #expect(options?.filter.valuesByField == [Self.status: ["todo"]])
         #expect(options?.filter.clauses.first?.op == .isNot)
         #expect(options?.sort?.map(\.column.id) == ["title"])
         #expect(options?.grouping == ItemTableOptions.Grouping.none)
         #expect(second.viewMode == .table)
-        #expect(second.timelineFields[second.item] == "due_at")
-        #expect(second.compactBoards[second.item] == true)
+        #expect(second.timelineFields[second.shown] == "due_at")
+        #expect(second.compactBoards[second.shown] == true)
         #expect(second.cards.size == .large)
         #expect(second.calendarScale == .month)
         // Opening is not the person's change: it makes no step of Undo and no write.
-        #expect(second.liveChoices == second.observedChoices[second.item])
+        #expect(second.liveChoices == second.observedChoices[second.shown])
     }
 
     @Test func anotherPlaceKeepsItsOwnAndAPlaceNobodyChangedKeepsNothing() {
@@ -81,12 +81,12 @@ struct PlaceDefaultsTests {
         browser.choicesChanged()
         let stored = PlaceDefaults.stored(in: defaults)
         #expect(stored.default(for: Self.tasks) != nil)
-        #expect(stored.default(for: .recents) == nil)
-        #expect(Self.window(defaults, library: library, place: .recents).tableOptions[.recents]?.isFiltering != true)
+        #expect(stored.default(for: .feed) == nil)
+        #expect(Self.window(defaults, library: library, place: .feed).tableOptions[.feed]?.isFiltering != true)
     }
 
     @Test func aSavedViewAndTheThreeIndexesHaveNoDefaultView() {
-        #expect(!Browser.hasDefaultView(.view(ItemID("v"))))
+        #expect(!Browser.hasDefaultView(.saved(ItemID("v"))))
         #expect(!Browser.hasDefaultView(.sources))
         #expect(!Browser.hasDefaultView(.collections))
         #expect(!Browser.hasDefaultView(.library))
@@ -101,12 +101,12 @@ struct PlaceDefaultsTests {
         one.setFilter(Self.status, values: ["todo"])
         one.choicesChanged()
         // The other window keeps what it shows until it opens the place again.
-        #expect(two.tableOptions[two.item]?.isFiltering != true)
-        two.showing = .recents
+        #expect(two.tableOptions[two.shown]?.isFiltering != true)
+        two.showing = .feed
         two.showing = Self.tasks
         two.followPlaceDefault(in: library)
-        #expect(two.tableOptions[two.item]?.filter.valuesByField == [Self.status: ["todo"]])
-        two.tableOptions[two.item, default: .init()].grouping = .none
+        #expect(two.tableOptions[two.shown]?.filter.valuesByField == [Self.status: ["todo"]])
+        two.tableOptions[two.shown, default: .init()].grouping = .none
         two.choicesChanged()
         let stored = PlaceDefaults.stored(in: defaults).default(for: Self.tasks)
         #expect(FilterState(clauses: stored?.filter ?? []).valuesByField == [Self.status: ["todo"]])
@@ -323,14 +323,14 @@ struct PlaceDefaultsTests {
         #expect(PlaceDefaults.stored(in: defaults).default(for: .favorites)?.layout == .board)
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)
 
-        Self.store(PlaceDefault(layout: .table), for: .recents, in: defaults)
+        Self.store(PlaceDefault(layout: .table), for: .feed, in: defaults)
         let aside = try #require(defaults.array(forKey: PlaceDefaults.setAsideKey) as? [Data])
         #expect(aside.count == 1)
         let kept = try #require(JSONSerialization.jsonObject(with: aside[0]) as? [String: Any])
         #expect(Array(kept.keys) == [Self.tasks.storageKey])
         #expect((kept[Self.tasks.storageKey] as? [String: Any])?["filter"] as? String == "not a table")
         #expect(PlaceDefaults.stored(in: defaults).default(for: .favorites)?.layout == .board)
-        #expect(PlaceDefaults.stored(in: defaults).default(for: .recents)?.layout == .table)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: .feed)?.layout == .table)
     }
 
     // MARK: Column layouts that cannot be read

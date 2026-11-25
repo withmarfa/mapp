@@ -72,7 +72,6 @@ struct MarfaSearchSetsTests {
             _ = await eventually { !library.search("zebra", in: scope).isPending }
             return library.search("zebra", in: scope).items.map(\.title).sorted()
         }
-        let catalogue = library.catalogue
         let own = PlaceListing(includesKinds: false)
         #expect(await found(.query(try #require(ViewDraft.query(for: .type(parent), listing: own, catalogue: catalogue, views: [])))) == ["Zebra own"])
         #expect(await found(.query(try #require(ViewDraft.query(for: .type(parent), catalogue: catalogue, views: [])))) == ["Zebra own", "Zebra sub"])

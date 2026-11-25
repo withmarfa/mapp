@@ -67,7 +67,7 @@ import Testing
     @Test func aSearchThatAnswersReplacesWhatWasShownWhilePending() async throws {
         let (library, source) = try await BigLibrary.loaded()
         let browser = browser(showing: .library)
-        let found = Array(library.items(in: tasks).prefix(3).map(\.id))
+        let found = Array(library.items(in: tasks.place).prefix(3).map(\.id))
         source.hits.withLock { $0["sidebar"] = found }
         browser.searchText = "sidebar"
         let pending = browser.tableContent(in: library)

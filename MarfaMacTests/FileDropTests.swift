@@ -65,14 +65,14 @@ struct FileDropTests {
         #expect(browser.shown == .library)
     }
 
-    @Test func filesDroppedInTheInboxAllKeepTheInboxTierWhenThePersonMovesOnMidImport() async throws {
+    @Test func filesDroppedInTheFeedAllKeepTheFeedTierWhenThePersonMovesOnMidImport() async throws {
         let library = FakeItemLibrary()
         let browser = Browser()
         browser.adopt(library)
-        browser.show(.inbox, in: library, order: ItemOrder())
+        browser.show(.feed, in: library, order: ItemOrder())
         library.sendingFile = { browser.show(.library, in: library, order: ItemOrder()) }
         _ = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: ItemOrder(), undoManager: nil)
-        #expect(library.addedPlaces == [.inbox, .inbox])
+        #expect(library.addedPlaces == [.feed, .feed])
     }
 
     @Test func aDropCutOffByALibraryChangeStillAddsEveryFileToTheLibraryItWasDroppedOn() async throws {

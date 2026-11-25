@@ -153,16 +153,13 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func changesFromTheSourceReplaceWhatWasHeld() async throws {
         let (library, source) = try await loaded()
-        #expect(library.items(in: .recents).first?.id == F.p1)
         var renamed = try #require(library.item(F.n2))
         renamed.title = "Renamed"
         renamed.tier = .library
         renamed.modified = Date(timeIntervalSince1970: 2_000_000)
         source.send(.upserted([renamed]))
         #expect(await eventually { library.item(F.n2)?.title == "Renamed" })
-        // An edit moves an item to the top of Recents, though what the library holds is the same.
-        #expect(library.items(in: .recents).first?.id == F.n2)
-        #expect(library.items(in: .inbox).isEmpty)
+        #expect(library.items(in: .feed).isEmpty)
 
         let added = F.item(ItemID("new"), F.task, "New task", age: 0, edges: [F.child("c9", ItemID("new"), of: F.p2)])
         source.setBody("Fresh", of: added.id)
@@ -174,7 +171,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.removed([F.n1]))
         #expect(await eventually { library.isGone(F.n1) })
         #expect(library.item(F.n1) == nil)
-        #expect(!ids(library.items(in: .favorites)).contains(F.n1))
+        #expect(!ids(library.favoriteItems(in: .all, archived: .hidden)).contains(F.n1))
         #expect(library.isGone(nil))
     }
 
@@ -256,7 +253,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         // The Inbox is the feed tier, and a blank body is no text.
         let inbox = try #require(library.createItem(
-            typeID: "core.note", title: "Captured", body: "\n", parentID: nil, in: .inbox, undoManager: nil))
+            typeID: "core.note", title: "Captured", body: "\n", parentID: nil, in: .feed, undoManager: nil))
         #expect(source.writes.last == .create(id: inbox, ItemDraft(type: F.note, title: "Captured", tier: .feed)))
 
         // Undoing a create puts the item in the bin; redoing it brings it back.
@@ -878,7 +875,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.attaching.attached.withLock { $0.map(\.file) } == ["plan.pdf"])
 
         let id = await library.addFile(
-            disk.url("photo.png", "png"), title: "Holiday", parentID: F.p1, in: .inbox)
+            disk.url("photo.png", "png"), title: "Holiday", parentID: F.p1, in: .feed)
         #expect(id != nil)
         let added = try #require(source.attaching.added.withLock { $0.first })
         #expect(added.file == "photo.png" && added.data == Data("png".utf8))

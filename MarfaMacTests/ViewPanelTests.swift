@@ -42,7 +42,7 @@ struct ViewPanelTests {
         let browser = Browser()
         browser.defaults = defaults()
         browser.adopt(library, undoManager: undo)
-        browser.showing = .view(id)
+        browser.showing = .saved(id)
         browser.viewMode = .table
         browser.followView(in: library)
         browser.choicesChanged()
@@ -385,9 +385,9 @@ struct ViewPanelTests {
         let again = Browser()
         again.defaults = Self.defaults()
         again.adopt(library, undoManager: nil)
-        again.showing = .view(Self.id)
+        again.showing = .saved(Self.id)
         again.followView(in: library)
-        #expect(again.tableOptions[again.item]?.filter.clauses.first == FilterClause(field: Self.status, op: .isNot, values: ["in_progress"]))
+        #expect(again.tableOptions[again.shown]?.filter.clauses.first == FilterClause(field: Self.status, op: .isNot, values: ["in_progress"]))
     }
 
     /// The view saying a chip another way is not another app's change: a later write of the sort leaves the chip as the
@@ -518,7 +518,7 @@ struct ViewPanelTests {
         browser.showing = .library
         await task?.value
         #expect(Self.held(library)?.version == 1)
-        browser.showing = .view(Self.id)
+        browser.showing = .saved(Self.id)
         browser.followView(in: library)
         #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
     }

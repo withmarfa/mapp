@@ -245,7 +245,7 @@ extension LiveMarfaTests {
             do {
                 source.refresh()
                 try #require(await eventually {
-                    library.isLoaded && library.connection == .online && library.count(in: .library) > 100
+                    library.isLoaded && library.connection == .online && library.count(in: Place.library) > 100
                 })
                 try await body(library, source, made)
             } catch {
@@ -419,18 +419,18 @@ extension LiveMarfaTests {
             try await withLibrary { library, source, made in
                 let token = "zt" + UUID().uuidString.prefix(8).lowercased()
                 let id = try #require(library.createItem(
-                    typeID: "core.note", title: "MARFAMACTEST review \(token)", body: "captured", parentID: nil, in: .inbox,
+                    typeID: "core.note", title: "MARFAMACTEST review \(token)", body: "captured", parentID: nil, in: .feed,
                     undoManager: nil))
                 made.add(id)
-                #expect(await eventually { library.items(in: .inbox).contains { $0.id == id } })
+                #expect(await eventually { library.items(in: .feed).contains { $0.id == id } })
                 await source.flush()
                 try #require(await eventually { library.item(id)?.sync == .settled })
                 try await source.engine.sync.refreshNow()
                 // Gives the changes the catch-up brought time to reach the library before checking that the item
                 // did not leave the Inbox.
                 try await Task.sleep(for: .seconds(2))
-                Attachment.record("held: \(library.item(id) != nil), tier: \(String(describing: library.item(id)?.tier)), inbox: \(library.items(in: .inbox).count), failure: \(String(describing: library.notices.waiting.last))", named: "Inbox.txt")
-                #expect(library.items(in: .inbox).contains { $0.id == id })
+                Attachment.record("held: \(library.item(id) != nil), tier: \(String(describing: library.item(id)?.tier)), inbox: \(library.items(in: .feed).count), failure: \(String(describing: library.notices.waiting.last))", named: "Inbox.txt")
+                #expect(library.items(in: .feed).contains { $0.id == id })
             }
         }
 

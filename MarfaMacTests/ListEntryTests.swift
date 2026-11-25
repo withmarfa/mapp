@@ -19,13 +19,13 @@ struct ListEntryTests {
     ])
     private static let scores = listField("scores", ["points": ["type": "integer", "minimum": 1, "maximum": 5]])
 
-    private static let person = MarfaMapping.type(TypeID(ItemType(
+    private static let person = MarfaMapping.itemType(ItemType(
         id: "core.entity.person", label: "Person", fields: [
             TypeField(name: "title", type: "string", declaredBy: "core.entity"), emails, phones, addresses,
-        ], titleField: "title")))
+        ], titleField: "title"))
 
     private static func shape(_ field: TypeField) throws -> ListShape {
-        let mapped = try #require(MarfaMapping.type(TypeID(ItemType(id: "t", label: "T", fields: [field]))).fields.first)
+        let mapped = try #require(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [field])).fields.first)
         guard case .list(let shape) = mapped.kind else { Issue.record("not a list: \(mapped.kind)"); throw CancellationError() }
         return shape
     }
@@ -38,30 +38,30 @@ struct ListEntryTests {
 
     @Test func anArrayOfStringsIsAListOfWordsAndOneOfAnythingElseIsLeftAlone() {
         let tags = TypeField(name: "tags", type: "array", declaredBy: "t", definition: ["items_type": "string"])
-        #expect(MarfaMapping.type(TypeID(ItemType(id: "t", label: "T", fields: [tags]))).fields.first?.kind == .words)
+        #expect(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [tags])).fields.first?.kind == .words)
         let numbers = TypeField(name: "sizes", type: "array", declaredBy: "t", definition: ["items_type": "number"])
-        #expect(MarfaMapping.type(TypeID(ItemType(id: "t", label: "T", fields: [numbers]))).fields.first?.kind == .other)
+        #expect(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [numbers])).fields.first?.kind == .other)
     }
 
     @Test func aListFieldCarriesItsLimitAndTakesNoMoreThanItDeclares() throws {
         let tags = TypeField(name: "sites", type: "array", declaredBy: "t", definition: ["items_type": "url", "maxItems": 2])
-        let field = try #require(MarfaMapping.type(TypeID(ItemType(id: "t", label: "T", fields: [tags]))).fields.first)
+        let field = try #require(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [tags])).fields.first)
         #expect(field.maxItems == 2)
         #expect(field.accepts(.array([.string("a"), .string("b")])))
         #expect(!field.accepts(.array([.string("a"), .string("b"), .string("c")])))
         let free = TypeField(name: "sites", type: "array", declaredBy: "t", definition: ["items_type": "url"])
-        #expect(MarfaMapping.type(TypeID(ItemType(id: "t", label: "T", fields: [free]))).fields.first?.maxItems == nil)
+        #expect(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [free])).fields.first?.maxItems == nil)
     }
 
     @Test func aMemberTheAppCannotReadLeavesTheListUntouchedRatherThanEditedBlind() {
         let odd = Self.listField("odd", ["value": ["type": "string"], "blob": ["type": "geometry"]])
-        let mapped = MarfaMapping.type(TypeID(ItemType(id: "t", label: "T", fields: [odd]))).fields.first
+        let mapped = MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [odd])).fields.first
         #expect(mapped?.kind == .other)
     }
 
     @Test func aNumberFieldCarriesItsBounds() throws {
         let rating = TypeField(name: "rating", type: "integer", declaredBy: "core.media", definition: ["minimum": 1, "maximum": 5])
-        let field = try #require(MarfaMapping.type(TypeID(ItemType(id: "core.media", label: "Media", fields: [rating]))).fields.first)
+        let field = try #require(MarfaMapping.itemType(ItemType(id: "core.media", label: "Media", fields: [rating])).fields.first)
         #expect(field.numberRule == NumberRule(integer: true, minimum: 1, maximum: 5))
         let members = try Self.shape(Self.scores)
         #expect(members.member("points")?.kind == .number(NumberRule(integer: true, minimum: 1, maximum: 5)))
@@ -148,7 +148,7 @@ struct ListEntryTests {
         #expect(shape.fault(of: .string("b@example.com")) != nil)
         #expect(shape.fault(of: good) == nil)
         // The row's "Unrecognized value" check reads the field's acceptance.
-        let field = try #require(MarfaMapping.type(TypeID(ItemType(id: "t", label: "T", fields: [Self.emails]))).fields.first)
+        let field = try #require(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [Self.emails])).fields.first)
         #expect(field.accepts(.array([good])))
         #expect(!field.accepts(.array([good, .string("b@example.com")])))
         #expect(!field.accepts(.array([Self.entry(["value": .string("a@example.com"), "kind": .string("x")])])))
@@ -220,9 +220,9 @@ struct ListEntryTests {
 
     @Test func anAddressOfOnlyAPostcodeIsNeverANumberToCall() throws {
         let postcodes = Self.listField("addresses", ["label": ["type": "string"], "postal_code": ["type": "string"]])
-        let person = MarfaMapping.type(TypeID(ItemType(
+        let person = MarfaMapping.itemType(ItemType(
             id: "core.entity.person", label: "Person", fields: [TypeField(name: "title", type: "string", declaredBy: "core.entity"), postcodes],
-            titleField: "title")))
+            titleField: "title"))
         let item = Self.personItem(["addresses": .array([Self.entry(["postal_code": .string("90210 12345")])])])
         let lead = PageHeaderLead(for: item, kind: .person, now: .now)
         let rows = lead.refine(PropertyRow.rows(of: item, type: person, hidden: ["title"], relationships: [], parentField: "child-of", format: .standard, tags: []))
@@ -245,7 +245,7 @@ struct ListEntryTests {
     // MARK: Media
 
     @Test func aMediaProgressIsAStatusAndItsRatingAFiveStepNumber() throws {
-        let media = MarfaMapping.type(TypeID(ItemType(
+        let media = MarfaMapping.itemType(ItemType(
             id: "core.media", label: "Media",
             fields: [
                 TypeField(name: "title", type: "string", declaredBy: "core.media"),
@@ -255,7 +255,7 @@ struct ListEntryTests {
                 ]]),
                 TypeField(name: "rating", type: "integer", declaredBy: "core.media", definition: ["minimum": 1, "maximum": 5]),
                 TypeField(name: "kind", type: "enum", declaredBy: "core.media", definition: ["enum_values": ["book", "film", "game"]]),
-            ], titleField: "title")))
+            ], titleField: "title"))
         #expect(media.statusField?.key == "progress")
         #expect(media.statusField?.statusGroup(of: "finished") == .completed)
         let rating = try #require(media.fields.first { $0.key == "rating" })

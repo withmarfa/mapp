@@ -66,7 +66,6 @@ struct MakingAnItemTests {
     @Test func aTypesPlaceHoldsItsTypeWhateverWasUsedLast() {
         #expect(opened(in: .type(TypeID("core.task")), remembered: "test.plain") == "core.task")
         #expect(opened(in: .collections, remembered: "test.plain") == FakeItemLibrary.collectionType.rawValue)
-        #expect(opened(in: .files, remembered: "test.plain") == TypeID.file.rawValue)
         #expect(opened(in: .type(TypeID("core.task")), remembered: "test.plain", asked: "core.note") == "core.note", "a kind asked for wins")
     }
 

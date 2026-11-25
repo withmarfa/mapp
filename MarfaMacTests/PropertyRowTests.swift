@@ -24,7 +24,7 @@ struct PropertyRowTests {
         TypeField(name: name, label: label, type: type, description: description, declaredBy: "aic.ticket", definition: definition)
     }
 
-    private static let ticket = MarfaMapping.type(TypeID(ItemType(
+    private static let ticket = MarfaMapping.itemType(ItemType(
         id: "aic.ticket", label: "Ticket",
         fields: [
             field("title"), field("body"),
@@ -33,7 +33,7 @@ struct PropertyRowTests {
             field("due_at", "datetime", label: "Deadline"), field("done", "boolean"), field("estimate", "integer"),
             field("link", "url"), field("contact", "email"), field("summary"), field("empty")
         ],
-        titleField: "title", bodyField: "body")))
+        titleField: "title", bodyField: "body"))
 
     private static func item(_ properties: [String: PropertyValue]) -> MarfaMac.Item {
         MarfaMac.Item(

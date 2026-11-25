@@ -19,7 +19,7 @@ struct PlaceDensitiesTests {
         #expect(stored.density(for: .library) == .compact)
         #expect(stored.density(for: .type(TypeID("core.task"))) == .standard)
         #expect(stored.density(for: .type(TypeID("core.note"))) == nil)
-        #expect(stored.density(for: .recents) == nil)
+        #expect(stored.density(for: .feed) == nil)
     }
 
     @Test func clearingTheLastDensityRemovesTheKey() {
@@ -48,11 +48,11 @@ struct PlaceDensitiesTests {
         let defaults = Self.defaults()
         let key = PlaceView.library.storageKey
         defaults.set(try JSONEncoder().encode([key: "compact", "other": "roomy"]), forKey: PlaceDensities.key)
-        PlaceDensities.update(in: defaults) { $0.set(.standard, for: .recents) }
+        PlaceDensities.update(in: defaults) { $0.set(.standard, for: .feed) }
         let aside = try #require(defaults.array(forKey: PlaceDensities.setAsideKey) as? [Data])
         #expect(try JSONDecoder().decode([String: String].self, from: aside[0]) == ["other": "roomy"])
         let stored = PlaceDensities.stored(in: defaults)
         #expect(stored.density(for: .library) == .compact)
-        #expect(stored.density(for: .recents) == .standard)
+        #expect(stored.density(for: .feed) == .standard)
     }
 }

@@ -176,7 +176,7 @@ struct NavigationCostTests {
         let (library, _) = try await BigLibrary.loaded()
         let places: [(String, PlaceView)] = [
             ("all", .library), ("decisions", .type(TypeID("aic.decision"))), ("tasks", .type(TypeID("aic.ticket.task"))),
-            ("sessions", .type(TypeID("aic.session"))), ("recents", .recents), ("favorites", .favorites),
+            ("sessions", .type(TypeID("aic.session"))), ("feed", .feed), ("favorites", .favorites),
         ]
         for (name, place) in places {
             let browser = Browser()

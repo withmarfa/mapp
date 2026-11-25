@@ -40,7 +40,7 @@ struct ViewGroupKeptTests {
         filters: [String: Set<String>] = [:], layout: ViewDraft.Layout = .table, timelineDate: String? = nil
     ) -> ViewDraft.Window {
         var window = ViewDraft.Window(
-            place: .view(ItemID("view-tasks")), columns: columns, sort: sort, grouping: grouping,
+            place: .saved(ItemID("view-tasks")), columns: columns, sort: sort, grouping: grouping,
             filter: FilterState(clauses: filters.map { FilterClause(field: $0.key, op: .is, values: Array($0.value)) }), targets: targets,
             layout: layout, timelineDate: timelineDate)
         window.groupMode = mode
@@ -104,7 +104,7 @@ struct ViewGroupKeptTests {
         let browser = Browser()
         browser.defaults = ViewPanelTests.defaults()
         browser.adopt(library)
-        browser.showing = .view(ItemID("view-tasks"))
+        browser.showing = .saved(ItemID("view-tasks"))
         browser.viewMode = .table
         browser.followView(in: library)
         browser.choicesChanged()
@@ -188,7 +188,7 @@ struct ViewGroupKeptTests {
         let browser = Browser()
         browser.defaults = ViewPanelTests.defaults()
         browser.adopt(library)
-        browser.showing = .view(ItemID("view-tasks"))
+        browser.showing = .saved(ItemID("view-tasks"))
         browser.viewMode = .table
         browser.followView(in: library)
         browser.choicesChanged()
@@ -221,7 +221,7 @@ struct ViewGroupKeptTests {
         let browser = Browser()
         browser.defaults = ViewPanelTests.defaults()
         browser.adopt(library)
-        browser.showing = .view(view.id)
+        browser.showing = .saved(view.id)
         browser.viewMode = .table
         browser.followView(in: library)
         browser.choicesChanged()

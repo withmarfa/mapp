@@ -15,7 +15,7 @@ import Testing
         definition: ["items_type": "object", "items_fields": ["points": ["type": "integer", "minimum": 1, "maximum": 5, "required": true]]])
 
     private static func field(_ field: TypeField) throws -> ItemTypeInfo.Field {
-        try #require(MarfaMapping.type(TypeID(ItemType(id: "t", label: "T", fields: [field]))).fields.first)
+        try #require(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [field])).fields.first)
     }
 
     private static func shape(_ field: TypeField) throws -> ListShape {

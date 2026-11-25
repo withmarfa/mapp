@@ -9,7 +9,7 @@ struct PagePinsTests {
         TypeField(name: name, type: type, declaredBy: "aic.ticket", definition: definition)
     }
 
-    private static let ticket = MarfaMapping.type(TypeID(ItemType(
+    private static let ticket = MarfaMapping.itemType(ItemType(
         id: "aic.ticket", label: "Ticket",
         fields: [
             field("title"), field("body"),
@@ -17,15 +17,15 @@ struct PagePinsTests {
             field("priority", "enum", definition: ["enum_values": ["low", "high"]]),
             field("mobiles"), field("labels"),
         ],
-        titleField: "title", bodyField: "body")))
+        titleField: "title", bodyField: "body"))
 
-    private static let bookmark = MarfaMapping.type(TypeID(ItemType(
+    private static let bookmark = MarfaMapping.itemType(ItemType(
         id: "core.bookmark", label: "Bookmark",
         fields: [
             field("title"), field("body"), field("description"), field("publisher"), field("source_title"),
             field("published_at", "datetime"), field("image_url"),
         ],
-        titleField: "title", bodyField: "body")))
+        titleField: "title", bodyField: "body"))
 
     private static let catalogue = Catalogue(itemTypes: [
         ticket,

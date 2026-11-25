@@ -41,7 +41,7 @@ extension LiveMarfaTests {
         func browsesEveryPlaceAndFollowsEdgesBothWays() async throws {
             try await withLibrary { library, source, made in
                 let token = "zb" + UUID().uuidString.prefix(8).lowercased()
-                @MainActor func make(_ title: String, under parent: ItemID? = nil, in place: PlaceView = .library) throws -> ItemID {
+                @MainActor func make(_ title: String, under parent: ItemID? = nil, in place: Place = .library) throws -> ItemID {
                     let id = library.createItem(
                         typeID: "core.note", title: "MARFAMACTEST \(title) \(token)", body: "Made by the app tests.",
                         parentID: parent, in: place, undoManager: nil)
@@ -49,7 +49,7 @@ extension LiveMarfaTests {
                     return try #require(id)
                 }
                 let project = try make("project")
-                let captured = try make("captured", in: .inbox)
+                let captured = try make("captured", in: .feed)
                 try #require(await eventually { library.item(project) != nil })
                 let children = [try make("first child", under: project), try make("second child", under: project)]
                 await source.flush()
@@ -59,26 +59,28 @@ extension LiveMarfaTests {
                 })
 
                 let types = Set(library.items(in: .library).map(\.type))
-                for place in [PlaceView.inbox, .library, .favorites, .files] + types.map({ PlaceView.type($0) }) {
+                for place in [Place.feed, .library] + types.map({ Place.type($0) }) {
                     let items = library.items(in: place)
                     #expect(library.count(in: place) == items.count, "\(place)")
                     #expect(!library.name(of: place).isEmpty, "\(place)")
                     switch place {
-                    case .favorites: #expect(items.allSatisfy { $0.isFavorite && $0.state == .active })
-                    case .inbox: #expect(items.allSatisfy { $0.tier == .feed })
-                    // A type's place holds only its own items, never its subtypes'.
-                    case .type(let type): #expect(items.allSatisfy { $0.type == TypeID(type) && $0.state == .active }, "\(place)")
+                    case .feed: #expect(items.allSatisfy { $0.tier == .feed })
+                    case .type(let type):
+                        let own = library.items(in: place, scope: .all, archived: .hidden, includingKinds: false)
+                        #expect(own.allSatisfy { $0.type == type && $0.state == .active }, "\(place)")
+                        #expect(Set(own.map(\.id)).isSubset(of: Set(items.map(\.id))), "\(place)")
                     default: #expect(items.allSatisfy { $0.state == .active }, "\(place)")
                     }
                 }
+                #expect(library.favoriteItems(in: .library, archived: .hidden).allSatisfy { $0.isFavorite && $0.state == .active })
                 // A library may hold untitled notes, so what is read back is the titles of the notes made here.
                 #expect(library.item(project)?.title == "MARFAMACTEST project \(token)")
                 #expect(children.map { library.item($0)?.title } == ["MARFAMACTEST first child \(token)", "MARFAMACTEST second child \(token)"])
-                // One copy holds both tiers: the Inbox is the feed, and All Items has the feed's items among the rest.
-                let inbox = library.items(in: .inbox)
-                #expect(inbox.contains { $0.id == captured })
-                #expect(!inbox.contains { $0.id == project })
-                #expect(Set(inbox.map(\.id)).isSubset(of: Set(library.items(in: .library).map(\.id))))
+                // One copy holds both tiers: the Feed lists the feed tier, and the Library does not.
+                let feed = library.items(in: .feed)
+                #expect(feed.contains { $0.id == captured })
+                #expect(!feed.contains { $0.id == project })
+                #expect(Set(feed.map(\.id)).isDisjoint(with: Set(library.items(in: .library).map(\.id))))
 
                 // Each child holds its parent as `child-of`, which makes the parent no collection.
                 let below = try #require(library.relationships(for: project).first { $0.field == "inverse:parent-of" })
@@ -258,7 +260,7 @@ extension LiveMarfaTests {
 
                 // A favorite, and its undo.
                 step { library.setFavorite([child], true, undoManager: undo) }
-                #expect(await eventually { library.items(in: .favorites).contains { $0.id == child } })
+                #expect(await eventually { library.favoriteItems(in: .all, archived: .hidden).contains { $0.id == child } })
                 undo.undo()
                 #expect(await eventually { library.item(child)?.isFavorite == false })
 
@@ -377,7 +379,7 @@ extension LiveMarfaTests {
                 try #require(await eventually {
                     if case .file(_, let size)? = library.item(file)?.content { size == Int64(png.count) } else { false }
                 })
-                #expect(library.items(in: .files).contains { $0.id == file })
+                #expect(library.activeItems.contains { $0.id == file })
                 #expect(library.notices.waiting.last == nil, "\(String(describing: library.notices.waiting.last))")
             }
         }
@@ -406,7 +408,7 @@ extension LiveMarfaTests {
                     try #require(await eventually { library.views.contains { $0.id.rawValue == view.id } })
                     #expect(SidebarPlan(library, layout: SidebarLayout()).library.contains(.views))
                     #expect(library.name(of: place) == "MARFAMACTEST view \(token)")
-                    #expect(await eventually { library.items(in: place).map(\.id) == [id] })
+                    #expect(await eventually { library.items(inView: ItemID(view.id)).map(\.id) == [id] })
 
                     #expect(library.item(ItemID(view.id)) == nil)
                     #expect(!library.items(in: .library).contains { $0.id.rawValue == view.id })

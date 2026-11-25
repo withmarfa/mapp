@@ -23,7 +23,7 @@ struct BrowserViewSeedTests {
         browser.defaults = ViewPanelTests.defaults()
         ViewLayouts.update(in: browser.defaults) { $0.set(ViewMacSettings(layout: layout), for: view.id) }
         browser.adopt(library)
-        browser.showing = .view(view.id)
+        browser.showing = .saved(view.id)
         browser.viewMode = .table
         browser.followView(in: library)
         return (browser, library)

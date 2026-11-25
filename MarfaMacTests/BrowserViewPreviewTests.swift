@@ -36,7 +36,7 @@ struct BrowserViewPreviewTests {
     private static func window(_ library: FakeItemLibrary, view: LibraryView = view()) -> Browser {
         let browser = Browser()
         browser.adopt(library)
-        browser.showing = .view(view.id)
+        browser.showing = .saved(view.id)
         browser.viewMode = .table
         browser.followView(in: library)
         return browser
@@ -105,7 +105,7 @@ struct BrowserViewPreviewTests {
         let library = Self.library()
         let changed = Self.window(library)
         let plain = Self.window(library)
-        changed.tableOptions[changed.item]?.filter = FilterState()
+        changed.tableOptions[changed.shown]?.filter = FilterState()
         #expect(titles(changed, library).count == 4)
         #expect(titles(plain, library) == ["t0", "t2", "t3"])
     }

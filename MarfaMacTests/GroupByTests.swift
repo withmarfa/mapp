@@ -168,7 +168,7 @@ struct GroupByTests {
         var options = seed
         options.groupOrder = ["false", ""]
         options.hiddenGroups = ["true"]
-        var window = ViewDraft.Window(place: .view(view.id), columns: [column], sort: [], grouping: column)
+        var window = ViewDraft.Window(place: .saved(view.id), columns: [column], sort: [], grouping: column)
         window.layout = .table
         let update = ViewDraft.change(window, options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(update.change == LibraryViewChange(group: .set(LibraryViewGroup(

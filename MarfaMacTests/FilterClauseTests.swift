@@ -350,7 +350,7 @@ struct FilterClauseTests {
         let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
         var options = seed
         options.filter = FilterState(clauses: [Self.clause("field.due_at", .inLast, ["7"])])
-        var window = ViewDraft.Window(place: .view(view.id), columns: Self.columns, sort: [], grouping: nil, filter: options.filter, targets: Self.targets)
+        var window = ViewDraft.Window(place: .saved(view.id), columns: Self.columns, sort: [], grouping: nil, filter: options.filter, targets: Self.targets)
         window.layout = .table
         let update = ViewDraft.change(
             window, options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)

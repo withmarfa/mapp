@@ -40,7 +40,7 @@ struct SidebarTabsTests {
 
         let plan = SidebarPlan(library(), layout: layout)
         #expect(plan.tabs.count == 1)
-        #expect(plan.shownBuiltInViews == [.inbox, .recents])
+        #expect(plan.shownBuiltInViews == [.feed])
         #expect(plan.shownSavedViews.map(\.title) == ["Reading", "Open work"], "the person's order of views holds")
         #expect(plan.groups(in: SidebarTab.homeID, customizing: false).map(\.group.kind) == [.shortcuts, .library, .views, .types])
         // Written back, it is the layout it was, with nothing added.
@@ -335,13 +335,13 @@ struct SidebarTabsTests {
         let view = SidebarPlace.view(ItemID("v-Reading"))
         var layout = SidebarLayout()
         #expect(layout.color(of: view) == .gray)
-        for place in [SidebarPlace.inbox, .recents, .favorites, .all, .sources, .collections, .collection(ItemID("c-One")), .source("rss")] {
+        for place in [SidebarPlace.feed, .favorites, .library, .sources, .collections, .collection(ItemID("c-One")), .source("rss")] {
             #expect(layout.color(of: place) == .gray && place.defaultTone == .gray)
         }
         #expect(SidebarPlace.type("core.note").defaultTone == nil)
-        layout.setColor(.blue, of: .all)
-        #expect(layout.color(of: .all) == .blue)
-        layout.setColor(nil, of: .all)
+        layout.setColor(.blue, of: .library)
+        #expect(layout.color(of: .library) == .blue)
+        layout.setColor(nil, of: .library)
         layout.setColor(.purple, of: view)
         #expect(layout.color(of: view) == .purple)
         let stored = try JSONDecoder().decode(SidebarLayout.self, from: JSONEncoder().encode(layout))
@@ -362,7 +362,7 @@ struct SidebarTabsTests {
     @Test func aColorChosenBeforeGrayBecameTheDefaultStays() throws {
         let saved = Data(#"{"colors":{"inbox":"blue","favorites":"pink"}}"#.utf8)
         let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
-        #expect(layout.color(of: .inbox) == .blue && layout.color(of: .favorites) == .pink && layout.color(of: .recents) == .gray)
+        #expect(layout.color(of: .feed) == .blue && layout.color(of: .favorites) == .pink && layout.color(of: .library) == .gray)
     }
 
     @Test func anUnknownStoredColorReadsAsTheViewsOwn() throws {
