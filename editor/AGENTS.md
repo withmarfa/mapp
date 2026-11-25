@@ -28,13 +28,12 @@ The item editor's page: TypeScript on Inkkit, built by Vite into one self-contai
 - **Trap:** Inkkit's scroll container is `document.body`. Measured on `document.documentElement`, reveals and Find go wrong once the page has scrolled.
 - **`--inkkit-column-inset`, set once on `body`, pads the text, the header and the footer.** Keep all three on it, and override no Inkkit selector to pad the text.
 - **Draw property rows as flex rows, never a grid.** The comment in `style.css` says why.
-- **The row above the title takes no room** and is only faded at rest, so a hover moves nothing and the keyboard and VoiceOver reach it.
 
 ## Header
 
-- **The header draws what Swift sends and decides nothing:** not a kind, a type, which pins, a cap, an order or a menu. A pin's value keeps to one line and its whole text is the help.
+- **The head draws what Swift sends and decides nothing:** not a type, which rows show, which pins, a cap, an order or a menu. A pin's value keeps to one line and its whole text is the help.
 - **It edits nothing and shows no error for a refused write.** A row flagged `editable` posts `editValue`, a field's name `fieldMenu`, a pin's button `headerMenu`, and Swift opens the editor or menu under the rectangle.
-- **A dragged row posts `moveRow` with the whole order it shows,** folded rows included (`row-drag.ts`). Swift stores it and the page draws what comes back.
+- **A dragged row posts `moveRow` with the whole order it shows,** folded rows included (`row-drag.ts`). Swift stores it and the page draws what comes back. A right-click on a row posts `fieldMenu`, as a click on its name does.
 - **Report scrolling only when something changes for the toolbar** (`headerScrolledAway`, `contentUnderToolbar`), never at every scroll.
 
 ## Editing

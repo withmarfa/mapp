@@ -40,8 +40,8 @@ struct PagePlacementsTests {
 
     @Test func aChoiceOverridesTheDefaultEitherWay() {
         var placements = PagePlacements()
-        placements.setShown(true, row: "github_id", of: Self.comment)
-        placements.setShown(false, row: "repo", of: Self.ticket)
+        placements.setShows(.whenSet, row: "github_id", of: Self.comment)
+        placements.setShows(.hidden, row: "repo", of: Self.ticket)
         placements.setLinkedFrom(.page, of: Self.ticket, in: Self.catalogue)
         placements.setLinkedFrom(.inspector, of: Self.person, in: Self.catalogue)
         #expect(placements.placement(of: Self.comment, in: Self.catalogue).showsOnPage("github_id"))
@@ -69,7 +69,7 @@ struct PagePlacementsTests {
 
     @Test func aChoiceForOneTypeLeavesEveryOtherTypeAlone() {
         var placements = PagePlacements()
-        placements.setShown(false, row: "repo", of: Self.ticket)
+        placements.setShows(.hidden, row: "repo", of: Self.ticket)
         placements.setLinkedFrom(.page, of: Self.ticket, in: Self.catalogue)
         let comment = placements.placement(of: Self.comment, in: Self.catalogue)
         #expect(comment.showsOnPage("repo"))
@@ -80,8 +80,8 @@ struct PagePlacementsTests {
 
     @Test func resettingATypeGivesItsDefaultsBack() {
         var placements = PagePlacements()
-        placements.setShown(false, row: "repo", of: Self.ticket)
-        placements.setShown(false, row: "repo", of: Self.comment)
+        placements.setShows(.hidden, row: "repo", of: Self.ticket)
+        placements.setShows(.hidden, row: "repo", of: Self.comment)
         placements.reset(Self.ticket)
         #expect(placements.placement(of: Self.ticket, in: Self.catalogue).showsOnPage("repo"))
         #expect(!placements.placement(of: Self.comment, in: Self.catalogue).showsOnPage("repo"))
@@ -92,8 +92,8 @@ struct PagePlacementsTests {
 
     @Test func theChoiceRoundTripsThroughItsStoredText() {
         var placements = PagePlacements()
-        placements.setShown(false, row: "repo", of: Self.ticket)
-        placements.setShown(true, row: "github_id", of: Self.comment)
+        placements.setShows(.hidden, row: "repo", of: Self.ticket)
+        placements.setShows(.whenSet, row: "github_id", of: Self.comment)
         placements.setLinkedFrom(.page, of: Self.comment, in: Self.catalogue)
         #expect(PagePlacements(rawValue: placements.rawValue) == placements)
         #expect(PagePlacements().rawValue == "{}")
@@ -118,7 +118,7 @@ struct PagePlacementsTests {
     @Test func theDefaultsHoldTheChoicesUnderOneKey() throws {
         let defaults = ThrowawayDefaults.make("MarfaMac.PagePlacementsTests")
         #expect(PagePlacements.stored(in: defaults) == PagePlacements())
-        PagePlacements.update(in: defaults) { $0.setShown(false, row: "repo", of: Self.ticket) }
+        PagePlacements.update(in: defaults) { $0.setShows(.hidden, row: "repo", of: Self.ticket) }
         #expect(PagePlacements.stored(in: defaults).placement(of: Self.ticket, in: Self.catalogue).showsOnPage("repo") == false)
         PagePlacements.update(in: defaults) { $0.reset(Self.ticket) }
         #expect(PagePlacements.stored(in: defaults) == PagePlacements())
@@ -130,17 +130,17 @@ struct PagePlacementsTests {
         var placements = PagePlacements()
         placements.setPins(["#source"], of: Self.task)
         #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#source"])
-        #expect(placements.pins(of: Self.subtask, in: Self.catalogue) == ["#type", "child-of", "#updated"])
+        #expect(placements.pins(of: Self.subtask, in: Self.catalogue) == ["child-of"])
     }
 
     @Test func aDefaultPinThatASavedChoiceTurnedOffStaysOff() {
         var placements = PagePlacements()
-        placements.setShown(false, row: "state", of: Self.task)
-        placements.setShown(false, row: "#updated", of: Self.task)
-        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#type", "child-of"])
-        // Turning it on again gives the default pin back.
-        placements.setShown(true, row: "state", of: Self.task)
-        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#type", "state", "child-of"])
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of"], "the status and the parent")
+        placements.setShows(.hidden, row: "state", of: Self.task)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["child-of"])
+        // Showing it again gives the default pin back.
+        placements.setShows(.whenSet, row: "state", of: Self.task)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of"])
     }
 
     @Test func aChosenListTakesThePlaceOfTheDefaultPins() {
@@ -148,7 +148,7 @@ struct PagePlacementsTests {
         placements.setPins(["#updated", "repo"], of: Self.ticket)
         #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#updated", "repo"])
         // A hidden row is the person's word about the property block; a pin they chose is theirs too.
-        placements.setShown(false, row: "repo", of: Self.ticket)
+        placements.setShows(.hidden, row: "repo", of: Self.ticket)
         #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#updated", "repo"])
     }
 
@@ -170,18 +170,15 @@ struct PagePlacementsTests {
 
     @Test func pinningStartsFromTheDefaultPinsAndMovingKeepsThemWithinTheList() {
         var placements = PagePlacements()
-        var took = placements.pin("#source", of: Self.task, in: Self.catalogue)
-        #expect(!took, "four defaults fill the list")
-        placements.unpin("#type", of: Self.task, in: Self.catalogue)
-        took = placements.pin("#source", of: Self.task, in: Self.catalogue)
+        let took = placements.pin("repo", of: Self.task, in: Self.catalogue)
         #expect(took)
-        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of", "#updated", "#source"])
-        placements.movePin("#source", to: 0, of: Self.task, in: Self.catalogue)
-        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#source", "state", "child-of", "#updated"])
-        placements.movePin("#source", to: 99, of: Self.task, in: Self.catalogue)
-        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of", "#updated", "#source"])
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of", "repo"])
         placements.movePin("repo", to: 0, of: Self.task, in: Self.catalogue)
-        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of", "#updated", "#source"])
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["repo", "state", "child-of"])
+        placements.movePin("repo", to: 99, of: Self.task, in: Self.catalogue)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of", "repo"])
+        placements.movePin("gone", to: 0, of: Self.task, in: Self.catalogue)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of", "repo"])
     }
 
     @Test func fiveStoredPinsShowFourAndADuplicateCountsOnce() throws {
@@ -200,29 +197,37 @@ struct PagePlacementsTests {
         #expect(PagePlacements(rawValue: placements.rawValue) == placements)
     }
 
-    @Test func aChoiceSavedBeforePinsStillReadsAndKeepsEverythingItHeld() throws {
-        let old = #"{"aic.ticket":{"linkedFrom":"page","rows":{"repo":false}}}"#
+    @Test func aChoiceSavedAsShownOrHiddenIsReadOnceAsThreeStatesWithNothingLost() throws {
+        let old = #"{"aic.comment":{"rows":{"github_id":true}},"aic.ticket":{"linkedFrom":"page","pins":["repo"],"rowOrder":["repo"],"rows":{"repo":false}}}"#
         let placements = try #require(PagePlacements(rawValue: old))
-        let choice = try #require(placements.choices["aic.ticket"])
-        #expect(choice.pins == nil)
-        #expect(choice.rows == ["repo": false])
-        #expect(choice.linkedFrom == .page)
-        #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#type", "child-of", "#updated"])
-        #expect(placements.rawValue == old, "written back as it was read")
+        let ticket = try #require(placements.choices["aic.ticket"])
+        #expect(ticket.shows == ["repo": .hidden])
+        #expect(ticket.linkedFrom == .page)
+        #expect(ticket.pins == ["repo"])
+        #expect(ticket.rowOrder == ["repo"])
+        #expect(placements.placement(of: Self.ticket, in: Self.catalogue).shows("repo") == .hidden)
+        // A row shown that would be hidden by default, a connector's identifier, stays shown.
+        #expect(placements.placement(of: Self.comment, in: Self.catalogue).shows("github_id") == .whenSet)
+        #expect(placements.placement(of: Self.comment, in: Self.catalogue).shows("other_id") == .whenSet)
+        // Written back in the new form only, and read the same way again.
+        let written = placements.rawValue
+        #expect(!written.contains(#""rows""#))
+        #expect(written.contains(#""shows":{"repo":"hidden"}"#))
+        #expect(PagePlacements(rawValue: written) == placements)
     }
 
-    @Test func aChoiceSavedBeforeOrderingStillReadsAndAnOrderRoundTrips() throws {
-        let old = ##"{"aic.ticket":{"pins":["#type"],"rows":{"repo":false}}}"##
-        let placements = try #require(PagePlacements(rawValue: old))
-        #expect(placements.choices["aic.ticket"]?.rowOrder == nil)
-        #expect(placements.rawValue == old, "written back as it was read")
+    @Test func aWordALaterVersionAddsIsSkippedAndTheRestIsKept() throws {
+        let placements = try #require(PagePlacements(rawValue: #"{"aic.ticket":{"shows":{"repo":"always","state":"sometimes"}}}"#))
+        #expect(placements.choices["aic.ticket"]?.shows == ["repo": .always])
+    }
 
-        var ordered = placements
+    @Test func anOrderRoundTripsAndEachRowIsNamedOnce() throws {
+        var ordered = PagePlacements()
         ordered.setRowOrder(["repo", "#tags", "repo"], of: Self.ticket)
         #expect(ordered.choices["aic.ticket"]?.rowOrder == ["repo", "#tags"], "each row once")
         #expect(PagePlacements(rawValue: ordered.rawValue) == ordered)
         ordered.setRowOrder(nil, of: Self.ticket)
-        #expect(ordered == placements)
+        #expect(ordered == PagePlacements())
     }
 
     @Test func thePropertyBlockFollowsTheChosenOrderAndRowsNotNamedKeepTheirOrderAfterIt() {
@@ -231,7 +236,7 @@ struct PagePlacementsTests {
         var placements = PagePlacements()
         placements.setRowOrder(["c", "gone", "a"], of: Self.task)
         let placement = placements.placement(of: Self.task, in: Self.catalogue)
-        #expect(PropertyRow.block(candidates, placement: placement).map(\.id) == ["c", "a", "b", "d"])
+        #expect(placement.ordered(candidates, id: \.id).map(\.id) == ["c", "a", "b", "d"])
     }
 
     @Test func noPinsIsAChoiceThatSurvivesStorage() throws {
@@ -249,9 +254,9 @@ struct PagePlacementsTests {
     @Test func resettingATypeGivesItsDefaultPinsBackToo() {
         var placements = PagePlacements()
         placements.setPins(["#source"], of: Self.task)
-        placements.setShown(false, row: "repo", of: Self.ticket)
+        placements.setShows(.hidden, row: "repo", of: Self.ticket)
         placements.reset(Self.task)
-        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#type", "state", "child-of", "#updated"])
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of"])
         #expect(!placements.hasChoice(for: Self.task))
         #expect(placements.hasChoice(for: Self.ticket))
     }
@@ -261,10 +266,10 @@ struct PagePlacementsTests {
         let unreadable = #"{"aic.ticket":{"rows":{"repo":"not a flag"}}}"#
         defaults.set(unreadable, forKey: PagePlacements.key)
 
-        PagePlacements.update(in: defaults) { $0.setShown(false, row: "repo", of: Self.ticket) }
-        PagePlacements.update(in: defaults) { $0.setShown(true, row: "repo", of: Self.ticket) }
+        PagePlacements.update(in: defaults) { $0.setShows(.hidden, row: "repo", of: Self.ticket) }
+        PagePlacements.update(in: defaults) { $0.setShows(.whenSet, row: "repo", of: Self.ticket) }
 
         #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [unreadable])
-        #expect(PagePlacements.stored(in: defaults).choices["aic.ticket"]?.rows == ["repo": true])
+        #expect(PagePlacements.stored(in: defaults).choices["aic.ticket"]?.shows == ["repo": .whenSet])
     }
 }

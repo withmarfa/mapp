@@ -261,9 +261,6 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     /// The symbol a tag's chip starts with, drawn at the size the app's tag chip draws it.
     static let tagSymbol = "number"
 
-    /// What a row's name shows under the pointer, to say it can be dragged: six dots.
-    static let rowGripSymbol = "circle.grid.2x3.fill"
-
     /// The symbols at the size the rows' 13 point text gives them, following the interface's text size, and the
     /// icons of `typeIcons` (Iconify IDs), which the Swift SDK draws.
     @MainActor
@@ -276,7 +273,6 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         for name in PropertyRow.Value.symbols + [Self.pictureSymbol] {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
-        symbols[Self.rowGripSymbol] = Self.symbol(Self.rowGripSymbol, size: size * 9 / 13, weight: .regular)
         // The kicker's flags, at its 12 points.
         for flag in PageHead.Kicker.Flag.allCases {
             symbols[flag.symbol] = Self.symbol(flag.symbol, size: size * 11 / 13, weight: .regular)

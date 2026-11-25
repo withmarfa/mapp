@@ -823,7 +823,17 @@ button.item-kicker-type:focus-visible {
   grid-area: 1 / 1;
 }
 
+/* Six dots, two across and three down, 3 points each. */
 .item-prop-grip {
+  --dot: calc(var(--interface-text-size) * 3 / 13);
+  width: calc(var(--dot) * 3);
+  height: calc(var(--dot) * 4.7);
+  background: radial-gradient(
+      circle,
+      var(--label-secondary) calc(var(--dot) / 2),
+      transparent calc(var(--dot) / 2 + 0.5px)
+    )
+    calc(var(--dot) * -0.5) calc(var(--dot) * -0.425) / calc(var(--dot) * 2) calc(var(--dot) * 1.85);
   visibility: hidden;
 }
 
@@ -842,8 +852,8 @@ button.item-kicker-type:focus-visible {
   visibility: visible;
 }
 
-.item-prop:not(:only-child) > .item-prop-label:hover .item-glyph:not(.item-prop-grip),
-.item-prop.dragged .item-glyph:not(.item-prop-grip) {
+.item-prop:not(:only-child) > .item-prop-label:hover .item-glyph,
+.item-prop.dragged .item-glyph {
   visibility: hidden;
 }
 

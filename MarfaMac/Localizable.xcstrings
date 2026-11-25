@@ -2309,6 +2309,9 @@
     "Always" : {
 
     },
+    "Always Show" : {
+
+    },
     "Always kept, so they open offline." : {
 
     },
@@ -2514,9 +2517,6 @@
 
     },
     "Archived Items" : {
-
-    },
-    "Archived items leave your lists. You can find them in Library > Archive." : {
 
     },
     "Archived “%@”" : {
@@ -3871,17 +3871,6 @@
     "Custom Color" : {
 
     },
-    "Customize Layout in the Title Row" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Customize Layout"
-          }
-        }
-      }
-    },
     "Customize Layout…" : {
       "extractionState" : "manual"
     },
@@ -4140,6 +4129,9 @@
     "Disk" : {
 
     },
+    "Dismiss" : {
+
+    },
     "Display" : {
 
     },
@@ -4172,6 +4164,9 @@
     },
     "Drag the pin to move it." : {
       "extractionState" : "manual"
+    },
+    "Drag to Reorder" : {
+
     },
     "Drop a File, Paste One, or Click to Choose" : {
       "extractionState" : "manual"
@@ -6355,9 +6350,6 @@
     "Move Up" : {
 
     },
-    "Move ^[%lld item](inflect: true) to the Feed?" : {
-
-    },
     "Move to Feed" : {
 
     },
@@ -6368,9 +6360,6 @@
 
     },
     "Move to Tab" : {
-
-    },
-    "Move “%@” to the Feed?" : {
 
     },
     "Moved an item to Recently Deleted" : {
@@ -7581,6 +7570,9 @@
     "Pinned" : {
       "extractionState" : "manual"
     },
+    "Pinned Properties" : {
+
+    },
     "Pinned under the title. Customize Layout on an item of this type changes the same." : {
 
     },
@@ -7691,6 +7683,9 @@
     },
     "Properties" : {
       "extractionState" : "manual"
+    },
+    "Properties can be pinned under the title from a row’s menu." : {
+
     },
     "Property Not Saved" : {
       "extractionState" : "manual"
@@ -8743,6 +8738,9 @@
     "Show Updates" : {
 
     },
+    "Show When It Has a Value" : {
+
+    },
     "Show a Month" : {
 
     },
@@ -9309,15 +9307,6 @@
       "extractionState" : "manual"
     },
     "The Connector" : {
-
-    },
-    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
 
     },
     "The Folder Is Missing Where This Copy Is Kept" : {

@@ -141,7 +141,7 @@ struct PageHeadView<Title: View>: View {
             case .email(let text):
                 if let url = URL(string: "mailto:\(text)") { link(text, url) } else { plain(text) }
             case .phone(let text):
-                if let url = Self.dialAddress(text) { link(text, url) } else { plain(text) }
+                if let url = PageHead.dialAddress(text) { link(text, url) } else { plain(text) }
             }
             if row.more > 0 {
                 Text(verbatim: PageHead.moreText(row.more))
@@ -170,15 +170,6 @@ struct PageHeadView<Title: View>: View {
         .foregroundStyle(.tint)
     }
 
-    /// A number dialed as its digits and a leading plus, whatever spacing it is written with; nil where it has none.
-    static func dialAddress(_ number: String) -> URL? {
-        var dialed = ""
-        for (index, character) in number.enumerated() {
-            if character.isASCII, character.isNumber { dialed.append(character) } else if index == 0, character == "+" { dialed.append(character) }
-        }
-        guard dialed.contains(where: \.isNumber) else { return nil }
-        return URL(string: "tel:\(dialed)")
-    }
 }
 
 /// The status pin: its group's mark and the status in a chip. Where the item can be changed it is a native menu of the

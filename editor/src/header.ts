@@ -1,8 +1,6 @@
 import { openLink, postToHost } from './bridge'
 import { dragRows } from './row-drag'
 
-/** The symbol a row's name shows under the pointer, six dots, a key of `HeaderIcons.symbols`. */
-const rowGrip = 'circle.grid.2x3.fill'
 /** The symbol a tag's chip starts with, a key of `HeaderIcons.symbols`. */
 const tagSymbol = 'number'
 
@@ -865,9 +863,7 @@ export class ItemHeader {
     const term = element('dt', 'item-prop-label', entry)
     const symbol = element('span', 'item-prop-symbol', term)
     this.glyph(row.symbol, symbol)
-    const grip = this.glyph(rowGrip, symbol)
-    grip.classList.add('item-prop-grip')
-    grip.removeAttribute('aria-hidden')
+    const grip = element('span', 'item-prop-grip', symbol)
     grip.setAttribute('role', 'img')
     grip.setAttribute('aria-label', this.labels.reorder)
     const name = element('span', 'item-prop-name', term)

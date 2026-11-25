@@ -8,40 +8,13 @@ struct PageLayoutTests {
     private static let catalogue = Catalogue()
 
     private nonisolated static func row(_ id: String) -> PageLayout.Row { PageLayout.Row(id: id, label: id, symbol: "text.alignleft") }
-    private static let rows = ["#type", "#updated", "a", "b", "c", "#linked"].map(row)
+    private static let rows = ["a", "b", "c", "d", "e", "#linked"].map(row)
 
     private static func layout(_ rows: [PageLayout.Row] = rows, _ placements: PagePlacements = PagePlacements()) -> PageLayout {
         PageLayout(rows: rows, placement: placements.placement(of: type, in: catalogue))
     }
 
     private static func ids(_ rows: [PageLayout.Row]) -> [String] { rows.map(\.id) }
-
-    @Test func aRowDraggedOnThePageKeepsTheOrderTheCopyShowedApartFromTheMovedRow() throws {
-        // The page drew c, a, b, which is not this layout's own order (a, b, c); a dropped last must leave c first.
-        let layout = Self.layout()
-        #expect(Self.ids(layout.page) == ["a", "b", "c"])
-        let moved = try #require(layout.listing(["c", "b", "a"], moving: "a"))
-        #expect(Self.ids(moved.page) == ["c", "b", "a"], "the shown order, not the default with a moved")
-        var placements = PagePlacements()
-        placements.apply(moved, of: Self.type, in: Self.catalogue)
-        #expect(placements.choices["aic.ticket"]?.rowOrder?.prefix(3) == ["c", "b", "a"])
-    }
-
-    @Test func aRowThePageDidNotDrawKeepsItsPlace() throws {
-        let moved = try #require(Self.layout().listing(["c", "a"], moving: "c"))
-        #expect(Self.ids(moved.page) == ["c", "b", "a"])
-    }
-
-    @Test func aListedOrderIgnoresWhatIsNotAPageRowAndKeepsWhatItDoesNotName() throws {
-        let layout = Self.layout()
-        let moved = try #require(layout.listing(["#type", "b", "gone", "b", "a"], moving: "a"))
-        #expect(Self.ids(moved.page) == ["b", "a", "c"], "a pin, an unknown id and a repeat are ignored; c keeps its place after")
-        #expect(Self.ids(moved.pinned) == Self.ids(layout.pinned))
-        #expect(Self.ids(moved.hidden) == Self.ids(layout.hidden))
-        #expect(layout.listing(["a", "b", "c"], moving: "#type") == nil, "a pin is not a page row")
-        #expect(layout.listing(["a", "b", "c"], moving: "#linked") == nil, "a hidden row is not a page row")
-        #expect(layout.listing(["a", "b", "c"], moving: "z") == nil)
-    }
 
     @Test func aRowMovedBetweenGroupsIsOnOrOffThePageAccordingly() {
         var placements = PagePlacements()
@@ -61,11 +34,11 @@ struct PageLayoutTests {
         var placements = PagePlacements()
         let layout = Self.layout(Self.rows, placements)
         let moved = layout.moved("c", by: -2)!
-        #expect(Self.ids(moved.page) == ["c", "a", "b"])
+        #expect(Self.ids(moved.page) == ["c", "a", "b", "d", "e"])
         placements.apply(moved, of: Self.type, in: Self.catalogue)
-        #expect(Self.ids(Self.layout(Self.rows, placements).page) == ["c", "a", "b"])
+        #expect(Self.ids(Self.layout(Self.rows, placements).page) == ["c", "a", "b", "d", "e"])
         let candidates = ["a", "b", "c"].map { PropertyRow(id: $0, label: $0, value: .text($0)) }
-        #expect(PropertyRow.block(candidates, placement: placements.placement(of: Self.type, in: Self.catalogue)).map(\.id) == ["c", "a", "b"])
+        #expect(placements.placement(of: Self.type, in: Self.catalogue).ordered(candidates, id: \.id).map(\.id) == ["c", "a", "b"])
 
         placements.apply(moved.moved("c", by: 2)!, of: Self.type, in: Self.catalogue)
         #expect(placements.choices["aic.ticket"]?.rowOrder == nil, "back in its default order")
@@ -74,8 +47,8 @@ struct PageLayoutTests {
 
     @Test func aFifthPinIsRefusedAndTheLayoutIsLeftAlone() {
         var layout = Self.layout(Self.rows)
-        #expect(Self.ids(layout.pinned) == ["#type", "#updated"])
-        layout = layout.moving("a", to: .pinned)!.moving("b", to: .pinned)!
+        #expect(Self.ids(layout.pinned).isEmpty)
+        layout = layout.moving("d", to: .pinned)!.moving("e", to: .pinned)!.moving("a", to: .pinned)!.moving("b", to: .pinned)!
         #expect(layout.pinned.count == PagePlacement.pinLimit && !layout.canPin)
         #expect(layout.moving("c", to: .pinned) == nil)
         #expect(layout.moving("#linked", to: .pinned) == nil)
@@ -84,10 +57,10 @@ struct PageLayoutTests {
 
     @Test func aPinTheItemHasNoRowForStaysInStorageBehindTheShownPins() {
         var placements = PagePlacements()
-        placements.setPins(["gone", "#type"], of: Self.type)
+        placements.setPins(["gone", "e"], of: Self.type)
         let layout = Self.layout(Self.rows, placements)
-        #expect(Self.ids(layout.pinned) == ["#type"])
+        #expect(Self.ids(layout.pinned) == ["e"])
         placements.apply(layout.moving("a", to: .pinned)!, of: Self.type, in: Self.catalogue)
-        #expect(placements.pins(of: Self.type, in: Self.catalogue) == ["#type", "a", "gone"])
+        #expect(placements.pins(of: Self.type, in: Self.catalogue) == ["e", "a", "gone"])
     }
 }

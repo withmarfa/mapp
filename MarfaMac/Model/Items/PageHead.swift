@@ -158,6 +158,16 @@ nonisolated struct PageHead: Equatable, Sendable {
         item.value(of: field.key)?.string.flatMap { $0.isEmpty ? nil : $0 }
     }
 
+    /// A number dialed as its digits and a leading plus, whatever spacing it is written with; nil where it has none.
+    static func dialAddress(_ number: String) -> URL? {
+        var dialed = ""
+        for (index, character) in number.enumerated() {
+            if character.isASCII, character.isNumber { dialed.append(character) } else if index == 0, character == "+" { dialed.append(character) }
+        }
+        guard dialed.contains(where: \.isNumber) else { return nil }
+        return URL(string: "tel:\(dialed)")
+    }
+
     /// The icon of the type of the item `target` names.
     @MainActor
     static func typeIcon(of target: ItemID, in library: any ItemLibrary) -> String? {

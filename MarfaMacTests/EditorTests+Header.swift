@@ -9,14 +9,15 @@ import WebKit
 extension EditorTests {
     // MARK: The item header
 
-    static func header(_ title: String, id: ItemID = ItemID("note"), hidden: Bool = false) -> PageHeader {
-        PageHeader(item: id.rawValue, hidden: hidden, title: title, draft: nil, titleRejected: false,
+    static func header(_ title: String, id: ItemID = ItemID("note")) -> PageHeader {
+        PageHeader(item: id.rawValue, title: title, draft: nil, titleRejected: false,
                    titleRefusal: "The title could not be saved.", editable: true,
-                   kind: .general, person: nil, subtitle: nil, status: .init(label: "In Progress", enabled: true),
-                   parent: .init(label: "Field Research", enabled: true),
-                   pins: [PropertyRow(id: PagePlacement.type, label: "Type", value: .type("Task", icon: "lucide:list-checks"))],
-                   properties: [PropertyRow(id: "status", label: "Status", value: .status), PropertyRow(id: "child-of", label: "Parent", value: .parent)],
-                   contents: [], linked: [], showsText: true, showMore: "Show 0 More", showMoreContents: "Show 0 More", showMoreLinked: "Show 0 More", interfaceTextSize: 13, titleLines: 2, chips: .init(looks: .defaults))
+                   kicker: .init(PageHead.Kicker(typeName: "Task", typeIcon: "lucide:list-checks", changesType: true, flags: [.readOnly])),
+                   status: .init(label: "In Progress", enabled: true), parent: .init(label: "Field Research", enabled: true),
+                   pins: [],
+                   rows: [PropertyRow(id: "status", label: "Status", value: .status), PropertyRow(id: "child-of", label: "Parent", value: .parent)],
+                   showMore: "Show 0 More", linked: [], showsText: true, showMoreLinked: "Show 0 More", interfaceTextSize: 13, titleLines: 2,
+                   chips: .init(looks: .defaults))
     }
 
     static func json(_ value: some Encodable) -> String {
@@ -219,7 +220,7 @@ extension EditorTests {
         #expect(try await page.editor.webView.evaluateJavaScript("window.pastedScriptRan === undefined") as? Bool == true)
     }
 
-    @Test func theContextMenuOverARowKnowsWhichRowAndLeavesTheMenuToWebKit() async throws {
+    @Test func aRightClickOnARowOpensTheRowsMenuInPlaceOfWebKits() async throws {
         let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -229,24 +230,24 @@ extension EditorTests {
         try await page.load("Some text.\n")
         let id = try #require(page.editor.pageItemID)
         var header = Self.header("Review the findings", id: id)
-        header.properties.append(PropertyRow(id: "repo", label: "Repo", value: .text("withmarfa/marfa-mac")))
+        header.rows.append(PropertyRow(id: "repo", label: "Repo", value: .text("withmarfa/marfa-mac")))
         page.editor.setHeader(header)
-        var events = 0
-        page.editor.onHeaderEvent = { _ in events += 1 }
+        var menus: [String] = []
+        page.editor.onHeaderEvent = { event in
+            if case .fieldMenu(let row, _, _, _) = event { menus.append(row) }
+        }
         try #require(await eventuallyAsking { (try? await Self.rect("[data-row='repo']", in: page)) != nil })
         let prevented = try await page.editor.webView.evaluateJavaScript("""
             (() => { const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
               document.querySelector('[data-row="repo"] .item-prop-value').dispatchEvent(e); return e.defaultPrevented })()
             """) as? Bool
-        #expect(prevented == false, "WebKit's own menu opens")
-        try await page.wait { page.editor.menuRow != nil }
-        #expect(page.editor.menuRow?.item == id)
-        #expect(page.editor.menuRow?.row == "repo")
-        _ = page.editor.takeMenuRow()
+        #expect(prevented == true, "WebKit's own menu does not open")
+        try await page.wait { menus == ["repo"] }
+        #expect(page.editor.menuRow == nil)
         try await page.run("document.querySelector('p').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
         _ = try await page.editor.webView.evaluateJavaScript("1")
         #expect(page.editor.menuRow == nil, "a menu elsewhere offers no row")
-        #expect(events == 0, "the menu itself needs nothing from the header")
+        #expect(menus == ["repo"])
     }
 
     /// An item's page as the app shows it: the native view, reading the item from the library, over the page.
@@ -400,12 +401,14 @@ extension EditorTests {
             #expect(host.library.setItemProperty(host.ticket, key: "title", value: .string(title), undoManager: nil))
             try await host.waitForTitle(title)
         }
-        // Deleted elsewhere, the item becomes read-only and its header gives way to the banner.
+        // Deleted elsewhere, the item becomes read-only and its head stays, with the title locked.
+        let titleEditable = "document.getElementById('ItemPageTitle').getAttribute('contenteditable')"
         host.library.delete([host.ticket], undoManager: nil)
         try await host.page.wait { !host.page.editor.isEditable }
-        try await host.waitFor("the header to hide") { try await host.value("document.getElementById('item-header').hidden") as? Bool == true }
+        try await host.waitFor("the title to lock") { try await host.value(titleEditable) as? String == "false" }
+        #expect(try await host.value("document.getElementById('item-header').hidden") as? Bool == false)
         host.library.recover([host.ticket], undoManager: nil)
         try await host.page.wait { host.page.editor.isEditable }
-        try await host.waitFor("the header to show") { try await host.value("document.getElementById('item-header').hidden") as? Bool == false }
+        try await host.waitFor("the title to unlock") { try await host.value(titleEditable) as? String == "plaintext-only" }
     }
 }

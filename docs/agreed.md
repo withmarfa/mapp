@@ -124,9 +124,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The head | A grey line over the title: the type, then Read Only, Feed or Archived where true. Clicking the type opens Change Type. One head for every kind, in the web page and in the app's own pages. | `ItemPageHeader.swift`, `PageHeader.swift`, `editor/src/header.ts` | `Rethink-Task-Page`, `Rethink-Long-Page` |
-| Rows | Under the title, one row for each property with a value, six, then Show N More. A type with no text shows its first six, empty ones too. Boxes, strips and the pinned header's looks go. Pinned properties are a setting, off. | `PagePins`, `PagePlacements`, `editor/src/header.ts` | `Rethink-Properties-Rule`, `Rethink-Properties-Sizes` |
-| A row's menu | Show When It Has a Value, Always Show, Hide on every page of the type, Move Up and Down, then the field's own menu. Customize Layout goes. | `FieldMenu`, `PagePlacements`, `CustomizeLayout.swift` | `Rethink-Item-Menus` |
+| Customize Layout | It goes, since a row's menu holds what it placed. | `CustomizeLayout.swift` | `Rethink-Item-Menus` |
 | Scrolled | The title sits in the toolbar on one line. | `ItemDetail.swift`, `WindowToolbar.swift` | `Rethink-Page-Scrolled`, `Rethink-White-Page` |
 | Foot | Sub-Items with nesting on any item that has them; a Timeline of mentions on a person and a place; more after 30. | `LinkedFromPlace`, `editor/src/header.ts` | `Rethink-Sub-Items`, `Rethink-Person`, `Rethink-Place` |
 | Corner | Formats, text size and Focus on a written page; size and Focus otherwise; Open on a file. | `PageCorner` | `Rethink-Formats`, `Rethink-Focus` |
@@ -162,17 +160,17 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Task, project | Status, priority and due as rows, sub-items at the foot. | `TypeLooks`, `editor/src/header.ts` | `Rethink-Task-Page`, `Rethink-Project`, `Rethink-Project-Full` |
-| Event | When is a row with how far off it is; attendees' answers in gray. | `EventHeader` | `Rethink-Event`, `Rethink-Event-Full` |
-| Bookmark, article, web page | The description is a row; Reader or Original in the corner, the original at full width. The reading header goes. | `ReadingHeader`, `WebPageItemPage.swift` | `Rethink-Bookmark`, `Rethink-Bookmark-Full`, `Rethink-Web-Page-Reader`, `Rethink-Web-Page-Original` |
+| Task, project | Sub-items at the foot. | `TypeLooks`, `editor/src/header.ts` | `Rethink-Task-Page`, `Rethink-Project`, `Rethink-Project-Full` |
+| Event | Attendees' answers in gray. | `EventHeader` | `Rethink-Event`, `Rethink-Event-Full` |
+| Bookmark, article, web page | Reader or Original in the corner, the original at full width. | `WebPageItemPage.swift` | `Rethink-Bookmark`, `Rethink-Bookmark-Full`, `Rethink-Web-Page-Reader`, `Rethink-Web-Page-Original` |
 | Highlight | The passage is its text, in a leading style and edited as text. Its note is a row of two lines. It has no title. | `TypeLooks`, `editor/src/header.ts` | `Rethink-Highlight`, `Rethink-Highlight-Full`, `Rethink-Highlights` |
-| Person, place | The first six rows. A place has a map on its page. | `PersonHeader`, `FileItemContent` | `Rethink-Person`, `Rethink-Person-Full`, `Rethink-Place`, `Rethink-Place-Full` |
+| Person, place | A place has a map on its page. | `FileItemContent` | `Rethink-Person`, `Rethink-Person-Full`, `Rethink-Place`, `Rethink-Place-Full` |
 | Message | No title field, so its text leads. From is a mark and a name. | `TypeLooks` | `Rethink-Message`, `Rethink-Message-Full` |
 | Image | Fit in the corner, its facts, rows that can be edited. | `FileItemContent`, `FileCorner.swift` | `Rethink-Image`, `Rethink-Image-Full` |
 | PDF | Paper on a gray or white ground, by a setting; contents in Outline. The PDF keeps its own scroller, with the head as its first inset; so do a video and a picture. | `FileItemContent`, `FileCorner.swift` | `Rethink-PDF`, `Rethink-PDF-Full`, `Rethink-PDF-White`, `Rethink-PDF-Full-White` |
 | Audio, video | A playback bar at the window's foot, with a waveform, speed, skip and the place kept; nothing plays by itself. **Waits for Marfa:** a transcript. | `FileItemContent` | `Rethink-Audio`, `Rethink-Audio-Transcript`, `Rethink-Video`, `Rethink-Playback` |
 | Table item | A sheet of its own rows, without properties or margins, row numbers off. The app keeps the order and a column's menu sets it. The last piece, and it may be cut. | new files in `MarfaMac/Views/` | `Rethink-Table-Item`, `Rethink-Table-Item-Full`, `Rethink-Table-Item-Numbers`, `Rethink-Table-Item-Column`, `Rethink-Table-Preview` |
-| Read only | Read Only with a lock over the title, no Aa, and one line in Info. | `ItemPageHeader.swift` | `Rethink-Read-Only`, `Rethink-Read-Only-Full` |
+| Read only | No Aa, and one line in Info. | `PageCorner`, `ItemInspector.swift` | `Rethink-Read-Only`, `Rethink-Read-Only-Full` |
 
 ## Version history
 
