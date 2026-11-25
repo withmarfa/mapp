@@ -65,7 +65,7 @@ struct ItemList: View, Equatable {
             return .handled
         }
         .searchStatus(browser)
-        .topRowScrolls()
+        .topRowTable()
         .toolbar {
             // While the sidebar is hidden its button and Back and Forward lead this column's toolbar, so the field has
             // that much less room.

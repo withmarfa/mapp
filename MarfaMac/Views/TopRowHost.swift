@@ -124,8 +124,8 @@ extension View {
         modifier(TopRowScrolls())
     }
 
-    /// The same for a table, whose scroll view is AppKit's: its column headings stay pinned under the row once the rows
-    /// have scrolled past the row of views.
+    /// The same for a table or a list, whose scroll view is AppKit's: a table's column headings stay pinned under the row
+    /// once the rows have scrolled past the row of views.
     func topRowTable() -> some View {
         modifier(TopRowTable())
     }
@@ -154,7 +154,7 @@ private struct TopRowTable: ViewModifier {
     }
 }
 
-/// Reaches the `NSScrollView` behind a table. SwiftUI's `contentMargins` leaves a `Table`'s scroll view alone, so the
+/// Reaches the `NSScrollView` behind a table or a list. SwiftUI's `contentMargins` leaves their scroll views alone, so the
 /// room for the row of views is the scroll view's own top inset, to which AppKit adds the headings' height. The headings'
 /// container is then set at the toolbar's lower edge, or lower while the row of views still shows, and set again whenever
 /// the scroll view or AppKit moves it.
@@ -232,7 +232,7 @@ private struct TopRowTableProbe: NSViewRepresentable {
         }
 
         private func place() {
-            guard !isPlacing, let table, let scroll = table.enclosingScrollView, let container = table.headerView?.superview else { return }
+            guard !isPlacing, let table, let scroll = table.enclosingScrollView else { return }
             let clip = scroll.contentView
             let scrolled = max(0, clip.bounds.origin.y + clip.contentInsets.top)
             if let model = space.scroll {
@@ -240,6 +240,8 @@ private struct TopRowTableProbe: NSViewRepresentable {
                 let headings = table.headerView?.frame.height ?? 0
                 if model.headingHeight != headings { model.headingHeight = headings }
             }
+            // A list has no column headings to pin.
+            guard let container = table.headerView?.superview else { return }
             let top = scroll.safeAreaInsets.top + max(0, space.restHeight - scrolled)
             if container.frame.origin.y != top {
                 isPlacing = true
@@ -304,7 +306,10 @@ private struct WindowTitleHider: NSViewRepresentable {
         }
 
         func hide() {
-            guard let window, window.titleVisibility != .hidden else { return }
+            guard let window else { return }
+            // The smallest the window goes, as a frame: the toolbar's height is in it.
+            if window.minSize.height < 520 { window.minSize = NSSize(width: 760, height: 520) }
+            guard window.titleVisibility != .hidden else { return }
             window.titleVisibility = .hidden
         }
 

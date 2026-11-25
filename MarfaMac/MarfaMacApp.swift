@@ -57,8 +57,8 @@ struct MarfaMacApp: App {
     var body: some Scene {
         WindowGroup(id: Self.mainWindowID) {
             RootView(settingsLauncher: settingsLauncher, libraries: libraries)
-                // The smallest the window goes: the panel, the sidebar, the control and the views have given way by then.
-                .frame(minWidth: 760, minHeight: 520)
+                // The smallest the window goes is 760 by 520 (`hidesWindowTitle`): the panel, the sidebar, the control and the views have given way by then.
+                .frame(minWidth: 760)
                 .interfaceTextStyle()
                 // The page's web view is backed by this color, which, unlike the window's default background, is
                 // not tinted by the desktop. Making it the window's background gives the list, Settings and the

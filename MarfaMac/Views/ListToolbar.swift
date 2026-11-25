@@ -10,6 +10,8 @@ struct ListToolbar: ToolbarContent {
     var leadsWithHistory = false
 
     var body: some ToolbarContent {
+        // With no title to push them, the buttons stand at the column's end.
+        ToolbarSpacer(.flexible)
         if leadsWithHistory {
             ToolbarItem(placement: .navigation) { SidebarHistory(browser: browser) }
                 .sharedBackgroundVisibility(.hidden)

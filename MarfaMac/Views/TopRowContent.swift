@@ -74,7 +74,9 @@ struct TopRowContent {
         // A filter or an arrangement leaves fewer in the list than the place holds, and the count says what is listed.
         let listed = browser.listShape == nil ? base : browser.listedCount(in: library) ?? browser.filteredItems(in: library).count
         let results = browser.searchResults(in: library)
-        let everything = library.count(in: shown, favoritesScope: listing.scope)
+        // A search of everything finds items beyond the place, so it is counted against all of them.
+        let everything = browser.searchScope(in: library) == .everywhere
+            ? library.count(in: .library) + library.count(in: .feed) : library.count(in: shown, favoritesScope: listing.scope)
 
         let counts = library.scopeCounts(in: place)
         let offers = shown.view == .own && ListScope.showsScopeControl(place: place, counts: counts)

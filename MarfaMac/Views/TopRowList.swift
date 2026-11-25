@@ -26,7 +26,8 @@ private struct TopRowOverList: ViewModifier {
 
     func body(content: Content) -> some View {
         let row = TopRowContent.make(browser: browser, library: library)
-        let beside = isAlwaysBeside || browser.isSearchExpanded || browser.isSearching
+        // With the sidebar closed the place, its views and the buttons share one row.
+        let beside = isAlwaysBeside || browser.isSearchExpanded || browser.isSearching || opensPlaces
         let restHeight = row.hasViews && !beside ? TopRowMetrics.restHeight : 0
         content
             .environment(\.topRowSpace, TopRowSpace(scroll: scroll, restHeight: restHeight))
