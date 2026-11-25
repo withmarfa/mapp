@@ -8,13 +8,13 @@ struct KeyCap: View {
 
     var body: some View {
         Text(key)
-            .font(.system(size: 10, weight: .medium))
+            .font(.system(size: 11, weight: .medium))
             .foregroundStyle(onAccent ? Color.white.opacity(0.75) : Color.primary.opacity(0.42))
             .padding(.horizontal, 3)
-            .frame(minWidth: 16)
-            .frame(height: 16)
+            .frame(minWidth: 18)
+            .frame(height: 18)
             .overlay {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .strokeBorder(onAccent ? Color.white.opacity(0.45) : Color.primary.opacity(0.2), lineWidth: 1)
             }
             .accessibilityHidden(true)

@@ -93,13 +93,12 @@ const links = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('.in
 const mark = 'data:image/png;base64,AAAA'
 const note = { icon: 'type:lucide:sticky-note', tone: 'yellow' }
 const person = { icon: 'type:lucide:user', tone: 'purple' }
-/** What Inkkit drew before a link: its icon's mask and color, and its tint, as set on the link. */
+/** What Inkkit drew before a link: its icon's mask and color, as set on the link. */
 const drawn = (link: HTMLElement) => {
   const lead = link.querySelector<HTMLElement>('.inkkit-wiki-link-lead')
   return {
     icon: lead?.style.getPropertyValue('--_inkkit-wiki-icon') ?? '',
     color: lead?.style.getPropertyValue('--_inkkit-wiki-icon-color') ?? '',
-    tint: link.style.getPropertyValue('--_inkkit-wiki-link-tint'),
   }
 }
 const marks = (root: HTMLElement) => links(root).map((link) => link.dataset.missing ?? null)
@@ -449,7 +448,7 @@ test('a suggestion request the person has typed past sends nothing', async () =>
 
 // What a link looks like follows the type of the item it names, which only the app knows.
 
-test('a link to a note of a type with an icon is drawn with that icon in the type tone, and tinted by it', () =>
+test('a link to a note of a type with an icon is drawn with that icon in the type tone', () =>
   withEditor('[[Plan]] and [[Ana]] and [[Bare]]\n', async (_editor, root) => {
     page.drawn[note.icon] = mark
     page.drawn[person.icon] = mark
@@ -460,12 +459,10 @@ test('a link to a note of a type with an icon is drawn with that icon in the typ
     expect(plan).toEqual({
       icon: `url("${mark}")`,
       color: 'var(--link-icon-yellow, currentcolor)',
-      tint: 'var(--link-tint-yellow, transparent)',
     })
     expect(ana?.color).toBe('var(--link-icon-purple, currentcolor)')
-    expect(ana?.tint).toBe('var(--link-tint-purple, transparent)')
     // A link the app gave no type is drawn as before.
-    expect(bare).toEqual({ icon: '', color: '', tint: '' })
+    expect(bare).toEqual({ icon: '', color: '' })
     expect(marks(root)).toEqual([null, null, null])
   }))
 
@@ -478,25 +475,21 @@ test('the bytes of one icon are sent once however many links name items of that 
     expect(page.sent).toEqual([[note.icon]])
   }))
 
-test('a type with a tone and no icon is tinted and draws no icon', () =>
+test('a type with a tone and no icon draws no icon', () =>
   withEditor('[[Plain]]\n', async (_editor, root) => {
     page.types.set('Plain', { tone: 'gray' })
     await settle()
-    expect(drawn(links(root)[0]!)).toEqual({
-      icon: '',
-      color: '',
-      tint: 'var(--link-tint-gray, transparent)',
-    })
+    expect(drawn(links(root)[0]!)).toEqual({ icon: '', color: '' })
   }))
 
-test('a link to a missing note keeps its dashed look and draws no icon or tint', () =>
+test('a link to a missing note keeps its dashed look and draws no icon', () =>
   withEditor('[[Gone]]\n', async (_editor, root) => {
     page.missing.add('Gone')
     page.types.set('Gone', note)
     page.drawn[note.icon] = mark
     await settle()
     expect(marks(root)).toEqual(['true'])
-    expect(drawn(links(root)[0]!)).toEqual({ icon: '', color: '', tint: '' })
+    expect(drawn(links(root)[0]!)).toEqual({ icon: '', color: '' })
   }))
 
 test('a heading link and a link with an alias take the icon of the note they name', () =>
@@ -568,7 +561,7 @@ test('a link whose note becomes missing, or ambiguous, loses its icon', () =>
     page.types.delete('Plan')
     editor.linksChanged()
     await settle()
-    expect(drawn(links(root)[0]!)).toEqual({ icon: '', color: '', tint: '' })
+    expect(drawn(links(root)[0]!)).toEqual({ icon: '', color: '' })
   }))
 
 test('an icon the answer did not send, or a tone that is not a word, is left out and nothing throws', () =>
@@ -583,8 +576,8 @@ test('an icon the answer did not send, or a tone that is not a word, is left out
     editor.linksChanged()
     await settle()
     const [unsent, odd] = links(root).map(drawn)
-    expect(unsent).toEqual({ icon: '', color: '', tint: 'var(--link-tint-blue, transparent)' })
-    expect(odd).toEqual({ icon: `url("${mark}")`, color: '', tint: '' })
+    expect(unsent).toEqual({ icon: '', color: '' })
+    expect(odd).toEqual({ icon: `url("${mark}")`, color: '' })
     expect(marks(root)).toEqual([null, null])
   }))
 

@@ -23,6 +23,7 @@ struct WebLinkSheet: View {
                 TextField("Web Address", text: $address)
                     .textFieldStyle(.roundedBorder)
                     .focused($isFieldFocused)
+                    .appFocusRing(isFocused: isFieldFocused)
                     .onSubmit(add)
                     .accessibilityIdentifier("WebLinkField")
             }

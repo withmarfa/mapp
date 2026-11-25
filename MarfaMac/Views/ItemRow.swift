@@ -41,7 +41,7 @@ struct ItemRow: View {
 
     private var compact: some View {
         HStack(spacing: 8) {
-            if content.mixesTypes { TypeMark(icon: content.typeIcon) }
+            if content.mixesTypes { TonedGlyph(id: content.typeIcon) }
             Text(content.title)
                 .interfaceFont(.body)
                 .lineLimit(1)

@@ -36,6 +36,7 @@ struct TypeIconPicker: View {
             TextField("Search Icons", text: $model.search)
                 .textFieldStyle(.roundedBorder)
                 .focused($searchFocused)
+                .appFocusRing(isFocused: searchFocused)
                 .accessibilityIdentifier("TypeIconSearch")
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 6) {

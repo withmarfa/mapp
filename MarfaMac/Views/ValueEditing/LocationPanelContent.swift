@@ -70,6 +70,7 @@ struct LocationPanelContent: View {
             TextField("Search for a Place", text: Bindable(model).query)
                 .textFieldStyle(.plain)
                 .focused($focus, equals: .search)
+                .appFocusRing(isFocused: focus == .search)
                 .accessibilityIdentifier("LocationSearch")
                 .onChange(of: model.query) { model.queryChanged() }
             if !model.query.isEmpty {
@@ -214,6 +215,7 @@ struct LocationPanelContent: View {
                     .padding(.horizontal, 6 * scale)
                     .frame(height: 22 * scale)
                     .background(.quaternary, in: .rect(cornerRadius: 5 * scale, style: .continuous))
+                    .appFocusRing(.rect(cornerRadius: 5 * scale, style: .continuous), isFocused: focus == .name)
                     .accessibilityIdentifier("LocationName")
             }
             .padding(.horizontal, 3 * scale)
@@ -286,30 +288,31 @@ private struct LocationResultRow: View {
     let scale: CGFloat
     let choose: () -> Void
     @State private var isHovered = false
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         HStack(spacing: 7 * scale) {
             Image(systemName: "mappin.circle.fill")
-                .foregroundStyle(isHovered ? AnyShapeStyle(.white) : AnyShapeStyle(.red))
+                .foregroundStyle(.red)
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: result.title).lineLimit(1).truncationMode(.tail)
                 if !result.subtitle.isEmpty {
                     Text(verbatim: result.subtitle)
                         .font(.system(size: 11 * scale))
-                        .foregroundStyle(isHovered ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
             }
             Spacer(minLength: 0)
         }
-        .foregroundStyle(isHovered ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .foregroundStyle(.primary)
         .padding(.horizontal, 6 * scale)
         .padding(.vertical, 3 * scale)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             if isHovered {
-                RoundedRectangle(cornerRadius: ValueEditMetrics.rowRadius * scale, style: .continuous).fill(Color.accentColor)
+                RoundedRectangle(cornerRadius: ValueEditMetrics.rowRadius * scale, style: .continuous).fill(SelectionLooks.chosen(for: scheme))
             }
         }
         .contentShape(.rect)

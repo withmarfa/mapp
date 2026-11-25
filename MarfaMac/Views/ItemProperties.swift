@@ -401,6 +401,7 @@ struct ItemPropertyRow: View {
         .lineLimit(isNumber ? 1...1 : isFocused ? 1...12 : token ? 1...1 : 1...3)
         .truncationMode(token ? .middle : .tail)
         .focused($isFocused)
+        .appFocusRing(isFocused: isFocused)
         .onSubmit { commit() }
         .onExitCommand { input.discard(toMatch: currentText); editing = false; isFocused = false }
         .frame(maxWidth: .infinity, alignment: .leading)

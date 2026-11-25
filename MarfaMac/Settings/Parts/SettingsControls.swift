@@ -291,6 +291,7 @@ struct SettingsField: View {
         .font(isMonospaced ? SettingsTokens.font(.mono, scale: scale) : nil)
         .autocorrectionDisabled()
         .focused($isFocused)
+        .appFocusRing(isFocused: isFocused)
         .onSubmit(onSubmit)
         .onChange(of: isFocused) { if !$1 { onEndEditing?() } }
         .frame(width: width)
@@ -371,6 +372,7 @@ struct SettingsNumberField: View {
                 .multilineTextAlignment(unit == nil ? .leading : .trailing)
                 .autocorrectionDisabled()
                 .focused($isFocused)
+                .appFocusRing(isFocused: isFocused)
                 .onSubmit(onSubmit)
                 .onChange(of: isFocused) { if !$1 { onEndEditing?() } }
                 .frame(width: unit == nil ? SettingsTokens.Metric.controlWidth : SettingsTokens.Metric.numberWidth)

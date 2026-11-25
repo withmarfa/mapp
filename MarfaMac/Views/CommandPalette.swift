@@ -151,6 +151,7 @@ struct CommandPalette: View {
                 .textFieldStyle(.plain)
                 .interfaceFont(.title3)
                 .focused($focus, equals: .field)
+                .appFocusRing(isFocused: focus == .field)
                 // Actions holds the keyboard while it is open.
                 .disabled(actionsFor != nil)
                 // Read afresh: Return can come before the view is drawn again after the last key.

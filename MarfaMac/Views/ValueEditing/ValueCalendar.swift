@@ -93,15 +93,16 @@ private struct ValueCalendarDay: View {
     let scale: CGFloat
     let action: () -> Void
     @State private var hovered = false
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         Button(action: action) {
             Text(verbatim: String(calendar.component(.day, from: day)))
                 .font(.system(size: 13 * scale, weight: isToday ? .semibold : .regular))
                 .monospacedDigit()
-                .foregroundStyle(isSelected ? AnyShapeStyle(.white) : isToday ? AnyShapeStyle(Color.accentColor) : inMonth ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                .foregroundStyle(isToday ? AnyShapeStyle(Color.accentColor) : inMonth ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
                 .frame(width: 28 * scale, height: 28 * scale)
-                .background(isSelected ? AnyShapeStyle(Color.accentColor) : hovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: .circle)
+                .background(isSelected ? SelectionLooks.chosen(for: scheme) : hovered ? SelectionLooks.hover(for: scheme) : .clear, in: .circle)
                 .contentShape(.circle)
                 .frame(maxWidth: .infinity)
         }

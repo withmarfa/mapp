@@ -140,6 +140,7 @@ struct FilterSetBody: View {
                     .padding(.horizontal, 8 * scale)
                     .frame(height: 28 * scale)
                     .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7 * scale, style: .continuous))
+                    .appFocusRing(.rect(cornerRadius: 7 * scale, style: .continuous))
                     .padding(.horizontal, ValueEditMetrics.padding * scale)
                     .accessibilityIdentifier("FilterValueSearch")
             }
@@ -249,6 +250,7 @@ struct FilterCountBody: View {
                 .frame(width: 56 * scale, height: 26 * scale)
                 .padding(.horizontal, 6 * scale)
                 .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7 * scale, style: .continuous))
+                .appFocusRing(.rect(cornerRadius: 7 * scale, style: .continuous), isFocused: isFocused)
                 .accessibilityIdentifier("FilterCount")
             Text("days").foregroundStyle(.secondary)
             Spacer(minLength: 0)
@@ -276,6 +278,7 @@ struct FilterTextBody: View {
             .padding(.horizontal, 8 * scale)
             .frame(height: 28 * scale)
             .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7 * scale, style: .continuous))
+            .appFocusRing(.rect(cornerRadius: 7 * scale, style: .continuous), isFocused: isFocused)
             .padding(.horizontal, ValueEditMetrics.padding * scale)
             .onAppear { isFocused = true }
             .accessibilityIdentifier("FilterText")
@@ -388,6 +391,7 @@ struct FilterFieldPanel: View {
                 .padding(.horizontal, 8 * scale)
                 .frame(height: 28 * scale)
                 .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7 * scale, style: .continuous))
+                .appFocusRing(.rect(cornerRadius: 7 * scale, style: .continuous), isFocused: isFocused)
                 .padding(.horizontal, ValueEditMetrics.padding * scale)
                 .padding(.top, ValueEditMetrics.padding * scale)
                 .onSubmit { if let first { pick(first.id) } }
@@ -435,34 +439,35 @@ struct FilterFieldPanel: View {
     }
 }
 
-/// One line of any panel, as a value panel draws its rows: the mark, the title, and the accent under the pointer. A heading
+/// One line of any panel, as a value panel draws its rows: the mark, the title, and the gray under the pointer. A heading
 /// that picks nothing is only a label.
 private struct FilterOptionRow: View {
     let option: FilterValueOption
     let scale: CGFloat
     let action: () -> Void
     @State private var isHovered = false
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let lit = isHovered && option.isSelectable
         HStack(spacing: 7 * scale) {
-            ValueMarkView(mark: option.mark, scale: scale, onAccent: lit)
+            ValueMarkView(mark: option.mark, scale: scale)
             Text(verbatim: option.title)
                 .fontWeight(option.isHeading ? .semibold : .regular)
                 .lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8 * scale)
             if let detail = option.detail {
-                Text(verbatim: detail).foregroundStyle(lit ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+                Text(verbatim: detail).foregroundStyle(.secondary)
             }
         }
         .font(.system(size: ValueEditMetrics.textSize * scale))
-        .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(option.isSelectable ? .primary : .secondary))
+        .foregroundStyle(option.isSelectable ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
         .padding(.leading, (option.isIndented ? 22 : 8) * scale)
         .padding(.trailing, 8 * scale)
         .frame(height: ValueEditMetrics.rowHeight * scale)
         .background {
             if lit {
-                RoundedRectangle(cornerRadius: ValueEditMetrics.rowRadius * scale, style: .continuous).fill(Color.accentColor)
+                RoundedRectangle(cornerRadius: ValueEditMetrics.rowRadius * scale, style: .continuous).fill(SelectionLooks.chosen(for: scheme))
             }
         }
         .contentShape(.rect)

@@ -266,7 +266,7 @@ struct CalendarWeekView: View {
                     Text(verbatim: entry.title)
                         .interfaceFont(.system(size: 11.5, weight: .medium))
                         .lineLimit(1)
-                        .foregroundStyle(isSelected ? Color.white : .primary)
+                        .foregroundStyle(.primary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -327,7 +327,7 @@ struct CalendarWeekView: View {
                 let blockWidth = max(slot - 2, 8)
                 CalendarCell(browser: browser, entry: block.entry, day: day.date, calendar: calendar, format: format, choose: choose, open: open) { isSelected in
                     CalendarBlockLabel(
-                        entry: block.entry, isSelected: isSelected, calendar: calendar, format: format, width: blockWidth, height: tall - 1)
+                        entry: block.entry, calendar: calendar, format: format, width: blockWidth, height: tall - 1)
                         .frame(width: blockWidth, height: tall - 1, alignment: .topLeading)
                         .calendarFill(isSelected, radius: 6)
                         .shadow(color: isSelected ? .black.opacity(0.18) : .clear, radius: 3, y: 2)
@@ -413,7 +413,6 @@ private struct CalendarReveal: View {
 /// is cut, and its start where there is room left after the title (`CalendarLayout.blockLabel`).
 private struct CalendarBlockLabel: View {
     let entry: CalendarEntry
-    let isSelected: Bool
     let calendar: Calendar
     let format: DateFormat
     let width: CGFloat
@@ -438,14 +437,14 @@ private struct CalendarBlockLabel: View {
                         .interfaceFont(.system(size: 11.5, weight: .medium))
                         .lineLimit(1)
                         .truncationMode(.tail)
-                        .foregroundStyle(isSelected ? Color.white : .primary)
+                        .foregroundStyle(.primary)
                 }
             }
             if showsTime {
                 Text(verbatim: DateDisplay.timeOfDay(of: entry.start, format: format, calendar: calendar))
                     .interfaceFont(.system(size: 10.5))
                     .lineLimit(1)
-                    .foregroundStyle(isSelected ? Color.white.opacity(0.85) : .secondary)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(EdgeInsets(top: 3 * scale, leading: side, bottom: 3 * scale, trailing: side))

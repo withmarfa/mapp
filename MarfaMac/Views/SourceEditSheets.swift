@@ -28,6 +28,7 @@ struct SourceNameSheet: View {
                 TextField("Name", text: $model.name)
                     .textFieldStyle(.roundedBorder)
                     .focused($focused)
+                    .appFocusRing(isFocused: focused)
                     .disabled(!model.canChange)
                     .onSubmit(rename)
                     .accessibilityIdentifier("SourceName")
@@ -93,6 +94,7 @@ struct SourceMarkSheet: View {
             TextField("Search Icons", text: $model.search)
                 .textFieldStyle(.roundedBorder)
                 .focused($searchFocused)
+                .appFocusRing(isFocused: searchFocused)
                 .accessibilityIdentifier("SourceMarkSearch")
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 6) {

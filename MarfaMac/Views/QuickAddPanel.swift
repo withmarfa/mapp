@@ -23,7 +23,7 @@ struct QuickAddPanel: View {
     /// Where the keyboard was before the panel took it, and goes back to once the panel is put away.
     @State private var returnFocus: Browser.Pane = .list
 
-    private enum Field: Hashable { case title, body }
+    private enum Field: Hashable { case title, body, kind }
 
     var body: some View {
         if let draft = quickAdd.draft {
@@ -117,28 +117,48 @@ struct QuickAddPanel: View {
 
     // MARK: Kind
 
-    /// The kind of item, as a pop-up button showing its symbol and name.
+    /// The kind of item, as a pop-up button showing its symbol and name: the tinted chip once a kind is chosen, and a
+    /// button until then.
+    @ViewBuilder
     private func typePicker(_ draft: QuickAdd.Draft) -> some View {
         let shown = QuickAdd.typeIDs(of: SidebarPlan(library, layout: libraries.sidebarLayout).shownTypes)
         let (first, rest) = QuickAdd.kindMenu(QuickAdd.types(in: library), shown: shown, chosen: draft.typeID)
         let chosen = (first + rest).first { $0.id.rawValue == draft.typeID }
-        return Menu {
-            Picker("Kind", selection: Binding { draft.typeID } set: { choose($0) }) {
-                ForEach(first) { type in kindLabel(type).tag(type.id.rawValue) }
-                if !rest.isEmpty {
-                    Divider()
-                    ForEach(rest) { type in kindLabel(type).tag(type.id.rawValue) }
-                }
+        let kinds = Picker("Kind", selection: Binding { draft.typeID } set: { choose($0) }) {
+            ForEach(first) { type in kindLabel(type).tag(type.id.rawValue) }
+            if !rest.isEmpty {
+                Divider()
+                ForEach(rest) { type in kindLabel(type).tag(type.id.rawValue) }
             }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        } label: {
-            if let chosen { kindLabel(chosen) } else { Text("Kind") }
         }
-        .appMenu(.value)
-        .help("Kind of Item")
-        .accessibilityLabel("Kind of Item")
-        .accessibilityIdentifier("QuickAddType")
+        .pickerStyle(.inline)
+        .labelsHidden()
+        if let chosen {
+            Menu {
+                kinds
+            } label: {
+                TintedChip(text: chosen.label, icon: library.catalogue.icon(for: chosen.id), isFocused: focus == .kind)
+            }
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+            .focusEffectDisabled()
+            .focused($focus, equals: .kind)
+            .fixedSize()
+            .help("Kind of Item")
+            .accessibilityLabel("Kind of Item")
+            .accessibilityIdentifier("QuickAddType")
+        } else {
+            Menu {
+                kinds
+            } label: {
+                Text("Kind")
+            }
+            .appMenu(.value)
+            .help("Kind of Item")
+            .accessibilityLabel("Kind of Item")
+            .accessibilityIdentifier("QuickAddType")
+        }
     }
 
     private func kindLabel(_ type: ItemTypeOption) -> some View {
@@ -170,6 +190,7 @@ struct QuickAddPanel: View {
             .textFieldStyle(.plain)
             .interfaceFont(isFile ? .title3 : .title2.weight(.semibold))
             .focused($focus, equals: .title)
+            .appFocusRing(isFocused: focus == .title)
             .onSubmit { focus = .body }
             .onExitCommand { putAway() }
             .onKeyPress(keys: [.tab, KeyEquivalent("\u{19}")]) { press in

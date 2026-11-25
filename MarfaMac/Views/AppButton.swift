@@ -56,9 +56,20 @@ struct AppButtonStyle: ButtonStyle {
         return AnyShape(.rect(cornerRadius: size.cornerRadius * scale, style: .continuous))
     }
 
-    /// A gray ring of 3 points drawn outside the button's edge, as the design system's focus state draws it.
+    /// The ring of `AppFocusRing`, drawn outside the button's edge, as the design system's focus state draws it.
     static func focusRing(_ shape: AnyShape) -> some View {
-        shape.stroke(Color.primary.opacity(0.26), lineWidth: 3).padding(-1.5)
+        FocusRingStroke(shape: shape)
+    }
+
+    private struct FocusRingStroke: View {
+        let shape: AnyShape
+        @Environment(\.colorScheme) private var scheme
+
+        var body: some View {
+            shape
+                .stroke(ChipLooks.defaults.focusRing(for: scheme), lineWidth: ChipLooks.defaults.focusRingWidth)
+                .padding(-ChipLooks.defaults.focusRingWidth / 2)
+        }
     }
 
     private struct Content: View {

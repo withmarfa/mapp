@@ -52,11 +52,11 @@ struct NewTiles: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 20, height: 20)
-                    .foregroundStyle(tone.ink(looks, for: scheme))
+                    .foregroundStyle(tone.color(for: scheme))
                 Text(verbatim: type.label)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
-                    .foregroundStyle(tone.ink(looks, for: scheme))
+                    .foregroundStyle(tone.nameInk(looks, for: scheme))
             }
             .padding(.horizontal, 8)
             .frame(width: Self.width, height: Self.height)

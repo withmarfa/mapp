@@ -78,7 +78,7 @@ private struct PaletteMark: View {
         Group {
             switch icon {
             case .type(let name):
-                TypeMark(icon: name, size: .side)
+                TonedGlyph(id: name)
             case .symbol:
                 RowIconImage(icon: icon)
                     .foregroundStyle(.secondary)
@@ -504,6 +504,7 @@ struct PaletteActionsPanel: View {
             TextField("Search for Actions", text: $query)
                 .textFieldStyle(.plain)
                 .focused(focus, equals: .actions)
+                .appFocusRing(isFocused: focus.wrappedValue == .actions)
                 .onSubmit(submit)
                 .onExitCommand(perform: close)
                 .padding(.horizontal, 12)

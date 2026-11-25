@@ -27,7 +27,7 @@ function keyOf(link: LinkRef): string {
  * keeping the old ones until the new arrive so a link does not flicker.
  *
  * The page decides no color: a link names its tone and the app's style (`window.editor.setLinkStyle`) says what that
- * tone is under the look in force, by `--link-icon-<tone>` and `--link-tint-<tone>`.
+ * tone is under the look in force, by `--link-icon-<tone>`.
  */
 export class ItemLinkStatus {
   private item = ''
@@ -49,7 +49,7 @@ export class ItemLinkStatus {
     private readonly redraw: (targets: string[]) => void,
   ) {}
 
-  /** What Inkkit draws for the link: `missing` once the app has said so, the icon and tint of the type of the item
+  /** What Inkkit draws for the link: `missing` once the app has said so, the icon and color of the type of the item
    *  it names, or nothing. */
   status(link: LinkRef, item: string): ({ missing?: boolean } & WikiLinkPresentation) | undefined {
     this.adopt(item)
@@ -67,7 +67,6 @@ export class ItemLinkStatus {
       ...(icon === undefined ? {} : { icon }),
       // The tone is a word the app named and the look gives it a color; without one the icon takes the text's.
       ...(tone === undefined ? {} : { iconColor: `var(--link-icon-${tone}, currentcolor)` }),
-      ...(tone === undefined ? {} : { tint: `var(--link-tint-${tone}, transparent)` }),
     }
   }
 

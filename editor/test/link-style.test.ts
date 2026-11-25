@@ -10,10 +10,10 @@ beforeEach(() => {
 
 test('a style is set as variables on the page', () => {
   expect(
-    links.set({ '--inkkit-wiki-link-underline': 'underline', '--link-tint-blue': 'red' }),
+    links.set({ '--inkkit-wiki-link-underline': 'underline', '--link-icon-blue': 'red' }),
   ).toBe(true)
   expect(style.getPropertyValue('--inkkit-wiki-link-underline')).toBe('underline')
-  expect(style.getPropertyValue('--link-tint-blue')).toBe('red')
+  expect(style.getPropertyValue('--link-icon-blue')).toBe('red')
 })
 
 test('a variable the next style does not name is taken off, so a look leaves nothing of the one before', () => {

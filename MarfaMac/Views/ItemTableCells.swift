@@ -94,7 +94,7 @@ struct ItemTableCell: View {
     @ViewBuilder private var content: some View {
         switch column.content {
         case .title: title
-        case .type: PageChip(text: row.typeLabel, kind: .type(icon: row.typeIcon), size: .row)
+        case .type: MarkedName(text: row.typeLabel, icon: row.typeIcon, size: .row)
         case .parent: links(row.parent.map { [$0] } ?? [])
         case .children: links(row.children)
         case .collections: links(row.collections)
@@ -346,7 +346,7 @@ struct ItemTableCell: View {
                     Button {
                         if let item = library.item(link.id) { browser.reveal(item, in: library, order: order) }
                     } label: {
-                        PageChip(text: link.title, kind: .link(icon: link.icon), size: .row)
+                        MarkedName(text: link.title, icon: link.icon, size: .row, underlinesOnHover: true)
                     }
                     .buttonStyle(.plain)
                     .help(Text("Show \(link.title)"))

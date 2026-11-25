@@ -8,7 +8,8 @@ nonisolated enum AppearanceKey {
     static let highlights = "highlightColor"
     static let textFont = "textFont"
     static let codeFont = "codeFont"
-    static let all = [theme, accent, highlights, textFont, codeFont]
+    static let typeChipTint = TypeChipTint.key
+    static let all = [theme, accent, highlights, textFont, codeFont, typeChipTint]
 }
 
 /// Whether the app follows the Mac's light or dark appearance, or keeps one of its own.

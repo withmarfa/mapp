@@ -24,6 +24,7 @@ An item's page is its title, pinned properties, property block and text. One pag
 - **Nothing sits between the title and the pins**, and nothing else uses the space under a title, because the page reads the same from type to type.
 - **An empty value is the word Empty where the person can set it, and absent where they cannot.** No placeholder stands for a missing pin.
 - **A value is cut, never reworded.** The whole value is its help and is in the right sidebar.
+- **A linked item that cannot be read, is gone or is in the bin shows nothing**, never an id. A choice its field does not list still draws as its word.
 - **An email or phone is a row**, not a chip in the header, because it opens something. Latitude and longitude are one row, Location.
 - **A kind's header extends the general one** (`PageHeaderKind`): an event's time, a person's job, a reading item's description. What a header draws, no pin or row repeats.
 - **A stale pin stays stored and is not drawn**, so a property that comes back is pinned again.

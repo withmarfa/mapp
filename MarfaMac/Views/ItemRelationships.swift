@@ -174,7 +174,7 @@ struct InspectorItemRow: View {
             if let id = target.itemID, target.isOpenable {
                 Button { onOpen(id) } label: {
                     HStack(alignment: .inspectorTitleCenter, spacing: InspectorMetrics.markGap) {
-                        TypeMark(icon: typeIcon(id), size: .row)
+                        TonedGlyph(id: typeIcon(id))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(target.displayTitle)
                                 .lineLimit(1)
@@ -256,6 +256,7 @@ struct ItemRelationshipPicker: View {
             Text(LocalizedStringKey(relationship.label)).interfaceFont(.title2.bold())
             TextField("Search Items", text: $query)
                 .textFieldStyle(.roundedBorder)
+                .appFocusRing()
                 .accessibilityIdentifier("RelationshipSearch")
             List(filtered) { candidate in
                 RelationshipCandidateRow(

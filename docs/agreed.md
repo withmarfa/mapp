@@ -133,7 +133,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | In place | A table's last row, a board lane's plus, a calendar's drag. The item stays where it was typed until the row is left. In a nested table it is top-level; in a grouped one it joins the group under the pointer, or the first. Escape drops an empty row and keeps typed text; leaving adds. | `ItemTable.swift`, `ItemBoard.swift`, `CalendarWeekView.swift` | `Rethink-New-In-Table`, `Rethink-New-In-Board`, `Rethink-New-In-Calendar` |
 | From any app | The same panel in the screen's upper third, with a drop of files. | `QuickAddPanel.swift` | `Rethink-New-Anywhere`, `Rethink-New-Drop` |
 | New Opens | A setting, One Line or the text form. | `PreferencesMap` | `Rethink-New-Line` |
-| Tint on the chosen type | A tint is the default for the type being given to an item, and for no other chip. A setting in Appearance chooses Tinted or Gray. | `PageChip`, `ChipLooks` | `Rethink-Tinted-Chip` |
 
 ## The item's page
 
@@ -213,7 +212,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Marks and chips | A chip is a word from a set. A type or a linked item is its mark and name; a person is initials in a pale purple circle and a name. Priority: low purple, medium yellow, high orange, urgent red. Type marks are plain. | `PageChip`, `ChipLooks`, `PersonCircle`, `TypeMark`, `OptionTone` | `Rethink-Found-Chips` |
 | Areas, glass, measures | Three areas, where glass is used, and one set of measures, radii and type sizes. Dark values are in one table before they are used. | `InterfaceStyle`, `MarfaMac/Views/Looks/` | `Rethink-Found-Areas`, `Rethink-Found-Glass`, `Rethink-Found-Measures`, `Rethink-Found-Measures-Page`, `Rethink-Found-Radii`, `Rethink-Found-Type`, `Rethink-Found-Selection` |
 | Buttons | Small is a rounded rectangle, larger is a capsule. A text action has a fill, but for a page notice's. | `AppButton.swift` | `Rethink-Page-Notices` |
 | Messages | A toast is a symbol, what happened and Undo; a second replaces the first. An alert with a red button has a gray Cancel. | `ToastView.swift`, `LibraryDialogs.swift` | `Rethink-Keep-Toast`, `Rethink-Delete-Toast`, `Rethink-Delete-Alert` |

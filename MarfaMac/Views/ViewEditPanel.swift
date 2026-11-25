@@ -23,6 +23,7 @@ struct ViewEditPanel: View {
                             TextField("View Name", text: $panel.shownName)
                                 .textFieldStyle(.plain)
                                 .focused($nameFocused)
+                                .appFocusRing(isFocused: nameFocused)
                                 .onSubmit { submitName() }
                                 .accessibilityIdentifier("ViewPanelName")
                         }

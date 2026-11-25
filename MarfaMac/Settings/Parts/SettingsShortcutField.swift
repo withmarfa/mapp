@@ -64,7 +64,7 @@ struct SettingsShortcutField: View {
                 }
             }
             .frame(width: SettingsTokens.Metric.controlWidth)
-            .overlay { if isRecording { shape.stroke(SettingsTokens.focusRing, lineWidth: 3).padding(-1.5).allowsHitTesting(false) } }
+            .overlay { if isRecording { shape.stroke(SettingsTokens.focusRing, lineWidth: ChipLooks.defaults.focusRingWidth).padding(-ChipLooks.defaults.focusRingWidth / 2).allowsHitTesting(false) } }
             .settingsErrorRing(isError)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)

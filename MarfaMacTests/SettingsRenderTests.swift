@@ -82,9 +82,9 @@ import Testing
     func marks(matching query: String, in set: MarfaMarkSet) -> [String] { ["lucide:inbox", "lucide:rss", "lucide:book-open"] }
     func markGlyph(_ id: String) -> AnyView { AnyView(Image(systemName: "tray")) }
     func markTitle(_ id: String) -> String { id }
-    func typeMark(for pattern: String) -> AnyView { AnyView(TypeMark(icon: typeIcons[pattern], size: .side)) }
+    func typeMark(for pattern: String) -> AnyView { AnyView(TypeTile(icon: typeIcons[pattern], size: .side)) }
     var typeCalls: any TypeCalls = FakeTypeCalls()
-    func largeTypeMark(for id: String) -> AnyView { AnyView(TypeMark(icon: typeIcons[id], size: .large)) }
+    func largeTypeMark(for id: String) -> AnyView { AnyView(TypeTile(icon: typeIcons[id], size: .large)) }
     func itemCount(ofType id: String) -> Int { 0 }
     func typePlural(of id: String) -> String? { nil }
     func typeIcon(of id: String) -> String? { typeIcons[id] }

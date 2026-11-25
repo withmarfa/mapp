@@ -91,6 +91,8 @@ nonisolated struct ValueChip: Identifiable, Hashable, Sendable {
     var mark: ValueListRow.Mark = .none
     /// Whether the panel can take it away: a type and a required field's value cannot be.
     var isRemovable = true
+    /// Whether the chip is the type being given to an item, the one chip that takes a tint.
+    var givesType = false
 }
 
 /// One line of a list in a value panel or a menu.

@@ -24,27 +24,39 @@ Each kind of thing has one drawing, used on the page, in the right sidebar, in a
 
 | Kind of value | Drawing |
 | --- | --- |
-| Status | Its group's symbol and its word, in a chip with a fine edge |
-| Priority or another option | A dot in the option's color, then the word |
-| Type | Its name tinted in its color, with its icon |
-| Linked item | Its type mark and title on gray |
-| Tag | Gray, after a number sign |
-| Person | Initials in a circle; the name beside it wherever there is room |
-| Date, number, web address, source | Plain text |
+| Status, option | A chip: the status's symbol or the option's dot, then the word |
+| Tag | The `number` symbol and the word, on the same chip |
+| Type, linked item | Its mark in its tone and its name, never a chip |
+| Person | Initials in a pale purple circle, with the name beside it where there is room |
+| Date, number, address, source | Plain text |
 
-- **A value from a set is a chip, and anything else is text**, so a value that can be picked is told from one that was typed.
-- **A colored fill means a type.** No other chip takes one, and a person is never colored.
-- **Chips come from one family** (`PageChip`, `PersonCircle`, `ChipLine`) in two sizes (`ChipSize`), so chips side by side line up. Measures are in `ChipLooks`. The web header draws the same in HTML, from what the app sends (`PageHeaderIcons`).
-- **Several values show as the first two, then a count.** A word too long is cut and its help holds it whole.
-- **A linked item that cannot be read, is gone or is in the bin shows nothing**, never an id.
-- **A type's mark is the same everywhere** (`TypeMark`): its icon on a pale square of its own color, with no shadow.
-- **A choice that its field does not list still draws as its word.**
+- **A value from a set is a chip, and anything else is text or a fact**.
+- **A chip has one gray wash and no edge:** radius 7, text 12 at medium weight (11.5 at regular in a row). Only the type being given to an item is tinted (`TintedChip`); Appearance chooses Tinted (default) or Gray.
+- **A person's circle is 18 points: purple letters on pale purple, no edge** (`PersonCircle`). The name beside it is a fact: 13 points, regular.
+- **Chips come from one family** (`PageChip`, `PersonCircle`, `ChipLine`) in two sizes. `ChipLooks` owns the measures, the web header reads them as `--chip-*` variables, and `ChipLooksTests` checks they agree.
+- **Several values show as two, then a count.**
+- **A type's mark in a row, on the page and in a palette is its glyph in the plain tone** (`TonedGlyph`, 14 points). A tile (`TypeTile`) is only for the Settings type page.
 - **A filter chip reads in order:** field, operator, values, then its close button.
+
+### Dark values
+
+Neutral washes are white at the same strength, hairlines white at 12%, and a tone keeps its hue (`TypeTone`). `ChipLooksTests` holds each text to 4.5 to 1 on its fill.
+
+| Color | Light | Dark | Where used |
+| --- | --- | --- | --- |
+| Chip wash | Ink 3.5% | White 3.5% | Every chip |
+| Tinted type chip | Tone 14% | Tone 20% | `TintedChip` |
+| Person fill | Purple 15% | Purple 26% | `PersonCircle` |
+| Chip text | Ink 72% | White 72% | Chips, a fact in a row |
+| Name on a tint | Tone toward black: 28% person, 46% type | Tone 50% toward white | `PersonCircle`, `TintedChip`, `NewTiles` |
+| Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Panels, calendars (`SelectionLooks`) |
+| Keycap edge | Ink 20% | White 20% | `KeyCap` |
+| Focus ring | Ink 26% | White 26% | Every keyboard control (`appFocusRing`) |
 
 ## Status, priority and empty values
 
 - **`StatusSymbol` is the one map from a status's group to a symbol and a tint.** The words stay the type's own, so an app's "Closed" still reads Closed. A word that no group claims draws as not started.
-- **A task's priority takes its color from its rank**, never from its word (`OptionTone.prioritySteps`). Any other option takes one from its word, so it is the same at every launch.
+- **A task's priority takes its color from its rank**, never from its word (`OptionTone.prioritySteps`). Any other option takes one from its word.
 - **An empty value is the gray word Empty**, never a plus button.
 - **A favorite is a yellow star.** The tag behind it is never shown as a tag.
 
@@ -54,6 +66,7 @@ Each kind of thing has one drawing, used on the page, in the right sidebar, in a
 - **A chosen card has a soft ring and no fill**, because a fill would cover its picture.
 - **A heading, a date line and a group's header get no hover mark**, because they cannot be clicked. A group's chevron is the only part of its header that reacts.
 - **A cell that can be edited keeps its own tint** over the row's.
+- **A chosen row in a value panel, a filter panel or a calendar is the same gray** (`SelectionLooks`), never the accent.
 
 ## Buttons
 
@@ -62,13 +75,13 @@ Each kind of thing has one drawing, used on the page, in the right sidebar, in a
 - **A symbol on its own is a gray circle.** On a header row, and for a close button inside a banner or chip, it is plain until the pointer is over it.
 - **Two arrows choose a value and one arrow opens a menu of commands** (`appMenu`, with `.value` or `.commands`).
 - **A label ends in an ellipsis when the button opens** a sheet, a dialog, a chooser, a confirmation or a browser page. A button that acts at once, or is a menu, has none.
-- **Keyboard focus is a gray ring** in the button's shape.
+- **Keyboard focus is the app's own 3 point gray ring** in the control's shape, on every control that takes the keyboard: `appFocusRing` on a field, `AppButtonStyle` on a button.
 - **In a sheet, a destructive action stands alone at the leading edge**, and Cancel and the main action are at the trailing edge. The button says Delete, not Delete Collection.
 - **A field, a chip and a token keep soft corners**, so a value never reads as a button.
 
 ## Keycaps
 
-- **Where the app draws a shortcut, it is outlined keycaps**, one glyph each (`KeyCap`). A menu keeps the system's glyphs.
+- **Where the app draws a shortcut, it is outlined keycaps**, one glyph each (`KeyCap`): 18 points high, radius 5, text 11. A menu keeps the system's glyphs.
 
 ## Messages
 

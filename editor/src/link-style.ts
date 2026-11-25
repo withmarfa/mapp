@@ -1,5 +1,5 @@
 /** Names the app may set to change how links look: Inkkit's link and wiki link tokens and the page's own
- *  `--link-icon-<tone>` and `--link-tint-<tone>`, which say what a type's tone is under the look in force
+ *  `--link-icon-<tone>`, which says what a type's tone is under the look in force
  *  (`ItemLinkStatus`). */
 const allowed = /^--(inkkit-link|inkkit-wiki-link|link)-[a-z-]+$/
 

@@ -23,6 +23,7 @@ struct InlineSearchField: NSViewRepresentable {
     func makeNSView(context: Context) -> Field {
         let field = Field()
         field.controlSize = .large
+        field.focusRingType = .none
         field.sendsSearchStringImmediately = true
         field.delegate = context.coordinator
         field.setAccessibilityIdentifier(identifier)
@@ -98,7 +99,53 @@ struct InlineSearchField: NSViewRepresentable {
         /// The button of a click that began outside the open, empty field, so only its own release closes the field.
         private var clickElsewhereButton: Int?
 
+        /// The app's own keyboard focus ring (`AppButtonStyle.focusRing`) in place of the system's: 3 points, gray, round the
+        /// field's capsule, drawn while the field is being edited.
+        private let ring = CAShapeLayer()
+
         isolated deinit { removeMonitor() }
+
+        override func becomeFirstResponder() -> Bool {
+            let accepted = super.becomeFirstResponder()
+            if accepted { showRing(true) }
+            return accepted
+        }
+
+        override func textDidEndEditing(_ notification: Notification) {
+            super.textDidEndEditing(notification)
+            showRing(false)
+        }
+
+        override func layout() {
+            super.layout()
+            if !ring.isHidden { showRing(true) }
+        }
+
+        override func viewDidChangeEffectiveAppearance() {
+            super.viewDidChangeEffectiveAppearance()
+            if !ring.isHidden { showRing(true) }
+        }
+
+        private func showRing(_ isOn: Bool) {
+            guard isOn else {
+                ring.isHidden = true
+                return
+            }
+            wantsLayer = true
+            layer?.masksToBounds = false
+            if ring.superlayer == nil {
+                ring.fillColor = nil
+                ring.lineWidth = ChipLooks.defaults.focusRingWidth
+                layer?.addSublayer(ring)
+            }
+            let outset = ChipLooks.defaults.focusRingWidth / 2
+            let edge = bounds.insetBy(dx: -outset, dy: -outset)
+            ring.path = CGPath(roundedRect: edge, cornerWidth: edge.height / 2, cornerHeight: edge.height / 2, transform: nil)
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                ring.strokeColor = NSColor.labelColor.withAlphaComponent(ChipLooks.defaults.focusRingOpacity).cgColor
+            }
+            ring.isHidden = false
+        }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()

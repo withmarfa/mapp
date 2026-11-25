@@ -233,7 +233,7 @@ struct ScrolledItemTitle: View {
             HStack(spacing: 5) {
                 if showsIcon {
                     TypeGlyph(id: icon)
-                        .font(.system(size: TypeMark.Size.row.metrics.icon))
+                        .font(.system(size: ChipLooks.defaults.chipMarkSize))
                         .foregroundStyle(TypeTone(icon: icon).color(for: scheme))
                         .accessibilityHidden(true)
                 }

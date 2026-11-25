@@ -20,10 +20,10 @@ Search this page before you propose a look. Each line is a refused design, then 
 
 ## Chips, marks and values
 
-- **A tinted chip, except for the type being given to an item,** or a hairline round a status. A mark and a name, and one quiet gray chip.
+- **A tinted chip, except for the type being given to an item,** or a hairline round a status. A type or a link is a mark and a name, and every other chip is the one quiet wash.
 - **A glass mark with a shadow, or a filled tile behind a sidebar icon.** The plain mark.
-- **A person in a gray chip, or drawn smaller than the chips beside.** Initials in a pale circle.
-- **A tag with a tag symbol or an outline.** Gray, after a number sign.
+- **A person in a gray chip, a circle with an edge, or one drawn smaller than the chips beside.** Initials in a pale purple circle with no edge.
+- **A tag with the tag symbol or an outline.** The `number` symbol, on the one chip wash.
 - **Chips of two heights, or squeezed to a few letters.** Fit whole chips, then a count.
 - **A bordered plus for an empty value.** The word Empty.
 - **A heart, or drawn status rings.** The star, and the app's symbols.

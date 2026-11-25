@@ -38,6 +38,7 @@ struct ValueEditContent: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: ValueEditMetrics.textSize * scale))
                     .focused($fieldFocused)
+                    .appFocusRing(isFocused: fieldFocused)
                     .accessibilityLabel(model.searchPrompt)
                     .accessibilityIdentifier("ValueEditSearch")
             }
@@ -133,6 +134,7 @@ struct ValueEditContent: View {
             .padding(.horizontal, 8 * scale)
             .padding(.vertical, 4 * scale)
             .frame(maxWidth: .infinity, minHeight: ValueEditMetrics.rowHeight * scale, alignment: .leading)
+            .appFocusRing(isFocused: fieldFocused)
             .accessibilityLabel(field?.label ?? "")
             .accessibilityIdentifier("ValueEditText")
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
@@ -185,6 +187,7 @@ struct ValueEditContent: View {
                 .padding(.horizontal, 6 * scale)
                 .frame(height: 22 * scale)
                 .background(.quaternary, in: .rect(cornerRadius: 5 * scale, style: .continuous))
+                .appFocusRing(.rect(cornerRadius: 5 * scale, style: .continuous), isFocused: timeFocused)
                 .overlay(alignment: .trailing) {
                     if (model.timeDraft ?? model.timeText).isEmpty {
                         Text(verbatim: "--:--").foregroundStyle(.tertiary).padding(.trailing, 6 * scale).allowsHitTesting(false)
@@ -229,30 +232,31 @@ private struct ValueEditRow: View {
     let scale: CGFloat
 
     private var isActive: Bool { model.activeRow == row.id }
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         HStack(spacing: 7 * scale) {
-            ValueMarkView(mark: row.mark, scale: scale, onAccent: isActive)
+            ValueMarkView(mark: row.mark, scale: scale)
             Text(verbatim: row.title).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8 * scale)
             if let detail = row.detail {
                 if row.role == .create {
-                    ShortcutKeys(detail, onAccent: isActive).layoutPriority(1)
+                    ShortcutKeys(detail).layoutPriority(1)
                 } else {
                     Text(verbatim: detail)
                         .layoutPriority(1)
-                        .foregroundStyle(isActive ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .font(.system(size: ValueEditMetrics.textSize * scale))
-        .foregroundStyle(isActive ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .foregroundStyle(.primary)
         .padding(.horizontal, 8 * scale)
         .frame(height: ValueEditMetrics.rowHeight * scale)
         .background {
             if isActive {
                 RoundedRectangle(cornerRadius: ValueEditMetrics.rowRadius * scale, style: .continuous)
-                    .fill(Color.accentColor)
+                    .fill(SelectionLooks.chosen(for: scheme))
             }
         }
         .contentShape(.rect)
