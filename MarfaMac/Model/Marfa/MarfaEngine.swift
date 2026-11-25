@@ -170,6 +170,10 @@ actor MarfaEngine {
     /// The titles, lowercased, of the files being attached to each item, so two attached at once get different names.
     var attachingTitles: [String: Set<String>] = [:]
     var failures: [SourceFailure] = []
+    /// Each new item's parent link the copy queued, by its queued write, until the server answers it.
+    var parentLinks: [String: ParentLink] = [:]
+    /// Parent links refused, told once the items are published, so each notice names the item and its parent.
+    var refusedParentLinks: [ParentRefusal] = []
     /// The person's latest edit of each item's text, which their next edit of it follows.
     var ownText: [ItemID: OwnText] = [:]
     /// Answered writes already taken into `ownText`, so none is counted twice.

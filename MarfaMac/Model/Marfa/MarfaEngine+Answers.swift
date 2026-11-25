@@ -60,6 +60,14 @@ extension MarfaEngine {
             let outcome = MarfaMapping.outcome(
                 verdict, afterRefusal: MarfaProblems.waitsOnStopped(answer, among: { answeredNow[$0] ?? refusals[$0] }))
             ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
+            // A blocked or dead link may be released and sent again, so it is followed until it is answered for good.
+            if !outcome.mayBeSentAgain, let link = parentLinks.removeValue(forKey: answer.id) {
+                ids.formUnion([link.child.rawValue, link.parent.rawValue])
+                if case .refused(let problem) = outcome {
+                    let reason = problem.message ?? String(localized: "The Marfa server refused this change.")
+                    refusedParentLinks.append(ParentRefusal(link: link, reason: reason, listed: true))
+                }
+            }
             if let itemID = answer.itemId {
                 ids.insert(itemID)
                 remember(outcome, of: answer.kind, for: ItemID(itemID))
@@ -126,5 +134,28 @@ extension MarfaEngine {
     private func hasLeft(_ raw: String) async -> Bool {
         guard rows[raw] == nil else { return false }
         return (try? await copy.items.get(raw)) == nil
+    }
+}
+
+/// A new item's parent link, as queued.
+nonisolated struct ParentLink: Hashable, Sendable {
+    let child: ItemID
+    let parent: ItemID
+}
+
+/// A parent link refused as it was queued, or by the server later, when the refused write is also `listed` in Settings.
+nonisolated struct ParentRefusal: Hashable, Sendable {
+    let link: ParentLink
+    let reason: String
+    let listed: Bool
+}
+
+extension WriteOutcome {
+    /// Blocked or dead, so a release sends the write again.
+    fileprivate var mayBeSentAgain: Bool {
+        switch self {
+        case .blocked, .dead: true
+        case .accepted, .merged, .conflicted, .refused: false
+        }
     }
 }

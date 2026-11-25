@@ -277,6 +277,24 @@ struct NewItemDraftsTests {
         #expect(back.returned)
     }
 
+    @Test func aRefusalHeardWithNoNewItemOpenComesBackAfterARelaunch() async throws {
+        let disk = TestFiles()
+        let file = disk.directory.appending(path: "Drafts.json")
+        let item = ItemID.mint()
+        let library = FakeItemLibrary()
+        library.serverKey = "a"
+        let drafts = NewItemDrafts(file: file)
+        let following = drafts.follow(library)
+        defer { following.cancel() }
+        _ = Self.sent("Refused with no window", as: item, in: drafts)
+        library.refusedCreations = [item]
+        #expect(await eventually { NewItemDrafts(file: file).holdsDraft(.line, in: "a") }, "the refusal is written with the draft at once")
+
+        let reopened = NewItemDrafts(file: file)
+        reopened.settle(in: FakeItemLibrary())
+        #expect(reopened.takeReturned(.line, in: "a")?.draft.title == "Refused with no window")
+    }
+
     @Test func aSentIDThatCannotBeWrittenIsNotSent() throws {
         let disk = TestFiles()
         let blocker = disk.url("Blocker")

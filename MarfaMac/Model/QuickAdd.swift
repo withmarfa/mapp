@@ -389,6 +389,8 @@ final class QuickAdd {
     /// The draft as it was when its file was sent, while the file is being added, so the panel does not add it
     /// twice and a closing window does not hand off what is already on its way.
     private var sending: Draft?
+    /// The kept draft whose file is on its way, which the window may let go before the library answers.
+    private var sendingEntry: UUID?
     /// While the core is asked about the parent, before anything is sent. The draft is still the window's to hand
     /// off, since nothing is on its way, so this only stops a second Add.
     private var checkingParent = false
@@ -413,23 +415,23 @@ final class QuickAdd {
     }
 
     /// Lets the draft go as it leaves the window. The draft stays kept on this Mac (`NewItemDrafts`), and the next
-    /// window to open a new item in its library takes it back. An entry still being typed into a list field is in
-    /// no draft, so that alone goes to the clipboard through `notices`, which tells the person.
+    /// window to open a new item in its library takes it back. A draft whose file is on its way stays kept as it was
+    /// sent until the library answers (`fileSent`), and only what was typed besides is offered meanwhile. An entry
+    /// still being typed into a list field is in no draft, so that alone goes to the clipboard through `notices`,
+    /// which tells the person.
     func leave(because departure: Departure, telling notices: Notices) {
         let lists = unfinishedListText
-        // A file being added, and what was sent with it, are on their way already, so only the rest is kept.
-        if let entry, var kept = draft, let sending {
-            kept.files.removeAll { sending.files.contains($0) }
-            if NameText.trimmed(kept.title) == NameText.trimmed(sending.title) { kept.title = "" }
-            if kept.parentID == sending.parentID { kept.parentID = nil }
-            kept.properties = kept.properties.filter { sending.properties[$0.key] != $0.value }
-            kept.chips.removeAll { sending.chips.contains($0) }
-            kept.tags.removeAll { sending.tags.contains($0) }
-            drafts.update(entry, kept)
-            // What stays is no longer the file on its way.
-            drafts.notSent(entry)
+        if let entry, var rest = draft, let sending {
+            rest.files.removeAll { sending.files.contains($0) }
+            if NameText.trimmed(rest.title) == NameText.trimmed(sending.title) { rest.title = "" }
+            if rest.parentID == sending.parentID { rest.parentID = nil }
+            rest.properties = rest.properties.filter { sending.properties[$0.key] != $0.value }
+            rest.chips.removeAll { sending.chips.contains($0) }
+            rest.tags.removeAll { sending.tags.contains($0) }
+            drafts.release(entry, sending: sending, rest: rest)
+        } else if let entry {
+            drafts.release(entry)
         }
-        if let entry { drafts.release(entry) }
         entry = nil
         draft = nil
         listDrafts = [:]
@@ -442,10 +444,30 @@ final class QuickAdd {
         notices.notKept(String(localized: "Entry Not Added"), text: lists.joined(separator: "\n"), reason: reason)
     }
 
-    fileprivate func saving(_ draft: Draft?) {
+    fileprivate func saving(_ draft: Draft) {
         sending = draft
-        guard let entry else { return }
-        if draft != nil { drafts.sendingFile(entry) }
+        sendingEntry = entry
+        if let entry { drafts.sendingFile(entry) }
+    }
+
+    /// The library added the file on its way as `item`, or nothing where nil. Answers whether the window still
+    /// holds the draft. Where it let it go meanwhile, the draft as sent waits for Marfa's answer, or comes back at
+    /// once, and the person is told where.
+    fileprivate func fileSent(_ item: ItemID?, telling notices: Notices) -> Bool {
+        let files = Array(sending?.files.prefix(1) ?? [])
+        sending = nil
+        guard let sent = sendingEntry else { return true }
+        sendingEntry = nil
+        guard sent != entry else { return true }
+        if let item {
+            drafts.added(sent, as: item)
+        } else {
+            drafts.giveBack(sent)
+            notices.tell(
+                String(localized: "File Not Added"),
+                String(localized: "\(QuickAdd.File.names(files)) wasn’t added, so what you typed for it is kept. It comes back the next time you make a new item."))
+        }
+        return false
     }
     /// The create about to be made from the draft, kept first (`NewItemDrafts.sending`). False where the draft is kept
     /// nowhere, so nothing would follow the create.
@@ -876,9 +898,9 @@ extension Browser {
             let title = NameText.trimmed(draft.title)
             id = await library.addFile(
                 file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, tier: draft.tier, tags: draft.tags)
-            quickAdd.saving(nil)
+            let held = quickAdd.fileSent(id, telling: library.notices)
             guard let id else {
-                quickAdd.notCreated()
+                if held { quickAdd.notCreated() }
                 return nil
             }
             // The file is a step of its own, as a created item is, so the toast's Undo takes back this file.
@@ -888,9 +910,11 @@ extension Browser {
             library.registerNewItemUndo(id, undoManager: undoManager)
             if opensGroup { undoManager?.endUndoGrouping() }
             // The person may have changed the draft while the file was sent; only the file sent is taken from it.
-            guard quickAdd.draft == typed else {
-                quickAdd.notCreated()
-                quickAdd.draft?.files.removeAll { $0 == file }
+            guard held, quickAdd.draft == typed else {
+                if held {
+                    quickAdd.notCreated()
+                    quickAdd.draft?.files.removeAll { $0 == file }
+                }
                 return id
             }
         } else {

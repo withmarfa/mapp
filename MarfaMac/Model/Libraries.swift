@@ -35,6 +35,9 @@ import MarfaTesting
 
     /// The owner's pages that are open, which hold what was typed and not kept until Settings closes or the app quits.
     let ownerDrafts = OwnerDrafts()
+    /// The new items this Mac keeps, which hear each create the open library refuses, with or without a window.
+    @ObservationIgnored private let newItemDrafts = NewItemDrafts.standard()
+    @ObservationIgnored private var refusalsHeard: Task<Void, Never>?
 
     /// What each library's person chose to show in the sidebar.
     let sidebarLayouts: SidebarLayouts
@@ -119,6 +122,7 @@ import MarfaTesting
             ownerDrafts.deliver(draft, to: notices, because: String(localized: "You closed Settings before this was saved."))
         }
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
+        newItemDrafts.notices = host.notices
         host.libraryChanged = { [weak self] library in self?.follow(library) }
         LaunchTrace.shared.mark(.librariesInit, note: isLaunching ? "server set" : "no server")
     }
@@ -149,6 +153,8 @@ import MarfaTesting
 
     /// Has this app's settings follow the library's copy, where it has one of a Marfa server.
     private func follow(_ library: MarfaLibrary?) {
+        refusalsHeard?.cancel()
+        refusalsHeard = library.map(newItemDrafts.follow)
         guard let source = library?.source as? MarfaSource else {
             preferences.detach()
             return
