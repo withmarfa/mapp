@@ -65,7 +65,7 @@ The item editor's page: TypeScript on Inkkit, built by Vite into one self-contai
 
 ## Byte preservation
 
-- **Inkkit keeps the text of every block an edit did not reach,** and link definitions, embeds and `[[link]]` source. Only edited or new blocks take its canonical form.
+- **Inkkit keeps the text of every block an edit did not reach,** and link definitions, embeds and `[[link]]` source. Only edited or new blocks take its canonical form. An embed it cannot write back as read stays a block of literal Markdown, and the page asks nothing for it.
 - **`editor/fixtures/corpus/` holds unusual but valid Markdown.** Each text has one paragraph with `EDIT HERE`, which `editor/test/consumer.test.ts` edits and undoes, expecting every other byte back. Add a fixture for any form found rewritten.
 
 ## Commands

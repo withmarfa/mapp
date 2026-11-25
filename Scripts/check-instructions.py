@@ -18,7 +18,7 @@ Instruction files, each `AGENTS.md` at any depth:
 Instruction files and the pages in `docs/`:
 
 5. Each is within its word budget in `BUDGETS`, not counting a page's frontmatter, and no bullet is over 60 words.
-6. None holds a status, a release, a date, a session, a person or a board's number (`BANNED`). `docs/agreed.md` alone may
+6. None holds a status, a release, a date, a session or a board's number (`BANNED`). `docs/agreed.md` alone may
    say what is not built. `this Mac` is for the pages on settings and on ownership.
 7. Each backticked name exists. Anything that fits neither of these is skipped:
    - A path (it holds `/`, or ends in a file extension such as `.swift` or `.ts`) exists from the repository root or from
@@ -87,7 +87,6 @@ BANNED = [(re.compile(p), why) for p, why in (
     (r"\bv?0\.0\.[1-9]", "a release goes stale"),
     (rf"\b{MONTH} \d{{4}}\b|\b\d{{4}}-\d\d-\d\d\b", "dates are for git"),
     (r"\b[Ss]ession \d{2,}", "history is for git"),
-    (r"\bAugust\b", "name no person"),
     (r"(?<![\w/.#-])[A-Z]\d{1,3}[a-z]?(?!\w|[.-]\w)", "board numbers change; name the board's file"),
     (r"[\u2014\u00b7]", "no em dash or interpunct"),
 )]

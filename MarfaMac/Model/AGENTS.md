@@ -14,7 +14,7 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 
 ## One rule decides, the view draws
 
-- **What a list row or card says is `RowContent`,** which is pure, from the item, its type's look and the list (`RowList`). `RowContents` keeps it for each item value, so no row body resolves a look or reads the catalogue. Looks are resolved once, in `Browser.looks(in:)`.
+- **What a list row or card says is `RowContent`,** which is pure, from the item, its type's look and the list (`RowList`). `RowContents` keeps it for each item value, so no row body resolves a look or reads the catalogue.
 - **What sits under a page's title is `PagePins`,** and what a person chose for a type is `PagePlacements`.
 
 ## Settings the app keeps
@@ -34,10 +34,10 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 
 ## Places, views and search
 
-- **A file attached to another item is left out of places in one place** (`MarfaItemIndex.standalone`), so lists and counts agree.
+- **A file attached to another item is left out of places in one place** (`MarfaItemIndex.standalone`).
 - **A type counts only its own items, never its subtypes** (`MarfaItemIndex.activeByType`). Include Subtypes changes what the list shows (`Browser.placeItems`) and what a saved view is given (`ViewDraft.query`).
 - **`Browser.choicesChanged()` is the one funnel for a place's choices.** It registers one undo step and, in a saved view, writes Marfa's part at once, on the version last read, never queued. A failed write keeps the window's choice, a conflict shows the view, and both are told.
-- **A window whose filters differ from its view's lists a preview** (`ItemLibrary.previewItems(ofView:query:)`). It reads the copy, works offline and writes nothing.
+- **A window whose filters differ from its view's lists a preview** (`ItemLibrary.previewItems(ofView:query:)`).
 - **Ask the browser for a place's content** (`Browser.tableContent(in:)`, `sections`, `paletteIndex`). Never build an `ItemTableContent` or read the library's items in a view, because that repeats the work at every draw.
 - **A new `ItemLibrary` must bump** `contentRevision` when items or the catalogue change, `membershipRevision` when places do, and `namesRevision` when a name does.
 - **Names, previews, labels, dates and excerpts are the core's** (`Item.name`, `Item.displayTitle`, `Marfa.ItemDate`); `title` is only what the app writes. The app parses and filters none. Relationship names are Marfa's (`EdgeType.label`), never reworded.
@@ -61,13 +61,14 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 - **`Model/Telemetry/` is the one place for logs and signposts** (`Telemetry.logger(_:)`). Never make a `Logger`, because its privacy rules would be its own.
 - **Never log a person's text, titles, property values or keys.** Log kinds, durations and counts, with `privacy: .public` for those alone. A message that may quote text keeps the default privacy.
 - **Reports leave only through `Telemetry+Reports.swift`,** a closed list over `Reporting`. A report holds fixed words, numbers and flags: no text, id, title, server address, path or error message. `Reporting.Gate` keeps tests and previews from reporting.
-- **Every alert to the person goes through `Notices`** (`tell`, `notKept`). A change not kept goes to the clipboard the first time it is shown.
+- **Every alert to the person goes through `Notices`** (`tell`, `notKept`). A change not kept goes to the clipboard the first time it is shown, and is never written over before the person answers.
 
 ## Code Review Rules
 
 - **Named type.** Flag a test for a type identifier, or a hard-coded label, field or behavior for a type, outside the list under Types.
 - **Library type leaks.** Flag a view, command or editor change that names `MarfaLibrary` outside a preview, offers Delete Immediately without `reachesServer`, or names an SF Symbol for a type. `TypeGlyph` draws `Catalogue.icon(for:)`.
 - **Folder as a place.** Flag a folder as a sidebar place, a move between folders, or a folder the app syncs itself. A folder is a fact on an item.
+- **Fallback library.** Flag anything but the connect, waiting or failure page while no server's copy is open.
 - **Unflushed switch.** Flag a change of library, a quit or a window's close (`EditorCloseDelegate`) that goes ahead without its flush.
 - **Picture fetched another way.** Flag a web picture that skips `WebPictures.answer`, `PictureFetcher` or the check at each redirect.
 - **Person's text logged or reported.** Flag a log, signpost or report that carries text, a title, an item's id, a key or an error's message as public.

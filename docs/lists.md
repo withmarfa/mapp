@@ -95,4 +95,4 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 - **A search is narrowed in the query, never after it** (`SearchNarrowing`), because Marfa limits how many it answers, and a limit counted first would hide matches. More conditions than a query takes are refused and named.
 - **What a search leaves out is said** (`SearchLeaveOuts`), with a way to include it.
-- **A search is sorted by relevance until the person sorts it.**
+- **A search in the list and in Items is sorted by relevance until the person sorts it.** The gallery and the table keep their own sorts until relevance is picked (`Browser.ordersByRelevance`).

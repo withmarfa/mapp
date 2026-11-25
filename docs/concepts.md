@@ -41,7 +41,7 @@ The server one person owns, and the source of every item the app shows.
 
 **In the app:** a row, a card, an entry, a pin on a map or a block on a calendar, and a page when opened. It looks different by layout, never by the place it was opened from.
 
-- **One command, everywhere.** Keep, Move to Feed, Archive, Delete, Favorite, Add Tag, Add to Collection and Change Type are the same command in a row's menu, a page's More menu, the menu bar, the palette and the bar for several items.
+- **One command, everywhere.** Keep, Move to Feed, Archive, Delete, Favorite, Add Tag, Add to Collection and Change Type are the same command in a row's menu, a page's More menu, the menu bar, the palette and the capsule for several items.
 - **What a person may change does not depend on who keeps the item.** Library, Feed, Archive, Delete, Favorite, tags, collections and links work on an item its connector keeps and on an archived item.
 - **On a read-only item the title, text and fields are locked**, and the page gives the reason. Read-only is Marfa's advice to apps, not a wall.
 

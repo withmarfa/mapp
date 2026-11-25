@@ -32,7 +32,7 @@ A macOS app for a Marfa server's items. It works only through the `marfa-swift` 
 ## Working here
 
 - Say "note" only for a `core.note`'s text, a type's name or the Note callout.
-- Use American English. Put no time estimates, absolute paths, machine or account names or credentials in files: they are public. A comment says only why.
+- Use American English. Put no time estimates, absolute paths, machine or account names or credentials in files. A comment says only why.
 - Use scoped lowercase Conventional Commits in the present tense: `feat(app):`, `fix(editor):`.
 - Work in `.claude/worktrees/`. `.agents/skills/land-a-pull-request/SKILL.md` says what to run and how to merge; the folders' `AGENTS.md` files have the commands.
 - Keep no shims, aliases or migration paths.
@@ -41,13 +41,13 @@ A macOS app for a Marfa server's items. It works only through the `marfa-swift` 
 
 - Target macOS 27 and Xcode 27 only, with no `#available` checks.
 - Use SwiftUI's native containers and controls, and AppKit only where SwiftUI cannot.
-- Every user-facing string goes through the String Catalog. After an `xcodebuild` build, `Scripts/sync-strings.sh <derived data>` updates it, as Xcode does itself.
+- Every user-facing string goes through the String Catalog. After an `xcodebuild` build, run `Scripts/sync-strings.sh <derived data>`.
 - The app is not sandboxed. Release keeps the hardened runtime with no exceptions. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting`, the plugins release reader (`PluginRelease`) and Sparkle may connect out. Neither the item page nor a sealed web page loads from the network itself.
 
 ## Data rules
 
 - Never drop or silently overwrite a person's text. A write that cannot be kept where meant is kept where the person can get it back (a conflicted copy, the queue, the clipboard) and the person is told.
-- An item's Markdown text is held byte for byte. An edit keeps the text of every block it did not reach.
+- An item's Markdown text is held byte for byte. Opened and left alone, it is never rewritten; an edit keeps the text of every block it did not reach.
 - Views, commands and the editor reach a library only through `ItemLibrary`, read from the environment's `library` value, and name items by `ItemID`, never by path.
 - This app's settings sync through the connected Marfa (`PreferencesSync`), but for what `PreferencesMap.staysOnMac` names.
 

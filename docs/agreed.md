@@ -37,7 +37,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Library | Lists active library items in the one table every place uses, with a row of views and, at its end, Types, Collections, Sources and Archive. Its first view is named All. It opens as a table, and as a list with ten items or fewer. Its off-main arrangement of rows (`ItemIndexModel`) moves into the shared list and is not lost. | `ItemsIndex.swift`, `IndexPage.swift`, `ItemTable.swift` | `Rethink-Library`, `Rethink-Library-New`, `Rethink-Library-Heavy` |
 | Types | A table of Name (nested), Items, Views, Made By, Latest. Its row menu has Open, Open in New Window, New, New View…, Add to Sidebar, Copy Link, Edit Type…. Made By waits for the package to give a type's provenance, and Copy Link for a link form (`ItemLinkRoute` has only items). | `SidebarIndex.swift`, `ItemLinkRoute` | `Rethink-Types`, `Rethink-Types-Ordinary`, `Rethink-Types-Agents` |
 | Collections | Name, Items, Source, Edited. The tabs, the source filter and the index's sidebar go. A collection can be archived, and cannot be moved to the Feed. | `SidebarIndex.swift`, `IndexInspector.swift` | `Rethink-Collections`, `Rethink-Collections-Full` |
-| Sources | Name, Items, Latest, and the types a source writes as marks and names, three and a count. Its page's panel has the facts. **Waits for Marfa:** a source's Kind, and where its new items go; the main window makes no owner calls. | `SidebarIndex.swift`, `SourceLook.swift` | `Rethink-Sources`, `Rethink-Sources-Full`, `Rethink-Source`, `Rethink-Sources-Waiting` |
+| Sources | Name, Items, Latest, and the types a source writes as marks and names, three and a count. Its page's panel has the facts. A source's Kind can be read by any app today: `GET /plugins` names each connector's source and the direction of its kinds, and an app's source starts with `oauth:`. Only New Items Go To waits, because it needs the owner's permission and the main window makes no owner calls. | `SidebarIndex.swift`, `SourceLook.swift` | `Rethink-Sources`, `Rethink-Sources-Full`, `Rethink-Source`, `Rethink-Sources-Waiting` |
 | Index pages go | The tabs, the New tiles, the index's own toolbar and filters. | `IndexPage.swift`, `NewTiles.swift`, `IndexToolbar.swift` | `Rethink-Library` |
 | A type counts its kinds | A type's place lists and counts its own items and its kinds' items. There is one count, the same beside its title, in the sidebar and in Types. Include Kinds is a switch in the View panel's Types. | `MarfaItemIndex`, `IncludeSubtypes.swift` | `Rethink-Types`, `Rethink-View-Types` |
 
@@ -76,7 +76,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The capsule | Glass controls at the foot of the window, all symbols: Keep first in the Feed, Archive, Add Tag, Add to Collection, Change Type, More, and Delete last, apart. The count is the control that lets go. Beside a list, the same stands under the pile of cards in the page's column. | `MainView.swift`, `ItemActions.swift` | `Rethink-Selection-Capsule-Table`, `Rethink-Selection-Capsule-List`, `Rethink-Selection-Options` |
+| The capsule | Several chosen items are one capsule of symbols at the foot of the window, in glass: Keep leads in the Feed, then Archive, Add Tag, Add to Collection, Change Type and More, and Delete stands apart at the end. The count is the control that lets them go. Beside a list, the same stands under the pile of cards in the page's column. | `MainView.swift`, `ItemActions.swift` | `Rethink-Selection-Capsule-Table`, `Rethink-Selection-Capsule-List`, `Rethink-Selection-Options`, `Rethink-Selection-States` |
 | Undo | Each Keep, move, archive, link and new row is one undo, however many items. | `StepUndo`, `ItemWrite` | `Rethink-Archive-Toast` |
 
 ## Layouts
@@ -133,7 +133,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | In place | A table's last row, a board lane's plus, a calendar's drag. The item stays where it was typed until the row is left. In a nested table it is top-level; in a grouped one it joins the group under the pointer, or the first. Escape drops an empty row and keeps typed text; leaving adds. | `ItemTable.swift`, `ItemBoard.swift`, `CalendarWeekView.swift` | `Rethink-New-In-Table`, `Rethink-New-In-Board`, `Rethink-New-In-Calendar` |
 | From any app | The same panel in the screen's upper third, with a drop of files. | `QuickAddPanel.swift` | `Rethink-New-Anywhere`, `Rethink-New-Drop` |
 | New Opens | A setting, One Line or the text form. | `PreferencesMap` | `Rethink-New-Line` |
-| Tint on the chosen type | The type being given to an item, and no other, has a tinted chip. Appearance sets Tinted (the default) or Gray. | `PageChip`, `ChipLooks` | `Rethink-Tinted-Chip` |
+| Tint on the chosen type | A tint is the default for the type being given to an item, and for no other chip. A setting in Appearance chooses Tinted or Gray. | `PageChip`, `ChipLooks` | `Rethink-Tinted-Chip` |
 
 ## The item's page
 
@@ -154,7 +154,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The panel | White, closed by default, with pills: Outline, Links, Info. It remembers the pill for each type. One part has no pills. The boards say About where the app says Info. | `ItemInspector.swift` | `Rethink-Panel-Sizes`, `Rethink-Task-Page` |
+| The panel | White, closed by default, with pills: Outline, Links, Info. It remembers the pill for each type. One part has no pills. | `ItemInspector.swift` | `Rethink-Panel-Sizes`, `Rethink-Task-Page` |
 | Outline | Reading Time and Words, or a PDF's Pages, then the headings. | `ItemInspectorRows.swift` | `Rethink-Long-Page`, `Rethink-PDF` |
 | Links | In Collection, Referenced By, Links in the Text, Excerpts, Thread, Attachments. | `ItemRelationships.swift` | `Rethink-Highlight`, `Rethink-Message` |
 | Info | Source, version, created, edited, a file's facts, In, Leaves the Feed, who keeps it, History. The history is asked for when Info shows. | `ItemInspectorFields.swift` | `Rethink-Feed-Page-In`, `Rethink-Kept-By` |
@@ -226,4 +226,4 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Drag onto a collection | A drop on a collection's row in the sidebar adds the items. Nothing else takes a drop there, and nothing springs open. | `SidebarGroups.swift` | `Rethink-Drag-To-Collection` |
 | Board lanes | Lanes are dragged into an order. | `ItemBoard.swift` | – |
 | Edit the type | A field's menu opens the type in Settings. | `FieldMenu` | – |
-| Settings' parts | A type's Strict and Keep Versions, and a connector's Files row in its mapping. The first two need an owner permission and a drawn control; the last **waits for Marfa.** | `MarfaMac/Settings/Marfa/` | – |
+| Settings' parts | A connector's Files row in its mapping. **Waits for Marfa.** | `MarfaMac/Settings/Marfa/` | – |
