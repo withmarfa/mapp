@@ -33,7 +33,7 @@ struct WindowRestorationTests {
         let notes = items(1_000)
         let library = FakeItemLibrary(items: notes)
         let saved = Browser()
-        saved.show(.feed, in: library, order: ItemOrder())
+        saved.show(.type(TypeID("core.note")), in: library, order: ItemOrder())
         saved.selection = Set(notes.map(\.id))
         let restored = Browser()
         restored.restore(saved.snapshot(), in: library, order: ItemOrder())
@@ -70,7 +70,7 @@ struct WindowBringBackTests {
 
     @Test func aWindowKeptBeforeTheseThingsWereKeptStillOpens() throws {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
-        var snapshot = Browser.Snapshot(place: .library, selection: [newer.id])
+        var snapshot = Browser.Snapshot(place: .feed, selection: [newer.id])
         snapshot.opensItem = nil
         let data = try JSONEncoder().encode(snapshot)
         let back = Browser()

@@ -461,15 +461,16 @@ struct ViewDraftTests {
     }
 
     @Test func aSubtypeChosenInATypesPlaceReplacesThePlacesOwnTypeTerms() throws {
-        // A place of a type with subtypes saves its own items; the window filtered to a subtype shows that subtype's.
-        let place = try #require(ViewDraft.query(for: .type(TypeID("aic.ticket")), catalogue: Self.catalogue, views: []))
+        // A type's place with its kinds left out saves its own items; the window filtered to a kind shows that kind's.
+        let own = PlaceListing(includesKinds: false)
+        let place = try #require(ViewDraft.query(for: .type(TypeID("aic.ticket")), listing: own, catalogue: Self.catalogue, views: []))
         #expect(place.filter == #"type eq "aic.ticket""#)
         let sub = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket.task"]])))
         #expect(sub.query.types == [Self.ticketTask])
         #expect(sub.query.filter == nil)
         #expect(sub.unkept.isEmpty)
         // The parent alone is the place's own items already.
-        let parent = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket"]])))
+        let parent = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket"]], listing: own)))
         #expect(parent.query == place)
         // Another type with its own subtypes is exact, and the place's terms are replaced.
         let other = try #require(Self.draft(Self.window(.type(TypeID("core.task")), filters: ["type": ["aic.ticket"]])))

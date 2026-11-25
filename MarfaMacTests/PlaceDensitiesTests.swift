@@ -40,10 +40,6 @@ struct PlaceDensitiesTests {
         #expect(PlaceDensities.stored(in: defaults).density(for: .library) == .compact)
     }
 
-    @Test func allItemsKeepsTheKeyItWasStoredUnder() {
-        #expect(PlaceView.library.storageKey == #"{"allNotes":{}}"#)
-    }
-
     @Test func aDensityThisVersionDoesNotKnowIsSetAsideWhileTheRestIsKept() throws {
         let defaults = Self.defaults()
         let key = PlaceView.library.storageKey

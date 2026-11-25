@@ -117,7 +117,7 @@ import Testing
 
     @Test func aValueTheSettingCannotStoreIsSkippedAndChangesNothing() async throws {
         defaults.set("dark", forKey: AppearanceKey.theme)
-        ViewOrders.update(in: defaults) { $0.set([.favorites, .own], in: .library) }
+        ViewOrders.update(in: defaults) { $0.set([.favorites, .own], in: .library); $0.set([.own], in: .feed) }
         let sync = sync()
         let before = held(sync)
         var units = before
