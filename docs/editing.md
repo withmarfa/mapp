@@ -7,6 +7,8 @@ paths:
   - MarfaMac/Views/NewItem*.swift
   - MarfaMac/Model/Items/TypeChange*.swift
   - MarfaMac/Model/Items/ItemWrite*.swift
+  - MarfaMac/Model/FileImport.swift
+  - MarfaMac/Views/WindowFiles.swift
 ---
 
 # Making and editing
@@ -38,23 +40,29 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 - **Keys:** Tab moves the kind, `#` a tag, `@` a parent, `/` a property. Rows offer the most recent first.
 - **Add (↩) keeps the line open with the same kind,** with an Undo. ⌘↩ adds and opens; ⇧↩ opens the text form.
-- **Words stay in the title until Add or ⇧↩,** which take out what was read (`QuickAdd.finishLine`). Chips show what is read (`QuickAdd.lineChips`); the board draws words leaving.
+- **Words stay in the title until Add or ⇧↩ take out what was read** (`QuickAdd.finishLine`); chips show it (`QuickAdd.lineChips`).
 - **Delete on a chip stops it being read** (`QuickAdd.Draft.decline`). An offer chosen for a typed word keeps the word (`QuickAdd.Mark`).
-- **A tag is `#` and a letter at a word's start** (`NewItemText.tags`). Favorite, reserved tags and `Issue #12` are never read; Return alone never swaps them for another tag.
-- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), in the person's locale: `27/11` or `Fri 27 Nov` in Britain.
+- **A tag is `#` and a letter at a word's start** (`NewItemText.tags`); reserved tags are never read.
+- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), in the person's locale.
 - **A web address pasted into an empty line makes a bookmark** (`QuickAdd.bookmarkKind`).
 - **A kind change keeps the title and sets aside values it cannot hold** (`QuickAdd.tellSetAside`).
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps each new item not added through a closed window, a quit and a refusal. A slot is `Slot.line` or `Slot.inPlace(_:)`; a library is its instance (`serverKey`). New Item waits for it (`QuickAdd.isAvailable`).
+`NewItemDrafts` keeps each new item not added through a closed window, a quit and a refusal, by slot (`Slot.line`, `Slot.inPlace(_:)`) and instance (`serverKey`).
 
 | Call | Does |
 | --- | --- |
 | `make(_:_:in:)`, `take(_:in:)` | Start or claim a draft, never shared |
 | `update(_:_:)`, `escape(_:)` | Keep what was typed; drop an empty draft |
-| `sending(_:as:)`, `settle(in:)` | Write the item's ID first, or make nothing. Hide the draft until Marfa accepts or refuses it (`ItemLibrary.refusedCreates`), even after its row shows |
+| `sending(_:as:)`, `settle(in:)` | Write the item's ID first; hide the draft until Marfa answers (`ItemLibrary.refusedCreates`) |
 | `release(_:)`, `drop(_:)` | The holder went, or the person cleared it |
+
+### Dropping
+
+- **Files dropped on a list join the place in view** (`Browser.fileDropTarget`): a collection, the Feed, else the Library.
+- **A collection's row, card or sidebar row takes items and files** (`dropsInto`).
+- **A drop is one undo step and one toast;** Undo unlinks, then moves them to Recently Deleted.
 
 ## Changing type
 

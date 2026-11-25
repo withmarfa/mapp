@@ -2,62 +2,67 @@ import Foundation
 import Observation
 
 extension Browser {
-    /// Where an import puts what it adds, fixed when the files are dropped, since the person may move on while they
-    /// are read and sent.
-    struct ImportDestination {
-        /// The place the files were dropped in, which decides their tier (the Feed is the feed tier).
-        let place: PlaceView
-        /// The collection the items join: the one dropped on, else the one the window showed.
-        let collection: ItemID?
-        /// Whether the drop was on a collection, rather than on the window.
-        let isOnCollection: Bool
-    }
-
-    /// The destination for files dropped now, on the collection `collection` when there is one.
-    func importDestination(into collection: ItemID? = nil) -> ImportDestination {
-        ImportDestination(place: shown, collection: collection ?? shownCollection, isOnCollection: collection != nil)
-    }
-
-    /// The one way files from outside become items: dropped from Finder on the list, the sidebar or the window, dropped
-    /// on a collection, or taken from a nearby device. Each file is added as an item of its own, of the type its kind
-    /// calls for (as the new item's file is), in the place the window showed when they were dropped (`destination`,
-    /// which is that place when none is given). Where that was a collection, or the drop was on one, the items join
-    /// it. A file that cannot be read, and one the library refuses, are told, and the rest are still added. The files
-    /// are written to `library` whatever the window does meanwhile, since a write there is safe and a drop cut short
-    /// would lose the rest; only the window's own steps (selecting what was added, revealing it) stop once the window
-    /// has changed library, and once the person has moved to another place their selection is left alone. Returns the
-    /// items made.
+    /// The one way files from outside become items: dropped from Finder on a list or on a collection's row or card, or
+    /// taken from a nearby device. Each file is added as an item of its own, of the type its kind calls for (as quick
+    /// add's file is), where `target` says, which is the place the window showed when they were dropped when none is
+    /// given. Where that is a collection, the items join it. A folder, a file that cannot be read and one the library
+    /// refuses are told, and the rest are still added; a file named twice is added once. The drop is one undo step
+    /// and one toast, made once the library holds what was added. Where it does not within `waiting`, the toast has no
+    /// Undo, the items it holds are still joined to the collection, and the person is told. The files are written to `library` whatever the window does meanwhile, since a write there is
+    /// safe and a drop cut short would lose the rest; only the window's own steps (selecting what was added,
+    /// revealing it) stop once the window has changed library, and once the person has moved to another place their
+    /// selection is left alone. Returns the items made.
     @discardableResult
     func importFiles(
-        _ urls: [URL], unreadable: Int = 0, into collection: ItemID? = nil, destination: ImportDestination? = nil,
-        in library: any ItemLibrary, order: ItemOrder, undoManager: UndoManager?
+        _ urls: [URL], unreadable: Int = 0, to target: FileDropTarget? = nil,
+        in library: any ItemLibrary, order: ItemOrder, undoManager: UndoManager?, toasts: ToastPresenter? = nil,
+        waiting: Duration = .seconds(10)
     ) async -> [ItemID] {
-        let destination = destination ?? importDestination(into: collection)
+        let target = target ?? fileDropTarget(in: library)
         var files: [QuickAdd.File] = []
         var notRead: [String] = []
         for url in urls {
-            if let file = QuickAdd.File(url) { files.append(file) } else { notRead.append("“\(url.lastPathComponent)”") }
+            if let file = QuickAdd.File(url) {
+                if !files.contains(file) { files.append(file) }
+            } else {
+                notRead.append("“\(url.lastPathComponent)”")
+            }
         }
         QuickAdd.File.tellUnreadable(notRead, unreadable: unreadable, to: library.notices)
         var added: [ItemID] = []
         for file in files {
-            if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: destination.place.place), tags: []) { added.append(id) }
+            if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: target.place), tags: []) { added.append(id) }
         }
         guard !added.isEmpty else { return [] }
+        // A drop is told, joined and given its Undo only for what the library holds: a source that has not shown an
+        // item cannot move it to Recently Deleted or give it an edge.
+        let holdsAll = await library.waitUntilHolding(added, within: waiting)
+        let held = added.filter { library.item($0) != nil }
+        let undoManager = holdsAll ? undoManager : nil
+        let run = DropStep(undoManager)
+        // Registered first, so Undo takes the items out of the collection before it trashes them, and Redo restores
+        // them before it joins them again: a source refuses an edge write on an item in the bin.
+        if holdsAll { registerUndoOfAdding(added, in: library, undoManager: undoManager) }
         var joined = false
-        if let target = destination.collection {
-            await library.waitUntilHolding(added)
-            joined = library.addToCollection(Set(added.filter { library.item($0) != nil }), target, undoManager: undoManager)
+        if let collection = target.collection, !held.isEmpty {
+            joined = library.addToCollection(Set(held), collection, undoManager: undoManager)
         }
-        guard isShowing(library), shown.isSame(destination.place) else { return added }
+        let step = run.finish(named: String(localized: "Add Files"))
+        if !holdsAll {
+            library.notices.tell(
+                String(localized: "Drop Can’t Be Undone"),
+                String(localized: "\(added.count - held.count) of the \(added.count) files added have not reached the library yet, so this drop has no Undo."))
+        }
+        let asked = files.count + notRead.count + unreadable
+        let leftOut = target.collection == nil ? 0 : added.count - (joined ? held.count : 0)
+        say(addedMessage(added.count, of: asked, to: target.isOnCollection ? target.name : nil, leftOut: leftOut, from: target.name),
+            symbol: "arrow.down.doc", step: step, toasts: toasts)
+        guard isShowing(library), shown.isSame(target.shown), let first = held.first else { return added }
         let listed = Set(placeItems(in: library).map(\.id))
-        if (joined && destination.collection == shownCollection) || added.allSatisfy(listed.contains) {
-            selection = Set(added)
-        } else if !destination.isOnCollection {
-            await library.waitUntilHolding(added)
-            if isShowing(library), shown.isSame(destination.place), let first = library.item(added[0]) {
-                reveal(first, in: library, order: order)
-            }
+        if (joined && target.collection == shownCollection) || held.allSatisfy(listed.contains) {
+            selection = Set(held)
+        } else if !target.isOnCollection, let item = library.item(first) {
+            reveal(item, in: library, order: order)
         }
         return added
     }
@@ -65,17 +70,36 @@ extension Browser {
     /// Imports what a drop or a nearby device handed over, through `FileIntake`, then removes any copy made of it.
     /// Where the files go is fixed now, before the providers are read.
     func importProviders(
-        _ providers: [NSItemProvider], into collection: ItemID? = nil, in library: any ItemLibrary, order: ItemOrder,
-        undoManager: UndoManager?
+        _ providers: [NSItemProvider], to target: FileDropTarget? = nil, in library: any ItemLibrary, order: ItemOrder,
+        undoManager: UndoManager?, toasts: ToastPresenter?
     ) {
-        let destination = importDestination(into: collection)
+        let target = target ?? fileDropTarget(in: library)
         Task {
             let gathered = await FileIntake.files(from: providers)
             await importFiles(
-                gathered.urls, unreadable: gathered.unreadable, destination: destination, in: library, order: order,
-                undoManager: undoManager)
+                gathered.urls, unreadable: gathered.unreadable, to: target, in: library, order: order,
+                undoManager: undoManager, toasts: toasts)
             gathered.remove()
         }
+    }
+
+    /// Takes the added items back to Recently Deleted, as one step of the undo manager; its redo restores them.
+    private func registerUndoOfAdding(_ ids: [ItemID], in library: any ItemLibrary, undoManager: UndoManager?) {
+        guard let undoManager else { return }
+        undoManager.registerUndo(withTarget: self) { [weak library, weak undoManager] _ in
+            MainActor.assumeIsolated { library?.delete(Set(ids), undoManager: undoManager) }
+        }
+    }
+
+    /// What the toast says of a drop: how many files were added, of how many asked for where some were not, and the
+    /// collection they joined where the drop was on one. Where `leftOut` of them did not join the collection, it
+    /// says so instead.
+    private func addedMessage(_ count: Int, of asked: Int, to collection: String?, leftOut: Int, from place: String) -> String {
+        let added = count == asked
+            ? AttributedString(localized: "^[Added \(count) File](inflect: true)").text
+            : String(localized: "Added \(count) of \(asked) Files")
+        if leftOut > 0 { return String(localized: "\(added), \(leftOut) not in \(place)") }
+        return collection.map { String(localized: "\(added) to \($0)") } ?? added
     }
 
     /// The collection the window shows.
@@ -86,9 +110,10 @@ extension Browser {
 
 extension ItemLibrary {
     /// Returns once the library holds every item in `ids`, which a library fed by a server does only when its source
-    /// says so, or when `limit` has passed.
-    func waitUntilHolding(_ ids: [ItemID], within limit: Duration = .seconds(10)) async {
-        guard ids.contains(where: { item($0) == nil }) else { return }
+    /// says so, or when `limit` has passed. Says whether it holds them all.
+    @discardableResult
+    func waitUntilHolding(_ ids: [ItemID], within limit: Duration = .seconds(10)) async -> Bool {
+        guard ids.contains(where: { item($0) == nil }) else { return true }
         let watcher = Task {
             for await isHeld in Observations({ ids.allSatisfy { self.item($0) != nil } }) where isHeld { return }
         }
@@ -98,5 +123,6 @@ extension ItemLibrary {
         }
         await watcher.value
         timeout.cancel()
+        return ids.allSatisfy { item($0) != nil }
     }
 }
