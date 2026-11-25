@@ -869,6 +869,16 @@
         }
       }
     },
+    "%lld changes made at another address for this Marfa are kept on this Mac in %@ and are sent the next time the app connects." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld changes made at another address for this Marfa are kept on this Mac in %2$@ and are sent the next time the app connects."
+          }
+        }
+      }
+    },
     "%lld changes need attention" : {
       "localizations" : {
         "en" : {
@@ -3421,6 +3431,9 @@
     "Changes Haven’t Been Sent" : {
       "extractionState" : "manual"
     },
+    "Changes Still Waiting" : {
+
+    },
     "Changes not yet sent are kept." : {
 
     },
@@ -3564,9 +3577,6 @@
 
     },
     "Choose it in Runs next time, or remove it in Terminal with %@." : {
-
-    },
-    "Choose one item to read or edit it." : {
 
     },
     "Choose the machine that runs %@ to see one." : {

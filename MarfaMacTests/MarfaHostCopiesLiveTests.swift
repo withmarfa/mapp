@@ -44,13 +44,13 @@ extension LiveMarfaTests {
         ) async throws {
             let (bareFolder, explicitFolder) = folders
             #expect(bench.location.directory(for: bare).lastPathComponent == bareFolder)
-            #expect(bench.location.directory(for: explicit).lastPathComponent == bareFolder, "either spelling finds the same copy")
 
             let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
             bench.signIns.save(key, for: bare.address)
             try await host.connect(address: bare.address.absoluteString, key: key)
             let source = try #require(host.source as? MarfaSource)
             #expect(bench.location.store(for: bare) == bench.location.store(in: bareFolder))
+            #expect(bench.location.directory(for: explicit).lastPathComponent == bareFolder, "either spelling now opens the same copy")
             let instance = try #require(await source.instanceID())
             #expect(host.libraryKey(for: bare) == "marfa:\(instance)")
             #expect(host.libraryKey(for: explicit) == host.libraryKey(for: bare))
