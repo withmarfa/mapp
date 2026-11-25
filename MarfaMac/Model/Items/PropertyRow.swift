@@ -1,9 +1,9 @@
 import Foundation
 import Marfa
 
-/// One row of the property block an item's page draws under its title, or one pin above it: the label and a value
-/// drawn by the kind of field it came from. A row the item can take an edit for (`editable`) opens its editor under
-/// the value, as the status and the parent keep their menus; every other value is edited in the inspector.
+/// One row of an item's head, or one pin above it: the label and a value drawn by the kind of field it came from. A row
+/// the item can take an edit for (`editable`) opens its editor under the value, as the status and the parent keep their
+/// menus. `PageHead` decides which rows show.
 nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// An item a row links to.
     struct Target: Hashable, Sendable {
@@ -18,14 +18,10 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     }
 
     enum Value: Hashable, Sendable {
-        /// The status pill, drawn by the page from the header's status menu.
+        /// The status pill, drawn by the page from the head's status menu. A status not set is `empty`.
         case status
         /// The parent's pill, drawn the same way. A pinned parent is `items`, a link that only opens it.
         case parent
-        /// The name of the item's type, drawn as the type's chip: its mark and tint come from its icon.
-        case type(String, icon: String?)
-        /// What the item came from, by the name the library gives its source.
-        case source(String)
         case items([Target])
         /// The entries of a list of people, each by the name it goes by (`ListShape.personName`), drawn as the person chip.
         case people([String])
@@ -35,8 +31,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         case tags([String])
         /// A date or datetime as a person reads it.
         case date(String)
-        /// An event's first pin: when it happens, with its zone and how far off it is in the help.
-        case when(String, help: String)
+        /// An event's time, and after it in grey how far off it is, or All Day.
+        case when(String, note: String)
         case url(String)
         case email(String)
         /// A number to call.
@@ -44,8 +40,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         case boolean(Bool)
         /// Text, a choice's label or a number.
         case text(String)
-        /// A value the item does not have yet, drawn as the word Empty. It only opens the editor, so it is always
-        /// `editable`. The symbol is the one a value of the field's kind has.
+        /// A value the item does not have, drawn as the word Empty. The symbol is the one a value of the field's kind has.
         case empty(symbol: String)
 
         /// The SF Symbol that stands for the kind of value beside its label.
@@ -53,8 +48,6 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             switch self {
             case .status: "circle.dotted"
             case .parent: "square.stack"
-            case .type: "square.grid.2x2"
-            case .source: "dot.radiowaves.left.and.right"
             case .items: "link"
             case .people: "person.2"
             case .options: "list.bullet"
@@ -71,19 +64,19 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         }
 
         /// Every symbol a row can show, for a page that draws them as images.
-        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet", "person.2", "square.grid.2x2", "dot.radiowaves.left.and.right", "clock", ItemLocation.symbol]
+        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet", "person.2", "clock", ItemLocation.symbol]
     }
 
     let id: String
     let label: String
-    let value: Value
+    var value: Value
     /// The number to call the main entry of a list holds, where its list can hold one (`ListShape.numberToCall`).
     var numberToCall: String?
-    /// How many values of a list a pin left out, for the "+N more" after the first value (`PagePins.moreText`). Always
-    /// 0 in the property block.
+    /// How many values of a list a pin left out, for the "+N more" after the first value (`PageHead.moreText`). Always
+    /// 0 in the rows.
     var more = 0
-    /// The words of every value of a list a pin cut, joined as `wholeValue` joins them, so the pin's help and its
-    /// accessibility label name them all (`PagePins.capped`). Nil for any row that shows its whole value.
+    /// The words of the whole value, where the row shows less of it: a list a pin cut, or an event's time with its
+    /// zone. Nil for any row that shows its whole value.
     var help: String?
     /// Whether the value opens an editor under it, or for a yes or no flips: any value that can be edited, on an item
     /// that can take the edit. The app says so; the page never decides it.
@@ -94,77 +87,60 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     var optionTones: [TypeTone] = []
     /// The symbol beside the label where it is not the one the value's kind gives: a Location's pin, whose value is text.
     var symbol: String?
+    /// Text that may run to a second line before it is cut.
+    var long = false
+    /// Shown only once Show More is open (`PageHead`).
+    var folded = false
+    /// Hidden on the type's pages, so drawn grey under Show More.
+    var muted = false
 
     /// The symbol drawn beside the label.
     var symbolName: String { symbol ?? value.symbol }
 
-    /// The words of the row's value, for a pin's help and its accessibility label: every value of a list, even where the
-    /// pin shows only the first.
+    /// The words of the row's value, for its help and its accessibility label: every value of a list, even where a pin
+    /// shows only the first.
     var wholeValue: String {
         if let help { return help }
         switch value {
         case .status, .parent, .empty: return ""
-        case .type(let name, _): return name
         case .items(let targets): return targets.map(\.title).joined(separator: ", ")
         case .people(let words), .options(let words), .tags(let words): return words.joined(separator: ", ")
-        case .when(_, let help): return help
-        case .source(let text), .date(let text), .text(let text), .url(let text), .email(let text), .phone(let text): return text
+        case .when(let time, let note): return "\(time), \(note)"
+        case .date(let text), .text(let text), .url(let text), .email(let text), .phone(let text): return text
         case .boolean(let flag): return flag ? String(localized: "Yes") : String(localized: "No")
         }
     }
 
-    /// Whether the row is a value the item does not have yet.
+    /// Whether the row is a value the item does not have.
     var isEmpty: Bool {
         if case .empty = value { true } else { false }
     }
 
-    /// How many rows show before "Show N more".
-    static let foldAfter = 6
-
-    /// The rows to draw, and how many are left out until the block is expanded.
-    static func split(_ rows: [PropertyRow], expanded: Bool) -> (shown: ArraySlice<PropertyRow>, hidden: Int) {
-        guard !expanded, rows.count > foldAfter else { return (rows[...], 0) }
-        return (rows.prefix(foldAfter), rows.count - foldAfter)
-    }
-
-    /// A text value too long to read in a row belongs in the body or the inspector.
+    /// A text value too long to read in a list's row or a table's cell, which shows nothing for it.
     static let longestText = 120
 
-    /// The rows of the property block, in the order the person chose, else the order a person reads them: of the item's
-    /// `candidates`, those the person's `placement` shows, except `excluding`, which the page shows another way
-    /// (`PagePins.leftOutOfBlock`).
-    static func block(_ candidates: [PropertyRow], placement: PagePlacement, excluding: Set<String> = []) -> [PropertyRow] {
-        placement.ordered(candidates.filter { placement.showsOnPage($0.id) && !excluding.contains($0.id) }, id: \.id)
-    }
-
-    /// Every row the item could show, whatever the person chose, in the order a person reads them: its type, source
-    /// and last edit, the type's fields as the catalogue orders them, then the parent if the item has one, then the
-    /// item's other relationships, then its tags. A field shows only with a value, except the status, which always
-    /// shows where the type has one, since its pill is how a status is set from the page. The keys in `hidden` are what
-    /// the page shows elsewhere, such as the title and the text. With `offersEmpty`, an editable value the item does not
-    /// have yet is a row too, read as Empty, that opens its editor: that is the page's way to give a value to the
-    /// field, the parent and the tags. With `showsCoordinates`, the latitude and longitude are rows of their own beside the
-    /// Location that stands for them. Empty rows come after the others in each group, so the fold hides them first. The
-    /// block and the pins are both chosen from these.
+    /// Every row the item could show, whatever the person chose, in the order a person reads them: the type's fields as
+    /// the catalogue orders them, with the parent after the status (or first, where the type has no status), and one
+    /// Location for the latitude, the longitude and a name for the place; then the item's other relationships that link
+    /// to something; then its tags. A field, the parent or the tags with no value is a row too, read as Empty, which
+    /// opens its editor where the item can take the edit. The keys in `hidden` are what the page shows another way, such
+    /// as the title and the text. With `showsCoordinates`, the latitude and longitude are rows of their own beside the
+    /// Location that stands for them.
     static func candidates(
-        of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String, format: DateFormat,
-        tags: [String], typeLabel: String?, typeIcon: String?, sourceName: String?, now: Date, calendar: Calendar, locale: Locale,
-        offersEmpty: Bool = false, showsCoordinates: Bool = false, changesType: Bool? = nil, isPriority: (ItemTypeInfo.Field) -> Bool = { _ in false },
-        icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool
+        of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], format: DateFormat, tags: [String],
+        showsCoordinates: Bool = false, isPriority: (ItemTypeInfo.Field) -> Bool = { _ in false }, icon: (ItemID) -> String?,
+        isPerson: (ItemID) -> Bool
     ) -> [PropertyRow] {
-        var rows: [PropertyRow] = []
-        if let typeLabel {
-            rows.append(PropertyRow(id: PagePlacement.type, label: String(localized: "Type"), value: .type(typeLabel, icon: typeIcon), editable: changesType ?? item.allows(.type)))
-        }
-        if let source = (sourceName ?? item.source)?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
-            rows.append(PropertyRow(id: PagePlacement.source, label: String(localized: "Source"), value: .source(source)))
-        }
-        rows.append(PropertyRow(
-            id: PagePlacement.updated, label: String(localized: "Updated"),
-            value: .date(DateDisplay.text(of: item.modified, place: .list, format: format, now: now, calendar: calendar, locale: locale))))
+        let parentField = PagePlacement.parent
         var fields: [PropertyRow] = []
-        var empty: [PropertyRow] = []
-        let parent = relationships.contains { $0.field == parentField && !$0.targets.isEmpty }
+        let parentRow: PropertyRow? = {
+            if relationships.contains(where: { $0.field == parentField && !$0.targets.isEmpty }) {
+                let label = relationships.first { $0.field == parentField }?.label ?? String(localized: "Parent")
+                return PropertyRow(id: parentField, label: label, value: .parent)
+            }
+            guard let none = relationships.first(where: { $0.field == parentField }) else { return nil }
+            return PropertyRow(id: parentField, label: none.label, value: .empty(symbol: Value.parent.symbol), editable: item.allows(.links) && none.isEditable)
+        }()
         let status = type?.statusField
         let location = ItemLocation.of(type)
         let owned = location?.ownedKeys(showingCoordinates: showsCoordinates) ?? []
@@ -172,37 +148,37 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         for field in type?.fields ?? [] where !hidden.contains(field.key) {
             if let location, location.keys.contains(field.key) {
                 // One row stands for the point and its name, where the first of them is.
-                if !locationDrawn, let row = location.row(of: item, offersEmpty: offersEmpty) {
-                    if row.isEmpty { empty.append(row) } else { fields.append(row) }
-                }
+                if !locationDrawn { fields.append(location.row(of: item)) }
                 locationDrawn = true
                 if owned.contains(field.key) { continue }
             }
+            let edits = item.allows(.fields) && isEdited(field)
             if field.key == status?.key {
-                fields.append(PropertyRow(id: field.key, label: field.label, value: .status))
-                if parent { fields.append(parentRow(relationships, parentField)) }
-            } else if let value = value(of: field, in: item, format: format) {
-                fields.append(PropertyRow(
-                    id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item),
-                    editable: item.allows(.fields) && isEdited(field),
-                    optionTones: optionTones(of: field, in: item, isPriority: isPriority(field))))
-            } else if offersEmpty, item.allows(.fields), isEdited(field), !InspectorFields.hasValue(item.value(of: field.key)) {
-                empty.append(PropertyRow(id: field.key, label: field.label, value: .empty(symbol: symbol(of: field)), editable: true))
+                let set = item.value(of: field.key)?.string.map { !$0.isEmpty } ?? false
+                fields.append(set
+                    ? PropertyRow(id: field.key, label: field.label, value: .status)
+                    : PropertyRow(id: field.key, label: field.label, value: .empty(symbol: Value.status.symbol), editable: edits && field.isPicked))
+                if let parentRow { fields.append(parentRow) }
+            } else if let value = value(of: field, in: item, format: format, long: true) {
+                var row = PropertyRow(
+                    id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item), editable: edits,
+                    optionTones: optionTones(of: field, in: item, isPriority: isPriority(field)))
+                if case .text(let text) = value { row.long = text.count > longestText || text.contains(where: \.isNewline) }
+                // A number to call opens the phone, as an address opens its page.
+                if let number = row.numberToCall { row.value = .phone(number) }
+                fields.append(row)
+            } else if !InspectorFields.hasValue(item.value(of: field.key)) {
+                fields.append(PropertyRow(id: field.key, label: field.label, value: .empty(symbol: symbol(of: field)), editable: edits))
             }
         }
-        if parent, !fields.contains(where: { $0.value == .parent }) { fields.insert(parentRow(relationships, parentField), at: 0) }
-        if offersEmpty, !parent, item.allows(.links), let none = relationships.first(where: { $0.field == parentField && $0.isEditable }) {
-            empty.append(PropertyRow(id: parentField, label: none.label, value: .empty(symbol: "square.stack"), editable: true))
-        }
-        rows += fields + empty
+        if let parentRow, !fields.contains(where: { $0.id == parentField }) { fields.insert(parentRow, at: 0) }
+        var rows = fields
         for relationship in relationships where !relationship.field.hasPrefix("inverse:") && relationship.field != parentField {
             if let row = linkRow(relationship, icon: icon, isPerson: isPerson) { rows.append(row) }
         }
-        if !tags.isEmpty {
-            rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags), editable: item.allows(.tags)))
-        } else if offersEmpty, item.allows(.tags) {
-            rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .empty(symbol: "tag"), editable: true))
-        }
+        rows.append(tags.isEmpty
+            ? PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .empty(symbol: "tag"), editable: item.allows(.tags))
+            : PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags), editable: item.allows(.tags)))
         return rows
     }
 
@@ -236,11 +212,6 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         return targets.isEmpty ? nil : PropertyRow(id: relationship.field, label: relationship.label, value: .items(targets), editable: edits)
     }
 
-    private static func parentRow(_ relationships: [ItemRelationship], _ field: String) -> PropertyRow {
-        let label = relationships.first { $0.field == field }?.label ?? String(localized: "Parent")
-        return PropertyRow(id: field, label: label, value: .parent)
-    }
-
     /// The number to call a list field's main entry holds, or nil.
     static func numberToCall(of field: ItemTypeInfo.Field, in item: Item) -> String? {
         guard case .list(let shape) = field.kind, let main = ListEntries.main(of: item.value(of: field.key)) else { return nil }
@@ -256,8 +227,10 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         }
     }
 
-    /// The value a field's row draws, or nil where the field has none or holds something a row does not show.
-    static func value(of field: ItemTypeInfo.Field, in item: Item, format: DateFormat) -> Value? {
+    /// The value a field's row draws, or nil where the field has none or holds something a row does not show. Text
+    /// longer than `longestText` or of more than one line is left out of a list's row and a table's cell, and shown by a
+    /// page's head (`long`), which cuts it after two lines.
+    static func value(of field: ItemTypeInfo.Field, in item: Item, format: DateFormat, long: Bool = false) -> Value? {
         guard let stored = item.value(of: field.key), InspectorFields.hasValue(stored) else { return nil }
         switch (field.kind, stored) {
         case (.list(let shape), .array(let entries)):
@@ -277,7 +250,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if field.format == .url { return .url(text) }
             if field.format == .email { return .email(text) }
-            guard !text.contains(where: \.isNewline), text.count <= longestText else { return nil }
+            guard long || (!text.contains(where: \.isNewline) && text.count <= longestText) else { return nil }
             return .text(text)
         case (_, .array(let values)):
             let words = values.compactMap(\.string).filter { !$0.isEmpty }
@@ -311,39 +284,24 @@ nonisolated struct LinkedItem: Hashable, Sendable, Encodable {
         try container.encode(date, forKey: .date)
     }
 
-    /// Which of the items that point at a collection a list holds: a collection's members are its contents, and
-    /// every other link to it is a plain link to it.
-    enum Members {
-        case all, only, excluding
-
-        fileprivate func admits(_ field: String) -> Bool {
-            let isMembership = field == "inverse:" + MarfaMapping.collectionEdge
-            switch self {
-            case .all: return true
-            case .only: return isMembership
-            case .excluding: return !isMembership
-            }
-        }
-    }
-
     /// The active items that hold a link to `id` in any relationship the library reads (the inverse ones), once
     /// each, the most recently edited first.
     static func list(
         pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date, format: DateFormat,
-        members: Members = .all, item: (ItemID) -> Item?, calendar: Calendar = .current, locale: Locale = .current
+        item: (ItemID) -> Item?, calendar: Calendar = .current, locale: Locale = .current
     ) -> [LinkedItem] {
         Cost.measure(.linkedItems) {
-            find(pointingTo: id, in: relationships, catalogue: catalogue, now: now, format: format, members: members, item: item, calendar: calendar, locale: locale)
+            find(pointingTo: id, in: relationships, catalogue: catalogue, now: now, format: format, item: item, calendar: calendar, locale: locale)
         }
     }
 
     private static func find(
         pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date, format: DateFormat,
-        members: Members, item: (ItemID) -> Item?, calendar: Calendar, locale: Locale
+        item: (ItemID) -> Item?, calendar: Calendar, locale: Locale
     ) -> [LinkedItem] {
         var seen: Set<ItemID> = [id]
         var found: [Item] = []
-        for relationship in relationships where relationship.field.hasPrefix("inverse:") && members.admits(relationship.field) {
+        for relationship in relationships where relationship.field.hasPrefix("inverse:") {
             for target in relationship.targets {
                 guard let other = target.itemID, !target.isDeleted, let held = item(other), held.state == .active,
                       seen.insert(other).inserted else { continue }

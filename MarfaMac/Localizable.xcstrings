@@ -4,6 +4,16 @@
     "" : {
 
     },
+    "%@  %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@  %2$@"
+          }
+        }
+      }
+    },
     "%@ %@" : {
       "localizations" : {
         "en" : {
@@ -366,6 +376,16 @@
     "%@ now comes from a plugin or from Marfa, so it wasn’t deleted." : {
 
     },
+    "%@ of %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@"
+          }
+        }
+      }
+    },
     "%@ of %@ selected" : {
 
     },
@@ -468,6 +488,17 @@
     "%@ you make show here." : {
 
     },
+    "%@ × %@" : {
+      "comment" : "A picture's width and height in pixels.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ × %2$@"
+          }
+        }
+      }
+    },
     "%@%@ files nothing uses" : {
 
     },
@@ -487,6 +518,36 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@, %2$@ and their items stay."
+          }
+        }
+      }
+    },
+    "%@, %@ items" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ items"
+          }
+        }
+      }
+    },
+    "%@, %@ of %@ items" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ of %3$@ items"
+          }
+        }
+      }
+    },
+    "%@, %@ of ^[%lld item](inflect: true)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ of ^[%3$lld item](inflect: true)"
           }
         }
       }
@@ -511,7 +572,20 @@
         }
       }
     },
+    "%@, ^[%lld item](inflect: true)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, ^[%2$lld item](inflect: true)"
+          }
+        }
+      }
+    },
     "%@, Archived" : {
+
+    },
+    "%@, changed" : {
 
     },
     "%@, edited" : {
@@ -1305,6 +1379,9 @@
         }
       }
     },
+    "%lld min" : {
+      "comment" : "Minutes to read."
+    },
     "%lld minutes" : {
 
     },
@@ -1340,6 +1417,9 @@
     "%lld more left out of search." : {
 
     },
+    "%lld more views" : {
+
+    },
     "%lld not started" : {
       "extractionState" : "manual"
     },
@@ -1371,16 +1451,6 @@
     },
     "%lld of %lld done" : {
       "extractionState" : "manual"
-    },
-    "%lld of %lld items" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld of %2$lld items"
-          }
-        }
-      }
     },
     "%lld or more versions" : {
 
@@ -1749,9 +1819,6 @@
 
     },
     "A connector comes with its plugin. Its settings and secrets are kept in %@." : {
-
-    },
-    "A connector manages this item’s title, text, properties, and type." : {
 
     },
     "A connector’s sign-in needs the app signed in as an app. Sign in again in Connection." : {
@@ -2223,6 +2290,9 @@
     "All" : {
 
     },
+    "All %@" : {
+
+    },
     "All %lld" : {
 
     },
@@ -2302,6 +2372,9 @@
 
     },
     "Always" : {
+
+    },
+    "Always Show" : {
 
     },
     "Always kept, so they open offline." : {
@@ -2514,16 +2587,10 @@
     "Archived Items" : {
 
     },
-    "Archived items leave your lists. You can find them in Library > Archive." : {
-
-    },
     "Archived “%@”" : {
 
     },
     "Archived, unarchived or moved to or from another state." : {
-
-    },
-    "Arrange" : {
 
     },
     "Articles Open In" : {
@@ -2796,6 +2863,9 @@
       }
     },
     "Brings in and sends out" : {
+
+    },
+    "Browse" : {
 
     },
     "Browser" : {
@@ -3288,9 +3358,6 @@
     },
     "Choose an Icon" : {
       "extractionState" : "manual"
-    },
-    "Choose an event to see its details." : {
-
     },
     "Choose an item to see its details." : {
 
@@ -3869,22 +3936,14 @@
     "Current Password" : {
 
     },
+    "Current Version" : {
+
+    },
     "Custom" : {
 
     },
     "Custom Color" : {
 
-    },
-    "Customize Layout in the Title Row" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Customize Layout"
-          }
-        }
-      }
     },
     "Customize Layout…" : {
       "extractionState" : "manual"
@@ -4078,6 +4137,9 @@
     "Diagram unavailable:" : {
 
     },
+    "Dimensions" : {
+
+    },
     "Dinner with Sam" : {
 
     },
@@ -4141,6 +4203,9 @@
     "Disk" : {
 
     },
+    "Dismiss" : {
+
+    },
     "Display" : {
 
     },
@@ -4173,6 +4238,9 @@
     },
     "Drag the pin to move it." : {
       "extractionState" : "manual"
+    },
+    "Drag to Reorder" : {
+
     },
     "Drop a File, Paste One, or Click to Choose" : {
       "extractionState" : "manual"
@@ -4453,6 +4521,9 @@
     },
     "Everywhere" : {
       "extractionState" : "manual"
+    },
+    "Excerpts" : {
+
     },
     "Existing %@" : {
 
@@ -4800,9 +4871,6 @@
         }
       }
     },
-    "From Apps" : {
-
-    },
     "From Plugins" : {
 
     },
@@ -4966,6 +5034,9 @@
     "Heading 6" : {
 
     },
+    "Headings" : {
+
+    },
     "Health" : {
 
     },
@@ -5048,6 +5119,9 @@
 
     },
     "History" : {
+
+    },
+    "History isn’t available right now." : {
 
     },
     "Holds" : {
@@ -5150,6 +5224,9 @@
     "Import…" : {
 
     },
+    "In" : {
+
+    },
     "In %@." : {
 
     },
@@ -5211,6 +5288,9 @@
 
     },
     "Indigo" : {
+
+    },
+    "Info" : {
 
     },
     "Inherited from %@" : {
@@ -5912,6 +5992,9 @@
     "Left out with %@" : {
 
     },
+    "Length" : {
+
+    },
     "Let Chats Save Files" : {
 
     },
@@ -5975,7 +6058,7 @@
     "Links Between Items" : {
 
     },
-    "Links in This Page" : {
+    "Links in the Text" : {
 
     },
     "Links to Items" : {
@@ -6287,6 +6370,9 @@
     "More Fields" : {
 
     },
+    "More From This Book" : {
+
+    },
     "More changes arrived while you were deciding. Look at them before you choose." : {
       "extractionState" : "manual"
     },
@@ -6338,9 +6424,6 @@
     "Move Up" : {
 
     },
-    "Move ^[%lld item](inflect: true) to the Feed?" : {
-
-    },
     "Move to Feed" : {
 
     },
@@ -6351,9 +6434,6 @@
 
     },
     "Move to Tab" : {
-
-    },
-    "Move “%@” to the Feed?" : {
 
     },
     "Moved an item to Recently Deleted" : {
@@ -6720,9 +6800,6 @@
 
     },
     "No Results" : {
-
-    },
-    "No Sections" : {
 
     },
     "No Server Settings" : {
@@ -7328,6 +7405,9 @@
     "Opens a panel to add a value" : {
 
     },
+    "Opens the sidebar's places" : {
+
+    },
     "Opens this address" : {
       "extractionState" : "manual"
     },
@@ -7403,6 +7483,9 @@
     "Page Width" : {
 
     },
+    "Pages" : {
+
+    },
     "Pages on it can no longer call the server." : {
 
     },
@@ -7419,6 +7502,9 @@
 
     },
     "Palettes" : {
+
+    },
+    "Panel" : {
 
     },
     "Paragraph Spacing" : {
@@ -7564,6 +7650,9 @@
     "Pinned" : {
       "extractionState" : "manual"
     },
+    "Pinned Properties" : {
+
+    },
     "Pinned under the title. Customize Layout on an item of this type changes the same." : {
 
     },
@@ -7675,6 +7764,9 @@
     "Properties" : {
       "extractionState" : "manual"
     },
+    "Properties can be pinned under the title from a row’s menu." : {
+
+    },
     "Property Not Saved" : {
       "extractionState" : "manual"
     },
@@ -7750,6 +7842,12 @@
     "Read and Edit" : {
 
     },
+    "Read only. %@ keeps this item, so an edit here would be overwritten." : {
+
+    },
+    "Read only. A connector keeps this item, so an edit here would be overwritten." : {
+
+    },
     "Read the Audit Log" : {
 
     },
@@ -7772,6 +7870,9 @@
 
     },
     "Reading Sources…" : {
+
+    },
+    "Reading Time" : {
 
     },
     "Reading Where Files Are…" : {
@@ -7820,6 +7921,9 @@
 
     },
     "Redo" : {
+
+    },
+    "Referenced By" : {
 
     },
     "Refresh" : {
@@ -7928,9 +8032,6 @@
       "extractionState" : "manual"
     },
     "Remove from Favorites" : {
-
-    },
-    "Remove from Sidebar" : {
 
     },
     "Remove from “%@”" : {
@@ -8392,9 +8493,6 @@
     "Section Options" : {
 
     },
-    "Sections for %@" : {
-
-    },
     "Seeing and ending the webhooks other apps and keys made needs Manage Keys." : {
 
     },
@@ -8609,6 +8707,12 @@
         }
       }
     },
+    "Show All %lld Versions" : {
+
+    },
+    "Show All Items, the Library or the Feed" : {
+
+    },
     "Show All Tabs" : {
 
     },
@@ -8703,6 +8807,9 @@
 
     },
     "Show Updates" : {
+
+    },
+    "Show When It Has a Value" : {
 
     },
     "Show a Month" : {
@@ -9122,6 +9229,9 @@
     "Synced Folders" : {
 
     },
+    "Synced With %@." : {
+
+    },
     "Syncing Is Paused" : {
 
     },
@@ -9268,15 +9378,6 @@
       "extractionState" : "manual"
     },
     "The Connector" : {
-
-    },
-    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
 
     },
     "The Folder Is Missing Where This Copy Is Kept" : {
@@ -10708,6 +10809,9 @@
     "This would link the item back to itself through the items between them." : {
       "extractionState" : "manual"
     },
+    "Thread" : {
+
+    },
     "Three things for next week." : {
 
     },
@@ -11205,9 +11309,6 @@
     "View > Show Original switches it." : {
 
     },
-    "View As" : {
-
-    },
     "View Deleted" : {
 
     },
@@ -11268,6 +11369,9 @@
     },
     "View as Timeline" : {
       "extractionState" : "manual"
+    },
+    "View, %@" : {
+
     },
     "View, Collection, or Item" : {
 
@@ -11706,9 +11810,6 @@
     "^[%lld change](inflect: true)" : {
 
     },
-    "^[%lld item](inflect: true)" : {
-
-    },
     "^[%lld item](inflect: true) can’t be added as a file." : {
       "extractionState" : "manual"
     },
@@ -11735,9 +11836,6 @@
 
     },
     "^[%lld removal](inflect: true)" : {
-
-    },
-    "^[%lld result](inflect: true)" : {
 
     },
     "^[%lld setting](inflect: true) use it." : {

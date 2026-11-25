@@ -114,6 +114,51 @@ import Testing
         #expect(NSDictionary(dictionary: joined) == NSDictionary(dictionary: layout.merging(["hidden": ["inbox", "recents"]]) { _, new in new }))
     }
 
+    @Test func theRememberedPanelPartIsReadBackAndAWordThisVersionLacksIsNoChoice() throws {
+        let here = defaults()
+        let setting = try setting(PanelParts.key)
+        setting.write([
+            .row(.types, setting: "panelPart", key: "core.note"): #"{"part":"links"}"#,
+            .row(.types, setting: "panelPart", key: "core.task"): #"{"part":"timeline"}"#,
+            .row(.types, setting: "panelPart", key: "core.event"): "{}",
+        ], to: here, library: "a")
+        let parts = try #require(here.string(forKey: PanelParts.key).flatMap(PanelParts.init(rawValue:)))
+        #expect(parts.part(of: TypeID("core.note")) == .links)
+        #expect(parts.part(of: TypeID("core.task")) == nil, "a part a later version added is no choice here")
+        #expect(parts.part(of: TypeID("core.event")) == nil)
+        guard case .units(let units) = setting.read(here, library: "a") else { Issue.record("unreadable"); return }
+        #expect(units[.row(.types, setting: "panelPart", key: "core.note")] == #"{"part":"links"}"#)
+        #expect(here.stringArray(forKey: PanelParts.setAsideKey) == nil, "an unknown word is not unreadable text")
+    }
+
+    @Test func aChoiceKeepsARowItCannotReadAndAWordAndMembersALaterCopyWrote() throws {
+        let stored = #"{"core.event":{"part":42},"core.note":{"part":"links","width":3},"core.task":{"part":"timeline","extra":[1,"a"]}}"#
+        var parts = try #require(PanelParts(rawValue: stored))
+        #expect(parts.part(of: TypeID("core.task")) == nil)
+        parts.choose(.info, for: TypeID("core.page"))
+        parts.choose(.outline, for: TypeID("core.note"))
+        let again = try #require(PanelParts(rawValue: parts.rawValue))
+        #expect(again == parts)
+        #expect(
+            parts.rawValue
+                == #"{"core.event":{"part":42},"core.note":{"part":"outline","width":3},"core.page":{"part":"info"},"core.task":{"extra":[1,"a"],"part":"timeline"}}"#)
+    }
+
+    @Test func choosingOverARowItCannotReadSetsItAside() throws {
+        let here = defaults()
+        here.set(#"{"core.event":{"part":42}}"#, forKey: PanelParts.key)
+        PanelParts.choose(.links, for: TypeID("core.event"), in: here)
+        #expect(here.stringArray(forKey: PanelParts.setAsideKey) == [#"{"part":42}"#])
+        #expect(PanelParts.stored(in: here).part(of: TypeID("core.event")) == .links)
+        here.set("[1]", forKey: PanelParts.key)
+        PanelParts.choose(.info, for: TypeID("core.note"), in: here)
+        #expect(here.stringArray(forKey: PanelParts.setAsideKey)?.last == "[1]")
+        here.set(#"{"core.task":{"extra":true,"part":"timeline"}}"#, forKey: PanelParts.key)
+        PanelParts.choose(.info, for: TypeID("core.task"), in: here)
+        #expect(here.stringArray(forKey: PanelParts.setAsideKey)?.last == #"{"extra":true,"part":"timeline"}"#, "a word a later copy wrote is kept before it is replaced")
+        #expect(PanelParts.stored(in: here).part(of: TypeID("core.task")) == .info)
+    }
+
     @Test func aRowThatIsNotJSONIsSetAsideAndTheStoreKeepsItsDefault() throws {
         let here = defaults()
         let setting = try setting(PagePlacements.key)

@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 extension Browser {
     func searchScope(in library: any ItemLibrary) -> SearchScope {
@@ -42,16 +41,6 @@ extension Browser {
     func pageTitle(in library: any ItemLibrary) -> String {
         if listsArchive { return String(localized: "Library") }
         return isSearching ? String(localized: "Search") : library.name(of: shown)
-    }
-
-    /// The count the window carries beside its title. The Archive says how many items it holds, and how many of them a
-    /// search or a filter leaves; every other place says how many items it lists, or how many results a search found.
-    func countLine(_ listed: Int, in library: any ItemLibrary) -> Text {
-        guard listsArchive else {
-            return isSearching ? Text("^[\(listed) result](inflect: true)") : Text("^[\(listed) item](inflect: true)")
-        }
-        let held = library.count(in: .archive, scope: .all)
-        return listed == held ? Text(held, format: .number) : Text("\(listed) of \(held)")
     }
 
     /// What `shown` lists besides its filters, as the person or a saved view chose, else the place's own: the Library

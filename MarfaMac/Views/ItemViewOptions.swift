@@ -42,22 +42,6 @@ struct ItemViewOptions: View {
     }
 }
 
-/// One pop-up button stays at the window's trailing side whichever view is shown.
-struct ViewModeMenu: View {
-    @CurrentLibrary private var library
-    @Bindable var browser: Browser
-
-    var body: some View {
-        // A menu rather than a picker for the toolbar's sake: the tray and Icon and Text name an item by its label. Its
-        // choices are the View menu's own, so one control makes the change however it is asked for.
-        Menu("View As", systemImage: browser.viewMode.symbol) {
-            ItemViewOptions(browser: browser, modes: browser.availableViewModes(in: library))
-        }
-        .help("View As")
-        .accessibilityIdentifier("ViewModeMenu")
-    }
-}
-
 /// The options of the view a window shows, in one menu at the same place on every view's toolbar: after Search,
 /// before View As. It opens with Show Filters or Hide Filters, and is tinted and counts the filters where the place has
 /// any, so a saved view that opens with its row hidden still says filters apply. The View menu holds the same options

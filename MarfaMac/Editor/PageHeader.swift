@@ -2,13 +2,12 @@ import AppKit
 import MarfaIcons
 import SwiftUI
 
-/// What the page's item header shows: the item's title, or the person's unsaved draft of it, its pinned properties
-/// (`PagePins`) and the rows of the property block. The page draws it above the item so the two scroll as one
-/// surface; what it does stays native.
+/// What the page's head shows, for the web page to draw above the item so the two scroll as one surface: the item's
+/// title, or the person's unsaved draft of it, and its `PageHead` (the kicker, the pins and the rows). What it does stays
+/// native.
 nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// The status or the parent as the menu the page opens from it, wherever the page draws it. The page draws the
-    /// button; the app builds the menu. An empty status, in the property block, has no value yet: the page reads it
-    /// as every empty value reads, and `label` is then unused. A parent exists only with a value.
+    /// button; the app builds the menu. A parent exists only with a value.
     struct Pin: Encodable, Equatable, Sendable {
         /// A status's symbol, as the page names it among the images the app sends (`PageHeaderIcons.symbols`), and the
         /// tint it takes from the page's colors. The catalogue holds neither: they follow the group the type puts the
@@ -25,12 +24,39 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 
         var label: String
         var enabled: Bool
-        var empty = false
         /// Only the status pin has a mark.
         var mark: Mark?
         /// Only the parent pin has these: the parent's type icon and the tone of its chip, as a linked item's has.
         var icon: TypeIconRef?
         var tone: String?
+    }
+
+    /// The kicker as the page draws it: the type's mark in its tone and its name, then each flag with its symbol.
+    struct Kicker: Encodable, Equatable, Sendable {
+        struct Flag: Encodable, Equatable, Sendable {
+            var id: String
+            var words: String
+            /// The flag's symbol among the images the app sends.
+            var symbol: String
+        }
+
+        var type: String
+        var icon: TypeIconRef
+        var tone: String
+        /// Whether the type's name asks for Change Type (`changeType`).
+        var changesType: Bool
+        var flags: [Flag]
+        /// What VoiceOver reads for the whole line.
+        var spoken: String
+
+        init(_ kicker: PageHead.Kicker) {
+            type = kicker.typeName
+            icon = TypeIconRef(name: kicker.typeIcon)
+            tone = TypeTone(icon: kicker.typeIcon).rawValue
+            changesType = kicker.changesType
+            flags = kicker.flags.map { Flag(id: $0.rawValue, words: $0.words, symbol: $0.symbol) }
+            spoken = kicker.spoken
+        }
     }
 
     /// Every chip look as CSS custom properties for the page, resolved for light and for dark so an appearance
@@ -64,9 +90,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     }
 
     var item: String
-    /// A deleted item shows a banner instead.
-    var hidden: Bool
-    /// The page is in Focus: the title and the properties are hidden, and the footer and the kind stay as they are.
+    /// The page is in Focus: the head is hidden, and the footer stays as it is.
     var focused = false
     var title: String
     var draft: String?
@@ -76,58 +100,42 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var editable: Bool
     /// False where the item is titled by the first line of its text, which the page already shows as its text.
     var showsTitle = true
-    /// Which header the page draws, chosen from the core type the item's type builds on.
-    var kind: PageHeaderKind
-    var person: PersonHeader?
-    /// The line under the title: a person's work, or a reading item's description.
-    var subtitle: String?
-    /// The status menu, for the status row or pin, which holds it; nil where the type has none.
+    var kicker: Kicker
+    /// The status menu, for the status row or pin, which holds it; nil where the item holds no status.
     var status: Pin?
     /// The parent menu, for the parent row; nil where the item has no parent.
     var parent: Pin?
-    /// The pinned properties under the title, in the order the person chose, at most four.
+    /// The pinned properties under the title, in the order the person chose, while pinned properties are on.
     var pins: [PropertyRow]
-    /// The property block's rows, all of them; the page shows the first `foldAfter` until it is expanded.
-    var properties: [PropertyRow]
-    var foldAfter = PropertyRow.foldAfter
-    /// The items a collection holds, listed under its text; none for any other item.
-    var contents: [LinkedItem]
+    /// Every row, in order; the page shows those not `folded` until Show More is opened.
+    var rows: [PropertyRow]
+    /// "Show N More".
+    var showMore: String
     /// Items that link to this one, listed under its text.
     var linked: [LinkedItem]
     var linkedFoldAfter = LinkedItem.foldAfter
-    /// Whether the page has text to write. A collection with no text shows its contents in place of an empty page.
+    /// Whether the page has text to write. A collection with no text shows nothing to type into.
     var showsText: Bool
-    /// "Show N More", for the rows and for the items that are folded away.
-    var showMore: String
-    var showMoreContents: String
     var showMoreLinked: String
     var interfaceTextSize: Int
     /// How many lines the title shows before an ellipsis cuts it, while it is not being edited.
     var titleLines: Int
     var chips: ChipStyle
-    /// How many items link to this one, for the row above the title, wherever Linked From is placed.
-    var linkedCount = 0
-    /// Customize Layout in the row above the title: nil where the item cannot be laid out, else whether it is on.
-    var layoutOn: Bool?
 
-    /// The icons of the types the header names, which the page draws as images.
+    /// The icons of the types the head names, which the page draws as images.
     var typeIconNames: Set<String?> {
-        var names: Set<String?> = []
-        names.formUnion((contents + linked).map(\.icon))
+        var names: Set<String?> = [kicker.icon.name]
+        names.formUnion(linked.map(\.icon))
         if let parent = parent?.icon { names.insert(parent.name) }
-        for value in (pins + properties).map(\.value) {
-            switch value {
-            case .items(let targets): names.formUnion(targets.map(\.icon))
-            case .type(_, let icon): names.insert(icon)
-            default: break
-            }
+        for value in (pins + rows).map(\.value) {
+            if case .items(let targets) = value { names.formUnion(targets.map(\.icon)) }
         }
         return names
     }
 }
 
 extension PropertyRow: Encodable {
-    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people, icon, tone, more, help, editable }
+    private enum Key: String, CodingKey { case id, label, symbol, kind, text, note, texts, items, options, people, more, help, editable, long, folded, muted }
     /// What the page draws of an item a row links to: a type chip in the item's own tone, or a person's initials and
     /// name. The tone is one of `TypeTone`'s names; the page never picks a color.
     private struct Link: Encodable {
@@ -166,11 +174,6 @@ extension PropertyRow: Encodable {
         case .status: try container.encode("status", forKey: .kind)
         case .empty: try container.encode("empty", forKey: .kind)
         case .parent: try container.encode("parent", forKey: .kind)
-        case .type(let name, let icon):
-            try Self.encode("type", name, into: &container)
-            try container.encode(TypeIconKey.value(for: icon), forKey: .icon)
-            try container.encode(TypeTone(icon: icon).rawValue, forKey: .tone)
-        case .source(let name): try Self.encode("text", name, into: &container)
         case .items(let targets):
             try container.encode("items", forKey: .kind)
             try container.encode(targets.map(Link.init), forKey: .items)
@@ -186,9 +189,9 @@ extension PropertyRow: Encodable {
             try container.encode("tags", forKey: .kind)
             try container.encode(tags, forKey: .texts)
         case .date(let text): try Self.encode("date", text, into: &container)
-        case .when(let text, let help):
-            try Self.encode("date", text, into: &container)
-            try container.encode(help, forKey: .help)
+        case .when(let text, let note):
+            try Self.encode("when", text, into: &container)
+            try container.encode(note, forKey: .note)
         case .url(let text): try Self.encode("url", text, into: &container)
         case .email(let text): try Self.encode("email", text, into: &container)
         case .phone(let text): try Self.encode("phone", text, into: &container)
@@ -196,9 +199,12 @@ extension PropertyRow: Encodable {
             try Self.encode("text", flag ? String(localized: "Yes") : String(localized: "No"), into: &container)
         case .text(let text): try Self.encode("text", text, into: &container)
         }
-        if more > 0 { try container.encode(PagePins.moreText(more), forKey: .more) }
+        if more > 0 { try container.encode(PageHead.moreText(more), forKey: .more) }
         if let help { try container.encode(help, forKey: .help) }
         if editable { try container.encode(true, forKey: .editable) }
+        if long { try container.encode(true, forKey: .long) }
+        if folded { try container.encode(true, forKey: .folded) }
+        if muted { try container.encode(true, forKey: .muted) }
     }
 
     private static func encode(_ kind: String, _ text: String, into container: inout KeyedEncodingContainer<Key>) throws {
@@ -212,7 +218,7 @@ nonisolated enum PageHeaderMenu: String, Sendable {
     case status, parent
 }
 
-/// What the person did in the page's header, for the window to carry out.
+/// What the person did in the page's head, for the window to carry out.
 enum PageHeaderEvent {
     case titleInput(ItemID, String)
     case titleCommit(ItemID, String, startWriting: Bool)
@@ -221,19 +227,16 @@ enum PageHeaderEvent {
     case menu(PageHeaderMenu, ItemID, CGRect)
     /// A row's or a pin's value asks for its editor under it, in the editor's container: the row's identifier.
     case edit(row: String, ItemID, CGRect)
-    /// A row's or a pin's label was pressed, for its field menu under the label in the editor's container: the row's
+    /// A row's or a pin's name was pressed, for the row's menu under the name in the editor's container: the row's
     /// identifier, and whether the value's own editor is reachable only from the menu.
     case fieldMenu(row: String, editsValue: Bool, ItemID, CGRect)
-    /// Hide from Page was chosen in the menu over a row of the property block, or Linked From: the row's
-    /// identifier (`PagePlacement`) and the item the header was showing.
+    /// The kicker's type name was pressed, for Change Type under it.
+    case changeType(ItemID, CGRect)
+    /// Hide from Page was chosen in the menu over Linked From: the row's identifier (`PagePlacement`) and the item the
+    /// head was showing.
     case hideFromPage(row: String, ItemID)
-    /// A row of the property block was dragged by its key: the whole order the page shows after the move, folded rows
-    /// included.
+    /// A row was dragged by its name: the whole order the page lists after the move, folded rows included.
     case moveRow(row: String, order: [String], ItemID)
-    /// Customize Layout in the row above the title was pressed.
-    case toggleLayout
-    /// Linked From in the row above the title was pressed, to see what links here.
-    case showLinked
 }
 
 /// SF Symbols the header shows, drawn here because the page cannot draw them itself. The page uses each as a mask,
@@ -255,16 +258,10 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     /// The symbol in the callout's close button, drawn small and bold as it is in the app's other small buttons.
     static let closeSymbol = "xmark"
 
-    /// The symbols of the row above the title: Linked From and Customize Layout.
-    static let titleToolSymbols = ["arrow.down.left", "rectangle.split.2x1"]
-
     /// The symbol a tag's chip starts with, drawn at the size the app's tag chip draws it.
     static let tagSymbol = "number"
 
-    /// What a row's key shows under the pointer, to say it can be dragged.
-    static let rowGripSymbol = "line.3.horizontal"
-
-    /// The symbols at the size the pins' 12 point text gives them, following the interface's text size, and the
+    /// The symbols at the size the rows' 13 point text gives them, following the interface's text size, and the
     /// icons of `typeIcons` (Iconify IDs), which the Swift SDK draws.
     @MainActor
     init?(textSize: Int, typeIcons: Set<String?>) {
@@ -273,8 +270,12 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         guard let indicator = Self.symbol("chevron.down", size: size * 0.7, weight: .bold) else { return nil }
         self.indicator = indicator
         var symbols: [String: Icon] = [:]
-        for name in PropertyRow.Value.symbols + [Self.pictureSymbol, Self.rowGripSymbol] + Self.titleToolSymbols {
+        for name in PropertyRow.Value.symbols + [Self.pictureSymbol] {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
+        }
+        // The kicker's flags, at its 12 points.
+        for flag in PageHead.Kicker.Flag.allCases {
+            symbols[flag.symbol] = Self.symbol(flag.symbol, size: size * 11 / 13, weight: .regular)
         }
         symbols[Self.tagSymbol] = Self.symbol(
             Self.tagSymbol, size: ChipLooks.current.textSize * InterfaceStyle.scale(for: textSize) * 0.85, weight: .medium)

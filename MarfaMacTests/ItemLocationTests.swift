@@ -94,8 +94,8 @@ struct ItemLocationTests {
         let spec = try Self.spec("core.file.image")
         let image = Self.item("core.file.image", Self.london, content: .file(.png, byteCount: 4))
         #expect(image.allows(.fields))
-        #expect(spec.row(of: image, offersEmpty: true)?.editable == true)
-        #expect(spec.row(of: Self.item("core.file.image", content: .file(.png, byteCount: 4)), offersEmpty: true)?.editable == true)
+        #expect(spec.row(of: image).editable == true)
+        #expect(spec.row(of: Self.item("core.file.image", content: .file(.png, byteCount: 4))).editable == true)
     }
 
     // MARK: Points and frames

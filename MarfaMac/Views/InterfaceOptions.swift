@@ -5,32 +5,17 @@ enum InterfaceKey {
     static let textSize = "interfaceTextSize"
     /// The width the person last gave the right sidebar, kept across layouts and launches.
     static let inspectorWidth = "inspectorWidth"
-    /// Whether the inspector's Details section is open, kept across items and launches.
-    static let inspectorDetailsOpen = "inspectorDetailsOpen"
-    /// Whether the inspector's Properties, Relationships, Links in This Page, Linked From and Tags sections are open, kept across items
-    /// and launches.
-    static let inspectorPropertiesOpen = "inspectorPropertiesOpen"
-    static let inspectorRelationshipsOpen = "inspectorRelationshipsOpen"
-    static let inspectorLinksInPageOpen = "inspectorLinksInPageOpen"
-    static let inspectorLinkedFromOpen = "inspectorLinkedFromOpen"
-    static let inspectorTagsOpen = "inspectorTagsOpen"
-    static let inspectorOutlineOpen = "inspectorOutlineOpen"
-    static let inspectorAttachmentsOpen = "inspectorAttachmentsOpen"
-    static let inspectorCollectionsOpen = "inspectorCollectionsOpen"
-    static let inspectorAppOpen = "inspectorAppOpen"
     /// Whether the window's toolbar shows an item's title once the page's header has scrolled away.
     static let showsScrolledTitle = "showsScrolledTitle"
     /// Whether Back and Forward stand over the sidebar.
     static let showsSidebarHistory = "showsSidebarHistory"
-    /// What the toolbar's items show, chosen under Show in Customize Toolbar.
-    static let toolbarLabelStyle = "toolbarLabelStyle"
     /// Whether an item's page backs the toolbar with a blurred band while content scrolls under it.
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
     /// Whether the panels that edit a value are glass or a solid color.
     static let valuePanelStyle = "valuePanelStyle"
     /// What the command palette, Search Items and quick add stand on.
     static let paletteMaterial = "paletteMaterial"
-    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, inspectorOutlineOpen, inspectorAttachmentsOpen, inspectorCollectionsOpen, inspectorAppOpen, showsScrolledTitle, showsSidebarHistory, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, showsScrolledTitle, showsSidebarHistory, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 /// What a value panel is made of. Glass lets the page show through; Solid is the window's own color.
@@ -57,6 +42,12 @@ enum PaletteMaterial: String, CaseIterable, Identifiable {
     static let standard = PaletteMaterial.glass
 
     var id: Self { self }
+}
+
+/// The right sidebar's width in every window: 300, which the person can drag out to the widest.
+enum PanelWidth {
+    static let standard: CGFloat = 300
+    static let widest: CGFloat = 440
 }
 
 enum InterfaceStyle {

@@ -79,10 +79,13 @@ export type EditorMessage =
       rect: [number, number, number, number]
       viewportHeight: number
     }
-  /** Customize Layout in the row above the title: the app starts or ends it. */
-  | { type: 'toggleLayout' }
-  /** Linked From in the row above the title: the app shows what links here. */
-  | { type: 'showLinked' }
+  /** The kicker's type name: the app opens Change Type under it. */
+  | {
+      type: 'changeType'
+      item: string
+      rect: [number, number, number, number]
+      viewportHeight: number
+    }
   | { type: 'openLink'; href: string }
   | { type: 'openItem'; item: string }
   | { type: 'copy'; text: string }

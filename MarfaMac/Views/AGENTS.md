@@ -10,12 +10,10 @@ Windows, panes, toolbars and commands. Settings is a window of its own, in `Marf
 
 ## Toolbars
 
-- **Every toolbar in a customizable window is `toolbar(id:)`,** and each split view has an identifier of its own, which all its columns use.
-- **Trap:** replacing a toolbar under its open tray crashes, so `MainView` holds the split view while the tray is open.
-- **Trap:** a hidden `ToolbarSpacer` leaves its gap. Declare each fixed spacer only while the groups on both sides show, with `customizationBehavior(.disabled)`.
-- **Every state of a split view declares the same items and hides what does not apply,** because an item left out is dropped from the saved layout.
-- **An item that comes and goes has `customizationBehavior(.disabled)`** and never returns to a toolbar the person has customized, so it holds only what they can do without.
-- **The sidebar's button, Back and Forward stand over the sidebar** (`SidebarToolbar`, whose comment says what keeps them there). Keep the column's width limits outside its toolbar.
+- **Every toolbar is a plain `toolbar`,** with no identifier, because a person cannot customize the window's buttons. The top row (`TopRowFrame`) draws the title and the views in the content, and the toolbar holds only the buttons.
+- **Trap:** a hidden `ToolbarSpacer` leaves its gap. Declare each fixed spacer only while the groups on both sides show.
+- **Never put a width in the top row.** It measures the toolbar's items (`ToolbarRoomProbe`) and folds by what is left.
+- **The sidebar's button stands over the sidebar** (`SidebarToolbar`, whose comment says what keeps it there), and Back and Forward stand beside it, or lead the first column's toolbar while the sidebar is closed. Keep the column's width limits outside its toolbar.
 
 ## One split view at a time
 
@@ -30,7 +28,7 @@ Windows, panes, toolbars and commands. Settings is a window of its own, in `Marf
 
 ## Code Review Rules
 
-- **Toolbar without an identifier.** Flag a plain `toolbar` in a customizable window, an item that comes and goes without `customizationBehavior(.disabled)`, or a change to a mounted split view's column count.
+- **Toolbar that can be customized.** Flag a `toolbar(id:)`, a `ToolbarItem(id:)` or a width written into the top row, or a change to a mounted split view's column count.
 - **Toolbar action without a command.** Flag a toolbar action with no menu command or no palette entry.
 - **Row body runs for all.** Flag a change that makes every row's body run on a selection change or a one-item edit. Safe path: the doc comments above, and a measurement.
 - **Design already rejected.** Flag a drawing that repeats a line of `docs/rejected.md`.

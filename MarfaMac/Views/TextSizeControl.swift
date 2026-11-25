@@ -17,7 +17,7 @@ struct TextSizeControl: View {
                 TextSizeOptions()
             } label: {
                 HStack(spacing: 6) {
-                    Text("\(textSize) pt").monospacedDigit()
+                    Text("\(PageStyle.nearestTextSize(textSize)) pt").monospacedDigit()
                     Image(systemName: "chevron.down").font(.system(size: 9 * InterfaceStyle.scale(for: interfaceSize), weight: .semibold))
                 }
                 .padding(.horizontal, 6)
@@ -27,7 +27,7 @@ struct TextSizeControl: View {
             .fixedSize()
             .help("Text Size")
             .accessibilityLabel("Text Size")
-            .accessibilityValue("\(textSize) pt")
+            .accessibilityValue("\(PageStyle.nearestTextSize(textSize)) pt")
             .accessibilityIdentifier("PageTextSize")
         }
         .disabled(!isAvailable)
@@ -43,7 +43,7 @@ struct TextSizeOptions: View {
 
     var body: some View {
         let zoom = TextZoom.page
-        Picker("Text Size", selection: $textSize) {
+        Picker("Text Size", selection: Binding(get: { PageStyle.nearestTextSize(textSize) }, set: { textSize = $0 })) {
             ForEach(PageStyle.textSizes, id: \.self) { size in Text("\(size) pt").tag(size) }
         }
         .pickerStyle(.inline)

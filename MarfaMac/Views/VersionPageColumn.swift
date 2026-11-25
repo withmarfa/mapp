@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// The version chosen, read as a page: its title, the properties its type pins, and its text, with what it added
-/// since the version before it marked and what it dropped struck through.
+/// The version chosen, read as a page: its title, the properties its type pins while Pinned Properties is on, and its
+/// text, with what it added since the version before it marked and what it dropped struck through.
 struct VersionPageColumn: View {
     @CurrentLibrary private var library
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
+    @AppStorage(PageKey.pinsProperties) private var pinsProperties = false
     @Environment(\.interfaceTextSize) private var textSize
     let mode: VersionHistoryMode
     let list: VersionList?
@@ -55,9 +56,8 @@ struct VersionPageColumn: View {
     private var isDeleted: Bool { library.item(mode.item)?.state == .trashed }
 
     private func page(of entry: VersionEntry, older: VersionEntry?) -> some View {
-        let pins = entry.content.pins(
-            saved: entry.written, placement: placements.placement(of: entry.content.type, in: library.catalogue),
-            in: library.catalogue, format: dateFormat)
+        let pins = !pinsProperties ? [] : entry.content.pins(
+            placement: placements.placement(of: entry.content.type, in: library.catalogue), in: library.catalogue, format: dateFormat)
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if let title = entry.content.title, !title.isEmpty {
@@ -94,14 +94,10 @@ struct VersionPageColumn: View {
                     }
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    if pin.id == PagePlacement.type {
-                        MarkedName(text: pin.value, icon: library.catalogue.icon(for: type))
-                    } else {
-                        Text(verbatim: pin.value)
-                            .interfaceFont(.body)
-                            .lineLimit(1)
-                            .frame(minHeight: 22 * scale)
-                    }
+                    Text(verbatim: pin.value)
+                        .interfaceFont(.body)
+                        .lineLimit(1)
+                        .frame(minHeight: 22 * scale)
                 }
                 .frame(width: 136 * scale, alignment: .leading)
                 .help(pin.value)

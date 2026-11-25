@@ -1,11 +1,15 @@
 ---
-summary: What an item's page and right sidebar show, in what order, and what a person may arrange.
+summary: What an item's page and the panel beside it show, in what order, and what a person may arrange.
 paths:
   - MarfaMac/Editor/PageHeader.swift
   - MarfaMac/Model/PagePlacements.swift
+  - MarfaMac/Model/Items/FieldMenu.swift
+  - MarfaMac/Views/Looks/PageHeadView.swift
   - MarfaMac/Model/Items/Page*.swift
   - MarfaMac/Model/Items/PropertyRow.swift
-  - MarfaMac/Model/Items/SidebarSections.swift
+  - MarfaMac/Model/Items/Panel*.swift
+  - MarfaMac/Model/Items/PageOutline.swift
+  - MarfaMac/Views/ItemPanel/*.swift
   - MarfaMac/Views/Item*Inspector*.swift
   - MarfaMac/Views/ItemCorner.swift
   - MarfaMac/Views/WebPageItemPage.swift
@@ -15,44 +19,56 @@ paths:
 
 # The item page
 
-An item's page is its title, pinned properties, property block and text. One page serves every type. A type decides only which properties go where, so no page is built for a type.
+An item's page is its head (a kicker, the title and rows) and its text. One page serves every type. A type decides only which properties show and in what order, so no page is built for a type.
 
-## Rules
+## The head
 
-- **The app decides and the page draws.** `PagePins` and `PropertyRow` decide which values show and where; the web header draws what it is sent. A rule added in `editor/src/header.ts` would be missing from the sidebar, Customize Layout and VoiceOver.
-- **Nothing a person can read is lost by arranging.** A value is in the pins or the block, never both. A pinned row that an event's time pushes out goes back to the block, and the right sidebar lists every property whatever the page hides.
-- **Nothing sits between the title and the pins**, and nothing else uses the space under a title, because the page reads the same from type to type.
-- **An empty value is the word Empty where the person can set it, and absent where they cannot.** No placeholder stands for a missing pin.
-- **A value is cut, never reworded.** The whole value is its help and is in the right sidebar.
-- **A linked item that cannot be read, is gone or is in the bin shows nothing**, never an id. A choice its field does not list still draws as its word.
-- **An email or phone is a row**, not a chip in the header, because it opens something. Latitude and longitude are one row, Location.
-- **A kind's header extends the general one** (`PageHeaderKind`): an event's time, a person's job, a reading item's description. What a header draws, no pin or row repeats.
-- **A stale pin stays stored and is not drawn**, so a property that comes back is pinned again.
+- **One head, built once.** `PageHead` decides the kicker, pins and rows; `editor/src/header.ts` draws them on a page with text, `PageHeadView` on a saved web page, which has no menu or drag. A rule added in one drawing must be added in the other.
+- **The kicker** is the type's mark and name, then Read Only, Feed or Archived where true. Its name opens Change Type where the item can change type.
+- **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset and hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
+- **A type that keeps no text shows its first six rows.**
+- **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
+- **An event's time is one row, When,** always first, with how far off it is or All Day in grey.
+- **Long text stops after two lines;** an email, a phone and a number to call open.
+- **A value is cut, never reworded,** and a linked item that cannot be read, is gone or is in the bin shows nothing, never an id.
+- **Once the head is out of sight** the page says so with the item, title and mark (`DetailsPresentation.scrolledHead`).
 
-## Right sidebar
+## A row's menu
 
-- **It always lists everything**, in sections that keep whether they are open from item to item.
-- **What has been typed and not saved is kept** when the item changes or the sidebar closes (`ItemPropertyDraft`). A refused tag goes to the clipboard and the person is told.
-- **With nothing chosen it is one quiet line** for what the place lists (`InspectorPrompt`), or blank where another pane already says so.
-- **It holds no buttons that act on a container**, because the person may make it narrow.
+`FieldMenu` is the rule, and a row's name or a right-click opens it.
+
+- **How a row shows belongs to the type** (`PagePlacements`, `RowShows`) and changes no item, so a read-only item can be arranged.
+- **Text is 15 points by default** (title 28 on 34), in steps of 13 to 24; a stored 11 or 12 reads as the nearest.
+- **Pinned properties are a setting, off** (Settings › Editor). While on, the status and the parent are pinned unless the person chose others, at most four, and a pinned row leaves the rows.
+
+## The panel beside the page
+
+- **It is white behind a hairline and closed by default,** with a pill for each of Outline, Links and Info the item has. One part has no pills.
+- **A type remembers its pill** (`PanelParts`). A part the item lacks is not shown. With none remembered, one is chosen when the item opens.
+- **Outline shows only for an item with headings, or a PDF.**
+- **Links asks the server for nothing.** It uses edges the copy holds. A child, a collection's member and a file are left out of Referenced By, because each has a place. A link follows Open Items (`Browser.follow(link:)`).
+- **In is the last fact in Info,** a menu that moves the item between Library and Feed (`ItemLibrary.perform`), and plain where it may not move.
+- **Who keeps the item is said once at the top of Info:** the Read Only reason (`Item.obstacle(to:)`), or Synced With a connector's name (`GET /plugins`, read once for a library).
+- **History is asked for only while Info shows** (`PanelHistory`), one read for each version while the item is among the eight latest.
+- **Properties, Relationships and Tags and a sync problem stay in Info** until the page's rows and notices carry them.
+- **What has been typed and not saved is kept** when the item changes or the panel closes (`ItemPropertyDraft`).
 
 ## What the page locks
 
-The page and the right sidebar draw what `Item.allows(_:)` answers, and never judge an item themselves.
+The page and the panel draw what `Item.allows(_:)` answers, and never judge an item themselves.
 
 | The item is | The page |
 | --- | --- |
-| Read only | Locks the title, text, properties, and type. Tags, Favorite, collections, and links stay open |
+| Read only | Says Read Only in its kicker and locks the title, text, properties, and type. Tags, Favorite, collections, and links stay open |
 | A file | Has no text and no Change Type. Its title, location and the fields a person may change stay open |
-| In Recently Deleted | Locks everything but Recover and Delete Immediately |
+| In Recently Deleted | Keeps its head, and locks everything but Recover and Delete Immediately |
 
 ## Customize Layout
 
-- **A layout belongs to a type.** Every item of the type follows it, at once, in every window, and a child type does not inherit it.
-- **It changes no item**, so a read-only item can be laid out, and a lock does not stop it.
-- **Linked From has one place**, the page or the sidebar, which both halves of the panel read and write.
+- **A layout belongs to a type.** Every item of the type follows it, and a child type has its own.
+- **Linked From has one place,** the page's foot or the panel's Links.
 - **A type nobody customized has no entry** (`PagePlacements`), so a better default reaches it. Use Defaults removes the entry.
-- **Escape ends it, and Focus waits for it**, because it arranges the header that Focus hides.
+- **Escape ends it, and Focus waits for it**, because Focus hides what it arranges.
 - **Trap:** `Choice.pins` of nil means the default pins and an empty list means no pins. Treating one as the other pins properties that a person removed. `PagePlacement` gives the defaults.
 
 ## The corner
@@ -74,9 +90,8 @@ The page and the right sidebar draw what `Item.allows(_:)` answers, and never ju
 - **A person can turn off formats, text size and Focus** (`PageCornerChoice`). One turned off is in the page's More menu.
 - **Zoom keys size the file or the text, never both** (`FileViewCommands`, `TextZoomCommands`).
 - **A size belongs to one file.** Another item's page opens fitted.
-- **Focus belongs to one window and one item.** It hides the title and the properties only, so Linked From and a collection's contents stay.
+- **Focus belongs to one window and one item.** It hides the head only, so Linked From stays.
 - **Escape closes the formats bar first, then leaves Focus.** A sheet, the palette and quick add keep Escape for themselves.
-- **The formats bar runs the Format menu's commands** (`FormatsBar`), with no code of its own.
 
 ## Text and links
 
@@ -95,5 +110,5 @@ The page and the right sidebar draw what `Item.allows(_:)` answers, and never ju
 ## Version history
 
 - **It takes the place of the left sidebar and the page** (`VersionHistoryWorkspace`), so nothing in it edits the item by mistake.
-- **The page shows the version as it was**, with its pins, added words tinted and removed words struck through.
+- **The page shows the version as it was**, with the fields it pins while Pinned Properties is on, added words tinted and removed words struck through.
 - **Restoring is a new version**, and Restore Version is offered only when it can be done (`VersionHistoryMode`).

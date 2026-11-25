@@ -8,21 +8,25 @@ struct TextZoom: Equatable {
     let key: String
     let sizes: [Int]
     let defaultSize: Int
+    /// Whether a stored size that is not one of the steps counts as the nearest step (`PageStyle.nearestTextSize`), as the
+    /// page shows it, before a step is taken from it.
+    var readsNearest = false
 
-    static let page = TextZoom(key: PageKey.textSize, sizes: PageStyle.textSizes, defaultSize: PageStyle().textSize)
+    static let page = TextZoom(key: PageKey.textSize, sizes: PageStyle.textSizes, defaultSize: PageStyle().textSize, readsNearest: true)
     static let interface = TextZoom(key: InterfaceKey.textSize, sizes: InterfaceStyle.textSizes, defaultSize: InterfaceStyle.defaultTextSize)
 
     static func acting(pageFocused: Bool) -> TextZoom { pageFocused ? .page : .interface }
 
     /// The size after the step, or nil where it changes nothing. A stored size that is not one of the steps moves to
-    /// the nearest step in the direction asked.
-    func size(after step: Step, from current: Int) -> Int? {
+    /// the nearest step in the direction asked, except for the page, where it first reads as the nearest step.
+    func size(after step: Step, from stored: Int) -> Int? {
+        let current = readsNearest ? PageStyle.nearestTextSize(stored) : stored
         let next: Int? = switch step {
         case .bigger: sizes.first { $0 > current }
         case .smaller: sizes.last { $0 < current }
         case .actual: defaultSize
         }
-        return next == current ? nil : next
+        return next == stored ? nil : next
     }
 
     func apply(_ step: Step, in defaults: UserDefaults = .standard) {

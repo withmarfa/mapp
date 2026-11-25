@@ -70,7 +70,7 @@ enum PreferencesMap {
     private static let members: [SyncedSetting] =
         members(AppearanceKey.all + [
             InterfaceKey.textSize, InterfaceKey.valuePanelStyle, InterfaceKey.paletteMaterial, InterfaceKey.showsScrolledTitle,
-            InterfaceKey.showsPageToolbarBackground, InterfaceKey.showsSidebarHistory, InterfaceKey.toolbarLabelStyle,
+            InterfaceKey.showsPageToolbarBackground, InterfaceKey.showsSidebarHistory,
             SidebarTypeRow.subtypeIconsKey,
         ], in: .appearance)
         + members([
@@ -86,6 +86,8 @@ enum PreferencesMap {
             .commands, setting: "shortcut", .data, wrapper: "shortcuts", local: [], .data(ShortcutBindings.setAsideKey))),
         SyncedSetting(key: PagePlacements.key, place: .rows(
             .types, setting: "pagePlacements", .string, wrapper: nil, local: [], .string(PagePlacements.setAsideKey))),
+        SyncedSetting(key: PanelParts.key, place: .rows(
+            .types, setting: "panelPart", .string, wrapper: nil, local: [], .string(PanelParts.setAsideKey))),
         SyncedSetting(key: TypeLooks.defaultsKey, place: .serverRows(.types, setting: "look", .data(TypeLooks.setAsideKey))),
         // A table's widths are kept with the view on this Mac alone.
         SyncedSetting(key: ViewLayouts.key, place: .rows(
@@ -113,17 +115,13 @@ enum PreferencesMap {
     /// Every setting a settings file carries (`SettingsFile`).
     static let inFiles: [SyncedSetting] = synced + inFilesOnly
 
-    /// The settings that stay on this Mac: window sizes and column widths, what is open in the right sidebar, where the
+    /// The settings that stay on this Mac: window sizes and column widths, the right sidebar's width, where the
     /// last window and quick add were, Reopen Windows (the Mac's own answer), consent to error reports, Export
     /// Automatically (which folder and when, for each Marfa), Beta Versions (Sparkle keeps its own keys, which are never
     /// synced either), a table's columns (mostly widths), and the shortcuts that work in any app (`inFilesOnly`).
     static let staysOnMac: [String] = [
         StartWith.lastPlaceKey, ReopenWindows.key, QuickAdd.lastTypeKey, Reporting.switchKey, UpdateSettings.betaKey, ItemTableColumnLayouts.key,
-        InterfaceKey.inspectorWidth, InterfaceKey.inspectorDetailsOpen, InterfaceKey.inspectorPropertiesOpen,
-        InterfaceKey.inspectorRelationshipsOpen, InterfaceKey.inspectorLinksInPageOpen, InterfaceKey.inspectorLinkedFromOpen,
-        InterfaceKey.inspectorTagsOpen, InterfaceKey.inspectorOutlineOpen, InterfaceKey.inspectorAttachmentsOpen,
-        InterfaceKey.inspectorCollectionsOpen, InterfaceKey.inspectorAppOpen, AnyAppShortcuts.defaultsKey,
-        AutomaticExport.plansKey,
+        InterfaceKey.inspectorWidth, AnyAppShortcuts.defaultsKey, AutomaticExport.plansKey,
     ] + ColumnWidth.allCases.map(\.key)
 
     /// Every defaults key a synced setting reads or writes.

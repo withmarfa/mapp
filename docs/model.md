@@ -37,7 +37,7 @@ Each is a case where a declared field is not enough. Add to this list only where
 - `Catalogue.isTask`: a task's row reads its due date and priority.
 - `Catalogue.isStartDate`: which date of a task or an event is its start.
 - `Catalogue.isFileType`: what has a file behind it.
-- `PageHeaderKind`: the nearest ancestor with a header of its own.
+- `PageHeaderKind`: the nearest ancestor the app treats apart.
 - `LookPreset.suggested`: the highlight type, found by walking up.
 
 Two defaults name types: the sidebar's and toolbar's starting set for New, and the type quick add begins with. Both use only types the library offers.
@@ -82,9 +82,9 @@ Use these words in names, strings and comments. A word with "Marfa" is the serve
 | Preset | App | The look a type starts from (`LookPreset`) |
 | Density | App | How much room a row takes (`Density`) |
 | Properties list | App | The fields a view shows after the title (`ViewProperties`) |
-| Pin | App | A property under an item's title (`PagePins`) |
+| Pin | App | A property under an item's title (`PageHead`) |
 | Property block | App | The rows under the pins |
-| Right sidebar | App | The panel beside a page that lists everything (`ItemInspector`) |
+| Panel | App | The panel beside a page, with the parts Outline, Links and Info (`ItemPanel`) |
 | Corner | App | The controls at a page's or list's lower right (`WindowCorner`) |
 | Section, tab | App | A heading over sidebar rows, and a set of sections (`SidebarGroup`, `SidebarTab`) |
 | Shortcut | App | A sidebar row that acts and is never selected (`SidebarShortcut`), or a key (`ShortcutCommand`). Say which |

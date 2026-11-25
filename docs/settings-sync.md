@@ -76,5 +76,5 @@ paths:
 - **What they wrote wins at the next step**, even over a change from another Mac that this Mac has not taken. The marks that say so survive a relaunch.
 - **Import replaces each chosen section whole** (`SettingsFile`): a setting that the file lacks goes to its default, and other sections are untouched. A file that is not the app's, or is from a later version, changes nothing. Every value is checked before any is written.
 - **Restore puts back exactly what the point holds**, removes the keys it lacks and saves a point of its own, so it can be undone.
-- **Reset clears `MacSettings.keys` and `MacSettings.prefixes`.** It keeps the library's copy, the queue, the sign-in and the sync's record, and its alert says that every connected Mac follows.
+- **Reset clears `MacSettings.keys`.** It keeps the library's copy, the queue, the sign-in and the sync's record, and its alert says that every connected Mac follows.
 - **A system-wide shortcut that another app holds is kept as it was** and counted as skipped.

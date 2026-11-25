@@ -18,10 +18,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Sidebar closed | The title gets an arrow that opens the sidebar's rows as a menu. Back and Forward stay. The control after the count follows the title. | `SidebarToolbar.swift`, `MainView.swift` | `Rethink-Sidebar-Closed`, `Rethink-Sidebar-Closed-Menu` |
-| The top row | Title and count on one baseline, the Library or Feed control, the place's views, then the buttons. At rest the views have their own row; scrolled, they sit beside the title. Types, Collections and Sources fold into one menu first, then views into N More, then one pill. It is drawn in the content, as `docs/window.md` says. | `WindowToolbar.swift`, `ListToolbar.swift`, `IndexScrollAway.swift` | `Rethink-Library-Scrolled`, `Rethink-Top-Row-Columns`, `Rethink-Top-Row-Lists` |
-| Customize Toolbar goes | Its commands stay in the menus and the palette. | `WindowToolbarLayout` | `Rethink-Library` |
-| Smallest window | The window goes down to 760 by 520. The panel folds first, then the sidebar by itself under 900 wide, then the control, the views, and a table's columns from the last. | `MarfaMacApp.swift`, `MainView.swift` | `Rethink-Small-Window`, `Rethink-Panel-Sizes` |
 | The Marfa's panel | The foot opens a panel: the Marfa's name and count, its latest sources, and the Marfas the app has signed in to, with a tick and a plus on the heading. Switching signs out of nothing. Pages flush first, and changes that were not sent stay queued. | `SidebarFoot.swift`, `MarfaHost` | `Rethink-Marfa` |
 
 ## Library and its places
@@ -39,14 +35,11 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Feed | No count on its row, no words of waiting. Its first view is named All. | `SidebarGroups.swift`, `Browser` | `Rethink-Inbox`, `Rethink-Inbox-View`, `Rethink-Inbox-Page`, `Rethink-Inbox-Modal` |
-| Library or Feed control | After the count on a type, collection, or source with Feed items, offer All Items, Library, and Feed with their counts. Keep it quiet on the default and hide it first when space runs out. The title counts what is listed. The sidebar count stays the same. | `ListToolbar.swift`, `ListScope` | `Rethink-Scope-Menu`, `Rethink-Type-Inbox` |
 | Default From | Settings > Lists offers All Items (the default) and Library. | `PreferencesMap`, Settings > Lists | `Rethink-Scope-Menu` |
 | Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. The table of both tiers has it; the list and gallery do not yet. | `ItemRow.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
 | A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. **Waits for the package:** its catalogue does not say which types hold a table, and the app names no type (marfa-swift#561). | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |
 | Quick Actions | Keep, Archive and Delete on the row under the pointer, a choice of each view, with the default that `docs/concepts.md` gives. | `ItemRow.swift`, `ViewMacSettings` | `Rethink-Inbox-Actions`, `Rethink-View-Quick-Actions` |
-| In | A value on the panel's Info for every item, Library or Feed, that a person changes there. | `ItemInspector.swift` | `Rethink-Feed-Page-In` |
-| Leaves the Feed | A date beside In, only where the type has a limit and the item is active in the Feed. Move to Feed asks first only where the limit would remove the item at once: the alert is built and asks `ItemLibrary.feedLimitQuestion`, which answers nothing until the limit is in the catalogue. **Waits for Marfa and the package:** a type's feed window in the catalogue (marfa#3560, marfa-swift#559). | `ItemInspector.swift`, `ItemMoves.swift` | `Rethink-Feed-Limit`, `Rethink-Feed-Limit-Move` |
-| Who else keeps an item | One line in Info: "Read only. RSS keeps this item, so a change made here would be overwritten." or "Synced with GitHub. A change made here is sent there." | `ItemInspector.swift` | `Rethink-Kept-By` |
+| Leaves the Feed | A date beside In, only where the type has a limit and the item is active in the Feed. Move to Feed asks first only where the limit would remove the item at once: the alert is built and asks `ItemLibrary.feedLimitQuestion`, which answers nothing until the limit is in the catalogue. **Waits for Marfa and the package:** a type's feed window in the catalogue (marfa#3560, marfa-swift#559). | `PanelInfoView.swift`, `ItemMoves.swift` | `Rethink-Feed-Limit`, `Rethink-Feed-Limit-Move` |
 
 ## Archiving
 
@@ -121,9 +114,8 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The head | A grey line over the title: the type, then Read Only, Feed or Archived where true. Clicking the type opens Change Type. One head for every kind, in the web page and in the app's own pages. | `ItemPageHeader.swift`, `PageHeader.swift`, `editor/src/header.ts` | `Rethink-Task-Page`, `Rethink-Long-Page` |
-| Rows | Under the title, one row for each property with a value, six, then Show N More. A type with no text shows its first six, empty ones too. Boxes, strips and the pinned header's looks go. Pinned properties are a setting, off. | `PagePins`, `PagePlacements`, `editor/src/header.ts` | `Rethink-Properties-Rule`, `Rethink-Properties-Sizes` |
-| A row's menu | Show When It Has a Value, Always Show, Hide on every page of the type, Move Up and Down, then the field's own menu. Customize Layout goes. | `FieldMenu`, `PagePlacements`, `CustomizeLayout.swift` | `Rethink-Item-Menus` |
+| Customize Layout | It goes, since a row's menu holds what it placed. | `CustomizeLayout.swift` | `Rethink-Item-Menus` |
+| Stored `rows` | A page placement is stored with `rows` beside `shows`, because a copy from before `shows` sets the whole map aside without `rows`. Removed after the first v0.1 release: write `shows` only and keep reading an old `rows` once. | `PagePlacements.swift` | – |
 | Scrolled | The title sits in the toolbar on one line. | `ItemDetail.swift`, `WindowToolbar.swift` | `Rethink-Page-Scrolled`, `Rethink-White-Page` |
 | Foot | Sub-Items with nesting on any item that has them; a Timeline of mentions on a person and a place; more after 30. | `LinkedFromPlace`, `editor/src/header.ts` | `Rethink-Sub-Items`, `Rethink-Person`, `Rethink-Place` |
 | Corner | Formats, text size and Focus on a written page; size and Focus otherwise; Open on a file. | `PageCorner` | `Rethink-Formats`, `Rethink-Focus` |
@@ -136,11 +128,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The panel | White, closed by default, with pills: Outline, Links, Info. It remembers the pill for each type. One part has no pills. | `ItemInspector.swift` | `Rethink-Panel-Sizes`, `Rethink-Task-Page` |
-| Outline | Reading Time and Words, or a PDF's Pages, then the headings. | `ItemInspectorRows.swift` | `Rethink-Long-Page`, `Rethink-PDF` |
-| Links | In Collection, Referenced By, Links in the Text, Excerpts, Thread, Attachments. | `ItemRelationships.swift` | `Rethink-Highlight`, `Rethink-Message` |
-| Info | Source, version, created, edited, a file's facts, In, Leaves the Feed, who keeps it, History. The history is asked for when Info shows. | `ItemInspectorFields.swift` | `Rethink-Feed-Page-In`, `Rethink-Kept-By` |
-| What goes | Properties, Tags, Relationships, From Apps and the sidebar's own arrangement, once the rows carry them. Fields the type does not declare are the last rows, under Other. A sync problem is a page notice. | `ItemProperties.swift`, `ItemTags.swift`, `SidebarArrangement` | `Rethink-Properties-Rule` |
+| What goes | Properties, Tags and Relationships in Info, and the sync problem, once the page's rows carry them. Fields the type does not declare are the last rows, under Other. | `ItemInspector.swift`, `ItemProperties.swift`, `ItemTags.swift` | `Rethink-Properties-Rule` |
 
 ## Editing and links
 
@@ -163,17 +151,17 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Task, project | Status, priority and due as rows, sub-items at the foot. | `TypeLooks`, `editor/src/header.ts` | `Rethink-Task-Page`, `Rethink-Project`, `Rethink-Project-Full` |
-| Event | When is a row with how far off it is; attendees' answers in gray. | `EventHeader` | `Rethink-Event`, `Rethink-Event-Full` |
-| Bookmark, article, web page | The description is a row; Reader or Original in the corner, the original at full width. The reading header goes. | `ReadingHeader`, `WebPageItemPage.swift` | `Rethink-Bookmark`, `Rethink-Bookmark-Full`, `Rethink-Web-Page-Reader`, `Rethink-Web-Page-Original` |
+| Task, project | Sub-items at the foot. | `TypeLooks`, `editor/src/header.ts` | `Rethink-Task-Page`, `Rethink-Project`, `Rethink-Project-Full` |
+| Event | Attendees' answers in gray. | `EventHeader` | `Rethink-Event`, `Rethink-Event-Full` |
+| Bookmark, article, web page | Reader or Original in the corner, the original at full width. | `WebPageItemPage.swift` | `Rethink-Bookmark`, `Rethink-Bookmark-Full`, `Rethink-Web-Page-Reader`, `Rethink-Web-Page-Original` |
 | Highlight | The passage is its text, in a leading style and edited as text. Its note is a row of two lines. It has no title. | `TypeLooks`, `editor/src/header.ts` | `Rethink-Highlight`, `Rethink-Highlight-Full`, `Rethink-Highlights` |
-| Person, place | The first six rows. A place has a map on its page. | `PersonHeader`, `FileItemContent` | `Rethink-Person`, `Rethink-Person-Full`, `Rethink-Place`, `Rethink-Place-Full` |
+| Person, place | A place has a map on its page. | `FileItemContent` | `Rethink-Person`, `Rethink-Person-Full`, `Rethink-Place`, `Rethink-Place-Full` |
 | Message | No title field, so its text leads. From is a mark and a name. | `TypeLooks` | `Rethink-Message`, `Rethink-Message-Full` |
 | Image | Fit in the corner, its facts, rows that can be edited. | `FileItemContent`, `FileCorner.swift` | `Rethink-Image`, `Rethink-Image-Full` |
 | PDF | Paper on a gray or white ground, by a setting; contents in Outline. The PDF keeps its own scroller, with the head as its first inset; so do a video and a picture. | `FileItemContent`, `FileCorner.swift` | `Rethink-PDF`, `Rethink-PDF-Full`, `Rethink-PDF-White`, `Rethink-PDF-Full-White` |
 | Audio, video | A playback bar at the window's foot, with a waveform, speed, skip and the place kept; nothing plays by itself. **Waits for Marfa:** a transcript. | `FileItemContent` | `Rethink-Audio`, `Rethink-Audio-Transcript`, `Rethink-Video`, `Rethink-Playback` |
 | Table item | A sheet of its own rows, without properties or margins, row numbers off. The app keeps the order and a column's menu sets it. The last piece, and it may be cut. | new files in `MarfaMac/Views/` | `Rethink-Table-Item`, `Rethink-Table-Item-Full`, `Rethink-Table-Item-Numbers`, `Rethink-Table-Item-Column`, `Rethink-Table-Preview` |
-| Read only | Read Only with a lock over the title, no Aa, and one line in Info. | `ItemPageHeader.swift` | `Rethink-Read-Only`, `Rethink-Read-Only-Full` |
+| Read only | No Aa, and one line in Info. | `PageCorner`, `ItemInspector.swift` | `Rethink-Read-Only`, `Rethink-Read-Only-Full` |
 
 ## Version history
 

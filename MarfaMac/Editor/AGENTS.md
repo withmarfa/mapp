@@ -6,7 +6,7 @@ The Swift side of the item editor. The page is in `editor/`; read `editor/AGENTS
 
 - **Use AppKit's `WKWebView` in an `NSViewRepresentable`,** because SwiftUI's `WebView` lacks printing, menu filtering, Undo routing, dropped files and focus.
 - **A private WebKit setting is allowed only when** Apple's own `WebView` uses it, WebKit responds to its selector, and the page works without it (`WebViewChrome.swift`).
-- **Trap:** the system's scroll edge never reaches the page and the toolbar draws no background, so the app draws its own band (`ToolbarBand`, `bandsToolbar()`, `bandsFoot`). No view in this window may rely on the system's edge.
+- **Trap:** the system's scroll edge never reaches the page and the toolbar draws no background, so the app draws its own band (`ToolbarBand`, `bandsFoot`). No view in this window may rely on the system's edge.
 - **Keep the bridge's decoding hand-written.** `MarfaMacTests/EditorBridgeTests.swift` checks it against `editor/bridge-messages.json`.
 - **A script error the page reports is logged,** never shown as the notice's words (`EditorController.tellPageFault`).
 - **The navigation delegate allows only the page itself and `marfa-embed:`** (`EditorController+Navigation.swift`). Keep every other navigation canceled.
@@ -37,9 +37,9 @@ The Swift side of the item editor. The page is in `editor/`; read `editor/AGENTS
 
 ## Header
 
-- **The page draws the header and the app builds its data** (`MarfaMac/Views/ItemPageHeader.swift`) and carries out its events. Swift alone decides which rows are editable (`PropertyRow.editable`) and what a field's menu holds (`FieldMenu`).
-- **A value opens in `ValueEditPresenter` under the rectangle the page sends,** and is written through the library as in the right sidebar. A refusal is told in the panel, never on the page.
-- **A dragged row goes through `PageLayout.listing` and `PagePlacements`,** as in Customize Layout: it sets the order for the type and changes no item.
+- **The page draws the head and the app builds its data** (`PageHead`, sent by `ItemPageHeader`) and carries out its events. Swift alone decides which rows show, which are editable and what a row's menu holds (`FieldMenu`).
+- **A value opens in `ValueEditPresenter` under the rectangle the page sends,** and is written through the library as in the panel. A refusal is told in the panel, never on the page.
+- **A drag's order is merged into the type's saved order** (`PagePlacements.setDraggedOrder`), so rows the item lacks keep their places.
 - **Customize Layout belongs to the window** (`DetailsPresentation.isCustomizingLayout`), and Escape from the page ends it.
 - **Build the header only when what it reads changes** (`EditorController.showHeader`). Reading `contentRevision` or a whole list there rebuilds it at an edit anywhere.
 - **A title is editable only where `ItemLibrary.canSetTitle(of:)` says so.** Unsaved and refused titles stay in `EditorController.titleDrafts`, and one still refused stops a quit, a library change or a close and names the item.

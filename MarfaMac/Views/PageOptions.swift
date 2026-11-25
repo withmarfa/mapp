@@ -9,7 +9,8 @@ enum PageKey {
     static let titleLines = "titleLines"
     static let linkLook = LinkLook.key
     /// Whether a Location's latitude and longitude show as rows of their own. Off, they are drawn by the Location row alone.
-    static let showsCoordinates = "showsCoordinates"
+    static let showsCoordinates = ShowsCoordinates.key
+    static let pinsProperties = PinsProperties.key
     static let smartPunctuation = "smartPunctuation"
     static let pairsBrackets = "pairsBrackets"
     static let continuesLists = "continuesLists"
@@ -20,15 +21,23 @@ enum PageKey {
     static let cornerShowsTextSize = "cornerShowsTextSize"
     static let cornerShowsFocus = "cornerShowsFocus"
     static let all = [
-        fullWidth, textSize, checksSpelling, readingWidth, titleLines, linkLook, showsCoordinates, LineSpacing.key, ParagraphSpacing.key,
+        fullWidth, textSize, checksSpelling, readingWidth, titleLines, linkLook, showsCoordinates, pinsProperties, LineSpacing.key, ParagraphSpacing.key,
         IndentWith.key, PasteAs.key, EditingMode.key, smartPunctuation, pairsBrackets, continuesLists, foldsHeadings, showsCodeLineNumbers,
         cornerShowsFormats, cornerShowsTextSize, cornerShowsFocus,
     ]
 }
 
+/// Reads the Pinned Properties setting where the page's head is made, which is not a view.
+nonisolated enum PinsProperties {
+    /// Whether an item's page pins properties under its title, which its rows then leave out. Off by default.
+    static let key = "pinsProperties"
+    static func stored(in defaults: UserDefaults = .standard) -> Bool { defaults.bool(forKey: key) }
+}
+
 /// Reads the Show Coordinates setting where the page's rows are made, which are not views.
-enum ShowsCoordinates {
-    static func stored(in defaults: UserDefaults = .standard) -> Bool { defaults.bool(forKey: PageKey.showsCoordinates) }
+nonisolated enum ShowsCoordinates {
+    static let key = "showsCoordinates"
+    static func stored(in defaults: UserDefaults = .standard) -> Bool { defaults.bool(forKey: key) }
 }
 
 /// How many lines an item page's title shows before an ellipsis cuts it, while the title is not being edited.
@@ -51,8 +60,9 @@ enum TitleLines {
 /// How an item's page is set out. The defaults here are the only ones; stored settings fall back to them.
 nonisolated struct PageStyle: Equatable {
     var fullWidth = false
-    /// The body text's size in points; headings, spacing and the reading width scale with it.
-    var textSize = 13
+    /// The body text's size in points; headings, spacing and the reading width scale with it. The title is 28 on 34 at
+    /// the default.
+    var textSize = 15
     var checksSpelling = true
     var lineSpacing = LineSpacing.standard
     var paragraphSpacing = ParagraphSpacing.standard
@@ -83,7 +93,13 @@ nonisolated struct PageStyle: Equatable {
         max(CGFloat(textSize * 3), fullWidth ? 0 : (width - CGFloat(readingWidth * textSize)) / 2)
     }
 
-    static let textSizes = [11, 12, 13, 14, 16, 18, 20, 24]
+    static let textSizes = [13, 14, 15, 16, 18, 20, 24]
+
+    /// The step nearest `size`, the smaller of two equally near. A size stored before these steps (11 or 12 points) is
+    /// kept in the defaults as it is and read as this, wherever the page, its menus and Settings show or use it.
+    static func nearestTextSize(_ size: Int) -> Int {
+        textSizes.min { abs($0 - size) < abs($1 - size) } ?? size
+    }
     static let readingWidths = 36...80
 }
 
@@ -114,7 +130,7 @@ struct StoredPageStyle: DynamicProperty {
 
     var wrappedValue: PageStyle {
         PageStyle(
-            fullWidth: fullWidth, textSize: textSize, checksSpelling: checksSpelling, lineSpacing: lineSpacing,
+            fullWidth: fullWidth, textSize: PageStyle.nearestTextSize(textSize), checksSpelling: checksSpelling, lineSpacing: lineSpacing,
             paragraphSpacing: paragraphSpacing, smartPunctuation: smartPunctuation, pairsBrackets: pairsBrackets,
             continuesLists: continuesLists, indentWith: indentWith, pasteAs: pasteAs, editingMode: editingMode,
             foldsHeadings: foldsHeadings, showsCodeLineNumbers: showsCodeLineNumbers, readingWidth: readingWidth, linkLook: linkLook,

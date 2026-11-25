@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where an item's Linked From list shows: at the foot of its page, or in the inspector.
+/// Where an item's Linked From list shows: at the foot of its page, or only in the panel.
 nonisolated enum LinkedFromPlace: String, Codable, Sendable {
     case page, inspector
 }
@@ -16,22 +16,67 @@ nonisolated struct PagePlacements: Equatable, Sendable {
 
     /// What the person chose for one type. A row not named here follows the default.
     struct Choice: Codable, Equatable, Sendable {
-        /// Row identifiers (`PagePlacement`) the person chose to show on the page (true) or keep off it (false).
-        var rows: [String: Bool] = [:]
+        /// How each row the person placed shows on the type's pages, by its identifier (`PagePlacement`).
+        var shows: [String: RowShows] = [:]
+        /// The word a row's `shows` holds that this version does not name, by row, as it was stored. Rewriting the choice
+        /// keeps it until the person chooses how that row shows.
+        var otherShows: [String: String] = [:]
         var linkedFrom: LinkedFromPlace?
-        /// The row identifiers pinned under the title, in order. Nil follows the default pins; an empty list is a
-        /// choice, that nothing is pinned. Optional so a choice saved before pins existed still decodes.
+        /// The row identifiers pinned under the title, in order, while pinned properties are on
+        /// (`PageKey.pinsProperties`). Nil follows the default pins; an empty list is a choice, that nothing is pinned.
         var pins: [String]?
-        /// The row identifiers in the order the page lists them, the property block's order. A row not named keeps its
-        /// own order after those named. Nil follows the default order. Optional so a choice saved before ordering
-        /// existed still decodes.
+        /// The row identifiers in the order the page lists them. A row not named keeps its own order after those named.
+        /// Nil follows the default order.
         var rowOrder: [String]?
-        /// The identifiers (`SidebarSection`) of the right sidebar's sections, in order. Nil follows the default
-        /// sections. Linked From is named here only while `linkedFrom` puts it in the sidebar: that one setting decides
-        /// where it is, and this list only where in the sidebar.
-        var sidebar: [String]?
+        /// Every member this version does not name, as it was stored: an older or a later copy wrote it, and rewriting the
+        /// row keeps it.
+        var others: [String: StoredJSON] = [:]
 
-        var isEmpty: Bool { rows.isEmpty && linkedFrom == nil && pins == nil && rowOrder == nil && sidebar == nil }
+        var isEmpty: Bool {
+            shows.isEmpty && otherShows.isEmpty && linkedFrom == nil && pins == nil && rowOrder == nil && others.isEmpty
+        }
+
+        init(shows: [String: RowShows] = [:], linkedFrom: LinkedFromPlace? = nil, pins: [String]? = nil, rowOrder: [String]? = nil) {
+            self.shows = shows
+            self.linkedFrom = linkedFrom
+            self.pins = pins
+            self.rowOrder = rowOrder
+        }
+
+        private static let known: Set<String> = ["shows", "rows", "linkedFrom", "pins", "rowOrder"]
+
+        /// Every member is optional on reading, and `shows` is read first. A choice saved as shown or hidden (`rows`,
+        /// true or false) is read as When It Has a Value or Hidden. A word a later version adds to `shows` is kept apart
+        /// in `otherShows`, and the row follows the default while it is there.
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: DynamicKey.self)
+            if let words = try container.decodeIfPresent([String: String].self, forKey: DynamicKey("shows")) {
+                shows = words.compactMapValues(RowShows.init(rawValue:))
+                otherShows = words.filter { RowShows(rawValue: $0.value) == nil }
+            } else if let rows = try container.decodeIfPresent([String: Bool].self, forKey: DynamicKey("rows")) {
+                shows = rows.mapValues { $0 ? .whenSet : .hidden }
+            }
+            linkedFrom = try container.decodeIfPresent(LinkedFromPlace.self, forKey: DynamicKey("linkedFrom"))
+            pins = try container.decodeIfPresent([String].self, forKey: DynamicKey("pins"))
+            rowOrder = try container.decodeIfPresent([String].self, forKey: DynamicKey("rowOrder"))
+            others = try container.members(except: Self.known)
+        }
+
+        /// Writes `rows` (true unless hidden) beside `shows`, always, even with none placed. A copy from before `shows`
+        /// requires `rows`, and one that does not find it sets the whole document aside, so a stored shape must never
+        /// lose a member an older copy requires. This version reads `shows` and ignores `rows` when both are there. A row
+        /// whose word is another version's is written to `rows` as shown.
+        func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: DynamicKey.self)
+            let words = shows.mapValues(\.rawValue).merging(otherShows) { known, _ in known }
+            if !words.isEmpty { try container.encode(words, forKey: DynamicKey("shows")) }
+            let rows = shows.mapValues { $0 != .hidden }.merging(otherShows.mapValues { _ in true }) { known, _ in known }
+            try container.encode(rows, forKey: DynamicKey("rows"))
+            try container.encodeIfPresent(linkedFrom, forKey: DynamicKey("linkedFrom"))
+            try container.encodeIfPresent(pins, forKey: DynamicKey("pins"))
+            try container.encodeIfPresent(rowOrder, forKey: DynamicKey("rowOrder"))
+            for (name, value) in others { try container.encode(value, forKey: DynamicKey(name)) }
+        }
     }
 
     /// By type identifier.
@@ -89,18 +134,74 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         update(type) { $0.rowOrder = order.map(PagePlacement.unique) }
     }
 
-    mutating func setShown(_ shown: Bool, row: String, of type: TypeID) {
-        update(type) { $0.rows[row] = shown }
+    /// Chooses how a row shows on the type's pages.
+    mutating func setShows(_ shows: RowShows, row: String, of type: TypeID) {
+        update(type) {
+            $0.shows[row] = shows
+            $0.otherShows[row] = nil
+        }
     }
 
-    /// Chooses whether the page shows a row. Linked From is either on the page or in the inspector, so showing it
+    /// Chooses whether the page shows a row at all: showing a hidden row shows it when it has a value, and showing a
+    /// row that shows already leaves it as it is. Linked From is either on the page or in the inspector, so showing it
     /// moves it.
     mutating func set(_ shown: Bool, row: String, of type: TypeID, in catalogue: Catalogue) {
         if row == PagePlacement.linkedFrom {
             setLinkedFrom(shown ? .page : .inspector, of: type, in: catalogue)
-        } else {
-            setShown(shown, row: row, of: type)
+        } else if !shown {
+            setShows(.hidden, row: row, of: type)
+        } else if placement(of: type, in: catalogue).shows(row) == .hidden {
+            setShows(.whenSet, row: row, of: type)
         }
+    }
+
+    /// Moves `row` up (negative) or down by `offset` among `visible`, the rows the page lists in the order it lists them,
+    /// and keeps that move in the type's order. Returns false at either end, or for a row not in `visible`.
+    @discardableResult
+    mutating func move(_ row: String, by offset: Int, in visible: [String], of type: TypeID) -> Bool {
+        var order = PagePlacement.unique(visible)
+        guard let from = order.firstIndex(of: row), order.indices.contains(from + offset) else { return false }
+        order.swapAt(from, from + offset)
+        moveRow(row, among: order, of: type)
+        return true
+    }
+
+    /// Keeps a dragged row's new place: `order` is every row the page lists, folded ones too, in the order the drag
+    /// left them, and the type's order takes exactly that for the rows it names. A saved row `order` does not name
+    /// (a pinned row, or one this item lacks) keeps its place after the row that preceded it in the saved order, or
+    /// first where none did, for the items that have it.
+    mutating func setDraggedOrder(_ order: [String], of type: TypeID) {
+        var merged = PagePlacement.unique(order)
+        let named = Set(merged)
+        let saved = choices[type.rawValue]?.rowOrder ?? []
+        for (at, row) in saved.enumerated() where !named.contains(row) && !merged.contains(row) {
+            if at > 0, let after = merged.firstIndex(of: saved[at - 1]) {
+                merged.insert(row, at: after + 1)
+            } else {
+                merged.insert(row, at: 0)
+            }
+        }
+        setRowOrder(merged, of: type)
+    }
+
+    /// Keeps the move of `row` in the type's order. `visible` is the rows the page lists, in the order they are in after
+    /// the move: the row goes where it stands among them, and every other row, shown or not, keeps its saved place, so a
+    /// pinned row or one this item lacks keeps its position for the items that have it. A row the saved order does not
+    /// name takes the place the page lists it in, after the named ones.
+    mutating func moveRow(_ row: String, among visible: [String], of type: TypeID) {
+        let visible = PagePlacement.unique(visible)
+        guard let at = visible.firstIndex(of: row) else { return }
+        var order = PagePlacement.unique((choices[type.rawValue]?.rowOrder ?? []) + visible)
+        order.removeAll { $0 == row }
+        // After the row it now follows on the page, or, first of all, before the one it now precedes.
+        if at > 0, let after = order.firstIndex(of: visible[at - 1]) {
+            order.insert(row, at: after + 1)
+        } else if at + 1 < visible.count, let before = order.firstIndex(of: visible[at + 1]) {
+            order.insert(row, at: before)
+        } else {
+            order.append(row)
+        }
+        setRowOrder(order, of: type)
     }
 
     /// Chooses where Linked From goes. A place equal to the type's default is not kept, so the type follows its default
@@ -108,44 +209,6 @@ nonisolated struct PagePlacements: Equatable, Sendable {
     mutating func setLinkedFrom(_ place: LinkedFromPlace, of type: TypeID, in catalogue: Catalogue) {
         let isDefault = place == placement(of: type, in: catalogue).defaultLinkedFromPlace
         update(type) { $0.linkedFrom = isDefault ? nil : place }
-    }
-
-    /// The sidebar's sections for `type`, in order (see `PagePlacement.sidebarSections`).
-    func sidebarSections(of type: TypeID, in catalogue: Catalogue) -> [String] {
-        placement(of: type, in: catalogue).sidebarSections
-    }
-
-    /// Shows exactly these sections (each once) in this order. Linked From is in the sidebar exactly when it is
-    /// named, so naming or dropping it also moves it between the sidebar and the page foot. An order equal to the
-    /// default is not kept.
-    mutating func setSidebarSections(_ sections: [String], of type: TypeID, in catalogue: Catalogue) {
-        let ids = PagePlacement.unique(sections)
-        let inSidebar = ids.contains(PagePlacement.linkedFrom)
-        if inSidebar != (placement(of: type, in: catalogue).linkedFromPlace == .inspector) {
-            setLinkedFrom(inSidebar ? .inspector : .page, of: type, in: catalogue)
-        }
-        let defaults = SidebarSection.defaultIDs.filter { $0 != PagePlacement.linkedFrom || inSidebar }
-        update(type) { $0.sidebar = ids == defaults ? nil : ids }
-    }
-
-    /// Adds a section after the others. One already shown stays where it is.
-    mutating func addSidebarSection(_ section: String, of type: TypeID, in catalogue: Catalogue) {
-        let current = sidebarSections(of: type, in: catalogue)
-        guard !current.contains(section) else { return }
-        setSidebarSections(current + [section], of: type, in: catalogue)
-    }
-
-    mutating func removeSidebarSection(_ section: String, of type: TypeID, in catalogue: Catalogue) {
-        setSidebarSections(sidebarSections(of: type, in: catalogue).filter { $0 != section }, of: type, in: catalogue)
-    }
-
-    /// Moves a shown section to `index` among the shown ones, which is kept within them.
-    mutating func moveSidebarSection(_ section: String, to index: Int, of type: TypeID, in catalogue: Catalogue) {
-        var sections = sidebarSections(of: type, in: catalogue)
-        guard let from = sections.firstIndex(of: section) else { return }
-        sections.remove(at: from)
-        sections.insert(section, at: min(max(index, 0), sections.count))
-        setSidebarSections(sections, of: type, in: catalogue)
     }
 
     /// Takes back every choice for the type, so it follows the defaults again.
@@ -190,14 +253,19 @@ nonisolated extension PagePlacements {
     }
 }
 
+/// How a row shows on a type's pages: when the item has a value for it (the default), always, even empty, or only
+/// under Show More, greyed.
+nonisolated enum RowShows: String, Codable, CaseIterable, Sendable {
+    case whenSet, always, hidden
+}
+
 /// What the page shows of one type's items. A row is named by its identifier: a field's key, a relationship's field
-/// (the parent's is `child-of`), `#type`, `#source`, `#updated` (the item's own type, source and last edit), `#tags`,
-/// or `#linked` for Linked From.
+/// (the parent's is `child-of`), `#tags`, `#location`, or `#linked` for Linked From.
 nonisolated struct PagePlacement: Equatable, Sendable {
+    /// The item's type, which the kicker's type name opens the panel for. It is not a row.
     static let type = "#type"
-    static let source = "#source"
-    static let updated = "#updated"
-    /// An event's time. It leads the pins and is no person's choice, so it is in no placement.
+    /// An event's time, the one row an event's start, end, day and zone show in. It leads the rows and is no person's
+    /// choice, so it is in no placement.
     static let when = "#when"
     static let tags = "#tags"
     /// The Location row, which stands for an item's latitude and longitude, and its name for the place where it has one.
@@ -208,9 +276,8 @@ nonisolated struct PagePlacement: Equatable, Sendable {
     /// The most properties a page pins.
     static let pinLimit = 4
 
-    /// The properties pinned under the title, in order (`pinLimit` at most, none twice): the person's choice, or with
-    /// none the type's own, then the status, the parent and the last edit. A default pin that a saved choice turned
-    /// off (`choice.rows[id] == false`) stays off, since that is the person's choice too.
+    /// The properties pinned under the title while pinned properties are on, in order (`pinLimit` at most, none twice):
+    /// the person's choice, or with none the status and the parent. A default pin the person hid stays off.
     let pins: [String]
 
     /// The type's link field: the connector's own identity for the item, which says nothing to a person.
@@ -239,8 +306,8 @@ nonisolated struct PagePlacement: Equatable, Sendable {
         // links on the page. Every other item's links are for looking up, which the inspector is for.
         let kind = PageHeaderKind.of(type, in: catalogue)
         let info = catalogue.itemTypes[type]
-        let pins = choice.pins
-            ?? [Self.type, info?.statusField?.key, Self.parent, Self.updated].compactMap { $0 }.filter { choice.rows[$0] != false }
+        let defaults: [String] = [info?.statusField?.key, Self.parent].compactMap { $0 }.filter { choice.shows[$0] != .hidden }
+        let pins = choice.pins ?? defaults
         self.init(
             linkField: info?.linkField, choice: choice,
             defaultLinkedFrom: kind == .person || catalogue.isCollection(type) ? .page : .inspector,
@@ -276,26 +343,15 @@ nonisolated struct PagePlacement: Equatable, Sendable {
         return key == "etag" || ["_id", "_hash", "_sha", "_uid"].contains { key.hasSuffix($0) }
     }
 
-    func showsOnPage(_ row: String) -> Bool { choice.rows[row] ?? defaultShows(row) }
+    /// How `row` shows: the person's choice, or when it has a value, but for what only a connector's bookkeeping needs.
+    func shows(_ row: String) -> RowShows { choice.shows[row] ?? (defaultShows(row) ? .whenSet : .hidden) }
+
+    func showsOnPage(_ row: String) -> Bool { shows(row) != .hidden }
 
     var linkedFromPlace: LinkedFromPlace { choice.linkedFrom ?? defaultLinkedFrom }
 
     /// Where Linked From goes for this type when the person has chosen nothing.
     var defaultLinkedFromPlace: LinkedFromPlace { defaultLinkedFrom }
-
-    /// The sidebar's sections in order: the person's list, or the default sections. A stored id that names no section
-    /// is dropped here, so the panel and every move work from one list. Linked From is there only while its place is
-    /// the sidebar, at its place in the list or, where the list does not name it, last.
-    var sidebarSections: [String] {
-        let linked = PagePlacement.linkedFrom
-        var sections = Self.unique(choice.sidebar ?? SidebarSection.defaultIDs).filter { SidebarSection(id: $0) != nil }
-        if linkedFromPlace == .page {
-            sections.removeAll { $0 == linked }
-        } else if !sections.contains(linked) {
-            sections.append(linked)
-        }
-        return sections
-    }
 
     private func defaultShows(_ row: String) -> Bool { row != linkField && !bookkeeping.contains(row) }
 }

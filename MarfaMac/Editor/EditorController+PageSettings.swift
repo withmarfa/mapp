@@ -153,11 +153,10 @@ extension EditorController {
             "empty": String(localized: "Empty"),
             "discardChanges": String(localized: "Discard Changes"),
             "linkedFrom": String(localized: "Linked From"),
-            "customizeLayout": String(localized: "Customize Layout in the Title Row"),
-            "contents": String(localized: "Contents"),
             "showLess": String(localized: "Show Less"),
-            "timeline": String(localized: "Timeline"),
             "properties": String(localized: "Properties"),
+            "reorder": String(localized: "Drag to Reorder"),
+            "changeType": String(localized: "Change Type"),
         ]
     }
 

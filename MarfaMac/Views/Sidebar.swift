@@ -125,13 +125,7 @@ struct SidebarContent {
                 return row(library.catalogue.plural(for: TypeID(id)), .type(library.catalogue.icon(for: TypeID(id))), opens: .type(TypeID(id)))
             }
             guard let data = Self.row(place, in: library, creatable: creatable), let opens = data.opens else { return nil }
-            let icon: RowIcon = switch data.mark {
-            case .symbol(let name): .symbol(name)
-            case .icon(let icon): icon
-            case .grayType(let id): .type(id)
-            case .view(let id): .symbol(SidebarPlace.symbol(ofView: id, in: ViewLayouts.stored()))
-            }
-            return row(data.title, icon, opens: opens)
+            return row(data.title, data.menuIcon, opens: opens)
         }
     }
 }
@@ -168,6 +162,16 @@ nonisolated struct SidebarPlaceRowData: Equatable {
     var count: Int?
     /// A collection's row offers a plus under the pointer.
     var adds = false
+
+    /// The row's mark as a menu item or a shortcut draws it.
+    @MainActor var menuIcon: RowIcon {
+        switch mark {
+        case .symbol(let name): .symbol(name)
+        case .icon(let icon): icon
+        case .grayType(let id): .type(id)
+        case .view(let id): .symbol(SidebarPlace.symbol(ofView: id, in: ViewLayouts.stored()))
+        }
+    }
 }
 
 /// A shortcut's row. It does something or goes somewhere, so it never takes the selection.

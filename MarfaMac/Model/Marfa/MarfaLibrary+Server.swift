@@ -21,6 +21,18 @@ extension MarfaLibrary {
         }
     }
 
+    /// Asks once for a library. An ask that fails is made again on a later call only after `connectorRetryWait`.
+    func readConnectors() async {
+        guard connectors == nil, !isReadingConnectors, let sourceNames else { return }
+        if let failed = connectorsFailedAt, ContinuousClock.now - failed < Self.connectorRetryWait { return }
+        isReadingConnectors = true
+        defer { isReadingConnectors = false }
+        connectors = try? await sourceNames.connectors()
+        connectorsFailedAt = connectors == nil ? .now : nil
+    }
+
+    static let connectorRetryWait = Duration.seconds(60)
+
     func updateSource(_ code: String, name: SourceFieldChange?, mark: SourceFieldChange?) async -> SourceEditFailure? {
         guard let sourceNames else { return .unsupported }
         do {

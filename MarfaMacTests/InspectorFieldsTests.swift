@@ -64,7 +64,6 @@ struct InspectorFieldsTests {
         library.catalogue = Catalogue(itemTypes: [Self.task])
         let header = ItemPageHeader.header(of: library.items[0].id, in: library, drafts: DetailsPresentation())
         #expect(header?.status?.label == "In Progress")
-        #expect(header?.status?.empty == false)
         #expect(header?.status?.enabled == true)
     }
 
@@ -74,19 +73,8 @@ struct InspectorFieldsTests {
         let library = FakeItemLibrary(items: [item])
         library.catalogue = Catalogue(itemTypes: [Self.task])
         let header = ItemPageHeader.header(of: item.id, in: library, drafts: DetailsPresentation())
-        #expect(header?.pins.map(\.id) == ["#type", "status", "#updated"])
+        #expect(header?.rows.contains { $0.id == "status" && $0.value == .status } == true)
         #expect(header?.status?.enabled == false)
-    }
-
-    @MainActor @Test func anEmptyStatusIsAnEmptyChipPin() {
-        let item = Self.item("aic.ticket.task")
-        let library = FakeItemLibrary(items: [item])
-        library.catalogue = Catalogue(itemTypes: [Self.task])
-        let header = ItemPageHeader.header(of: item.id, in: library, drafts: DetailsPresentation())
-        #expect(header?.pins.map(\.id) == ["#type", "status", "#updated"])
-        #expect(header?.pins.first { $0.id == "status" }?.isEmpty == true)
-        // A pinned row is not in the property block either.
-        #expect(header?.properties.map(\.id).contains("status") == false)
     }
 
     @MainActor @Test func theHeaderDrawsATitleOnlyForAnItemWhoseTitleIsItsOwn() {
@@ -98,12 +86,12 @@ struct InspectorFieldsTests {
         #expect(ItemPageHeader.header(of: fromText.id, in: library, drafts: DetailsPresentation())?.showsTitle == false)
     }
 
-    @MainActor @Test func aStatusWithNoValueIsAnEmptyPinAndATypeWithoutOneHasNone() {
+    @MainActor @Test func aStatusWithNoValueIsAnEmptyRowAndATypeWithoutOneHasNone() {
         let library = FakeItemLibrary(items: [Self.item("aic.ticket.task"), Self.item("core.file", id: "10000000-0000-0000-0000-000000000002")])
         library.catalogue = Catalogue(itemTypes: [Self.task, Self.file])
         let empty = ItemPageHeader.header(of: library.items[0].id, in: library, drafts: DetailsPresentation())
-        #expect(empty?.status?.label == "")
-        #expect(empty?.status?.empty == true)
+        #expect(empty?.status == nil)
+        #expect(empty?.rows.first { $0.id == "status" }?.isEmpty == true)
         #expect(ItemPageHeader.header(of: library.items[1].id, in: library, drafts: DetailsPresentation())?.status == nil)
     }
 
@@ -124,7 +112,7 @@ struct InspectorFieldsTests {
         #expect(ItemPageHeader.statusChoices(of: blocked, in: status) == ["pending", "in_progress", "completed", "canceled", "blocked"])
         let completed = Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string("completed"))])
         #expect(ItemPageHeader.statusChoices(of: completed, in: status) == status.options)
-        #expect(PagePins.statusValue(of: Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string(""))]), in: status) == nil)
+        #expect(PageHead.statusValue(of: Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string(""))]), in: status) == nil)
     }
 
     // MARK: The inspector's fields
