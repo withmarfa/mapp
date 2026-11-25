@@ -6,8 +6,6 @@ import Foundation
 /// written as edges by the package, as the text is saved: a link is a `references` edge, which the item it names
 /// shows as linked from, and an embedded file is an `attached-to` edge from the file to the item.
 extension MarfaLibrary {
-    static let inversePrefix = "inverse:"
-
     /// A relationship field as one item sees it: the edge type, and whether the item is the edge's `to` end.
     nonisolated struct FieldEnd {
         let info: EdgeTypeInfo
@@ -16,8 +14,8 @@ extension MarfaLibrary {
     }
 
     func fieldEnd(_ field: String) -> FieldEnd? {
-        if field.hasPrefix(Self.inversePrefix) {
-            guard let info = catalogue.edgeTypes[String(field.dropFirst(Self.inversePrefix.count))] else { return nil }
+        if field.hasPrefix(RelationField.inversePrefix) {
+            guard let info = catalogue.edgeTypes[String(field.dropFirst(RelationField.inversePrefix.count))] else { return nil }
             return FieldEnd(info: info, atTo: info.writtenFrom == .from, isInverse: true)
         }
         guard let (info, isReverse) = catalogue.edgeType(named: field) else { return nil }
@@ -160,7 +158,7 @@ extension MarfaLibrary {
         }
         let pointing = index.links(touching: id).filter { $0.holder != id }
         for type in Set(pointing.map(\.type)) {
-            guard let end = fieldEnd(Self.inversePrefix + type) else { continue }
+            guard let end = fieldEnd(RelationField.inversePrefix + type) else { continue }
             let holders = pointing.filter { $0.type == type }.map { $0.holder }
             let targets = Self.ordered(holders.filter { self.headerItem($0) != nil }.map(target))
             // A two-way relation reads the same from both items, so the links pointing here join the ones this item
@@ -176,13 +174,13 @@ extension MarfaLibrary {
             }
             // The text that links an item is the linking item's to change, not a relationship of this one.
             results.append(ItemRelationship(
-                field: Self.inversePrefix + type, label: label(end), targets: targets,
+                field: RelationField.inversePrefix + type, label: label(end), targets: targets,
                 isEditable: item.allows(.links) && type != MarfaMapping.bodyLinkEdge,
                 allowsMultiple: end.info.reverseCardinality == .many))
         }
         return results.sorted { lhs, rhs in
-            lhs.field.hasPrefix(Self.inversePrefix) != rhs.field.hasPrefix(Self.inversePrefix)
-                ? !lhs.field.hasPrefix(Self.inversePrefix)
+            lhs.field.hasPrefix(RelationField.inversePrefix) != rhs.field.hasPrefix(RelationField.inversePrefix)
+                ? !lhs.field.hasPrefix(RelationField.inversePrefix)
                 : lhs.label.localizedStandardCompare(rhs.label) == .orderedAscending
         }
     }
@@ -205,16 +203,16 @@ extension MarfaLibrary {
                 ends[written ? info.reverseName ?? info.id : info.id] = FieldEnd(info: info, atTo: written, isInverse: false)
             }
             if !(info.isTwoWay && own), admits(item.type, info, atTo: !written) {
-                ends[Self.inversePrefix + info.id] = FieldEnd(info: info, atTo: !written, isInverse: true)
+                ends[RelationField.inversePrefix + info.id] = FieldEnd(info: info, atTo: !written, isInverse: true)
             }
         }
         for link in index.links(touching: id) {
-            guard let held = fieldEnd(link.holder == id ? link.type : Self.inversePrefix + link.type) else { continue }
+            guard let held = fieldEnd(link.holder == id ? link.type : RelationField.inversePrefix + link.type) else { continue }
             if held.isInverse, held.info.isTwoWay, ends.values.contains(where: { $0.info.id == held.info.id && !$0.isInverse }) {
                 continue
             }
             if ends.values.contains(where: { $0.info.id == held.info.id && $0.atTo == held.atTo }) { continue }
-            let name = held.isInverse ? Self.inversePrefix + held.info.id : held.atTo ? held.info.reverseName ?? held.info.id : held.info.id
+            let name = held.isInverse ? RelationField.inversePrefix + held.info.id : held.atTo ? held.info.reverseName ?? held.info.id : held.info.id
             ends[name] = held
         }
         let fields = ends.map { field, end -> RelationField in
@@ -227,8 +225,8 @@ extension MarfaLibrary {
         }
         return fields.sorted { lhs, rhs in
             if lhs.targets.isEmpty != rhs.targets.isEmpty { return !lhs.targets.isEmpty }
-            let lhsInverse = lhs.field.hasPrefix(Self.inversePrefix)
-            if lhsInverse != rhs.field.hasPrefix(Self.inversePrefix) { return !lhsInverse }
+            let lhsInverse = lhs.field.hasPrefix(RelationField.inversePrefix)
+            if lhsInverse != rhs.field.hasPrefix(RelationField.inversePrefix) { return !lhsInverse }
             switch lhs.label.localizedStandardCompare(rhs.label) {
             case .orderedAscending: return true
             case .orderedDescending: return false

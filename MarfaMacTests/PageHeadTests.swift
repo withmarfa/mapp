@@ -37,21 +37,25 @@ struct PageHeadTests {
         return item
     }
 
-    private static func parent(_ title: String? = "Project") -> ItemRelationship {
-        ItemRelationship(
-            field: "child-of", label: "Parent",
-            targets: title.map { [ItemRelationshipTarget(title: $0, itemID: ItemID("p1"), resolution: .resolved(ItemID("p1")))] } ?? [],
-            isEditable: true, allowsMultiple: false)
+    private static func link(
+        _ field: String, _ label: String, _ targets: [String] = [], editability: RelationField.Editability = .editable
+    ) -> RelationField {
+        RelationField(
+            field: field, label: label, cardinality: field == "child-of" ? .one : .many, allowedTypes: [],
+            targets: targets.map { ItemRelationshipTarget(title: $0, itemID: ItemID($0), resolution: .resolved(ItemID($0))) },
+            editability: editability)
     }
+
+    private static func parent(_ title: String? = "Project") -> RelationField { link("child-of", "Parent", title.map { [$0] } ?? []) }
 
     private static func head(
         _ item: MarfaMac.Item, placements: PagePlacements = PagePlacements(), pins: Bool = false, tags: [String] = [],
-        relationships: [ItemRelationship] = [], when: PropertyRow? = nil
+        links: [RelationField] = [], when: PropertyRow? = nil
     ) -> PageHead {
         let type = item.type == TypeID("aic.contact") ? contact : ticket
         let catalogue = Catalogue(itemTypes: [ticket, contact])
         let candidates = PropertyRow.candidates(
-            of: item, type: type, hidden: ["title", "body"], relationships: relationships, format: .standard, tags: tags,
+            of: item, type: type, hidden: ["title", "body"], links: links, format: .standard, tags: tags,
             icon: { _ in nil }, isPerson: { _ in false })
         return PageHead(
             kicker: kicker, candidates: candidates, when: when, placement: placements.placement(of: item.type, in: catalogue),
@@ -63,7 +67,7 @@ struct PageHeadTests {
     // MARK: Rows
 
     @Test func onlyRowsWithAValueShowAndEveryOtherPropertyWaitsUnderShowMoreInTheTypesOrder() {
-        let head = Self.head(Self.item(["priority": .string("high"), "summary": .string("Short")]), relationships: [Self.parent(nil)])
+        let head = Self.head(Self.item(["priority": .string("high"), "summary": .string("Short")]), links: [Self.parent(nil)])
         #expect(Self.shown(head) == ["priority", "summary"])
         #expect(head.order == ["state", "child-of", "priority", "a", "b", "c", "d", "e", "f", "summary", "done", "#tags"])
         #expect(head.foldedCount == 10)
@@ -112,15 +116,31 @@ struct PageHeadTests {
         #expect(PropertyRow.value(of: summary, in: Self.item(["summary": .string("One\nTwo")]), format: .standard) == nil)
     }
 
-    @Test func theCollectionsRowIsTheOneLinkRowThePageEditsInPlace() {
-        func link(_ field: String, _ label: String, _ id: String) -> ItemRelationship {
-            ItemRelationship(
-                field: field, label: label, targets: [ItemRelationshipTarget(title: label, itemID: ItemID(id), resolution: .resolved(ItemID(id)))],
-                isEditable: true, allowsMultiple: true)
-        }
-        let head = Self.head(Self.item(), relationships: [link(MarfaMapping.collectionEdge, "In Collection", "c1"), link("related", "Related", "r1")])
+    @Test func everyLinkTheTypeMayHoldIsARowAndAReadOnlyOneSaysWhy() {
+        let reason = "A link is changed in the text that holds it."
+        let head = Self.head(Self.item(), links: [
+            Self.link(MarfaMapping.collectionEdge, "In Collection"), Self.link("about", "About", ["a1"]),
+            Self.link("references", "References", ["r1"], editability: .readOnly(reason)),
+            Self.link("inverse:parent-of", "Children", ["c1"]),
+        ])
+        #expect(head.rows.first { $0.id == MarfaMapping.collectionEdge }?.value == .empty(symbol: "link"), "an item in no collection has the row")
         #expect(head.rows.first { $0.id == MarfaMapping.collectionEdge }?.editable == true)
-        #expect(head.rows.first { $0.id == "related" }?.editable == false)
+        #expect(head.rows.first { $0.id == "about" }?.editable == true)
+        let references = head.rows.first { $0.id == "references" }
+        #expect(references?.editable == false)
+        #expect(references?.lock == reason)
+        #expect(Self.shown(head) == ["about", "references"], "a link shows when it has one, and the links that point here wait under Show More")
+        #expect(head.rows.first { $0.id == "inverse:parent-of" }?.folded == true)
+    }
+
+    @Test func aValueNoFieldDescribesIsTheLastReadOnlyRowUnderOther() {
+        let head = Self.head(Self.item(["odd": .string("kept")]))
+        let other = head.rows.last
+        #expect(other?.id == PropertyRow.otherPrefix + "odd")
+        #expect(other?.section == PropertyRow.otherHeading)
+        #expect(other?.folded == true)
+        #expect(other?.editable == false)
+        #expect(!head.order.contains(PropertyRow.otherPrefix + "odd"), "it has no place in the order")
     }
 
     // MARK: When
@@ -146,10 +166,10 @@ struct PageHeadTests {
 
     @Test func pinsAreOffByDefaultAndWhenOnAPinnedRowLeavesTheRows() {
         let item = Self.item(["state": .string("pending"), "priority": .string("high")])
-        let off = Self.head(item, relationships: [Self.parent()])
+        let off = Self.head(item, links: [Self.parent()])
         #expect(off.pins.isEmpty)
         #expect(Self.shown(off) == ["state", "child-of", "priority"])
-        let on = Self.head(item, pins: true, relationships: [Self.parent()])
+        let on = Self.head(item, pins: true, links: [Self.parent()])
         #expect(on.pins.map(\.id) == ["state", "child-of"], "the status and the parent are the default pins")
         #expect(Self.shown(on) == ["priority"])
     }

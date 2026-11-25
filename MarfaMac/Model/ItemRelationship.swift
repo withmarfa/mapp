@@ -35,6 +35,9 @@ nonisolated struct RelationField: Identifiable, Sendable {
         case readOnly(String)
     }
 
+    /// The start of the name of the end that points at the item: `inverse:` and the edge type.
+    static let inversePrefix = "inverse:"
+
     /// What `ItemLibrary.changeLinks` takes: an edge type, its reverse name, or `inverse:` and the edge type.
     let field: String
     /// Marfa's name for the end the item holds (`EdgeTypeInfo.label(atTo:)`).

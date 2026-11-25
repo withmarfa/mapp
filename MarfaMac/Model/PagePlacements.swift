@@ -353,5 +353,7 @@ nonisolated struct PagePlacement: Equatable, Sendable {
     /// Where Linked From goes for this type when the person has chosen nothing.
     var defaultLinkedFromPlace: LinkedFromPlace { defaultLinkedFrom }
 
-    private func defaultShows(_ row: String) -> Bool { row != linkField && !bookkeeping.contains(row) }
+    /// Unless chosen, a row shows when it has a value, but for the type's connector link, a connector's bookkeeping and the
+    /// links that point at the item, which Linked From already lists.
+    private func defaultShows(_ row: String) -> Bool { row != linkField && !bookkeeping.contains(row) && !row.hasPrefix(RelationField.inversePrefix) }
 }

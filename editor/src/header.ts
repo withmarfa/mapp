@@ -91,6 +91,9 @@ export interface HeaderRow {
   folded?: boolean
   /** Hidden on the type's pages, so grey under Show More. */
   muted?: boolean
+  /** The heading of the group a row sits under, after the rows with none: the app words it and decides which rows are
+   *  in it. Such a row is drawn but never dragged. */
+  section?: string
 }
 
 /** An item that links to the one on the page. */
@@ -352,6 +355,8 @@ export class ItemHeader {
   private readonly pins: HTMLDListElement
   private readonly pinsBox: HTMLDivElement
   private readonly properties: HTMLDListElement
+  /** The rows the app put under a heading of their own, after the rows that can be dragged. */
+  private readonly sections: HTMLElement
   private readonly moreProperties: HTMLButtonElement
   private readonly rowsBox: HTMLDivElement
   private readonly linked: LinkedSection
@@ -412,6 +417,7 @@ export class ItemHeader {
       () => this.drawn,
     )
     this.properties.setAttribute('aria-label', this.labels.properties)
+    this.sections = element('div', 'item-prop-sections', this.rowsBox)
     this.moreProperties = moreButton(this.rowsBox, () => {
       this.expanded.properties = !this.expanded.properties
       this.redraw()
@@ -841,22 +847,47 @@ export class ItemHeader {
     this.pins.replaceChildren(...model.pins.map((pin) => this.pin(pin, model)))
     this.pinsBox.hidden = model.pins.length === 0
 
-    const shown = this.expanded.properties ? model.rows : model.rows.filter((row) => !row.folded)
+    const visible = this.expanded.properties ? model.rows : model.rows.filter((row) => !row.folded)
+    const shown = visible.filter((row) => !row.section)
     this.properties.replaceChildren(...shown.map((row) => this.row(row, model)))
     this.properties.hidden = shown.length === 0
+    this.drawSections(
+      visible.filter((row) => row.section),
+      model,
+    )
     const folded = model.rows.some((row) => row.folded)
     this.moreProperties.hidden = !folded
     this.moreProperties.textContent = this.expanded.properties
       ? this.labels.showLess
       : model.showMore
     this.moreProperties.setAttribute('aria-expanded', String(this.expanded.properties))
-    this.rowsBox.hidden = shown.length === 0 && !folded
-    this.rowsBox.classList.toggle('bare', shown.length === 0)
+    this.rowsBox.hidden = visible.length === 0 && !folded
+    this.rowsBox.classList.toggle('bare', visible.length === 0)
 
     this.linked.draw(this.labels.linkedFrom, model.linked, model.linkedFoldAfter, {
       more: model.showMoreLinked,
       less: this.labels.showLess,
     })
+  }
+
+  /** The rows under a heading, each heading once with its rows below it, in the order the app sent them. */
+  private drawSections(rows: HeaderRow[], model: HeaderModel) {
+    const groups = new Map<string, HeaderRow[]>()
+    for (const row of rows) groups.set(row.section!, [...(groups.get(row.section!) ?? []), row])
+    this.sections.replaceChildren(
+      ...[...groups].map(([heading, members]) => {
+        const group = element('div', 'item-prop-section')
+        const title = element('div', 'item-prop-heading', group)
+        title.setAttribute('role', 'heading')
+        title.setAttribute('aria-level', '3')
+        title.textContent = heading
+        const list = element('dl', 'item-props', group)
+        list.setAttribute('aria-label', heading)
+        list.replaceChildren(...members.map((row) => this.row(row, model)))
+        return group
+      }),
+    )
+    this.sections.hidden = groups.size === 0
   }
 
   /** A row: its grabber in the symbol's place, its name, and its value, three elements for VoiceOver. */

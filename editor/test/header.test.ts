@@ -1046,6 +1046,21 @@ test('a page with every row folded keeps Show More and draws no hairline until a
   expect(box.classList.contains('bare')).toBe(false)
 })
 
+test('rows the app puts under a heading come last under it, and are not dragged', () => {
+  const other = { ...rows(1)[0]!, id: 'other:odd', label: 'Odd', folded: true, section: 'Other' }
+  header.set({ ...ticket, rows: [...rows(2), other], showMore: 'Show 1 More' })
+  expect(root.querySelector('.item-prop-sections')!.hasAttribute('hidden')).toBe(true)
+  root.querySelector<HTMLButtonElement>('.item-rows > .item-more')!.click()
+  const section = root.querySelector('.item-prop-section')!
+  expect(section.querySelector('.item-prop-heading')!.textContent).toBe('Other')
+  expect(section.querySelectorAll('.item-prop')).toHaveLength(1)
+  expect(
+    root
+      .querySelector('.item-props:not(.item-prop-section .item-props)')!
+      .querySelectorAll('.item-prop'),
+  ).toHaveLength(2)
+})
+
 test("a long text is a row cut after two lines, and an event's When says how far off it is in grey", () => {
   header.set({
     ...ticket,

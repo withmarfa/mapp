@@ -93,6 +93,12 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     var folded = false
     /// Hidden on the type's pages, so drawn grey under Show More.
     var muted = false
+    /// Why a link the item may hold takes no change, in the person's words, which the row's help tag says. Nil for every
+    /// row that is not a read-only link.
+    var lock: String?
+    /// The heading a row sits under in Show More, worded by the app: the values no field describes (`otherHeading`).
+    /// Such a row is read only and has no place in the type's order.
+    var section: String?
 
     /// The symbol drawn beside the label.
     var symbolName: String { symbol ?? value.symbol }
@@ -119,28 +125,28 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// A text value too long to read in a list's row or a table's cell, which shows nothing for it.
     static let longestText = 120
 
+    /// The heading of the rows for values no field describes.
+    static var otherHeading: String { String(localized: "Other") }
+
+    /// The prefix of such a row's identifier, which no field's key or edge's name starts with.
+    static let otherPrefix = "other:"
+
     /// Every row the item could show, whatever the person chose, in the order a person reads them: the type's fields as
     /// the catalogue orders them, with the parent after the status (or first, where the type has no status), and one
-    /// Location for the latitude, the longitude and a name for the place; then the item's other relationships that link
-    /// to something; then its tags. A field, the parent or the tags with no value is a row too, read as Empty, which
-    /// opens its editor where the item can take the edit. The keys in `hidden` are what the page shows another way, such
-    /// as the title and the text. With `showsCoordinates`, the latitude and longitude are rows of their own beside the
-    /// Location that stands for them.
+    /// Location for the latitude, the longitude and a name for the place; then every link the item's type may hold
+    /// (`links`), the ones it has first; then its tags; then the values no field describes, read only, under their own
+    /// heading. A field, a link or the tags with no value is a row too, read as Empty, which opens its editor where the
+    /// item can take the edit. The keys in `hidden` are what the page shows another way, such as the title and the
+    /// text. With `showsCoordinates`, the latitude and longitude are rows of their own beside the Location that stands
+    /// for them.
     static func candidates(
-        of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], format: DateFormat, tags: [String],
+        of item: Item, type: ItemTypeInfo?, hidden: Set<String>, links: [RelationField], format: DateFormat, tags: [String],
         showsCoordinates: Bool = false, isPriority: (ItemTypeInfo.Field) -> Bool = { _ in false }, icon: (ItemID) -> String?,
-        isPerson: (ItemID) -> Bool
+        isPerson: (ItemID) -> Bool, label: (String) -> String? = { _ in nil }
     ) -> [PropertyRow] {
         let parentField = PagePlacement.parent
         var fields: [PropertyRow] = []
-        let parentRow: PropertyRow? = {
-            if relationships.contains(where: { $0.field == parentField && !$0.targets.isEmpty }) {
-                let label = relationships.first { $0.field == parentField }?.label ?? String(localized: "Parent")
-                return PropertyRow(id: parentField, label: label, value: .parent)
-            }
-            guard let none = relationships.first(where: { $0.field == parentField }) else { return nil }
-            return PropertyRow(id: parentField, label: none.label, value: .empty(symbol: Value.parent.symbol), editable: item.allows(.links) && none.isEditable)
-        }()
+        let parentRow = links.first { $0.field == parentField }.map { edgeRow($0, icon: icon, isPerson: isPerson) }
         let status = type?.statusField
         let location = ItemLocation.of(type)
         let owned = location?.ownedKeys(showingCoordinates: showsCoordinates) ?? []
@@ -173,13 +179,48 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         }
         if let parentRow, !fields.contains(where: { $0.id == parentField }) { fields.insert(parentRow, at: 0) }
         var rows = fields
-        for relationship in relationships where !relationship.field.hasPrefix("inverse:") && relationship.field != parentField {
-            if let row = linkRow(relationship, icon: icon, isPerson: isPerson) { rows.append(row) }
-        }
+        for link in links where link.field != parentField { rows.append(edgeRow(link, icon: icon, isPerson: isPerson)) }
         rows.append(tags.isEmpty
             ? PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .empty(symbol: "tag"), editable: item.allows(.tags))
             : PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags), editable: item.allows(.tags)))
-        return rows
+        return rows + otherRows(of: item, type: type, hidden: hidden, links: links, format: format, label: label)
+    }
+
+    /// The row of one link the item's type may hold: the items it reaches, or Empty. It opens its editor where the item
+    /// takes the change, and otherwise says why not.
+    static func edgeRow(_ link: RelationField, icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool) -> PropertyRow {
+        var row: PropertyRow
+        let targets = link.targets.compactMap { target -> Target? in
+            guard target.isOpenable, !target.isDeleted, let id = target.itemID else { return nil }
+            return Target(title: target.title, item: id, icon: icon(id), kind: isPerson(id) ? .person : .link)
+        }
+        if link.field == PagePlacement.parent {
+            // The parent is the head's own pill where there is one.
+            row = PropertyRow(id: link.field, label: link.label, value: link.targets.isEmpty ? .empty(symbol: Value.parent.symbol) : .parent)
+        } else {
+            row = PropertyRow(id: link.field, label: link.label, value: targets.isEmpty ? .empty(symbol: Value.items([]).symbol) : .items(targets))
+        }
+        switch link.editability {
+        case .editable: row.editable = true
+        case .readOnly(let reason): row.lock = reason
+        }
+        return row
+    }
+
+    /// The values the item holds that no field of its type describes and no link names, in the order it holds them, as
+    /// rows to read.
+    private static func otherRows(
+        of item: Item, type: ItemTypeInfo?, hidden: Set<String>, links: [RelationField], format: DateFormat, label: (String) -> String?
+    ) -> [PropertyRow] {
+        let known = InspectorFields.accountedFor(type: type, hidden: hidden).union(links.map(\.field))
+        return item.properties.compactMap { property in
+            guard !known.contains(property.key), InspectorFields.hasValue(property.value) else { return nil }
+            let value = ItemValueText.value(of: property.value, format: format)
+            var row = PropertyRow(
+                id: otherPrefix + property.key, label: ItemValueText.name(of: property.key, label: label(property.key)), value: value, section: otherHeading)
+            if case .text(let text) = value { row.long = text.count > longestText || text.contains(where: \.isNewline) }
+            return row
+        }
     }
 
     /// Whether the page edits the field's value: in a panel, or for a yes or no with a click.
@@ -199,17 +240,6 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         case .text where field.format == .email: Value.email("").symbol
         default: Value.text("").symbol
         }
-    }
-
-    /// The row of the items a relationship links to, or nil where it links to none the page can open.
-    static func linkRow(_ relationship: ItemRelationship, icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool) -> PropertyRow? {
-        let targets = relationship.targets.compactMap { target -> Target? in
-            guard target.isOpenable, !target.isDeleted, let id = target.itemID else { return nil }
-            return Target(title: target.title, item: id, icon: icon(id), kind: isPerson(id) ? .person : .link)
-        }
-        // The collections are the one link a page edits in place: its menu offers the panel that adds and removes them.
-        let edits = relationship.field == MarfaMapping.collectionEdge && relationship.isEditable
-        return targets.isEmpty ? nil : PropertyRow(id: relationship.field, label: relationship.label, value: .items(targets), editable: edits)
     }
 
     /// The number to call a list field's main entry holds, or nil.

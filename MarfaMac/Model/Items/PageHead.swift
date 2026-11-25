@@ -9,6 +9,9 @@ import Foundation
 /// to Always Show, or, for a type with no text, of every row the person has not hidden. The rest are `folded`, and a
 /// hidden row is also `muted`. An event's time is its first row, When, whatever the person chose.
 ///
+/// The values no field describes (`PropertyRow.section`) come last, always folded and read only, under a heading of their
+/// own, and have no place in the person's order.
+///
 /// Pins are made only while pinned properties are on (`PinsProperties`). A pinned row leaves the rows.
 nonisolated struct PageHead: Equatable, Sendable {
     /// The grey line over the title: the type's mark and name, then what is true of the item among Read Only, Feed and
@@ -59,8 +62,9 @@ nonisolated struct PageHead: Equatable, Sendable {
     /// "Show 10 More". The page draws these words and never counts.
     var showMore: String { String(localized: "Show \(foldedCount) More") }
 
-    /// The rows' identifiers in the order the page lists them, which a move in the row's menu works from.
-    var order: [String] { rows.map(\.id) }
+    /// The rows' identifiers in the order the page lists them, which a move in the row's menu works from. The rows for
+    /// values no field describes (`section`) are in no order.
+    var order: [String] { rows.filter { $0.section == nil }.map(\.id) }
 
     init(kicker: Kicker, pins: [PropertyRow], rows: [PropertyRow]) {
         self.kicker = kicker
@@ -81,9 +85,10 @@ nonisolated struct PageHead: Equatable, Sendable {
         let event = PageHeaderKind.of(item.type, in: catalogue) == .event ? EventHeader(item: item, now: now) : nil
         let candidates = PropertyRow.candidates(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(event == nil ? [] : EventHeader.keys),
-            relationships: library.relationships(for: item.id), format: dateFormat, tags: library.tags(of: item),
+            links: library.relationFields(of: item.id), format: dateFormat, tags: library.tags(of: item),
             showsCoordinates: showsCoordinates, isPriority: { catalogue.isPriority($0, of: $0.declaredBy) },
-            icon: { PageHead.typeIcon(of: $0, in: library) }, isPerson: { PageHead.isPerson($0, in: library) })
+            icon: { PageHead.typeIcon(of: $0, in: library) }, isPerson: { PageHead.isPerson($0, in: library) },
+            label: { catalogue.label(ofField: $0, for: item.type) })
         let when = event.map {
             PropertyRow(id: PagePlacement.when, label: String(localized: "When"), value: .when($0.time, note: $0.note), help: $0.help)
         }
@@ -108,7 +113,12 @@ nonisolated struct PageHead: Equatable, Sendable {
             pins = placement.pins.compactMap { id in candidates.first { $0.id == id && (!$0.isEmpty || $0.editable) } }.map(Self.capped)
         }
         let pinned = Set(pins.map(\.id))
-        let listed = placement.ordered(candidates.filter { !pinned.contains($0.id) }, id: \.id)
+        let listed = placement.ordered(candidates.filter { !pinned.contains($0.id) && $0.section == nil }, id: \.id)
+        let others = candidates.filter { $0.section != nil }.map { row in
+            var row = row
+            row.folded = true
+            return row
+        }
         let leading = listed.filter { row in
             switch placement.shows(row.id) {
             case .hidden: false
@@ -122,7 +132,7 @@ nonisolated struct PageHead: Equatable, Sendable {
             row.folded = !shown.contains(row.id)
             row.muted = placement.shows(row.id) == .hidden
             return row
-        }
+        } + others
         self.init(kicker: kicker, pins: pins, rows: rows)
     }
 
