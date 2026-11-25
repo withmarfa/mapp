@@ -449,6 +449,30 @@ struct FilterClauseTests {
 
     // MARK: A saved view's own conditions
 
+    @Test func changingOneConditionOfAnAnyFilterLeavesTheTypeConditionWhereItWas() throws {
+        var targets = Self.targets
+        targets[FilterTarget.type.id] = .type
+        targets[FilterTarget.source.id] = .source
+        let query = LibraryViewQuery(filter: #"type eq "core.note" OR source eq "mail""#)
+        let view = LibraryView(id: ItemID("v"), title: "V", query: query)
+        let seed = ViewDraft.options(for: view, catalogue: Self.catalogue).filter
+        #expect(seed.matchesAny)
+        #expect(Set(seed.clauses) == [Self.clause("type", .is, ["core.note"]), Self.clause("source", .is, ["mail"])])
+        func written(_ clauses: [FilterClause]) -> LibraryViewQuery {
+            ViewDraft.replacing(
+                query, with: FilterState(clauses: clauses, matchesAny: true), targets: targets, seededTypes: nil, catalogue: Self.catalogue
+            ).query
+        }
+        // Mail to Calendar: the untouched type condition stays in the filter, so the view never narrows to notes from Calendar.
+        let calendar = written([Self.clause("type", .is, ["core.note"]), Self.clause("source", .is, ["calendar"])])
+        #expect(calendar.types.isEmpty)
+        #expect(calendar.filter == #"type eq "core.note" OR source eq "calendar""#)
+        // A changed type is still one of the conditions matched by Any.
+        let tasks = written([Self.clause("type", .is, ["core.task"]), Self.clause("source", .is, ["mail"])])
+        #expect(tasks.types.isEmpty)
+        #expect(tasks.filter == #"type eq "core.task" OR source eq "mail""#)
+    }
+
     @Test func aConditionTheRowCannotShowIsLockedAndTheRestIsShown() throws {
         let query = LibraryViewQuery(types: [Self.task], filter: #"id eq "x" AND properties.owner eq "ann" AND properties.status eq "todo" AND state eq "active""#)
         let locked = ViewDraft.unshownConditions(of: query, catalogue: Self.catalogue)

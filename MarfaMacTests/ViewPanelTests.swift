@@ -806,4 +806,74 @@ struct ViewPanelTests {
         #expect(settings?.opening == .modal)
         #expect(settings?.quickActions == false)
     }
+
+    // MARK: This Mac's settings, beside another Mac's
+
+    /// Another Mac's choice reaching this Mac's defaults, as a settings sync puts it there.
+    private static func arrive(on browser: Browser, _ change: (inout ViewMacSettings) -> Void) {
+        ViewLayouts.update(in: browser.defaults) {
+            var settings = $0.settings(for: Self.id) ?? ViewMacSettings()
+            change(&settings)
+            $0.set(settings, for: Self.id)
+        }
+    }
+
+    @Test func aChangeOfOneSettingKeepsAnotherMacsNewerChoiceAndUndoPutsBackOnlyItsOwn() {
+        let (browser, _, undo) = Self.opened()
+        _ = browser.macSettings(for: Self.id)
+        Self.arrive(on: browser) { $0.opening = .modal }
+        undo.beginUndoGrouping()
+        browser.setShowsQuickActions(false)
+        Self.close(undo)
+        var stored = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        #expect(stored?.quickActions == false)
+        #expect(stored?.opening == .modal, "the other Mac's Open Items stays")
+        Self.arrive(on: browser) { $0.density = .compact }
+        undo.undo()
+        stored = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        #expect(stored?.quickActions == nil)
+        #expect(stored?.opening == .modal)
+        #expect(stored?.density == .compact, "Undo leaves a choice made after its step")
+    }
+
+    @Test func undoOfALayoutPutsBackOnlyTheLayout() {
+        let (browser, _, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.viewMode = .gallery
+        Self.close(undo)
+        Self.arrive(on: browser) { $0.opening = .modal }
+        undo.undo()
+        let stored = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        #expect(stored?.layout == .table)
+        #expect(stored?.opening == .modal)
+    }
+
+    @Test func aLayoutChosenForANewViewIsTheDraftsAndCancelWritesNothingToTheView() async throws {
+        let (browser, library, undo) = Self.opened()
+        let before = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        browser.openNewViewPanel(in: library)
+        undo.beginUndoGrouping()
+        browser.viewMode = .gallery
+        browser.changeDensity(.compact)
+        Self.close(undo)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id) == before, "the view's own settings stay")
+        #expect(browser.density == .compact, "the window shows the draft's")
+        Self.arrive(on: browser) { $0.layout = .board }
+        browser.escapeViewPanel(in: library)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.layout == .board, "Cancel leaves another Mac's layout")
+        #expect(browser.viewMode == .table)
+        // Create View gives the new view the draft's settings, and leaves the view's own.
+        Self.arrive(on: browser) { $0.layout = .table }
+        browser.openNewViewPanel(in: library)
+        browser.viewMode = .gallery
+        browser.changeDensity(.compact)
+        await browser.finishViewPanel(in: library, order: Self.order)
+        let made = try #require(library.views.first { $0.id != Self.id })
+        let settings = ViewLayouts.stored(in: browser.defaults).settings(for: made.id)
+        #expect(settings?.layout == .gallery)
+        #expect(settings?.density == .compact)
+        let original = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        #expect(original?.layout == .table)
+        #expect(original?.density == nil)
+    }
 }
