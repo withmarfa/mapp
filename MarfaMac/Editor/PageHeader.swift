@@ -258,10 +258,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     /// The symbols of the property rows and of the four statuses by SF Symbol name, and the icons of the types by `TypeIconKey`.
     var symbols: [String: Icon]
 
-    /// The symbol on the callout that says pictures at web addresses are not loaded, kept with the row symbols.
-    static let pictureSymbol = "photo"
-
-    /// The symbol in the callout's close button, drawn small and bold as it is in the app's other small buttons.
+    /// The symbol in the notice's close button, drawn small and bold as it is in the app's other small buttons.
     static let closeSymbol = "xmark"
 
     /// The symbol a tag's chip starts with, drawn at the size the app's tag chip draws it.
@@ -276,7 +273,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         guard let indicator = Self.symbol("chevron.down", size: size * 0.7, weight: .bold) else { return nil }
         self.indicator = indicator
         var symbols: [String: Icon] = [:]
-        for name in PropertyRow.Value.symbols + [Self.pictureSymbol] {
+        for name in PropertyRow.Value.symbols + PageNotice.symbols {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
         // The kicker's flags, at its 12 points.

@@ -86,6 +86,9 @@ export type EditorMessage =
       rect: [number, number, number, number]
       viewportHeight: number
     }
+  /** The person chose the page's notice action, for the item the page shows. Loading pictures is the page's own and
+   *  posts nothing. */
+  | { type: 'noticeAction'; item: string; kind: string }
   | { type: 'openLink'; href: string }
   | { type: 'openItem'; item: string }
   | { type: 'copy'; text: string }

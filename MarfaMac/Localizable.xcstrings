@@ -8782,6 +8782,9 @@
     "Show Backups" : {
 
     },
+    "Show Changes" : {
+
+    },
     "Show Command Palette" : {
 
     },
@@ -9929,9 +9932,6 @@
     "The file couldn’t be attached." : {
       "extractionState" : "manual"
     },
-    "The file for this page isn’t in Marfa." : {
-
-    },
     "The file may be damaged or unavailable. Try opening it in another app." : {
 
     },
@@ -10718,6 +10718,9 @@
     "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The app reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected." : {
       "extractionState" : "manual"
     },
+    "This item couldn’t be read on this Mac." : {
+
+    },
     "This item doesn’t have a link yet. Try again once Marfa has finished syncing." : {
 
     },
@@ -10752,6 +10755,9 @@
       "extractionState" : "manual"
     },
     "This item isn’t ready to link yet. Try again once its copy has loaded." : {
+
+    },
+    "This item’s file isn’t in Marfa." : {
 
     },
     "This item’s tags can’t be changed." : {
@@ -11815,6 +11821,9 @@
     "Your changes are kept on this Mac and sent when you’re back online." : {
       "extractionState" : "manual"
     },
+    "Your changes to this item haven’t reached the server." : {
+
+    },
     "Your changes to “%@” were saved as a copy" : {
       "extractionState" : "manual"
     },
@@ -11828,6 +11837,9 @@
 
     },
     "Your items are still loading." : {
+
+    },
+    "Your latest changes were too large to save to Marfa. They’re kept on this Mac, where you can copy them." : {
 
     },
     "Your settings are back as they were before Import, %@." : {

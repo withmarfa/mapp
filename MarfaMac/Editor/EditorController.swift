@@ -54,6 +54,10 @@ final class EditorController: NSObject {
     @ObservationIgnored var headerTypeIcons: Set<String?> = []
     /// What the person does in the page's item header, for the window showing it to carry out.
     @ObservationIgnored var onHeaderEvent: (PageHeaderEvent) -> Void = { _ in }
+    /// Carries out the page's notice action for an item, by the notice's kind (`PageNotice.Kind`).
+    @ObservationIgnored var onNoticeAction: (ItemID, String) -> Void = { _, _ in }
+    /// What the page's notices say, which the page keeps in front of its own about pictures.
+    @ObservationIgnored private(set) var notices: [PageNotice] = []
     /// The window's drafts of item titles, which are saved before the window closes or the library changes.
     @ObservationIgnored var titleDrafts: DetailsPresentation?
     /// Shows the item whose refused title is being told, in the window holding the draft.
@@ -411,6 +415,17 @@ final class EditorController: NSObject {
         guard header != self.header else { return }
         self.header = header
         if isReady { sendHeader() }
+    }
+
+    /// Shows `notices` at the top of the page, or none, and again after the page reloads.
+    func setNotices(_ notices: [PageNotice]) {
+        guard notices != self.notices else { return }
+        self.notices = notices
+        if isReady { sendNotices() }
+    }
+
+    func sendNotices() {
+        call("setNotices", json(notices))
     }
 
     func sendHeader() {

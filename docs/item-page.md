@@ -17,6 +17,8 @@ paths:
   - MarfaMac/Views/WebPageItemPage.swift
   - MarfaMac/Views/VersionHistory*.swift
   - editor/src/header.ts
+  - editor/src/notice.ts
+  - MarfaMac/Views/PageNoticeView.swift
 ---
 
 # The item page
@@ -52,7 +54,7 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 - **In ends Info's facts,** a menu that moves the item between Library and Feed (`ItemLibrary.perform`), plain where it may not. Leaves the Feed can follow.
 - **Who keeps the item is said once at the top of Info:** the Read Only reason (`Item.obstacle(to:)`), or Synced With a connector's name (`GET /plugins`, read once for a library).
 - **History is asked for only while Info shows** (`PanelHistory`), one read for each version while the item is among the eight latest.
-- **Properties, Relationships and Tags and a sync problem stay in Info** until the page's rows and notices carry them.
+- **Properties, Relationships and Tags stay in Info** until the page's rows carry them.
 - **What has been typed and not saved is kept** when the item changes or the panel closes (`ItemPropertyDraft`).
 
 ## What the page locks
@@ -64,6 +66,23 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 | Read only | Says Read Only in its kicker and locks the title, text, properties, and type. Tags, Favorite, collections, and links stay open |
 | A file | Has no text and no Change Type. Its title, location and the fields a person may change stay open |
 | In Recently Deleted | Keeps its head, and locks everything but Recover and Delete Immediately |
+
+## Page notices
+
+Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`). The web head, a file's page and a saved web page draw them the same way, with one action at most and no fill. VoiceOver hears them once. The wash reaches 12 points beyond the text, with 22 points under it.
+
+| The item has | The action |
+| --- | --- |
+| Been deleted | Recover |
+| A copy saved beside it | Open Copy |
+| Text that could not be read | None; the reason stands where the text would |
+| A write held in the copy | None; Show Changes opens the Settings page that lists a held write's text where one was too large |
+| Values that could not be read | None |
+| No file in Marfa | None |
+| Pictures not loaded | Load Pictures, and a close for the page |
+
+- **The first row that holds leads,** and a write that only waits says nothing. Unreadable text, a held write and a missing file are never hidden: each has its line under the first.
+- **An action carries its item from the app,** and none writes or drops text. A write refused as too large never tells the person to shorten the older text: the latest is kept in the copy.
 
 ## Customize Layout
 
@@ -108,7 +127,7 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 ## Files and saved web pages
 
 - **A file's text is never edited here**, and its page is drawn around a viewer (`FileViewing`).
-- **A saved web page loads nothing from the network by itself.** Its pictures wait until the person asks (`PicturesWaitingCallout`), and asking changes only what is shown, never the file.
+- **A saved web page loads nothing from the network by itself.** Its pictures wait until the person asks (`PageNotice`), and asking changes only what is shown, never the file.
 - **A picture larger than the bitmap that the app keeps is softer when enlarged**, because a decoded picture must not take the window's memory.
 
 ## Version history

@@ -1,7 +1,7 @@
 import { InkKitError, type FilePresentation } from '@aicayzer/inkkit'
 import { askPicture, type PictureAnswer, type PictureAsk } from './bridge'
 
-/** The words a picture's line or card and the callout above the text use. The app supplies them in the person's
+/** The words a picture's line or card and the page's notice about waiting pictures use. The app supplies them in the person's
  *  language. */
 export interface PictureWords {
   /** The button at the end of the box for a picture that waits, which loads that picture alone. */
@@ -11,14 +11,14 @@ export interface PictureWords {
   /** What a picture is called when its description only repeats the item's title. */
   picture?: string
   picturesOff?: string
-  /** The callout's button for one waiting picture, and for several. */
+  /** The notice's action for one waiting picture, and for several. */
   loadOnePicture?: string
   loadPictures?: string
-  /** The callout's sentence for one waiting picture. */
+  /** The notice's sentence for one waiting picture. */
   pictureNotLoaded?: string
-  /** The callout's sentence for several, with `%lld` where the number of pictures goes. */
+  /** The notice's sentence for several, with `%lld` where the number of pictures goes. */
   picturesNotLoaded?: string
-  /** The accessibility label of the callout's close button. */
+  /** The accessibility label of the notice's close button. */
   closePictures?: string
 }
 
@@ -49,20 +49,20 @@ export type Ask = typeof askPicture
  * refused. A picture that is `waiting` or `loading` is Inkkit's placeholder, one full-width outlined row in the text: a
  * picture symbol, the picture's description (or its website when it has none) and, while it waits, a Load button at
  * the row's trailing end,
- * which fires the adapter's `open` for that picture alone and loads only it; the banner's Load Pictures button
- * loads them all. A loading one names the same picture ("Loading <description>…", so several loading together read
+ * which fires the adapter's `open` for that picture alone and loads only it; the notice's Load Pictures
+ * action loads them all. A loading one names the same picture ("Loading <description>…", so several loading together read
  * apart), with no button, in the same line. The line's look is `--inkkit-file-placeholder-*` tokens in `style.css`. A picture that is `off` or `refused` keeps Inkkit's default card, readable, with its Open arrow. A
  * `refused` picture whose `retry` is set is tried again alone by its Open arrow. Any other card's Open
  * arrow opens the address in the browser (`opensInBrowser`). The page styles none of Inkkit's own classes.
  *
- * The callout at the top of the page, above the title (`#picture-bar`), counts the distinct addresses still waiting among the cards drawn, and
+ * The page's notice (`PageNoticeLine`) counts the distinct addresses still waiting among the cards drawn, and
  * so drops as each one is chosen. Its close button (`dismiss`) hides it for the page on show, and nothing the
  * pictures do brings it back; a different item, or the same one opened anew (`opened`), does.
  *
  * The asks mean: `chosen` when the person chose, `drawing` when a card is drawn, and `cached` for printing and
  * export, which show only what the app already holds and fetch nothing (`ItemEditor.printable` sets `cacheOnly`).
  *
- * Asking again (`changed`, `savedChanged`) keeps what a card and the callout's count showed until the new answer
+ * Asking again (`changed`, `savedChanged`) keeps what a card and the notice's count showed until the new answer
  * arrives, and draws the card again only if the answer differs. A picture being chosen is left alone by both, so its
  * card ends with its own answer. An embed of an item is not a picture and never reaches this class.
  */
@@ -87,8 +87,8 @@ export class WebPictures {
     private words: PictureWords,
     /** Draws these addresses' cards again. */
     private redraw: (addresses: string[]) => void,
-    /** Hears how many pictures wait for the person to load them, and whether the callout is to show, whenever that
-     *  changes. The callout shows while any wait, unless the person closed it for this page. */
+    /** Hears how many pictures wait for the person to load them, and whether the notice is to show, whenever that
+     *  changes. The notice shows while any wait, unless the person closed it for this page. */
     private waitingChanged: (
       count: number,
       sentence: string,
@@ -125,13 +125,13 @@ export class WebPictures {
     if (changed.length > 0) this.redraw(changed)
   }
 
-  /** The item is opened anew, even if it is the one already on the page: a callout the person closed shows again. */
+  /** The item is opened anew, even if it is the one already on the page: a notice the person closed shows again. */
   opened() {
     this.dismissed = false
     this.schedule()
   }
 
-  /** The person closed the callout: it stays hidden for this page. Nothing is loaded and no setting changes. */
+  /** The person closed the notice: it stays hidden for this page. Nothing is loaded and no setting changes. */
   dismiss() {
     this.dismissed = true
     this.schedule()
@@ -243,7 +243,7 @@ export class WebPictures {
     return true
   }
 
-  /** Every picture of the item that waits for the person, chosen together, as the callout's button does. */
+  /** Every picture of the item that waits for the person, chosen together, as the notice's action does. */
   chooseAll() {
     for (const address of this.waiting()) void this.choose(address)
   }

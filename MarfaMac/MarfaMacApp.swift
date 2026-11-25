@@ -137,6 +137,7 @@ struct MarfaMacApp: App {
             .environment(libraries.shortcuts)
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
             .modifier(ItemWindowNotices(notices: libraries.host.notices, launcher: settingsLauncher))
+            .environment(\.settingsLauncher, settingsLauncher)
             .opensItemLinks(delegate.itemLinks)
         }
         .handlesExternalEvents(matching: [])

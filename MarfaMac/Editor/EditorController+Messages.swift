@@ -41,6 +41,7 @@ extension EditorController {
             headerIconSize = nil
             headerTypeIcons = []
             sendHeader()
+            sendNotices()
             if let pageItemID {
                 embeds.version += 1
                 call("setItem", json(pageItemID.rawValue))
@@ -99,6 +100,8 @@ extension EditorController {
             onHeaderEvent(.moveRow(row: row, order: order, item))
         case .changeType(let item, let rect, let viewportHeight):
             onHeaderEvent(.changeType(item, containerRect(rect, viewportHeight: viewportHeight)))
+        case .noticeAction(let item, let kind):
+            onNoticeAction(item, kind)
         case .openLink(let href):
             // The page has already refused what Inkkit's `canOpenLink` does not allow.
             openAddress(href)

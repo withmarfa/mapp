@@ -75,10 +75,12 @@ nonisolated extension MarfaMapping {
 
     /// Each item the queue holds a write for, or that a drain answered `refused` or `conflicted` (which the queue
     /// forgets unless the write carried content), with what most needs the person: a stopped write, then a refused
-    /// one, then a conflict, then the count still waiting. An item missing from the answer is settled.
+    /// one, then a conflict, then the count still waiting, and whether a write held for its size is among them. An
+    /// item missing from the answer is settled.
     static func syncStates(queue: [Marfa.QueuedWrite], remembered: [ItemID: SyncState] = [:]) -> [ItemID: SyncState] {
         var waiting: [ItemID: Int] = [:]
         var answered: [ItemID: SyncState] = remembered
+        var oversized: Set<ItemID> = []
         for write in queue {
             guard let itemID = write.itemId else { continue }
             let id = ItemID(itemID)
@@ -87,7 +89,20 @@ nonisolated extension MarfaMapping {
                 continue
             }
             let state = outcome(verdict).syncState
+            switch state {
+            case .refused(let problem), .blocked(let problem): if problem.isTooLarge { oversized.insert(id) }
+            default: break
+            }
             if state != .settled, rank(state) > rank(answered[id]) { answered[id] = state }
+        }
+        // A write held for its size keeps the person's latest text in Settings, which a block or another refusal that
+        // outranks it must not hide.
+        for id in oversized {
+            switch answered[id] {
+            case .refused(var problem)?: problem.alsoHoldsOversizedText = true; answered[id] = .refused(problem)
+            case .blocked(var problem)?: problem.alsoHoldsOversizedText = true; answered[id] = .blocked(problem)
+            default: break
+            }
         }
         for (id, count) in waiting where answered[id] == nil {
             answered[id] = .waiting(writes: count)
