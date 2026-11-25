@@ -295,7 +295,12 @@ extension Browser {
 
     /// Where Open, Return and a double-click open an item in the open place.
     func itemOpening(defaults: UserDefaults = .standard) -> ItemOpening {
-        chosenOpening ?? ItemOpening.stored(in: defaults)
+        itemOpening(settings: ItemOpening.stored(in: defaults))
+    }
+
+    /// The same, for a view that watches Settings' Open Items itself (`@AppStorage`) and passes it as `settings`.
+    func itemOpening(settings: ItemOpening) -> ItemOpening {
+        chosenOpening ?? settings
     }
 
     /// Changes where the open place opens its items; nil follows Settings. Undo takes it back.

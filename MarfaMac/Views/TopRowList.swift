@@ -42,7 +42,7 @@ private struct TopRowOverList: ViewModifier {
         // Except in a list column beside a page: there the traffic lights, the sidebar's button and Back and Forward leave
         // the first line no room for the title, so it, the scope and the views have the row below, which scrolls away. So
         // too at the smallest window over a layout with the page beside it, which leaves the layout no wider than a list.
-        let isCompact = opensPlaces && (isBesidePage || (isSmall && browser.showsBesidePage(opening: opening)))
+        let isCompact = opensPlaces && (isBesidePage || (isSmall && browser.showsBesidePage(opening: browser.itemOpening(settings: opening))))
         let beside = !isCompact && (isAlwaysBeside || browser.isSearchExpanded || browser.isSearching || opensPlaces || isSmall)
         let restHeight = (row.hasViews || isCompact) && !beside
             ? TopRowMetrics.restHeight(scale: InterfaceStyle.scale(for: textSize)) : 0

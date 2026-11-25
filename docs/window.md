@@ -80,7 +80,7 @@ paths:
 
 ## Opening an item
 
-- **Open, Return, a double click and a link follow Open Items** (`ItemOpening`).
+- **Open, Return, a double click and a link follow Open Items** (`ItemOpening`), the view's own, else Settings', and so does the title's layout beside an open item.
 - **Beside the List is the standard:** a layout that spans the window shows the chosen item's page beside it, and a new row replaces it once the selection rests (`BesideSettler`).
 - **A column, a modal and a full page show one item** with the window's one editor, one at a time. New Window takes several and asks first above a limit (`ItemWindows`).
 - **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`), Keep moves on once queued, and a followed link stays in it.

@@ -85,4 +85,30 @@ struct ItemOpeningTests {
         #expect(Array(entries.suffix(3)) == [.divider, .moves, .delete])
         #expect(!RowMenuEntry.entries(opening: .modal, inBin: true).contains(.moves))
     }
+
+    // MARK: The title beside an open item
+
+    /// The title stands at the compact lead only where the page is beside the layout, so it follows the place's own Open Items.
+    @Test @MainActor func theTitleLaysOutByTheViewsOwnOpenItemsOverSettings() {
+        let browser = Browser()
+        browser.defaults = ThrowawayDefaults.make("ItemOpeningTests")
+        browser.showing = .library
+        browser.viewMode = .table
+        browser.selection = [ItemID("a")]
+        func lead(settings: ItemOpening) -> CGFloat {
+            TopRowMetrics.collectionLead(browser: browser, settings: settings, opensPlaces: true, isSmall: true)
+        }
+
+        #expect(lead(settings: .besideList) == TopRowMetrics.listLead, "no choice of its own follows Settings")
+        #expect(lead(settings: .modal) == TopRowMetrics.lead)
+
+        browser.setOpening(.modal)
+        #expect(lead(settings: .besideList) == TopRowMetrics.lead, "the view's choice wins over Settings' Beside the List")
+        browser.setOpening(.besideList)
+        #expect(lead(settings: .modal) == TopRowMetrics.listLead, "and over Settings' Over the List")
+        #expect(browser.itemOpening(settings: .modal) == .besideList)
+
+        browser.setOpening(nil)
+        #expect(browser.itemOpening(settings: .fullPage) == .fullPage)
+    }
 }
