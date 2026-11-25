@@ -78,8 +78,8 @@ struct TypeValuesSheet: View {
         }
     }
 
-    /// The draft a required field starts with. The title the type needs starts as the name the item has now (a note's
-    /// first line, say), for one item, so changing the type asks only to confirm it; every other value starts empty.
+    /// The draft a required field starts with. The title the type needs starts as the name the item has now (the first
+    /// line of its text, say), for one item, so changing the type asks only to confirm it; every other value starts empty.
     private func prefilled(_ field: ItemTypeInfo.Field) -> ItemPropertyDraft {
         let draft = ItemPropertyDraft()
         guard request.ids.count == 1, let id = request.ids.first, let item = library.headerItem(id),

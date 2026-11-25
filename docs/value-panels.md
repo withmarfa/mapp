@@ -10,7 +10,7 @@ paths:
 
 `docs/editing.md` says how an item is made and its type changed.
 
-## Value panels
+## Panels
 
 - **A value is edited in a panel under itself** (`ValueEditPresenter`, `ValueEditModel`), the same one from a row, a cell, the right sidebar and a chip. Rows are 28 points, 1 point apart, with 7 point corners, in a panel with 14 point corners.
 - **A panel is as wide as its board** (`ValueEditMetrics`): status 250, date 212, choice 170, type 230 and event time 262, and a section header is 27 points.
