@@ -118,14 +118,6 @@ final class Browser {
         let viewItems: [ItemID]?
     }
 
-    /// Where each item stands in the sort the board's cards follow: the place's sort where the person or the view set
-    /// one, else nil, which keeps the cards by title.
-    func boardCardOrder(in library: any ItemLibrary) -> [ItemID: Int]? {
-        guard tableOptions[shown]?.sort?.isEmpty == false else { return nil }
-        let rows = tableContent(in: library).rows
-        return Dictionary(rows.enumerated().map { ($0.element.item.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
-    }
-
     /// How a field's column is named among the table's columns (`ItemTableLayout.columns`).
     nonisolated static let fieldColumnPrefix = "field."
 
@@ -178,6 +170,8 @@ final class Browser {
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
+    /// How many items the list or the timeline draws, with what they belong to (`listItemsDrawn`).
+    var listPagingState: (key: TablePagingKey, items: Int)?
     /// The items the listed types may have as a parent, held for the types and what the library holds.
     @ObservationIgnored var parentMemo: (key: ParentKey, options: [SearchOffers.Option])?
     /// The search's offers for the last key they were worked out for (`searchOffers`).
@@ -199,6 +193,12 @@ final class Browser {
     @ObservationIgnored var sectionsWork = PlaceWork<SectionsKey, ListArrangement>()
     /// Counts what landed from work off the main actor besides the table, which a layout reads to draw it.
     var placeWorkLanded = 0
+    /// How often the window worked a place's table or list out whole, and how often it updated one, which tests read.
+    @ObservationIgnored var placeWorkCounts = PlaceWorkCounts()
+    /// The board's lanes, the calendar's entries and the timeline's days, worked out off the main actor for a large place (`placed`).
+    @ObservationIgnored var boardWork = PlaceWork<PlacingKey<BoardChoice>, BoardLanes>()
+    @ObservationIgnored var calendarWork = PlaceWork<PlacingKey<CalendarChoice>, CalendarPlacing>()
+    @ObservationIgnored var timelineWork = PlaceWork<PlacingKey<TimelineChoice>, TimelinePlacing>()
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
     /// The last Group by offer, while the table's content and the layout it was made for stand (`Browser+Grouping`).
@@ -469,6 +469,7 @@ final class Browser {
         let isFirst = libraryID == nil
         libraryID = id
         pagingState = nil
+        listPagingState = nil
         tableMemo = nil
         heldTables = [:]
         heldSearch = nil
@@ -478,6 +479,9 @@ final class Browser {
         offerMemo = nil
         parentMemo = nil
         sectionsWork.reset()
+        boardWork.reset()
+        calendarWork.reset()
+        timelineWork.reset()
         viewModesMemo = nil
         fieldsMemo = nil
         paletteMemo = nil

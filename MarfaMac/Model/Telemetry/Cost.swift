@@ -25,8 +25,6 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     case tableUpdated
     /// A large list's sections worked out off the main actor, whole or for the items that changed (`Browser.sections`).
     case sectionsArranged
-    /// One run of the gallery's own body, timed over its listing of every item the place holds.
-    case galleryBody
     /// What one gallery card derives from its item, the catalogue and the files it embeds (`GalleryCardFacts`).
     case galleryCard
     /// One placing of the soft selection's marks on a list or table.

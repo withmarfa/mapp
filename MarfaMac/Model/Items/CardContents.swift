@@ -60,6 +60,8 @@ nonisolated extension RowContent {
 final class CardContents {
     private struct Basis: Equatable {
         let library: ObjectIdentifier
+        /// Which types there are and what they are called, which a row shows.
+        let catalogue: Catalogue
         let looks: [TypeID: TypeLook]
         let list: RowList
         let shape: CardShape
@@ -84,7 +86,7 @@ final class CardContents {
     func contents(
         of items: [Item], in library: any ItemLibrary, looks: [TypeID: TypeLook], list: RowList, shape: CardShape
     ) -> [ItemID: RowContent] {
-        let next = Basis(library: ObjectIdentifier(library), looks: looks, list: list, shape: shape)
+        let next = Basis(library: ObjectIdentifier(library), catalogue: library.catalogue, looks: looks, list: list, shape: shape)
         if next != basis {
             basis = next
             held = [:]
@@ -124,18 +126,12 @@ final class CardContents {
         return made
     }
 
-    /// The items whose rows may differ since the last pass: those the library or the counts say changed. Nil where every
-    /// item is read again, as at the first pass, and where the library cannot say, when what was made is let go too, since
-    /// a catalogue read again can change any of it.
+    /// The items whose content may differ since the last pass: those the library or the counts say changed. Nil where
+    /// every item is checked again, as at the first pass and where the library cannot say.
     private func changes(in library: any ItemLibrary) -> Set<ItemID>? {
         let now = (content: library.contentRevision, counts: library.counts.revision)
         defer { revisions = now }
-        guard let revisions else { return nil }
-        guard let items = library.changedItems(since: revisions.content) else {
-            held = [:]
-            made = [:]
-            return nil
-        }
+        guard let revisions, let items = library.changedItems(since: revisions.content) else { return nil }
         return library.counts.changedItems(since: revisions.counts).map { items.union($0) }
     }
 }

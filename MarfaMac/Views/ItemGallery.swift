@@ -39,8 +39,9 @@ struct ItemGallery: View {
 
     var body: some View {
         let _ = daysSeen
-        let sections = browser.sections(in: library, order: order, now: library.now())
-        let ids = Cost.measure(.galleryBody) { sections.flatMap { $0.items.map(\.id) } }
+        let listing = browser.listing(in: library, order: order, now: library.now())
+        let sections = listing.sections
+        let ids = listing.ids
         let title = browser.pageTitle(in: library)
         // The picture's opening lines are drawn on the card when the preview allows them, so the line under the title
         // does not say them again.

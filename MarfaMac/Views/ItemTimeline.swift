@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A place's items by day. Choosing a row runs the list that holds the selection, not this body, which places every
-/// item, so a selection does not place them again.
+/// A place's items by day. Choosing a row runs the list that holds the selection, not this body, which reads where the
+/// browser placed every item, so a selection does not place them again.
 struct ItemTimeline: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
@@ -18,16 +18,17 @@ struct ItemTimeline: View {
         let fields = browser.timelineFieldChoices(in: library)
         // Chosen in the View panel's Timeline section (`ViewPanelLayoutRows`).
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.shown], fields: fields)
-        let looks = browser.looks(in: library)
         let now = library.now()
-        let groups = ItemTimelineLayout.groups(
-            for: items, field: field, looks: looks, catalogue: library.catalogue, today: now)
+        // Worked out off the main actor for a large place (`Browser.placed`); only a page of it is drawn, as the list's is.
+        let placing = browser.timelinePlacing(in: library, field: field, now: now)
+        let (groups, more) = placing.drawn(upTo: browser.listItemsDrawn)
         let list = RowList(
-            mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: now))
+            mixesTypes: placing.types.count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: now))
         let contents = rowContents.contents(
-            of: items, in: library, looks: browser.propertyLooks(in: library), list: list, shape: CardShape(leaving: field))
+            of: groups.flatMap { $0.rows.map(\.item) }, in: library, looks: browser.propertyLooks(in: library), list: list,
+            shape: CardShape(leaving: field))
 
-        timeline(groups, contents: contents, now: now)
+        timeline(groups, more: more, contents: contents, now: now)
         .topRowScrolls()
         .clearsSeveralOnEscape(browser)
         .deletesChosen(browser) { Set(items.map(\.id)) }
@@ -48,6 +49,12 @@ struct ItemTimeline: View {
         }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
+        }
+        // An item chosen past what is drawn, as by Back or a link, is drawn.
+        .onChange(of: browser.selection, initial: true) {
+            if browser.selection.count == 1, let id = browser.selection.first, let position = placing.positions[id] {
+                browser.drawList(through: position)
+            }
         }
     }
 
@@ -82,9 +89,9 @@ struct ItemTimeline: View {
         return lines
     }
 
-    private func timeline(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> some View {
+    private func timeline(_ groups: [ItemTimelineGroup], more: Bool, contents: [ItemID: RowContent], now: Date) -> some View {
         ScrollViewReader { proxy in
-            list(groups, contents: contents, now: now)
+            list(groups, more: more, contents: contents, now: now)
                 // The days run from today on and then back, so today's agenda is the first line of the first group.
                 .onChange(of: browser.timelineTodayRequests) {
                     guard let first = groups.first.flatMap({ lines(of: $0, now: now).first }) else { return }
@@ -93,7 +100,7 @@ struct ItemTimeline: View {
         }
     }
 
-    private func list(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> some View {
+    private func list(_ groups: [ItemTimelineGroup], more: Bool, contents: [ItemID: RowContent], now: Date) -> some View {
         SelectableTimeline(browser: browser) {
             ForEach(groups) { group in
                 ForEach(lines(of: group, now: now)) { line in
@@ -147,10 +154,18 @@ struct ItemTimeline: View {
                     }
                 }
             }
+            if more {
+                // Drawn only to come into view, which draws the next page.
+                Color.clear.frame(height: 1)
+                    .selectionDisabled()
+                    .listRowSeparator(.hidden)
+                    .accessibilityHidden(true)
+                    .onAppear { browser.drawMoreOfList() }
+            }
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, hovers: true, inert: inertRows(groups, contents: contents, now: now), selection: { browser.selection })
+        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, hovers: true, inert: inertRows(groups, more: more, contents: contents, now: now), selection: { browser.selection })
         .focused(pane, equals: .list)
         .takesKeyboardOnClick { browser.focusRequest = .list }
         .accessibilityLabel("Timeline")
@@ -163,9 +178,9 @@ struct ItemTimeline: View {
         .onKeyPress(.return) { browser.openSelection() ? .handled : .ignored }
     }
 
-    /// The places in the list of the rows that are not items: the Earlier heading and the line for now. An item with no
-    /// content yet makes no row, so it takes no place.
-    private func inertRows(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> Set<Int> {
+    /// The places in the list of the rows that are not items: the Earlier heading, the line for now and the line that draws
+    /// more. An item with no content yet makes no row, so it takes no place.
+    private func inertRows(_ groups: [ItemTimelineGroup], more: Bool, contents: [ItemID: RowContent], now: Date) -> Set<Int> {
         var inert: Set<Int> = []
         var place = 0
         for group in groups {
@@ -179,6 +194,7 @@ struct ItemTimeline: View {
                 }
             }
         }
+        if more { inert.insert(place) }
         return inert
     }
 

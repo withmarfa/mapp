@@ -122,7 +122,7 @@ extension Browser {
     /// The items in the order the window last drew them: the table's rows in the table, else the list's or gallery's
     /// sections, with whatever the place lists after them (a board, a timeline) in its own order.
     func onScreenOrder(in library: any ItemLibrary) -> [ItemID] {
-        let drawn = viewMode == .table ? tableMemo?.content.rows.map(\.item.id) : sectionsWork.held?.value.sections.flatMap { $0.items.map(\.id) }
+        let drawn = viewMode == .table ? tableMemo?.content.rows.map(\.item.id) : sectionsWork.held?.value.ids
         return (drawn ?? []) + placeItems(in: library).map(\.id)
     }
 
@@ -143,6 +143,11 @@ extension Browser {
     /// A place of more than `arrangesAlongsideAbove` items is worked out off the main actor (`PlaceWork`), its last
     /// sections showing meanwhile, and a change of items re-places only the items that changed.
     func sections(in library: any ItemLibrary, order: ItemOrder, now: Date) -> [ItemSection] {
+        listing(in: library, order: order, now: now).sections
+    }
+
+    /// The list's sections with what a layout reads of them, worked out with them (`sections(in:order:now:)`).
+    func listing(in library: any ItemLibrary, order: ItemOrder, now: Date) -> ListArrangement {
         _ = placeWorkLanded
         let derived = derivedKey(in: library)
         let shape = listShape
@@ -152,20 +157,31 @@ extension Browser {
         // A filtered or arranged place takes its rows, and where it is arranged its order and groups, from the table.
         let content = shape.map { _ in tableContent(in: library) }
         let key = SectionsKey(choices: choices, table: content?.serial, content: content == nil ? library.contentRevision : nil)
-        if let held = sectionsWork.held, held.key == key { return held.value.sections }
+        if let held = sectionsWork.held, held.key == key { return held.value }
+        // A list of the place's own items that no change touched stands as it is.
+        if content == nil, let held = sectionsWork.held, held.key.choices == choices, let since = held.value.content,
+           let changed = library.changedItems(since: since),
+           (derived.items ?? items(in: library)).count == held.value.ids.count, !changed.contains(where: { held.value.positions[$0] != nil }) {
+            let kept = held.value.at(library.contentRevision)
+            sectionsWork.hold(kept, for: key)
+            return kept
+        }
         let work = sectionsMaking(content, items: derived.items, in: library, order: order, now: now, choices: choices)
+        if case .list(_, let earlier, _, _) = work.source, !work.ordersItself {
+            if earlier == nil { placeWorkCounts.listsSorted += 1 } else { placeWorkCounts.listsUpdated += 1 }
+        }
         let count = content?.allRows.count ?? work.count
         let shown = sectionsWork.held.flatMap { $0.key.choices.derived.isSamePlace(as: derived.key) ? $0.value : nil }
         guard count > Self.arrangesAlongsideAbove, let shown else {
             let made = Cost.measure(.sections) { work.make() }
             sectionsWork.hold(made, for: key)
-            return made.sections
+            return made
         }
         let settles = sectionsWork.held?.key.choices == choices
         sectionsWork.start(key, settling: settles ? Self.arrangeSettling : nil, {
             Cost.measure(.sectionsArranged) { work.make() }
         }, landed: { [weak self] in self?.placeWorkLanded += 1 })
-        return shown.sections
+        return shown
     }
 
     /// What the sections are made of, read on the main actor: the table's rows where it arranges the place, else what the
@@ -195,7 +211,7 @@ extension Browser {
     /// What the list's sections depend on besides the items: the filters, and the sort and grouping where they are
     /// set. Nil where the place is neither filtered nor arranged, so the table's other choices (a folded group, a
     /// page) never make the sections again.
-    struct ListShape: Equatable, Sendable {
+    nonisolated struct ListShape: Equatable, Sendable {
         var options: ItemTableOptions
         /// Whether the table's sort and grouping order the list.
         var arranged: Bool
@@ -223,6 +239,34 @@ extension Browser {
     func filteredItems(in library: any ItemLibrary) -> [Item] {
         guard tableOptions[shown]?.isFiltering == true || hasSearchTokens else { return items(in: library) }
         return tableContent(in: library).keptItems
+    }
+
+    /// What a layout that places the items itself (the board, the calendar, the timeline) works out from them by `choice`:
+    /// the place's items, less those the filters hide. A place of more than `arrangesAlongsideAbove` items is worked out
+    /// off the main actor, its last answer showing meanwhile, and a run of changes is let settle first. `table`, where the
+    /// answer reads it, is the table it was read from, whose next one makes the answer again.
+    func placed<Choice: Equatable & Sendable, Value: Sendable>(
+        _ work: PlaceWork<PlacingKey<Choice>, Value>, choice: Choice, table: ItemTableContent? = nil, in library: any ItemLibrary,
+        make: @escaping @Sendable ([Item]) -> Value
+    ) -> Value {
+        _ = placeWorkLanded
+        let derived = derivedKey(in: library)
+        let narrows = tableOptions[shown]?.isFiltering == true || hasSearchTokens
+        let content = narrows ? (table ?? tableContent(in: library)) : table
+        let key = PlacingKey(
+            derived: derived.key, shape: listShape, choice: choice, table: content?.serial,
+            content: narrows ? nil : library.contentRevision)
+        if let held = work.held, held.key == key { return held.value }
+        let items = narrows ? content?.keptItems ?? [] : derived.items ?? self.items(in: library)
+        let shown = work.held.flatMap { $0.key.derived.isSamePlace(as: derived.key) ? $0.value : nil }
+        guard items.count > Self.arrangesAlongsideAbove, let shown else {
+            let value = make(items)
+            work.hold(value, for: key)
+            return value
+        }
+        let settles = work.held.map { $0.key.derived == key.derived && $0.key.shape == key.shape && $0.key.choice == key.choice } ?? false
+        work.start(key, settling: settles ? Self.arrangeSettling : nil, { make(items) }, landed: { [weak self] in self?.placeWorkLanded += 1 })
+        return shown
     }
 
     /// Whether the open place has filters that hide everything it lists. A search's tokens that do so are the search's
@@ -286,9 +330,15 @@ extension Browser {
             return held.content
         }
         endArranging()
-        let content = earlier.flatMap { earlier in
-            changed.flatMap { ItemTableContent.updating(earlier.content, browser: self, library: library, items: listed, changed: $0) }
-        } ?? ItemTableContent(browser: self, library: library, items: listed)
+        let content: ItemTableContent
+        if let earlier, let changed,
+           let updated = ItemTableContent.updating(earlier.content, browser: self, library: library, items: listed, changed: changed) {
+            placeWorkCounts.tablesUpdated += 1
+            content = updated
+        } else {
+            placeWorkCounts.tablesMade += 1
+            content = ItemTableContent(browser: self, library: library, items: listed)
+        }
         take((key, content), searching: searching, isLarge: isLarge)
         return content
     }
@@ -385,6 +435,7 @@ extension Browser {
             content.land(ordered, rows: Browser.holding(pinned, in: ordered.rows, as: shownRows))
             Cost.record(.tableArrange, since: start)
             self.arranging = nil
+            if plan == nil { self.placeWorkCounts.tablesMade += 1 } else { self.placeWorkCounts.tablesUpdated += 1 }
             self.tableMemo = (key, content)
             if searching { self.heldSearch = (key, content) } else { self.hold((key, content), for: place) }
             self.tableArrangements += 1
@@ -428,7 +479,7 @@ extension Browser {
         return (key, listed)
     }
 
-    struct DerivedKey: Equatable, Sendable {
+    nonisolated struct DerivedKey: Equatable, Sendable {
         let library: ObjectIdentifier
         let place: PlaceView
         let listing: PlaceListing
@@ -440,7 +491,92 @@ extension Browser {
         func isSamePlace(as other: DerivedKey) -> Bool { library == other.library && place == other.place }
     }
 
-    struct SectionsChoices: Equatable, Sendable {
+    /// What a layout's placing of the items is worked out for (`placed`).
+    nonisolated struct PlacingKey<Choice: Equatable & Sendable>: Equatable, Sendable {
+        let derived: DerivedKey
+        let shape: ListShape?
+        let choice: Choice
+        /// The table the items or the order were read from (`ItemTableContent.serial`).
+        let table: Int?
+        /// The library's revision, where the items are the place's own.
+        let content: Int?
+    }
+
+    /// What the calendar places its items by, besides the items.
+    nonisolated struct CalendarChoice: Equatable, Sendable {
+        let looks: [TypeID: TypeLook]
+        let calendar: Calendar
+        let marksFeed: Bool
+    }
+
+    /// The calendar's entries, and how many items have no date to stand on.
+    nonisolated struct CalendarPlacing: Sendable {
+        let entries: [CalendarEntry]
+        let leftOut: Int
+    }
+
+    /// What the timeline places its items by, besides the items.
+    nonisolated struct TimelineChoice: Equatable, Sendable {
+        let field: String?
+        let looks: [TypeID: TypeLook]
+        let today: Date
+    }
+
+    /// Where each item stands on the calendar (`CalendarLayout.entries`).
+    func calendarPlacing(in library: any ItemLibrary, calendar: Calendar) -> CalendarPlacing {
+        let looks = looks(in: library)
+        let catalogue = library.catalogue
+        let marksFeed = listing.scope == .all
+        let choice = CalendarChoice(looks: looks, calendar: calendar, marksFeed: marksFeed)
+        return placed(calendarWork, choice: choice, in: library) { items in
+            let placed = CalendarLayout.entries(for: items, looks: looks, catalogue: catalogue, calendar: calendar, marksFeed: marksFeed)
+            return CalendarPlacing(entries: placed.entries, leftOut: placed.leftOut)
+        }
+    }
+
+    /// The timeline's days (`ItemTimelineLayout.groups`), by `field` or each item's own date.
+    func timelinePlacing(in library: any ItemLibrary, field: String?, now: Date) -> TimelinePlacing {
+        let looks = looks(in: library)
+        let catalogue = library.catalogue
+        // Placed again as the day changes, so today leads.
+        let today = Calendar.current.startOfDay(for: now)
+        return placed(timelineWork, choice: TimelineChoice(field: field, looks: looks, today: today), in: library) { items in
+            TimelinePlacing(groups: ItemTimelineLayout.groups(for: items, field: field, looks: looks, catalogue: catalogue, today: now))
+        }
+    }
+
+    /// The timeline's days, with what the timeline reads of them without a pass over the place.
+    nonisolated struct TimelinePlacing: Sendable {
+        let groups: [ItemTimelineGroup]
+        /// Where each item stands, counting rows from the first day.
+        let positions: [ItemID: Int]
+        let types: Set<TypeID>
+
+        init(groups: [ItemTimelineGroup]) {
+            self.groups = groups
+            let rows = groups.flatMap(\.rows)
+            positions = Dictionary(rows.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+            types = Set(rows.map(\.item.type))
+        }
+
+        /// The days up to `limit` rows, the last of them cut short where it holds more, and whether any rows are left.
+        func drawn(upTo limit: Int) -> (groups: [ItemTimelineGroup], more: Bool) {
+            var drawn: [ItemTimelineGroup] = []
+            var left = limit
+            for group in groups {
+                guard left > 0 || group.rows.isEmpty else { return (drawn, true) }
+                if group.rows.count > left {
+                    drawn.append(ItemTimelineGroup(id: group.id, rows: Array(group.rows.prefix(left))))
+                    return (drawn, true)
+                }
+                drawn.append(group)
+                left -= group.rows.count
+            }
+            return (drawn, false)
+        }
+    }
+
+    nonisolated struct SectionsChoices: Equatable, Sendable {
         let derived: DerivedKey
         let order: ItemOrder
         let day: Date
@@ -449,7 +585,7 @@ extension Browser {
         let hidesEmpty: Bool
     }
 
-    struct SectionsKey: Equatable, Sendable {
+    nonisolated struct SectionsKey: Equatable, Sendable {
         let choices: SectionsChoices
         /// The table the sections are made from, where the place is filtered or arranged (`ItemTableContent.serial`).
         let table: Int?
@@ -458,7 +594,7 @@ extension Browser {
     }
 
     /// The revisions a table was made at, which a change of items moves and an update follows.
-    struct TableBasis: Equatable, Sendable {
+    nonisolated struct TableBasis: Equatable, Sendable {
         let content: Int
         let membership: Int
         /// A changed or evicted count answer changes the rows that show it.
@@ -488,6 +624,14 @@ extension Browser {
     private var showsOnlyFavorites: Bool { shown.isFavorites }
 }
 
+/// How often a window worked a place's table or list out whole, and how often it updated one from the last.
+nonisolated struct PlaceWorkCounts: Equatable, Sendable {
+    var tablesMade = 0
+    var tablesUpdated = 0
+    var listsSorted = 0
+    var listsUpdated = 0
+}
+
 /// What a list's sections are made of (`Browser.sections`), read on the main actor and made with no actor, so a large
 /// place's are made off it.
 nonisolated struct ListSections: Sendable {
@@ -514,7 +658,10 @@ nonisolated struct ListSections: Sendable {
 
     func make() -> ListArrangement {
         switch source {
-        case .table(let table): ListArrangement(sections: table.sections(order: order, now: now, ordersItself: ordersItself, favoritesFirst: favoritesFirst), sorted: nil, content: nil)
+        case .table(let table):
+            return ListArrangement(
+                sections: table.sections(order: order, now: now, ordersItself: ordersItself, favoritesFirst: favoritesFirst), sorted: nil,
+                content: nil)
         case .list(let items, let earlier, let changed, let content):
             if ordersItself {
                 return ListArrangement(sections: items.isEmpty ? [] : [ItemSection(group: nil, items: items)], sorted: nil, content: content)
@@ -538,13 +685,39 @@ nonisolated struct ListSections: Sendable {
     }
 }
 
-/// A list's sections, and the items in the list's order they were made of, which the next change re-places items in.
+/// A list's sections, what a layout reads of them without a pass over the place, and the items in the list's order they
+/// were made of, which the next change re-places items in.
 nonisolated struct ListArrangement: Sendable {
     let sections: [ItemSection]
+    /// Every item of the sections, in order, the folded ones too.
+    let ids: [ItemID]
+    /// The items the list shows, in order: those of the sections not folded away.
+    let shownIDs: [ItemID]
+    /// Where each of `ids` stands.
+    let positions: [ItemID: Int]
+    /// The types of the items.
+    let types: Set<TypeID>
     /// The items in the list's own order, before favorites lead, where the list ordered them.
     let sorted: [Item]?
     /// The library's revision the items were listed at, where they are the place's own.
-    let content: Int?
+    private(set) var content: Int?
+
+    init(sections: [ItemSection], sorted: [Item]?, content: Int?) {
+        self.sections = sections
+        self.sorted = sorted
+        self.content = content
+        ids = sections.flatMap { $0.items.map(\.id) }
+        shownIDs = sections.flatMap { $0.isCollapsed ? [] : $0.items.map(\.id) }
+        positions = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        types = Set(sections.lazy.flatMap(\.items).map(\.type))
+    }
+
+    /// The same sections, as made at the library's revision `content`, which changed none of their items.
+    func at(_ content: Int) -> ListArrangement {
+        var moved = self
+        moved.content = content
+        return moved
+    }
 }
 
 /// What an arranged table gives the list's sections: its rows in order and its groups.
