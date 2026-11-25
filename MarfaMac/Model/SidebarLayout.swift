@@ -240,6 +240,9 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     /// The word an earlier copy kept in `hidden` when Settings hid the Types section.
     static let typesSectionKey = "types"
 
+    /// Forgets that an earlier copy hid the Types section, as showing it again does.
+    mutating func showTypesSection() { hidden.remove(Self.typesSectionKey) }
+
     func isCollapsed(_ section: SidebarPlace) -> Bool { collapsed.contains(section.key) }
 
     mutating func setCollapsed(_ section: SidebarPlace, _ isCollapsed: Bool) {

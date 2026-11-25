@@ -262,7 +262,7 @@ nonisolated extension SidebarLayout {
         groups?.removeAll { $0.id == group.id }
         group.tab = tab
         group.isHidden = false
-        if group.kind == .types { hidden.remove(Self.typesSectionKey) }
+        if group.kind == .types { showTypesSection() }
         groups?.append(group)
         return group.id
     }
