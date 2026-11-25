@@ -475,14 +475,16 @@ struct QuickAddTests {
             draft.title = "Holiday"
             draft.files = [photo]
             drafts.update(id, draft)
-            drafts.sendingFile(id)
+            #expect(drafts.sendingFile(id))
         }
         let browser = Browser()
         browser.quickAdd.drafts = NewItemDrafts(file: file)
         browser.openNewItem(form: .text, in: library)
         #expect(browser.quickAdd.draft?.title == "Holiday")
         #expect(browser.quickAdd.mayBeInMarfa)
-        #expect(browser.quickAdd.lastAdded != nil, "a notice says it may already be in Marfa")
+        #expect(browser.quickAdd.lastAdded == QuickAdd.mayBeInMarfaNotice, "a notice says it may already be in Marfa")
+        browser.handOverToTextForm(in: library)
+        #expect(browser.quickAdd.mayBeInMarfa, "the text form shows the notice too")
 
         #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
         #expect(browser.quickAdd.asksAgain)
@@ -511,6 +513,43 @@ struct QuickAddTests {
         library.refusedCreations = [id]
         drafts.settle(in: library)
         #expect(drafts.takeReturned(.line, in: library.serverKey)?.draft.title == "Holiday", "refused later, the title comes back")
+    }
+
+    @Test func editsWhileAFileIsSentNeverChangeWhatWasSent() async throws {
+        let library = FakeItemLibrary(now: start)
+        let (release, released) = AsyncStream<Void>.makeStream()
+        library.sendingFile = { for await _ in release { break } }
+        let browser = Browser()
+        browser.openNewItem(kind: TypeID.file.rawValue, form: .text, in: library)
+        let photo = try disk.file("photo.png")
+        browser.quickAdd.draft?.files = [photo]
+        browser.quickAdd.draft?.title = "Holiday"
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        browser.quickAdd.draft?.title = ""
+        browser.quickAdd.draft?.files = []
+        library.refusesFiles = true
+        released.yield()
+        #expect(await saving.value == nil)
+
+        let back = try #require(browser.quickAdd.drafts.takeReturned(.line, in: library.serverKey), "what was sent is kept")
+        #expect(back.draft.title == "Holiday")
+        #expect(back.draft.files == [photo])
+    }
+
+    @Test func aFileWhoseMarkerCannotBeSavedIsNotAdded() async throws {
+        let library = FakeItemLibrary(now: start)
+        let blocker = disk.url("Blocker")
+        let browser = Browser()
+        browser.quickAdd.drafts = NewItemDrafts(file: blocker.appending(path: "Drafts.json"))
+        browser.openNewItem(kind: TypeID.file.rawValue, form: .text, in: library)
+        browser.quickAdd.draft?.files = [try disk.file("photo.png")]
+        browser.quickAdd.draft?.title = "Holiday"
+
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(library.addedFiles.isEmpty, "nothing is sent that no later run could follow")
+        #expect(browser.quickAdd.draft?.title == "Holiday", "the draft stays as typed")
+        #expect(library.notices.waiting.contains { $0.title == "Item Not Added" }, "\(library.notices.waiting.map(\.title))")
     }
 
     @Test func textTypedWhileAFileIsAddedIsHandedOffAsTheWindowCloses() async throws {

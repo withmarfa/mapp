@@ -165,6 +165,10 @@ nonisolated struct ParentLinkStore {
         return link
     }
 
+    var isEmpty: Bool { links.isEmpty }
+    func link(for write: Marfa.QueuedWrite) -> ParentLink? { links[write.id] }
+    mutating func refuse(_ write: String, reason: String) {}
+
     mutating func keepOnly(_ writes: Set<String>) {
         let kept = links.filter { writes.contains($0.key) }
         guard kept.count != links.count else { return }

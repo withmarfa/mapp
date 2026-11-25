@@ -239,6 +239,109 @@ struct MarfaDrainAnswersTests {
         await source.close()
     }
 
+    /// A file's upload refused for its own reason takes its create with it, folded into the upload's problem.
+    @Test @MainActor
+    func aFileWhoseUploadIsRefusedLaterIsARefusedCreate() async throws {
+        let (source, _, store) = try await open()
+        defer { try? FileManager.default.removeItem(at: store.deletingLastPathComponent()) }
+        let library = MarfaLibrary(source: source, notices: Notices())
+        try #require(await eventually { library.isLoaded })
+        let file = store.deletingLastPathComponent().appending(path: "Plan.txt")
+        try Data("plan".utf8).write(to: file)
+        let id = try #require(await library.addFile(file, title: "Plan", parentID: nil, tier: .library, tags: []))
+        let writes = try await source.copy.queue.all()
+        let upload = try #require(writes.first { $0.kind == .uploadBlob })
+        let create = try #require(writes.first { $0.kind == .createItem && $0.itemId == id.rawValue })
+        try #require(create.dependsOn.contains(upload.id))
+        try Self.record(upload.id, "UPDATE queue SET verdict = 'refused', reason = 'The file is too large.', sent = 0 WHERE id = ?", at: store)
+        try Self.record(create.id, "UPDATE queue SET verdict = 'refused', reason = 'the write it depends on was refused', sent = 0 WHERE id = ?", at: store)
+        await source.tellAnswers()
+
+        #expect(await eventually { library.refusedCreates.contains(id) }, "\(library.syncReport.problems)")
+        #expect(library.refusalReason(creating: id) != nil)
+        await source.close()
+    }
+
+    private static func parentLinks(at root: URL) throws -> URL {
+        MarfaStoreLocation(root: root).directory(for: try MarfaConnection(address: "http://127.0.0.1:9"))
+            .appending(path: "New Item Parent Links.json")
+    }
+
+    /// Queues a child under a parent, then closes the copy, as a quit does. Answers the link's write.
+    private func queueChildAndQuit(at root: URL) async throws -> (Marfa.QueuedWrite, URL) {
+        let (source, log, store) = try await open(at: root)
+        let parent = ItemID.mint()
+        let child = ItemID.mint()
+        source.submit(.create(id: parent, ItemDraft(type: TypeID("core.note"), title: "Garden", body: "Plans")), as: WriteID())
+        source.submit(.create(id: child, ItemDraft(type: TypeID("core.note"), title: "Seeds", body: "List", parent: parent)), as: WriteID())
+        await source.queueSubmitted()
+        _ = try #require(await log.wait { $0.snapshot?.items.first { $0.id == child }?.edgesOut.isEmpty == false })
+        let link = try #require(try await source.copy.queue.all().first { $0.kind == .createEdge })
+        await source.close()
+        return (link, store)
+    }
+
+    /// A refusal is kept with its link before it is told, so a quit in between still tells it at the next launch.
+    @Test @MainActor
+    func aParentLinkRefusedJustBeforeAQuitIsToldAfterTheRelaunch() async throws {
+        let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (link, store) = try await queueChildAndQuit(at: root)
+        // As the engine leaves it when the app stops after the answer and before the notice: the refusal kept with
+        // the link, and the write, which carried no content, gone from the queue.
+        var links = ParentLinkStore(file: try Self.parentLinks(at: root))
+        links.refuse(link.id, reason: "That kind can’t be under this one.")
+        try Self.record(link.id, "DELETE FROM queue WHERE id = ?", at: store)
+
+        let (source, _, _) = try await open(at: root)
+        let library = MarfaLibrary(source: source, notices: Notices())
+        let told = await eventually {
+            library.notices.waiting.contains {
+                $0.title == "Can’t Put Item Under Its Parent" && $0.message.contains("That kind can’t be under this one.")
+                    && $0.message.contains("“Seeds”")
+            }
+        }
+        #expect(told, "told: \(library.notices.waiting.map(\.message))")
+        await source.close()
+    }
+
+    /// A link whose write left the queue with no answer the app took may not have been made, and is told so once.
+    @Test @MainActor
+    func aParentLinkWhoseWriteLeftTheQueueUnansweredIsTold() async throws {
+        let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (link, store) = try await queueChildAndQuit(at: root)
+        try Self.record(link.id, "DELETE FROM queue WHERE id = ?", at: store)
+
+        do {
+            let (source, _, _) = try await open(at: root)
+            let library = MarfaLibrary(source: source, notices: Notices())
+            let told = await eventually {
+                library.notices.waiting.contains { $0.message.contains("“Seeds”") && $0.message.contains("may not have been made") }
+            }
+            #expect(told, "told: \(library.notices.waiting.map(\.message))")
+            await source.close()
+        }
+        #expect(ParentLinkStore(file: try Self.parentLinks(at: root)).isEmpty, "then dropped")
+    }
+
+    /// A queue id names the link only while the write is that link, so a stale entry never matches another write.
+    @Test
+    func aParentLinkIsFoundOnlyByTheWriteThatMadeIt() {
+        let parent = ItemID.mint()
+        let child = ItemID.mint()
+        let link = ParentLink(child: child, parent: parent)
+        var links = ParentLinkStore(file: nil)
+        links.keep(link, for: "w")
+        func write(_ kind: WriteKind, _ item: ItemID, _ target: ItemID?) -> Marfa.QueuedWrite {
+            Marfa.QueuedWrite(id: "w", kind: kind, itemId: item.rawValue, toId: target?.rawValue, idempotencyKey: "w", queuedAt: "2026-11-25T09:00:00Z")
+        }
+        #expect(links.link(for: write(.createItem, child, nil)) == nil)
+        #expect(links.link(for: write(.createEdge, .mint(), child)) == nil)
+        #expect(links.link(for: write(.createEdge, parent, .mint())) == nil)
+        #expect(links.link(for: write(.createEdge, parent, child)) == link)
+    }
+
     /// A blocked answer is one the copy keeps, since the write may be released, and a released write keeps its queue
     /// id. Its next answer is taken like any other, and a second refusal of it is told again.
     @Test

@@ -169,11 +169,12 @@ final class NewItemDrafts {
 
     /// The draft's file is about to be added. The library names the file's item only once it is queued, so a draft
     /// read back with this still set comes back saying the file may be in the library already.
-    func sendingFile(_ id: UUID) {
-        guard entries[id] != nil else { return }
+    func sendingFile(_ id: UUID) -> Bool {
+        guard entries[id] != nil else { return true }
         entries[id]?.addingFile = true
         entries[id]?.interrupted = false
         save()
+        return true
     }
 
     /// The library made nothing from the draft, so it stays the holder's as typed.

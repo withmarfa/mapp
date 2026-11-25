@@ -289,6 +289,7 @@ final class QuickAdd {
     var mayBeInMarfa = false
     /// Whether the window asks the person to add again a draft that may be in Marfa already.
     var asksAgain = false
+    static var mayBeInMarfaNotice: String { "stub" }
 
     /// Writes the draft as it now is, or drops it where it is empty.
     private func keep() {
@@ -470,7 +471,7 @@ final class QuickAdd {
     fileprivate func saving(_ draft: Draft) {
         sending = draft
         sendingEntry = entry
-        if let entry { drafts.sendingFile(entry) }
+        if let entry { _ = drafts.sendingFile(entry) }
     }
 
     /// Returns whether the window still holds the draft. If the window closed, keep the draft until Marfa answers
