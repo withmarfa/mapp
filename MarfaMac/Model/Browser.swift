@@ -543,14 +543,84 @@ final class Browser {
         /// View puts back only those, and only where the view still holds what this window made.
         var changed: Set<ViewChoices.Part> = []
         var mine: ViewChoices?
+        /// Each setting as Marfa held it when the window opened the view, whole, with what the app cannot show: Revert
+        /// View writes these back, never the window's reading of them.
+        var raw: LibraryView
+        /// Each setting as Marfa returned it after this Mac last wrote it. Revert View writes a setting back only while
+        /// Marfa still holds this (or, unwritten, `raw`), so another app's change, even one the window cannot show, stays.
+        var written = LibraryViewChange()
+        /// The settings Revert View put back, as `raw` holds them: while the window shows one as it opened, it is
+        /// written so, through an Undo and a Redo too (`Browser.viewUpdate`).
+        var reverting: LibraryViewChange?
 
         /// Takes the view's choices as read for `parts`, but where they are still this window's own change: a setting
         /// another app changed becomes the opening one, and no longer this window's to put back.
-        mutating func follow(_ parts: Set<ViewChoices.Part>, of other: ViewChoices) {
+        mutating func follow(_ parts: Set<ViewChoices.Part>, of other: ViewChoices, raw view: LibraryView) {
             let own = mine.map { changed.subtracting(other.parts(differingFrom: $0)) } ?? []
             let taken = parts.subtracting(own)
             choices.take(taken, from: other)
             changed.subtract(taken)
+            for setting in Self.settings(of: taken) where Self.parts(of: setting).isDisjoint(with: changed) {
+                take(setting, of: view)
+            }
+        }
+
+        /// Takes a setting of the view as it now stands for the opening one, which this window no longer changed.
+        mutating func take(_ setting: PendingViewChanges.Setting, of view: LibraryView) {
+            switch setting {
+            case .sort: raw.sort = view.sort; written.sort = nil; reverting?.sort = nil
+            case .group: raw.group = view.group; written.group = nil; reverting?.group = nil
+            case .query: raw.query = view.query; written.query = nil; reverting?.query = nil
+            }
+        }
+
+        /// Notes what Marfa holds of each setting a write of this Mac's sent.
+        mutating func wrote(_ change: LibraryViewChange, returned view: LibraryView) {
+            if change.sort != nil { written.sort = view.sort }
+            if change.group != nil { written.group = view.group.map { .set($0) } ?? .clear }
+            if change.query != nil { written.query = view.query }
+        }
+
+        /// Whether Marfa still holds a setting as this Mac last left it, compared as Marfa holds it.
+        func holdsWhatItLeft(_ setting: PendingViewChanges.Setting, in view: LibraryView) -> Bool {
+            switch setting {
+            case .sort: view.sort == (written.sort ?? raw.sort)
+            case .group:
+                switch written.group {
+                case .set(let group): view.group == group
+                case .clear: view.group == nil
+                case nil: view.group == raw.group
+                }
+            case .query: view.query == (written.query ?? raw.query)
+            }
+        }
+
+        /// The opening value of each setting, as a change that writes it back.
+        func opening(_ settings: Set<PendingViewChanges.Setting>) -> LibraryViewChange {
+            var change = LibraryViewChange()
+            if settings.contains(.sort) { change.sort = raw.sort }
+            if settings.contains(.group) { change.group = raw.group.map { .set($0) } ?? .clear }
+            if settings.contains(.query) { change.query = raw.query }
+            return change
+        }
+
+        /// The settings of the view that hold these choices: the filters and the listing are both its query.
+        static func settings(of parts: Set<ViewChoices.Part>) -> Set<PendingViewChanges.Setting> {
+            Set(parts.map { part in
+                switch part {
+                case .sort: .sort
+                case .grouping: .group
+                case .filters, .listing: .query
+                }
+            })
+        }
+
+        static func parts(of setting: PendingViewChanges.Setting) -> Set<ViewChoices.Part> {
+            switch setting {
+            case .sort: [.sort]
+            case .group: [.grouping]
+            case .query: [.filters, .listing]
+            }
         }
     }
 

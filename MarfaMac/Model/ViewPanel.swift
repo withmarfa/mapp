@@ -51,9 +51,27 @@ final class ViewPanel {
     /// The name already given back, so a quit after a close does not give it twice.
     @ObservationIgnored private var handedOffName: String?
     /// The name of a view being edited. A new view's name is the form's, which keeps it until the server takes it.
-    var name: String
-    /// The view's name as the panel last read it, so a rename elsewhere shows unless the person is typing their own.
+    var name: String {
+        didSet {
+            if typedRename == nil {
+                renameBase = nil
+            } else if renameBase == nil {
+                renameBase = RenameBase(title: knownTitle, version: knownVersion)
+            }
+        }
+    }
+    /// The view's name and version as the panel last read them, so a rename elsewhere shows unless the person is typing
+    /// their own.
     var knownTitle: String
+    @ObservationIgnored var knownVersion: Int64 = 0
+    /// The view's name and version when the person began to type over its name: the rename is written against these,
+    /// so a rename made in another app meanwhile is never written over (`Browser.commitViewName`).
+    @ObservationIgnored private(set) var renameBase: RenameBase?
+
+    struct RenameBase: Equatable {
+        let title: String
+        let version: Int64
+    }
     private(set) var form: ViewTitleForm?
     private(set) var snapshot: Snapshot?
 
@@ -61,6 +79,7 @@ final class ViewPanel {
         purpose = .edit(view.id)
         name = view.title
         knownTitle = view.title
+        knownVersion = view.version
         self.notices = notices
         Self.open.add(self)
     }
@@ -150,12 +169,30 @@ final class ViewPanel {
 
     /// The write of `name` answered. From a panel that ended meanwhile, whatever the person typed last and the view does
     /// not hold is given back, once no later write of a name is still under way.
-    func finishRename(name: String, kept: Bool) {
+    func finishRename(name: String, kept: Bool, reason: String? = nil) {
         if renaming == name { renaming = nil }
-        if kept { knownTitle = name }
-        guard let reason = leftWhileRenaming, renaming == nil else { return }
+        if kept {
+            knownTitle = name
+            // A name typed since starts from the one just written.
+            if renaming == nil { renameBase = typedRename.map { _ in RenameBase(title: name, version: knownVersion) } }
+        }
+        guard let left = leftWhileRenaming, renaming == nil else { return }
         leftWhileRenaming = nil
-        giveBackRename(reason: reason)
+        giveBackRename(reason: reason ?? left)
+    }
+
+    /// A rename refused because the view was renamed elsewhere starts again from the view as it is now.
+    func restartRename(from view: LibraryView) {
+        guard renaming == nil, typedRename != nil else { return }
+        renameBase = RenameBase(title: view.title, version: view.version)
+    }
+
+    /// The panel read the view again: a name the person has not typed over follows it.
+    func follow(_ view: LibraryView) {
+        let following = name == knownTitle
+        knownTitle = view.title
+        knownVersion = view.version
+        if following { name = view.title }
     }
 
     /// The view is gone, so the name typed for it has nowhere to go. Whether there was one to give back.

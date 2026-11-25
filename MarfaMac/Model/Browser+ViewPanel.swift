@@ -112,8 +112,7 @@ extension Browser {
             if !library.views.isEmpty { closeGoneViewPanel(panel, in: library) }
             return
         }
-        if panel.name == panel.knownTitle { panel.name = view.title }
-        panel.knownTitle = view.title
+        panel.follow(view)
     }
 
     /// The view the panel edits is gone: the panel closes, and the person is told, or is given back the name they typed.

@@ -625,6 +625,69 @@ struct ViewPanelTests {
         #expect(Self.held(library)?.group == nil)
     }
 
+    /// Revert View writes back a sort whole, with a key the Mac cannot show.
+    @Test func revertWritesBackASortTheMacCannotShow() async {
+        var custom = Self.view()
+        custom.sort = [LibraryViewSort(field: "source", ascending: true), LibraryViewSort(field: "updated_at", ascending: false)]
+        let (browser, library, undo) = Self.opened(view: custom)
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].sort = Self.byTitle }
+        #expect(Self.held(library)?.sort == [LibraryViewSort(field: "title", ascending: true)])
+        undo.beginUndoGrouping()
+        browser.revertView(in: library)
+        Self.close(undo)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.sort == custom.sort })
+        #expect(!library.notices.waiting.contains { $0.title == "View Partly Reverted" })
+    }
+
+    /// Revert View puts back a grouping by day with its group order and hidden groups.
+    @Test func revertWritesBackADayGroupingWithItsOrderAndHiddenGroups() async {
+        var custom = Self.view()
+        custom.group = LibraryViewGroup(field: "updated_at", bucket: .day, order: [.string("2026-11-02")], hidden: [.string("2026-11-01")])
+        let (browser, library, undo) = Self.opened(view: custom)
+        await Self.change(browser) { browser.chooseGrouping(.column(Self.status, by: .value)) }
+        #expect(Self.held(library)?.group?.field == "properties.status")
+        undo.beginUndoGrouping()
+        browser.revertView(in: library)
+        Self.close(undo)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.group == custom.group })
+    }
+
+    /// A sort another app changed in a way the window cannot see, as Marfa holds it, stays through Revert View, and the
+    /// person is told.
+    @Test func revertKeepsASortAnotherAppChangedAndSaysSo() async throws {
+        let (browser, library, undo) = Self.opened()
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].sort = Self.byTitle }
+        var changed = try #require(Self.held(library))
+        changed.version += 1
+        changed.sort = [LibraryViewSort(field: "title", ascending: true), LibraryViewSort(field: "source", ascending: true)]
+        library.views = [changed]
+        browser.followView(in: library)
+        undo.beginUndoGrouping()
+        browser.revertView(in: library)
+        Self.close(undo)
+        #expect(library.notices.waiting.contains { $0.title == "View Partly Reverted" && $0.message.contains("Sort") })
+        await browser.choicesChanged()?.value
+        #expect(Self.held(library)?.sort == changed.sort)
+    }
+
+    /// A name typed while another app renamed the view is not written over that name: it goes to the clipboard.
+    @Test(arguments: [true, false]) func aNameTypedWhileAnotherAppRenamedTheViewGoesToTheClipboard(windowSawIt: Bool) async throws {
+        let (browser, library, _) = Self.opened()
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "Typed"
+        var renamed = try #require(Self.held(library))
+        renamed.title = "Renamed Elsewhere"
+        renamed.version += 1
+        library.views = [renamed]
+        if windowSawIt {
+            browser.reconcileViewPanel(in: library)
+            browser.followView(in: library)
+        }
+        browser.dismissViewPanel(in: library)
+        #expect(await eventually(within: .seconds(20)) { library.notices.waiting.contains { $0.isNotKept && $0.text == "Typed" } })
+        #expect(Self.held(library)?.title == "Renamed Elsewhere")
+    }
+
     @Test func aNameTypedThenClickedAwayFromOfflineGoesToTheClipboard() async {
         let (browser, library, _) = Self.opened(reachesServer: false)
         browser.openViewPanel(in: library)
