@@ -26,17 +26,17 @@ struct ItemList: View, Equatable {
         let _ = daysSeen
         let now = library.now()
         // Worked out off the main actor for a large place, with the ids and types read here, so the body makes no pass over it.
-        let listing = browser.listing(in: library, order: order, now: now)
+        let arrangement = browser.arrangement(in: library, order: order, now: now)
         // A folded section lists its heading alone.
-        let ids = listing.shownIDs
+        let ids = arrangement.shownIDs
         // Only a page of a long list is drawn, and the next as its end comes into view (`Browser.listItemsDrawn`).
-        let lines = ListLine.lines(of: listing.sections, upTo: browser.listItemsDrawn)
+        let lines = ListLine.lines(of: arrangement.sections, upTo: browser.listItemsDrawn)
         let drawnIDs = lines.compactMap(\.itemID)
         // Each row's content is worked out once for the item as it is and held by the browser, so a change of selection or
         // of one item makes the content of that row alone, and a row's body looks nothing up.
         let _ = placeDensities
         let density = browser.density ?? settingsDensity
-        let list = browser.rowList(of: listing.types, in: library, order: order, now: now, format: dateFormat, density: density)
+        let list = browser.rowList(of: arrangement.types, in: library, order: order, now: now, format: dateFormat, density: density)
         let contents = browser.rowContents.contents(of: lines.compactMap(\.entry), in: library, looks: browser.propertyLooks(in: library), list: list)
         let results = browser.searchResults(in: library)
         let excerpts = results?.excerpts ?? [:]
@@ -84,7 +84,7 @@ struct ItemList: View, Equatable {
         }
         // An item chosen past what is drawn, as by Back, a link or a new item, is drawn.
         .onChange(of: browser.selection, initial: true) {
-            if browser.selection.count == 1, let id = browser.selection.first, let position = listing.positions[id] {
+            if browser.selection.count == 1, let id = browser.selection.first, let position = arrangement.positions[id] {
                 browser.drawList(through: position)
             }
         }

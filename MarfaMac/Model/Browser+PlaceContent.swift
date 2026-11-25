@@ -143,11 +143,11 @@ extension Browser {
     /// A place of more than `arrangesAlongsideAbove` items is worked out off the main actor (`PlaceWork`), its last
     /// sections showing meanwhile, and a change of items re-places only the items that changed.
     func sections(in library: any ItemLibrary, order: ItemOrder, now: Date) -> [ItemSection] {
-        listing(in: library, order: order, now: now).sections
+        arrangement(in: library, order: order, now: now).sections
     }
 
     /// The list's sections with what a layout reads of them, worked out with them (`sections(in:order:now:)`).
-    func listing(in library: any ItemLibrary, order: ItemOrder, now: Date) -> ListArrangement {
+    func arrangement(in library: any ItemLibrary, order: ItemOrder, now: Date) -> ListArrangement {
         _ = placeWorkLanded
         let derived = derivedKey(in: library)
         let shape = listShape

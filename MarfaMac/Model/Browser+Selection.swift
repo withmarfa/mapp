@@ -53,7 +53,7 @@ extension Browser {
         guard followsCollection else { return [] }
         guard !showsPlaceIndex else { return [] }
         guard viewMode == .table else {
-            let shown = listing(in: library, order: order, now: library.now()).ids
+            let shown = arrangement(in: library, order: order, now: library.now()).ids
             // The items the filters and the hidden groups leave out stay in the selection's reach, as the table's do.
             let rest: [ItemID]
             if listShape?.arranged == true, !ordersByRelevance {

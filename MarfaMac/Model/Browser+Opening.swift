@@ -89,7 +89,7 @@ extension Browser {
             let rows = content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)
             return rows.map(\.item.id)
         }
-        return listing(in: library, order: order, now: library.now()).ids
+        return arrangement(in: library, order: order, now: library.now()).ids
     }
 
     /// The items the modal's arrows go to.
