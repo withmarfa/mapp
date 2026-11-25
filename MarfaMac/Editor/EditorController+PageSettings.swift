@@ -152,7 +152,6 @@ extension EditorController {
             "status": String(localized: "Status"),
             "empty": String(localized: "Empty"),
             "discardChanges": String(localized: "Discard Changes"),
-            "linkedFrom": String(localized: "Linked From"),
             "showLess": String(localized: "Show Less"),
             "properties": String(localized: "Properties"),
             "reorder": String(localized: "Drag to Reorder"),

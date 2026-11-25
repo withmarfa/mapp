@@ -40,6 +40,20 @@
     "noticeAction": { "item": "x", "kind": "deleted" },
     "openLink": { "href": "https://example.com" },
     "openItem": { "item": "x" },
+    "cardHover": {
+      "item": "x",
+      "card": { "kind": "item", "link": "y" },
+      "rect": [0, 0, 1, 1],
+      "viewportHeight": 1
+    },
+    "cardEnd": {},
+    "cardMenu": {
+      "item": "x",
+      "card": { "kind": "item", "link": "y" },
+      "rect": [0, 0, 1, 1],
+      "viewportHeight": 1
+    },
+    "footMore": { "item": "x", "key": "timeline" },
     "copy": { "text": "x" },
     "escape": {},
     "pasteImages": {},

@@ -35,11 +35,9 @@ const ticket: HeaderModel = {
     { id: 'status', label: 'Status', symbol: 'circle.dotted', kind: 'status' },
     { id: 'child-of', label: 'Epic', symbol: 'square.stack', kind: 'parent' },
   ],
-  linked: [],
-  linkedFoldAfter: 20,
+  foot: [],
   showsText: true,
   showMore: 'Show 0 More',
-  showMoreLinked: 'Show 0 More',
   interfaceTextSize: 13,
   titleLines: 2,
 }
@@ -584,12 +582,19 @@ test('a parent chip takes the icon and tone of its own type, and a read-only sta
   expect(posted.map((message) => message.type)).toEqual(['headerMenu'])
 })
 
-test('the Linked From heading is a row the menu can name', () => {
-  const mention = { item: 'm', title: 'Mention', symbol: 'link', type: 'Note', date: 'Today' }
-  header.set({ ...ticket, linked: [mention] })
+test('the Linked From and Timeline headings are a row the menu can name, and Sub-Items is not', () => {
+  const row = { item: 'm', title: 'Mention', symbol: 'link', date: 'Today' }
+  header.set({
+    ...ticket,
+    foot: [
+      { kind: 'timeline', title: 'Timeline', total: 1, rows: [row], key: 'timeline' },
+      { kind: 'subItems', title: 'Sub-Items', total: 1, rows: [row], key: 'subItems' },
+    ],
+  })
   expect(header.hasFooterItems).toBe(true)
-  const toggle = footer.querySelector('.item-linked-from .item-linked-toggle')!
-  expect(header.rowAt(toggle)).toEqual({ item: 'ticket', row: '#linked' })
+  const timeline = footer.querySelector('.item-foot-timeline .item-foot-heading')!
+  expect(header.rowAt(timeline)).toEqual({ item: 'ticket', row: '#linked' })
+  expect(header.rowAt(footer.querySelector('.item-foot-subItems .item-foot-heading'))).toBeNull()
 })
 
 test('a URL that is not web is shown as text, not as a link', () => {
@@ -601,50 +606,101 @@ test('a URL that is not web is shown as text, not as a link', () => {
   expect(root.querySelector('.item-prop dd')!.textContent).toBe('javascript:alert(1)')
 })
 
-test('linked items are folded, then listed with their type and date, and open on a click', () => {
-  const linked = [
-    { item: 'a', title: 'Wiring', symbol: 'calendar', type: 'Session', date: '2 Oct' },
-    { item: 'b', title: 'Decision', symbol: 'doc', type: 'Decision', date: '24 Oct' },
+test('the foot lists what the app sends, each row opening its item', () => {
+  const rows = [
+    { item: 'a', title: 'Wiring', symbol: 'calendar', date: '2 Oct' },
+    { item: 'b', title: 'Decision', symbol: 'doc', date: '24 Oct' },
   ]
-  header.set({ ...ticket, linked })
-  const toggle = footer.querySelector<HTMLButtonElement>('.item-linked-from .item-linked-toggle')!
-  expect(toggle.textContent).toBe('Linked From2')
-  expect(toggle.getAttribute('aria-expanded')).toBe('false')
-  expect(footer.querySelector<HTMLElement>('.item-linked-from .item-linked-list')!.hidden).toBe(
-    true,
-  )
-  toggle.click()
-  expect(toggle.getAttribute('aria-expanded')).toBe('true')
-  const rowsShown = [...footer.querySelectorAll('.item-linked-from .item-linked-row')]
-  expect(rowsShown.map((row) => row.querySelector('.item-linked-name')!.textContent)).toEqual([
+  header.set({
+    ...ticket,
+    foot: [{ kind: 'linkedFrom', title: 'Linked From', total: 2, rows, key: 'linkedFrom' }],
+  })
+  const section = footer.querySelector<HTMLElement>('.item-foot-linkedFrom')!
+  expect(section.querySelector('.item-foot-heading')!.textContent).toBe('Linked From2')
+  const shown = [...section.querySelectorAll('.item-foot-row')]
+  expect(shown.map((row) => row.querySelector('.item-foot-name')!.textContent)).toEqual([
     'Wiring',
     'Decision',
   ])
-  expect(rowsShown[0]!.querySelector('.item-linked-detail')!.textContent).toBe('Session2 Oct')
+  expect(shown[0]!.querySelector('.item-foot-date')!.textContent).toBe('2 Oct')
   posted = []
-  rowsShown[1]!.querySelector<HTMLElement>('button')!.click()
+  shown[1]!.querySelector<HTMLElement>('.item-foot-open')!.click()
   expect(posted).toEqual([{ type: 'openItem', item: 'b' }])
 })
 
-test('a long list of linked items expands, and folds again', () => {
-  const linked = Array.from({ length: 5 }, (_, index) => ({
+test('Show More asks the app for the next rows of its list, and draws only the rows it sends', () => {
+  const rows = Array.from({ length: 30 }, (_, index) => ({
     item: `i${index}`,
-    title: `Item ${index}`,
+    title: `Mention ${index}`,
     symbol: 'doc',
-    type: 'Note',
     date: 'Today',
   }))
-  header.set({ ...ticket, linked, linkedFoldAfter: 3, showMoreLinked: 'Show 2 More' })
-  const section = footer.querySelector<HTMLElement>('.item-linked-from')!
-  section.querySelector<HTMLButtonElement>('.item-linked-toggle')!.click()
-  expect(section.querySelectorAll('.item-linked-row')).toHaveLength(3)
-  const more = section.querySelector<HTMLButtonElement>('.item-more')!
-  expect(more.textContent).toBe('Show 2 More')
-  more.click()
-  expect(section.querySelectorAll('.item-linked-row')).toHaveLength(5)
-  expect(more.textContent).toBe('Show Less')
-  more.click()
-  expect(section.querySelectorAll('.item-linked-row')).toHaveLength(3)
+  const section = {
+    kind: 'timeline' as const,
+    title: 'Timeline',
+    total: 143,
+    rows,
+    key: 'timeline',
+    more: 'Show 113 More',
+  }
+  header.set({ ...ticket, foot: [section] })
+  expect(footer.querySelectorAll('.item-foot-row')).toHaveLength(30)
+  expect(footer.querySelector('.item-foot-count')!.textContent).toBe('143')
+  posted = []
+  footer.querySelector<HTMLButtonElement>('.item-foot-more')!.click()
+  expect(posted).toEqual([{ type: 'footMore', item: 'ticket', key: 'timeline' }])
+  const next = Array.from({ length: 30 }, (_, index) => ({
+    ...rows[0]!,
+    item: `j${index}`,
+    title: `Mention ${30 + index}`,
+  }))
+  header.set({
+    ...ticket,
+    foot: [{ ...section, rows: [...rows, ...next], more: 'Show 83 More' }],
+  })
+  expect(footer.querySelectorAll('.item-foot-row')).toHaveLength(60)
+  expect(footer.querySelector('.item-foot-more')!.textContent).toBe('Show 83 More')
+  header.set({ ...ticket, foot: [{ ...section, rows: [...rows, ...next], more: undefined }] })
+  expect(footer.querySelector('.item-foot-more')).toBeNull()
+})
+
+test('sub-items nest, the first level open and the deeper folded, and Show More is for its own list', () => {
+  const leaf = { item: 'leaf', title: 'Leaf', symbol: 'doc', date: '' }
+  const child = {
+    item: 'child',
+    title: 'Child',
+    symbol: 'doc',
+    date: '',
+    children: [{ ...leaf, children: [{ ...leaf, item: 'deep', title: 'Deep' }] }],
+    more: 'Show 3 More',
+    key: 'sub:child',
+  }
+  const task = {
+    item: 'task',
+    title: 'Task',
+    symbol: 'doc',
+    date: '12 Dec',
+    mark: { symbol: 'circle', tint: 'secondary' as const },
+    children: [child],
+  }
+  header.set({
+    ...ticket,
+    foot: [{ kind: 'subItems', title: 'Sub-Items', total: 4, rows: [task], key: 'subItems' }],
+  })
+  const names = () => [...footer.querySelectorAll('.item-foot-name')].map((n) => n.textContent)
+  // The task's sub-items are open; the child's own are folded.
+  expect(names()).toEqual(['Task', 'Child'])
+  const arrows = footer.querySelectorAll<HTMLButtonElement>('.item-foot-arrow')
+  expect(arrows).toHaveLength(2)
+  expect(arrows[1]!.getAttribute('aria-expanded')).toBe('false')
+  arrows[1]!.click()
+  expect(names()).toEqual(['Task', 'Child', 'Leaf'])
+  expect(footer.querySelector('.item-foot-more')!.textContent).toBe('Show 3 More')
+  posted = []
+  footer.querySelector<HTMLButtonElement>('.item-foot-more')!.click()
+  expect(posted).toEqual([{ type: 'footMore', item: 'ticket', key: 'sub:child' }])
+  arrows[0]!.click()
+  expect(names()).toEqual(['Task'])
 })
 
 test('a row of many links draws the first the app names, then a button that draws the rest', () => {
@@ -683,9 +739,10 @@ test('the title is told how many lines to show', () => {
   expect(root.style.getPropertyValue('--title-lines')).toBe('4')
 })
 
-test('an item nothing links to has no Linked From section', () => {
+test('an item with nothing at its foot has none', () => {
   header.set(ticket)
-  expect(footer.querySelector<HTMLElement>('.item-linked-from')!.hidden).toBe(true)
+  expect(footer.hidden).toBe(true)
+  expect(footer.querySelector('.item-foot')).toBeNull()
 })
 
 const phone = { id: 'tel', label: 'Phone', symbol: 'phone', kind: 'phone' as const }

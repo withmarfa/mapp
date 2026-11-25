@@ -27,7 +27,7 @@ nonisolated enum PageOpenTarget: Equatable, Sendable {
             }
         case .reading:
             return library.originalAddress(of: item).map(PageOpenTarget.address)
-        case .general, .event, .person:
+        case .general, .event, .person, .place:
             guard let location = ItemLocation.of(library.catalogue.itemTypes[item.type]),
                   case .point(let point) = location.reading(of: item) else { return nil }
             return .point(point)

@@ -25,7 +25,7 @@ struct ItemDetail: View {
                 .onAppear { editor.close() }
         } else if let id = shownID, let item = library.item(id) {
             if library.pageLayout(of: item) != .text {
-                FileItemPage(item: item, drafts: details, open: { [editor] in editor.onOpenItem($0) }, onResolved: { browser.fileFetched(id, at: $0) }, backsToolbar: backsToolbar)
+                FileItemPage(item: item, drafts: details, open: { [editor] in editor.follow($0) }, onResolved: { browser.fileFetched(id, at: $0) }, backsToolbar: backsToolbar)
                     .itemCorner(item, editor: nil, details: details, isShown: showsCorner)
                     // An editor that holds the file has left its page for it already (`EditorController.open`).
                     .onAppear { if editor.heldItemID != id { editor.close() } }

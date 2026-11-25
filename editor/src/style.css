@@ -795,8 +795,7 @@ button.item-kicker-type:focus-visible {
 .item-props[hidden],
 .item-prop-sections[hidden],
 .item-more[hidden],
-.item-linked[hidden],
-.item-linked-list[hidden] {
+.item-foot[hidden] {
   display: none;
 }
 
@@ -1060,67 +1059,74 @@ button.item-kicker-type:focus-visible {
   color: var(--label-secondary);
 }
 
-/* Linked From and a collection's contents: a folded group under a faint hairline. */
-.item-linked {
-  border-top: 1px solid var(--label-quinary);
+/* What belongs to the item, under the text: Sub-Items, nested, and Timeline or Linked From. Every measure is its design
+   point at the 13 point interface text. */
+.item-foot + .item-foot {
+  margin-top: calc(var(--interface-text-size) * 30 / 13);
 }
 
-.item-linked + .item-linked {
-  margin-top: calc(var(--step) * 4);
-}
-
-.item-linked-toggle {
+.item-foot-heading {
   display: flex;
-  align-items: center;
-  gap: calc(var(--step) * 2);
-  width: 100%;
-  min-height: calc(var(--step) * 9);
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--label-secondary);
-  font: inherit;
-  text-align: start;
-  cursor: default;
+  align-items: baseline;
+  gap: calc(var(--interface-text-size) * 7 / 13);
+  padding-bottom: calc(var(--interface-text-size) * 8 / 13);
+  border-bottom: 1px solid var(--label-quinary);
+  color: var(--label-primary);
+  font-weight: 600;
 }
 
-/* The same small chevron the pins end in, last in the row after the count: down while the group is folded, up
-   while it is open. */
-.item-chevron {
-  flex: none;
-  width: var(--icon-indicator-width, 0.6em);
-  height: var(--icon-indicator-height, 0.6em);
-  background: var(--label-secondary);
-  -webkit-mask: var(--icon-indicator) center / contain no-repeat;
-  mask: var(--icon-indicator) center / contain no-repeat;
-  transition: transform 0.12s ease;
+.item-foot-count {
+  color: var(--label-tertiary);
+  font-size: calc(var(--interface-text-size) * 12 / 13);
+  font-weight: 400;
 }
 
-.item-linked-toggle[aria-expanded='true'] .item-chevron {
-  transform: rotate(180deg);
-}
-
-.item-linked-count {
-  margin-inline-start: auto;
-  color: var(--label-secondary);
-  opacity: 0.7;
-}
-
-.item-linked-list {
+.item-foot-list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.item-linked-open {
+.item-foot-line {
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: calc(var(--step) * 2);
-  width: 100%;
-  min-height: calc(var(--step) * 9);
-  /* Ends level with the count above, which sits before the chevron. */
-  padding: 0 calc(var(--icon-indicator-width, 0.6em) + var(--step) * 2) 0 0;
+  gap: calc(var(--interface-text-size) * 9 / 13);
+  min-height: calc(var(--interface-text-size) * 36 / 13);
+  padding-inline-start: calc(var(--depth, 0) * var(--interface-text-size) * 23 / 13);
+  border-bottom: 1px solid var(--label-quinary);
+}
+
+.item-foot-arrow {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--interface-text-size) * 14 / 13);
+  height: calc(var(--interface-text-size) * 18 / 13);
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/* The arrow of a row with sub-items points down while they show and across while they are folded. */
+.item-foot-arrow .item-chevron {
+  transform: rotate(-90deg);
+}
+
+.item-foot-arrow[aria-expanded='true'] .item-chevron {
+  transform: none;
+}
+
+.item-foot-open {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  align-self: stretch;
+  gap: calc(var(--interface-text-size) * 9 / 13);
+  min-width: 0;
+  padding: 0;
   border: 0;
   background: none;
   color: var(--label-primary);
@@ -1129,28 +1135,41 @@ button.item-kicker-type:focus-visible {
   cursor: default;
 }
 
-.item-linked-open:hover .item-linked-name {
+.item-foot-open:hover .item-foot-name {
   text-decoration: underline;
 }
 
-.item-linked-name {
+.item-foot-open > .item-glyph,
+.item-foot-mark {
+  flex: none;
+}
+
+/* A type's icon takes the type's tone, as a linked item's chip does. */
+.item-foot-open > .item-glyph {
+  background: var(--tone, var(--label-secondary));
+}
+
+.item-foot-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.item-linked-detail {
-  display: inline-flex;
-  align-items: center;
+.item-foot-date {
   flex: none;
   margin-inline-start: auto;
-  color: var(--label-secondary);
+  color: var(--label-tertiary);
   font-size: calc(var(--interface-text-size) * 12 / 13);
 }
 
-.item-linked-toggle:focus-visible,
-.item-linked-open:focus-visible,
+.item-foot-more-row {
+  padding-inline-start: calc(var(--depth, 0) * var(--interface-text-size) * 23 / 13);
+  list-style: none;
+}
+
+.item-foot-arrow:focus-visible,
+.item-foot-open:focus-visible,
 .item-more:focus-visible,
 .item-link:focus-visible {
   outline: 3px solid var(--focus-ring);

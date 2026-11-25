@@ -18,6 +18,11 @@ paths:
   - MarfaMac/Views/VersionHistory*.swift
   - editor/src/header.ts
   - editor/src/notice.ts
+  - editor/src/foot.ts
+  - editor/src/card.ts
+  - MarfaMac/Model/Items/PageFoot.swift
+  - MarfaMac/Model/Items/LinkCard.swift
+  - MarfaMac/Views/LinkCard/*.swift
   - MarfaMac/Views/PageNoticeView.swift
 ---
 
@@ -36,6 +41,14 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 - **Long text stops after two lines;** an email, a phone and a number to call open.
 - **A value is cut, never reworded,** and a linked item that cannot be read, is gone or is in the bin shows nothing, never an id.
 - **Once the head is out of sight** the page says so with the item, title and mark (`DetailsPresentation.scrolledHead`).
+
+## The foot
+
+`PageFoot` lists Sub-Items (nested, counting everything beneath) on any item that has them, and a person's or a place's mentions as a Timeline, newest first. Other items' mentions are Linked From, where Settings › Layouts puts it on the page. A list shows 30 rows and Show More adds 30, each nested list by itself.
+
+## The card
+
+A pause of 600 ms on a linked item (a chip, a foot or panel row, a link in the text) shows its type, name and up to two lines (`LinkCardContent`) from the counts `ItemCounts` holds, never from the server. It takes no focus or key (`LinkCardPresenter`) and goes on a scroll, key, click or leaving. Show Card, in a menu or for VoiceOver, shows it now. A missing, deleted or unreadable item has none.
 
 ## A row's menu
 
@@ -111,7 +124,8 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 ## Text and links
 
 - **A plain click on a link places the caret**, because the page is for writing. Command-click, or Open Link at the caret, opens it.
-- **A link to an item opens as Settings says** (`ItemOpening`), and one followed in the modal stays there. So does a link in a row, the foot or a panel (`EditorController.follow`).
+- **A link to an item opens as Settings says** (`ItemOpening`), and one followed in the modal stays there. So does a link in a row, the foot, a panel or a file's page (`EditorController.follow`).
+- **A right-click on a picture of an item offers Open Item and Copy Link,** then Open and Show in Finder.
 - **Every look of a link reads the same under the pointer** (`LinkLook`), and a link to nothing keeps its dashes in all of them.
 - **Opening is refused for an address that may not be opened**, such as a script, and the rest of the link's menu stays.
 - **Removing a link keeps its words.**
