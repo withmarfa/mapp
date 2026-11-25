@@ -395,8 +395,10 @@ extension Browser {
     /// made, and writes that to Marfa and this Mac. A setting another app changed since stays. One step of Undo brings
     /// the person's changes back.
     func revertView(in library: any ItemLibrary) {
-        guard let opened = openedView, shown.isSame(.saved(opened.id)), isViewChanged else { return }
-        let id = opened.id
+        guard let id = openedView?.id, shown.isSame(.saved(id)), isViewChanged else { return }
+        // A change the window has not yet passed through the funnel is still its own.
+        choicesChanged()
+        guard let opened = openedView else { return }
         if let layout = opened.mac.layout, layout != viewMode, availableViewModes(in: library).contains(layout) {
             viewMode = layout
         }
