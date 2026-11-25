@@ -213,6 +213,10 @@ import Observation
     @ObservationIgnored var stateAnswers: [WriteID: (WriteID, StateAnswer) -> Void] = [:]
     /// Restores answered blocked or dead whose archive will not follow, told together once no restore waits.
     @ObservationIgnored var archivesDropped = 0
+    /// Where this Mac's tier change on its way leaves each item, until the copy shows it, and each tier write until
+    /// its answer (`setTiers`).
+    @ObservationIgnored var tierMoving: [ItemID: TierMoving] = [:]
+    @ObservationIgnored var tierWrites: [WriteID: TierWrite] = [:]
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []

@@ -221,7 +221,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// unless there was nothing to change.
     @discardableResult
     func restoreVersion(_ snapshot: ItemSnapshot, of id: ItemID, undoManager: UndoManager?) -> Bool
-    /// In one undoable change. An item in the bin, or one a connector keeps, is skipped and told.
+    /// In one undoable change. An item in the bin is skipped and told.
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?)
     /// The tags the library sets itself, which the person neither adds nor removes by hand: the favorite tag, which
     /// the Favorite command owns, and any a library keeps for its own use.
@@ -238,8 +238,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Removes `tag` from each of the items that hold it. An item that no longer holds it, as when another device
     /// removed it first, is left alone.
     func removeTag(_ tag: String, from ids: Set<ItemID>, undoManager: UndoManager?)
-    /// To Recently Deleted, in one undoable change. An item already there has nothing to change, and one a connector
-    /// keeps is skipped and told.
+    /// To Recently Deleted, in one undoable change. An item already there has nothing to change.
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?)
     /// For the question before moving several items: how many more items than `ids` the server says moving them also
     /// takes, only where the library is online and `ids` are 2 to 20; nil otherwise and whenever it can't be read.
@@ -255,6 +254,20 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Attaches the file at `file` to the item, read where it is while this runs, and says what the item's text
     /// writes to show it. A failure means the file is not attached.
     func attach(file: URL, to id: ItemID) async throws -> Embed
+
+    // MARK: Tier and state
+
+    /// Moves each of `ids` that `tierPlan` changes to `tier`, each its own queued write, in one undoable change named
+    /// for the command. What it leaves alone is told. An Undo moves back only an item still in the tier this left.
+    @discardableResult
+    func setTier(_ ids: Set<ItemID>, to tier: Tier, undoManager: UndoManager?) -> CommandOutcome
+    /// Archives what `archivePlan` gives for `ids`, and the items beneath them where `beneath`, in one undoable change.
+    /// An Undo makes active again only what this archived and is still archived; an item archived before stays so.
+    @discardableResult
+    func archive(_ ids: Set<ItemID>, beneath: Bool, undoManager: UndoManager?) -> CommandOutcome
+    /// Makes each archived item among `ids` active, in one undoable change. Items beneath them stay as they are.
+    @discardableResult
+    func unarchive(_ ids: Set<ItemID>, undoManager: UndoManager?) -> CommandOutcome
 
     // MARK: Views
 

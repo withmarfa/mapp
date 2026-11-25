@@ -20,6 +20,7 @@ extension MarfaLibrary {
             read(id)
             answered(id, outcome)
             stateWriteAnswered(id, outcome)
+            tierWriteAnswered(id, outcome)
             settle(id)
             propertyAnswered(id, outcome, holding: holding)
         case .taken(let id):
@@ -29,6 +30,7 @@ extension MarfaLibrary {
             if let edit = propertyEdits[id] { edit.take(holding: { item(edit.item)?.value(of: $0) }) }
             took(id)
             stateWriteTaken(id)
+            tierWriteTaken(id)
             read(id)
             settle(id)
         case .catalogue(let catalogue):

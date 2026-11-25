@@ -19,6 +19,8 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         /// A collection, which collections are flat and can't join.
         case isCollection
         case cantJoinCollection
+        /// A collection, a view or the app's settings, which stays in the Library.
+        case staysInLibrary
         case fullOfTags
         case cantMoveToLane
         /// Its type requires the field a Not Set lane would clear.
@@ -56,6 +58,7 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case .cantBecomeType: String(localized: "\(count) items can’t become this type.")
         case .isCollection: String(localized: "\(count) items are collections, which can’t be in another collection.")
         case .cantJoinCollection: String(localized: "\(count) items can’t be filed in a collection.")
+        case .staysInLibrary: String(localized: "\(count) items are collections, which stay in the Library.")
         case .fullOfTags: String(localized: "\(count) items already have the most tags an item can have.")
         case .cantMoveToLane: String(localized: "\(count) items can’t go in this lane.")
         case .needsValue: String(localized: "\(count) items need a value there, so it can’t be cleared.")

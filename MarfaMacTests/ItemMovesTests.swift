@@ -1,0 +1,112 @@
+import Foundation
+import Testing
+@testable import MarfaMac
+
+/// Keep, Move to Feed, Archive and Unarchive: what each moves, and that an Undo moves back only what it changed.
+/// Alpha holds Epic task, which holds Bug one; Bug one is archived already and holds an item in the bin.
+@MainActor
+@Suite(.hangLimit) struct ItemMovesTests {
+    typealias F = LibraryFixture
+
+    static let binned = ItemID("binned")
+
+    private func loaded() async throws -> (MarfaLibrary, FakeItemSource) {
+        let items = F.items.map { item in
+            var item = item
+            if item.id == F.t1 { item.state = .archived }
+            return item
+        } + [F.item(Self.binned, F.note, "Binned child", age: 10, state: .trashed, edges: [F.child("c9", Self.binned, of: F.t1)])]
+        let source = FakeItemSource()
+        for (id, text) in F.texts { source.setBody(text, of: id) }
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: F.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        return (library, source)
+    }
+
+    /// The copy shows each item as `change` leaves it, as another device's change or the engine's read of a write does.
+    private func show(_ ids: [ItemID], in library: MarfaLibrary, _ source: FakeItemSource, _ change: (inout Item) -> Void) async throws {
+        let items = try ids.map { id in
+            var item = try #require(library.item(id))
+            change(&item)
+            return item
+        }
+        source.send(.upserted(items))
+        let expected = Dictionary(uniqueKeysWithValues: items.map { ($0.id, ($0.state, $0.tier)) })
+        try #require(await eventually { expected.allSatisfy { library.item($0.key)?.state == $0.value.0 && library.item($0.key)?.tier == $0.value.1 } })
+    }
+
+    /// Every write so far is in the copy and accepted.
+    private func acceptAll(_ source: FakeItemSource) {
+        for write in source.submitted {
+            source.send(.taken(write.id))
+            source.send(.answered(write.id, .accepted))
+        }
+        source.clearWrites()
+    }
+
+    @Test func archiveTakesWhatIsActiveBeneathAndItsUndoMovesBackOnlyWhatItChanged() async throws {
+        let (library, source) = try await loaded()
+        let plan = library.archivePlan([F.p1])
+        #expect(plan.archiving == [F.p1])
+        #expect(plan.beneath == [F.e1], "Bug one is archived already, and the item in the bin is left there")
+
+        let undo = UndoManager()
+        let outcome = library.archive([F.p1], beneath: true, undoManager: undo)
+        #expect(outcome == CommandOutcome(changed: 2, onlyItem: nil, skips: BatchSkips()))
+        #expect(Set(source.writes) == [.transition(F.p1, .archived), .transition(F.e1, .archived)])
+        try await show([F.p1, F.e1], in: library, source) { $0.state = .archived }
+        acceptAll(source)
+
+        // Another device makes Epic task active again.
+        try await show([F.e1], in: library, source) { $0.state = .active }
+        undo.undo()
+        #expect(source.writes == [.transition(F.p1, .active)], "Bug one stays archived, and Epic task is left as it is")
+        #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.changedSince, count: 1))
+    }
+
+    @Test func keepOnAnArchivedFeedItemChangesOnlyItsTierAndItsUndoMovesItBack() async throws {
+        let (library, source) = try await loaded()
+        try await show([F.n2], in: library, source) { $0.state = .archived }
+        let item = try #require(library.item(F.n2))
+        let undo = UndoManager()
+        let outcome = library.setTier([F.n2, F.n1], to: .library, undoManager: undo)
+        #expect(outcome.onlyItem == F.n2 && outcome.skips.isEmpty, "an item in the Library already needs nothing")
+        #expect(library.movedMessage(.keep, outcome) == "Kept “Feed note” in the Library")
+        #expect(source.writes == [.retier(F.n2, .library, base: item.version)])
+        try await show([F.n2], in: library, source) { $0.tier = .library }
+        acceptAll(source)
+        #expect(library.item(F.n2)?.state == .archived)
+
+        undo.undo()
+        #expect(source.writes == [.retier(F.n2, .feed, base: item.version)])
+        #expect(undo.undoActionName.isEmpty && undo.redoActionName == ItemMove.keep.name)
+    }
+
+    @Test func aTierUndoLeavesAnItemMovedElsewhereSince() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        library.setTier([F.n2], to: .library, undoManager: undo)
+        try await show([F.n2], in: library, source) { $0.tier = .library }
+        acceptAll(source)
+        // Another device moves it back to the Feed, so the Undo would write over that change.
+        try await show([F.n2], in: library, source) { $0.tier = .feed }
+        undo.undo()
+        #expect(source.writes.isEmpty)
+        #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.changedSince, count: 1))
+    }
+
+    @Test func aMixedSelectionOffersBothTiersAndACollectionStaysInTheLibrary() async throws {
+        let (library, _) = try await loaded()
+        #expect(library.selectionCommands([F.n1, F.n2, F.t1]) == [.keep, .moveToFeed, .archive, .unarchive])
+        #expect(library.selectionCommands([F.n2]) == [.keep, .archive])
+        #expect(library.selectionCommands([F.n3]).isEmpty, "an item in the bin offers none")
+
+        let (collections, _) = try await MarfaCollectionsTests().loaded()
+        let holiday = MarfaCollectionsTests.holiday
+        #expect(collections.selectionCommands([holiday]) == [.archive])
+        var stays = BatchSkips()
+        stays.skip(.staysInLibrary)
+        #expect(collections.tierPlan([holiday, F.n1], to: .feed) == ([F.n1], stays))
+    }
+}

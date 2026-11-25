@@ -9,8 +9,9 @@ nonisolated enum MarfaMapping {
     static let blobField = "blob_ref"
     static let mimeTypeField = "mime_type"
     static let sizeField = "size_bytes"
-    /// The keys a file item keeps its bytes' facts under, shown as the file's kind and size instead.
-    static let fileFacts: Set<String> = [blobField, mimeTypeField, sizeField]
+    /// The fields Marfa sets on a file from its bytes, which no person changes: the bytes, their kind and size, shown as
+    /// the file's kind and size instead, and what the server reads out of them (`READ_FROM_BYTES` in marfa-rules).
+    static let fileFacts: Set<String> = [blobField, mimeTypeField, sizeField, "extracted_text", "width", "height", durationField]
     /// Marfa's folder device writes a body link as this edge, so it reads as the body's, not a property's.
     static let bodyLinkEdge = "references"
     /// Marfa writes an embed of a file as this edge, from the file's item to the item whose body embeds it.

@@ -715,6 +715,43 @@ final class FakeItemLibrary: ItemLibrary {
         return id
     }
 
+    // MARK: Tier and state
+
+    func setTier(_ ids: Set<ItemID>, to tier: Tier, undoManager: UndoManager?) -> CommandOutcome {
+        let move: ItemMove = tier == .library ? .keep : .moveToFeed
+        let plan = tierPlan(ids, to: tier)
+        tellSkipped(plan.skips, didChange: !plan.changing.isEmpty, failing: move.failing)
+        let before = Dictionary(uniqueKeysWithValues: plan.changing.compactMap { id in item(id).map { (id, $0.tier) } })
+        change(plan.changing) { $0.tier = tier }
+        undoManager?.registerUndo(withTarget: self) { library in
+            for (id, old) in before { library.change([id]) { $0.tier = old } }
+        }
+        undoManager?.setActionName(move.name)
+        return CommandOutcome(plan.changing, skips: plan.skips)
+    }
+
+    func archive(_ ids: Set<ItemID>, beneath: Bool, undoManager: UndoManager?) -> CommandOutcome {
+        let plan = archivePlan(ids)
+        let moving = beneath ? plan.archiving.union(plan.beneath) : plan.archiving
+        tellSkipped(plan.skips, didChange: !moving.isEmpty, failing: ItemMove.archive.failing)
+        moveState(moving, to: .archived, name: ItemMove.archive.name, undoManager: undoManager)
+        return CommandOutcome(moving, skips: plan.skips)
+    }
+
+    func unarchive(_ ids: Set<ItemID>, undoManager: UndoManager?) -> CommandOutcome {
+        let plan = unarchivePlan(ids)
+        tellSkipped(plan.skips, didChange: !plan.changing.isEmpty, failing: ItemMove.unarchive.failing)
+        moveState(plan.changing, to: .active, name: ItemMove.unarchive.name, undoManager: undoManager)
+        return CommandOutcome(plan.changing, skips: plan.skips)
+    }
+
+    private func moveState(_ ids: Set<ItemID>, to state: ItemState, name: String, undoManager: UndoManager?) {
+        let back: ItemState = state == .archived ? .active : .archived
+        change(ids) { $0.state = state }
+        undoManager?.registerUndo(withTarget: self) { library in library.moveState(ids, to: back, name: name, undoManager: undoManager) }
+        undoManager?.setActionName(name)
+    }
+
     // MARK: Collections
 
     var collections: [Item] {
