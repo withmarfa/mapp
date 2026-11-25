@@ -389,7 +389,9 @@ private struct WindowTitleHider: NSViewRepresentable {
 }
 
 /// Reports how far full screen has slid the toolbar down to show the menu bar. The content's safe area does not change
-/// as it does: only the toolbar's own window moves, so the row drawn under the toolbar reads that window's frame.
+/// as it does: only the toolbar's own window moves, so the row drawn under the toolbar reads that window's frame. That
+/// window paints a title bar background of its own, which the main window's hidden toolbar background does not reach: it
+/// covers the row's title from its leading edge, so the probe makes it transparent too.
 private struct ToolbarRevealProbe: NSViewRepresentable {
     @Binding var reveal: CGFloat
 
@@ -430,6 +432,7 @@ private struct ToolbarRevealProbe: NSViewRepresentable {
             barObservers.forEach { NotificationCenter.default.removeObserver($0) }
             barObservers = []
             if let bar {
+                bar.titlebarAppearsTransparent = true
                 barObservers.append(NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: bar, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.measure() }
                 })
