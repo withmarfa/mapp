@@ -210,6 +210,23 @@ import Testing
         #expect(collections.tierPlan([holiday, F.n1], to: .feed) == ([F.n1], stays))
     }
 
+    @Test func aCapsuleCommandOnAMixedSelectionActsOnlyOnTheItemsItAppliesToAndCountsTheRest() async throws {
+        let (library, source) = try await loaded()
+        // Chosen: two live items, one in the bin, and one a sync has since removed.
+        let facts = SelectionFacts.make([F.n1, F.n2, F.n3, ItemID("removed")], in: library)
+        #expect(facts.ids == [F.n1, F.n2, F.n3], "an item the library no longer holds is not acted on")
+        #expect(facts.moves == [.keep, .moveToFeed, .archive])
+        #expect(facts.title == "3 Notes")
+
+        var outcome: CommandOutcome?
+        library.perform(.archive, on: facts.ids, undoManager: Self.manager(), details: nil) { outcome = $0 }
+        #expect(Set(source.writes) == [.transition(F.n1, .archived, from: .active), .transition(F.n2, .archived, from: .active)])
+        for write in source.submitted { source.send(.taken(write.id)) }
+        var skips = BatchSkips()
+        skips.skip(.inBin)
+        #expect(await eventually { outcome == CommandOutcome(changed: 2, onlyItem: nil, skips: skips) }, "the item in the bin is counted, not passed over")
+    }
+
     @Test func aMenuListsTheTierMovesThenArchiveAndUnarchiveOnlyWhereNothingCanBeArchived() async throws {
         let (library, _) = try await loaded()
         #expect(ItemMove.inMenu(library.selectionCommands([F.n1, F.n2])) == [.keep, .moveToFeed, .archive])
