@@ -275,15 +275,17 @@ struct MainView: View {
 
     /// Folds the panel and then the sidebar as the window narrows past their widths, and opens them again as it widens, but
     /// only what it folded itself. It acts when the width crosses a limit, so a person who opens one in a narrow window
-    /// keeps it open. A width from nothing is a window just opened, which crosses every limit it is under or over.
+    /// keeps it open. The first width is where the window starts, not a crossing: it folds nothing, and only opens again
+    /// what a quit left folded.
     private func foldForWidth(from old: CGFloat, to new: CGFloat) {
         func crossed(_ limit: CGFloat) -> Bool? {
-            if new < limit, old >= limit || old == 0 { return true }
+            if new < limit, old >= limit { return true }
             if new >= limit, old < limit { return false }
             return nil
         }
         if let folds = crossed(Self.panelFoldsBelow) {
-            if folds, details.isPresented { foldedPanel = true; details.isPresented = false }
+            // A panel opened for the moment, as by Customize Layout, is not the person's, so it is not opened again.
+            if folds, details.isPresented { foldedPanel = details.isPresentedByPerson; details.isPresented = false }
             else if !folds, foldedPanel { foldedPanel = false; details.isPresented = true }
         }
         if let folds = crossed(Self.sidebarFoldsBelow) {
@@ -390,7 +392,7 @@ struct MainView: View {
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
-            // The window's width may have arrived before what it restored, which it folds or opens again as it must.
+            // The window's width may have arrived before what it restored, so what a quit left folded opens again now.
             if windowWidth > 0 { foldForWidth(from: 0, to: windowWidth) }
             let editor = editor
             if restoresWindow {

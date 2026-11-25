@@ -49,7 +49,7 @@ paths:
 ## Smallest window
 
 - **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900, and under 800 the views are one pill beside the title.
-- **Only what the window folded opens again,** also after a quit; what the person opens or closes is theirs.
+- **Only what the window folded opens again,** also after a quit; what the person opens or closes is theirs. A window folds only when its width crosses a limit, never on opening.
 - **The panel is 300 wide** in every window (`PanelWidth`).
 
 ## Corner
