@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import os
 
 /// Taking the answers the copy holds: telling each write its verdict, and the copy clearing those taken.
 extension MarfaEngine {
