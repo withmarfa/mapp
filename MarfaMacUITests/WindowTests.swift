@@ -189,8 +189,8 @@ nonisolated final class WindowTests: XCTestCase {
         XCTAssertGreaterThan(total, 1)
         XCTAssertTrue(row(titled: "Bike service").waitForExistence(timeout: 2))
         row(titled: "Bike service").click()
-        let selected = "\(total) items selected"
-        let prompt = window.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", selected, selected)).firstMatch
+        // Several chosen items show the capsule, whose count says how many.
+        let prompt = window.buttons["SelectionCount"]
         app.typeKey("a", modifierFlags: .command)
         XCTAssertTrue(prompt.waitForExistence(timeout: 3), "Command-A selects every item in the list")
         row(titled: "Bike service").click()
