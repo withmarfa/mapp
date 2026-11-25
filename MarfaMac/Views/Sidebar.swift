@@ -33,6 +33,7 @@ struct SidebarContent {
     let canCreate: Bool
     /// The sections of the open tab that show: all of them while customizing, otherwise those with something in them.
     let sections: [SidebarSectionData]
+
     /// Every shown type row, folded open as the person left them, before the "N More" row cuts them short.
     let typeRows: [SidebarPlan.TypeRow]
     /// The types a plus under the pointer can make an item of, by identifier.
@@ -202,7 +203,7 @@ private struct SidebarList: View {
     private var selection: Binding<PlaceView?> {
         // A row names a saved view at the Library (`PlaceView.memoryKey`), wherever its home is.
         Binding {
-            browser.showing?.memoryKey
+            content.chosenRow(showing: browser.showing)
         } set: { item in
             guard let item, !browser.customizesSidebar else { return }
             if !item.isSame(browser.showing) { browser.show(item, in: library, order: order) }
@@ -250,7 +251,7 @@ private struct SidebarList: View {
         }
         // The window mounts this list afresh when its presentation changes, so it starts where the last one was.
         .remembersScroll(in: browser.sidebarMemory)
-        .softSelection(rows: [content.marksSignature, browser.sidebarShowsAllTypes ? 1 : 0], selection: { browser.showing?.memoryKey })
+        .softSelection(rows: [content.marksSignature, browser.sidebarShowsAllTypes ? 1 : 0], selection: { content.chosenRow(showing: browser.showing) })
         .contextMenu { if !content.customizing { SidebarCustomizeButton(browser: browser) } }
         .accessibilityIdentifier("Sidebar")
         // The right and left arrows open and close the selected type, as the system's outline does for its own rows.
@@ -387,4 +388,16 @@ struct SidebarCustomizeButton: View {
         Button("Customize Sidebar…") { browser.customizesSidebar = true }
             .disabled(browser.customizesSidebar)
     }
+}
+
+extension SidebarContent {
+    /// The row chosen for what the window shows: its own row, else the Library's for a page of the Library (Types,
+    /// Collections, Sources and the Archive), which the top row opens, as the boards draw it.
+    func chosenRow(showing: PlaceView?) -> PlaceView? {
+        guard let shown = showing?.memoryKey, shown.view == .own, Self.libraryPages.contains(shown.place),
+              !sections.contains(where: { $0.rows.contains { $0.opens == shown } }) else { return showing?.memoryKey }
+        return .library
+    }
+
+    private static let libraryPages: [Place] = [.types, .collections, .sources, .archive]
 }

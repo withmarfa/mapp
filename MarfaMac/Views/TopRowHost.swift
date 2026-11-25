@@ -111,7 +111,7 @@ private struct TopRowStack<Line: View, Rest: View>: View {
         // The first row is as far below the toolbar as the row of views and the headings are tall.
         let isUnder = bands && offset > restHeight + headings + 0.5
         ZStack(alignment: .top) {
-            ToolbarBand(toolbarHeight: height, isShown: isUnder)
+            ToolbarBand(toolbarHeight: height, isShown: isUnder, isBacked: true)
             VStack(spacing: 0) {
                 line(room, isAway)
                     .frame(height: height)
@@ -341,6 +341,7 @@ private struct WindowTitleHider: NSViewRepresentable {
 
     final class Hider: NSView {
         private var observer: (any NSObjectProtocol)?
+        private var visibility: NSKeyValueObservation?
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -348,10 +349,13 @@ private struct WindowTitleHider: NSViewRepresentable {
             super.viewDidMoveToWindow()
             if let observer { NotificationCenter.default.removeObserver(observer) }
             observer = nil
+            visibility = nil
             guard let window else { return }
             hide()
-            // SwiftUI puts the title back as the window enters or leaves full screen and as a modal opens, so it is
-            // hidden again at each update of the window. Reading one property is all an update costs.
+            // SwiftUI puts the title back as the place changes, as the window enters or leaves full screen and as a
+            // modal opens, sometimes after the last event, when no update of the window follows. So it is hidden again
+            // the moment it is shown, and at each update of the window for a change no observer is told of.
+            visibility = window.observe(\.titleVisibility) { [weak self] _, _ in MainActor.assumeIsolated { self?.hide() } }
             observer = NotificationCenter.default.addObserver(
                 forName: NSWindow.didUpdateNotification, object: window, queue: .main
             ) { [weak self] _ in MainActor.assumeIsolated { self?.hide() } }

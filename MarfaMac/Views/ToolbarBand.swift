@@ -18,6 +18,9 @@ struct ToolbarBand: View {
     var showsLine = true
     /// How much of the blur shows.
     var strength = Self.strength
+    /// Whether the material is backed by the content's own ground. Over AppKit's table and list the material blurs
+    /// nothing, so rows would read sharp through it; backed, they read only as the faint ghost `strength` leaves.
+    var isBacked = false
 
     /// How much of the blur shows, so the content behind reads only as a faint ghost.
     static let strength: Double = 0.9
@@ -33,6 +36,7 @@ struct ToolbarBand: View {
     var body: some View {
         Rectangle()
             .fill(.bar)
+            .background { if isBacked { Color(nsColor: .controlBackgroundColor) } }
             .opacity(strength)
             .overlay(alignment: edge == .top ? .bottom : .top) {
                 // One physical pixel, whatever the display's scale.
