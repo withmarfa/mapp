@@ -8,8 +8,8 @@ nonisolated enum Typography {
     static let caption = 11.0
     static let title = 24.7
     static let titleTracking = -0.022
-    static let readerBody = 14.6
-    static let codeBlockRatio = 0.867
+    static let readerBody = 17.0
+    static let readerHeading = 22.0
     static let systemCSS = "-apple-system, system-ui, sans-serif"
     static let monoCSS = "ui-monospace, 'SF Mono', Menlo, monospace"
 

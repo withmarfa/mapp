@@ -20,7 +20,7 @@ nonisolated enum SourceViewMode: String, CaseIterable, Identifiable, Sendable {
 /// never rewritten on disk or in the library.
 ///
 /// - Reader is the document `ReaderDocument` makes of the article (`PageAnalyzer` has already cleaned it): the item
-///   page's text size in a serif, in the text column of an item's page (`PageStyle.horizontalInset`), as CSS so it follows
+///   page's zoom applied to a serif, in the text column of an item's page (`PageStyle.horizontalInset`), as CSS so it follows
 ///   the window as it resizes. It sits on the window's own background.
 /// - Original is the document as written, at its own width. Only a document that says nothing about its look, with no
 ///   style, color or background of its own, is given a baseline and the text column, since it has no look to keep;
@@ -84,17 +84,19 @@ nonisolated struct SourceLook: Equatable, Sendable {
 
     private static let mailRules = "[data-marfa-mail] { margin-left: auto; margin-right: auto; float: none; }"
 
-    /// The board's prose: New York at 14.6 for every 13 of the page's text, a 1.65 line, headings in the same serif.
     private var readerRules: String {
-        let size = String(format: "%.1f", Double(textSize) * Typography.readerBody / Double(Typography.body))
-        let captionSize = Typography.pageSize(Typography.caption, at: CGFloat(textSize))
+        let pageSize = CGFloat(textSize)
+        let bodySize = Typography.pageSize(Typography.readerBody, at: pageSize)
+        let headingSize = Typography.pageSize(Typography.readerHeading, at: pageSize)
+        let captionSize = Typography.pageSize(Typography.caption, at: pageSize)
         return """
             :root { color-scheme: light dark; }
             html { box-sizing: border-box; margin: 0; padding: 16px \(inset) 48px; }
-            body { margin: 0; font: \(size)px/1.65 "New York", ui-serif, Georgia, serif; color: CanvasText; text-align: start; overflow-wrap: break-word; }
+            body { margin: 0; font: \(bodySize)px/calc(28 / 17) "New York", ui-serif, Georgia, serif; color: CanvasText; text-align: start; overflow-wrap: break-word; }
             p, ul, ol, pre, table, figure, blockquote, dl { margin: 0 0 0.75em; }
             h1, h2, h3, h4, h5, h6 { line-height: 1.3; margin: 1.4em 0 0.4em; font-weight: 700; text-wrap: balance; }
-            h1 { font-size: 1.5em; } h2 { font-size: 1.2em; } h3 { font-size: 1.03em; } h4, h5, h6 { font-size: 1em; }
+            h1 { font-size: 1.5em; } h2 { font-size: \(headingSize)px; line-height: calc(30 / 22); }
+            h3 { font-size: 1.03em; } h4, h5, h6 { font-size: 1em; }
             a { color: AccentColor; text-decoration: none; }
             ul, ol { padding-inline-start: 1.5em; }
             li { margin: 0 0 0.25em; }

@@ -42,7 +42,7 @@ final class PrintDocumentRenderer: NSObject, WKNavigationDelegate {
         const typography = document.createElement('style');
         typography.textContent = headings +
           '.inkkit-print-document :is(code, pre) { font-family: var(--marfa-print-code); }' +
-          '.inkkit-print-document pre:not(.inkkit-print-literal) { font-size: ' + codeRatio + 'rem; }';
+          '.inkkit-print-document pre:not(.inkkit-print-literal) { font-size: 1rem; line-height: calc(21 / 13); }';
         document.head.append(typography);
         await Promise.race([
           (async () => { await document.fonts.ready; await Promise.all(Array.from(document.images, image => image.decode())); })(),
@@ -53,7 +53,6 @@ final class PrintDocumentRenderer: NSObject, WKNavigationDelegate {
             "headings": headings,
             "textFamily": textFamily.map { FontChoice.css(family: $0, generic: Typography.systemCSS) } ?? Typography.systemCSS,
             "codeFamily": codeFamily.map { FontChoice.css(family: $0, generic: Typography.monoCSS) } ?? Typography.monoCSS,
-            "codeRatio": Typography.codeBlockRatio,
         ], in: nil, contentWorld: .page)
     }
 

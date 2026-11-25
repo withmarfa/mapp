@@ -194,7 +194,7 @@ private struct VersionLineView: View {
                 .padding(.leading, 14)
                 .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 3) }
         case .code:
-            Text(attributed).font(.system(size: size * Typography.codeBlockRatio, design: .monospaced))
+            Text(attributed).font(.system(size: size, design: .monospaced))
         case .paragraph:
             Text(attributed)
         case .table(let table):

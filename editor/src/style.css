@@ -173,6 +173,11 @@ body {
   font-size: var(--page-heading-3-size);
 }
 
+.inkkit-root .ProseMirror pre:has(> code) {
+  font-size: 1rem;
+  line-height: calc(21 / 13);
+}
+
 :root,
 #item-header,
 #item-footer {
