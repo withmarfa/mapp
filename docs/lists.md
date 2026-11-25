@@ -37,7 +37,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds, and an exact-type condition only with Include Kinds off; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`).
 - **Making, renaming and deleting a view needs the server and is never queued.** An unmade view stays in its panel. A rename never replaces another app's; deleting asks.
 - **Starting points are what Marfa saves exactly** (`NewViewStart`); This Search, first while searching, takes the sayable tokens.
-- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, else the sole collection or source its filter requires. Collection membership uses the item's outbound edge. For the feed tier alone or sources alone, use the Feed. Otherwise use the Library.
+- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, then its sole required collection or source. Membership uses the outbound edge. Feed-tier views with no collection or source equality, or only several source equalities, belong to the Feed. Otherwise use the Library.
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
 - **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).

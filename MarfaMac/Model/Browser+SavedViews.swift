@@ -526,8 +526,7 @@ extension Browser {
         deletingView = id
     }
 
-    /// Deletes the view for good, once the person confirmed. Nothing of it stays in the app's settings, and its panel closes
-    /// with nothing said: the person did this.
+    /// Deletes the view for good after confirmation and clears its saved layout.
     func deleteView(_ id: ItemID, in library: any ItemLibrary) async {
         deletingView = nil
         viewsBeingDeleted.insert(id)

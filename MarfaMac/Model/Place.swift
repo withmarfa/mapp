@@ -236,9 +236,8 @@ extension PlaceMemory: Equatable where Value: Equatable {}
 extension PlaceMemory: Sendable where Value: Sendable {}
 
 nonisolated extension Place {
-    /// The place a saved view belongs to: the one type it lists; else the one collection its filter requires through
-    /// `in-collection`, naming no other collection or source; else the one source it requires, naming no other source
-    /// or collection; else the Feed, when it lists the feed tier and names no collection or source; else the Library.
+    /// Prefer the sole type, then the sole required collection or source. Use the Feed for a feed-tier view
+    /// with no source or collection equality, or with only several source equalities. Otherwise use the Library.
     static func home(of query: LibraryViewQuery, catalogue: Catalogue) -> Place {
         if query.types.count == 1, let type = query.types.first { return .type(type) }
         let parsed = (try? ViewDraft.terms(of: query.filter)) ?? ViewDraft.Parsed(terms: [], join: .all)

@@ -181,7 +181,7 @@ extension Browser {
         }
     }
 
-    /// The view that already has `name`, as Marfa's views are told apart by their names in every app.
+    /// The name check for Create View. Marfa allows duplicate titles.
     func viewNamed(_ name: String, in library: any ItemLibrary) -> LibraryView? {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return library.views.first { $0.title.trimmingCharacters(in: .whitespacesAndNewlines).compare(name, options: .caseInsensitive) == .orderedSame }
