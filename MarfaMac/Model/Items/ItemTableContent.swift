@@ -68,7 +68,8 @@ final class ItemTableContent {
         allRows = ItemTableRow.rows(of: items, in: library, wanting: wanted, looks: looks)
         let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
         columns = ItemTableLayout.columns(
-            for: allRows, types: browser.listedTypes(in: library), catalogue: library.catalogue, hidden: hidden, looks: looks)
+            for: allRows, types: browser.listedTypes(in: library), catalogue: library.catalogue, hidden: hidden, looks: looks,
+            listsArchive: browser.listsArchive)
         catalogue = library.catalogue
         listedTypes = browser.listedTypes(in: library)
         now = library.now()

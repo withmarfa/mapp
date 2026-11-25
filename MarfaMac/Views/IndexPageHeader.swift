@@ -9,6 +9,8 @@ struct IndexPageTop: View {
     @Binding var tab: IndexTab
     /// What the page's New button does, where the page has one.
     var new: (() -> Void)?
+    /// Whether the places the Library leads on to stand before the tools (`LibraryPlaces`).
+    var leadsOn = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -20,9 +22,39 @@ struct IndexPageTop: View {
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("IndexTitle")
             IndexTabBar(tabs: tabs, tab: $tab) {
+                if leadsOn { LibraryPlaces(browser: browser) }
                 if browser.indexPlaceHasTools { IndexTools(browser: browser, new: new) }
             }
         }
+    }
+}
+
+/// The places the Library leads on to, at the end of its tabs: Collections and Sources with how many each holds, and the
+/// Archive. Types has no page yet, so it is not here.
+struct LibraryPlaces: View {
+    @CurrentLibrary private var library
+    @StoredOrder private var order
+    let browser: Browser
+
+    var body: some View {
+        HStack(spacing: 4) {
+            place(String(localized: "Collections"), .collections, count: library.count(in: .collections, scope: .all))
+            place(String(localized: "Sources"), .sources, count: library.count(in: .sources, scope: .all))
+            place(String(localized: "Archive"), .archive, count: nil)
+        }
+    }
+
+    private func place(_ title: String, _ place: PlaceView, count: Int?) -> some View {
+        Button {
+            browser.show(place, in: library, order: order)
+        } label: {
+            HStack(spacing: 4) {
+                Text(verbatim: title)
+                if let count { Text(count, format: .number).monospacedDigit().foregroundStyle(.secondary) }
+            }
+        }
+        .appButton(.plain)
+        .accessibilityIdentifier("LibraryPlace.\(place.place.word)")
     }
 }
 
