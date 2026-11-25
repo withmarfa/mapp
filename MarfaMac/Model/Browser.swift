@@ -195,7 +195,10 @@ final class Browser {
     var tableArrangements = 0
     /// The rows of Types, Collections or Sources, held while what they read stands (`Browser+PlaceIndex`).
     @ObservationIgnored var indexRowsMemo: (key: IndexRowsKey, rows: [IndexRow])?
-    @ObservationIgnored var sectionsMemo: (key: SectionsKey, sections: [ItemSection])?
+    /// The list's sections, worked out off the main actor for a large place (`sections(in:order:now:)`).
+    @ObservationIgnored var sectionsWork = PlaceWork<SectionsKey, ListArrangement>()
+    /// Counts what landed from work off the main actor besides the table, which a layout reads to draw it.
+    var placeWorkLanded = 0
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
     /// The last Group by offer, while the table's content and the layout it was made for stand (`Browser+Grouping`).
@@ -474,7 +477,7 @@ final class Browser {
         indexRowsMemo = nil
         offerMemo = nil
         parentMemo = nil
-        sectionsMemo = nil
+        sectionsWork.reset()
         viewModesMemo = nil
         fieldsMemo = nil
         paletteMemo = nil

@@ -113,6 +113,8 @@ import Observation
 
     /// Bumped when any item changes, for the lists and search.
     var contentRevision = 0
+    /// Which items each step of `contentRevision` changed (`changedItems(since:)`).
+    @ObservationIgnored var changeLog = ItemChangeLog()
     /// Bumped only when an item comes, goes or changes which places hold it, or the catalogue changes, for the counts.
     var membershipRevision = 0
     /// Bumped when an item's title or the name the core gives it changes. A link shows that name. A keystroke that
@@ -284,6 +286,8 @@ import Observation
         var content = -1
         var ids: [ItemID]
         var items: [Item] = []
+        /// Where each id stands in `ids`, kept between patches while the ids stay (`MarfaLibrary.listing`).
+        var positions: [ItemID: Int]?
     }
 
     /// A text save the source has not answered.

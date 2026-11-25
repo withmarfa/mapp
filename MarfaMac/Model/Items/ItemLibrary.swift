@@ -47,6 +47,11 @@ protocol ItemLibrary: AnyObject, Observable {
     /// this and `membershipRevision` rather than `contentRevision`, which a published keystroke moves. A library that
     /// bumps `membershipRevision` for every item change may leave this as that.
     var namesRevision: Int { get }
+    /// The items that changed after `revision` of `contentRevision`: their own values, or a link's far end, whose title a
+    /// row shows and whose coming or going takes an attached file out of the lists or back. Nil where the library cannot
+    /// say: the copy was read whole again, the catalogue changed, or the changes since are more than it keeps. What is
+    /// worked out from a place's items, and kept, is remade only for these.
+    func changedItems(since revision: Int) -> Set<ItemID>?
     /// Names the Marfa the library reads by its instance id, never its address, so what this Mac keeps for it, such
     /// as an item typed and not yet added, waits for it and goes to no other, even a server that later takes its
     /// address. Empty until the copy has read its instance, and where there is no server.
@@ -349,6 +354,7 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     var namesRevision: Int { membershipRevision }
+    func changedItems(since revision: Int) -> Set<ItemID>? { nil }
     /// Every create Marfa refused for good: those refused as they were sent, and those the copy lists as refused, on
     /// their own or with a write they went with, such as a file's upload.
     var refusedCreates: Set<ItemID> {

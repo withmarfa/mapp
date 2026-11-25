@@ -69,7 +69,13 @@ nonisolated enum ItemGroup: Hashable {
         now: Date,
         calendar: Calendar = .current
     ) -> [ItemSection] {
-        let items = sort.sorted(items)
+        sections(ofSorted: sort.sorted(items), sort: sort, favoritesFirst: favoritesFirst, groupsByDate: groupsByDate, now: now, calendar: calendar)
+    }
+
+    /// The sections of items already in `sort`'s order.
+    static func sections(
+        ofSorted items: [Item], sort: ItemSort, favoritesFirst: Bool, groupsByDate: Bool, now: Date, calendar: Calendar = .current
+    ) -> [ItemSection] {
         var sections: [ItemSection] = []
         var rest = items
         if favoritesFirst {

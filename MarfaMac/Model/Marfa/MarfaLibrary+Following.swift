@@ -99,15 +99,22 @@ extension MarfaLibrary {
 
     /// One step of the source, taken in at once, so each revision moves at most once for it.
     private func take(_ changes: ItemChanges) {
-        var changed = false
         var moved = false
         var renamed = false
+        // Each changed item and every item at the far end of one of its links, before and after, since a row shows the
+        // titles of its links and a file attached to an item leaves the lists with it (`ItemLibrary.changedItems(since:)`).
+        var touched: Set<ItemID> = []
+        func touch(_ item: Item) {
+            touched.insert(item.id)
+            for link in index.links(touching: item.id) { touched.insert(link.from); touched.insert(link.to) }
+            for edge in item.edgesOut { if case .item(let other) = edge.to { touched.insert(other) } }
+        }
         for id in changes.removed {
             guard let record = records.removeValue(forKey: id) else { continue }
+            touch(record.item)
             index.remove(record.item)
             record.isHeld = false
             noteLinks(touching: record.item)
-            changed = true
             moved = true
         }
         for item in changes.upserted {
@@ -115,9 +122,11 @@ extension MarfaLibrary {
                 let old = record.item
                 guard old != item else { continue }
                 if old.title != item.title || old.name != item.name { renamed = true }
+                touch(old)
                 // The index is current before the stamps move, so a reader told by a stamp sees the new edges.
                 index.remove(old)
                 index.insert(item, catalogue: catalogue)
+                touch(item)
                 record.item = item
                 if old.edgesOut != item.edgesOut {
                     noteLinks(touching: old)
@@ -127,13 +136,16 @@ extension MarfaLibrary {
             } else {
                 records[item.id] = ItemRecord(item)
                 index.insert(item, catalogue: catalogue)
+                touch(item)
                 if !item.edgesOut.isEmpty { noteLinks(touching: item) }
                 moved = true
             }
-            changed = true
         }
         hold(changes.bodies)
-        if changed { contentRevision += 1 }
+        if !touched.isEmpty {
+            contentRevision += 1
+            changeLog.record(touched, at: contentRevision)
+        }
         if moved { membershipRevision += 1 }
         if renamed { namesRevision += 1 }
         // A copy still filling may not have its instance yet; each step it takes in may bring it.
@@ -179,6 +191,7 @@ extension MarfaLibrary {
         index = MarfaItemIndex()
         for record in records.values { index.insert(record.item, catalogue: catalogue) }
         contentRevision += 1
+        changeLog.restart(at: contentRevision)
         membershipRevision += 1
     }
 
