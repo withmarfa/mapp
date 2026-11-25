@@ -191,7 +191,7 @@ struct NewItemDraftsTests {
         let item = try #require(library.createItem(
             typeID: "core.task", title: "Offline", body: "", properties: [:], tags: [], parentID: nil, tier: .library, undoManager: nil))
         let index = try #require(library.items.firstIndex { $0.id == item })
-        library.items[index].sync = .waiting
+        library.items[index].sync = .waiting(writes: 1)
         _ = Self.sent("Offline", as: item, in: drafts)
 
         drafts.settle(in: library)
@@ -239,7 +239,7 @@ struct NewItemDraftsTests {
         library.serverKey = "a"
         library.items = [Item(
             id: queued, type: TypeID("core.task"), title: "Queued", titleRule: .property("title"), version: ItemVersion(1),
-            created: .now, modified: .now, sync: .waiting)]
+            created: .now, modified: .now, sync: .waiting(writes: 1))]
         let reopened = NewItemDrafts(file: file)
         reopened.settle(in: library)
         let back = try #require(reopened.takeReturned(.line, in: "a"))
