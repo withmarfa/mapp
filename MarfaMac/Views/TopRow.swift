@@ -187,9 +187,9 @@ private struct TopRowTitle: View {
 
     private var cluster: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title)
-                .font(.system(size: 22 * scale, weight: .bold)).lineLimit(1).truncationMode(.tail)
-                .frame(maxWidth: Self.widest, alignment: .leading)
+            CappedWidth(limit: Self.widest) {
+                Text(title).font(.system(size: 22 * scale, weight: .bold)).lineLimit(1).truncationMode(.tail)
+            }
             Text(countText)
                 .font(.system(size: 15 * scale)).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
                 .fixedSize().layoutPriority(1)
@@ -216,6 +216,25 @@ private struct TopRowTitle: View {
         }
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("TopRowTitle")
+    }
+}
+
+/// Lays out its one child at the width it needs up to `limit`, and narrower when the row has less. A flexible frame
+/// would take the whole room offered and leave the count beside the title at the edge of it.
+private struct CappedWidth: Layout {
+    let limit: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let child = subviews.first else { return .zero }
+        return child.sizeThatFits(ProposedViewSize(width: min(proposal.width ?? limit, limit), height: proposal.height))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(bounds.size))
+    }
+
+    func explicitAlignment(of guide: VerticalAlignment, in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGFloat? {
+        subviews.first.map { bounds.minY + $0.dimensions(in: ProposedViewSize(bounds.size))[guide] }
     }
 }
 

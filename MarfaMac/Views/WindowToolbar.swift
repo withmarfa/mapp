@@ -188,7 +188,8 @@ struct DetailsToggle: View {
 }
 
 /// A toolbar button that is on or off, with the glass of its own that Back and Forward draw. Gray while on, never the
-/// accent color, and its symbol stays as an off button's.
+/// accent color, and its symbol stays as an off button's. The system's own toggle fills an on button with its tint and
+/// a white symbol, which no tint here turns gray.
 struct ToolbarOnOffStyle: ToggleStyle {
     /// The height of the toolbar's own glass.
     static let height: CGFloat = 36
@@ -199,11 +200,34 @@ struct ToolbarOnOffStyle: ToggleStyle {
                 .labelStyle(.iconOnly)
                 .font(.system(size: 15))
                 .frame(width: Self.height, height: Self.height)
-                .contentShape(.circle)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.primary)
-        .glassEffect(configuration.isOn ? .regular.tint(CornerMetrics.onTint).interactive() : .regular.interactive(), in: .circle)
+        .buttonStyle(OnOffGlass(isOn: configuration.isOn))
+        .accessibilityAddTraits(configuration.isOn ? .isSelected : [])
+    }
+}
+
+/// The glass of `ToolbarOnOffStyle`, dimmed while disabled, with a keyboard focus ring that follows the circle.
+private struct OnOffGlass: ButtonStyle {
+    let isOn: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        Content(label: configuration.label, isOn: isOn)
+    }
+
+    private struct Content<Label: View>: View {
+        let label: Label
+        let isOn: Bool
+        @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.isFocused) private var isFocused
+
+        var body: some View {
+            label
+                .foregroundStyle(.primary)
+                .contentShape(.circle)
+                .glassEffect(isOn ? .regular.tint(CornerMetrics.onTint).interactive() : .regular.interactive(), in: .circle)
+                .overlay { if isFocused { AppButtonStyle.focusRing(AnyShape(Circle())) } }
+                .opacity(isEnabled ? 1 : 0.4)
+        }
     }
 }
 

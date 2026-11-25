@@ -169,6 +169,7 @@ struct ItemWindow: View {
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
             if let id {
                 ItemInspectorHost(itemID: id, details: details, editor: editor)
+                    .panelEdgeThroughToolbar()
                     .toolbar { InspectorToolbar(details: details, editor: editor) }
             }
         }

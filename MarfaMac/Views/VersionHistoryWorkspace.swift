@@ -23,6 +23,7 @@ struct VersionHistoryWorkspace: View {
             VersionPageColumn(mode: mode, list: list)
                 .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
                     VersionFactsPanel(mode: mode, list: list)
+                        .panelEdgeThroughToolbar()
                         .inspectorColumnWidth(min: PanelWidth.standard, ideal: PanelWidth.standard, max: PanelWidth.widest)
                 }
                 .toolbar { toolbar }
