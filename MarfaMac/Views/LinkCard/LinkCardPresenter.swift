@@ -36,8 +36,6 @@ final class LinkCardPresenter {
     private var shown: Shown?
     private var monitor: Any?
     private var observers: [any NSObjectProtocol] = []
-    /// How many cards have been drawn, for tests to see that a resting pointer shows one and a passing one none.
-    private(set) var presented = 0
 
     /// Waits for the pointer to rest, then shows the card of the item `resolve` names, if it names one the library can
     /// show. A new rest, or `end()`, drops one still waiting.
@@ -80,7 +78,6 @@ final class LinkCardPresenter {
         window.addChildWindow(panel, ordered: .above)
         place()
         panel.orderFront(nil)
-        presented += 1
         followCounts()
         if announcing {
             NSAccessibility.post(

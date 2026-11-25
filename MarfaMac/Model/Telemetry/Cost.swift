@@ -30,7 +30,7 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     case pageHeader
     /// One `ItemLibrary.relationships(for:)` read.
     case relationships
-    /// One `LinkedItem.list`, found and sorted.
+    /// One `PageFoot.of`: the sub-items and the items that link here, found and sorted.
     case linkedItems
     /// Drawing the symbols and type icons the page's header uses, as pictures.
     case headerIcons
