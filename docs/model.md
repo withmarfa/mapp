@@ -47,7 +47,8 @@ Two defaults name types: the sidebar's and toolbar's starting set for New, and t
 - **One rule says what an item allows:** `Item.obstacle(to:)`, for each `ItemChange`. Every editor, command and planner asks it, and its answer is the `BatchSkips.Reason` a command on several tells.
 - **Read only locks the connector-managed title, text, properties, and type.** A natural-key upsert keeps the current tags and tier when the connector omits them (`items/natural-key-tags`, `items/tier-upsert`). A binned item stays in the bin (`items/natural-key-trashed`).
 - **Archived blocks nothing.** In Recently Deleted, everything is blocked but Recover and Delete Immediately.
-- **The tier and the state are separate.** Keep and Move to Feed send `ItemWrite.retier`; Archive and Unarchive send `ItemWrite.transition` through `setStates`, as Delete does. Each item is its own queued write, and a command is one undo step.
+- **The tier and the state are separate.** Keep and Move to Feed send `ItemWrite.retier`; Archive and Unarchive send `ItemWrite.transition` through `setStates`, as Delete does; only Recover sends `ItemWrite.restore`, so no other move takes an item out of Recently Deleted. Each item is its own queued write, and a command is one undo step.
+- **Undo and Redo move only what this Mac moved and Marfa took** (`stateLeft`, `tierLeft`). An item since moved elsewhere, in the bin, or already where the step would put it, is left alone, and the person is told once.
 - **Archive with what is beneath takes every active item under the selection through `parent-of`** (`archivePlan`). Marfa's own archive reaches no child.
 
 ## Vocabulary
