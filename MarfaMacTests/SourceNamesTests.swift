@@ -12,6 +12,8 @@ nonisolated final class FakeSourceNames: SourceNameSource {
         var failure: SourceEditFailure?
         var changes: [(code: String, name: SourceFieldChange?, mark: SourceFieldChange?)] = []
         var asks = 0
+        var connectorAsks = 0
+        var connectorsFail = false
     }
 
     let state = Mutex(State())
@@ -33,6 +35,15 @@ nonisolated final class FakeSourceNames: SourceNameSource {
         let (failure, counts) = state.withLock { ($0.failure, $0.counts) }
         if let failure { throw failure }
         return counts
+    }
+
+    func connectors() async throws(SourceEditFailure) -> ConnectorKeepers {
+        let fails = state.withLock { state -> Bool in
+            state.connectorAsks += 1
+            return state.connectorsFail
+        }
+        if fails { throw .unreachable }
+        return ConnectorKeepers()
     }
 
     func update(_ code: String, name: SourceFieldChange?, mark: SourceFieldChange?) async throws(SourceEditFailure) -> SourceInfo {
@@ -114,6 +125,22 @@ private let github = SourceInfo(code: "gh", name: "GitHub", mark: nil, nameOrigi
         #expect(await library.updateSource("readwise", name: .set("x"), mark: nil) == failure)
         #expect(!failure.message.isEmpty)
         #expect(library.name(of: .source("readwise")) == "Readwise")
+    }
+
+    @Test func aFailedConnectorReadWaitsBeforeItIsAskedAgain() async throws {
+        let names = FakeSourceNames([readwise])
+        names.state.withLock { $0.connectorsFail = true }
+        let (library, _) = try await open(names)
+        await library.readConnectors()
+        await library.readConnectors()
+        #expect(names.state.withLock { $0.connectorAsks } == 1)
+        #expect(library.connectors == nil)
+        library.connectorsFailedAt = .now - MarfaLibrary.connectorRetryWait
+        names.state.withLock { $0.connectorsFail = false }
+        await library.readConnectors()
+        await library.readConnectors()
+        #expect(names.state.withLock { $0.connectorAsks } == 2)
+        #expect(library.connectors != nil)
     }
 
     @Test func aLibraryWithNoServerRefusesTheChange() async throws {

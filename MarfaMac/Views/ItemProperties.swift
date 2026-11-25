@@ -20,7 +20,7 @@ struct ItemPropertyRow: View {
     /// that opens a panel shows it. A yes/no waits for a click.
     var startsEditing = false
     /// Whether the row writes or hands back what was typed when it leaves the screen. A row whose draft belongs to a
-    /// window (the inspector's) or to a sheet that may be cancelled leaves that to its owner: a section folded, or a
+    /// window (the inspector's) or to a sheet that may be cancelled leaves that to its owner: a pill changed, or a
     /// sheet closed, must not raise "Property Not Saved" or put text on the clipboard.
     var handsOffOnLeave = true
     /// Whether the page shows this property too, and what changes it; nil offers no choice.
@@ -90,10 +90,10 @@ struct ItemPropertyRow: View {
         if case .list(let shape) = definition.kind {
             // The list tells its own refusals, beside the entry they are about.
             VStack(alignment: .leading, spacing: 8) {
-                ListEntriesEditor(
+                EntriesEditor(
                     shape: shape, label: definition.label, key: definition.key, value: value, isEditable: isEditable,
                     editing: input.list, isWriting: isWriting, onChange: onChange)
-                if isEditable, editKind != nil {
+                if isEditable, case .people? = editKind {
                     Button { openEditor() } label: { Label("Add Person…", systemImage: "person.badge.plus") }
                         .appButton(.secondary, size: .small)
                         .accessibilityLabel("Add Person to \(definition.label)")
@@ -136,7 +136,7 @@ struct ItemPropertyRow: View {
         }
     }
 
-    /// A value nothing here changes, read as a Details row is.
+    /// A value nothing here changes, drawn as plain text.
     @ViewBuilder private var plain: some View {
         if definition.kind.isDate, let dateText {
             InspectorText(text: dateText, keepsOneLine: true, endsAtTrailingEdge: true)
@@ -327,7 +327,15 @@ struct ItemPropertyRow: View {
 
     /// The panel the value opens in. A row for a value no item holds yet types a text or a number into the row, since a
     /// panel writes what was typed to its item.
-    private var panelKind: ValueEditKind? { editKind.flatMap { item == nil && $0.isTyped ? nil : $0 } }
+    private var panelKind: ValueEditKind? {
+        editKind.flatMap { kind in
+            switch kind {
+            // A form edits a yes or no with its checkbox and a list of entries in its own blocks.
+            case .yesNo, .entries: nil
+            default: item == nil && kind.isTyped ? nil : kind
+            }
+        }
+    }
 
     private func openEditor() {
         guard isEditable, let kind = panelKind, let library, let view = anchor.view else { return }

@@ -38,7 +38,7 @@ The Swift side of the item editor. The page is in `editor/`; read `editor/AGENTS
 ## Header
 
 - **The page draws the header and the app builds its data** (`MarfaMac/Views/ItemPageHeader.swift`) and carries out its events. Swift alone decides which rows are editable (`PropertyRow.editable`) and what a field's menu holds (`FieldMenu`).
-- **A value opens in `ValueEditPresenter` under the rectangle the page sends,** and is written through the library as in the right sidebar. A refusal is told in the panel, never on the page.
+- **A value opens in `ValueEditPresenter` under the rectangle the page sends,** and is written through the library as in the panel. A refusal is told in the panel, never on the page.
 - **A dragged row goes through `PageLayout.listing` and `PagePlacements`,** as in Customize Layout: it sets the order for the type and changes no item.
 - **Customize Layout belongs to the window** (`DetailsPresentation.isCustomizingLayout`), and Escape from the page ends it.
 - **Build the header only when what it reads changes** (`EditorController.showHeader`). Reading `contentRevision` or a whole list there rebuilds it at an edit anywhere.

@@ -3,13 +3,15 @@ import Foundation
 /// Writing through the source: `submit` hands the source each `ItemWrite` and follows it to its answer, and the
 /// property edits and link replacements follow their writes further. Saved views and attachments are written elsewhere.
 extension MarfaLibrary {
-    func awaitLinks(_ links: Set<WriteID>, thenUnlink unlinks: [EdgeDraft]) {
+    func awaitLinks(_ links: Set<WriteID>, thenUnlink unlinks: [EdgeDraft], failing title: String, recordingIn step: LinkStep) {
         let group = UUID()
-        replacements[group] = Replacement(awaiting: links, unlinks: unlinks)
+        replacements[group] = Replacement(awaiting: links, unlinks: unlinks, failing: title, step: step)
+        step.heldBack = group
         for link in links { replacing[link] = group }
     }
 
-    /// A link refused or held drops the removal, which leaves the old link beside any new one taken.
+    /// A link refused or held drops the removal, which leaves the old link beside any new one taken. The removals
+    /// sent are the step's too, and their skips are told once.
     func settleReplacement(_ id: WriteID, _ outcome: WriteOutcome) {
         guard let group = replacing.removeValue(forKey: id), var replacement = replacements[group] else { return }
         switch outcome {
@@ -19,12 +21,20 @@ extension MarfaLibrary {
                 replacements[group] = replacement
                 return
             }
-            replacements[group] = nil
-            unlink(replacement.unlinks)
+            dropReplacement(group)
+            gatheringSkips(failing: replacement.failing) {
+                unlink(replacement.unlinks, failing: replacement.failing, recordingIn: replacement.step)
+            }
         case .conflicted, .refused, .blocked, .dead:
-            replacements[group] = nil
-            for link in replacement.awaiting { replacing[link] = nil }
+            dropReplacement(group)
         }
+    }
+
+    /// The removals held back for `group` are not sent, as when the step is undone before the new links are answered.
+    func dropReplacement(_ group: UUID) {
+        guard let replacement = replacements.removeValue(forKey: group) else { return }
+        for link in replacement.awaiting { replacing[link] = nil }
+        replacement.step.heldBack = nil
     }
 
     /// Every write the library makes goes through here, so a refusal reaches the person under `title`, as does

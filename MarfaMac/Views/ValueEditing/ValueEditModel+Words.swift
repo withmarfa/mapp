@@ -7,16 +7,16 @@ extension ValueEditModel {
     var wordRows: [ValueListRow] {
         let held = Set(heldWords.map { $0.lowercased() })
         let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matching = wordPool.filter { word in
-            !held.contains(word.lowercased()) && (typed.isEmpty || word.localizedStandardContains(typed))
+        let matching = wordPool.filter { entry in
+            !held.contains(entry.word.lowercased()) && (typed.isEmpty || entry.word.localizedStandardContains(typed))
         }
-        var rows: [ValueListRow] = []
-        if !matching.isEmpty {
-            rows += matching.prefix(30).map { ValueListRow(id: "word:" + $0, role: .option, title: $0, mark: .tag) }
+        var rows: [ValueListRow] = matching.prefix(30).map {
+            ValueListRow(id: "word:" + $0.word, role: .option, title: $0.word, detail: $0.count.formatted(), mark: .tag)
         }
-        let known = held.contains(typed.lowercased()) || wordPool.contains { $0.lowercased() == typed.lowercased() }
+        let known = held.contains(typed.lowercased()) || wordPool.contains { $0.word.lowercased() == typed.lowercased() }
         if !typed.isEmpty, !known {
-            rows.append(ValueListRow(id: "create", role: .create, title: String(localized: "Add “\(typed)”"), detail: "↩", mark: .symbol("plus")))
+            if !rows.isEmpty { rows.append(.separator) }
+            rows.append(ValueListRow(id: "create", role: .create, title: String(localized: "Add “\(typed)”"), mark: .symbol("plus")))
         }
         return rows
     }

@@ -5,19 +5,6 @@ enum InterfaceKey {
     static let textSize = "interfaceTextSize"
     /// The width the person last gave the right sidebar, kept across layouts and launches.
     static let inspectorWidth = "inspectorWidth"
-    /// Whether the inspector's Details section is open, kept across items and launches.
-    static let inspectorDetailsOpen = "inspectorDetailsOpen"
-    /// Whether the inspector's Properties, Relationships, Links in This Page, Linked From and Tags sections are open, kept across items
-    /// and launches.
-    static let inspectorPropertiesOpen = "inspectorPropertiesOpen"
-    static let inspectorRelationshipsOpen = "inspectorRelationshipsOpen"
-    static let inspectorLinksInPageOpen = "inspectorLinksInPageOpen"
-    static let inspectorLinkedFromOpen = "inspectorLinkedFromOpen"
-    static let inspectorTagsOpen = "inspectorTagsOpen"
-    static let inspectorOutlineOpen = "inspectorOutlineOpen"
-    static let inspectorAttachmentsOpen = "inspectorAttachmentsOpen"
-    static let inspectorCollectionsOpen = "inspectorCollectionsOpen"
-    static let inspectorAppOpen = "inspectorAppOpen"
     /// Whether the window's toolbar shows an item's title once the page's header has scrolled away.
     static let showsScrolledTitle = "showsScrolledTitle"
     /// Whether Back and Forward stand over the sidebar.
@@ -28,7 +15,7 @@ enum InterfaceKey {
     static let valuePanelStyle = "valuePanelStyle"
     /// What the command palette, Search Items and quick add stand on.
     static let paletteMaterial = "paletteMaterial"
-    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, inspectorOutlineOpen, inspectorAttachmentsOpen, inspectorCollectionsOpen, inspectorAppOpen, showsScrolledTitle, showsSidebarHistory, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, showsScrolledTitle, showsSidebarHistory, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 /// What a value panel is made of. Glass lets the page show through; Solid is the window's own color.

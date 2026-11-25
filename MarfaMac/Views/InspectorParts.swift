@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The measures of the inspector at the default text size, which scale with the interface text.
+/// The measures the right sidebar's parts share at the default text size, which scale with the interface text: the
+/// item's Properties and Relationships, the view panel, the index pages and Version History.
 enum InspectorMetrics {
     /// The name column of a row. It never takes more than `maxNameShare` of the width, so a large text size leaves
     /// the value room.
@@ -23,16 +24,6 @@ enum InspectorMetrics {
     static let boxRowPadding: CGFloat = 6
     static let boxRadius: CGFloat = 10
     static let boxStroke: CGFloat = 0.5
-    /// A cell of Details: the gap between cells, the padding inside one (the board draws the bottom a point deeper
-    /// than the top), its corners, the gap between its name and its value, and how many lines its value may take.
-    static let cellGap: CGFloat = 6
-    static let cellInsetH: CGFloat = 9
-    static let cellInsetTop: CGFloat = 7
-    static let cellInsetBottom: CGFloat = 8
-    static let cellRadius: CGFloat = 9
-    static let cellValueGap: CGFloat = 3
-    static let cellNameSize: CGFloat = 11
-    static let cellValueLines = 2
     /// The room between a link row's mark and its title, and between its title and its date.
     static let markGap: CGFloat = 8
     /// How far a row's hover fill reaches past its content, so the content stays level with the headings.
@@ -53,8 +44,8 @@ enum InspectorMetrics {
 }
 
 extension EnvironmentValues {
-    /// The widest name among the rows of the inspector, which every row's name column takes, so Details and
-    /// Properties line up. Nil until the rows have measured their names.
+    /// The widest name among the rows of the inspector, which every row's name column takes, so the
+    /// rows line up. Nil until the rows have measured their names.
     @Entry var inspectorNameWidth: CGFloat?
 }
 
@@ -79,59 +70,18 @@ private struct SharedNameColumn: ViewModifier {
     }
 }
 
-/// The inspector's sections, each of which folds and keeps whether it is open for every item and launch.
-enum InspectorSectionKind: CaseIterable {
-    case details, properties, relationships, linksInPage, linkedFrom, tags, outline, attachments, collections
-    /// Each section from an app folds on its own (`InspectorSectionView`'s `foldKey`), since which ones an item has
-    /// depends on its links.
-    case app
-
-    var key: String {
-        switch self {
-        case .details: InterfaceKey.inspectorDetailsOpen
-        case .properties: InterfaceKey.inspectorPropertiesOpen
-        case .relationships: InterfaceKey.inspectorRelationshipsOpen
-        case .linksInPage: InterfaceKey.inspectorLinksInPageOpen
-        case .linkedFrom: InterfaceKey.inspectorLinkedFromOpen
-        case .tags: InterfaceKey.inspectorTagsOpen
-        case .outline: InterfaceKey.inspectorOutlineOpen
-        case .attachments: InterfaceKey.inspectorAttachmentsOpen
-        case .collections: InterfaceKey.inspectorCollectionsOpen
-        case .app: InterfaceKey.inspectorAppOpen
-        }
-    }
-
-    var identifier: String {
-        switch self {
-        case .details: "ItemInspectorDetails"
-        case .properties: "ItemInspectorProperties"
-        case .relationships: "ItemInspectorRelationships"
-        case .linksInPage: "ItemInspectorLinksInPage"
-        case .linkedFrom: "ItemInspectorLinkedFrom"
-        case .tags: "ItemInspectorTags"
-        case .outline: "ItemInspectorOutline"
-        case .attachments: "ItemInspectorAttachments"
-        case .collections: "ItemInspectorCollections"
-        case .app: "ItemInspectorApp"
-        }
-    }
-}
-
 /// A section of the inspector: a heading above a grouped box, with the section's name, then its count, and a chevron at
 /// the end that folds the box. The heading is one button, so VoiceOver and the keyboard reach the chevron by it. A
 /// section that can take something new has a small plus on its heading, beside the chevron.
 ///
 /// The box takes each view of `content` as a row, with a divider between rows, so a row is a view of its own, never a
-/// stack of several. A section with nothing in it shows `placeholder` as its one row. A section that is not `boxed`
-/// draws its content as it is, for Details, whose cells are boxes of their own, and for Relationships, whose groups each
-/// draw one. Its `placeholder` is still a box of its own.
+/// stack of several. A section with nothing in it shows `placeholder` as its one row.
 struct InspectorSection<Content: View, Add: View>: View {
     let title: LocalizedStringKey
     var count: Int?
     @Binding var isOpen: Bool
     let identifier: String
     var placeholder: LocalizedStringKey?
-    var boxed = true
     /// The plus control, given whether the heading is hovered.
     let add: (Bool) -> Add
     @ViewBuilder let content: Content
@@ -142,54 +92,11 @@ struct InspectorSection<Content: View, Add: View>: View {
             if isOpen {
                 if let placeholder {
                     InspectorBox { Text(placeholder).foregroundStyle(.secondary) }
-                } else if boxed {
-                    InspectorBox { content }
                 } else {
-                    content
+                    InspectorBox { content }
                 }
             }
         }
-    }
-}
-
-/// An `InspectorSection` that keeps whether it is open for every item and launch.
-struct InspectorSectionView<Content: View, Add: View>: View {
-    @AppStorage private var isOpen: Bool
-    let kind: InspectorSectionKind
-    let title: LocalizedStringKey
-    var count: Int?
-    var placeholder: LocalizedStringKey?
-    var boxed = true
-    let identifier: String
-    let add: (Bool) -> Add
-    @ViewBuilder let content: Content
-
-    /// `foldKey` and `identifier` name this section alone where several share one kind, as each app's does.
-    init(_ kind: InspectorSectionKind, title: LocalizedStringKey, count: Int? = nil, placeholder: LocalizedStringKey? = nil,
-         boxed: Bool = true, foldKey: String? = nil, identifier: String? = nil, @ViewBuilder add: @escaping (Bool) -> Add,
-         @ViewBuilder content: () -> Content) {
-        _isOpen = AppStorage(wrappedValue: true, foldKey ?? kind.key)
-        self.identifier = identifier ?? kind.identifier
-        self.kind = kind
-        self.title = title
-        self.count = count
-        self.placeholder = placeholder
-        self.boxed = boxed
-        self.add = add
-        self.content = content()
-    }
-
-    var body: some View {
-        InspectorSection(title: title, count: count, isOpen: $isOpen, identifier: identifier, placeholder: placeholder,
-                         boxed: boxed, add: add) { content }
-    }
-}
-
-extension InspectorSectionView where Add == EmptyView {
-    init(_ kind: InspectorSectionKind, title: LocalizedStringKey, count: Int? = nil, placeholder: LocalizedStringKey? = nil,
-         boxed: Bool = true, foldKey: String? = nil, identifier: String? = nil, @ViewBuilder content: () -> Content) {
-        self.init(kind, title: title, count: count, placeholder: placeholder, boxed: boxed, foldKey: foldKey, identifier: identifier,
-                  add: { _ in EmptyView() }, content: content)
     }
 }
 
@@ -287,88 +194,6 @@ private struct InspectorSurface: ViewModifier {
             .background(scheme == .dark ? Color.white.opacity(0.03) : Color(nsColor: .controlBackgroundColor), in: shape)
             .overlay { shape.strokeBorder(.separator, lineWidth: InspectorMetrics.boxStroke) }
             .clipShape(shape)
-    }
-}
-
-/// A fact of Details in a small box of its own: its name above its value, as the design's `.m-insp-cell`. The value
-/// takes up to `cellValueLines` lines, cut at its end, or one line cut in the middle where it has no space in it.
-struct InspectorCell<Value: View>: View {
-    @Environment(\.interfaceTextSize) private var textSize
-    let name: String
-    @ViewBuilder let value: Value
-
-    var body: some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        VStack(alignment: .leading, spacing: InspectorMetrics.cellValueGap * scale) {
-            Text(verbatim: name)
-                .interfaceFont(.system(size: InspectorMetrics.cellNameSize))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            value
-                .interfaceFont(.body)
-        }
-        .padding(.horizontal, InspectorMetrics.cellInsetH)
-        .padding(.top, InspectorMetrics.cellInsetTop)
-        .padding(.bottom, InspectorMetrics.cellInsetBottom)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .inspectorSurface(radius: InspectorMetrics.cellRadius)
-        .accessibilityElement(children: .contain)
-    }
-}
-
-/// Lays cells out two to a row. A cell whose value is too long for half the width takes a whole row; a cell left with
-/// no partner sits alone in the first column, as wide as the others. Cells of a row are as tall as the tallest.
-struct InspectorCellGrid: Layout {
-    var spacing: CGFloat
-
-    /// Whether a cell whose value one line needs `ideal` wide does not fit a column of `column`.
-    static func takesWholeRow(ideal: CGFloat, column: CGFloat) -> Bool { ideal > column + 0.5 }
-
-    /// The cells of each row, by index.
-    private func rows(of subviews: Subviews, width: CGFloat) -> [[Int]] {
-        let column = (width - spacing) / 2
-        var rows: [[Int]] = []
-        var open: [Int] = []
-        for index in subviews.indices {
-            if Self.takesWholeRow(ideal: subviews[index].sizeThatFits(.unspecified).width, column: column) {
-                if !open.isEmpty { rows.append(open); open = [] }
-                rows.append([index])
-            } else {
-                open.append(index)
-                if open.count == 2 { rows.append(open); open = [] }
-            }
-        }
-        if !open.isEmpty { rows.append(open) }
-        return rows
-    }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 300
-        let heights = rows(of: subviews, width: width).map { row in
-            row.map { subviews[$0].sizeThatFits(.init(width: rowWidth(of: row, subviews: subviews, width: width), height: nil)).height }.max() ?? 0
-        }
-        return CGSize(width: width, height: heights.reduce(0, +) + spacing * CGFloat(max(0, heights.count - 1)))
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var y = bounds.minY
-        for row in rows(of: subviews, width: bounds.width) {
-            let cell = rowWidth(of: row, subviews: subviews, width: bounds.width)
-            let height = row.map { subviews[$0].sizeThatFits(.init(width: cell, height: nil)).height }.max() ?? 0
-            for (column, index) in row.enumerated() {
-                subviews[index].place(
-                    at: CGPoint(x: bounds.minX + CGFloat(column) * (cell + spacing), y: y), anchor: .topLeading,
-                    proposal: .init(width: cell, height: height))
-            }
-            y += height + spacing
-        }
-    }
-
-    /// A row's cell: half the width less the gap, or all of it for a cell that takes the row.
-    private func rowWidth(of row: [Int], subviews: Subviews, width: CGFloat) -> CGFloat {
-        let column = (width - spacing) / 2
-        if row.count == 1, Self.takesWholeRow(ideal: subviews[row[0]].sizeThatFits(.unspecified).width, column: column) { return width }
-        return column
     }
 }
 

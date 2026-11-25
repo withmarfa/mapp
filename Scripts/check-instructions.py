@@ -73,6 +73,7 @@ BUDGETS = {  # words
     "docs/settings-sync.md": 1100,
     "docs/settings-window.md": 1000,
     "docs/type-looks.md": 900,
+    "docs/value-panels.md": 800,
     "docs/window.md": 900,
 }
 MONTH = r"(?:January|February|March|April|May|June|July|August|September|October|November|December)"

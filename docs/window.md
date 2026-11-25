@@ -29,7 +29,7 @@ paths:
 - **A row whose thing is gone keeps its place in the layout,** so a thing that returns, or is late in a sync, comes back to it.
 - **A shortcut acts, or goes somewhere, and is not a place** (`SidebarShortcut`). Search and New are shortcuts.
 - **A row's menu is AppKit's** (`SidebarPlaceMenu`): SwiftUI menus cannot hold color swatches.
-- **Go lists the same places, views and types** (`GoMenu`), hidden types too, so a window without its sidebar reaches them.
+- **Go lists the same places, views and types** (`GoMenu`), hidden types and the Archive too, so a window without its sidebar reaches them.
 - **A sidebar row opens a place or one of its views.** A saved view opens at its home ([Two kinds of view](lists.md#two-kinds-of-view)).
 - **The Library and the Feed keep the keys earlier copies gave All Items and Inbox** (`all`, `inbox`), so an arranged sidebar reads unchanged. An unknown section kind is left out and written back where it was.
 - **Recently Deleted is a page of Settings**, never a row.

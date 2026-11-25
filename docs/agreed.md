@@ -21,7 +21,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | The two fixed zones | Search and New, then Library with its count and Feed with none. The Feed's symbol is `water.waves`. Search opens the Command Palette. | `SidebarGroups.swift`, `SidebarTypeRow.swift` | `Rethink-Sidebars`, `Rethink-Library` |
 | Under the pointer | A plus takes the place of the count on a type, a kind and a collection. Search and New show their shortcuts. A section's heading shows Add and More. Nothing in a row moves. | `SidebarTypeRow.swift`, `SidebarGroups.swift` | `Rethink-Sidebar-Pointer`, `Rethink-Sidebar-Sections` |
 | Pinned and Types | Pinned holds views, collections and items. Types list their kinds under them. A person's arrangement is read into the new sidebar: views they placed keep their sections, the rest go to Pinned, and an unknown group is ignored. | `SidebarLayout`, `SidebarGroups.swift` | `Rethink-Sidebars` |
-| Customize Sidebar | Dashed places (Tab, Command, a Library list, Pinned, Type, Section) each open a menu of what can go there. One tabs row shows while customizing. | `CustomizeSidebar.swift` | `Rethink-Customize-Sidebar`, `Rethink-Customize-Sidebar-Add` |
+| Customize Sidebar | Dashed places (Tab, Command, a Library list, Pinned, Type, Section) each open a menu of what can go there. One tabs row shows while customizing. | new file in `MarfaMac/Views/` | `Rethink-Customize-Sidebar`, `Rethink-Customize-Sidebar-Add` |
 | The Marfa's panel | The foot opens a panel: the Marfa's name and count, its latest sources, and the Marfas the app has signed in to, with a tick and a plus on the heading. Switching signs out of nothing. Pages flush first, and changes that were not sent stay queued. | `SidebarFoot.swift`, `MarfaHost` | `Rethink-Marfa` |
 | Sidebar color | Gray or White, in Appearance, synced. | `Sidebar.swift`, `PreferencesMap` | `Rethink-Sidebars` |
 
@@ -41,19 +41,17 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | --- | --- | --- | --- |
 | Feed | No count on its row, no words of waiting. Its first view is named All. | `SidebarGroups.swift`, `Browser` | `Rethink-Inbox`, `Rethink-Inbox-View`, `Rethink-Inbox-Page`, `Rethink-Inbox-Modal` |
 | Default From | Settings > Lists offers All Items (the default) and Library. | `PreferencesMap`, Settings > Lists | `Rethink-Scope-Menu` |
-| Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. | `ItemRow.swift`, `ItemTableCells.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
+| Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. The table of both tiers has it; the list and gallery do not yet. | `ItemRow.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
 | A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. **Waits for the package:** its catalogue does not say which types hold a table, and the app names no type (marfa-swift#561). | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |
 | Quick Actions | Keep, Archive and Delete on the row under the pointer, a choice of each view, with the default that `docs/concepts.md` gives. | `ItemRow.swift`, `ViewMacSettings` | `Rethink-Inbox-Actions`, `Rethink-View-Quick-Actions` |
-| In | A value on the panel's Info for every item, Library or Feed, that a person changes there. | `ItemInspector.swift` | `Rethink-Feed-Page-In` |
-| Leaves the Feed | A date beside In, only where the type has a limit and the item is active in the Feed. Move to Feed asks first only where the limit would remove the item at once: the alert is built and asks `ItemLibrary.feedLimitQuestion`, which answers nothing until the limit is in the catalogue. **Waits for Marfa and the package:** a type's feed window in the catalogue (marfa#3560, marfa-swift#559). | `ItemInspector.swift`, `ItemMoves.swift` | `Rethink-Feed-Limit`, `Rethink-Feed-Limit-Move` |
-| Who else keeps an item | One line in Info: "Read only. RSS keeps this item, so a change made here would be overwritten." or "Synced with GitHub. A change made here is sent there." | `ItemInspector.swift` | `Rethink-Kept-By` |
+| Leaves the Feed | A date beside In, only where the type has a limit and the item is active in the Feed. Move to Feed asks first only where the limit would remove the item at once: the alert is built and asks `ItemLibrary.feedLimitQuestion`, which answers nothing until the limit is in the catalogue. **Waits for Marfa and the package:** a type's feed window in the catalogue (marfa#3560, marfa-swift#559). | `PanelInfoView.swift`, `ItemMoves.swift` | `Rethink-Feed-Limit`, `Rethink-Feed-Limit-Move` |
 
 ## Archiving
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Undo of state and tier where the copy cannot be sure | **Waits for Marfa:** an expected state on a transition (marfa#3523) and an update that refuses a stale version (marfa#3528). Until then, Undo does nothing and says so when the copy shows a change, and a change the copy has not yet learned of can still be overwritten. | `MarfaEngine+Writing.swift`, `MarfaLibrary+Bin.swift`, `MarfaLibrary+Moves.swift` | `Rethink-Archive-Toast` |
-| Library's Archive | Its own count and its own layout choice in the Library's row of lists. One type's archived items are this place narrowed by a token in Search. | `SidebarIndex.swift` | `Rethink-Archive`, `Rethink-Type-Archive` |
+| One type's archive | One type's archived items are the Archive narrowed by a token in Search. | Search | `Rethink-Type-Archive` |
 | An archived item's page | Says Archived over its title, and edits as any other. | `ItemPageHeader.swift`, `BatchSkips` | `Rethink-Archived-Page` |
 
 ## Several items
@@ -136,23 +134,16 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The panel | White, closed by default, with pills: Outline, Links, Info. It remembers the pill for each type. One part has no pills. | `ItemInspector.swift` | `Rethink-Panel-Sizes`, `Rethink-Task-Page` |
-| Outline | Reading Time and Words, or a PDF's Pages, then the headings. | `ItemInspectorRows.swift` | `Rethink-Long-Page`, `Rethink-PDF` |
-| Links | In Collection, Referenced By, Links in the Text, Excerpts, Thread, Attachments. | `ItemRelationships.swift` | `Rethink-Highlight`, `Rethink-Message` |
-| Info | Source, version, created, edited, a file's facts, In, Leaves the Feed, who keeps it, History. The history is asked for when Info shows. | `ItemInspectorFields.swift` | `Rethink-Feed-Page-In`, `Rethink-Kept-By` |
-| What goes | Properties, Tags, Relationships, From Apps and the sidebar's own arrangement, once the rows carry them. Fields the type does not declare are the last rows, under Other. A sync problem is a page notice. | `ItemProperties.swift`, `ItemTags.swift`, `SidebarArrangement` | `Rethink-Properties-Rule` |
+| What goes | Properties, Tags and Relationships in Info, and the sync problem, once the page's rows carry them. Fields the type does not declare are the last rows, under Other. | `ItemInspector.swift`, `ItemProperties.swift`, `ItemTags.swift` | `Rethink-Properties-Rule` |
 
 ## Editing and links
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Value panels | Gray highlight, chips in the field, counts beside tags and choices, Add for a new word. A parent shows its mark and its status. | `MarfaMac/Views/ValueEditing/` | `Rethink-Edit-Values`, `Rethink-Edit-Status`, `Rethink-Edit-Tags`, `Rethink-Edit-Text`, `Rethink-Edit-Location` |
-| Lists with labels | Email and phone entries are edited in one panel, with a label column. | `ListEditing.swift` | `Rethink-Edit-Lists` |
-| An event's time | One panel: start, end, all day and zone, one write. | `EventHeader`, `ValueEditKind` | `Rethink-Edit-Event` |
 | Edges as rows | Each edge field a type may hold gets a row and a value panel: filled ones in place, the rest under Show More, and inverses where Marfa allows. The panel obeys Marfa's answer. One commit is one undo. Only a reference in the text is not editable. An item in no collection has an empty In Collection row. | `ValueEditKind`, `ItemRelationshipPicker`, `PropertyRow` | `Rethink-Properties-Rule`, `Rethink-Edit-Values` |
+| Undo of a link in one call | Undo checks a link's id, type and ends, then deletes it by id in a second package call, so a move synced between the two is lost, as with state moves. **Waits for Marfa:** one package call that checks and deletes. | `MarfaEngine+Writing.swift` | – |
 | Conflict | A calm line with Keep My Edit and Use Current Value. | `ValueEditModel` | `Rethink-Edit-Conflict` |
 | Status where it is seen | A click on a status in a row or a lane opens its panel; the row stays until it is left. | `StatusSymbol`, `ItemRow.swift` | `Rethink-Status-In-List` |
-| Change Type | From the page's head, the same panel, with what each type asks for. | `CommandValuePanels.swift`, `TypeValuesSheet` | `Rethink-Change-Type`, `Rethink-Change-Type-Values` |
 | Every link follows Open Items | In the text, rows, foot and panel, through one function of the browser. A picture in the text has Open Item and Copy Link on its menu. | `Browser`, `EditorController` | – |
 | Link card | After a pause on a linked item, a small card with its type, name and two lines. No keyboard focus, no server call. | new files in `MarfaMac/Views/`, `editor/src/` | `Rethink-Link-Card` |
 

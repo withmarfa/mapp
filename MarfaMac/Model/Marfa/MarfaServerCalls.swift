@@ -291,6 +291,29 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
         }
     }
 
+    /// Each installed connector's source and the direction of each type it writes (`GET /plugins`, which any app may read).
+    @concurrent func connectors() async throws(SourceEditFailure) -> ConnectorKeepers {
+        do {
+            var keepers = ConnectorKeepers()
+            for plugin in try await client().listPlugins().ok.body.json.data {
+                guard let connector = plugin.connector.value else { continue }
+                for kind in connector.kinds {
+                    let direction: ConnectorDirection = switch kind.direction {
+                    case ._in: .into
+                    case .out: .out
+                    case .both: .both
+                    }
+                    keepers.add(source: connector.source, type: TypeID(kind._type), direction: direction)
+                }
+            }
+            return keepers
+        } catch let ending as Ending {
+            throw Self.sourceFailure(ending)
+        } catch {
+            throw Self.sourceFailure(Self.ending(error))
+        }
+    }
+
     /// The items the library lists: the active ones in either tier, without parts (`part eq false`), which are the
     /// files attached to an item and the other items that live with a host. The server leaves out hidden items
     /// (`system.*` and `app.*`, `items/hidden-types`) and the ones the key cannot read by itself.

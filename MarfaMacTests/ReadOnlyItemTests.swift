@@ -104,7 +104,7 @@ import UniformTypeIdentifiers
         library.addTag("later", to: [F.n2], undoManager: nil)
         library.setFavorite([F.n2], true, undoManager: nil)
         #expect(library.addToCollection([F.n2], Self.holiday, undoManager: nil))
-        #expect(await library.changeItemRelationship(F.n2, field: "about", adding: [F.p1], removing: [], undoManager: nil))
+        #expect(await source.taking { await library.changeLinks(F.n2, field: "about", adding: [F.p1], removing: [], undoManager: nil) } == .taken)
         library.delete([F.n2], undoManager: nil)
         #expect(source.writes.count == 5, "sent \(source.writes)")
         #expect(source.writes.last == .transition(F.n2, .trashed, from: .active))

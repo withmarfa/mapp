@@ -10,7 +10,7 @@ paths:
 
 # How things look
 
-Each kind of thing has one drawing, used on the page, in the right sidebar, in a row, a card, a table cell and a panel. Measures, colors and fills are tokens in the code; this page has the rules that they serve. Search `docs/rejected.md` before you propose a look.
+Each kind of thing has one drawing, used on the page, in the panel, in a row, a card, a table cell and a panel. Measures, colors and fills are tokens in the code; this page has the rules that they serve. Search `docs/rejected.md` before you propose a look.
 
 ## Where things go
 
@@ -66,7 +66,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 - **A chosen card has a soft ring and no fill**, because a fill would cover its picture.
 - **A heading, a date line and a group's header get no hover mark**, because they cannot be clicked. A group's chevron is the only part of its header that reacts.
 - **A cell that can be edited keeps its own tint** over the row's.
-- **A chosen row in a value panel, a filter panel or a calendar is the same gray** (`SelectionLooks`), never the accent.
+- **A chosen row in a value panel, filter panel or calendar is the same gray** (`SelectionLooks`), never the accent.
 
 ## Buttons
 

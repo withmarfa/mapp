@@ -37,44 +37,21 @@ extension UTType {
     nonisolated static let marfaLayoutRow = UTType(exportedAs: "\(AppPaths.bundleIdentifier).layout-row")
 }
 
-/// The right sidebar while Customize Layout is on. Page arranges the item's rows in three groups, Pinned (up to four), On
-/// the Page and Hidden, by dragging, by the pin on a row, or with Move Up and Move Down; Sidebar orders, removes and adds
-/// the sidebar's own sections (`SidebarArrangement`). The page and the sidebar stay in view and follow each change at
-/// once. Both choices are for the item's type (`PagePlacements`), so they hold for every item of the type, and they are
-/// the app's own: the item is not changed, so a read-only item can be laid out too.
+/// The right sidebar while Customize Layout is on: the item's rows in three groups, Pinned (up to four), On the Page and
+/// Hidden, arranged by dragging, by the pin on a row, or with Move Up and Move Down. The page stays in view and follows
+/// each change at once. The choice is for the item's type (`PagePlacements`), so it holds for every item of the type, and
+/// it is the app's own: the item is not changed, so a read-only item can be laid out too.
 struct ItemLayoutPanel: View {
-    private enum Arranging: Hashable { case page, sidebar }
-
     @CurrentLibrary private var library
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(PageKey.showsCoordinates) private var showsCoordinates = false
-    @State private var arranging = Arranging.page
     let item: Item
-    /// The headings the page reported for the item, for the Outline's count in Sidebar.
-    var outline: [OutlineHeading] = []
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Arrange", selection: $arranging) {
-                Text("Page").tag(Arranging.page)
-                Text("Sidebar").tag(Arranging.sidebar)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .buttonSizing(.flexible)
-            .controlSize(.large)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .accessibilityIdentifier("LayoutArranging")
-            ScrollView {
-                switch arranging {
-                case .page: pageGroups
-                case .sidebar: SidebarArrangement(item: item, outline: outline)
-                }
-            }
-            .scrollBounceBehavior(.basedOnSize)
+        ScrollView {
+            pageGroups
         }
+        .scrollBounceBehavior(.basedOnSize)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ItemLayoutPanel")
     }
@@ -104,7 +81,7 @@ struct ItemLayoutPanel: View {
         placements.apply(layout, of: item.type, in: library.catalogue)
     }
 
-    /// Takes the type's choices back, for the page and the sidebar, quietly, beside the first heading.
+    /// Takes the type's choices back, quietly, beside the first heading.
     private var options: some View {
         Menu {
             Button("Use Defaults") { placements.reset(item.type) }

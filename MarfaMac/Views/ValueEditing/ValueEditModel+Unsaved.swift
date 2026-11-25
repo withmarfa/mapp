@@ -66,7 +66,7 @@ extension ValueEditModel {
     }
 
     /// Gives the person text this panel cannot keep through the notices, which put it on the clipboard.
-    private func handBack(_ text: String, reason: String? = nil) {
+    func handBack(_ text: String, reason: String? = nil) {
         guard !text.isEmpty else { return }
         let typed = kind.field.map { "\($0.label): \(text)" } ?? text
         let title = kind == .tags ? String(localized: "Tag Not Added") : String(localized: "Property Not Saved")

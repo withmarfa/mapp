@@ -403,42 +403,46 @@ private struct MoreMenu: View {
     var body: some View {
         let item = pageItems.count == 1 ? pageItems.first : nil
         Menu("More", systemImage: "ellipsis") {
-            command(.open)
-            command(.openAsModal)
-            command(.openAsFullPage)
-            command(.openInNewWindow)
-            command(.quickLook)
-            command(.openOriginal)
-            command(.openInBrowser)
-            ItemShareLink(item: item, fileURL: fileURL, library: library, showsIcon: false)
-            command(.copyLink)
-            Divider()
-            ItemOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)
-            CollectionActions(selection: ids, details: details, undoManager: undoManager)
-            Divider()
-            command(.addAttachment)
-            Divider()
-            Menu("Page Width", systemImage: "arrow.left.and.right") {
-                PageWidthOptions().pickerStyle(.inline).labelsHidden()
-            }
-            command(.toggleSource)
-            command(.toggleReader)
-            ForEach(cornerControlsInMore, id: \.self) { button in
-                switch button {
-                case .formats: command(.toggleFormats)
-                case .textSize:
-                    Menu("Text Size", systemImage: "textformat.size") { TextSizeOptions() }
-                        .disabled(!PageCorner.sizesText(layout: pageLayout, look: details?.pageLook?.mode))
-                case .focus: command(.toggleFocus)
-                case .look, .pages, .zoom: EmptyView()
+            Group {
+                command(.open)
+                command(.openAsModal)
+                command(.openAsFullPage)
+                command(.openInNewWindow)
+                command(.quickLook)
+                command(.openOriginal)
+                command(.openInBrowser)
+                ItemShareLink(item: item, fileURL: fileURL, library: library, showsIcon: false)
+                command(.copyLink)
+                Divider()
+                ItemOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)
+                CollectionActions(selection: ids, details: details, undoManager: undoManager)
+                Divider()
+                command(.addAttachment)
+                Divider()
+                Menu("Page Width", systemImage: "arrow.left.and.right") {
+                    PageWidthOptions().pickerStyle(.inline).labelsHidden()
                 }
+                command(.toggleSource)
+                command(.toggleReader)
+                ForEach(cornerControlsInMore, id: \.self) { button in
+                    switch button {
+                    case .formats: command(.toggleFormats)
+                    case .textSize:
+                        Menu("Text Size", systemImage: "textformat.size") { TextSizeOptions() }
+                            .disabled(!PageCorner.sizesText(layout: pageLayout, look: details?.pageLook?.mode))
+                    case .focus: command(.toggleFocus)
+                    case .look, .pages, .zoom: EmptyView()
+                    }
+                }
+                Divider()
+                command(.print)
+                command(.exportPDF)
+                Divider()
+                ItemMoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
+                ItemRemoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
             }
-            Divider()
-            command(.print)
-            command(.exportPDF)
-            Divider()
-            ItemMoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
-            ItemRemoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
+            // On macOS a menu item draws its symbol only when the menu asks for it. The menu's own label stays a symbol.
+            .labelStyle(.titleAndIcon)
         }
         .menuIndicator(.hidden)
         .help("More")

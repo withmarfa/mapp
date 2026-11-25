@@ -182,6 +182,8 @@ nonisolated struct SampleSourceNames: SourceNameSource {
         return SampleCastell.libraryCounts(of: SampleCastell.world(size).items)
     }
 
+    func connectors() async throws(SourceEditFailure) -> ConnectorKeepers { ConnectorKeepers() }
+
     func update(_ code: String, name: SourceFieldChange?, mark: SourceFieldChange?) async throws(SourceEditFailure) -> SourceInfo {
         throw .unsupported
     }

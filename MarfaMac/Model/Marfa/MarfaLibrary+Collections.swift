@@ -10,6 +10,13 @@ extension MarfaLibrary {
         return Self.byTitle(heldItems(ids))
     }
 
+    var joinableCollections: [Item] {
+        let ids = catalogue.collectionTypes.reduce(into: Set<ItemID>()) { found, type in
+            found.formUnion(index.byType[type]?.ids(in: .all, .shown) ?? [])
+        }
+        return Self.byTitle(heldItems(ids))
+    }
+
     /// The members of a collection in the order Marfa keeps for them: by each edge's `position` where it has one,
     /// then the rest by title.
     func membersInOrder(of collection: ItemID, among members: [Item]) -> [ItemID] {
@@ -37,7 +44,7 @@ extension MarfaLibrary {
     @discardableResult
     func addToCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
         let title = String(localized: "Can’t Add to Collection")
-        guard let target = item(collection), target.state == .active, catalogue.isCollection(target.type) else {
+        guard let target = item(collection), target.state != .trashed, catalogue.isCollection(target.type) else {
             notices.tell(title, String(localized: "This collection isn’t in the library."))
             return false
         }

@@ -104,7 +104,7 @@ nonisolated extension ItemTableColumn {
     /// item's own dates have their place on the row (the look's date), so only a table shows them as properties.
     var isChip: Bool {
         switch content {
-        case .title, .created, .edited, .occurred, .duration: false
+        case .title, .created, .edited, .occurred, .duration, .source: false
         case .type, .parent, .children, .collections, .count, .tags, .field: true
         }
     }
@@ -123,6 +123,7 @@ nonisolated extension ItemTableColumn {
         case .created, .edited, .occurred: "calendar"
         case .count: "number"
         case .tags: "tag"
+        case .source: "antenna.radiowaves.left.and.right"
         case .duration: "clock"
         case .field(let field): PageLayout.symbol(of: field)
         }
@@ -194,7 +195,7 @@ nonisolated extension ItemTableColumn {
         case .children: return .relation(.children)
         case .collections: return .relation(.collections)
         case .count(let fact): return look.counts.contains(fact) ? .count(fact) : nil
-        case .title, .type, .created, .edited, .occurred, .duration: return nil
+        case .title, .type, .created, .edited, .occurred, .duration, .source: return nil
         }
     }
 }

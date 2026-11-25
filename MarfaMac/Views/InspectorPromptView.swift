@@ -16,7 +16,6 @@ struct InspectorPromptView: View {
     private var line: Text {
         switch prompt {
         case .item: Text("Choose an item to see its details.")
-        case .event: Text("Choose an event to see its details.")
         case .collection: Text("Choose a collection to see what’s in it.")
         case .source: Text("Choose a source to see what it sends.")
         }

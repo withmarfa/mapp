@@ -148,12 +148,12 @@ nonisolated enum SampleLibrary {
                 TypeField(
                     name: "emails", type: "array", declaredBy: "core.entity",
                     definition: ["items_type": "object", "items_fields": [
-                        "value": ["type": "email", "required": true], "label": ["type": "string"],
+                        "value": ["type": "email", "required": true, "label": "Email"], "label": ["type": "string", "label": "Label"],
                     ]]),
                 TypeField(
                     name: "phones", type: "array", declaredBy: "core.entity",
                     definition: ["items_type": "object", "items_fields": [
-                        "value": ["type": "string", "required": true], "label": ["type": "string"],
+                        "value": ["type": "string", "required": true, "label": "Phone"], "label": ["type": "string", "label": "Label"],
                     ]]),
                 TypeField(
                     name: "addresses", type: "array", declaredBy: "core.entity",

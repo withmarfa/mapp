@@ -115,6 +115,22 @@ import Testing
         #expect(await eventually { outcome == CommandOutcome(changed: 1, onlyItem: F.p1, skips: skips) })
     }
 
+    @Test func infoMovingALibraryItemToTheFeedIsOneStepAndItsUndoMovesItBack() async throws {
+        let (library, source) = try await loaded()
+        let item = try #require(library.item(F.n1))
+        let undo = UndoManager()
+        library.setTier([F.n1], to: .feed, undoManager: undo)
+        #expect(source.writes == [.retier(F.n1, .feed, base: item.version)])
+        try await show([F.n1], in: library, source) { $0.tier = .feed }
+        acceptAll(source)
+        try #require(await eventually { library.tierWrites.isEmpty })
+        #expect(undo.undoActionName == ItemMove.moveToFeed.name)
+
+        undo.undo()
+        #expect(source.writes == [.retier(F.n1, .library, base: item.version)])
+        #expect(!undo.canUndo, "one move is one step")
+    }
+
     /// Keeps Feed note, whose write the copy shows, and answers it each of `outcomes` in turn.
     private func keep(answering outcomes: [WriteOutcome]) async throws -> (MarfaLibrary, FakeItemSource, UndoManager) {
         let (library, source) = try await loaded()

@@ -128,7 +128,7 @@ struct PlaceDefaultsTests {
 
         browser.resetView(in: library)
         #expect(browser.tableOptions[browser.shown]?.isFiltering != true)
-        #expect(browser.viewMode == Browser.naturalLayout)
+        #expect(browser.viewMode == Browser.naturalLayout(of: browser.shown))
         #expect(browser.density == nil)
         #expect(!browser.isDefaultViewChanged)
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)

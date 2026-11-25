@@ -488,6 +488,17 @@
     "%@ you make show here." : {
 
     },
+    "%@ × %@" : {
+      "comment" : "A picture's width and height in pixels.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ × %2$@"
+          }
+        }
+      }
+    },
     "%@%@ files nothing uses" : {
 
     },
@@ -570,6 +581,9 @@
           }
         }
       }
+    },
+    "%@, Archived" : {
+
     },
     "%@, changed" : {
 
@@ -1365,6 +1379,9 @@
         }
       }
     },
+    "%lld min" : {
+      "comment" : "Minutes to read."
+    },
     "%lld minutes" : {
 
     },
@@ -1811,9 +1828,6 @@
 
     },
     "A connector comes with its plugin. Its settings and secrets are kept in %@." : {
-
-    },
-    "A connector manages this item’s title, text, properties, and type." : {
 
     },
     "A connector’s sign-in needs the app signed in as an app. Sign in again in Connection." : {
@@ -2291,6 +2305,9 @@
     "All Data" : {
 
     },
+    "All Day" : {
+
+    },
     "All Deleted Items" : {
 
     },
@@ -2520,9 +2537,6 @@
     "Archive All" : {
 
     },
-    "Archive Is Empty" : {
-
-    },
     "Archive Only These Items" : {
 
     },
@@ -2555,6 +2569,9 @@
         }
       }
     },
+    "Archived" : {
+
+    },
     "Archived Items" : {
 
     },
@@ -2565,9 +2582,6 @@
 
     },
     "Archived, unarchived or moved to or from another state." : {
-
-    },
-    "Arrange" : {
 
     },
     "Articles Open In" : {
@@ -3336,9 +3350,6 @@
     "Choose an Icon" : {
       "extractionState" : "manual"
     },
-    "Choose an event to see its details." : {
-
-    },
     "Choose an item to see its details." : {
 
     },
@@ -3895,13 +3906,13 @@
     "Create Link Type" : {
 
     },
+    "Create Tag “%@”" : {
+
+    },
     "Create Type" : {
 
     },
     "Create Webhook" : {
-
-    },
-    "Create “%@”" : {
 
     },
     "Created" : {
@@ -3911,6 +3922,9 @@
 
     },
     "Current Password" : {
+
+    },
+    "Current Version" : {
 
     },
     "Custom" : {
@@ -4122,6 +4136,9 @@
     "Diagram unavailable:" : {
 
     },
+    "Dimensions" : {
+
+    },
     "Dinner with Sam" : {
 
     },
@@ -4303,10 +4320,10 @@
     "Edit Property" : {
       "extractionState" : "manual"
     },
-    "Edit Relationship" : {
-      "extractionState" : "manual"
-    },
     "Edit Statuses…" : {
+
+    },
+    "Edit Time" : {
 
     },
     "Edit Value" : {
@@ -4352,6 +4369,12 @@
       "extractionState" : "manual"
     },
     "Empty…" : {
+
+    },
+    "End Day" : {
+
+    },
+    "End Time" : {
 
     },
     "Ends" : {
@@ -4491,6 +4514,9 @@
     },
     "Everywhere" : {
       "extractionState" : "manual"
+    },
+    "Excerpts" : {
+
     },
     "Existing %@" : {
 
@@ -4838,9 +4864,6 @@
         }
       }
     },
-    "From Apps" : {
-
-    },
     "From Plugins" : {
 
     },
@@ -5004,6 +5027,9 @@
     "Heading 6" : {
 
     },
+    "Headings" : {
+
+    },
     "Health" : {
 
     },
@@ -5092,6 +5118,9 @@
 
     },
     "History" : {
+
+    },
+    "History isn’t available right now." : {
 
     },
     "Holds" : {
@@ -5194,6 +5223,9 @@
     "Import…" : {
 
     },
+    "In" : {
+
+    },
     "In %@." : {
 
     },
@@ -5255,6 +5287,9 @@
 
     },
     "Indigo" : {
+
+    },
+    "Info" : {
 
     },
     "Inherited from %@" : {
@@ -5546,9 +5581,6 @@
 
     },
     "Items you add show here." : {
-
-    },
-    "Items you archive show here." : {
 
     },
     "Items you delete wait here before they are permanently deleted." : {
@@ -5953,6 +5985,9 @@
     "Left out with %@" : {
 
     },
+    "Length" : {
+
+    },
     "Let Chats Save Files" : {
 
     },
@@ -6016,7 +6051,7 @@
     "Links Between Items" : {
 
     },
-    "Links in This Page" : {
+    "Links in the Text" : {
 
     },
     "Links to Items" : {
@@ -6277,6 +6312,9 @@
     "Marfa for Mac couldn’t check this link in time. Try opening it again." : {
 
     },
+    "Marfa keeps this link itself." : {
+
+    },
     "Marfa’s" : {
 
     },
@@ -6323,6 +6361,9 @@
 
     },
     "More Fields" : {
+
+    },
+    "More From This Book" : {
 
     },
     "More changes arrived while you were deciding. Look at them before you choose." : {
@@ -6760,9 +6801,6 @@
     "No Results" : {
 
     },
-    "No Sections" : {
-
-    },
     "No Server Settings" : {
 
     },
@@ -7031,6 +7069,9 @@
 
     },
     "Nothing is added until you install it." : {
+
+    },
+    "Nothing is archived." : {
 
     },
     "Nothing is installed until you choose it." : {
@@ -7441,6 +7482,9 @@
     "Page Width" : {
 
     },
+    "Pages" : {
+
+    },
     "Pages on it can no longer call the server." : {
 
     },
@@ -7457,6 +7501,9 @@
 
     },
     "Palettes" : {
+
+    },
+    "Panel" : {
 
     },
     "Paragraph Spacing" : {
@@ -7785,6 +7832,12 @@
     "Read and Edit" : {
 
     },
+    "Read only. %@ keeps this item, so an edit here would be overwritten." : {
+
+    },
+    "Read only. A connector keeps this item, so an edit here would be overwritten." : {
+
+    },
     "Read the Audit Log" : {
 
     },
@@ -7807,6 +7860,9 @@
 
     },
     "Reading Sources…" : {
+
+    },
+    "Reading Time" : {
 
     },
     "Reading Where Files Are…" : {
@@ -7855,6 +7911,9 @@
 
     },
     "Redo" : {
+
+    },
+    "Referenced By" : {
 
     },
     "Refresh" : {
@@ -7966,9 +8025,6 @@
       "extractionState" : "manual"
     },
     "Remove from Favorites" : {
-
-    },
-    "Remove from Sidebar" : {
 
     },
     "Remove from “%@”" : {
@@ -8436,9 +8492,6 @@
     "Section Options" : {
 
     },
-    "Sections for %@" : {
-
-    },
     "Seeing and ending the webhooks other apps and keys made needs Manage Keys." : {
 
     },
@@ -8652,6 +8705,9 @@
           }
         }
       }
+    },
+    "Show All %lld Versions" : {
+
     },
     "Show All Items, the Library or the Feed" : {
 
@@ -9046,6 +9102,12 @@
     "Start Again" : {
 
     },
+    "Start Day" : {
+
+    },
+    "Start Time" : {
+
+    },
     "Start With" : {
 
     },
@@ -9164,6 +9226,9 @@
 
     },
     "Synced Folders" : {
+
+    },
+    "Synced With %@." : {
 
     },
     "Syncing Is Paused" : {
@@ -9297,6 +9362,9 @@
 
     },
     "That restore point can’t be read. No settings were changed." : {
+
+    },
+    "That time doesn’t exist on that day in this time zone." : {
 
     },
     "The %@ aren’t public. Change them first, then turn this off." : {
@@ -9779,6 +9847,9 @@
     "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing." : {
 
     },
+    "The end can’t be before the start." : {
+
+    },
     "The entry changed or was removed while you were editing it." : {
       "extractionState" : "manual"
     },
@@ -10194,6 +10265,9 @@
 
     },
     "The tag could not be added." : {
+
+    },
+    "The time couldn’t be saved." : {
 
     },
     "The time in “%@” wasn’t cleared. %@" : {
@@ -10710,6 +10784,9 @@
     "This type no longer has that field." : {
 
     },
+    "This value changed while you were editing." : {
+
+    },
     "This value changed while you were editing. Your edit hasn’t been saved." : {
       "extractionState" : "manual"
     },
@@ -10743,6 +10820,9 @@
     "This would link the item back to itself through the items between them." : {
       "extractionState" : "manual"
     },
+    "Thread" : {
+
+    },
     "Three things for next week." : {
 
     },
@@ -10768,6 +10848,9 @@
 
     },
     "Time Format" : {
+
+    },
+    "Time Zone" : {
 
     },
     "Time of %@" : {
@@ -11662,6 +11745,9 @@
     "Your earlier settings are back." : {
 
     },
+    "Your edit hasn’t been saved." : {
+
+    },
     "Your items are still loading." : {
 
     },
@@ -12160,6 +12246,12 @@
 
     },
     "“%@” is not a shortcuts file that the app can read. No shortcuts were changed." : {
+
+    },
+    "“%@” isn’t a date and time, so the date wasn’t changed." : {
+
+    },
+    "“%@” isn’t a date, so the date wasn’t changed." : {
 
     },
     "“%@” isn’t a time, so the time wasn’t changed." : {

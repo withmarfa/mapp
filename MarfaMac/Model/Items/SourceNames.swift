@@ -86,6 +86,8 @@ nonisolated protocol SourceNameSource: Sendable {
     func sources() async throws(SourceEditFailure) -> [SourceInfo]
     /// How many active items each source wrote, in either tier. A source with none is absent.
     func counts() async throws(SourceEditFailure) -> [String: Int]
+    /// What the installed connectors say of the types they write, for each source.
+    func connectors() async throws(SourceEditFailure) -> ConnectorKeepers
     /// Changes the name or mark of `code`; a field left nil stays as it is. Answers the source as it now reads.
     func update(_ code: String, name: SourceFieldChange?, mark: SourceFieldChange?) async throws(SourceEditFailure) -> SourceInfo
 }

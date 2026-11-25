@@ -14,6 +14,8 @@ nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
     var collections: [RelatedItem] = []
     /// What Marfa answered for the counts the table's looks ask for (`rows(of:in:wanting:looks:)`).
     var counts: [CountFact: ItemCountAnswer] = [:]
+    /// The name of the source that made the item, as the server gave it when the row was made; empty where none did.
+    var sourceName = ""
     var id: ItemID { item.id }
 
     func items(of relation: Relation) -> [RelatedItem] {
@@ -31,13 +33,18 @@ extension ItemTableRow {
         of items: [Item], in library: any ItemLibrary, wanting wanted: Set<Relation> = [], looks: [TypeID: TypeLook] = [:]
     ) -> [ItemTableRow] {
         let catalogue = library.catalogue
+        var sourceNames: [String: String] = [:]
         return items.map { item in
             let relations = library.relations(of: item, wanting: wanted, counts: (looks[item.type] ?? .empty).counts)
+            let source = item.source.flatMap { $0.isEmpty ? nil : $0 }.map { code in
+                sourceNames[code] ?? { let name = library.sources.name(code); sourceNames[code] = name; return name }()
+            }
             return ItemTableRow(
                 item: item,
                 typeLabel: catalogue.label(for: item.type),
                 typeIcon: catalogue.icon(for: item.type),
-                parent: relations.parent, children: relations.children, collections: relations.collections, counts: relations.counts)
+                parent: relations.parent, children: relations.children, collections: relations.collections, counts: relations.counts,
+                sourceName: source ?? "")
         }
     }
 }
@@ -46,6 +53,8 @@ extension ItemTableRow {
 nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     enum Content: Hashable, Sendable {
         case title, type, parent, children, collections, created, edited
+        /// The app or key that made the item.
+        case source
         /// A count worked out when read (`CountFact`), which a look shows as its fact.
         case count(CountFact)
         /// When the item happened (Marfa's `occurred_at`), which a record's look shows as its date.
@@ -111,6 +120,8 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     static let collections = ItemTableColumn(
         id: "collections", label: "", content: .collections, style: .links, isShownByDefault: false)
     static let edited = ItemTableColumn(id: "edited", label: String(localized: "Edited"), content: .edited, style: .date)
+    static let source = ItemTableColumn(
+        id: "source", label: String(localized: "Source"), content: .source, style: .text, isShownByDefault: false)
     static let created = ItemTableColumn(
         id: "created", label: String(localized: "Created"), content: .created, style: .date, isShownByDefault: false)
     static let occurred = ItemTableColumn(
@@ -234,7 +245,7 @@ nonisolated extension ItemTableColumn {
         case .type: return row.item.type.rawValue
         case .parent: return row.parent?.id.rawValue
         case .field(let field): return ItemTableValue.string(row, key: field.key)
-        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration: return nil
+        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration, .source: return nil
         }
     }
 
@@ -246,7 +257,7 @@ nonisolated extension ItemTableColumn {
         case .field:
             if style == .boolean { return value == "true" ? String(localized: "Yes") : String(localized: "No") }
             return ItemTypeInfo.Field.label(ofOption: value)
-        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration: return value
+        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration, .source: return value
         }
     }
 
@@ -259,6 +270,7 @@ nonisolated extension ItemTableColumn {
         switch content {
         case .title: return .text(row.item.displayTitle)
         case .type: return .text(row.typeLabel)
+        case .source: return row.sourceName.isEmpty ? nil : .text(row.sourceName)
         case .parent: return row.parent.map { .text($0.title) }
         case .children: return row.children.first.map { .text($0.title) }
         case .collections: return row.collections.first.map { .text($0.title) }

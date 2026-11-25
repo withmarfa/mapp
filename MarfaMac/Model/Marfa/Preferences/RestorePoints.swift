@@ -35,8 +35,8 @@ nonisolated struct RestorePoint: Equatable, Identifiable, Sendable {
     let reason: Reason
 }
 
-/// This Mac's settings exactly as the app's own defaults hold them: every key in `MacSettings.keys` and each key under
-/// `MacSettings.prefixes`, each value as a binary property list, so a date, data, a dictionary of any shape and a number
+/// This Mac's settings exactly as the app's own defaults hold them: every key in `MacSettings.keys`, each value as a
+/// binary property list, so a date, data, a dictionary of any shape and a number
 /// JSON cannot hold all come back as they were. Only the app's persistent domain is read, never a value the defaults
 /// inherit from the arguments, the global domain or the registration domain, so a restore never makes a system setting
 /// the app's own. A setting kept for each server holds every server's entry, a value its store cannot read is held as it
@@ -85,7 +85,7 @@ nonisolated struct SettingsSnapshot: Equatable, Sendable {
     }
 
     @MainActor static func isCovered(_ key: String) -> Bool {
-        MacSettings.keys.contains(key) || MacSettings.prefixes.contains(where: key.hasPrefix)
+        MacSettings.keys.contains(key)
     }
 
     /// Each value as the defaults keep it, or nil where any cannot be read, so nothing is written from a point that cannot

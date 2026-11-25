@@ -22,6 +22,9 @@ struct RootView: View {
             let title = libraries.current?.catalogue.plural(for: type) ?? type.rawValue
             settingsLauncher.show(.types, subpage: SettingsSubpage(id: "type:" + type.rawValue, title: title))
         }
+        ValueEditPresenter.shared.sidebarTypes = { [libraries] library in
+            QuickAdd.typeIDs(of: SidebarPlan(library, layout: libraries.sidebarLayout).shownTypes)
+        }
         browser.lookChoices = libraries.typeLooks.choices(for: libraries.libraryKey)
         _browser = State(initialValue: browser)
     }

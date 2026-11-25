@@ -29,8 +29,8 @@ struct TopRowContent {
     let place: Place
     let title: String
     let count: Int
-    /// What the search found out of everything the place holds, while one runs.
-    let searched: Int?
+    /// What a search found, or a filter leaves of the Archive, out of everything the place holds.
+    let narrowed: Int?
     let views: [Choice]
     let chosen: String
     let places: [Browsed]
@@ -47,16 +47,16 @@ struct TopRowContent {
     var isDefaultScope: Bool { scope == defaultScope }
     var chosenChoice: Choice? { views.first { $0.id == chosen } ?? views.first }
 
-    /// The title's count as it is read: "1,205", and "38 of 48,312" while searching.
+    /// The title's count as it is read: "1,205", and "38 of 48,312" while searching or narrowing the Archive.
     var countText: String {
-        guard let searched else { return count.formatted() }
-        return String(localized: "\(searched.formatted()) of \(count.formatted())")
+        guard let narrowed else { return count.formatted() }
+        return String(localized: "\(narrowed.formatted()) of \(count.formatted())")
     }
 
     /// What VoiceOver reads for the title, the count being part of it: "Notes, 1 item".
     var titleLabel: String {
-        guard let searched else { return String(AttributedString(localized: "\(title), ^[\(count) item](inflect: true)").characters) }
-        return String(AttributedString(localized: "\(title), \(searched.formatted()) of ^[\(count) item](inflect: true)").characters)
+        guard let narrowed else { return String(AttributedString(localized: "\(title), ^[\(count) item](inflect: true)").characters) }
+        return String(AttributedString(localized: "\(title), \(narrowed.formatted()) of ^[\(count) item](inflect: true)").characters)
     }
 
     @MainActor
@@ -78,12 +78,22 @@ struct TopRowContent {
         let everything = browser.searchScope(in: library) == .everywhere
             ? library.count(in: .library) + library.count(in: .feed) : library.count(in: shown, favoritesScope: listing.scope)
 
+        // The Archive is a page of the Library and keeps its title through a search; its count says how many items it
+        // holds and how many of them a search or a filter leaves (`Browser.countLine`).
+        var count = results == nil ? listed : everything
+        var narrowed = results.map(\.items.count)
+        if browser.listsArchive {
+            let held = library.count(in: .archive, scope: .all)
+            let leaves = results?.items.count ?? browser.listedCount(in: library) ?? browser.filteredItems(in: library).count
+            (count, narrowed) = (held, leaves == held ? nil : leaves)
+        }
+
         let counts = library.scopeCounts(in: place)
         let offers = shown.view == .own && ListScope.showsScopeControl(place: place, counts: counts)
         let scopes = offers ? ListScope.allCases.map { ScopeChoice(scope: $0, title: $0.title, count: counts.count(in: $0)) } : []
         return TopRowContent(
-            place: place, title: library.name(of: place), count: results == nil ? listed : everything,
-            searched: results.map(\.items.count), views: views, chosen: chosen,
+            place: place, title: browser.listsArchive ? String(localized: "Library") : library.name(of: place), count: count,
+            narrowed: narrowed, views: views, chosen: chosen,
             places: place == .library ? browsed(in: library) : [], isChanged: browser.hasViewChanges,
             scopes: scopes, scope: listing.scope, defaultScope: ListScope.defaultScope(in: browser.defaults))
     }

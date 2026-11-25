@@ -218,3 +218,25 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         #expect(source.writes.isEmpty)
     }
 }
+
+/// The panel's History is read once for each version of an item, however often Info comes and goes.
+@MainActor
+@Suite(.hangLimit) struct PanelHistoryTests {
+    @Test func aVersionIsReadOnceAndAnEditReadsAgain() async {
+        let source = FakeHistory([page([1, 2]), page([1, 2, 3])])
+        let library = FakeItemLibrary()
+        library.history = source
+        let cache = PanelHistory()
+        let id = ItemID("launch")
+        cache.ask(id, version: ItemVersion(3), in: library)
+        _ = await eventually { cache.model(of: id, version: ItemVersion(3), in: library)?.phase == .loaded }
+        // Leaving Info and coming back, or another item and back, asks again for the same version.
+        cache.ask(id, version: ItemVersion(3), in: library)
+        cache.ask(ItemID("other"), version: ItemVersion(1), in: library)
+        cache.ask(id, version: ItemVersion(3), in: library)
+        #expect(source.cursors.withLock { $0.count } == 1)
+        cache.ask(id, version: ItemVersion(4), in: library)
+        _ = await eventually { cache.model(of: id, version: ItemVersion(4), in: library)?.phase == .loaded }
+        #expect(source.cursors.withLock { $0.count } == 2)
+    }
+}

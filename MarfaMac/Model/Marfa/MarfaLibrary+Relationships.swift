@@ -187,12 +187,66 @@ extension MarfaLibrary {
         }
     }
 
-    /// Active items of a type the field's far end allows. Which of them the core would refuse, such as one that
-    /// would close a cycle, is asked of each (`relationshipVerdict`).
+    func relationFields(of id: ItemID) -> [RelationField] {
+        Cost.measure(.relationships) { readRelationFields(of: id) }
+    }
+
+    /// Every field Marfa lets the item hold, or that it already holds, own or inverse. A two-way type's links read the
+    /// same from both ends, so its inverse joins its own field, unless only the inverse end admits the item.
+    /// Filled fields come first. Within each group, sort own fields before inverses, then by label and field name.
+    private func readRelationFields(of id: ItemID) -> [RelationField] {
+        guard let item = headerItem(id) else { return [] }
+        observeLinks(of: id)
+        var ends: [String: FieldEnd] = [:]
+        for info in catalogue.edgeTypes.values {
+            let written = info.writtenFrom == .to
+            let own = admits(item.type, info, atTo: written)
+            if own {
+                ends[written ? info.reverseName ?? info.id : info.id] = FieldEnd(info: info, atTo: written, isInverse: false)
+            }
+            if !(info.isTwoWay && own), admits(item.type, info, atTo: !written) {
+                ends[Self.inversePrefix + info.id] = FieldEnd(info: info, atTo: !written, isInverse: true)
+            }
+        }
+        for link in index.links(touching: id) {
+            guard let held = fieldEnd(link.holder == id ? link.type : Self.inversePrefix + link.type) else { continue }
+            if held.isInverse, held.info.isTwoWay, ends.values.contains(where: { $0.info.id == held.info.id && !$0.isInverse }) {
+                continue
+            }
+            if ends.values.contains(where: { $0.info.id == held.info.id && $0.atTo == held.atTo }) { continue }
+            let name = held.isInverse ? Self.inversePrefix + held.info.id : held.atTo ? held.info.reverseName ?? held.info.id : held.info.id
+            ends[name] = held
+        }
+        let fields = ends.map { field, end -> RelationField in
+            let linked = end.isInverse ? others(of: id, end).filter { headerItem($0) != nil } : linked(to: id, end)
+            let allowed = catalogue.itemTypes.keys.filter { !$0.isHidden && admits($0, end.info, atTo: !end.atTo) }
+            return RelationField(
+                field: field, label: label(end), cardinality: end.info.cardinality(atTo: end.atTo),
+                allowedTypes: allowed.sorted { $0.rawValue < $1.rawValue }, targets: Self.ordered(linked.map(target)),
+                editability: obstacle(item, end).map { .readOnly($0) } ?? .editable)
+        }
+        return fields.sorted { lhs, rhs in
+            if lhs.targets.isEmpty != rhs.targets.isEmpty { return !lhs.targets.isEmpty }
+            let lhsInverse = lhs.field.hasPrefix(Self.inversePrefix)
+            if lhsInverse != rhs.field.hasPrefix(Self.inversePrefix) { return !lhsInverse }
+            switch lhs.label.localizedStandardCompare(rhs.label) {
+            case .orderedAscending: return true
+            case .orderedDescending: return false
+            case .orderedSame: return lhs.field < rhs.field
+            }
+        }
+    }
+
+    /// The items a link may reach: active and archived, never in the bin, since Marfa links an archived item as any
+    /// other ("What an item allows").
+    private var linkable: Set<ItemID> { index.ids(in: .active).union(index.ids(in: .archived)) }
+
+    /// Active and archived items of a type the field's far end allows. Which of them the core would refuse, such as one
+    /// that would close a cycle, is asked of each (`relationshipVerdict`).
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
         guard let item = item(id), let end = fieldEnd(field) else { return [] }
         guard admits(item.type, end.info, atTo: end.atTo) else { return [] }
-        return heldItems(index.ids(in: .active))
+        return heldItems(linkable)
             .filter { $0.id != id && admits($0.type, end.info, atTo: !end.atTo) }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
@@ -218,7 +272,7 @@ extension MarfaLibrary {
             admits(TypeID(typeID), constraint(of: info, atTo: true))
         else { return [] }
         let parents = constraint(of: info, atTo: false)
-        return heldItems(index.ids(in: .active))
+        return heldItems(linkable)
             .filter { admits($0.type, parents) }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
@@ -228,7 +282,7 @@ extension MarfaLibrary {
             admits(TypeID(typeID), constraint(of: info, atTo: true))
         else { return false }
         let parents = constraint(of: info, atTo: false)
-        return index.ids(in: .active).contains { id in heldItems(CollectionOfOne(id)).first.map { admits($0.type, parents) } ?? false }
+        return linkable.contains { id in heldItems(CollectionOfOne(id)).first.map { admits($0.type, parents) } ?? false }
     }
 
     // MARK: Writing
@@ -241,6 +295,10 @@ extension MarfaLibrary {
             let end: EdgeTypeInfo.End
             let to: ItemID
             let from: ItemID
+            /// The edge's other end, which the move leaves where it is.
+            let stays: ItemID
+
+            var reversed: Move { Move(edge: edge, end: end, to: from, from: to, stays: stays) }
         }
 
         var adding: [EdgeDraft] = []
@@ -248,13 +306,15 @@ extension MarfaLibrary {
         var moving: [Move] = []
 
         var isEmpty: Bool { adding.isEmpty && removing.isEmpty && moving.isEmpty }
+    }
 
-        /// The change that puts everything back.
-        var reversed: RelationshipChange {
-            RelationshipChange(
-                adding: removing, removing: adding,
-                moving: moving.map { Move(edge: $0.edge, end: $0.end, to: $0.from, from: $0.to) })
-        }
+    /// An edge's type and ends, which a removal is matched by from one look at the copy to the next.
+    private nonisolated struct EdgeEnds: Hashable {
+        let type: String
+        let from: ItemID
+        let to: ItemID
+
+        init(_ draft: EdgeDraft) { (type, from, to) = (draft.type, draft.from, draft.to) }
     }
 
     /// A link a change makes, which the core is asked about as it would be written: a new link, or an end moved.
@@ -265,9 +325,9 @@ extension MarfaLibrary {
 
     /// What working out a change comes to.
     private enum Planning {
-        /// The field or the item is not one the app changes; nothing is told.
+        /// The field or the item is not one the library holds; nothing is told.
         case unavailable
-        /// the app's own policy refuses the change, in the words to tell the person.
+        /// The item or the field takes no change, in the words to tell the person.
         case refused(String)
         /// The edges to write, and every link they make.
         case change(RelationshipChange, made: [MadeLink])
@@ -289,29 +349,36 @@ extension MarfaLibrary {
     /// The change is worked out, the core asked of every link it makes (`Edges.check(from:to:type:)` of a new link,
     /// `Edges.check(_:moving:)` of a move), and then worked out again from the links the copy holds then and written in
     /// the same step, with its undo, so an earlier change that landed meanwhile is kept and not repeated, and a move's
-    /// old parent is the one it left. A link new in that second look is asked too.
+    /// old parent is the one it left. A link new in that second look is asked too, but a move only of an edge seen in
+    /// the first: where it would move another, as one another device made in place of the old, the change is refused.
     /// Changes run one after another in the order they were made, each once the copy has taken the writes of the one
     /// before (see `relationshipChain`). Nothing is written until the core has answered.
-    /// True means the core accepted the change and it is written, or there was nothing to change; false means it was
-    /// refused and told, by the app's own policy (`plan`) or by the core's judgement, and the field is as it was. `finish`
-    /// waits for a change in flight.
+    ///
+    /// The answer waits for the copy to queue or refuse the writes sent at once, since the copy judges each again
+    /// against what it holds then: a move whose edge another device changed since the core was asked, or a removal of
+    /// an edge gone, is never answered `taken`. A removal held back for the new links is answered later, in a notice.
+    /// `finish` waits for a change still being checked, not for the copy's answer.
     @discardableResult
-    func changeItemRelationship(
+    func changeLinks(
         _ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?
-    ) async -> Bool {
+    ) async -> EdgeVerdict {
         relationshipChangesInFlight += 1
         let previous = relationshipChain
-        let work = Task { () -> (kept: Bool, writes: Set<WriteID>) in
+        let work = Task { () -> (verdict: EdgeVerdict, step: LinkStep?) in
             await previous?.value
             let done = await self.applyRelationship(id, field: field, adding: adding, removing: removing, undoManager: undoManager)
             self.relationshipChangesInFlight -= 1
             return done
         }
         // The next change reads the copy, which shows this one's writes once the source has taken or answered each.
-        relationshipChain = Task {
-            await self.untilSettled(work.value.writes)
+        let settled = Task {
+            await self.untilSettled(work.value.step?.sent ?? [])
         }
-        return await work.value.kept
+        relationshipChain = settled
+        let done = await work.value
+        guard let step = done.step else { return done.verdict }
+        await settled.value
+        return step.verdict
     }
 
     /// Returns once each write has been taken into the copy (`SourceChange.taken`) or answered before that
@@ -328,30 +395,55 @@ extension MarfaLibrary {
 
     private func applyRelationship(
         _ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?
-    ) async -> (kept: Bool, writes: Set<WriteID>) {
+    ) async -> (verdict: EdgeVerdict, step: LinkStep?) {
         let cantChange = String(localized: "Can’t Change This Relationship")
         var asked: Set<MadeLink> = []
+        // Each removal and move names an edge this Mac held when the change was first worked out, before any wait for
+        // the core, so an edge another device puts between the same ends meanwhile is never the one removed or moved.
+        var seenRemovals: [EdgeEnds: EdgeDraft]?
+        var seenMoves: Set<EdgeID>?
         while true {
-            let plan: (change: RelationshipChange, made: [MadeLink])
+            var plan: (change: RelationshipChange, made: [MadeLink])
             switch self.plan(id, field: field, adding: adding, removing: removing) {
-            case .unavailable: return (false, [])
+            case .unavailable: return (.unknown, nil)
             case .refused(let reason):
                 notices.tell(cantChange, reason)
-                return (false, [])
+                return (.refused(reason), nil)
             case .change(let change, let made): plan = (change, made)
             }
-            guard !plan.change.isEmpty else { return (true, []) }
+            let firstLook = seenRemovals ?? Dictionary(
+                plan.change.removing.compactMap(seen).map { (EdgeEnds($0), $0) }, uniquingKeysWith: { first, _ in first })
+            seenRemovals = firstLook
+            plan.change.removing = plan.change.removing.compactMap { firstLook[EdgeEnds($0)] }
+            let movable = seenMoves ?? Set(plan.change.moving.map(\.edge))
+            seenMoves = movable
+            guard plan.change.moving.allSatisfy({ movable.contains($0.edge) }) else {
+                let reason = BatchSkips.sentence(.changedSince, count: 1)
+                notices.tell(cantChange, reason)
+                return (.refused(reason), nil)
+            }
+            guard !plan.change.isEmpty else { return (.taken, nil) }
             let unasked = plan.made.filter { !asked.contains($0) }
             guard !unasked.isEmpty else {
-                let writes = relink(plan.change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
-                return (true, writes)
+                let name = fieldEnd(field).map { String(localized: "Change \(label($0))") } ?? cantChange
+                var made: LinkStep?
+                gatheringSkips(failing: cantChange) {
+                    made = relink(plan.change, name: name, failing: cantChange, undoManager: undoManager)
+                }
+                guard let step = made, !step.sent.isEmpty else { return (.unknown, nil) }
+                return (.taken, step)
             }
             for link in unasked {
-                if case .refused(let reason) = await verdict(of: link) {
+                switch await verdict(of: link) {
+                case .refused(let reason):
                     notices.tell(cantChange, reason)
-                    return (false, [])
+                    return (.refused(reason), nil)
+                case .incomplete:
+                    notices.tell(cantChange, MarfaEngine.notCurrent)
+                    return (.incomplete, nil)
+                case .taken, .unknown:
+                    asked.insert(link)
                 }
-                asked.insert(link)
             }
         }
     }
@@ -365,15 +457,22 @@ extension MarfaLibrary {
         return own + others(of: id, farEnd).filter { !own.contains($0) }
     }
 
+    /// Why the field of `item` takes no change, or nil where it does: what the item allows (`Item.obstacle(to:)`), a
+    /// link the item's text holds, or one whose far end only Marfa keeps, as a synced folder.
+    private func obstacle(_ item: Item, _ end: FieldEnd) -> String? {
+        if let reason = item.obstacle(to: .links) { return BatchSkips.sentence(reason, count: 1) }
+        if end.info.id == MarfaMapping.bodyLinkEdge { return String(localized: "A link is changed in the text that holds it.") }
+        if constraint(of: end.info, atTo: !end.atTo).isServers { return String(localized: "Marfa keeps this link itself.") }
+        return nil
+    }
+
     /// What the edges would be changed by, and every link it makes, whether added or made by moving an end: what the
     /// core is asked about. The app decides only which edges to write: an end that holds one link of its type has it
     /// replaced by a move, and a link another item holds as its own is never taken. How many links an end may hold is
     /// the core's to judge, of the links this makes.
     private func plan(_ id: ItemID, field: String, adding wanted: [ItemID], removing unwanted: [ItemID]) -> Planning {
-        guard let item = item(id), item.allows(.links), let end = fieldEnd(field) else { return .unavailable }
-        guard end.info.id != MarfaMapping.bodyLinkEdge else {
-            return .refused(String(localized: "A link is changed in the text that holds it."))
-        }
+        guard let item = item(id), let end = fieldEnd(field) else { return .unavailable }
+        if let reason = obstacle(item, end) { return .refused(reason) }
         let holds = end.info.cardinality(atTo: end.atTo)
         let farEnd = FieldEnd(info: end.info, atTo: !end.atTo, isInverse: !end.isInverse)
         // A two-way relation is one list of the links this item holds and the ones pointing at it.
@@ -409,10 +508,10 @@ extension MarfaLibrary {
             // then the end that moves is the one on the far side of that edge.
             let replaced = replacingOwn ? unlinking.compactMap { old -> (ItemID, RelationshipChange.Move)? in
                 if let edge = held(by: id, end).first(where: { (farIsTo ? $0.to : $0.from) == old }) {
-                    return (old, .init(edge: edge.id, end: farIsTo ? .to : .from, to: other, from: old))
+                    return (old, .init(edge: edge.id, end: farIsTo ? .to : .from, to: other, from: old, stays: id))
                 }
                 if let edge = held(by: id, farEnd).first(where: { (farIsTo ? $0.from : $0.to) == old }) {
-                    return (old, .init(edge: edge.id, end: farIsTo ? .from : .to, to: other, from: old))
+                    return (old, .init(edge: edge.id, end: farIsTo ? .from : .to, to: other, from: old, stays: id))
                 }
                 return nil
             }.first : nil
@@ -422,7 +521,7 @@ extension MarfaLibrary {
                 made.append(.moved(move))
             } else if let theirs = taken.first {
                 let old = farIsTo ? theirs.from : theirs.to
-                let move = RelationshipChange.Move(edge: theirs.id, end: farIsTo ? .from : .to, to: id, from: old)
+                let move = RelationshipChange.Move(edge: theirs.id, end: farIsTo ? .from : .to, to: id, from: old, stays: other)
                 change.moving.append(move)
                 made.append(.moved(move))
             } else {
@@ -438,39 +537,70 @@ extension MarfaLibrary {
         return .change(change, made: made)
     }
 
-    /// Where links are added or moved and others removed, as when one item is chosen in place of another in a field
-    /// that holds many, the new links go first and the old ones are removed only once the source has taken every new
-    /// one, so a refusal leaves the field as it was rather than with the old link gone and the new one missing.
+    /// In a swap, the old links stay until the server accepts every addition and move.
+    /// Resolve removals before waiting for the server's answer to the new links. Undo also names each new edge by
+    /// its minted ID.
     ///
-    /// Returns the writes sent now that the source took, which a following change waits for: the adds, the moves and
-    /// any unlink sent at once. An unlink held back for the new links is not one of them, since it is sent only after
-    /// the server answers them, which can be long, and a write the source refused to take is not either.
+    /// Undo uses the writes recorded by `LinkStep`. The engine checks each write against the copy before queueing it.
+    ///
+    /// The step's `sent` are the writes sent now that the source took, which a following change waits for: the adds,
+    /// the moves and any unlink sent at once. An unlink held back for the new links is not one of them, since it is
+    /// sent only after the server answers them, which can be long, and a write the source refused to take is not either.
     @discardableResult
     func relink(
         _ change: RelationshipChange, name: String, failing title: String = String(localized: "Can’t Change This Relationship"),
         undoManager: UndoManager?
-    ) -> Set<WriteID> {
-        var links = change.adding.map { submit(.link($0), failing: title) }
-        links += change.moving.map { submit(.moveEdge($0.edge, end: $0.end, to: $0.to), failing: title) }
+    ) -> LinkStep {
+        let step = LinkStep()
+        var links: [WriteID] = []
+        for var draft in change.adding {
+            draft.id = EdgeID.mint(at: now())
+            let write = submit(.link(draft), failing: title)
+            follow(write, .added(draft), in: step)
+            links.append(write)
+        }
+        for move in change.moving {
+            let write = submit(.moveEdge(move.edge, end: move.end, to: move.to, from: move.from, stays: move.stays), failing: title)
+            follow(write, .moved(move), in: step)
+            links.append(write)
+        }
+        let removing = change.removing.compactMap(seen)
         var sent = Set(links)
         if links.isEmpty {
-            sent.formUnion(unlink(change.removing, failing: title))
-        } else if !change.removing.isEmpty {
-            awaitLinks(Set(links), thenUnlink: change.removing)
+            sent.formUnion(unlink(removing, failing: title, recordingIn: step))
+        } else if !removing.isEmpty {
+            awaitLinks(Set(links), thenUnlink: removing, failing: title, recordingIn: step)
         }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.relink(change.reversed, name: name, failing: title, undoManager: undoManager)
+            library.reverse(step, name: name, failing: title, undoManager: undoManager)
         }
         // A write that was not queued, as after the source closed, was told to the person and gets no answer.
-        sent = sent.filter { isFollowed($0) }
-        unsettled.formUnion(sent)
-        return sent
+        step.sent = sent.filter { isFollowed($0) }
+        unsettled.formUnion(step.sent)
+        return step
     }
 
+    /// The edge a removal names, by the id the draft carries or the one the library holds between its ends, with its
+    /// position, so an undo puts a collection member back where it was. Nil where no such edge is held.
+    private func seen(_ draft: EdgeDraft) -> EdgeDraft? {
+        if draft.id != nil { return draft }
+        guard let link = index.link(type: draft.type, from: draft.from, to: draft.to) else { return nil }
+        var seen = draft
+        seen.id = link.id
+        seen.position = draft.position ?? link.position
+        return seen
+    }
+
+    /// Submits each removal with the edge ID and ends recorded in the draft.
     @discardableResult
-    func unlink(_ drafts: [EdgeDraft], failing title: String = String(localized: "Can’t Change This Relationship")) -> [WriteID] {
+    func unlink(
+        _ drafts: [EdgeDraft], failing title: String = String(localized: "Can’t Change This Relationship"), recordingIn step: LinkStep? = nil
+    ) -> [WriteID] {
         drafts.compactMap { draft in
-            index.link(type: draft.type, from: draft.from, to: draft.to).map { submit(.unlink($0.id), failing: title) }
+            guard let id = draft.id else { return nil }
+            let write = submit(.unlink(EdgeDraft(type: draft.type, from: draft.from, to: draft.to, id: id)), failing: title)
+            if let step { follow(write, .removed(draft), in: step) }
+            return write
         }
     }
 }

@@ -14,13 +14,17 @@ struct ItemRowMenu<LayoutActions: View>: View {
     @ViewBuilder let layoutActions: LayoutActions
 
     var body: some View {
-        if !ids.isEmpty {
-            let items = ids.compactMap { library.item($0) }
-            let inBin = !items.isEmpty && items.allSatisfy { $0.state == .trashed }
-            ForEach(Array(RowMenuEntry.entries(opening: opening, inBin: inBin).enumerated()), id: \.offset) { _, entry in
-                view(of: entry, single: items.count == 1 ? items.first : nil, items: items)
+        Group {
+            if !ids.isEmpty {
+                let items = ids.compactMap { library.item($0) }
+                let inBin = !items.isEmpty && items.allSatisfy { $0.state == .trashed }
+                ForEach(Array(RowMenuEntry.entries(opening: opening, inBin: inBin).enumerated()), id: \.offset) { _, entry in
+                    view(of: entry, single: items.count == 1 ? items.first : nil, items: items)
+                }
             }
         }
+        // On macOS a menu item draws its symbol only when the menu asks for it.
+        .labelStyle(.titleAndIcon)
     }
 
     @ViewBuilder private func view(of entry: RowMenuEntry, single: Item?, items: [Item]) -> some View {

@@ -94,6 +94,29 @@ struct MarfaEdgeCheckTests {
         String(localized: "“\(name)” can hold only one link of this kind, and already holds it.")
     }
 
+    /// Marfa keeps an edge's id when another device moves it, so the undo of a new parent removes the edge only while
+    /// the copy shows it from the parent this Mac gave it. One moved elsewhere since is left where it is.
+    @Test func undoingAParentLeavesALinkAnotherDeviceMovedSince() async throws {
+        let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("child", "core.note")])
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
+        #expect(await scene.library.changeLinks(scene.id("child"), field: "child-of", adding: [scene.id("a")], removing: [], undoManager: undo) == .taken)
+        try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("a")] })
+        try #require(await eventually { scene.library.linkSteps.values.allSatisfy { $0.judging.isEmpty } })
+        undo.endUndoGrouping()
+        // Simulate a move already visible in the copy before Undo.
+        let edge = try #require(try await scene.fake.copy.edges.from(scene.id("a").rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
+        _ = try await scene.fake.copy.edges.update(edge.id, EdgeEdit(baseVersion: edge.version, move: .from(scene.id("b").rawValue)))
+        try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("b")] })
+        undo.undo()
+        try #require(await eventually { scene.library.linkSteps.values.allSatisfy { $0.judging.isEmpty } })
+        #expect(try await scene.fake.copy.queue.all().allSatisfy { $0.kind != .deleteEdge }, "the undo removed the moved link")
+        #expect(try await scene.fake.copy.edges.from(scene.id("b").rawValue).contains { $0.id == edge.id })
+        #expect(Self.holds("child", "child-of", in: scene) == [scene.id("b")])
+        await scene.source.close()
+    }
+
     @Test func aSecondParentIsRefusedByTheCoreAndAReplacementIsAMoveItTakes() async throws {
         let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("child", "core.note")])
         try await Self.file("child", under: "a", in: scene)
@@ -101,14 +124,14 @@ struct MarfaEdgeCheckTests {
         // A picker replaces the one parent, so the row is asked as a move, which the core takes.
         #expect(await scene.library.relationshipVerdict(for: scene.id("child"), field: "child-of", to: scene.id("b")) == .taken)
         // A second parent beside the first is the core's to refuse, in words naming the item that holds one already.
-        #expect(await scene.library.changeItemRelationship(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [], undoManager: nil) == false)
+        #expect(await scene.library.changeLinks(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [], undoManager: nil) != .taken)
         #expect(scene.library.notices.waiting.contains { $0.title == String(localized: "Can’t Change This Relationship") })
         #expect(Self.tells(fullMessage("child"), in: scene))
         #expect(try await scene.fake.copy.queue.all().count == queued, "a refused change queued a write")
         #expect(Self.holds("child", "child-of", in: scene) == [scene.id("a")])
         // Replacing it is one move.
         scene.library.notices.answerAll()
-        #expect(await scene.library.changeItemRelationship(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [scene.id("a")], undoManager: nil))
+        #expect(await scene.library.changeLinks(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [scene.id("a")], undoManager: nil) == .taken)
         try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("b")] })
         #expect(!scene.library.notices.waiting.contains { $0.title == String(localized: "Can’t Change This Relationship") })
         await scene.source.close()
@@ -118,12 +141,12 @@ struct MarfaEdgeCheckTests {
         let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("c", "core.note"), ("child", "core.note")])
         try await Self.file("child", under: "a", in: scene)
         let queued = try await scene.fake.copy.queue.all().count
-        #expect(await scene.library.changeItemRelationship(
-            scene.id("child"), field: "child-of", adding: [scene.id("b"), scene.id("c")], removing: [], undoManager: nil) == false)
+        #expect(await scene.library.changeLinks(
+            scene.id("child"), field: "child-of", adding: [scene.id("b"), scene.id("c")], removing: [], undoManager: nil) != .taken)
         #expect(Self.tells(fullMessage("child"), in: scene))
         #expect(try await scene.fake.copy.queue.all().count == queued)
         // Chosen under a parent that has the child already, from either end, is not a new link.
-        #expect(await scene.library.changeItemRelationship(scene.id("a"), field: "inverse:parent-of", adding: [scene.id("child")], removing: [], undoManager: nil))
+        #expect(await scene.library.changeLinks(scene.id("a"), field: "inverse:parent-of", adding: [scene.id("child")], removing: [], undoManager: nil) == .taken)
         #expect(try await scene.fake.copy.queue.all().count == queued)
         await scene.source.close()
     }
@@ -131,7 +154,7 @@ struct MarfaEdgeCheckTests {
     @Test func aChildChosenUnderAParentFromTheParentsSideIsAMoveTheCoreChecks() async throws {
         let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("child", "core.note")])
         try await Self.file("child", under: "a", in: scene)
-        #expect(await scene.library.changeItemRelationship(scene.id("b"), field: "inverse:parent-of", adding: [scene.id("child")], removing: [], undoManager: nil))
+        #expect(await scene.library.changeLinks(scene.id("b"), field: "inverse:parent-of", adding: [scene.id("child")], removing: [], undoManager: nil) == .taken)
         try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("b")] })
         // Moving a source end expires the copy and the app fills it again, which the fake can't do, so a notice
         // about reading the library may wait here. None of them is a refusal of the move.
@@ -147,25 +170,25 @@ struct MarfaEdgeCheckTests {
         let queued = try await scene.fake.copy.queue.all().count
 
         // A second link beside the one `x` holds is refused naming `x`.
-        #expect(await scene.library.changeItemRelationship(scene.id("x"), field: "supersedes", adding: [scene.id("v")], removing: [], undoManager: nil) == false)
+        #expect(await scene.library.changeLinks(scene.id("x"), field: "supersedes", adding: [scene.id("v")], removing: [], undoManager: nil) != .taken)
         #expect(Self.tells(fullMessage("x"), in: scene))
         // Replacing `y` by `w`, whose superseder is `z`'s link, is never taken from `z`.
         scene.library.notices.answerAll()
-        #expect(await scene.library.changeItemRelationship(scene.id("x"), field: "supersedes", adding: [scene.id("w")], removing: [scene.id("y")], undoManager: nil) == false)
+        #expect(await scene.library.changeLinks(scene.id("x"), field: "supersedes", adding: [scene.id("w")], removing: [scene.id("y")], undoManager: nil) != .taken)
         #expect(Self.tells(String(localized: "“\("z")” already holds this link to “\("w")”. Remove it there first."), in: scene))
         // `y`'s superseder `x` replaced by `z`, which already supersedes `w`, would leave `z` with two.
         scene.library.notices.answerAll()
-        #expect(await scene.library.changeItemRelationship(scene.id("y"), field: "inverse:supersedes", adding: [scene.id("z")], removing: [scene.id("x")], undoManager: nil) == false)
+        #expect(await scene.library.changeLinks(scene.id("y"), field: "inverse:supersedes", adding: [scene.id("z")], removing: [scene.id("x")], undoManager: nil) != .taken)
         #expect(Self.tells(fullMessage("z"), in: scene))
         // Taken from the other end it is the same: `z`'s link would move onto `y`, which has one.
         scene.library.notices.answerAll()
-        #expect(await scene.library.changeItemRelationship(scene.id("y"), field: "inverse:supersedes", adding: [scene.id("z")], removing: [], undoManager: nil) == false)
+        #expect(await scene.library.changeLinks(scene.id("y"), field: "inverse:supersedes", adding: [scene.id("z")], removing: [], undoManager: nil) != .taken)
         #expect(Self.tells(fullMessage("y"), in: scene))
         #expect(try await scene.fake.copy.queue.all().count == queued, "a refused change queued a write")
 
         // `y` replaced by `v`, which holds none, is one move.
         scene.library.notices.answerAll()
-        #expect(await scene.library.changeItemRelationship(scene.id("x"), field: "supersedes", adding: [scene.id("v")], removing: [scene.id("y")], undoManager: nil))
+        #expect(await scene.library.changeLinks(scene.id("x"), field: "supersedes", adding: [scene.id("v")], removing: [scene.id("y")], undoManager: nil) == .taken)
         try #require(await eventually { Self.holds("x", "supersedes", in: scene) == [scene.id("v")] })
         #expect(!scene.library.notices.waiting.contains { $0.title == String(localized: "Can’t Change This Relationship") })
         #expect(Self.holds("y", "inverse:supersedes", in: scene).isEmpty)
@@ -204,13 +227,13 @@ struct MarfaEdgeCheckTests {
         let scene = try await Self.scene([("holiday", "core.collection"), ("archive", "core.collection"), ("note", "core.note")])
         let queued = try await scene.fake.copy.queue.all().count
         // The item may join; the other collection may not, since the type is flat. Neither is written.
-        #expect(await scene.library.changeItemRelationship(
-            scene.id("holiday"), field: "inverse:in-collection", adding: [scene.id("note"), scene.id("archive")], removing: [], undoManager: nil) == false)
+        #expect(await scene.library.changeLinks(
+            scene.id("holiday"), field: "inverse:in-collection", adding: [scene.id("note"), scene.id("archive")], removing: [], undoManager: nil) != .taken)
         #expect(!scene.library.notices.waiting.isEmpty, "the core's refusal is told before the call answers")
         #expect(try await scene.fake.copy.queue.all().count == queued)
         #expect(scene.library.relationships(for: scene.id("holiday")).allSatisfy { $0.targets.isEmpty })
         // The item alone is taken.
-        #expect(await scene.library.changeItemRelationship(scene.id("holiday"), field: "inverse:in-collection", adding: [scene.id("note")], removing: [], undoManager: nil))
+        #expect(await scene.library.changeLinks(scene.id("holiday"), field: "inverse:in-collection", adding: [scene.id("note")], removing: [], undoManager: nil) == .taken)
         try #require(await eventuallyAsking { try await scene.fake.copy.queue.all().count == queued + 1 })
         await scene.source.close()
     }

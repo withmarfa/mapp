@@ -204,17 +204,28 @@ nonisolated struct UndoGroup: Hashable, Sendable {
     private let rawValue = UUID()
 }
 
-/// What the core says of an edge before it is written (`Edges.check`). Only its own refusal is `refused`; a check that
-/// could not be made, such as one asked while the key changes or before the copy is whole, is `unknown`, and says
-/// nothing for or against the edge: the write is judged again when it is queued.
+/// What the core says of an edge before it is written (`Edges.check`). Only its own refusal is `refused`. A copy not yet
+/// whole is `incomplete`: no edge can be written until it is, so a row says so and asks again. Any other check that
+/// could not be made, such as one asked while the key changes, is `unknown`, and says nothing for or against the edge:
+/// the write is judged again when it is queued.
 nonisolated enum EdgeVerdict: Equatable, Sendable {
     case taken
     case refused(String)
+    case incomplete
     case unknown
 
     /// The core's words where it refused the edge.
     var refusal: String? {
         if case .refused(let message) = self { message } else { nil }
+    }
+
+    /// What a row says of a link it cannot make now: the core's refusal, or that the copy is not whole yet.
+    var reason: String? {
+        switch self {
+        case .refused(let message): message
+        case .incomplete: String(localized: "This library is being brought up to date. Try again in a moment.")
+        case .taken, .unknown: nil
+        }
     }
 }
 

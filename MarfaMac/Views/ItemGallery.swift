@@ -41,7 +41,7 @@ struct ItemGallery: View {
         let _ = daysSeen
         let sections = browser.sections(in: library, order: order, now: library.now())
         let ids = Cost.measure(.galleryBody) { sections.flatMap { $0.items.map(\.id) } }
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
+        let title = browser.pageTitle(in: library)
         // The picture's opening lines are drawn on the card when the preview allows them, so the line under the title
         // does not say them again.
         let shape = CardShape(dropsOpening: browser.cards.preview == .pictureOrText || browser.cards.preview == .text)
