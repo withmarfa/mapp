@@ -18,6 +18,8 @@ paths:
   - MarfaMac/Model/Items/IndexRow.swift
   - MarfaMac/Views/ColumnSearch*.swift
   - MarfaMac/Views/ViewPanel*.swift
+  - MarfaMac/Views/Selection*.swift
+  - MarfaMac/Model/SelectionSummary.swift
 ---
 
 # Views and lists
@@ -57,6 +59,13 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Only divider drags save widths** (`keepWidths`).
 - **Item table text starts where the title does** (`TopRowMetrics.collectionLead`). Unset widths sample 120 rows (`ItemTableFit`). Name fills the remaining space until resized.
 - **Table timestamps show the time today with date words on** (`DateDisplay.Place.table`). Other dates use day labels.
+
+## Several items chosen
+
+- **Two or more chosen items are one capsule at the foot of the content in every layout, and under a pile of cards in the page column beside a list** (`SelectionCapsule`, `SelectionPile`). Keep leads where any chosen item is in the Feed, and a mixed choice offers it beside Move to Feed in More.
+- **Each button calls the command its menu item calls,** so it asks, skips, counts, toasts and undoes as the menu does, and acts only on the items the library still holds (`SelectionSummary`).
+- **A narrow column folds Add Tag, Add to Collection and Change Type into More.** The corner and a toast lift above the capsule.
+- **Escape lets go and ⌘⌫ deletes in every layout** (`clearsSeveralOnEscape`, `deletesChosen`). Share and Copy Links are not offered, since each reads one item.
 
 ## The View panel
 

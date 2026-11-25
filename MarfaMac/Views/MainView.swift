@@ -443,6 +443,10 @@ struct MainView: View {
                     browser.show(place, in: library, order: order)
                 }
                 if let layout = SampleLibrary.launchLayout { browser.set(layout: layout) }
+                if let count = launchSelectionCount {
+                    try? await Task.sleep(for: .seconds(1))
+                    browser.selection = Set(browser.items(in: library).prefix(count).map(\.id))
+                }
                 #endif
                 isRestored = true
                 takeItemLink()
@@ -495,6 +499,14 @@ struct MainView: View {
     }
 
     #if DEBUG
+    /// A sample launch can choose the first items of the place it opens, as `-MarfaMacSelectCount <n>`.
+    private var launchSelectionCount: Int? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard SampleLibrary.isRequested, let flag = arguments.firstIndex(of: "-MarfaMacSelectCount"),
+              arguments.indices.contains(flag + 1) else { return nil }
+        return Int(arguments[flag + 1])
+    }
+
     private var launchSelection: ItemID? {
         let arguments = ProcessInfo.processInfo.arguments
         guard SampleLibrary.isRequested, let flag = arguments.firstIndex(of: "-MarfaMacSelectItem"),
