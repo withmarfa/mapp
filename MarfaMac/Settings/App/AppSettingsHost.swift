@@ -143,7 +143,10 @@ enum LibraryDescription {
         return ClientPluginCalls(server: confirmingServer, client: confirmingClient, releaseAddress: address)
     }
 
-    func itemCount(ofType id: String) -> Int { libraries.current?.count(in: .type(TypeID(id))) ?? 0 }
+    /// The type's own active items, its kinds' left out.
+    func itemCount(ofType id: String) -> Int {
+        libraries.current?.items(in: .type(TypeID(id)), scope: .all, archived: .hidden, includingKinds: false).count ?? 0
+    }
 
     func typePlural(of id: String) -> String? {
         guard let catalogue = libraries.current?.catalogue, catalogue.itemTypes[TypeID(id)] != nil else { return nil }

@@ -616,7 +616,7 @@ extension Browser {
         quickAdd.clearDraft()
         let keepsText = !isFile && QuickAdd.hasBody(draft.typeID, in: catalogue)
         var collection: ItemID?
-        if case .collection(let id) = item { collection = id }
+        if shown.view == .own, case .collection(let id) = shown.place { collection = id }
         newItem = NewItem(
             id: id, typeID: draft.typeID, library: library, caret: keepsText ? draft.pageCaret : nil, isFile: isFile,
             attachments: isFile ? [] : draft.files, embedsInText: keepsText, collection: collection,
