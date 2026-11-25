@@ -244,33 +244,42 @@ struct PaletteLeftOutLine: View {
     }
 }
 
-/// What the palette says at the field's line when nothing answered the words: so, and New Item, which Return does. Where the
-/// copy is still filling it says it is looking, since what matches may not have arrived.
-struct PaletteNoResults: View {
-    let isLooking: Bool
+/// New Item at the end of the field's line, flat, once the words found nothing: Return makes it. Where the copy is still
+/// filling, what matches may not have arrived (`PaletteNoResults`).
+struct PaletteNewItem: View {
     /// Whether Return makes the item, which it does until the person arrows to a token offer.
     var returnMakes = true
     let onNew: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text(isLooking ? "Still Looking" : "No Results")
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .accessibilityIdentifier("CommandPaletteNoResults")
-            Button(action: onNew) {
-                HStack(spacing: 6) {
-                    Text("New Item")
-                    if returnMakes {
-                        ShortcutKeys("↩")
-                            .accessibilityHidden(true)
-                    }
+        Button(action: onNew) {
+            HStack(spacing: 6) {
+                Text("New Item")
+                if returnMakes {
+                    ShortcutKeys("↩")
+                        .accessibilityHidden(true)
                 }
             }
-            .appButton(.secondary, size: .small)
-            .accessibilityIdentifier("CommandPaletteNewItem")
+            .foregroundStyle(.secondary)
         }
-        .accessibilityElement(children: .contain)
+        .appButton(.plain, size: .small)
+        .accessibilityIdentifier("CommandPaletteNewItem")
+    }
+}
+
+/// What the palette's body says while nothing answered the words, centred: so, or that it is still looking.
+struct PaletteNoResults: View {
+    let isLooking: Bool
+    /// The body's height, which the panel keeps whatever is typed.
+    static let height: CGFloat = 150
+
+    var body: some View {
+        Text(isLooking ? "Still Looking" : "No Results")
+            .interfaceFont(.title3)
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, minHeight: Self.height)
+            .accessibilityIdentifier("CommandPaletteNoResults")
     }
 }
 

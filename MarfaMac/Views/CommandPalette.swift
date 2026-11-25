@@ -150,10 +150,13 @@ struct CommandPalette: View {
     private func searchField(_ sections: [Section]) -> some View {
         let results = sections.flatMap(\.rows).filter { !$0.isOffer }
         return HStack(spacing: PaletteMetrics.markGap) {
-            // In the rows' mark column, so the typed words start where the titles do.
+            // In the rows' mark column, so the typed words start where the titles do, on a circle that overhangs it.
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
                 .frame(width: PaletteMetrics.markWidth)
+                .background {
+                    if mode == .search { Circle().fill(.quaternary.opacity(0.6)).frame(width: 30, height: 30) }
+                }
             if !tokens.isEmpty {
                 PaletteTokenRow(tokens: tokens, library: library, selected: $selectedToken) { clause in
                     tokens.clauses.removeAll { $0 == clause }
@@ -165,7 +168,6 @@ struct CommandPalette: View {
                 .textFieldStyle(.plain)
                 .interfaceFont(.title3)
                 .focused($focus, equals: .field)
-                .appFocusRing(isFocused: focus == .field)
                 // Actions holds the keyboard while it is open.
                 .disabled(actionsFor != nil)
                 // Delete takes the chosen token away, or in an empty field the last, as it does in the list's search.
@@ -194,9 +196,14 @@ struct CommandPalette: View {
                 .accessibilityIdentifier("CommandPaletteField")
             if isTyped {
                 if results.isEmpty {
-                    PaletteNoResults(
-                        isLooking: Self.emptyAnswer(searching: mode == .search, results: searched) == .stillLooking,
-                        returnMakes: !arrowed, onNew: newItem)
+                    // Offers alone fill the body, so the answer is at the field's line then, and in the body otherwise.
+                    if !sections.flatMap(\.rows).isEmpty {
+                        Text(emptyAnswer)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .accessibilityIdentifier("CommandPaletteCount")
+                    }
+                    PaletteNewItem(returnMakes: !arrowed, onNew: newItem)
                 } else {
                     let count = PaletteSections.resultCount(sections) { $0.id != Self.searchItemsID && !$0.isOffer }
                     Text(count == 1 ? String(localized: "1 result") : String(localized: "\(count) results"))
@@ -210,6 +217,11 @@ struct CommandPalette: View {
         .padding(.top, 18)
         .padding(.bottom, 12)
     }
+
+    /// Whether the copy is still filling, so that what matches may not have arrived.
+    private var isLooking: Bool { Self.emptyAnswer(searching: mode == .search, results: searched) == .stillLooking }
+
+    private var emptyAnswer: LocalizedStringKey { isLooking ? "Still Looking" : "No Results" }
 
     private var fieldPrompt: LocalizedStringKey {
         if mode == .search { tokens.isEmpty ? "Search Items" : "" } else { "Search Commands and Items" }
@@ -267,10 +279,13 @@ struct CommandPalette: View {
         ZStack(alignment: .bottomTrailing) {
             Group {
                 if rows.isEmpty {
-                    // Nothing found says so at the field's line, which also offers New Item, so only what was left out is here.
-                    leftOutRow
+                    // Nothing found says so, centred, with New Item at the field's line; what was left out is under it.
+                    VStack(spacing: 0) {
+                        if isTyped { PaletteNoResults(isLooking: isLooking) }
+                        leftOutRow
+                    }
                 } else {
-                    list(sections, chosen: chosen)
+                    list(sections, chosen: chosen, showsBar: hasChoice(rows))
                 }
             }
             .safeAreaBar(edge: .bottom, spacing: 0) {
@@ -308,7 +323,7 @@ struct CommandPalette: View {
         .frame(minHeight: actionsFor == nil ? 0 : 340)
     }
 
-    private func list(_ sections: [Section], chosen: Int) -> some View {
+    private func list(_ sections: [Section], chosen: Int, showsBar: Bool) -> some View {
         var offset = 0
         let numbered = sections.map { section in
             defer { offset += section.rows.count }
@@ -336,6 +351,8 @@ struct CommandPalette: View {
                 }
                 .padding(.horizontal, PaletteMetrics.listInset)
             }
+            // The last row can scroll clear of the bar that stands over the foot.
+            .contentMargins(.bottom, showsBar ? PaletteBar.height + PaletteBar.inset * 2 : 0, for: .scrollContent)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .frame(maxHeight: PaletteMetrics.resultsHeight)
             .onChange(of: scrollTarget) { if let scrollTarget { proxy.scrollTo(scrollTarget) } }
