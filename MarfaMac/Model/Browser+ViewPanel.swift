@@ -90,7 +90,6 @@ extension Browser {
     /// (`MainView`), so a button made for another layout was just taken away, as a starting point or a layout chosen in
     /// the panel takes it: the panel stays, and the new button shows it. Only the button in view takes a click outside.
     func viewPanelPopoverClosed(anchoredIn layout: ItemViewMode, in library: any ItemLibrary) {
-        guard layout == viewMode else { return }
         dismissViewPanel(in: library)
     }
 

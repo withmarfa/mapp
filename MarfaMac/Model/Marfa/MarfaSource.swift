@@ -175,7 +175,8 @@ nonisolated final class MarfaSource: ItemSource {
     }
 
     func instanceID() async -> String? {
-        try? await engine.reading.status().instanceId
+        let copy = copy
+        return try? await MarfaEngine.asking { try await copy.status() }.instanceId
     }
 
     /// Hydrates a new copy or catches up a held one, then sends what waits in the queue. Call it once the
