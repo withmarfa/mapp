@@ -11792,7 +11792,7 @@
     "Your items are still loading." : {
 
     },
-    "Your latest changes to this item weren’t saved to Marfa. They’re kept on this Mac, in Settings, where you can copy them." : {
+    "Your latest changes were too large to save to Marfa. They’re kept on this Mac, where you can copy them." : {
 
     },
     "Your settings are back as they were before Import, %@." : {

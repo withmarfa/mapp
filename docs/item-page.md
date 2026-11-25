@@ -76,7 +76,7 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 | Been deleted | Recover |
 | A copy saved beside it | Open Copy |
 | Text that could not be read | None; the reason stands where the text would |
-| A write held in the copy | None; for one too large, Show Changes opens the Settings page that lists it and its text |
+| A write held in the copy | None; Show Changes opens the Settings page that lists a held write's text where one was too large |
 | Values that could not be read | None |
 | No file in Marfa | None |
 | Pictures not loaded | Load Pictures, and a close for the page |

@@ -1,6 +1,9 @@
 import Foundation
+import Marfa
 import Testing
 @testable import MarfaMac
+
+private typealias Item = MarfaMac.Item
 
 @Suite struct PageNoticeTests {
     private static let copy = ItemID("10000000-0000-0000-0000-000000000009")
@@ -79,9 +82,36 @@ import Testing
     @Test func aWriteTooLargeSaysWhereTheLatestChangesAre() throws {
         let item = Self.item { $0.sync = .blocked(Self.tooLarge) }
         let words = try #require(PageNotice.all(for: item).first?.words)
-        #expect(words.contains("weren’t saved to Marfa"))
+        #expect(words.contains("too large to save to Marfa"))
+        #expect(words.contains("where you can copy them"))
         #expect(!words.contains("Make it smaller"))
         #expect(PageNotice.all(for: item).first?.actionLabel == "Show Changes")
+    }
+
+    /// A block outranks a refusal in the queue's one state per item, which must not hide where the oversized text is.
+    @Test func aBlockedWriteBesideAnOversizedOneStillOffersShowChanges() throws {
+        let oversized = Refusal(
+            reason: "Too big.", requestLimit: RequestLimit(size: 1_111_069, limit: 1_048_576))
+        let queue = [
+            QueuedWrite(
+                id: "1", kind: .updateItem, itemId: Self.id.rawValue, idempotencyKey: "1", verdict: .refused(oversized),
+                queuedAt: "2026-10-06T00:00:00Z"),
+            QueuedWrite(
+                id: "2", kind: .updateItem, itemId: Self.id.rawValue, idempotencyKey: "2",
+                verdict: .blocked(reason: .credentialRefused), queuedAt: "2026-10-06T00:00:01Z")
+        ]
+        let state = try #require(MarfaMapping.syncStates(queue: queue)[Self.id])
+        guard case .blocked(let problem) = state else {
+            Issue.record("the block ranks first")
+            return
+        }
+        #expect(problem.unsent == nil)
+        let notice = try #require(PageNotice.all(for: Self.item { $0.sync = state }).first)
+        #expect(notice.action == .showChanges)
+        #expect(notice.words.contains("where you can copy them"))
+        // Alone, the same block offers nothing to show.
+        let alone = try #require(MarfaMapping.syncStates(queue: [queue[1]])[Self.id])
+        #expect(PageNotice.all(for: Self.item { $0.sync = alone }).first?.action == nil)
     }
 
     @Test func aDeletedItemWhoseTextCannotBeReadKeepsItsReason() {

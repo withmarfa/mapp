@@ -127,24 +127,21 @@ nonisolated struct PageNotice: Equatable, Sendable {
 
 nonisolated extension Item {
     /// What the page says of a write the copy holds on this item, or nil where none is held. A write that waits is
-    /// only on its way. A held write always has its line, with the copy's reason where it has one. Where the server
-    /// refused it as too large, the page shows the older text and the person's latest is in no write the server has, so
-    /// the line says where it is kept and offers to show it.
+    /// only on its way. A held write always has its line, with the copy's reason where it has one. Where a write was
+    /// refused as too large, the page shows the older text and the person's latest is in no write the server has, so
+    /// the line says where it is kept and offers to show it, whichever held write ranks first.
     fileprivate var heldNotice: PageNotice? {
         let problem: SyncProblem
         switch sync {
         case .refused(let held), .blocked(let held): problem = held
         case .settled, .waiting, .conflicted: return nil
         }
-        if case .tooLarge? = problem.unsent {
-            return PageNotice(
-                kind: .held, item: id,
-                words: String(localized: "Your latest changes to this item weren’t saved to Marfa. They’re kept on this Mac, in Settings, where you can copy them."),
-                action: .showChanges)
-        }
-        let lead = String(localized: "Your changes to this item haven’t reached the server.")
-        guard let message = problem.message, !message.isEmpty else { return PageNotice(kind: .held, item: id, words: lead) }
-        return PageNotice(kind: .held, item: id, words: lead + " " + Words.unsentReason(message))
+        let kept = String(localized: "Your latest changes were too large to save to Marfa. They’re kept on this Mac, where you can copy them.")
+        if problem.isTooLarge { return PageNotice(kind: .held, item: id, words: kept, action: .showChanges) }
+        var words = String(localized: "Your changes to this item haven’t reached the server.")
+        if let message = problem.message, !message.isEmpty { words += " " + Words.unsentReason(message) }
+        guard problem.alsoHoldsOversizedText else { return PageNotice(kind: .held, item: id, words: words) }
+        return PageNotice(kind: .held, item: id, words: words + " " + kept, action: .showChanges)
     }
 }
 
