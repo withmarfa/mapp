@@ -174,6 +174,8 @@ extension MarfaHost {
             // The package removes the copy's files and leaves the folder that held them, which it releases its
             // lock on first: the folder goes only if it is empty, so a copy opened in the gap is never taken with it.
             try await Self.offMain { try Self.removeIfEmpty(directory) }
+            // A copy made at this folder again is filled from whichever Marfa answers then.
+            try? location.copies.change { $0.instances[directory.lastPathComponent] = nil }
             return .removed
         } catch MarfaError.readingHandle, MarfaError.storeBusy {
             return .failed(Words.inUse)

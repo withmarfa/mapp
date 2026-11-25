@@ -1,6 +1,7 @@
 import Foundation
 import Marfa
 import MarfaTesting
+import Synchronization
 import Testing
 @testable import MarfaMac
 
@@ -150,13 +151,15 @@ import Testing
 
     @Test func anUnreadableRecordIsSetAsideAndTheCopiesAreFoundByTheirAddresses() async throws {
         let bench = HostBench()
-        let made = bench.location.directory(for: withPort)
-        _ = try await makeCopy(bench, in: made, unsent: 0)
-        try Data("{".utf8).write(to: bench.root.appending(path: "Copies.json"))
-        let location = MarfaStoreLocation(root: bench.root.appending(path: ".", directoryHint: .isDirectory))
-        #expect(location.directory(for: bare).standardizedFileURL == made.standardizedFileURL)
-        let names = try FileManager.default.contentsOfDirectory(atPath: bench.root.path)
+        let root = bench.root.appending(path: "Unread", directoryHint: .isDirectory)
+        let made = MarfaStoreLocation(root: root).directory(named: Self.folder(of: withPort))
+        try FileManager.default.createDirectory(at: made, withIntermediateDirectories: true)
+        try Data("{".utf8).write(to: root.appending(path: "Copies.json"))
+        let location = MarfaStoreLocation(root: root)
+        #expect(location.directory(for: bare) == made)
+        let names = try FileManager.default.contentsOfDirectory(atPath: root.path)
         #expect(names.contains { $0.hasPrefix("Copies unreadable") })
+        #expect(location.copies.current == MarfaCopies.Record())
     }
 
     // MARK: Copies made under both spellings

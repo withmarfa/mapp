@@ -113,7 +113,7 @@ nonisolated struct MarfaStoreLocation: Hashable, Sendable {
 
     /// A store refuses a server other than the instance it was hydrated from, so each Marfa keeps its own.
     func directory(for connection: MarfaConnection) -> URL {
-        if let folder = copies.folder(forOrigin: MarfaCopies.origin(of: connection)), exists(folder) {
+        if let folder = copies.folder(forOrigin: MarfaCopies.origin(of: connection)) {
             return directory(named: folder)
         }
         let spellings = Self.spellings(of: connection.address)
@@ -147,7 +147,10 @@ nonisolated struct MarfaStoreLocation: Hashable, Sendable {
     /// Every copy folder on this Mac.
     func folders() -> [String] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
-        return names.filter { FileManager.default.fileExists(atPath: store(in: $0).path) }.sorted()
+        return names.filter { name in
+            var isFolder: ObjCBool = false
+            return FileManager.default.fileExists(atPath: directory(named: name).path, isDirectory: &isFolder) && isFolder.boolValue
+        }.sorted()
     }
 
     private func exists(_ folder: String) -> Bool {
