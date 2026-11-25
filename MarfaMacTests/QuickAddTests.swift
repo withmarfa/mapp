@@ -419,6 +419,53 @@ struct QuickAddTests {
         #expect(library.addedFiles.first?.title == "Holiday")
     }
 
+    @Test func aFileThatFailsAfterTheWindowClosesGivesBackItsTitle() async throws {
+        let library = FakeItemLibrary(now: start)
+        let (release, released) = AsyncStream<Void>.makeStream()
+        library.sendingFile = { for await _ in release { break } }
+        let browser = Browser()
+        browser.openNewItem(kind: TypeID.file.rawValue, form: .text, in: library)
+        let photo = try disk.file("photo.png")
+        browser.quickAdd.draft?.files = [photo]
+        browser.quickAdd.draft?.title = "Holiday"
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        let drafts = browser.quickAdd.drafts
+        browser.quickAdd.leave(because: .closed, telling: library.notices)
+        library.refusesFiles = true
+        let told = library.notices.told
+        released.yield()
+        #expect(await saving.value == nil)
+
+        let back = try #require(drafts.takeReturned(.line, in: library.serverKey), "the title typed for the file is kept")
+        #expect(back.draft.title == "Holiday")
+        #expect(back.draft.files == [photo])
+        #expect(library.notices.waiting.contains { $0.title == "File Not Added" }, "\(library.notices.waiting.map(\.title))")
+        #expect(library.notices.told > told + 1, "the library's reason, then where the title is")
+    }
+
+    @Test func aFileAddedAfterTheWindowClosesWaitsForMarfaWithItsTitle() async throws {
+        let library = FakeItemLibrary(now: start)
+        let (release, released) = AsyncStream<Void>.makeStream()
+        library.sendingFile = { for await _ in release { break } }
+        let browser = Browser()
+        browser.openNewItem(kind: TypeID.file.rawValue, form: .text, in: library)
+        browser.quickAdd.draft?.files = [try disk.file("photo.png")]
+        browser.quickAdd.draft?.title = "Holiday"
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        let drafts = browser.quickAdd.drafts
+        browser.quickAdd.leave(because: .closed, telling: library.notices)
+        released.yield()
+        let id = try #require(await saving.value)
+        #expect(!drafts.holdsDraft(.line, in: library.serverKey), "added, it waits for Marfa's answer")
+
+        library.items.removeAll { $0.id == id }
+        library.refusedCreations = [id]
+        drafts.settle(in: library)
+        #expect(drafts.takeReturned(.line, in: library.serverKey)?.draft.title == "Holiday", "refused later, the title comes back")
+    }
+
     @Test func textTypedWhileAFileIsAddedIsHandedOffAsTheWindowCloses() async throws {
         let library = FakeItemLibrary(now: start)
         let (release, released) = AsyncStream<Void>.makeStream()

@@ -160,6 +160,35 @@ struct MarfaDrainAnswersTests {
         await source.close()
     }
 
+    /// The create is answered on its own, so a parent link the server refuses later is told by itself, naming the
+    /// item, its parent and the server's reason.
+    @Test @MainActor
+    func aParentLinkRefusedLaterIsToldAtTheItem() async throws {
+        let (source, log, store) = try await open()
+        defer { try? FileManager.default.removeItem(at: store.deletingLastPathComponent()) }
+        let library = MarfaLibrary(source: source, notices: Notices())
+        try #require(await eventually { library.isLoaded })
+        let parent = ItemID.mint()
+        let child = ItemID.mint()
+        source.submit(.create(id: parent, ItemDraft(type: TypeID("core.note"), title: "Garden", body: "Plans")), as: WriteID())
+        source.submit(.create(id: child, ItemDraft(type: TypeID("core.note"), title: "Seeds", body: "List", parent: parent)), as: WriteID())
+        await source.queueSubmitted()
+        _ = try #require(await log.wait { $0.snapshot?.items.first { $0.id == child }?.edgesOut.isEmpty == false })
+        #expect(library.notices.waiting.isEmpty, "queued, the link is not refused yet: \(library.notices.waiting.map(\.message))")
+        let link = try #require(try await source.copy.queue.all().first { $0.kind == .createEdge })
+        try Self.record(link.id, "UPDATE queue SET verdict = 'refused', reason = 'edge_constraint_violation', sent = 1 WHERE id = ?", at: store)
+        await source.tellAnswers()
+
+        let told = await eventually {
+            library.notices.waiting.contains {
+                $0.title == "Can’t Put Item Under Its Parent" && $0.message.contains("“Seeds”") && $0.message.contains("“Garden”")
+            }
+        }
+        #expect(told, "told: \(library.notices.waiting.map(\.message))")
+        #expect(library.item(child) != nil, "the item stays")
+        await source.close()
+    }
+
     /// A blocked answer is one the copy keeps, since the write may be released, and a released write keeps its queue
     /// id. Its next answer is taken like any other, and a second refusal of it is told again.
     @Test

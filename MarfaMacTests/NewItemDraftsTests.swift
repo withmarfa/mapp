@@ -4,7 +4,7 @@ import Testing
 
 /// The store that keeps every new item typed and not yet added, on this Mac.
 @MainActor
-@Suite
+@Suite(.hangLimit)
 struct NewItemDraftsTests {
     static func typed(_ title: String, kind: String = "core.task") -> QuickAdd.Draft {
         var draft = QuickAdd.Draft(typeID: kind)
@@ -253,6 +253,28 @@ struct NewItemDraftsTests {
         reopened.settle(in: library)
         #expect(reopened.takeReturned(.line, in: "a")?.draft.title == "Not in the copy")
         #expect(reopened.takeReturned(.line, in: "a") == nil, "the queued create stays hidden")
+    }
+
+    @Test func aRefusalIsKeptWithItsDraftAcrossARelaunch() throws {
+        let disk = TestFiles()
+        let file = disk.directory.appending(path: "Drafts.json")
+        let item = ItemID.mint()
+        do {
+            let drafts = NewItemDrafts(file: file)
+            _ = Self.sent("Refused before the quit", as: item, in: drafts)
+            let library = FakeItemLibrary()
+            library.serverKey = "a"
+            library.refusedCreations = [item]
+            drafts.settle(in: library)
+        }
+        // After the relaunch the copy knows nothing of the refusal, which only the draft still holds.
+        let library = FakeItemLibrary()
+        library.serverKey = "a"
+        let reopened = NewItemDrafts(file: file)
+        reopened.settle(in: library)
+        let back = try #require(reopened.takeReturned(.line, in: "a"))
+        #expect(back.draft.title == "Refused before the quit")
+        #expect(back.returned)
     }
 
     @Test func aSentIDThatCannotBeWrittenIsNotSent() throws {
