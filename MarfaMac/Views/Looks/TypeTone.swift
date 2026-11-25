@@ -80,8 +80,16 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
         return Color(.sRGB, red: r, green: g, blue: b)
     }
 
+    /// The name on the tinted chip: `tintedInkDepth` of the way to black in light, and the ink of a mark in dark.
+    func tintedInk(_ looks: ChipLooks, for scheme: ColorScheme) -> Color {
+        guard scheme != .dark else { return ink(looks, for: scheme) }
+        let (r, g, b) = components(dark: false)
+        let keep = 1 - looks.tintedInkDepth
+        return Color(.sRGB, red: r * keep, green: g * keep, blue: b * keep)
+    }
+
     /// The tone as CSS custom properties for the web page: `--tone`, `--tone-ink` for an icon on its tint, and
-    /// `--tone-mark` and `--tone-chip` for the pale fills at the opacities in force.
+    /// and `--tone-mark` for the pale square behind a mark.
     @MainActor static func cssColors(for icon: String?, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
         cssColors(for: TypeTone(icon: icon), dark: dark, looks: looks)
     }
@@ -96,16 +104,27 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
             "--tone": "rgb(\(red), \(green), \(blue))",
             "--tone-ink": "rgb(\(inkBytes))",
             "--tone-mark": "rgba(\(red), \(green), \(blue), \(String(format: "%g", looks.markOpacity)))",
-            "--tone-chip": "rgba(\(red), \(green), \(blue), \(String(format: "%g", dark ? looks.typeTintOpacityDark : looks.typeTintOpacity)))",
         ]
     }
 
-    private func components(dark: Bool) -> (Double, Double, Double) {
+    /// The tone as a CSS `rgb()` at `alpha`, and a color of the page's own as the same function.
+    func cssRGBA(_ alpha: Double, dark: Bool) -> String {
+        let (r, g, b) = components(dark: dark)
+        return "rgba(\(Self.byte(r)), \(Self.byte(g)), \(Self.byte(b)), \(String(format: "%g", alpha)))"
+    }
+
+    static func cssRGB(of color: (Double, Double, Double)) -> String {
+        "rgb(\(Self.byte(color.0)), \(Self.byte(color.1)), \(Self.byte(color.2)))"
+    }
+
+    private static func byte(_ value: Double) -> Int { Int((value * 255).rounded()) }
+
+    func components(dark: Bool) -> (Double, Double, Double) {
         let hex = dark ? darkHex : lightHex
         return (Double((hex >> 16) & 0xFF) / 255, Double((hex >> 8) & 0xFF) / 255, Double(hex & 0xFF) / 255)
     }
 
-    private func inkComponents(_ looks: ChipLooks, dark: Bool) -> (Double, Double, Double) {
+    func inkComponents(_ looks: ChipLooks, dark: Bool) -> (Double, Double, Double) {
         let (r, g, b) = components(dark: dark)
         guard dark else { return (r * (1 - looks.inkDepth), g * (1 - looks.inkDepth), b * (1 - looks.inkDepth)) }
         let lift = looks.inkDepthDark

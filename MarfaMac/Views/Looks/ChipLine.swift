@@ -23,7 +23,7 @@ struct ChipLine: View {
             ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
                 switch chip {
                 case .type(let icon, let label):
-                    PageChip(text: label, kind: .type(icon: icon), size: .row)
+                    MarkedName(text: label, icon: icon, size: .row)
                 case .status(let symbol, let label):
                     PageChip(text: label, kind: .status(symbol, chevron: false), size: .row)
                 case .option(let label, let tone):
@@ -33,7 +33,7 @@ struct ChipLine: View {
                 case .tag(let tag):
                     PageChip(text: tag, kind: .tag, size: .row)
                 case .linked(let icon, let title):
-                    PageChip(text: title, kind: .link(icon: icon), size: .row, underlinesOnHover: false)
+                    MarkedName(text: title, icon: icon, size: .row)
                 case .text(let text):
                     Text(verbatim: text).font(.system(size: size)).foregroundStyle(.secondary).lineLimit(1)
                 case .count(let text, let help):

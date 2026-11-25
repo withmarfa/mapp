@@ -119,7 +119,7 @@ enum LibraryDescription {
     func markTitle(_ id: String) -> String { IconNameSearch.title(of: id) }
 
     func typeMark(for pattern: String) -> AnyView {
-        AnyView(TypeMark(icon: libraries.current?.catalogue.itemTypes[TypeID(pattern)]?.icon, size: .side))
+        AnyView(TypeTile(icon: libraries.current?.catalogue.itemTypes[TypeID(pattern)]?.icon, size: .side))
     }
 
     // MARK: Types
@@ -127,7 +127,7 @@ enum LibraryDescription {
     var typeCalls: any TypeCalls { ServerTypeCalls(client: confirmingClient) }
 
     func largeTypeMark(for id: String) -> AnyView {
-        AnyView(TypeMark(icon: typeIcon(of: id), size: .large))
+        AnyView(TypeTile(icon: typeIcon(of: id), size: .large))
     }
 
     // MARK: Plugins

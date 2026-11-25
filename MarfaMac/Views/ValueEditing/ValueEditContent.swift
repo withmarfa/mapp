@@ -229,30 +229,31 @@ private struct ValueEditRow: View {
     let scale: CGFloat
 
     private var isActive: Bool { model.activeRow == row.id }
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         HStack(spacing: 7 * scale) {
-            ValueMarkView(mark: row.mark, scale: scale, onAccent: isActive)
+            ValueMarkView(mark: row.mark, scale: scale)
             Text(verbatim: row.title).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8 * scale)
             if let detail = row.detail {
                 if row.role == .create {
-                    ShortcutKeys(detail, onAccent: isActive).layoutPriority(1)
+                    ShortcutKeys(detail).layoutPriority(1)
                 } else {
                     Text(verbatim: detail)
                         .layoutPriority(1)
-                        .foregroundStyle(isActive ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .font(.system(size: ValueEditMetrics.textSize * scale))
-        .foregroundStyle(isActive ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .foregroundStyle(.primary)
         .padding(.horizontal, 8 * scale)
         .frame(height: ValueEditMetrics.rowHeight * scale)
         .background {
             if isActive {
                 RoundedRectangle(cornerRadius: ValueEditMetrics.rowRadius * scale, style: .continuous)
-                    .fill(Color.accentColor)
+                    .fill(SelectionLooks.chosen(for: scheme))
             }
         }
         .contentShape(.rect)

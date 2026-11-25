@@ -95,7 +95,7 @@ struct VersionPageColumn: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     if pin.id == PagePlacement.type {
-                        PageChip(text: pin.value, kind: .type(icon: library.catalogue.icon(for: type)))
+                        MarkedName(text: pin.value, icon: library.catalogue.icon(for: type))
                     } else {
                         Text(verbatim: pin.value)
                             .interfaceFont(.body)

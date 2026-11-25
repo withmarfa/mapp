@@ -1,16 +1,16 @@
 import MarfaIcons
 import SwiftUI
 
-/// A type's icon in its tone on a pale rounded square of the same color, with no shadow. It reads a table and two
-/// constants, so it is cheap in a list row. Sizes follow the design's `.m-tmark.is-*` and `tileSizes`.
-struct TypeMark: View {
+/// A type's icon in its tone on a pale rounded square of the same color, with no shadow. It is only for a gallery cover
+/// with no picture and the Settings type pages; everywhere else a type's mark is the bare `TonedGlyph`. Sizes follow the
+/// design's `tileSizes` (Foundations F6).
+struct TypeTile: View {
     enum Size: CaseIterable, Sendable {
-        case row, side, large
+        case side, large
 
         /// The square's side, its corner radius and the icon's side, in points.
         var metrics: (box: CGFloat, radius: CGFloat, icon: CGFloat) {
             switch self {
-            case .row: (18, 5, 11)
             case .side: (20, 6, 12)
             case .large: (32, 8, 16)
             }
@@ -18,7 +18,7 @@ struct TypeMark: View {
     }
 
     let icon: String?
-    var size: Size = .row
+    var size: Size = .side
 
     @Environment(\.colorScheme) private var scheme
 

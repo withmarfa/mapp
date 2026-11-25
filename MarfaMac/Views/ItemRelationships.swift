@@ -174,7 +174,7 @@ struct InspectorItemRow: View {
             if let id = target.itemID, target.isOpenable {
                 Button { onOpen(id) } label: {
                     HStack(alignment: .inspectorTitleCenter, spacing: InspectorMetrics.markGap) {
-                        TypeMark(icon: typeIcon(id), size: .row)
+                        TonedGlyph(id: typeIcon(id))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(target.displayTitle)
                                 .lineLimit(1)

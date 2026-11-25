@@ -6,7 +6,6 @@ import SwiftUI
 struct ValueMarkView: View {
     let mark: ValueListRow.Mark
     let scale: CGFloat
-    var onAccent = false
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -14,11 +13,11 @@ struct ValueMarkView: View {
         case .none:
             EmptyView()
         case .status(let group):
-            StatusMark(group: group, size: 12 * scale, onAccent: onAccent).frame(width: 14 * scale)
+            StatusMark(group: group, size: 12 * scale).frame(width: 14 * scale)
         case .person(let initials):
-            PersonCircle(initials: initials.isEmpty ? nil : initials, onAccent: onAccent)
+            PersonCircle(initials: initials.isEmpty ? nil : initials)
         case .tag:
-            glyph("tag")
+            glyph("number")
         case .symbol(let name):
             glyph(name)
         case .dot(let tone):
@@ -28,17 +27,14 @@ struct ValueMarkView: View {
                 .frame(width: 14 * scale)
                 .accessibilityHidden(true)
         case .type(let icon):
-            TypeGlyph(id: icon)
-                .foregroundStyle(onAccent ? AnyShapeStyle(.white) : AnyShapeStyle(TypeTone(icon: icon).color(for: scheme)))
-                .frame(width: 14 * scale, height: 14 * scale)
-                .accessibilityHidden(true)
+            TonedGlyph(id: icon, size: 14 * scale)
         }
     }
 
     private func glyph(_ name: String) -> some View {
         Image(systemName: name)
             .font(.system(size: 11 * scale))
-            .foregroundStyle(onAccent ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+            .foregroundStyle(.secondary)
             .frame(width: 14 * scale)
             .accessibilityHidden(true)
     }

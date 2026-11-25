@@ -29,6 +29,24 @@ struct TypeGlyph: View {
     }
 }
 
+/// A type's icon in its own tone, with nothing behind it: how a row, a page and a palette show a type's mark. A tile is
+/// only a gallery cover with no picture and the Settings type page (`TypeTile`).
+struct TonedGlyph: View {
+    let id: String?
+    var size: CGFloat = ChipLooks.defaults.chipMarkSize
+
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Image(typeGlyph: id)
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(TypeTone(icon: id).ink(ChipLooks.current, for: scheme))
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+}
+
 extension Image {
     /// The image for a type's icon where the mark has to be an image, as `TypeGlyph` draws it.
     init(typeGlyph id: String?) {

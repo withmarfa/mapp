@@ -150,7 +150,7 @@ private struct IndexTypesCell: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(shares.prefix(Self.shown)) { share in
-                PageChip(text: share.label, kind: .type(icon: share.icon), size: .row)
+                MarkedName(text: share.label, icon: share.icon, size: .row)
             }
             if shares.count > Self.shown {
                 Text("+\(shares.count - Self.shown)").foregroundStyle(.secondary)

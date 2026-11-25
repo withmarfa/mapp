@@ -78,7 +78,7 @@ private struct PaletteMark: View {
         Group {
             switch icon {
             case .type(let name):
-                TypeMark(icon: name, size: .side)
+                TonedGlyph(id: name)
             case .symbol:
                 RowIconImage(icon: icon)
                     .foregroundStyle(.secondary)

@@ -286,30 +286,31 @@ private struct LocationResultRow: View {
     let scale: CGFloat
     let choose: () -> Void
     @State private var isHovered = false
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         HStack(spacing: 7 * scale) {
             Image(systemName: "mappin.circle.fill")
-                .foregroundStyle(isHovered ? AnyShapeStyle(.white) : AnyShapeStyle(.red))
+                .foregroundStyle(.red)
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: result.title).lineLimit(1).truncationMode(.tail)
                 if !result.subtitle.isEmpty {
                     Text(verbatim: result.subtitle)
                         .font(.system(size: 11 * scale))
-                        .foregroundStyle(isHovered ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
             }
             Spacer(minLength: 0)
         }
-        .foregroundStyle(isHovered ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .foregroundStyle(.primary)
         .padding(.horizontal, 6 * scale)
         .padding(.vertical, 3 * scale)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             if isHovered {
-                RoundedRectangle(cornerRadius: ValueEditMetrics.rowRadius * scale, style: .continuous).fill(Color.accentColor)
+                RoundedRectangle(cornerRadius: ValueEditMetrics.rowRadius * scale, style: .continuous).fill(SelectionLooks.chosen(for: scheme))
             }
         }
         .contentShape(.rect)

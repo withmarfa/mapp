@@ -79,7 +79,7 @@ struct ItemLinkPicker: View {
 
     private func row(_ item: Item, isHighlighted: Bool) -> some View {
         HStack(spacing: 10) {
-            TypeMark(icon: library.catalogue.icon(for: item.type), size: .row)
+            TonedGlyph(id: library.catalogue.icon(for: item.type))
             Text(item.displayTitle).lineLimit(1)
             Spacer(minLength: 8)
             Text(library.placeLabel(of: item))

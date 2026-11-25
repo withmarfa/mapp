@@ -204,10 +204,20 @@ extension CalendarCell {
 }
 
 extension View {
-    /// The quiet fill of an item, or the accent for the chosen one.
+    /// The quiet fill of an item, or the soft grey of the chosen one.
     func calendarFill(_ isSelected: Bool, radius: CGFloat) -> some View {
-        background(
-            isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.primary.opacity(0.05)),
+        modifier(CalendarFill(isSelected: isSelected, radius: radius))
+    }
+}
+
+private struct CalendarFill: ViewModifier {
+    let isSelected: Bool
+    let radius: CGFloat
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        content.background(
+            isSelected ? SelectionLooks.chosen(for: scheme) : Color.primary.opacity(0.05),
             in: .rect(cornerRadius: radius, style: .continuous))
     }
 }
@@ -272,7 +282,7 @@ private struct CalendarMonthView: View {
                     Text(verbatim: entry.title)
                         .interfaceFont(.system(size: 11))
                         .lineLimit(1)
-                        .foregroundStyle(isSelected ? Color.white : .primary)
+                        .foregroundStyle(.primary)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .frame(maxWidth: .infinity, alignment: .leading)

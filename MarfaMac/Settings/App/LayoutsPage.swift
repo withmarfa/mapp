@@ -83,7 +83,7 @@ private struct LayoutsList: View {
         } label: {
             SettingsRow(
                 verbatim: type.plural, line: LayoutsListWords.line(startsAs: preset.startsAs, changes: changes),
-                lead: .custom(AnyView(TypeMark(icon: type.icon, size: .side)))
+                lead: .custom(AnyView(TypeTile(icon: type.icon, size: .side)))
             ) { SettingsChevron() }
         }
         .buttonStyle(.plain)

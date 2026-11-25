@@ -51,12 +51,12 @@ struct PagePinsView: View {
             case .parent:
                 EmptyView()
             case .type(let name, let icon):
-                PageChip(text: name, kind: .type(icon: icon))
+                MarkedName(text: name, icon: icon)
             case .items(let targets):
                 ForEach(targets, id: \.item) { target in
                     Button { open(target.item) } label: {
                         switch target.kind {
-                        case .link: PageChip(text: target.title, kind: .link(icon: target.icon))
+                        case .link: MarkedName(text: target.title, icon: target.icon, underlinesOnHover: true)
                         case .person: PagePerson(name: target.title, initials: PersonInitials.of(target.title))
                         }
                     }

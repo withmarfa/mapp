@@ -40,7 +40,7 @@ struct LayoutTypePage: View {
         let preset = LookPreset.suggested(for: type, in: catalogue)
         let changes = libraries.typeLooks.changeCount(for: type, in: key) + (placements.hasChoice(for: type) ? 1 : 0)
         return SettingsHead(
-            lead: TypeMark(icon: info?.icon, size: .large),
+            lead: TypeTile(icon: info?.icon, size: .large),
             title: Text(verbatim: info?.plural ?? type.rawValue),
             line: Text(verbatim: Self.startsAs(preset.startsAs, changes: changes))
         ) {

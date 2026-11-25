@@ -568,7 +568,7 @@ private struct LinkedItemRow: View {
     var body: some View {
         Button { onOpen(link.item) } label: {
             HStack(spacing: InspectorMetrics.markGap) {
-                TypeMark(icon: link.icon, size: .row)
+                TonedGlyph(id: link.icon)
                 Text(verbatim: link.title).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 6)
                 Text(verbatim: link.date).foregroundStyle(.secondary).lineLimit(1).fixedSize()
