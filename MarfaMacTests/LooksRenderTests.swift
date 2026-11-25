@@ -10,8 +10,8 @@ import Testing
         var body: some View {
             VStack(alignment: .leading, spacing: 18) {
                 row("Status") {
-                    PageChip(text: "Not started", kind: .status(.notStarted, chevron: true))
-                    PageChip(text: "In progress", kind: .status(.inProgress, chevron: true))
+                    PageChip(text: "Not started", kind: .status(.notStarted))
+                    PageChip(text: "In progress", kind: .status(.inProgress))
                     PageChip(text: "Done", kind: .status(.completed))
                     PageChip(text: "Canceled", kind: .status(.canceled))
                 }
