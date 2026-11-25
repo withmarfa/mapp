@@ -26,13 +26,15 @@ final class LinkStep {
     var refusals: [WriteID: SyncProblem] = [:]
 
     /// What the writes sent at once came to, once each is taken or answered: `incomplete` where the copy refused one
-    /// for not being whole, `refused` where it refused or skipped one, and `taken` where it took them all.
+    /// for not being whole, `refused` where it refused or skipped one, or the source closed before it took or answered
+    /// one, and `taken` where it took them all.
     var verdict: EdgeVerdict {
         let refused = sent.compactMap { refusals[$0] }
         if refused.contains(where: { MarfaEngine.isNotCurrent($0.code) }) { return .incomplete }
         if let problem = refused.first {
             return .refused(problem.message ?? String(localized: "The Marfa server refused this change."))
         }
+        if !sent.isDisjoint(with: judging) { return .refused(MarfaEngine.closedLibrary) }
         return .taken
     }
 }

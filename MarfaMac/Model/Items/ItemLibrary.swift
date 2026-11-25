@@ -224,8 +224,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Links `adding` to `id` and unlinks `removing` in the field, once the core has judged every link it makes
     /// (`Edges.check`), in one undo step. A caller sends what the person changed, never the list the screen showed, so
     /// a change made since is not undone. `taken` means the copy took every write the change sent at once, or there was
-    /// nothing to change; `refused` and `incomplete` (the copy not yet whole) are told to the person and leave the field
-    /// as it was; `unknown` is an item or field the library does not hold. Undo removes only the links the change added
+    /// nothing to change; `refused` (as by the source closing before it answered) and `incomplete` (the copy not yet
+    /// whole) are told to the person, and leave in place any write of the change the copy already took, which Undo
+    /// reverses; `unknown` is an item or field the library does not hold. Undo removes only the links the change added
     /// and puts back only the ones it removed, and leaves one changed elsewhere since, which it tells once.
     @discardableResult
     func changeLinks(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> EdgeVerdict
