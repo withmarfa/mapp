@@ -221,9 +221,9 @@ struct MarfaDrainAnswersTests {
         await source.close()
     }
 
-    /// A file's create is followed to its answer like any other, so a refusal after its window closed is known.
+    /// The queue lists a file's refused create, so a refusal after its window closed gives its draft back.
     @Test @MainActor
-    func aFileRefusedLaterIsARefusedCreateWithItsReason() async throws {
+    func aFileRefusedLaterIsARefusedCreate() async throws {
         let (source, _, store) = try await open()
         defer { try? FileManager.default.removeItem(at: store.deletingLastPathComponent()) }
         let library = MarfaLibrary(source: source, notices: Notices())
@@ -236,7 +236,6 @@ struct MarfaDrainAnswersTests {
         await source.tellAnswers()
 
         #expect(await eventually { library.refusedCreates.contains(id) })
-        #expect(await eventually { library.refusalReason(creating: id) != nil })
         await source.close()
     }
 

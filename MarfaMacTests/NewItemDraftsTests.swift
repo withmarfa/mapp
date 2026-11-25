@@ -405,11 +405,10 @@ struct NewItemDraftsTests {
         let drafts = NewItemDrafts(file: nil)
         weak var gone: FakeItemLibrary?
         var following: Task<Void, Never>?
-        do {
-            let library = FakeItemLibrary()
-            gone = library
-            following = drafts.follow(library)
-        }
+        var library: FakeItemLibrary? = FakeItemLibrary()
+        gone = library
+        following = library.map(drafts.follow)
+        library = nil
         #expect(await eventually { gone == nil })
         following?.cancel()
     }
