@@ -30,8 +30,8 @@
 ## Edges and files
 
 - **A relationship is written by the end that holds it, and the core judges it** (`Edges.check(from:to:type:)`): end types, nesting, the bin, cycles, duplicates and how many. The app has no cardinality rule.
-- **`changeItemRelationship` takes what the person changed** (`adding`, `removing`), never the screen's list. Changes run in call order, each after the source has taken (`SourceChange.taken`) or answered the one before.
-- **Only `validation` and `notFound` refuse a check,** in the core's words, but for a `details.constraint` of `cardinality` or `duplicate`. Any other error is `.unknown`, which refuses nothing, and a picker row asks again.
+- **`changeLinks` takes what the person changed** (`adding`, `removing`), never the screen's list. Changes run in call order, each after the source has taken (`SourceChange.taken`) or answered the one before.
+- **Only `validation` and `notFound` refuse a check,** in the core's words, but for a `details.constraint` of `cardinality` or `duplicate`. A copy not yet whole is `.incomplete`, and any other error `.unknown`; neither is the core's refusal, and a picker row asks again.
 - **Check a new child's parent and every new link before writing any** (`newChildVerdict(under:)`). A picker row asks as the change would be made.
 - **An end that holds one link has it replaced by moving the other end,** in one `edges.update`. Never remove and add, which can leave the end with none or two.
 - **Never take a link that a third item holds.** Tell the person which item holds it. A many-valued swap adds the new links first and removes the old ones once the source has taken them.

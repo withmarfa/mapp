@@ -212,7 +212,8 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
-    /// `Edges.check` throws `validation` or `notFound` for an edge the core refuses. Any other error (the copy closed or not yet whole, a canceled call) says nothing about the edge.
+    /// `Edges.check` throws `validation` or `notFound` for an edge the core refuses, and `hydrationIncomplete` or
+    /// `copyExpired` until the copy is whole. Any other error (the copy closed, a canceled call) says nothing about the edge.
     func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict {
         await verdict { try await MarfaEngine.asking { try await copy.edges.check(from: draft.from.rawValue, to: draft.to.rawValue, type: draft.type) } }
     }
@@ -229,6 +230,7 @@ nonisolated final class MarfaSource: ItemSource {
         } catch let error as MarfaError {
             switch error {
             case .validation, .notFound: return .refused(await refusal(error))
+            case .hydrationIncomplete, .copyExpired: return .incomplete
             default: return .unknown
             }
         } catch {

@@ -363,7 +363,7 @@ private struct RelationshipCandidateRow: View {
             switch await library.relationshipVerdict(for: owner, field: field, to: candidate.id) {
             case .refused(let message): return refusal = message
             case .taken: return
-            case .unknown:
+            case .incomplete, .unknown:
                 try? await Task.sleep(for: pause)
                 if Task.isCancelled { return }
                 pause *= 2

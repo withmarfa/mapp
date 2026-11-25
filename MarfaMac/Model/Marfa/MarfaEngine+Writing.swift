@@ -38,7 +38,7 @@ extension MarfaEngine {
                 switch write {
                 case .unlink(let edgeID):
                     if let edge = edges[edgeID.rawValue] { ends = [edge.fromId, edge.toId] }
-                case .moveEdge(let edgeID, _, let to):
+                case .moveEdge(let edgeID, _, let to, _):
                     ends = [to.rawValue]
                     if let edge = edges[edgeID.rawValue] { ends.formUnion([edge.fromId, edge.toId]) }
                 default: break
@@ -173,17 +173,19 @@ extension MarfaEngine {
             try await judge(id, state: .trashed)
             return [try await copy.items.restore(id.rawValue)]
         case .link(let draft):
+            try judge(edge: write)
             return [
                 try await copy.edges.create(
                     from: draft.from.rawValue, to: draft.to.rawValue, type: draft.type,
-                    properties: draft.position.map { [MarfaMapping.positionProperty: .number($0)] } ?? [:])
+                    properties: draft.position.map { [MarfaMapping.positionProperty: .number($0)] } ?? [:],
+                    id: draft.id?.rawValue)
             ]
         case .unlink(let edgeID):
+            try judge(edge: write)
             return [try await copy.edges.delete(edgeID.rawValue)]
-        case .moveEdge(let edgeID, let end, let to):
-            guard let edge = edges[edgeID.rawValue] else {
-                throw MarfaError.notFound(code: "edge_not_found", message: String(localized: "This link isn’t in the library."), server: nil)
-            }
+        case .moveEdge(let edgeID, let end, let to, _):
+            try judge(edge: write)
+            guard let edge = edges[edgeID.rawValue] else { throw Self.skipped(.changedSince) }
             let move: EdgeEdit.Move = end == .from ? .from(to.rawValue) : .to(to.rawValue)
             do {
                 // The copy's own version of the edge, since the move is refused on any other; an edge it shows
@@ -213,6 +215,28 @@ extension MarfaEngine {
         if now == .trashed, state != .trashed { throw Self.skipped(.inBin) }
         if let state, now != state { throw Self.skipped(.changedSince) }
         if let tier, (row.tier.map(MarfaMapping.tier) ?? .library) != tier { throw Self.skipped(.changedSince) }
+    }
+
+    /// The one rule for every edge write, Undo and Redo among them, judged on the edges the copy shows with the writes
+    /// queued before it: a link only while no edge of its type joins its ends, an unlink only while the edge is there,
+    /// and a move only while the end is where the writer saw it or already where it goes. Otherwise it is skipped, so
+    /// a link made or removed elsewhere is left as it is. The core judges the rest as the edge is queued.
+    private func judge(edge write: ItemWrite) throws {
+        switch write {
+        case .link(let draft):
+            let joined = edges.edges(touching: draft.from.rawValue).contains {
+                $0.edgeType == draft.type && $0.fromId == draft.from.rawValue && $0.toId == draft.to.rawValue
+            }
+            if joined { throw Self.skipped(.changedSince) }
+        case .unlink(let id):
+            if edges[id.rawValue] == nil { throw Self.skipped(.changedSince) }
+        case .moveEdge(let id, let end, let to, let from):
+            guard let edge = edges[id.rawValue] else { throw Self.skipped(.changedSince) }
+            let now = end == .from ? edge.fromId : edge.toId
+            if now != from.rawValue, now != to.rawValue { throw Self.skipped(.changedSince) }
+        default:
+            break
+        }
     }
 
     /// A write the engine did not queue because its item no longer stands as the step left it, told with the

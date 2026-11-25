@@ -100,7 +100,21 @@ nonisolated final class FakeItemSource: ItemSource {
     }
 
     var submitted: [Submitted] { written.withLock { $0 } }
-    var writes: [ItemWrite] { submitted.map(\.write) }
+    /// The writes sent, with each new edge's minted id left out, so a test names a new link by its ends.
+    var writes: [ItemWrite] {
+        submitted.map { sent in
+            guard case .link(var draft) = sent.write else { return sent.write }
+            draft.id = nil
+            return .link(draft)
+        }
+    }
+    /// The id the library minted for the last new edge it sent.
+    var lastMintedEdge: EdgeID? {
+        submitted.lazy.reversed().compactMap { sent -> EdgeID? in
+            if case .link(let draft) = sent.write { return draft.id }
+            return nil
+        }.first
+    }
 
     func send(_ change: SourceChange) {
         continuation.yield(withBodies(change))

@@ -61,7 +61,7 @@ final class FakeItemLibrary: ItemLibrary {
     var trashDays: Int?
     /// What `relationships(for:)` answers, by item.
     var relationshipsByItem: [ItemID: [ItemRelationship]] = [:]
-    /// Whether `changeItemRelationship` takes a write, and the writes it was asked for.
+    /// Whether `changeLinks` takes a write, and the writes it was asked for.
     var acceptsRelationships = false
     /// The items whose property writes are still on their way, as a library that queues a write reports them.
     var writingProperties: Set<ItemID> = []
@@ -269,6 +269,9 @@ final class FakeItemLibrary: ItemLibrary {
         }
     }
     func relationships(for id: ItemID) -> [ItemRelationship] { relationshipsByItem[id] ?? [] }
+    /// What `relationFields(of:)` answers, by item.
+    var relationFieldsByItem: [ItemID: [RelationField]] = [:]
+    func relationFields(of id: ItemID) -> [RelationField] { relationFieldsByItem[id] ?? [] }
     func childIDs(of id: ItemID) -> [ItemID] { items.filter { $0.parentID == id }.map(\.id) }
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] { [] }
     /// The refusal for each (item, other) a test sets; any other link is taken.
@@ -486,9 +489,9 @@ final class FakeItemLibrary: ItemLibrary {
 
     func isWritingProperties(of id: ItemID) -> Bool { writingProperties.contains(id) }
     func tookPropertyWrite(_ mark: Int) -> Bool { false }
-    func changeItemRelationship(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> Bool {
+    func changeLinks(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> EdgeVerdict {
         relationshipWrites.append((id, field, adding, removing))
-        return acceptsRelationships
+        return acceptsRelationships ? .taken : .refused("Refused.")
     }
 
     /// Every change of type asked for.

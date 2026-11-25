@@ -216,6 +216,8 @@ import Observation
     @ObservationIgnored var awaitingArchive: [WriteID: ItemID] = [:]
     /// Restores answered blocked or dead whose archive will not follow, told together once no restore waits.
     @ObservationIgnored var archivesDropped = 0
+    /// The link step each edge write belongs to, until the copy takes it and the server makes it or not (`LinkStep`).
+    @ObservationIgnored var linkSteps: [WriteID: LinkStep] = [:]
     /// What follows when the server does not make each tier write, until its last answer (`setTiers`).
     @ObservationIgnored var tierWrites: [WriteID: () -> Void] = [:]
     /// The command whose skips are gathered now, and the one each write waiting for its first answer belongs to
@@ -226,7 +228,7 @@ import Observation
     @ObservationIgnored var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
     /// The relationship changes asked for and not yet written or refused, and the last of them, which the next waits
-    /// for so changes run in the order they were made (`changeItemRelationship`).
+    /// for so changes run in the order they were made (`changeLinks`).
     @ObservationIgnored var relationshipChangesInFlight = 0
     @ObservationIgnored var relationshipChain: Task<Void, Never>?
     /// The relationship writes the source took that the copy has not yet taken in or the source has not answered, and
@@ -326,9 +328,11 @@ import Observation
         var unqueuedText: String?
     }
 
-    nonisolated struct Replacement {
+    struct Replacement {
         var awaiting: Set<WriteID>
-        var unlinks: [EdgeDraft]
+        let unlinks: [EdgeDraft]
+        let failing: String
+        let step: LinkStep
     }
 
     nonisolated struct Search {

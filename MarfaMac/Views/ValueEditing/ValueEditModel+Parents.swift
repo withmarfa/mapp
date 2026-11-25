@@ -58,12 +58,12 @@ extension ValueEditModel {
             if let adding, case .refused(let message) = await library.relationshipVerdict(for: item, field: PagePlacement.parent, to: adding) {
                 refusal = message
             }
-            let taken: Bool
+            var taken = false
             if refusal == nil {
-                taken = await library.changeItemRelationship(
+                let verdict = await library.changeLinks(
                     item, field: PagePlacement.parent, adding: adding.map { [$0] } ?? [], removing: removing.map { [$0] } ?? [], undoManager: undoManager)
-            } else {
-                taken = false
+                taken = verdict == .taken
+                refusal = verdict.reason
             }
             guard let self else {
                 if !taken { library.notices.notKept(String(localized: "Parent Not Saved"), text: label, reason: refusal ?? String(localized: "The parent could not be saved.")) }

@@ -22,6 +22,7 @@ extension MarfaLibrary {
             stateWriteJudged(id, outcome)
             stateWriteAnswered(id, outcome)
             tierWriteAnswered(id, outcome)
+            linkWriteAnswered(id, outcome)
             settle(id)
             propertyAnswered(id, outcome, holding: holding)
         case .taken(let id):
@@ -32,6 +33,7 @@ extension MarfaLibrary {
             took(id)
             gatherAnswer(id, nil)
             stateWriteJudged(id, nil)
+            linkWriteTaken(id)
             read(id)
             settle(id)
         case .catalogue(let catalogue):

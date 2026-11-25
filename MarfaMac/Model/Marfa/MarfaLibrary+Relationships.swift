@@ -187,6 +187,53 @@ extension MarfaLibrary {
         }
     }
 
+    func relationFields(of id: ItemID) -> [RelationField] {
+        Cost.measure(.relationships) { readRelationFields(of: id) }
+    }
+
+    /// Every field the item's type admits at either end of an edge type, and any it holds or is pointed at through
+    /// although its type is not admitted. A two-way relation is one field. Filled fields come first, then empty ones,
+    /// each its own before inverse, then by label and name, so a row keeps its place while its links change.
+    private func readRelationFields(of id: ItemID) -> [RelationField] {
+        guard let item = headerItem(id) else { return [] }
+        observeLinks(of: id)
+        var ends: [String: FieldEnd] = [:]
+        for info in catalogue.edgeTypes.values {
+            let written = info.writtenFrom == .to
+            if admits(item.type, info, atTo: written) {
+                ends[written ? info.reverseName ?? info.id : info.id] = FieldEnd(info: info, atTo: written, isInverse: false)
+            }
+            if !info.isTwoWay, admits(item.type, info, atTo: !written) {
+                ends[Self.inversePrefix + info.id] = FieldEnd(info: info, atTo: !written, isInverse: true)
+            }
+        }
+        for link in index.links(touching: id) {
+            guard let held = fieldEnd(link.holder == id ? link.type : Self.inversePrefix + link.type) else { continue }
+            if held.isInverse, held.info.isTwoWay { continue }
+            if ends.values.contains(where: { $0.info.id == held.info.id && $0.atTo == held.atTo }) { continue }
+            let name = held.isInverse ? Self.inversePrefix + held.info.id : held.atTo ? held.info.reverseName ?? held.info.id : held.info.id
+            ends[name] = held
+        }
+        let fields = ends.map { field, end -> RelationField in
+            let linked = end.isInverse ? others(of: id, end).filter { headerItem($0) != nil } : linked(to: id, end)
+            let allowed = catalogue.itemTypes.keys.filter { !$0.isHidden && admits($0, end.info, atTo: !end.atTo) }
+            return RelationField(
+                field: field, label: label(end), cardinality: end.info.cardinality(atTo: end.atTo),
+                allowedTypes: allowed.sorted { $0.rawValue < $1.rawValue }, targets: Self.ordered(linked.map(target)),
+                editability: obstacle(item, end).map { .readOnly($0) } ?? .editable)
+        }
+        return fields.sorted { lhs, rhs in
+            if lhs.targets.isEmpty != rhs.targets.isEmpty { return !lhs.targets.isEmpty }
+            let lhsInverse = lhs.field.hasPrefix(Self.inversePrefix)
+            if lhsInverse != rhs.field.hasPrefix(Self.inversePrefix) { return !lhsInverse }
+            switch lhs.label.localizedStandardCompare(rhs.label) {
+            case .orderedAscending: return true
+            case .orderedDescending: return false
+            case .orderedSame: return lhs.field < rhs.field
+            }
+        }
+    }
+
     /// Active items of a type the field's far end allows. Which of them the core would refuse, such as one that
     /// would close a cycle, is asked of each (`relationshipVerdict`).
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
@@ -241,6 +288,8 @@ extension MarfaLibrary {
             let end: EdgeTypeInfo.End
             let to: ItemID
             let from: ItemID
+
+            var reversed: Move { Move(edge: edge, end: end, to: from, from: to) }
         }
 
         var adding: [EdgeDraft] = []
@@ -248,13 +297,6 @@ extension MarfaLibrary {
         var moving: [Move] = []
 
         var isEmpty: Bool { adding.isEmpty && removing.isEmpty && moving.isEmpty }
-
-        /// The change that puts everything back.
-        var reversed: RelationshipChange {
-            RelationshipChange(
-                adding: removing, removing: adding,
-                moving: moving.map { Move(edge: $0.edge, end: $0.end, to: $0.from, from: $0.to) })
-        }
     }
 
     /// A link a change makes, which the core is asked about as it would be written: a new link, or an end moved.
@@ -265,9 +307,9 @@ extension MarfaLibrary {
 
     /// What working out a change comes to.
     private enum Planning {
-        /// The field or the item is not one the app changes; nothing is told.
+        /// The field or the item is not one the library holds; nothing is told.
         case unavailable
-        /// the app's own policy refuses the change, in the words to tell the person.
+        /// The item or the field takes no change, in the words to tell the person.
         case refused(String)
         /// The edges to write, and every link they make.
         case change(RelationshipChange, made: [MadeLink])
@@ -292,16 +334,18 @@ extension MarfaLibrary {
     /// old parent is the one it left. A link new in that second look is asked too.
     /// Changes run one after another in the order they were made, each once the copy has taken the writes of the one
     /// before (see `relationshipChain`). Nothing is written until the core has answered.
-    /// True means the core accepted the change and it is written, or there was nothing to change; false means it was
-    /// refused and told, by the app's own policy (`plan`) or by the core's judgement, and the field is as it was. `finish`
-    /// waits for a change in flight.
+    ///
+    /// The verdict is `taken` where the change is written or there was nothing to change; `refused` where the item, the
+    /// field or the core refuses it; `incomplete` while the copy is not whole; `unknown` for an item or field the
+    /// library does not hold. Every verdict but `taken` and `unknown` is also told, and leaves the field as it was.
+    /// `finish` waits for a change in flight.
     @discardableResult
-    func changeItemRelationship(
+    func changeLinks(
         _ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?
-    ) async -> Bool {
+    ) async -> EdgeVerdict {
         relationshipChangesInFlight += 1
         let previous = relationshipChain
-        let work = Task { () -> (kept: Bool, writes: Set<WriteID>) in
+        let work = Task { () -> (verdict: EdgeVerdict, writes: Set<WriteID>) in
             await previous?.value
             let done = await self.applyRelationship(id, field: field, adding: adding, removing: removing, undoManager: undoManager)
             self.relationshipChangesInFlight -= 1
@@ -311,7 +355,7 @@ extension MarfaLibrary {
         relationshipChain = Task {
             await self.untilSettled(work.value.writes)
         }
-        return await work.value.kept
+        return await work.value.verdict
     }
 
     /// Returns once each write has been taken into the copy (`SourceChange.taken`) or answered before that
@@ -328,30 +372,39 @@ extension MarfaLibrary {
 
     private func applyRelationship(
         _ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?
-    ) async -> (kept: Bool, writes: Set<WriteID>) {
+    ) async -> (verdict: EdgeVerdict, writes: Set<WriteID>) {
         let cantChange = String(localized: "Can’t Change This Relationship")
         var asked: Set<MadeLink> = []
         while true {
             let plan: (change: RelationshipChange, made: [MadeLink])
             switch self.plan(id, field: field, adding: adding, removing: removing) {
-            case .unavailable: return (false, [])
+            case .unavailable: return (.unknown, [])
             case .refused(let reason):
                 notices.tell(cantChange, reason)
-                return (false, [])
+                return (.refused(reason), [])
             case .change(let change, let made): plan = (change, made)
             }
-            guard !plan.change.isEmpty else { return (true, []) }
+            guard !plan.change.isEmpty else { return (.taken, []) }
             let unasked = plan.made.filter { !asked.contains($0) }
             guard !unasked.isEmpty else {
-                let writes = relink(plan.change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
-                return (true, writes)
+                let name = fieldEnd(field).map { String(localized: "Change \(label($0))") } ?? cantChange
+                var writes: Set<WriteID> = []
+                gatheringSkips(failing: cantChange) {
+                    writes = relink(plan.change, name: name, failing: cantChange, undoManager: undoManager)
+                }
+                return (.taken, writes)
             }
             for link in unasked {
-                if case .refused(let reason) = await verdict(of: link) {
+                switch await verdict(of: link) {
+                case .refused(let reason):
                     notices.tell(cantChange, reason)
-                    return (false, [])
+                    return (.refused(reason), [])
+                case .incomplete:
+                    notices.tell(cantChange, MarfaEngine.notCurrent)
+                    return (.incomplete, [])
+                case .taken, .unknown:
+                    asked.insert(link)
                 }
-                asked.insert(link)
             }
         }
     }
@@ -365,15 +418,22 @@ extension MarfaLibrary {
         return own + others(of: id, farEnd).filter { !own.contains($0) }
     }
 
+    /// Why the field of `item` takes no change, or nil where it does: what the item allows (`Item.obstacle(to:)`), a
+    /// link the item's text holds, or one whose far end only Marfa keeps, as a synced folder.
+    private func obstacle(_ item: Item, _ end: FieldEnd) -> String? {
+        if let reason = item.obstacle(to: .links) { return BatchSkips.sentence(reason, count: 1) }
+        if end.info.id == MarfaMapping.bodyLinkEdge { return String(localized: "A link is changed in the text that holds it.") }
+        if constraint(of: end.info, atTo: !end.atTo).isServers { return String(localized: "Marfa keeps this link itself.") }
+        return nil
+    }
+
     /// What the edges would be changed by, and every link it makes, whether added or made by moving an end: what the
     /// core is asked about. The app decides only which edges to write: an end that holds one link of its type has it
     /// replaced by a move, and a link another item holds as its own is never taken. How many links an end may hold is
     /// the core's to judge, of the links this makes.
     private func plan(_ id: ItemID, field: String, adding wanted: [ItemID], removing unwanted: [ItemID]) -> Planning {
-        guard let item = item(id), item.allows(.links), let end = fieldEnd(field) else { return .unavailable }
-        guard end.info.id != MarfaMapping.bodyLinkEdge else {
-            return .refused(String(localized: "A link is changed in the text that holds it."))
-        }
+        guard let item = item(id), let end = fieldEnd(field) else { return .unavailable }
+        if let reason = obstacle(item, end) { return .refused(reason) }
         let holds = end.info.cardinality(atTo: end.atTo)
         let farEnd = FieldEnd(info: end.info, atTo: !end.atTo, isInverse: !end.isInverse)
         // A two-way relation is one list of the links this item holds and the ones pointing at it.
@@ -441,6 +501,10 @@ extension MarfaLibrary {
     /// Where links are added or moved and others removed, as when one item is chosen in place of another in a field
     /// that holds many, the new links go first and the old ones are removed only once the source has taken every new
     /// one, so a refusal leaves the field as it was rather than with the old link gone and the new one missing.
+    /// Each new edge gets an id minted here, so its undo removes that edge and no other.
+    ///
+    /// The step registered in return reverses only what the copy took of it (`LinkStep`), each write judged against the
+    /// copy as it is queued (`MarfaEngine.judge(edge:)`), so a link changed elsewhere since is left as it is.
     ///
     /// Returns the writes sent now that the source took, which a following change waits for: the adds, the moves and
     /// any unlink sent at once. An unlink held back for the new links is not one of them, since it is sent only after
@@ -450,16 +514,27 @@ extension MarfaLibrary {
         _ change: RelationshipChange, name: String, failing title: String = String(localized: "Can’t Change This Relationship"),
         undoManager: UndoManager?
     ) -> Set<WriteID> {
-        var links = change.adding.map { submit(.link($0), failing: title) }
-        links += change.moving.map { submit(.moveEdge($0.edge, end: $0.end, to: $0.to), failing: title) }
+        let step = LinkStep()
+        var links: [WriteID] = []
+        for var draft in change.adding {
+            draft.id = EdgeID.mint(at: now())
+            let write = submit(.link(draft), failing: title)
+            follow(write, .added(draft), in: step)
+            links.append(write)
+        }
+        for move in change.moving {
+            let write = submit(.moveEdge(move.edge, end: move.end, to: move.to, from: move.from), failing: title)
+            follow(write, .moved(move), in: step)
+            links.append(write)
+        }
         var sent = Set(links)
         if links.isEmpty {
-            sent.formUnion(unlink(change.removing, failing: title))
+            sent.formUnion(unlink(change.removing, failing: title, recordingIn: step))
         } else if !change.removing.isEmpty {
-            awaitLinks(Set(links), thenUnlink: change.removing)
+            awaitLinks(Set(links), thenUnlink: change.removing, failing: title, recordingIn: step)
         }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.relink(change.reversed, name: name, failing: title, undoManager: undoManager)
+            library.reverse(step, name: name, failing: title, undoManager: undoManager)
         }
         // A write that was not queued, as after the source closed, was told to the person and gets no answer.
         sent = sent.filter { isFollowed($0) }
@@ -467,10 +542,20 @@ extension MarfaLibrary {
         return sent
     }
 
+    /// Removes each edge: the one the draft names by id, or the one the copy holds between its ends.
     @discardableResult
-    func unlink(_ drafts: [EdgeDraft], failing title: String = String(localized: "Can’t Change This Relationship")) -> [WriteID] {
+    func unlink(
+        _ drafts: [EdgeDraft], failing title: String = String(localized: "Can’t Change This Relationship"), recordingIn step: LinkStep? = nil
+    ) -> [WriteID] {
         drafts.compactMap { draft in
-            index.link(type: draft.type, from: draft.from, to: draft.to).map { submit(.unlink($0.id), failing: title) }
+            let link = draft.id == nil ? index.link(type: draft.type, from: draft.from, to: draft.to) : nil
+            guard let id = draft.id ?? link?.id else { return nil }
+            let write = submit(.unlink(id), failing: title)
+            var removed = draft
+            removed.id = id
+            removed.position = draft.position ?? link?.position
+            if let step { follow(write, .removed(removed), in: step) }
+            return write
         }
     }
 }

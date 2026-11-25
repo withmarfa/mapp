@@ -190,7 +190,7 @@ extension MarfaEngine {
             stand.faces["links \(draft.type) \(draft.from.rawValue) \(draft.to.rawValue)"] = .links(between.map(\.id).sorted())
         case .unlink(let id):
             edge(id.rawValue)
-        case .moveEdge(let id, _, let to):
+        case .moveEdge(let id, _, let to, _):
             edge(id.rawValue)
             place(to.rawValue)
         case .create, .purge:

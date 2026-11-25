@@ -27,6 +27,27 @@ nonisolated struct ItemRelationship: Identifiable, Sendable {
     var id: String { field }
 }
 
+/// One edge field an item's type may hold, its own or an inverse, as a row draws it (`ItemLibrary.relationFields(of:)`).
+nonisolated struct RelationField: Identifiable, Sendable {
+    enum Editability: Equatable, Sendable {
+        case editable
+        /// Why the row takes no change, in the person's words.
+        case readOnly(String)
+    }
+
+    /// What `ItemLibrary.changeLinks` takes: an edge type, its reverse name, or `inverse:` and the edge type.
+    let field: String
+    /// Marfa's name for the end the item holds (`EdgeTypeInfo.label(atTo:)`).
+    let label: String
+    /// How many links the item may hold here. The core judges it as a link is made.
+    let cardinality: EdgeTypeInfo.Cardinality
+    /// The types the far end admits, by identifier.
+    let allowedTypes: [TypeID]
+    let targets: [ItemRelationshipTarget]
+    let editability: Editability
+    var id: String { field }
+}
+
 /// One list of links in an item's inspector: a relationship, or the links in its content.
 nonisolated struct LinkGroup: Hashable, Sendable {
     let item: ItemID
