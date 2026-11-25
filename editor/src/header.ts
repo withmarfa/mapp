@@ -595,7 +595,6 @@ export class ItemHeader {
         : element('span', 'item-pin-symbol item-chip-mark item-icon-parent', pin)
     symbol.setAttribute('aria-hidden', 'true')
     element('span', 'item-pin-label item-chip-text', pin)
-    element('span', 'item-pin-icon item-icon-indicator', pin).setAttribute('aria-hidden', 'true')
     // A native pop-up button opens as the mouse goes down, and from the keyboard on Space or Return.
     pin.addEventListener('pointerdown', (event) => {
       if (event.button !== 0 || pin.disabled) return

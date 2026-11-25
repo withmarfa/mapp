@@ -116,7 +116,9 @@ private struct PanelLinkRow: View {
                     Label("Link Actions", systemImage: "ellipsis").labelStyle(.iconOnly).frame(width: 24, height: 24)
                         .foregroundStyle(showsMenu ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.clear))
                 }
-                .menuStyle(.borderlessButton)
+                // A borderless menu draws its picture in its own color, so it could not be drawn clear.
+                .menuStyle(.button)
+                .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .focused($menuFocused)

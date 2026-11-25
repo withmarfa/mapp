@@ -69,7 +69,7 @@ struct PageHeadTests {
     @Test func onlyRowsWithAValueShowAndEveryOtherPropertyWaitsUnderShowMoreInTheTypesOrder() {
         let head = Self.head(Self.item(["priority": .string("high"), "summary": .string("Short")]), links: [Self.parent(nil)])
         #expect(Self.shown(head) == ["priority", "summary"])
-        #expect(head.order == ["state", "child-of", "priority", "a", "b", "c", "d", "e", "f", "summary", "done", "#tags"])
+        #expect(head.order == ["state", "priority", "child-of", "a", "b", "c", "d", "e", "f", "summary", "done", "#tags"])
         #expect(head.foldedCount == 10)
         #expect(head.rows.first { $0.id == "a" }?.value == .empty(symbol: "text.alignleft"))
         #expect(head.rows.first { $0.id == "state" }?.editable == true, "an empty status opens its editor")
@@ -180,7 +180,7 @@ struct PageHeadTests {
         let item = Self.item(["state": .string("pending"), "priority": .string("high")])
         let off = Self.head(item, links: [Self.parent()])
         #expect(off.pins.isEmpty)
-        #expect(Self.shown(off) == ["state", "child-of", "priority"])
+        #expect(Self.shown(off) == ["state", "priority", "child-of"])
         let on = Self.head(item, pins: true, links: [Self.parent()])
         #expect(on.pins.map(\.id) == ["state", "child-of"], "the status and the parent are the default pins")
         #expect(Self.shown(on) == ["priority"])

@@ -76,9 +76,9 @@ nonisolated struct PageStyle: Equatable {
     var editingMode = EditingMode.formatted
     var foldsHeadings = false
     var showsCodeLineNumbers = false
-    /// How wide the text runs when not full width, in ems of the item's text, so it holds about as many words
-    /// whatever the text size.
-    var readingWidth = 54
+    /// How wide the text runs when not full width, in steps of `readingStep`. The default is the design's column of 680
+    /// points at the default text size.
+    var readingWidth = 45
     /// How a link to another item reads in the text.
     var linkLook = LinkLook.standard
     /// The page's accent, its highlight color and the families of its text and its code, as Settings > Appearance
@@ -88,9 +88,16 @@ nonisolated struct PageStyle: Equatable {
     var textFont = ""
     var codeFont = ""
 
+    /// One step of the reading width in ems of the item's text, so a width holds about as many words whatever the text
+    /// size.
+    static let readingStep = 680.0 / (45 * 15)
+
+    /// The reading width in ems of the item's text, as the editor's page takes it.
+    var readingEms: Double { Double(readingWidth) * Self.readingStep }
+
     /// Matches the editor's three-rem minimum margins and chosen reading width.
     func horizontalInset(for width: CGFloat) -> CGFloat {
-        max(CGFloat(textSize * 3), fullWidth ? 0 : (width - CGFloat(readingWidth * textSize)) / 2)
+        max(CGFloat(textSize * 3), fullWidth ? 0 : (width - CGFloat(readingEms) * CGFloat(textSize)) / 2)
     }
 
     static let textSizes = [13, 14, 15, 16, 18, 20, 24]

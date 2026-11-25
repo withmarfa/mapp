@@ -38,7 +38,8 @@ nonisolated enum ValueEditMetrics {
         case .eventTime: 262...262
         case .entries: 300...340
         case .yesNo: 160...200
-        case .tags, .words: 194...273
+        case .tags: 270...270
+        case .words: 194...273
         case .people: 216...308
         case .status: 250...300
         case .choice: 170...260
