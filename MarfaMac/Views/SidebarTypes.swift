@@ -6,7 +6,7 @@ import SwiftUI
 struct SidebarTypesSection: View, Equatable {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
-    @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
+    @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = true
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     /// Every shown row, folded open as the person left them.
     let rows: [SidebarPlan.TypeRow]

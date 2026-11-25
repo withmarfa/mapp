@@ -15,7 +15,7 @@ struct AppearancePage: View {
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsTitle = true
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true
     @AppStorage(InterfaceKey.showsSidebarHistory) private var showsHistory = true
-    @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
+    @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = true
     @AppStorage(SidebarColor.key) private var sidebarColor = SidebarColor.gray
     /// Read when the page has appeared, since asking the system for every installed font is slow.
     @State private var families: [String] = []
