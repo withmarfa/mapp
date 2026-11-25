@@ -265,6 +265,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.clearWrites()
         undo.undo()
         #expect(source.writes == [.transition(id, .trashed, from: .active)])
+        // The engine queues the move, which its Undo or Redo waits for.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try #require(await eventually { library.stateJudging.isEmpty })
         undo.redo()
         #expect(source.writes == [.transition(id, .trashed, from: .active), .restore(id)])
     }
@@ -447,11 +450,17 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         library.delete([F.n1, F.n3], undoManager: undo)
         #expect(source.writes == [.transition(F.n1, .trashed, from: .active)])
         #expect(undo.undoActionName == String(localized: "Delete Item"))
+        // The engine queues the move, which its Undo or Redo waits for.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try #require(await eventually { library.stateJudging.isEmpty })
         undo.undo()
         #expect(source.writes.last == .restore(F.n1))
         source.clearWrites()
         library.recover([F.n3, F.n1], undoManager: undo)
         #expect(source.writes == [.restore(F.n3)])
+        // The engine queues the move, which its Undo or Redo waits for.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try #require(await eventually { library.stateJudging.isEmpty })
         undo.undo()
         #expect(source.writes.last == .transition(F.n3, .trashed, from: .active))
     }
@@ -460,6 +469,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         library.delete([F.n1], undoManager: undo)
+        // The engine queues the move, which its Undo or Redo waits for.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try #require(await eventually { library.stateJudging.isEmpty })
         // The server took the delete and the copy let the row go; the source still lists it, as the bin holds it.
         var binned = try #require(library.item(F.n1))
         binned.state = .trashed
