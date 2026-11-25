@@ -420,10 +420,9 @@ private struct TopRowPills: View {
         Task { await browser.renameView(id, to: name, in: library) }
     }
 
-    private func drop(_ words: [String], onto target: TopRowContent.Choice) -> Bool {
-        guard let word = words.first, let moved = ViewChoice(knownWord: word) else { return false }
+    private func drop(_ words: [String], onto target: TopRowContent.Choice) {
+        guard let word = words.first, let moved = ViewChoice(knownWord: word) else { return }
         browser.moveView(moved, onto: target.target.view, in: place, library: library)
-        return true
     }
 
     private var plus: some View {
