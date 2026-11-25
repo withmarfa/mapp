@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where an item's Linked From list shows: at the foot of its page, or in the inspector.
+/// Where an item's Linked From list shows: at the foot of its page, or only in the panel.
 nonisolated enum LinkedFromPlace: String, Codable, Sendable {
     case page, inspector
 }
@@ -26,12 +26,38 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         /// own order after those named. Nil follows the default order. Optional so a choice saved before ordering
         /// existed still decodes.
         var rowOrder: [String]?
-        /// The identifiers (`SidebarSection`) of the right sidebar's sections, in order. Nil follows the default
-        /// sections. Linked From is named here only while `linkedFrom` puts it in the sidebar: that one setting decides
-        /// where it is, and this list only where in the sidebar.
-        var sidebar: [String]?
+        /// Every member this version does not name, as it was stored: an older or a later copy wrote it, and rewriting the
+        /// row keeps it.
+        var others: [String: StoredJSON] = [:]
 
-        var isEmpty: Bool { rows.isEmpty && linkedFrom == nil && pins == nil && rowOrder == nil && sidebar == nil }
+        var isEmpty: Bool { rows.isEmpty && linkedFrom == nil && pins == nil && rowOrder == nil && others.isEmpty }
+
+        init(rows: [String: Bool] = [:], linkedFrom: LinkedFromPlace? = nil, pins: [String]? = nil, rowOrder: [String]? = nil) {
+            self.rows = rows
+            self.linkedFrom = linkedFrom
+            self.pins = pins
+            self.rowOrder = rowOrder
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: DynamicKey.self)
+            rows = try container.decodeIfPresent([String: Bool].self, forKey: DynamicKey("rows")) ?? [:]
+            linkedFrom = try container.decodeIfPresent(LinkedFromPlace.self, forKey: DynamicKey("linkedFrom"))
+            pins = try container.decodeIfPresent([String].self, forKey: DynamicKey("pins"))
+            rowOrder = try container.decodeIfPresent([String].self, forKey: DynamicKey("rowOrder"))
+            others = try container.members(except: Self.known)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: DynamicKey.self)
+            try container.encode(rows, forKey: DynamicKey("rows"))
+            try container.encodeIfPresent(linkedFrom, forKey: DynamicKey("linkedFrom"))
+            try container.encodeIfPresent(pins, forKey: DynamicKey("pins"))
+            try container.encodeIfPresent(rowOrder, forKey: DynamicKey("rowOrder"))
+            for (name, value) in others { try container.encode(value, forKey: DynamicKey(name)) }
+        }
+
+        private static let known: Set<String> = ["rows", "linkedFrom", "pins", "rowOrder"]
     }
 
     /// By type identifier.
@@ -108,44 +134,6 @@ nonisolated struct PagePlacements: Equatable, Sendable {
     mutating func setLinkedFrom(_ place: LinkedFromPlace, of type: TypeID, in catalogue: Catalogue) {
         let isDefault = place == placement(of: type, in: catalogue).defaultLinkedFromPlace
         update(type) { $0.linkedFrom = isDefault ? nil : place }
-    }
-
-    /// The sidebar's sections for `type`, in order (see `PagePlacement.sidebarSections`).
-    func sidebarSections(of type: TypeID, in catalogue: Catalogue) -> [String] {
-        placement(of: type, in: catalogue).sidebarSections
-    }
-
-    /// Shows exactly these sections (each once) in this order. Linked From is in the sidebar exactly when it is
-    /// named, so naming or dropping it also moves it between the sidebar and the page foot. An order equal to the
-    /// default is not kept.
-    mutating func setSidebarSections(_ sections: [String], of type: TypeID, in catalogue: Catalogue) {
-        let ids = PagePlacement.unique(sections)
-        let inSidebar = ids.contains(PagePlacement.linkedFrom)
-        if inSidebar != (placement(of: type, in: catalogue).linkedFromPlace == .inspector) {
-            setLinkedFrom(inSidebar ? .inspector : .page, of: type, in: catalogue)
-        }
-        let defaults = SidebarSection.defaultIDs.filter { $0 != PagePlacement.linkedFrom || inSidebar }
-        update(type) { $0.sidebar = ids == defaults ? nil : ids }
-    }
-
-    /// Adds a section after the others. One already shown stays where it is.
-    mutating func addSidebarSection(_ section: String, of type: TypeID, in catalogue: Catalogue) {
-        let current = sidebarSections(of: type, in: catalogue)
-        guard !current.contains(section) else { return }
-        setSidebarSections(current + [section], of: type, in: catalogue)
-    }
-
-    mutating func removeSidebarSection(_ section: String, of type: TypeID, in catalogue: Catalogue) {
-        setSidebarSections(sidebarSections(of: type, in: catalogue).filter { $0 != section }, of: type, in: catalogue)
-    }
-
-    /// Moves a shown section to `index` among the shown ones, which is kept within them.
-    mutating func moveSidebarSection(_ section: String, to index: Int, of type: TypeID, in catalogue: Catalogue) {
-        var sections = sidebarSections(of: type, in: catalogue)
-        guard let from = sections.firstIndex(of: section) else { return }
-        sections.remove(at: from)
-        sections.insert(section, at: min(max(index, 0), sections.count))
-        setSidebarSections(sections, of: type, in: catalogue)
     }
 
     /// Takes back every choice for the type, so it follows the defaults again.
@@ -282,20 +270,6 @@ nonisolated struct PagePlacement: Equatable, Sendable {
 
     /// Where Linked From goes for this type when the person has chosen nothing.
     var defaultLinkedFromPlace: LinkedFromPlace { defaultLinkedFrom }
-
-    /// The sidebar's sections in order: the person's list, or the default sections. A stored id that names no section
-    /// is dropped here, so the panel and every move work from one list. Linked From is there only while its place is
-    /// the sidebar, at its place in the list or, where the list does not name it, last.
-    var sidebarSections: [String] {
-        let linked = PagePlacement.linkedFrom
-        var sections = Self.unique(choice.sidebar ?? SidebarSection.defaultIDs).filter { SidebarSection(id: $0) != nil }
-        if linkedFromPlace == .page {
-            sections.removeAll { $0 == linked }
-        } else if !sections.contains(linked) {
-            sections.append(linked)
-        }
-        return sections
-    }
 
     private func defaultShows(_ row: String) -> Bool { row != linkField && !bookkeeping.contains(row) }
 }

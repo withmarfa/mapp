@@ -84,7 +84,7 @@ Use these words in names, strings and comments. A word with "Marfa" is the serve
 | Properties list | App | The fields a view shows after the title (`ViewProperties`) |
 | Pin | App | A property under an item's title (`PagePins`) |
 | Property block | App | The rows under the pins |
-| Right sidebar | App | The panel beside a page that lists everything (`ItemInspector`) |
+| Panel | App | The panel beside a page, with the parts Outline, Links and Info (`ItemPanel`) |
 | Corner | App | The controls at a page's or list's lower right (`WindowCorner`) |
 | Section, tab | App | A heading over sidebar rows, and a set of sections (`SidebarGroup`, `SidebarTab`) |
 | Shortcut | App | A sidebar row that acts and is never selected (`SidebarShortcut`), or a key (`ShortcutCommand`). Say which |

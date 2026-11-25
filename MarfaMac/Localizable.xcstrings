@@ -468,6 +468,17 @@
     "%@ you make show here." : {
 
     },
+    "%@ × %@" : {
+      "comment" : "A picture's width and height in pixels.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ × %2$@"
+          }
+        }
+      }
+    },
     "%@%@ files nothing uses" : {
 
     },
@@ -1305,6 +1316,9 @@
         }
       }
     },
+    "%lld min" : {
+      "comment" : "Minutes to read."
+    },
     "%lld minutes" : {
 
     },
@@ -1758,9 +1772,6 @@
 
     },
     "A connector comes with its plugin. Its settings and secrets are kept in %@." : {
-
-    },
-    "A connector manages this item’s title, text, properties, and type." : {
 
     },
     "A connector’s sign-in needs the app signed in as an app. Sign in again in Connection." : {
@@ -2512,9 +2523,6 @@
 
     },
     "Archived, unarchived or moved to or from another state." : {
-
-    },
-    "Arrange" : {
 
     },
     "Articles Open In" : {
@@ -3280,9 +3288,6 @@
     "Choose an Icon" : {
       "extractionState" : "manual"
     },
-    "Choose an event to see its details." : {
-
-    },
     "Choose an item to see its details." : {
 
     },
@@ -3857,6 +3862,9 @@
     "Current Password" : {
 
     },
+    "Current Version" : {
+
+    },
     "Custom" : {
 
     },
@@ -4064,6 +4072,9 @@
 
     },
     "Diagram unavailable:" : {
+
+    },
+    "Dimensions" : {
 
     },
     "Dinner with Sam" : {
@@ -4442,6 +4453,9 @@
     "Everywhere" : {
       "extractionState" : "manual"
     },
+    "Excerpts" : {
+
+    },
     "Existing %@" : {
 
     },
@@ -4788,9 +4802,6 @@
         }
       }
     },
-    "From Apps" : {
-
-    },
     "From Plugins" : {
 
     },
@@ -4954,6 +4965,9 @@
     "Heading 6" : {
 
     },
+    "Headings" : {
+
+    },
     "Health" : {
 
     },
@@ -5042,6 +5056,9 @@
 
     },
     "History" : {
+
+    },
+    "History isn’t available right now." : {
 
     },
     "Holds" : {
@@ -5144,6 +5161,9 @@
     "Import…" : {
 
     },
+    "In" : {
+
+    },
     "In %@." : {
 
     },
@@ -5205,6 +5225,9 @@
 
     },
     "Indigo" : {
+
+    },
+    "Info" : {
 
     },
     "Inherited from %@" : {
@@ -5900,6 +5923,9 @@
     "Left out with %@" : {
 
     },
+    "Length" : {
+
+    },
     "Let Chats Save Files" : {
 
     },
@@ -5963,7 +5989,7 @@
     "Links Between Items" : {
 
     },
-    "Links in This Page" : {
+    "Links in the Text" : {
 
     },
     "Links to Items" : {
@@ -6273,6 +6299,9 @@
 
     },
     "More Fields" : {
+
+    },
+    "More From This Book" : {
 
     },
     "More changes arrived while you were deciding. Look at them before you choose." : {
@@ -6708,9 +6737,6 @@
 
     },
     "No Results" : {
-
-    },
-    "No Sections" : {
 
     },
     "No Server Settings" : {
@@ -7391,6 +7417,9 @@
     "Page Width" : {
 
     },
+    "Pages" : {
+
+    },
     "Pages on it can no longer call the server." : {
 
     },
@@ -7407,6 +7436,9 @@
 
     },
     "Palettes" : {
+
+    },
+    "Panel" : {
 
     },
     "Paragraph Spacing" : {
@@ -7735,6 +7767,12 @@
     "Read and Edit" : {
 
     },
+    "Read only. %@ keeps this item, so an edit here would be overwritten." : {
+
+    },
+    "Read only. A connector keeps this item, so an edit here would be overwritten." : {
+
+    },
     "Read the Audit Log" : {
 
     },
@@ -7757,6 +7795,9 @@
 
     },
     "Reading Sources…" : {
+
+    },
+    "Reading Time" : {
 
     },
     "Reading Where Files Are…" : {
@@ -7805,6 +7846,9 @@
 
     },
     "Redo" : {
+
+    },
+    "Referenced By" : {
 
     },
     "Refresh" : {
@@ -7916,9 +7960,6 @@
       "extractionState" : "manual"
     },
     "Remove from Favorites" : {
-
-    },
-    "Remove from Sidebar" : {
 
     },
     "Remove from “%@”" : {
@@ -8386,9 +8427,6 @@
     "Section Options" : {
 
     },
-    "Sections for %@" : {
-
-    },
     "Seeing and ending the webhooks other apps and keys made needs Manage Keys." : {
 
     },
@@ -8602,6 +8640,9 @@
           }
         }
       }
+    },
+    "Show All %lld Versions" : {
+
     },
     "Show All Tabs" : {
 
@@ -9117,6 +9158,9 @@
 
     },
     "Synced Folders" : {
+
+    },
+    "Synced With %@." : {
 
     },
     "Syncing Is Paused" : {
@@ -10707,6 +10751,9 @@
     },
     "This would link the item back to itself through the items between them." : {
       "extractionState" : "manual"
+    },
+    "Thread" : {
+
     },
     "Three things for next week." : {
 

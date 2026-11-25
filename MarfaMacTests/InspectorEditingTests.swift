@@ -103,14 +103,6 @@ struct InspectorEditingTests {
         #expect(ItemPropertyDraft().loss(as: .text, current: "a", isEditable: false) == nil)
     }
 
-    // MARK: Folding
-
-    @Test func everySectionHasItsOwnStoredKeyAndIsResetWithTheRest() {
-        let keys = InspectorSectionKind.allCases.map(\.key)
-        #expect(Set(keys).count == InspectorSectionKind.allCases.count)
-        for key in keys { #expect(InterfaceKey.all.contains(key)) }
-    }
-
     // MARK: Handing off
 
     private static let field = ItemTypeInfo.Field(key: "assignee", label: "Assignee", kind: .text, declaredBy: TypeID("core.task"))

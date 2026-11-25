@@ -9,13 +9,19 @@ nonisolated enum MarfaMapping {
     static let blobField = "blob_ref"
     static let mimeTypeField = "mime_type"
     static let sizeField = "size_bytes"
+    static let widthField = "width"
+    static let heightField = "height"
     /// The file’s blob reference, kind, size, and values Marfa reads from the bytes (`READ_FROM_BYTES`).
-    static let fileFacts: Set<String> = [blobField, mimeTypeField, sizeField, "extracted_text", "width", "height", durationField]
+    static let fileFacts: Set<String> = [blobField, mimeTypeField, sizeField, "extracted_text", widthField, heightField, durationField]
     /// Marfa's folder device writes a body link as this edge, so it reads as the body's, not a property's.
     static let bodyLinkEdge = "references"
     /// Marfa writes an embed of a file as this edge, from the file's item to the item whose body embeds it.
     static let attachmentEdge = "attached-to"
     static let parentEdge = "parent-of"
+    /// Marfa links an excerpt to its book with this edge, from the excerpt to the book.
+    static let excerptEdge = "excerpt-of"
+    /// Marfa links a message to its thread with this edge, from the message to the thread.
+    static let threadEdge = "in-thread"
     /// Marfa places an item in a synced folder with this edge, from the item to the folder; its `path` is the file
     /// the item is written to, whose name a link or an embed may name the item by.
     static let placementEdge = "in-folder"

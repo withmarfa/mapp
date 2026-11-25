@@ -155,7 +155,7 @@ struct MarfaMappingTests {
         let references = try #require(Self.catalogue.edgeTypes["references"])
         #expect(references.cardinality(atTo: true) == .many)
         #expect(references.cardinality(atTo: false) == .many)
-        let thread = MarfaMapping.edgeType(EdgeType(id: "in-thread", label: "In thread", cardinality: "many-to-one"))
+        let thread = MarfaMapping.edgeType(EdgeType(id: MarfaMapping.threadEdge, label: "In thread", cardinality: "many-to-one"))
         #expect(thread.cardinality(atTo: false) == .one)
         #expect(thread.cardinality(atTo: true) == .many)
     }

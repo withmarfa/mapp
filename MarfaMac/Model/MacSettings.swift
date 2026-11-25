@@ -13,20 +13,14 @@ enum MacSettings {
                 DateFormat.key, WeekStart.key, StartWith.key, StartWith.lastPlaceKey, ReopenWindows.key, NewItemType.key,
                 QuickAdd.lastTypeKey, NewRowTypes.key, RemotePictureSetting.key, Reporting.switchKey, UpdateSettings.betaKey, SidebarTypeRow.subtypeIconsKey,
                 SourceViewMode.key, PlaceDensities.key, PlaceDefaults.key, ItemTableColumnLayouts.key, ViewLayouts.key,
-                PagePlacements.key, ViewOrders.key, ListScope.defaultScopeKey, SidebarLayouts.defaultsKey, TypeLooks.defaultsKey, SearchLeaveOuts.defaultsKey,
+                PagePlacements.key, PanelParts.key, ViewOrders.key, ListScope.defaultScopeKey, SidebarLayouts.defaultsKey, TypeLooks.defaultsKey, SearchLeaveOuts.defaultsKey,
                 ShortcutBindings.defaultsKey, AnyAppShortcuts.defaultsKey, CalendarHourHeight.key,
                 AutomaticExport.plansKey,
             ] + SearchOptions.keys
     }
 
-    /// Settings kept one for each of a number of things, such as the open sections of each app's inspector.
-    static let prefixes = ["\(InterfaceKey.inspectorAppOpen)."]
-
     /// Puts every setting back to its default. Nothing else in the defaults is touched.
     static func reset(in defaults: UserDefaults = .standard) {
         for key in keys { defaults.removeObject(forKey: key) }
-        for key in defaults.dictionaryRepresentation().keys where prefixes.contains(where: key.hasPrefix) {
-            defaults.removeObject(forKey: key)
-        }
     }
 }
