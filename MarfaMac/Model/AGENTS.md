@@ -7,7 +7,7 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 - **Name no type, field or label in code.** They come from `Catalogue`. A type identifier is named only for these:
   - **Roots:** `TypeID.isShipped` guards Marfa's `core`, `system` and `marfa` roots and the plugins' `common`; `TypeID.isHidden` hides `system` and `app`. `MarfaSync` names `system.view`, and `PreferencesType` the app's own hidden settings.
   - **Families:** tasks (`Catalogue.isTask`, `Catalogue.isStartDate`), files (`Catalogue.isFileType`), the header (`PageHeaderKind`) and the suggested look (`LookPreset.suggested`); a preset's fields are named in `MarfaMapping`. Collections go by their role (`Catalogue.isCollection`), never an identifier.
-  - **Starting points:** the Note fallback of `QuickAdd`, `NewRowTypes.starting` and `TypesModel.beginChild`, each only where the catalogue offers it.
+  - **Starting points:** the Note fallback of `QuickAdd` and `TypesModel.beginChild`, each only where the catalogue offers it.
 - **Edit only a type the owner made.** `TypeDefinitionEdit` reads `provenance.origin` from `GET /types`, because a plugin's type can have its own root.
 - **A field is a status only by its kind, and a list only by its shape** (`Field.Kind.list`), whatever it is called.
 - **`ListEntries` alone changes a list.** Every edit returns the whole list with the other entries as they were.

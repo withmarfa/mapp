@@ -332,6 +332,12 @@ struct SidebarPlaceRow: View, Equatable {
             }
         }
         .onHover { isHovering = $0 }
+        // On a page of the Library the Library's row is already chosen, so the list is told of no click: the row
+        // goes to the Library itself.
+        .simultaneousGesture(TapGesture().onEnded {
+            guard data.opens == .library, !customizing, !PlaceView.library.isSame(browser.showing) else { return }
+            browser.show(.library, in: library, order: order)
+        }, isEnabled: data.opens == .library && !customizing)
         .sidebarRowGround(isHovering && !customizing)
         .contextMenu {
             SidebarPlaceMenu(data: data, groups: groups, customizing: customizing, browser: browser, order: order)

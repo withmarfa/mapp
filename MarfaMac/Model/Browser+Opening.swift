@@ -38,7 +38,7 @@ extension Browser {
     /// Whether the page is in a column beside a layout that spans the window, which `opening` says it is to be and
     /// the window can show: one item is chosen and nothing has taken the window's editor (the modal, a full page).
     func showsBesidePage(opening: ItemOpening) -> Bool {
-        opening == .besideList && (showsCollection || showsItemsIndex) && !isModalPresented && selection.count == 1
+        opening == .besideList && showsCollection && !isModalPresented && selection.count == 1
     }
 
     /// How a link followed from a page in a layout that spans the window opens: where the page already is, beside
@@ -80,10 +80,9 @@ extension Browser {
 
     nonisolated enum ModalStep: Sendable { case previous, next }
 
-    /// The items in the order of what is behind the modal: the Items index's rows, the table's rows, and for every other
+    /// The items in the order of what is behind the modal: the table's rows, and for every other
     /// layout the list's sections, which follow the filters and the sort.
     func orderBehind(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
-        if showsItemsIndex { return itemIndexRows(in: library).map(\.id) }
         if viewMode == .table {
             let content = tableContent(in: library)
             let rows = content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)

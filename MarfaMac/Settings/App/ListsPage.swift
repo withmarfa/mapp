@@ -6,7 +6,6 @@ import SwiftUI
 struct ListsPage: View {
     @AppStorage(ListKey.density) private var density = Density.standard
     @AppStorage(OrderKey.sort) private var sort = ItemOrder().sort
-    @AppStorage(ListKey.showsQuickAdd) private var showsQuickAdd = false
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = ItemOrder().groupsByDate
 
     var body: some View {
@@ -32,12 +31,6 @@ struct ListsPage: View {
                         Text("Date").tag(true)
                     }
                     .accessibilityIdentifier("GroupBy")
-                }
-            }
-            SettingsSection("Items Page") {
-                SettingsRow("Show Quick Add Options", line: "Tiles above the table for making a new item of a type.") {
-                    SettingsToggle(title: "Show Quick Add Options", isOn: $showsQuickAdd)
-                        .accessibilityIdentifier("ShowsQuickAdd")
                 }
             }
         }

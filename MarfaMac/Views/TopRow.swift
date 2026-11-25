@@ -155,7 +155,8 @@ struct TopRowPieces {
                         if let count = place.count { Text(count, format: .number).foregroundStyle(.tertiary) }
                     }
                 }
-                .buttonStyle(TopRowPillStyle(isChosen: false))
+                .buttonStyle(TopRowPillStyle(isChosen: place.target.place == content.place))
+                .accessibilityAddTraits(place.target.place == content.place ? .isSelected : [])
             }
         }
         .fixedSize()
@@ -289,7 +290,8 @@ private struct TopRowPills: View {
     let choose: (TopRowContent.Choice) -> Void
     let newView: () -> Void
 
-    private var current: TopRowContent.Choice? { choices.first { $0.id == chosen } ?? choices.first }
+    /// None while the window shows one of the Library's places.
+    private var current: TopRowContent.Choice? { choices.first { $0.id == chosen } ?? (chosen.isEmpty ? nil : choices.first) }
 
     private var split: (shown: [TopRowContent.Choice], hidden: [TopRowContent.Choice]) {
         guard let count = fold.shown, count < choices.count else { return (choices, []) }
@@ -367,7 +369,7 @@ private struct TopRowPills: View {
             Divider()
             Button("New View…", action: newView)
         } label: {
-            TopRowMenuLabel(title: Text(current?.title ?? ""), isChosen: true)
+            TopRowMenuLabel(title: current.map { Text($0.title) } ?? Text("Views"), isChosen: current != nil)
         }
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
     }

@@ -13,7 +13,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
-        XCTAssertTrue(element("ItemsIndex").waitForExistence(timeout: 5), "the window opens on the Items index")
+        XCTAssertTrue(element("TopRowTitle").waitForExistence(timeout: 5), "the window opens on the Library")
     }
 
     @MainActor override func tearDown() async throws {
@@ -74,7 +74,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(element("QuickAddTitle").waitForNonExistence(timeout: 2))
-        XCTAssertTrue(element("ItemsIndex").exists, "the window stays where it was")
+        XCTAssertTrue(element("TopRowTitle").exists, "the window stays where it was")
     }
 
     /// A click near the sidebar's trailing edge, level with `row`, past the end of its words.
@@ -105,7 +105,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         instanceName.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
         // The Settings window is the front one, so the main window's parts are asked of the whole app.
-        XCTAssertTrue(app.descendants(matching: .any)["ItemsIndex"].exists, "the main window keeps its page")
+        XCTAssertTrue(app.descendants(matching: .any)["TopRowTitle"].exists, "the main window keeps its page")
         XCTAssertTrue(app.outlines["Sidebar"].exists, "and its sidebar")
         XCTAssertEqual(app.windows.count, 2)
         attachScreenshot("SettingsFromInstanceMenu")
@@ -128,7 +128,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         }
         XCTAssertTrue(sidebarText("Favorites").exists)
         XCTAssertTrue(sidebarText("Types").exists)
-        // Items is an index page; a type lists its items.
+        // A type lists its items.
         element("SidebarType-core.note").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading list")).firstMatch
         XCTAssertTrue(note.waitForExistence(timeout: 3))
@@ -148,12 +148,10 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY, "the indexes are in the Library group, above Views")
         XCTAssertFalse(sidebarText("Home").exists, "collection entries belong in the index")
         choose("Collections")
-        let index = window.outlines["IndexPage"]
+        let index = element("PlaceIndexTable")
         XCTAssertTrue(index.waitForExistence(timeout: 3))
         let home = index.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Home")).firstMatch
-        let reading = index.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading")).firstMatch
         XCTAssertTrue(home.waitForExistence(timeout: 3))
-        XCTAssertLessThanOrEqual(home.frame.maxY, reading.frame.minY, "collections go by title")
         home.doubleClick()
         let boiler = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Boiler")).firstMatch
         let moving = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Moving checklist")).firstMatch

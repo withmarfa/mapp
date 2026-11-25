@@ -46,8 +46,12 @@ nonisolated struct PlaceEmpty: Equatable {
             return PlaceEmpty(
                 title: String(localized: "No \(plural)"), line: built.count < Self.lineLimit ? built : String(localized: "Nothing here yet."),
                 makes: makes, buttonTitle: makes == nil ? nil : String(localized: "New \(label)"))
-        case .types, .collections, .sources:
-            return plain(String(localized: "No Items"))
+        case .types:
+            return plain(String(localized: "No Types"), String(localized: "Types that hold items show here."))
+        case .collections:
+            return plain(String(localized: "No Collections"), String(localized: "Collections you make show here."))
+        case .sources:
+            return plain(String(localized: "No Sources"), String(localized: "Sources show where items came from."))
         }
     }
 }

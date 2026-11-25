@@ -37,6 +37,10 @@ extension Browser {
     /// Whether the window shows the Archive's own list, as against a view or a place's list of archived items.
     var listsArchive: Bool { shown.place == .archive && shown.view == .own }
 
+    /// Whether the window shows a list of items by what they are and where they came from: the Archive's own list, and the
+    /// Library's, whose default view is the name, type, source and edit date, latest first.
+    var listsByOrigin: Bool { (shown.place == .archive || shown.place == .library) && shown.view == .own }
+
     /// The title a layout gives the window: the Archive is a page of the Library and keeps its title through a search.
     func pageTitle(in library: any ItemLibrary) -> String {
         if listsArchive { return String(localized: "Library") }
@@ -226,7 +230,15 @@ extension Browser {
     /// What the place's table shows, worked out once and shared by everything that draws the table, its controls or
     /// a command about it, until the items, the place's options or the search change. Reading it does not depend on
     /// the selection, so a selection never makes it again.
+    ///
+    /// A place of more than `arrangesAlongsideAbove` items, such as a Library of tens of thousands, is not ordered on the
+    /// main actor at each change. Its last table stays on screen, the Library's also while the window is elsewhere, and the next is
+    /// sorted off the main actor (`arrange`). A run of edits is let settle first (`arrangeSettling`); a choice of the
+    /// person's or an item gone is arranged at once. The chosen row keeps its place through a re-sort until the person
+    /// chooses another, so a sort by Edited does not carry the row they are editing from under them.
     func tableContent(in library: any ItemLibrary) -> ItemTableContent {
+        // Read, so whoever asks is told when an arrangement lands.
+        _ = tableArrangements
         let keyed = (tableOptions[shown] ?? ItemTableOptions()).settled
         let derived = derivedKey(in: library)
         let key = TableKey(
@@ -234,9 +246,121 @@ extension Browser {
             hidesEmpty: hidesEmptyGroups, sources: library.sources.infos,
             relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()))
         if let held = tableMemo, held.key == key { return held.content }
-        let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
+        // A search's table is held apart, so its results never show the Library's table nor drop it.
+        let searching = isSearching
+        let held = (searching ? heldSearch : heldTables[shown])
+            .flatMap { $0.key.derived.library == key.derived.library && $0.key.derived.place == shown ? $0 : nil }
+        // The table the place held is the one asked for again, as when a search ends on the place it began on.
+        if let held, held.key == key { tableMemo = held; return held.content }
+        if let held, arranging?.key == key { return held.content }
+        let listed = derived.items ?? items(in: library)
+        if let held, listed.count > Self.arrangesAlongsideAbove {
+            arrange(key, items: listed, after: held, in: library)
+            return held.content
+        }
+        arranging?.task.cancel()
+        arranging = nil
+        let content = ItemTableContent(browser: self, library: library, items: listed)
         tableMemo = (key, content)
+        let isLarge = listed.count > Self.arrangesAlongsideAbove
+        if searching {
+            heldSearch = isLarge ? (key, content) : nil
+        } else {
+            heldSearch = nil
+            hold(isLarge ? (key, content) : nil, for: shown)
+        }
         return content
+    }
+
+    /// Up to this many items a table is worked out in place, so a small place never shows an earlier table first.
+    nonisolated static let arrangesAlongsideAbove = 2_000
+    /// How long a run of changes to a large place's items is let settle.
+    nonisolated static let arrangeSettling = Duration.milliseconds(300)
+
+    /// Keeps `table` as the held table of `place`, and forgets every other but the Library's, so a window that has
+    /// shown many large places holds two tables at most.
+    private func hold(_ table: (key: TableKey, content: ItemTableContent)?, for place: PlaceView) {
+        var kept: PlaceMemory<(key: TableKey, content: ItemTableContent)> = [:]
+        if !place.isSame(.library) { kept[.library] = heldTables[.library] }
+        kept[place] = table
+        heldTables = kept
+    }
+
+    /// Makes the table for `key` with its rows sorted off the main actor, and shows it once it is still the one asked for.
+    /// One arrangement works off the main actor at a time: a newer one waits for the one it replaces to end, which it does
+    /// at its next step, so a steady run of edits never piles sorts up.
+    private func arrange(
+        _ key: TableKey, items: [Item], after earlier: (key: TableKey, content: ItemTableContent), in library: any ItemLibrary
+    ) {
+        arranging?.task.cancel()
+        let place = shown
+        let sameChoices = key.options == earlier.key.options && key.choices == earlier.key.choices
+            && key.shownRelations == earlier.key.shownRelations && key.hidesEmpty == earlier.key.hidesEmpty
+            && key.relativeDay == earlier.key.relativeDay && key.derived.listing == earlier.key.derived.listing
+            && key.derived.ids == earlier.key.derived.ids && key.derived.byRelevance == earlier.key.derived.byRelevance
+        // Only the items' own changes settle: a membership change may have taken an item away, which must not stay chosen.
+        let settles = sameChoices && key.derived.membership == earlier.key.derived.membership
+        // The arrangement replaced ends once the work it has off the main actor ends.
+        let previous = arranging?.task
+        let options = tableOptions[shown] ?? ItemTableOptions()
+        let searching = isSearching
+        let token = UUID()
+        let task = Task { [weak self] in
+            if settles { try? await Task.sleep(for: Browser.arrangeSettling) }
+            await previous?.value
+            guard let self, !Task.isCancelled, self.shown == place, self.isShowing(library) else { self?.endArranging(token); return }
+            // The main actor only reads what the rows are made of, and takes the table as it lands.
+            let looks = self.looks(in: library)
+            let shownRelations = self.shownRelations
+            let wants = await Task.detached(priority: .userInitiated) {
+                ItemTableContent.Wants(items: items, looks: looks, options: options, shown: shownRelations)
+            }.value
+            guard self.isLive(token, place, searching) else { return self.endArranging(token) }
+            var start = ContinuousClock.now
+            let reading = ItemTableContent.reading(browser: self, library: library, items: items, wants: wants)
+            Cost.record(.tableArrange, since: start)
+            let made = await Task.detached(priority: .userInitiated) { ItemTableContent.Made(reading) }.value
+            guard self.isLive(token, place, searching) else { return self.endArranging(token) }
+            start = ContinuousClock.now
+            // The options the rows and the key were made from, not the window's now.
+            let content = ItemTableContent(browser: self, library: library, made: made, options: options, hidesEmptyGroups: key.hidesEmpty)
+            let ordering = content.ordering
+            Cost.record(.tableArrange, since: start)
+            let ordered = await Task.detached(priority: .userInitiated) { ordering.ordered() }.value
+            guard self.isLive(token, place, searching) else { return self.endArranging(token) }
+            start = ContinuousClock.now
+            // The chosen row is read as the table lands, where the held table shows it now. The held table's rows are
+            // read only for that row, since reading them sorts them on the main actor where they were never asked for.
+            let pinned = sameChoices && self.selection.count == 1 ? self.selection.first : nil
+            let shownRows = pinned == nil ? nil : ((searching ? self.heldSearch : self.heldTables[place])?.content.rows ?? earlier.content.rows)
+            content.land(ordered, rows: Browser.holding(pinned, in: ordered.rows, as: shownRows))
+            Cost.record(.tableArrange, since: start)
+            self.arranging = nil
+            self.tableMemo = (key, content)
+            if searching { self.heldSearch = (key, content) } else { self.hold((key, content), for: place) }
+            self.tableArrangements += 1
+        }
+        arranging = (key, token, task)
+    }
+
+    /// Whether the arrangement of `token` is still the one under way, for the place and the search it began for.
+    private func isLive(_ token: UUID, _ place: PlaceView, _ searching: Bool) -> Bool {
+        !Task.isCancelled && arranging?.token == token && shown == place && isSearching == searching
+    }
+
+    /// Ends the arrangement of `token` that did not land, so the next ask for that table arranges it again. A task that
+    /// was replaced finds another's record and leaves it.
+    private func endArranging(_ token: UUID) {
+        if arranging?.token == token { arranging = nil }
+    }
+
+    /// `rows` with the row of `id` where it stood in `earlier`, where both hold it.
+    nonisolated static func holding(_ id: ItemID?, in rows: [ItemTableRow], as earlier: [ItemTableRow]?) -> [ItemTableRow] {
+        guard let id, let earlier, let was = earlier.firstIndex(where: { $0.id == id }),
+              let now = rows.firstIndex(where: { $0.id == id }), was != now else { return rows }
+        var moved = rows
+        moved.insert(moved.remove(at: now), at: min(was, moved.count))
+        return moved
     }
 
     /// What everything worked out from a place's items depends on: which library and how often it changed, the

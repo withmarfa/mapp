@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The View Options of every layout and the index pages as the command palette lists them: each choice not already made.
+/// The View Options of every layout as the command palette lists them: each choice not already made.
 struct ViewOptionCommand {
     let title: String
     let systemImage: String
@@ -11,8 +11,7 @@ struct ViewOptionCommand {
     let action: () -> Void
 
     static func commands(for browser: Browser, in library: any ItemLibrary) -> [ViewOptionCommand] {
-        if let place = browser.indexPlace { return indexCommands(for: place, browser: browser) }
-        guard browser.offersViewOptions else { return [] }
+        guard browser.offersViewOptions, !browser.showsPlaceIndex else { return [] }
         switch browser.viewMode {
         case .table: return table(browser, library)
         case .board: return board(browser, library) + properties(browser, library)

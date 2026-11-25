@@ -32,18 +32,36 @@ extension ItemTableRow {
     static func rows(
         of items: [Item], in library: any ItemLibrary, wanting wanted: Set<Relation> = [], looks: [TypeID: TypeLook] = [:]
     ) -> [ItemTableRow] {
-        let catalogue = library.catalogue
+        let wants = ItemTableContent.Wants(items: items, relations: wanted, looks: looks)
+        return rows(of: items, relations: relations(asking: wants, in: library), catalogue: library.catalogue, sources: library.sources)
+    }
+
+    /// The links and counts the table wants, by item, for the items `wants` asks about; the others have none.
+    @MainActor
+    static func relations(asking wants: ItemTableContent.Wants, in library: any ItemLibrary) -> [ItemID: ItemRelations] {
+        var relations: [ItemID: ItemRelations] = [:]
+        for item in wants.asked {
+            let related = library.relations(of: item, wanting: wants.relations, counts: wants.counts[item.type] ?? [])
+            if related != .none { relations[item.id] = related }
+        }
+        return relations
+    }
+
+    /// The rows of `items` from what was read of the library, which needs no actor.
+    nonisolated static func rows(
+        of items: [Item], relations: [ItemID: ItemRelations], catalogue: Catalogue, sources: SourceDirectory
+    ) -> [ItemTableRow] {
         var sourceNames: [String: String] = [:]
         return items.map { item in
-            let relations = library.relations(of: item, wanting: wanted, counts: (looks[item.type] ?? .empty).counts)
+            let related = relations[item.id] ?? .none
             let source = item.source.flatMap { $0.isEmpty ? nil : $0 }.map { code in
-                sourceNames[code] ?? { let name = library.sources.name(code); sourceNames[code] = name; return name }()
+                sourceNames[code] ?? { let name = sources.name(code); sourceNames[code] = name; return name }()
             }
             return ItemTableRow(
                 item: item,
                 typeLabel: catalogue.label(for: item.type),
                 typeIcon: catalogue.icon(for: item.type),
-                parent: relations.parent, children: relations.children, collections: relations.collections, counts: relations.counts,
+                parent: related.parent, children: related.children, collections: related.collections, counts: related.counts,
                 sourceName: source ?? "")
         }
     }

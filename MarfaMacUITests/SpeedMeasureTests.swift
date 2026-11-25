@@ -333,7 +333,7 @@ nonisolated final class SpeedMeasureTests: XCTestCase {
 
     // MARK: Helpers
 
-    /// Chooses the first type the sidebar lists. A type's place takes the layout keys; the Items place is an index page.
+    /// Chooses the first type the sidebar lists, whose place takes the layout keys.
     @MainActor private func chooseFirstType() throws {
         let place = try XCTUnwrap(typeRows().first, "The instance shows a type in the sidebar")
         spot(sidebarElement(place)).click()

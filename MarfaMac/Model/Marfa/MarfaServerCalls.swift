@@ -297,6 +297,7 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
             var keepers = ConnectorKeepers()
             for plugin in try await client().listPlugins().ok.body.json.data {
                 guard let connector = plugin.connector.value else { continue }
+                keepers.add(connector: connector.source)
                 for kind in connector.kinds {
                     let direction: ConnectorDirection = switch kind.direction {
                     case ._in: .into
