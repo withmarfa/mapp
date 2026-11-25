@@ -18,7 +18,7 @@ nonisolated struct PaletteTokens: Equatable, Sendable {
         clauses.first { $0.field == FilterTarget.type.id && ($0.op == .is || $0.op == .isNot) && !$0.values.isEmpty }
     }
 
-    var types: Set<TypeID> { Set(typeClause?.values.map(TypeID.init) ?? []) }
+    var types: Set<TypeID> { Set((typeClause?.values ?? []).map { TypeID(rawValue: $0) }) }
     var excludesTypes: Bool { typeClause?.op == .isNot }
 
     /// The tokens left to apply once a search has answered.

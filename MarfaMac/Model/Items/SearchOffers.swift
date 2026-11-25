@@ -299,7 +299,7 @@ nonisolated enum SearchDates {
     }
 }
 
-extension FilterWording {
+nonisolated extension FilterWording {
     /// A token as its chip says it: the field, the relation unless it is the field's usual one (a tag is simply there, a type
     /// simply is), and the values.
     static func tokenParts(of clause: FilterClause, target: FilterTarget, calendar: Calendar, titles: (String) -> String?) -> Parts {
