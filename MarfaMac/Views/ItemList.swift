@@ -251,7 +251,7 @@ private enum ListLine: Identifiable {
             typeLabel: "Task", mixesTypes: true,
             chips: [
                 .type(icon: "lucide:circle-check", label: "Task"), .status(.inProgress, label: "In Progress"),
-                .option(label: "High", tone: .red), .person(initials: "AC", name: "August Cayzer"),
+                .option(label: "High", tone: .red), .person(initials: "MC", name: "Mira Castell"),
             ], more: 1),
         RowContent(
             title: "Field notes", date: "Yesterday", secondary: "Start with what we observed in the kitchen.",
