@@ -33,7 +33,7 @@ struct FileItemContent: View {
             if type.conforms(to: .plainText) {
                 switch previewURL == url ? textPreview : nil {
                 case .text(let text):
-                    PlainTextFilePage(text: text, title: title) { NSWorkspace.shared.open(url) }
+                    PlainTextFilePage(text: text, title: title)
                 case .unsupported:
                     systemPreview
                 case .unavailable:
@@ -57,13 +57,6 @@ struct FileItemContent: View {
 
     private var systemPreview: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text(title).interfaceFont(.headline).lineLimit(1)
-                Spacer()
-                Button("Open", systemImage: "arrow.up.forward.app") { NSWorkspace.shared.open(url) }
-                    .appButton(.secondary)
-            }
-            .padding()
             switch FileViewKind.of(type) {
             case .pdf:
                 FilePDFPreview(url: url, item: item, details: details)

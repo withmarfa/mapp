@@ -69,4 +69,4 @@ The Swift side of the item editor. The page is in `editor/`; read `editor/AGENTS
 - **Editor made for every view value.** Flag an `EditorController`, web view or other costly object made in a view's initializer or given to `State(initialValue:)`. Safe path: `EditorSlot`, or `.task`.
 - **Unguarded private API.** Flag a private WebKit setting without a `responds(to:)` check, or one that Apple's own `WebView` does not use.
 - **Link request left open.** Flag a path that ends Link to Item without one answer, writes a link without `bodyLink(to:in:)`, or parses, escapes or folds a link's text.
-- **Edit saved to the wrong place.** Flag a save without the version it was typed on, or one that can land in another item.
+- **Edit saved to the wrong place.** Flag a save without the version it was typed on, one landing in another item, or a page form not showing `EditorController.heldItemID`.

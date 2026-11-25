@@ -35,8 +35,12 @@ extension ItemMove {
 extension ItemLibrary {
     /// Runs `move` on `ids`, or asks first where it must: Archive of items that hold others, and Move to Feed of items
     /// the Feed would let go. The question belongs to `details`' window. Without one nothing can ask, so Archive takes
-    /// only the chosen items and Move to Feed goes ahead.
-    func perform(_ move: ItemMove, on ids: Set<ItemID>, undoManager: UndoManager?, details: DetailsPresentation?) {
+    /// only the chosen items and Move to Feed goes ahead. `moved` hears what the copy queued, once it has judged each
+    /// write, where the move runs now; a move that asks first does not answer it.
+    func perform(
+        _ move: ItemMove, on ids: Set<ItemID>, undoManager: UndoManager?, details: DetailsPresentation?,
+        moved: ((CommandOutcome) -> Void)? = nil
+    ) {
         func titleOfOne() -> String? { ids.count == 1 ? ids.first.flatMap { item($0)?.name } : nil }
         if let details {
             switch move {
@@ -55,7 +59,7 @@ extension ItemLibrary {
                 break
             }
         }
-        Browser.move(move, ids, in: self, undoManager: undoManager, toasts: details?.toasts)
+        Browser.move(move, ids, in: self, undoManager: undoManager, toasts: details?.toasts, moved: moved)
     }
 }
 

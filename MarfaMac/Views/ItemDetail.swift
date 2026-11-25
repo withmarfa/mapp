@@ -11,6 +11,11 @@ struct ItemDetail: View {
     var backsToolbar = true
     /// Whether the page has its corner. A modal's page has none.
     var showsCorner = true
+    /// The item to show in place of the selection's, which the column beside a layout follows once the selection has
+    /// rested (`BesideSettler`). Nil shows the selection's.
+    var itemID: ItemID?
+
+    private var shownID: ItemID? { itemID ?? browser.selection.first }
 
     var body: some View {
         if browser.selection.count > 1 {
@@ -18,16 +23,18 @@ struct ItemDetail: View {
                        detail: Text("Choose one item to read or edit it."), actions: { EmptyView() })
                 .accessibilityIdentifier("MultipleSelectionPrompt")
                 .onAppear { editor.close() }
-        } else if let id = browser.selection.first, let item = library.item(id) {
+        } else if let id = shownID, let item = library.item(id) {
             if library.pageLayout(of: item) != .text {
                 FileItemPage(item: item, drafts: details, open: { [editor] in editor.onOpenItem($0) }, onResolved: { browser.fileFetched(id, at: $0) }, backsToolbar: backsToolbar)
                     .itemCorner(item, editor: nil, details: details, isShown: showsCorner)
-                    .onAppear { editor.close() }
+                    // An editor that holds the file has left its page for it already (`EditorController.open`).
+                    .onAppear { if editor.heldItemID != id { editor.close() } }
             } else {
                 ItemPage(item: item, editor: editor, headerDrafts: details, backsToolbar: backsToolbar)
                     .itemCorner(item, editor: editor, details: details, isShown: showsCorner)
                     .onAppear(perform: grantFocusRequest)
                     .onChange(of: browser.focusRequest, grantFocusRequest)
+                    .onChange(of: itemID, grantFocusRequest)
             }
         } else {
             Group {
@@ -45,10 +52,12 @@ struct ItemDetail: View {
     /// The page takes the keyboard when asked, once it shows; the editor holds the request until its page is ready.
     private func grantFocusRequest() {
         guard let request = browser.focusRequest, request == .page || request == .title else { return }
+        // A column still on the item before waits for the one the selection moved to.
+        if let itemID, itemID != browser.selection.first { return }
         browser.focusRequest = nil
         let caret = request == .page ? browser.focusCaret : nil
         browser.focusCaret = nil
-        editor.focus(browser.selection.first, onTitle: request == .title, caret: caret)
+        editor.focus(shownID, onTitle: request == .title, caret: caret)
     }
 }
 

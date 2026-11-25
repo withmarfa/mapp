@@ -118,11 +118,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Stored `rows` | A page placement is stored with `rows` beside `shows`, because a copy from before `shows` sets the whole map aside without `rows`. Removed after the first v0.1 release: write `shows` only and keep reading an old `rows` once. | `PagePlacements.swift` | – |
 | Scrolled | The title sits in the toolbar on one line. | `ItemDetail.swift`, `WindowToolbar.swift` | `Rethink-Page-Scrolled`, `Rethink-White-Page` |
 | Foot | Sub-Items with nesting on any item that has them; a Timeline of mentions on a person and a place; more after 30. | `LinkedFromPlace`, `editor/src/header.ts` | `Rethink-Sub-Items`, `Rethink-Person`, `Rethink-Place` |
-| Corner | Formats, text size and Focus on a written page; size and Focus otherwise; Open on a file. | `PageCorner` | `Rethink-Formats`, `Rethink-Focus` |
 | Blocks | A callout as a tinted block without a rail. A code block's actions in its corner; the place of its language is open. | `editor/src/style.css` | `Rethink-Blocks`, `Rethink-Blocks-Code` |
-| Beside the list | Open Items gains Beside the List: the page in a column, one editor to a window. | `ItemOpening`, `EditorSlot` | `Rethink-Notes`, `Rethink-Library-New` |
-| Modal | Close, Up and Down lead; Favorite, Share and More trail, with Keep first on a Feed item; Open as Page in the corner. | `ItemModal.swift` | `Rethink-Modal`, `Rethink-Inbox-Modal` |
-| Own window | An item's window has the same page, panel and controls. | `ItemWindow.swift` | `Rethink-Item-Window` |
 
 ## The panel beside it
 

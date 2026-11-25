@@ -12,6 +12,8 @@ paths:
   - MarfaMac/Views/ItemPanel/*.swift
   - MarfaMac/Views/Item*Inspector*.swift
   - MarfaMac/Views/ItemCorner.swift
+  - MarfaMac/Views/PageOpener.swift
+  - MarfaMac/Model/Items/PageOpenTarget.swift
   - MarfaMac/Views/WebPageItemPage.swift
   - MarfaMac/Views/VersionHistory*.swift
   - editor/src/header.ts
@@ -78,15 +80,17 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 | The page | Its corner |
 | --- | --- |
 | Text that can be written | Formats, text size, Focus |
-| Text that cannot | Text size, Focus |
+| Text that cannot, or a type with none | Text size, Focus |
 | A web page with a Reader view | Reader or Original, text size, Focus |
 | A web page without one | Focus |
 | An image | Size, Focus |
-| A PDF | Page, size, Focus |
+| A PDF | Page (two or more), size, Focus |
 | Any other file, or one still arriving | Focus |
 | An item in the modal | None |
+| The column beside a layout | Open as Page |
 
 - **Every control in the corner is also a command in the View menu**, and the corner's own menus bind no keys, because a key registered twice works for neither.
+- **Open leads wherever the page has somewhere outside the app** (`PageOpenTarget`): the browser, a file's app or Maps, named in its help.
 - **A person can turn off formats, text size and Focus** (`PageCornerChoice`). One turned off is in the page's More menu.
 - **Zoom keys size the file or the text, never both** (`FileViewCommands`, `TextZoomCommands`).
 - **A size belongs to one file.** Another item's page opens fitted.
