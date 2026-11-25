@@ -37,7 +37,7 @@ An item's page is its title, pinned properties, property block and text. One pag
 - **A type remembers its pill** (`PanelParts`). A part the item lacks is not shown, and a word this version does not know is no choice.
 - **Outline shows only for an item with headings, or a PDF.** Its counts are worked out off the main thread. The page does not say which heading is in view.
 - **Links asks the server for nothing.** It is made from edges the copy holds. A child, a collection's member and a file are left out of Referenced By, because each has a place. A link follows Open Items (`Browser.follow(link:)`).
-- **In is the last fact in Info,** a menu that moves the item between Library and Feed (`ItemLibrary.setTier`) in one undo step, and plain where it may not move.
+- **In is the last fact in Info,** a menu that moves the item between Library and Feed as the Keep and Move to Feed commands do (`ItemLibrary.perform`), and plain where it may not move.
 - **Who keeps the item is said once at the top of Info,** with the reason `Item.obstacle(to:)` gives, so the page and the line never disagree. Only the read-only case has one: a connector that carries changes back needs an owner's call.
 - **History is asked for only while Info shows** (`PanelHistory`), once for each version. Version 1 says No earlier versions.
 - **Properties, Relationships and Tags and a sync problem stay in Info** until the page's rows and notices carry them.

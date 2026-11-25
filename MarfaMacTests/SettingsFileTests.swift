@@ -46,6 +46,7 @@ import Testing
         let looks = #"{"\#(library)":{"core.note":{"date":"created"}},"marfa:https://two":{"core.task":{"date":"created"}}}"#
         defaults.set(Data(looks.utf8), forKey: TypeLooks.defaultsKey)
         defaults.set(#"{"core.note":{"pins":["due_at"]}}"#, forKey: PagePlacements.key)
+        defaults.set(#"{"core.note":{"part":"links"}}"#, forKey: PanelParts.key)
         ViewOrders.update(in: defaults) { $0.set([.favorites, .own], in: .library) }
         ViewLayouts.update(in: defaults) { $0.set(ViewMacSettings(layout: .board, widths: Data("widths".utf8)), for: view) }
         PlaceDefaults.update(in: defaults) {
