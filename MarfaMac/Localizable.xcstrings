@@ -1703,16 +1703,7 @@
     "A" : {
 
     },
-    "A Collection" : {
-
-    },
     "A Folder" : {
-
-    },
-    "A Source" : {
-
-    },
-    "A Type" : {
 
     },
     "A View" : {
@@ -2008,6 +1999,9 @@
     "Add" : {
       "extractionState" : "manual"
     },
+    "Add %@" : {
+
+    },
     "Add Address" : {
 
     },
@@ -2069,9 +2063,6 @@
 
     },
     "Add Section" : {
-
-    },
-    "Add Shortcut" : {
 
     },
     "Add Sort" : {
@@ -2244,7 +2235,13 @@
     "All Links" : {
 
     },
+    "All Pages Are Shown" : {
+
+    },
     "All Types" : {
+
+    },
+    "All Types Are Shown" : {
 
     },
     "All day" : {
@@ -3437,6 +3434,9 @@
       "extractionState" : "manual"
     },
     "Comfortable Cards" : {
+
+    },
+    "Command" : {
 
     },
     "Command Line" : {
@@ -4855,9 +4855,6 @@
     "Go" : {
 
     },
-    "Go To" : {
-
-    },
     "Go back to settings saved before a change." : {
 
     },
@@ -4874,6 +4871,9 @@
 
     },
     "Gray" : {
+
+    },
+    "Gray, or white behind a hairline." : {
 
     },
     "Green" : {
@@ -4996,13 +4996,7 @@
     "Hide Sidebar" : {
 
     },
-    "Hide Views from Sidebar" : {
-
-    },
     "Hide from Page" : {
-
-    },
-    "Hide from Sidebar" : {
 
     },
     "Hide on %@ Pages" : {
@@ -5502,6 +5496,9 @@
 
     },
     "Items: %@." : {
+
+    },
+    "Item…" : {
 
     },
     "Its %@ %@" : {
@@ -6472,6 +6469,9 @@
       "extractionState" : "manual",
       "generatesSymbol" : false
     },
+    "New Item in %@" : {
+
+    },
     "New Items" : {
 
     },
@@ -6503,9 +6503,6 @@
 
     },
     "New Tab" : {
-
-    },
-    "New Tab…" : {
 
     },
     "New Type" : {
@@ -7528,6 +7525,9 @@
     "Pin a Property…" : {
 
     },
+    "Pin an Item" : {
+
+    },
     "Pink" : {
 
     },
@@ -7873,9 +7873,6 @@
     "Remove Old Activity" : {
 
     },
-    "Remove Shortcut" : {
-
-    },
     "Remove Sort" : {
 
     },
@@ -8007,9 +8004,6 @@
       "extractionState" : "manual"
     },
     "Rename Source…" : {
-
-    },
-    "Rename Tab" : {
 
     },
     "Rename View" : {
@@ -8278,9 +8272,6 @@
       "extractionState" : "manual"
     },
     "Saved" : {
-
-    },
-    "Saved Views" : {
 
     },
     "Saved as “%@”." : {
@@ -8644,9 +8635,6 @@
     },
     "Show Month" : {
       "extractionState" : "manual"
-    },
-    "Show More" : {
-
     },
     "Show Original" : {
 
@@ -10899,6 +10887,9 @@
     "Types that Marfa or a plugin provides can’t be changed. Add the field to a type of your own instead." : {
 
     },
+    "Types, Collections, or Sources" : {
+
+    },
     "Typing" : {
 
     },
@@ -11230,6 +11221,9 @@
     "View as Timeline" : {
       "extractionState" : "manual"
     },
+    "View, Collection, or Item" : {
+
+    },
     "Views" : {
 
     },
@@ -11445,6 +11439,9 @@
 
     },
     "Which and Where" : {
+
+    },
+    "White" : {
 
     },
     "Who" : {
