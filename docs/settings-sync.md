@@ -48,7 +48,7 @@ Read this before you add, move, reset or restore a setting.
 - **Each step compares three things:** this Mac, the item, and what both held after the last step (`PreferencesMerge`). A change on this Mac waits a moment, so a drag is one write. What was just applied is not written back.
 - **The record of what both hold is saved before the item is written**, so a refused write never sends another Mac's change back as this Mac's.
 - **The later write wins**, row by row and member by member. A table's change log can undo a batch from the command line.
-- **A conflicted copy of a field is answered by member:** what this Mac sent is written again, the rest is taken, and the copy goes to the bin.
+- **A conflicted copy of a field is answered by member:** what this Mac sent is written again, the rest is taken; the copy goes to the bin.
 - **After another Mac's change reaches the defaults, the stores read them again**, so open windows and shortcuts follow. A store that reads its value once must join the `reload` that `Libraries` gives `PreferencesSync`.
 - **A row that no setting here owns is the Marfa's.** A later version of the app may have written it, so it is never changed or deleted.
 
@@ -62,7 +62,7 @@ Read this before you add, move, reset or restore a setting.
 
 - **Remove… in Connection moves every settings item to the bin** and stops writing until Keep in Marfa Again. This Mac keeps its own settings.
 - **Disconnect can remove them too, and only with Keep Copy.** A removal sends the whole queue, and a change that the person discarded must not reach the server.
-- **The app signs out only after the server has taken the removal.** If that fails, it says so and stays connected.
+- **The app signs out only after the server has taken the removal.** If that fails, it stays connected.
 
 ## Restore points
 
