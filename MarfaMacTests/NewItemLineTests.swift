@@ -307,7 +307,7 @@ struct NewItemLineTests {
         let zulu = items.last!.id
         let best = QuickAdd.bestParents(items, matching: "", first: [zulu], limit: 6)
         #expect(best.map(\.displayTitle) == ["Zulu", "alpha", "Bravo", "Charlie", "Delta", "Echo"])
-        #expect(QuickAdd.bestParents(items, matching: "o", first: [], limit: 6).map(\.displayTitle) == ["Bravo", "Echo", "Foxtrot", "Golf", "Hotel", "Zulu"])
+        #expect(QuickAdd.bestParents(items, matching: "o", first: [], limit: 6).map(\.displayTitle) == ["Bravo", "Echo", "Foxtrot", "Golf", "Hotel"])
     }
 
     @Test func parentsComeQuicklyFromFiftyThousandItems() {

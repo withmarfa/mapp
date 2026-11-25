@@ -305,7 +305,9 @@ nonisolated enum NewItemText {
     private static func detected(_ match: NSTextCheckingResult, in text: String, calendar: Calendar) -> FoundDay? {
         guard let date = match.date, let range = Range(match.range, in: text) else { return nil }
         let phrase = String(text[range])
-        guard phrase.contains(where: \.isLetter), phrase.wholeMatch(of: /.*\d+\s*[\/.\-]\s*\d+.*/) == nil else { return nil }
+        guard phrase.contains(where: \.isLetter), phrase.wholeMatch(of: /.*\d+\s*[\/.\-]\s*\d+.*/) == nil,
+              phrase.firstMatch(of: /['’]\p{L}/) == nil
+        else { return nil }
         if range.lowerBound > text.startIndex, isWordCharacter(text[text.index(before: range.lowerBound)]) { return nil }
         let rest = text[range.upperBound...]
         if let next = rest.first, isWordCharacter(next) || (["'", "’"].contains(next) && rest.dropFirst().first?.isLetter == true) {
