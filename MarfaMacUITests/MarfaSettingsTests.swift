@@ -58,11 +58,12 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         address.click()
         address.typeText("ftp://marfa.example")
+        XCTAssertEqual(address.value as? String, "ftp://marfa.example")
+        XCTAssertTrue(connect.isEnabled)
         connect.click()
-        let notice = app.descendants(matching: .any)["MarfaNotice"].firstMatch
-        XCTAssertTrue(notice.waitForExistence(timeout: 3))
-        let noticeText = notice.label + " " + (notice.value as? String ?? "")
-        XCTAssertTrue(noticeText.contains("Check the Address"), "the combined notice exposes its title: \(notice.debugDescription)")
+        let detail = app.descendants(matching: .any)["SettingsDetail"]
+        XCTAssertTrue(detail.staticTexts["Check the Address"].waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(detail.staticTexts["Enter a Marfa server address, such as marfa.example."].exists)
         XCTAssertFalse(app.buttons["MarfaDisconnect"].exists, "nothing was connected")
         attachScreenshot("SettingsMarfaNotAServer")
     }
