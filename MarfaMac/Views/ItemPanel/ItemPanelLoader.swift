@@ -36,7 +36,7 @@ struct ItemPanelLoader<Legacy: View>: View {
                 item: item, source: item.source.map { library.sources.info($0).name },
                 version: library.itemVersion(id) ?? item.version, pages: pdf?.pages, moves: moves,
                 move: { library.perform($0 == .library ? .keep : .moveToFeed, on: [id], undoManager: undoManager, details: details) },
-                leavesTheFeed: item.tier == .feed && item.state == .active ? library.catalogue.feedExpiry(of: item) : nil),
+                leavesTheFeed: library.catalogue.leavesTheFeed(item)),
             onOpen: onOpen,
             onHeading: { editor?.revealHeading(at: $0) },
             onPage: goToPage,

@@ -22,32 +22,41 @@ nonisolated enum MoveWords {
         selected == 1 ? String(localized: "Archive Only This Item") : String(localized: "Archive Only These Items")
     }
 
-    /// The title asking whether to move items to the Feed that the Feed would let go.
-    static func feedTitle(selected: Int, title: String?) -> String {
-        if selected == 1, let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
-            return String(localized: "Move “\(title)” to the Feed?")
+    /// The title asking whether to move or unarchive items that the Feed would let go. `move` is Move to Feed or Unarchive.
+    static func feedTitle(_ move: ItemMove, selected: Int, title: String?) -> String {
+        let title = selected == 1 ? title?.trimmingCharacters(in: .whitespacesAndNewlines) : nil
+        if move == .unarchive {
+            if let title, !title.isEmpty { return String(localized: "Unarchive “\(title)”?") }
+            return AttributedString(localized: "Unarchive ^[\(selected) item](inflect: true)?").text
         }
+        if let title, !title.isEmpty { return String(localized: "Move “\(title)” to the Feed?") }
         return AttributedString(localized: "Move ^[\(selected) item](inflect: true) to the Feed?").text
     }
 
-    /// What the question says: how many of the `selected` items are older than the Feed keeps, and, where they share one
-    /// type, how long it keeps them.
-    static func feedMessage(selected: Int, question: FeedLimitQuestion) -> String {
-        let pastWindow = question.pastWindow
-        if let window = question.window {
-            let (plural, days) = (window.typePlural, window.days)
-            if selected == 1 {
-                return AttributedString(localized: "\(plural) leave the Feed after ^[\(days) day](inflect: true), and this one is older. It would go to Recently Deleted within the hour.").text
-            }
-            return pastWindow == 1
-                ? AttributedString(localized: "\(plural) leave the Feed after ^[\(days) day](inflect: true), and 1 of these is older. It would go to Recently Deleted within the hour.").text
-                : AttributedString(localized: "\(plural) leave the Feed after ^[\(days) day](inflect: true), and \(pastWindow) of these are older. They would go to Recently Deleted within the hour.").text
+    /// What the question says: how long the Feed keeps the items, where those past the window share one type, how many
+    /// of the `selected` items are older, and that they would go to Recently Deleted.
+    static func feedMessage(_ move: ItemMove, selected: Int, question: FeedLimitQuestion) -> String {
+        let past = question.pastWindow
+        let keeps = if let window = question.window {
+            AttributedString(localized: "\(window.typePlural) leave the Feed after ^[\(window.days) day](inflect: true)").text
+        } else {
+            String(localized: "The Feed lets items go after a while")
         }
-        if selected == 1 {
-            return String(localized: "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour.")
+        let older = if selected == 1 {
+            String(localized: ", and this one is older.")
+        } else if past == selected {
+            selected == 2 ? String(localized: ", and both are older.") : String(localized: ", and all \(selected) are older.")
+        } else if past == 1 {
+            String(localized: ", and 1 of the \(selected) items is older.")
+        } else {
+            String(localized: ", and \(past) of the \(selected) items are older.")
         }
-        return pastWindow == 1
-            ? String(localized: "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour.")
-            : String(localized: "The Feed lets items go after a while, and \(pastWindow) of these are older. They would go to Recently Deleted within the hour.")
+        let goes = switch (move == .unarchive, past == 1) {
+        case (false, true): String(localized: "It would go to Recently Deleted within the hour.")
+        case (false, false): String(localized: "They would go to Recently Deleted within the hour.")
+        case (true, true): String(localized: "Unarchived, it would go to Recently Deleted within the hour.")
+        case (true, false): String(localized: "Unarchived, they would go to Recently Deleted within the hour.")
+        }
+        return keeps + older + " " + goes
     }
 }

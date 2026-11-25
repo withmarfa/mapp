@@ -765,10 +765,10 @@ final class FakeItemLibrary: ItemLibrary {
         moved?(CommandOutcome(plan.changing, skips: plan.skips))
     }
 
-    /// What Move to Feed asks first, which a test sets.
+    /// What Move to Feed and Unarchive ask first, which a test sets.
     var feedLimit: FeedLimitQuestion?
 
-    func feedLimitQuestion(for ids: Set<ItemID>) -> FeedLimitQuestion? { feedLimit }
+    func feedLimitQuestion(_ move: ItemMove, for ids: Set<ItemID>) -> FeedLimitQuestion? { feedLimit }
 
     func archive(_ ids: Set<ItemID>, beneath: Bool, undoManager: UndoManager?, moved: ((CommandOutcome) -> Void)?) {
         let plan = archivePlan(ids)
