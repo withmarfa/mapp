@@ -154,6 +154,10 @@ import Testing
         here.set("[1]", forKey: PanelParts.key)
         PanelParts.choose(.info, for: TypeID("core.note"), in: here)
         #expect(here.stringArray(forKey: PanelParts.setAsideKey)?.last == "[1]")
+        here.set(#"{"core.task":{"extra":true,"part":"timeline"}}"#, forKey: PanelParts.key)
+        PanelParts.choose(.info, for: TypeID("core.task"), in: here)
+        #expect(here.stringArray(forKey: PanelParts.setAsideKey)?.last == #"{"extra":true,"part":"timeline"}"#, "a word a later copy wrote is kept before it is replaced")
+        #expect(PanelParts.stored(in: here).part(of: TypeID("core.task")) == .info)
     }
 
     @Test func aRowThatIsNotJSONIsSetAsideAndTheStoreKeepsItsDefault() throws {

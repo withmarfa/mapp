@@ -67,10 +67,8 @@ struct PanelInfoView<Legacy: View>: View {
         if let moves = model.moves {
             Menu {
                 ForEach([Tier.library, .feed], id: \.self) { option in
-                    Button { model.move(option) } label: {
-                        if option == tier { Label(Self.name(of: option), systemImage: "checkmark") } else { Text(Self.name(of: option)) }
-                    }
-                    .disabled(option != tier && !moves.contains(option))
+                    Toggle(Self.name(of: option), isOn: Binding(get: { option == tier }, set: { _ in if option != tier { model.move(option) } }))
+                        .disabled(option != tier && !moves.contains(option))
                 }
             } label: {
                 HStack(spacing: 5) {
@@ -95,52 +93,60 @@ struct PanelInfoView<Legacy: View>: View {
 
     // MARK: History
 
+    /// The versions, newest first, starting with the one the item holds now. An item at version 1 has nothing earlier to
+    /// ask for, so its list is that one row.
     @ViewBuilder private var historySection: some View {
         let version = Int(model.version.rawValue)
-        if let history = PanelHistory.shared.model(of: model.item.id, version: model.version, in: library), version > 1 {
-            let entries = VersionThread.entries(
-                snapshots: history.snapshots, current: model.item, currentText: nil, in: library.catalogue)
-            let earlier = Array(entries.dropFirst())
-            PanelHeading(title: String(localized: "History"), count: history.phase == .loaded ? entries.count : nil)
+        let history = version > 1 ? PanelHistory.shared.model(of: model.item.id, version: model.version, in: library) : nil
+        let entries = VersionThread.entries(
+            snapshots: history?.snapshots ?? [], current: model.item, currentText: nil, in: library.catalogue)
+        let isRead = version <= 1 || history?.phase == .loaded
+        PanelHeading(title: String(localized: "History"), count: isRead ? entries.count : nil)
+        ForEach(entries.prefix(PanelHistory.shown + 1)) { entry in
+            PanelHistoryRow(entry: entry, currentName: currentName(version: version), format: dateFormat)
+        }
+        if let history {
             switch history.phase {
             case .idle, .loading:
-                if earlier.isEmpty { ProgressView().controlSize(.small).frame(maxWidth: .infinity, minHeight: 28, alignment: .leading) }
+                if entries.count == 1 { ProgressView().controlSize(.small).frame(maxWidth: .infinity, minHeight: 28, alignment: .leading) }
             case .failed:
                 Text("History isn’t available right now.").interfaceFont(.callout).foregroundStyle(.secondary)
             case .loaded:
                 EmptyView()
             }
-            ForEach(earlier.prefix(PanelHistory.shown)) { entry in
-                PanelHistoryRow(entry: entry, format: dateFormat)
-            }
-            if earlier.count > PanelHistory.shown || history.hasMore {
-                PanelMoreButton(
-                    title: String(localized: "Show All \(entries.count) Versions"), identifier: "PanelShowAllVersions", action: onShowHistory)
-            }
-        } else if version <= 1 {
-            PanelHeading(title: String(localized: "History"))
-            Text("No earlier versions").interfaceFont(.callout).foregroundStyle(.tertiary)
         }
+        if entries.count > PanelHistory.shown + 1 || history?.hasMore == true {
+            PanelMoreButton(
+                title: String(localized: "Show All \(entries.count) Versions"), identifier: "PanelShowAllVersions", action: onShowHistory)
+        }
+    }
+
+    /// Who wrote the version the item holds: the source that made it, at version 1. Later, the server keeps no record of the
+    /// writer until the version is replaced.
+    private func currentName(version: Int) -> String {
+        if version <= 1, let source = model.source { return source }
+        return String(localized: "Current Version")
     }
 }
 
-/// One earlier version: the symbol of who wrote it, their name, and when.
+/// One version: the symbol of who wrote it, their name, and when.
 private struct PanelHistoryRow: View {
     @Environment(\.interfaceTextSize) private var textSize
     let entry: VersionEntry
+    let currentName: String
     let format: DateFormat
 
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
         HStack(spacing: 8) {
-            Image(systemName: PanelHistory.symbol(of: entry.writer))
+            Image(systemName: entry.isCurrent ? "clock" : PanelHistory.symbol(of: entry.writer))
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
                 .accessibilityHidden(true)
-            Text(verbatim: entry.writer?.displayName ?? String(localized: "Not known")).lineLimit(1)
+            Text(verbatim: entry.isCurrent ? currentName : (entry.writer?.displayName ?? String(localized: "Not known"))).lineLimit(1)
             Spacer(minLength: 6)
             if let written = entry.written {
-                let text = DateDisplay.text(of: written, place: .value, format: format)
+                let text = VersionBlocks.when(written, format: format)
                 Text(verbatim: entry.writtenIsApproximate ? String(localized: "About \(text)") : text)
                     .interfaceFont(.callout).foregroundStyle(.tertiary).lineLimit(1).fixedSize()
             }

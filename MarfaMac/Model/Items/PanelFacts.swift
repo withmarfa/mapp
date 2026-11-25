@@ -48,13 +48,13 @@ nonisolated struct PanelPDFFacts: Equatable, Sendable {
 
 /// The facts Info lists for an item, in order: where it came from, its version and times, then the file's own.
 nonisolated enum PanelInfo {
-    /// `pages` is a PDF's page count once read. Dates read as `format` says, with their time.
+    /// `pages` is a PDF's page count once read. Dates read as `format` says, with their time (`stamp`).
     static func facts(of item: Item, source: String?, version: ItemVersion, pages: Int?, format: DateFormat) -> [PanelFact] {
         var facts: [PanelFact] = []
         if let source { facts.append(PanelFact(name: String(localized: "Source"), value: source)) }
         facts.append(PanelFact(name: String(localized: "Version"), value: version.rawValue.formatted()))
-        facts.append(PanelFact(name: String(localized: "Created"), value: DateDisplay.text(of: item.created, place: .value, format: format)))
-        facts.append(PanelFact(name: String(localized: "Edited"), value: DateDisplay.text(of: item.modified, place: .value, format: format)))
+        facts.append(PanelFact(name: String(localized: "Created"), value: stamp(item.created, format: format)))
+        facts.append(PanelFact(name: String(localized: "Edited"), value: stamp(item.modified, format: format)))
         guard case .file(let type, let bytes) = item.content else { return facts }
         facts.append(PanelFact(name: String(localized: "Kind"), value: type.localizedDescription ?? String(localized: "File")))
         // The server gives a file's size once it holds the bytes, so a file not yet sent has none.
@@ -73,6 +73,18 @@ nonisolated enum PanelInfo {
             facts.append(PanelFact(name: String(localized: "Pages"), value: pages.formatted()))
         }
         return facts
+    }
+
+    /// A moment as Info writes it: "Today, 07:02" or "Yesterday, 18:04" for these days, else the date with its year and the
+    /// time, "2 Sep 2026, 09:12". A person's choice of dates and times is kept.
+    static func stamp(
+        _ date: Date, format: DateFormat, now: Date = .now, calendar: Calendar = .current, locale: Locale = .current
+    ) -> String {
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+        let place = format.usesWords && (-1...1).contains(days) ? DateDisplay.Place.table : .value
+        let day = DateDisplay.text(of: date, hasTime: false, place: place, format: format, now: now, calendar: calendar, locale: locale)
+        let time = DateDisplay.timeOfDay(of: date, format: format, calendar: calendar, locale: locale)
+        return String(localized: "\(day), \(time)")
     }
 
     private static func number(_ item: Item, _ key: String) -> Double? {
@@ -113,8 +125,8 @@ nonisolated enum PanelKeptBy {
     }
 
     private static func readOnly(_ source: String?) -> PanelKeptLine {
-        let text = source.map { String(localized: "Read only. \($0) keeps this item, so a change made here would be overwritten.") }
-            ?? String(localized: "Read only. A connector keeps this item, so a change made here would be overwritten.")
+        let text = source.map { String(localized: "Read only. \($0) keeps this item, so an edit here would be overwritten.") }
+            ?? String(localized: "Read only. A connector keeps this item, so an edit here would be overwritten.")
         return PanelKeptLine(symbol: "lock", text: text)
     }
 }

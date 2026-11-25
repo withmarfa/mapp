@@ -39,7 +39,7 @@ struct ItemPanel<Legacy: View>: View {
                     }
                 }
                 .padding(.horizontal, PanelMetrics.inset)
-                .padding(.top, PanelMetrics.contentTop)
+                .padding(.top, parts.count > 1 ? PanelMetrics.contentTop : PanelMetrics.contentTopAlone)
                 .padding(.bottom, PanelMetrics.inset)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -61,11 +61,15 @@ enum PanelMetrics {
     static let pillsInset: CGFloat = 9
     static let pillHeight: CGFloat = 28
     static let contentTop: CGFloat = 8
+    /// The room above the first line of a part that has no pills over it.
+    static let contentTopAlone: CGFloat = 23
     static let rowHeight: CGFloat = 30
     static let outlineRowHeight: CGFloat = 26
     static let headingTop: CGFloat = 22
     static let headingGap: CGFloat = 8
-    static let factsGap = CGSize(width: 16, height: 14)
+    static let factsGap = CGSize(width: 16, height: 15)
+    /// A fact's label to its value.
+    static let factLabelGap: CGFloat = 5
 }
 
 /// The panel's parts as pills. They are one radio group to VoiceOver, because only one part shows at a time.

@@ -44,15 +44,20 @@ nonisolated struct PanelParts: Equatable, Sendable {
         }
     }
 
-    /// Chooses `part` for `type`, keeping every other member of its row. Returns the text of a row this version could not
-    /// read that the choice replaced, for the caller to set aside.
+    /// Chooses `part` for `type`, keeping every other member of its row. Returns the text of a row the choice replaced that
+    /// this version could not read, or whose word it does not know, for the caller to set aside.
     @discardableResult
     mutating func choose(_ part: PanelPart, for type: TypeID) -> String? {
         let name = type.rawValue
         var members: [String: StoredJSON] = [:]
         var displaced: String?
         if let row = rows[name] {
-            if isReadable(row), case .object(let kept) = row { members = kept } else { displaced = row.text }
+            if isReadable(row), case .object(let kept) = row {
+                members = kept
+                if case .string(let word)? = kept[Self.partMember], PanelPart(rawValue: word) == nil { displaced = row.text }
+            } else {
+                displaced = row.text
+            }
         }
         members[Self.partMember] = .string(part.rawValue)
         rows[name] = .object(members)

@@ -103,9 +103,9 @@ struct PanelFactCell<Value: View>: View {
     @ViewBuilder let value: Value
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: PanelMetrics.factLabelGap) {
             Text(verbatim: name).interfaceFont(.callout).foregroundStyle(.secondary).lineLimit(1)
-            value.interfaceFont(.body)
+            value.interfaceFont(.body).lineLimit(1).minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .gridColumnAlignment(.leading)

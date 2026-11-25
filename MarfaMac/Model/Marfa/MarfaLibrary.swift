@@ -457,6 +457,7 @@ import Observation
     /// What the server's connectors say of the types they write, read once (`readConnectors`).
     var connectors: ConnectorKeepers?
     @ObservationIgnored var isReadingConnectors = false
+    @ObservationIgnored var connectorsFailedAt: ContinuousClock.Instant?
     /// Counts the asks as they start, so an answer that comes after a later ask or a rename does not put back what it
     /// found before.
     @ObservationIgnored var sourceTurn = 0
