@@ -56,8 +56,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 ## The View panel
 
-- **One popover under the View button holds the view** (`ViewPanelPopover`). Filter, Sort, Group, Properties and Types open one level in. The palette lists the same choices (`ViewOptionCommand`).
-- **The footer names which settings Marfa shares and which Marfa for Mac keeps.**
+- **The View button opens the panel** (`ViewPanelPopover`). Filter, Sort, Group, Properties, and Types each have a page. The footer shows where settings are saved.
 
 ## Grouping
 
@@ -65,7 +64,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A grouping has a mode** (`GroupMode`): each value, a date's span, set or not set, or the four status groups.
 - **A saved view keeps every grouping offered,** order and hidden groups too. Hide Empty Groups stays on the Mac.
 - **A saved view's weeks start on Monday,** as Marfa fixes them for every app. A place's own follow Settings.
-- **Not Applicable is last**, for items whose type lacks the field. It is the app's and is never written.
+- **Not Applicable is last.** In a saved view, presence grouping treats missing fields as Not Set, and status groups treat unknown words as No Status.
 - **A hidden group leaves the layout and not the count.**
 
 ## Filters
@@ -100,7 +99,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 ## Indexes
 
-- **Library › Types, Collections and Sources list places** (`PlaceIndex`), under the Library's title, count and views, with the place chosen. Search narrows the rows by name. With no view to set up, they draw no View button, unlike the boards.
+- **Library › Types, Collections, and Sources** (`PlaceIndex`) show places and search by name. They have no View button.
 - **Types nest kinds under their type.** Made By waits for the package's provenance; a type has no link to copy.
 - **A source's Kind** is Connector where `GET /plugins` names it, App for an `oauth:` code, else empty (`SourceKind`).
 - **A table of more than 2,000 items is made off the main actor** (`Browser.arrange`), its last table showing meanwhile. A search's table is held apart.
