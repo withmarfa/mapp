@@ -77,7 +77,7 @@ struct FileDropTests {
         #expect(notes.pill(count: 3) == "Add 3 Files to the Library")
         #expect(notes.place == .library && notes.collection == nil)
         browser.show(.type(.file), in: library, order: ItemOrder())
-        #expect(browser.fileDropTarget(in: library).pill(count: 3) == "Add 3 Files to Files")
+        #expect(browser.fileDropTarget(in: library).pill(count: 3) == "Add 3 Files to \(library.name(of: .type(.file)))")
         browser.show(.archive, in: library, order: ItemOrder())
         #expect(browser.fileDropTarget(in: library).pill(count: 0) == "Add Files to the Library")
     }

@@ -122,7 +122,7 @@ import Testing
         undo.groupsByEvent = false
         #expect(browser.addDropped([F.n1, F.p1], to: Self.holiday, in: library, undoManager: undo, toasts: toasts))
         #expect(source.writes.isEmpty)
-        #expect(!undo.canUndo)
+        #expect(undo.canUndo == false)
         #expect(toasts.current?.message == "2 items already in Holiday")
         #expect(toasts.current?.undo == nil)
     }
