@@ -441,13 +441,12 @@ extension Browser {
         let outcome = await writeName(
             name, of: id, expecting: expected, baseVersion: baseVersion, in: library, tellsOffline: !panel.hasLeftWithRename,
             tellsRenamed: !panel.hasLeftWithRename)
-        panel.finishRename(
-            name: name, kept: outcome == .kept,
-            reason: switch outcome {
-            case .renamedElsewhere: String(localized: "This view was renamed in another app, so your name wasn’t written.")
-            case .gone: Self.deletedElsewhere
-            case .kept, .notWritten: nil
-            })
+        let reason: String? = switch outcome {
+        case .renamedElsewhere: String(localized: "This view was renamed in another app, so your name wasn’t written.")
+        case .gone: Self.deletedElsewhere
+        case .kept, .notWritten: nil
+        }
+        panel.finishRename(name: name, kept: outcome == .kept, reason: reason)
         // A panel still open on a view deleted meanwhile closes with the name given back.
         if outcome == .gone, !panel.hasLeftWithRename, viewPanel === panel {
             viewPanel = nil
