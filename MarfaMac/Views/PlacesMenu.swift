@@ -70,7 +70,8 @@ struct PlacesMenuView: View {
         Section("Types") {
             rows(menu.types)
             if !menu.moreTypes.isEmpty {
-                Menu("\(menu.moreTypes.count) More") { rows(menu.moreTypes) }
+                // A submenu is built apart from the menu that holds it, so the label style is set again inside.
+                Menu("\(menu.moreTypes.count) More") { rows(menu.moreTypes).labelStyle(.titleAndIcon) }
             }
         }
     }

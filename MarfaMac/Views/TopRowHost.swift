@@ -389,7 +389,9 @@ private struct WindowTitleHider: NSViewRepresentable {
 }
 
 /// Reports how far full screen has slid the toolbar down to show the menu bar. The content's safe area does not change
-/// as it does: only the toolbar's own window moves, so the row drawn under the toolbar reads that window's frame.
+/// as it does: only the toolbar's own window moves, so the row drawn under the toolbar reads that window's frame. That
+/// window also lays an opaque layer of its own (`NSOpaqueBackstop`) over the column's top edge, from the sidebar's edge to
+/// the panel's width while the panel is open, which hides the first letters of the title: the probe hides it.
 private struct ToolbarRevealProbe: NSViewRepresentable {
     @Binding var reveal: CGFloat
 
@@ -403,6 +405,8 @@ private struct ToolbarRevealProbe: NSViewRepresentable {
         var report: (CGFloat) -> Void = { _ in }
         private var observers: [any NSObjectProtocol] = []
         private var barObservers: [any NSObjectProtocol] = []
+        private weak var backstop: CALayer?
+        private var backstopWatch: NSKeyValueObservation?
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -430,6 +434,11 @@ private struct ToolbarRevealProbe: NSViewRepresentable {
             barObservers.forEach { NotificationCenter.default.removeObserver($0) }
             barObservers = []
             if let bar {
+                hideBackstop(of: bar)
+                // The window lays the layer out again with the panel and the first time it shows, after the last event.
+                barObservers.append(NotificationCenter.default.addObserver(forName: NSWindow.didUpdateNotification, object: bar, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { if let bar = self?.bar { self?.hideBackstop(of: bar) } }
+                })
                 barObservers.append(NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: bar, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.measure() }
                 })
@@ -437,8 +446,22 @@ private struct ToolbarRevealProbe: NSViewRepresentable {
             measure()
         }
 
+        /// Hides the backstop and keeps it hidden: the window shows it again each time it lays out, with the panel opening
+        /// or closing among those.
+        private func hideBackstop(of bar: NSWindow) {
+            guard let layer = bar.contentView?.layer?.sublayers?.first(where: { $0.name == "NSOpaqueBackstop" }) else { return }
+            if layer !== backstop {
+                backstop = layer
+                backstopWatch = layer.observe(\.isHidden) { layer, _ in
+                    if !layer.isHidden { layer.isHidden = true }
+                }
+            }
+            layer.isHidden = true
+        }
+
         private func measure() {
             guard let window, let bar else { return report(0) }
+            hideBackstop(of: bar)
             // Hidden above the screen it is not over the row, which then stays.
             report(max(0, window.frame.maxY - bar.frame.maxY))
         }
