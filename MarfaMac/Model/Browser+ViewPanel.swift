@@ -66,8 +66,7 @@ extension Browser {
         return nil
     }
 
-    /// Closes the panel for a reason that is not the person's own choice: a view's changes were already written, and a
-    /// new view is dropped, with the name the person typed given back, since the panel is where it lived.
+    /// Closes the panel and hands back any unsaved draft or rename.
     func closeViewPanel(in library: any ItemLibrary) {
         guard let panel = viewPanel else { return }
         panel.handOff(because: .left)
@@ -87,9 +86,7 @@ extension Browser {
         dismissViewPanel(in: library)
     }
 
-    /// A click outside the panel: a new view is dropped with its name given back, and a view's or a place's panel closes.
-    /// A view's name still being typed is written, and given back if the write fails, is refused or finds the view gone,
-    /// since nothing else holds it once the panel has closed.
+    /// Handles dismissal by the popover. A rename is submitted and handed back if the write fails.
     func dismissViewPanel(in library: any ItemLibrary) {
         guard let panel = viewPanel else { return }
         if panel.isNew { return closeViewPanel(in: library) }
@@ -108,8 +105,7 @@ extension Browser {
         if shown.isSame(snapshot.place) { restoreSetAsideSearch(of: panel) }
     }
 
-    /// The place changed under the panel: a new view is cancelled, and a view's changes stay held where they were made.
-    /// A name typed is given back, since the change is not the person's Cancel.
+    /// Hands back an unsaved draft or rename when the window changes place.
     func viewPanelPlaceChanged() {
         guard let panel = viewPanel else { return }
         panel.handOff(because: .left)

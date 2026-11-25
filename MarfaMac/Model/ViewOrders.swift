@@ -31,8 +31,7 @@ nonisolated struct ViewOrders: Equatable, Sendable {
         order(in: place).compactMap(\.savedView)
     }
 
-    /// Keeps `views` as the order of `place`; an empty list forgets it. A stored word `views` does not hold, such as a
-    /// view this Mac has not read yet or a word a later copy wrote, stays at its position.
+    /// Keeps the positions of stored views this Mac has not read while reordering the views it holds.
     mutating func set(_ views: [ViewChoice], in place: Place) {
         var words = views.map(\.word)
         let given = Set(words)

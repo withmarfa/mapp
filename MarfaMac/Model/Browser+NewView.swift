@@ -236,7 +236,7 @@ extension Browser {
         return newViewDescription(in: library)
     }
 
-    /// The new view as its panel's sentence reads, under its name: its types, From, filters, layout, sort and group.
+    /// The summary given back when an unsaved draft closes.
     func newViewDescription(in library: any ItemLibrary) -> String {
         let panel = viewPanel
         let typed = panel?.trimmedName ?? ""
