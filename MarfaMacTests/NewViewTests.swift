@@ -392,7 +392,11 @@ struct NewViewTests {
         let text = try #require(notice.text)
         #expect(text.hasPrefix("Newest Tasks\n"))
         #expect(text.contains("sorted by"))
+        #expect(text.contains(", newest first"))
         #expect(text.contains(ItemViewMode.list.title))
+        #expect(text.contains("Add to Sidebar: "))
+        // A task's place lists All Items, the Feed's tier among them, so Quick Actions is said too.
+        #expect(text.contains("Quick Actions: "))
     }
 
     @Test func anUntouchedDraftEndsWithNothingGivenBack() {
@@ -471,17 +475,102 @@ struct NewViewTests {
     @Test func untickingTheLastInboxSourceLeavesNoneAndMakesNothing() async {
         let (browser, library) = Self.window(.feed)
         library.sources.counts = ["mail": 2]
+        var mail = Item(
+            id: ItemID("m0"), type: Self.task, title: "m0", name: "m0", titleRule: .firstLine, properties: [], version: ItemVersion(1),
+            created: library.now(), modified: library.now())
+        mail.tier = .feed
+        mail.source = "mail"
+        library.items.append(mail)
         browser.openNewViewPanel(in: library)
         browser.chooseStart(.inbox, in: library)
         #expect(browser.ticksSource("mail"))
+        #expect(!browser.items(in: library).isEmpty)
         browser.setSource("mail", chosen: false, in: library)
         #expect(!browser.ticksSource("mail"))
         #expect(browser.viewPanel?.choosesNoSource == true)
+        // No source chosen previews nothing, never every source.
+        #expect(browser.items(in: library).isEmpty)
+        #expect(browser.tableContent(in: library).kept.isEmpty)
+        #expect(!browser.listsAnything(in: library))
         #expect(await browser.finishViewPanel(in: library, order: Self.order) == nil)
         #expect(library.views.isEmpty)
         browser.setSource("mail", chosen: true, in: library)
         #expect(browser.ticksSource("mail"))
         #expect(browser.viewPanel?.choosesNoSource == false)
+        #expect(!browser.items(in: library).isEmpty)
+    }
+
+    @Test func aDraftRefusedAfterThePanelClosedIsGivenBack() async throws {
+        let (browser, library) = Self.window()
+        browser.openNewViewPanel(in: library)
+        browser.chooseStart(.favorites, in: library)
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewWrite = { await withCheckedContinuation { release = $0 } }
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "filter")
+        let create = Task { await browser.finishViewPanel(in: library, order: Self.order) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        // Submitted and not yet taken, the draft is the person's even with nothing changed.
+        #expect(browser.keepsNewViewOpen)
+        browser.closeViewPanel(in: library)
+        #expect(!library.notices.waiting.contains { $0.isNotKept })
+        release?.resume()
+        #expect(await create.value == nil)
+        let text = try #require(library.notices.waiting.first { $0.isNotKept }?.text)
+        #expect(text.hasPrefix("Favorites\n"))
+    }
+
+    @Test func aDraftTakenAfterThePanelClosedGivesNothingBack() async throws {
+        let (browser, library) = Self.window()
+        browser.openNewViewPanel(in: library)
+        browser.chooseStart(.favorites, in: library)
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewWrite = { await withCheckedContinuation { release = $0 } }
+        let create = Task { await browser.finishViewPanel(in: library, order: Self.order) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.closeViewPanel(in: library)
+        release?.resume()
+        #expect(await create.value != nil)
+        #expect(!library.notices.waiting.contains { $0.isNotKept })
+    }
+
+    @Test func aFromTokenTheChangedFromNoLongerSaysStopsNarrowingAndIsNamed() throws {
+        let (browser, library) = Self.window()
+        let feed = FilterClause(field: FilterTarget.tier.id, op: .is, values: [Tier.feed.word])
+        browser.addSearchToken(feed)
+        browser.openNewViewPanel(in: library)
+        #expect(browser.listing.scope == .feed)
+        #expect(browser.tableContent(in: library).kept.isEmpty)
+        browser.tableOptions[browser.shown]?.scope = .all
+        #expect(browser.fromTokensSetAside == [feed])
+        #expect(browser.tableContent(in: library).kept.count == 2)
+        let draft = try #require(ViewDraft.draft(SavedViews.window(browser, in: library, order: Self.order), catalogue: library.catalogue, views: []))
+        let named = draft.unkept.compactMap { if case .searchToken(let words) = $0 { words } else { nil } }
+        #expect(named.count == 1)
+        // Back on the From the token names, it narrows and is saved again.
+        browser.tableOptions[browser.shown]?.scope = .feed
+        #expect(browser.fromTokensSetAside.isEmpty)
+        let again = try #require(ViewDraft.draft(SavedViews.window(browser, in: library, order: Self.order), catalogue: library.catalogue, views: []))
+        #expect(again.unkept.isEmpty)
+    }
+
+    @Test func aLayoutChosenAfterAStartingPointKeepsTheDraftsOwnSort() async throws {
+        let (browser, library) = Self.window()
+        browser.openNewViewPanel(in: library)
+        browser.chooseStart(.recentlyAdded, in: library)
+        browser.viewMode = .table
+        let window = SavedViews.window(browser, in: library, order: Self.order)
+        let draft = try #require(ViewDraft.draft(window, catalogue: library.catalogue, views: []))
+        let made = try #require(await browser.finishViewPanel(in: library, order: Self.order))
+        #expect(made.sort == draft.sort)
+    }
+
+    @Test func aSortChosenAfterAStartingPointIsTheOneWritten() async throws {
+        let (browser, library) = Self.window()
+        browser.openNewViewPanel(in: library)
+        browser.chooseStart(.recentlyAdded, in: library)
+        browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title)]
+        let made = try #require(await browser.finishViewPanel(in: library, order: Self.order))
+        #expect(made.sort != [LibraryViewSort(field: "created_at", ascending: false)])
     }
 
     @Test func aPillRenameOfAViewDeletedElsewhereGivesTheNameBack() async {

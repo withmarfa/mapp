@@ -188,8 +188,12 @@ extension Browser {
         settings.quickActions = panel.quickActions ?? held
         guard form.canSubmit else { return nil }
         guard var draft = ViewDraft.draft(window, catalogue: library.catalogue, views: library.views) else { return nil }
-        // A starting point's own order is written as it is, never left to the order a layout or a search gives.
-        if let start = panel.start, let own = start.sort, tableOptions[shown]?.sort == own.window { draft.sort = own.saved }
+        // A starting point's own order is written as it is, never left to the order a layout or a search gives, while
+        // the person has changed neither the sort nor the layout since choosing it. Otherwise the draft's own order stands.
+        if let start = panel.start, let own = start.sort, let chosen = panel.startingValues,
+           tableOptions[shown]?.sort == own.window, viewMode == chosen.layout {
+            draft.sort = own.saved
+        }
         panel.problem = nil
         guard case .done(let view) = await form.submit(draft) else {
             panel.problem = .refused

@@ -29,14 +29,14 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A place's default view is the app's** (`PlaceDefaults`). Every change is kept as it is made, and Reset View puts the place back. Types, Collections and Sources have none.
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest, such as layout and properties (`ViewMacSettings` in `ViewLayouts`).
 - **A change to a saved view is written as it is made** (`Browser+ViewWrites`), naming only the settings that changed.
-- **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits (`PendingViewChanges`) by setting, so two windows keep theirs, through closing and quitting. A refused one goes to the clipboard in words.
+- **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits by setting (`PendingViewChanges`), through closing and quitting. A refused one goes to the clipboard in words.
 - **Revert View writes back each setting the window changed as Marfa held it at opening** (`openedView`), whole. One another app changed since stays, and the person is told.
 - **While a change waits, the window lists the view's query with its own filters, From and Archived Items** (`viewPreview`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
 - **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds, and an exact-type condition only with Include Kinds off; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`).
-- **Making, renaming and deleting a view needs the server and is never queued.** An unmade view stays in its panel. A changed draft stays open; a change of place or window gives it back in words. A rename never replaces another app's; deleting asks.
-- **Starting points are what Marfa saves exactly** (`NewViewStart`), sort too, and list their own items while chosen. This Search, first while searching, takes the sayable tokens, From as the tier. One the person has opens theirs, asking first if the draft changed.
+- **Making, renaming and deleting a view needs the server and is never queued.** An unmade view stays in its panel. A changed or submitted draft stays open; leaving it, or a late refusal, gives it back in words. A rename never replaces another app's; deleting asks.
+- **Starting points are what Marfa saves exactly** (`NewViewStart`), and list their own items while chosen. This Search, first while searching, takes the sayable tokens, From as the tier, unless the From changed. One the person has opens theirs, asking first if the draft changed.
 - **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
 - **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
