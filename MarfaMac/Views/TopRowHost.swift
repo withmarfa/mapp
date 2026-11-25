@@ -405,6 +405,8 @@ private struct ToolbarRevealProbe: NSViewRepresentable {
         var report: (CGFloat) -> Void = { _ in }
         private var observers: [any NSObjectProtocol] = []
         private var barObservers: [any NSObjectProtocol] = []
+        private weak var backstop: CALayer?
+        private var backstopWatch: NSKeyValueObservation?
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -444,10 +446,17 @@ private struct ToolbarRevealProbe: NSViewRepresentable {
             measure()
         }
 
+        /// Hides the backstop and keeps it hidden: the window shows it again each time it lays out, with the panel opening
+        /// or closing among those.
         private func hideBackstop(of bar: NSWindow) {
-            for layer in bar.contentView?.layer?.sublayers ?? [] where layer.name == "NSOpaqueBackstop" && !layer.isHidden {
-                layer.isHidden = true
+            guard let layer = bar.contentView?.layer?.sublayers?.first(where: { $0.name == "NSOpaqueBackstop" }) else { return }
+            if layer !== backstop {
+                backstop = layer
+                backstopWatch = layer.observe(\.isHidden) { layer, _ in
+                    if !layer.isHidden { layer.isHidden = true }
+                }
             }
+            layer.isHidden = true
         }
 
         private func measure() {
