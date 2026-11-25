@@ -382,7 +382,7 @@ struct ShortcutTests {
         #expect(result.applied == 1 && result.skipped == 0)
         #expect(bindings.shortcut(for: .newWindow) == key("y", [.command, .option]))
         #expect(bindings.shortcut(for: .refresh) == key("j", [.command, .option]))
-        let anyAppResult = anyApp.apply(["newItem": key("n", [.command, .control], code: 45)])
+        let anyAppResult = anyApp.apply(["quickAdd": key("n", [.command, .control], code: 45)])
         #expect(anyAppResult.applied == 1 && anyAppResult.skipped == 0)
         #expect(anyApp.shortcut(for: .newItem) != nil)
         #expect(anyApp.shortcut(for: .commandPalette) == key("k", [.command, .control]))
