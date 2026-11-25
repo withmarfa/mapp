@@ -30,18 +30,18 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest, such as layout and properties (`ViewMacSettings` in `ViewLayouts`).
 - **A change to a saved view is written as it is made** (`Browser+ViewWrites`), naming only the settings that changed.
 - **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits (`PendingViewChanges`) by setting, so two windows keep theirs, through closing and quitting. A refused one goes to the clipboard in words.
-- **Revert View writes back each setting the window changed as Marfa held it at opening** (`openedView`), whole. One another app changed since, as Marfa holds it, stays, and the person is told.
+- **Revert View writes back each setting the window changed as Marfa held it at opening** (`openedView`), whole. One another app changed since stays, and the person is told.
 - **While a change waits, the window lists the view's query with its own filters, From and Archived Items** (`viewPreview`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
 - **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds, and an exact-type condition only with Include Kinds off; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`).
-- **Making, renaming and deleting a view needs the server and is never queued.** An unmade view stays in its panel. A rename never replaces another app's; deleting asks.
-- **Starting points are what Marfa saves exactly** (`NewViewStart`); This Search, first while searching, takes the sayable tokens.
-- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, then its sole required collection or source. Membership uses the outbound edge. Feed-tier views with no collection or source equality, or only several source equalities, belong to the Feed. Otherwise use the Library.
+- **Making, renaming and deleting a view needs the server and is never queued.** An unmade view stays in its panel. A changed draft stays open; a change of place or window gives it back in words. A rename never replaces another app's; deleting asks.
+- **Starting points are what Marfa saves exactly** (`NewViewStart`), sort too, and list their own items while chosen. This Search, first while searching, takes the sayable tokens, From as the tier. One the person has opens theirs, asking first if the draft changed.
+- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
 - **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
-- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`), at launch and after each settings sync, once on each Mac, where the new keys leave it unset. The earlier entry stays for those copies.
+- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`) once on each Mac, where they are unset, and stays for those copies.
 
 ## Layouts
 
@@ -53,11 +53,11 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse a drop: no single value is meant.
-- **A table's widths are stored only from a drag of a divider** (`keepWidths`), never from AppKit's own layout, which changes without the person.
+- **A table's widths are stored only from a drag of a divider** (`keepWidths`), never from AppKit's layout, which changes by itself.
 
 ## The View panel
 
-- **The View button opens the panel** (`ViewPanelPopover`). Filter, Sort, Group, Properties, and Types each have a page. The footer shows where settings are saved.
+- **The View button opens the panel** (`ViewPanelPopover`). The footer shows where settings are saved.
 
 ## Grouping
 
