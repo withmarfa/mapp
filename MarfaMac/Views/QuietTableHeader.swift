@@ -93,6 +93,7 @@ private struct QuietTableHeader: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            if window == nil { stopWatching() }
             refresh()
             DispatchQueue.main.async { [weak self] in self?.refresh() }
         }
@@ -133,8 +134,10 @@ private struct QuietTableHeader: NSViewRepresentable {
             ) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } }
         }
 
-        deinit {
+        private func stopWatching() {
             if let watching { NotificationCenter.default.removeObserver(watching) }
+            watching = nil
+            watched = nil
         }
 
         /// The width and columns the table was last fitted to.

@@ -35,6 +35,20 @@ struct DateDisplayTests {
         #expect(TimeOfDay.parse("6:05\u{202F}PM").map { [$0.hour, $0.minute] } == [18, 5])
     }
 
+    @Test func everyTableDateColumnReadsOneWay() {
+        func text(_ date: Date, hasTime: Bool) -> String {
+            DateDisplay.text(of: date, hasTime: hasTime, place: .table, format: .standard, now: now, calendar: calendar, locale: Locale(identifier: "en_GB"))
+        }
+        // An item's own stamp today is its time, and a day alone, a field's date, is the day in words.
+        #expect(text(moment(daysAgo: 0, hour: 9, minute: 40), hasTime: true) == "09:40")
+        #expect(text(moment(daysAgo: 0, hour: 9, minute: 40), hasTime: false) == "Today")
+        // Any other day reads the same whether or not it has a time.
+        #expect(text(moment(daysAgo: 1), hasTime: true) == "Yesterday")
+        #expect(text(moment(daysAgo: 1), hasTime: false) == "Yesterday")
+        #expect(text(moment(daysAgo: 3), hasTime: true) == text(moment(daysAgo: 3), hasTime: false))
+        #expect(text(moment(daysAgo: 20), hasTime: true) == text(moment(daysAgo: 20), hasTime: false))
+    }
+
     // MARK: What is stored
 
     @Test func aStoredChoiceIsReadBackAndAnUnknownOneIsTheStandard() throws {

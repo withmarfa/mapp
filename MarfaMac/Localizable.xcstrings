@@ -602,6 +602,9 @@
         }
       }
     },
+    "%@, Feed" : {
+
+    },
     "%@, ^[%lld item](inflect: true)" : {
       "localizations" : {
         "en" : {
@@ -7602,6 +7605,9 @@
       "extractionState" : "manual"
     },
     "Opens a panel to add a value" : {
+
+    },
+    "Opens a panel to change the status" : {
 
     },
     "Opens the sidebar's places" : {

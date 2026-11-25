@@ -49,7 +49,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Gate | A list of 50,000 items stays quick to change. Nesting, Digest and Map come after it. | `Browser`, `ItemTable.swift` | `Rethink-Library-Heavy` |
 | Digest | Items read in place: a white card each, with its type, source, title and some lines. What belongs together (a thread, one book's highlights) is a pile under its newest. An older copy of the app reads an unknown layout as a list. | `ItemViewMode`, a new file in `MarfaMac/Views/` | `Rethink-Inbox`, `Rethink-Inbox-View` |
 | Map | The app's own markers, grouping, a card for the chosen one, Style and Group Nearby, No Location with a count, and the system's stepper in the corner. MapKit joins what may connect out. | `ItemViewMode`, a new file in `MarfaMac/Views/` | `Rethink-Map`, `Rethink-Map-Light-Full`, `Rethink-Map-View` |
-| Table | Sub-items nest under their parent. A column takes its content. A last row, New, is the row a person types in. Every date column reads one way. | `ItemTable.swift`, `ItemTableCells.swift` | `Rethink-Library`, `Rethink-Library-Heavy` |
+| Table | Sub-items nest under their parent. A last row, New, is the row a person types in. | `ItemTable.swift`, `ItemTableCells.swift` | `Rethink-Library`, `Rethink-Library-Heavy` |
 | List beside a page | The entries of every list beside a page, the same in every place. | `ItemList.swift`, `ItemRow.swift` | `Rethink-Notes`, `Rethink-Highlights` |
 | Board | Its columns are its groups, so Hide Empty Groups is the one switch. A lane has a plus. Rows: Properties, Card Size, Sub-Items. | `ItemBoard.swift` | `Rethink-Tasks-Board` |
 | Calendar | A choice of the date field, No Date with a count, Weekends, a gray chosen event, and a one-line header on the week. | `ItemCalendar.swift`, `CalendarWeekView.swift` | `Rethink-Calendar`, `Rethink-Calendar-Month`, `Rethink-Calendar-Light`, `Rethink-Calendar-Light-Full` |
@@ -85,7 +85,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | --- | --- | --- | --- |
 | Undo of a link in one call | Undo checks a link's id, type and ends, then deletes it by id in a second package call, so a move synced between the two is lost, as with state moves. **Waits for Marfa:** one package call that checks and deletes. | `MarfaEngine+Writing.swift` | – |
 | Conflict | A calm line with Keep My Edit and Use Current Value. | `ValueEditModel` | `Rethink-Edit-Conflict` |
-| Status where it is seen | A click on a status in a row or a lane opens its panel; the row stays until it is left. | `StatusSymbol`, `ItemRow.swift` | `Rethink-Status-In-List` |
+| Status where it is seen | The row stays where it is until it is left, even when its new status would move it. It waits for the held row that In place needs too. The mark before a task's name, in place of a Status column, is not built. | `Browser`, `ItemTable.swift` | `Rethink-Status-In-List` |
 
 ## Each kind of item
 

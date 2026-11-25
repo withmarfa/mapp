@@ -54,6 +54,9 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse a drop: no single value is meant.
 - **A table's widths are stored only from a drag of a divider** (`keepWidths`), never from AppKit's layout, which changes by itself.
+- **A table's first column starts 40 points from the pane's edge,** where the title does (`ItemTable.margin`).
+- **A column takes the width of its words:** the widest of the first rows' (`ItemTableFit`), not less than its heading. The name takes what the others leave and not less than its least, until a person drags its divider. Past that the table scrolls sideways.
+- **Every date column reads one way** (`DateDisplay.Place.table`, which `PlaceIndex` shares): an item's own stamp is its time today, then Yesterday, a weekday and the date; a field's date is a day, so a task due at four today is due Today.
 
 ## The View panel
 

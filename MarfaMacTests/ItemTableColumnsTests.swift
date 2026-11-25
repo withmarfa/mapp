@@ -162,8 +162,25 @@ struct ItemTableColumnsTests {
         defer { opened.window.performClose(nil); opened.window.contentView = nil; opened.defaults.removePersistentDomain(forName: suite) }
         #expect(opened.stored.isEmpty, "the layout AppKit chose was stored as the person's")
         let (library, _) = try await BigLibrary.loaded()
-        let ideals = opened.browser.shownColumns(opened.browser.tableContent(in: library).columns).map(\.widths.ideal)
-        #expect(opened.shownTableColumns.map { $0.width.rounded() } == ideals.map { $0.rounded() }, "a column with no stored width opens at its ideal")
+        let (shown, ideals) = Self.fitted(opened.browser, in: library)
+        let widths = opened.shownTableColumns.map { $0.width.rounded() }
+        #expect(Self.apart(widths, from: shown) == Self.apart(ideals, from: shown), "a column with no stored width opens at the width its words need")
+    }
+
+    /// The columns the table shows and the width each starts at: what its content needs (`ItemTableFit`), and for the name,
+    /// which takes what the others leave, nothing.
+    @MainActor
+    private static func fitted(_ browser: Browser, in library: any ItemLibrary) -> (shown: [ItemTableColumn], widths: [CGFloat]) {
+        let content = browser.tableContent(in: library)
+        let shown = browser.shownColumns(content.columns)
+        let fit = ItemTableFit.widths(
+            of: shown, rows: content.rows.prefix(ItemTableFit.sample), library: library, format: .standard, now: library.now(), scale: 1)
+        return (shown, shown.map { $0.content == .title ? 0 : (fit[$0.id]?.ideal ?? $0.widths.ideal).rounded() })
+    }
+
+    /// `widths` without the name's, which fills the window and is no ideal.
+    private static func apart(_ widths: [CGFloat], from shown: [ItemTableColumn]) -> [CGFloat] {
+        zip(widths, shown).filter { $0.1.content != .title }.map(\.0)
     }
 
     @MainActor
@@ -201,9 +218,10 @@ struct ItemTableColumnsTests {
         // The same table moves to a saved view that holds no widths of its own.
         opened.browser.showing = .saved(ItemID("view-1"))
         let (library, _) = try await BigLibrary.loaded()
-        let ideals = opened.browser.shownColumns(opened.browser.tableContent(in: library).columns).map { $0.widths.ideal.rounded() }
+        let (shown, ideals) = Self.fitted(opened.browser, in: library)
         try #require(await eventually { opened.shownTableColumns.count == ideals.count })
-        #expect(await eventually { opened.shownTableColumns.map { $0.width.rounded() } == ideals }, "the saved view kept the last place's widths: \(opened.shownTableColumns.map { $0.width.rounded() }) vs \(ideals)")
+        let wanted = Self.apart(ideals, from: shown)
+        #expect(await eventually { Self.apart(opened.shownTableColumns.map { $0.width.rounded() }, from: shown) == wanted }, "the saved view kept the last place's widths: \(opened.shownTableColumns.map { $0.width.rounded() }) vs \(ideals)")
         #expect(opened.stored.isEmpty, "showing the saved view stored widths for it")
     }
 
