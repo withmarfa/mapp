@@ -20,11 +20,12 @@ struct ListToolbar: ToolbarContent {
     }
 }
 
-/// Search and what sets up the view shown, in the order every view has them. The index pages have their own
-/// (`IndexToolbarItems`).
+/// Search and what sets up the view shown, in the order every view has them. Library › Types, Collections and Sources
+/// have no view, so only Search.
 struct ViewToolbarItems: ToolbarContent {
     @Bindable var browser: Browser
     let layout: ColumnSearch.Layout
+    var offersView = true
 
     var body: some ToolbarContent {
         ColumnSearch(
@@ -35,8 +36,10 @@ struct ViewToolbarItems: ToolbarContent {
             focusRequests: browser.searchFocusRequests,
             onDown: { browser.focusRequest = .list }
         )
-        ToolbarItem {
-            ViewOptionsMenu(browser: browser)
+        if offersView {
+            ToolbarItem {
+                ViewOptionsMenu(browser: browser)
+            }
         }
     }
 }

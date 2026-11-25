@@ -32,7 +32,7 @@ nonisolated final class ItemEmptyStateTests: XCTestCase {
     @MainActor func testAnEmptyCollectionLeavesTheContentPaneBlank() {
         window.quickAdd(type: "Collection", title: "Empty collection check")
         sidebar.staticTexts["Collections"].click()
-        let index = window.descendants(matching: .any).matching(identifier: "SidebarIndex").firstMatch
+        let index = window.descendants(matching: .any).matching(identifier: "PlaceIndexTable").firstMatch
         let collection = index.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Empty collection check")).firstMatch
         XCTAssertTrue(collection.waitForExistence(timeout: 3))
         collection.doubleClick()

@@ -85,11 +85,12 @@ struct PlaceDefaultsTests {
         #expect(Self.window(defaults, library: library, place: .feed).tableOptions[.feed]?.isFiltering != true)
     }
 
-    @Test func aSavedViewAndTheThreeIndexesHaveNoDefaultView() {
+    @Test func aSavedViewAndTheIndexesOfPlacesHaveNoDefaultView() {
         #expect(!Browser.hasDefaultView(.saved(ItemID("v"))))
         #expect(!Browser.hasDefaultView(.sources))
         #expect(!Browser.hasDefaultView(.collections))
-        #expect(!Browser.hasDefaultView(.library))
+        #expect(!Browser.hasDefaultView(.types))
+        #expect(Browser.hasDefaultView(.library))
         #expect(Browser.hasDefaultView(.collection(ItemID("c"))))
     }
 
@@ -128,7 +129,7 @@ struct PlaceDefaultsTests {
 
         browser.resetView(in: library)
         #expect(browser.tableOptions[browser.shown]?.isFiltering != true)
-        #expect(browser.viewMode == Browser.naturalLayout(of: browser.shown))
+        #expect(browser.viewMode == browser.naturalLayout(of: browser.shown))
         #expect(browser.density == nil)
         #expect(!browser.isDefaultViewChanged)
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)

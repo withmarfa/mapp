@@ -37,8 +37,8 @@ import Testing
         let units: [PreferenceUnit] = PreferencesMap.inFiles.map { setting in
             switch setting.place {
             case .member(let field), .serverMember(let field, _): .member(field, setting.key)
-            case .rows(let table, let word, _, _, _, _), .serverRows(let table, let word, _), .set(let table, let word),
-                 .placeRows(let table, let word, _): .row(table, setting: word, key: "x")
+            case .rows(let table, let word, _, _, _, _), .serverRows(let table, let word, _), .set(let table, let word):
+                .row(table, setting: word, key: "x")
             case .sidebar: .row(.sidebar, setting: PreferencesSidebar.layoutSetting, key: "order")
             }
         }

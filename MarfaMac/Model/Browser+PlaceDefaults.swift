@@ -8,18 +8,24 @@ import Foundation
 /// opens the place again, which reads the entry again, and so picks up the other window's change then.
 extension Browser {
     /// Whether a place has a default view: every place a person can arrange, which is any but a saved view, whose choices
-    /// are its own, and the three indexes (Items, Collections and Sources), whose tab and sort are kept by
-    /// `IndexPreferences` and which have no layout to choose.
+    /// are its own, and Types, Collections and Sources, which list places and have no layout to choose.
     nonisolated static func hasDefaultView(_ place: PlaceView) -> Bool {
-        place.savedView == nil && place != .library && place.listsItems
+        place.savedView == nil && place.listsItems
     }
 
     /// Whether the open place has a default view the window can change.
     var hasDefaultView: Bool { Self.hasDefaultView(shown) }
 
     /// The layout a place opens in until the person chooses one: a table for the Archive, which lists items by what they
-    /// are and where they came from, a list for any other.
-    nonisolated static func naturalLayout(of place: PlaceView) -> ItemViewMode { place == .archive ? .table : .list }
+    /// are and where they came from, and for the Library once it holds more than `libraryListLimit` items, which a new
+    /// Marfa's few read better as a list; a list for any other.
+    func naturalLayout(of place: PlaceView) -> ItemViewMode {
+        if place == .archive { return .table }
+        if place == .library, let library, library.count(in: .library) > Self.libraryListLimit { return .table }
+        return .list
+    }
+
+    nonisolated static let libraryListLimit = 10
 
     // MARK: Keeping
 
@@ -108,7 +114,7 @@ extension Browser {
         if placeProperties[place] != properties { placeProperties[place] = properties }
         observedChoices[place] = ViewChoices(options: options, timelineDate: stored.timelineField)
         // A place with no layout kept opens in its own, so one place's table is not carried to the next.
-        apply(layout: stored.layout ?? Self.naturalLayout(of: place), in: library)
+        apply(layout: stored.layout ?? naturalLayout(of: place), in: library)
     }
 
     // MARK: Resetting
@@ -123,7 +129,7 @@ extension Browser {
         let inputs = [PlaceDefaults.key, PlaceDensities.key, ItemTableColumnLayouts.key].map { defaults.data(forKey: $0) }
         if let known = changedMemo, known.place == place, known.inputs == inputs { return known.changed }
         let stored = PlaceDefaults.stored(in: defaults).default(for: place)
-        let changed = stored?.isChanged(naturalLayout: Self.naturalLayout(of: place)) == true
+        let changed = stored?.isChanged(naturalLayout: naturalLayout(of: place)) == true
             || PlaceDensities.stored(in: defaults).density(for: place) != nil
             || ItemTableColumnLayouts.isChanged(for: place, in: inputs[2] ?? Data())
         changedMemo = (place, inputs, changed)
@@ -155,7 +161,7 @@ extension Browser {
         observedChoices[place] = ViewChoices(options: ItemTableOptions(), timelineDate: nil)
         // The row of a place with no filter left is not kept open, which only a filter the person put in would have done.
         filterRowChoice[place] = nil
-        let natural = Self.naturalLayout(of: place)
+        let natural = naturalLayout(of: place)
         if viewMode != natural, availableViewModes(in: library).contains(natural) { set(layout: natural) }
         registerResetUndo(restoring: before)
     }

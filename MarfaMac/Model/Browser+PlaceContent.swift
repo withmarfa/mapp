@@ -226,7 +226,15 @@ extension Browser {
     /// What the place's table shows, worked out once and shared by everything that draws the table, its controls or
     /// a command about it, until the items, the place's options or the search change. Reading it does not depend on
     /// the selection, so a selection never makes it again.
+    ///
+    /// A place of more than `arrangesAlongsideAbove` items, such as a Library of tens of thousands, is not ordered on the
+    /// main actor at each change. Its last table stays on screen, also while the window is elsewhere, and the next is
+    /// sorted off the main actor (`arrange`). A run of edits is let settle first (`arrangeSettling`); a choice of the
+    /// person's or an item gone is arranged at once. The chosen row keeps its place through a re-sort until the person
+    /// chooses another, so a sort by Edited does not carry the row they are editing from under them.
     func tableContent(in library: any ItemLibrary) -> ItemTableContent {
+        // Read, so whoever asks is told when an arrangement lands.
+        _ = tableArrangements
         let keyed = (tableOptions[shown] ?? ItemTableOptions()).settled
         let derived = derivedKey(in: library)
         let key = TableKey(
@@ -234,9 +242,66 @@ extension Browser {
             hidesEmpty: hidesEmptyGroups, sources: library.sources.infos,
             relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()))
         if let held = tableMemo, held.key == key { return held.content }
-        let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
+        let held = heldTables[shown].flatMap { $0.key.derived.library == key.derived.library ? $0 : nil }
+        if let held, arranging?.key == key { return held.content }
+        let items = derived.items ?? items(in: library)
+        if let held, items.count > Self.arrangesAlongsideAbove {
+            arrange(key, items: items, after: held, in: library)
+            return held.content
+        }
+        arranging?.task.cancel()
+        arranging = nil
+        let content = ItemTableContent(browser: self, library: library, items: items)
         tableMemo = (key, content)
+        if items.count > Self.arrangesAlongsideAbove { heldTables[shown] = (key, content) }
         return content
+    }
+
+    /// Up to this many items a table is worked out in place, so a small place never shows an earlier table first.
+    nonisolated static let arrangesAlongsideAbove = 2_000
+    /// How long a run of changes to a large place's items is let settle.
+    nonisolated static let arrangeSettling = Duration.milliseconds(300)
+
+    /// Makes the table for `key` with its rows sorted off the main actor, and shows it once it is still the one asked for.
+    private func arrange(
+        _ key: TableKey, items: [Item], after earlier: (key: TableKey, content: ItemTableContent), in library: any ItemLibrary
+    ) {
+        arranging?.task.cancel()
+        let place = shown
+        let sameChoices = key.options == earlier.key.options && key.choices == earlier.key.choices
+            && key.shownRelations == earlier.key.shownRelations && key.hidesEmpty == earlier.key.hidesEmpty
+            && key.relativeDay == earlier.key.relativeDay && key.derived.listing == earlier.key.derived.listing
+            && key.derived.ids == earlier.key.derived.ids && key.derived.byRelevance == earlier.key.derived.byRelevance
+        // Only the items' own changes settle: a membership change may have taken an item away, which must not stay chosen.
+        let settles = sameChoices && key.derived.membership == earlier.key.derived.membership
+        let pinned = sameChoices && selection.count == 1 ? selection.first : nil
+        let task = Task { [weak self] in
+            if settles {
+                try? await Task.sleep(for: Self.arrangeSettling)
+                guard !Task.isCancelled else { return }
+            }
+            guard let self, self.shown == place, self.isShowing(library) else { return }
+            let content = ItemTableContent(browser: self, library: library, items: items)
+            let kept = content.kept
+            let sort = content.sort
+            let sorted = await Task.detached(priority: .userInitiated) { ItemTableLayout.sorted(kept, by: sort) }.value
+            guard !Task.isCancelled, self.arranging?.key == key, self.shown == place else { return }
+            content.rows = Self.holding(pinned, in: sorted, as: pinned == nil ? nil : earlier.content.rows)
+            self.arranging = nil
+            self.tableMemo = (key, content)
+            self.heldTables[place] = (key, content)
+            self.tableArrangements += 1
+        }
+        arranging = (key, task)
+    }
+
+    /// `rows` with the row of `id` where it stood in `earlier`, where both hold it.
+    nonisolated static func holding(_ id: ItemID?, in rows: [ItemTableRow], as earlier: [ItemTableRow]?) -> [ItemTableRow] {
+        guard let id, let earlier, let was = earlier.firstIndex(where: { $0.id == id }),
+              let now = rows.firstIndex(where: { $0.id == id }), was != now else { return rows }
+        var moved = rows
+        moved.insert(moved.remove(at: now), at: min(was, moved.count))
+        return moved
     }
 
     /// What everything worked out from a place's items depends on: which library and how often it changed, the
