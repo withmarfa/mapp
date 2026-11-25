@@ -111,8 +111,30 @@ private struct QuietTableHeader: NSViewRepresentable {
             (table.headerView as? QuietHeaderView)?.backdrop = backdrop
             resizing?.header = table.headerView
             resizing?.widthsChanged = { [weak self] in self?.restoreAfterChange() }
-            if let scrollView = table.enclosingScrollView { fit(table, in: scrollView) }
+            if let scrollView = table.enclosingScrollView {
+                watch(scrollView)
+                fit(table, in: scrollView)
+            }
             table.headerView?.needsDisplay = true
+        }
+
+        private weak var watched: NSScrollView?
+        private var watching: (any NSObjectProtocol)?
+
+        /// Fits the columns again when the page the table sits in changes size, which this view's own layout does not always
+        /// follow: a window made narrower leaves the flexible column as wide as it was.
+        private func watch(_ scrollView: NSScrollView) {
+            guard watched !== scrollView else { return }
+            if let watching { NotificationCenter.default.removeObserver(watching) }
+            watched = scrollView
+            scrollView.postsFrameChangedNotifications = true
+            watching = NotificationCenter.default.addObserver(
+                forName: NSView.frameDidChangeNotification, object: scrollView, queue: .main
+            ) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } }
+        }
+
+        deinit {
+            if let watching { NotificationCenter.default.removeObserver(watching) }
         }
 
         /// The width and columns the table was last fitted to.
