@@ -150,8 +150,8 @@ nonisolated enum ViewDraft {
             let sort = sort(window.sort)
             var group = group(window.grouping, mode: window.groupMode)
             if var held = group.group, let column = window.grouping {
-                if let order = window.groupOrder, !order.isEmpty { held.order = json(order, of: column) }
-                if let hidden = window.hiddenGroups, !hidden.isEmpty { held.hidden = json(hidden.sorted(), of: column) }
+                if let order = window.groupOrder, !order.isEmpty { held.order = json(order, of: column, mode: window.groupMode) }
+                if let hidden = window.hiddenGroups, !hidden.isEmpty { held.hidden = json(hidden.sorted(), of: column, mode: window.groupMode) }
                 group.group = held
             }
             return (sort.sort, group.group, sort.unkept + group.unkept)
@@ -233,17 +233,36 @@ nonisolated enum ViewDraft {
     static func group(_ column: ItemTableColumn?, mode: GroupMode = .value) -> (group: LibraryViewGroup?, unkept: [Unkept]) {
         guard let column else { return (nil, []) }
         if column.content == .parent { return (LibraryViewGroup(field: parentField), []) }
+        // Marfa groups by each item's own status group, whichever type's status column the window groups by.
+        if mode == .statusGroups { return (LibraryViewGroup(field: statusGroupField), []) }
+        if column.content == .source, mode == .value { return (LibraryViewGroup(field: sourceField), []) }
         guard let field = field(of: column) else { return (nil, [.group(column: label(of: column))]) }
         switch mode {
         case .value: return (LibraryViewGroup(field: field, order: declaredOrder(of: column)), [])
         case .bucket(let bucket): return (LibraryViewGroup(field: field, bucket: bucket), [])
-        case .presence, .statusGroups: return (nil, [.groupMode(column: label(of: column), mode: mode.title)])
+        case .presence:
+            // Marfa takes presence on a property, and not on an item's own dates, which every item may not have.
+            guard field.hasPrefix(propertyPrefix) else { return (nil, [.groupMode(column: label(of: column), mode: mode.title)]) }
+            return (LibraryViewGroup(field: field, byPresence: true), [])
+        case .statusGroups: return (nil, [])
         }
     }
 
-    /// Group keys as a view's lists hold them (`GroupKey.json`): a yes-or-no column's as bools.
-    static func json(_ keys: [String], of column: ItemTableColumn) -> [JSONValue] {
-        keys.compactMap { GroupKey.json($0, booleans: column.style == .boolean) }
+    static let statusGroupField = "status_group"
+    static let sourceField = "source"
+    private static let propertyPrefix = "properties."
+
+    /// Group keys as a view's lists hold them (`GroupKey.json`): a yes-or-no column's and Set or Not Set's as bools,
+    /// and a status group's as Marfa's four words, with No Status as `null`.
+    static func json(_ keys: [String], of column: ItemTableColumn, mode: GroupMode = .value) -> [JSONValue] {
+        switch mode {
+        case .presence:
+            return keys.compactMap { [GroupKey.set, GroupKey.notSet].contains($0) ? GroupKey.json($0, booleans: true) : nil }
+        case .statusGroups:
+            return keys.compactMap { $0 == GroupKey.none || StatusGroup(rawValue: $0) != nil ? GroupKey.json($0, booleans: false) : nil }
+        case .value, .bucket:
+            return keys.compactMap { GroupKey.json($0, booleans: column.style == .boolean) }
+        }
     }
 
     /// The order the app lists a column's values in, as a view's `group.order`: a status's words by their groups and
@@ -261,15 +280,29 @@ nonisolated enum ViewDraft {
     }
 
     /// The group a write sends in place of `held`, the view's own. Grouping by the same field keeps the groups `held`
-    /// orders and hides, which another app may have set: they name that field's values, whatever the span. Grouping by
-    /// another field drops them, since they name the old field's values, and orders the groups as the app lists them.
+    /// orders and hides, which another app may have set, where they can name a group of the new way of grouping: a
+    /// date's span keeps dates whatever the span, and Set or Not Set keeps only `true` and `false`. Grouping by another
+    /// field drops them, since they name the old field's values, and orders the groups as the app lists them.
     static func kept(_ group: LibraryViewGroup?, from held: LibraryViewGroup?) -> LibraryViewGroup? {
         guard var group else { return nil }
         if let held, held.field == group.field {
-            group.order = held.order
-            group.hidden = held.hidden
+            let sameWay = held.byPresence == group.byPresence && (held.bucket == nil) == (group.bucket == nil)
+            let fits = { (key: JSONValue) in sameWay || names(key, in: group) }
+            group.order = held.order.filter(fits)
+            group.hidden = held.hidden.filter(fits)
         }
         return group
+    }
+
+    /// Whether a key can name a group of `group`: Set or Not Set's are bools, a date span's dates or the null group.
+    private static func names(_ key: JSONValue, in group: LibraryViewGroup) -> Bool {
+        if group.byPresence { if case .bool = key { return true } else { return false } }
+        guard group.bucket != nil else { return true }
+        switch key {
+        case .null: return true
+        case .string(let text): return text.wholeMatch(of: /\d{4}-\d{2}-\d{2}/) != nil
+        default: return false
+        }
     }
 
     private static func label(of column: ItemTableColumn) -> String {
@@ -346,7 +379,8 @@ nonisolated enum ViewDraft {
             columnID(of: key.field).map { ItemTableComparator(column: placeholder($0), order: key.ascending ? .forward : .reverse) }
         }
         options.sort = sort.isEmpty ? nil : sort
-        if let group = view.group, let id = columnID(of: group.field), let mode = mode(of: group, column: id, catalogue: catalogue) {
+        if let group = view.group, let id = groupColumnID(of: group, view: view, catalogue: catalogue),
+           let mode = mode(of: group, column: id, catalogue: catalogue) {
             options.grouping = .column(id, by: mode)
             let order = group.order.compactMap(GroupKey.key(of:))
             let hidden = Set(group.hidden.compactMap(GroupKey.key(of:)))
@@ -365,6 +399,8 @@ nonisolated enum ViewDraft {
     /// are and a field is where a type declares it one.
     private static func mode(of group: LibraryViewGroup, column id: String, catalogue: Catalogue) -> GroupMode? {
         guard group.otherBucket == nil else { return nil }
+        if group.field == statusGroupField { return group.bucket == nil && !group.byPresence ? .statusGroups : nil }
+        if group.byPresence { return group.bucket == nil && id.hasPrefix(Browser.fieldColumnPrefix) ? .presence : nil }
         guard let bucket = group.bucket else { return .value }
         if [ItemTableColumn.created.id, ItemTableColumn.edited.id, ItemTableColumn.occurred.id].contains(id) { return .bucket(bucket) }
         guard id.hasPrefix(Browser.fieldColumnPrefix) else { return nil }
@@ -374,6 +410,20 @@ nonisolated enum ViewDraft {
             return true
         } }
         return isDate ? .bucket(bucket) : nil
+    }
+
+    /// The column the window groups a view's group by. Status groups stand on the status column of the first type
+    /// the view lists, or of every type where it lists none, as Group by offers them (`GroupOffer`).
+    private static func groupColumnID(of group: LibraryViewGroup, view: LibraryView, catalogue: Catalogue) -> String? {
+        switch group.field {
+        case sourceField: return ItemTableColumn.source.id
+        case statusGroupField:
+            let listed = view.query.types.isEmpty
+                ? Array(catalogue.itemTypes.keys) : view.query.types + view.query.types.flatMap { catalogue.descendants(of: $0) }
+            let key = listed.sorted { $0.rawValue < $1.rawValue }.lazy.compactMap { catalogue.itemTypes[$0]?.statusField?.key }.first
+            return key.map { Browser.fieldColumnPrefix + $0 }
+        default: return columnID(of: group.field)
+        }
     }
 
     /// The date field a view's days are grouped by, which a timeline shows its items by.
@@ -482,8 +532,8 @@ nonisolated enum ViewDraft {
             }
         } else if reorders(options, from: seed), var group = view.group, let column = window.grouping {
             // The same grouping with other groups first or left out: Marfa's `group.order` and `group.hidden`.
-            group.order = json(options.groupOrder ?? [], of: column)
-            group.hidden = json((options.hiddenGroups ?? []).sorted(), of: column)
+            group.order = json(options.groupOrder ?? [], of: column, mode: window.groupMode)
+            group.hidden = json((options.hiddenGroups ?? []).sorted(), of: column, mode: window.groupMode)
             change.group = .set(group)
         }
         if !options.filter.savable.isSame(as: seed.filter.savable) {

@@ -98,9 +98,10 @@ nonisolated enum MarfaMapping {
 
     private static func libraryGroup(_ group: ViewGrouping) -> LibraryViewGroup {
         let known = group.bucket.flatMap { LibraryViewGroup.Bucket(rawValue: $0.rawValue) }
+        let byPresence = group.bucket == .presence
         return LibraryViewGroup(
-            field: group.by, bucket: known, order: group.order, hidden: group.hidden,
-            otherBucket: known == nil ? group.bucket?.rawValue : nil)
+            field: group.by, bucket: known, order: group.order, hidden: group.hidden, byPresence: byPresence,
+            otherBucket: known == nil && !byPresence ? group.bucket?.rawValue : nil)
     }
 
     /// Nil where a view lists both tiers.
@@ -113,7 +114,8 @@ nonisolated enum MarfaMapping {
     }
 
     private static func marfaBucket(_ group: LibraryViewGroup) -> ViewGrouping.Bucket? {
-        (group.bucket?.rawValue ?? group.otherBucket).map(ViewGrouping.Bucket.init(rawValue:))
+        if group.byPresence { return .presence }
+        return (group.bucket?.rawValue ?? group.otherBucket).map(ViewGrouping.Bucket.init(rawValue:))
     }
 
     static func viewSettings(_ settings: LibraryViewSettings) -> ViewSettings {

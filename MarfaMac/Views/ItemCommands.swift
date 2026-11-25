@@ -171,7 +171,7 @@ enum ItemCommand: CaseIterable {
     func isEnabled(in context: ItemCommandContext) -> Bool {
         guard context.library != nil else { return false }
         return switch self {
-        case .open: context.hasBrowser && ItemOpening.stored().canOpen(context.ids.count)
+        case .open: context.browser?.itemOpening().canOpen(context.ids.count) == true
         case .openBesideList: context.hasBrowser && ItemOpening.besideList.canOpen(context.ids.count)
         case .openAsModal: context.hasBrowser && ItemOpening.modal.canOpen(context.ids.count)
         case .openAsFullPage: context.hasBrowser && ItemOpening.fullPage.canOpen(context.ids.count)

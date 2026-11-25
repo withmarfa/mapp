@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MarfaMac
 
-/// The filter row's clauses: what each kind and operator becomes in a saved view's filter and comes back as, the "is not"
+/// A place's filter clauses: what each kind and operator becomes in a saved view's filter and comes back as, the "is not"
 /// rewrite, All and Any, dates relative to the day (which a view never keeps), the count of conditions, and what a clause
 /// keeps in the window.
 @MainActor
@@ -406,6 +406,45 @@ struct FilterClauseTests {
         let held = (1...9).map { #"tags contains "t\#($0)""# }.joined(separator: " AND ")
         #expect(Self.filter([Self.clause("field.priority", .is, ["high"])], base: held).unkept.isEmpty)
         #expect(Self.filter([Self.clause("field.priority", .is, ["high"]), Self.clause("field.status", .is, ["done"])], base: held).unkept == [.tooManyFilters])
+    }
+
+    /// At nine conditions a new one or a changed one is offered only with an operator that takes one more: a date starts
+    /// before a day, since On takes two, and the menu offers neither On nor Between.
+    @Test func atNineConditionsOnlyAnOperatorThatFitsIsOffered() {
+        let nine = FilterState(clauses: [
+            Self.clause("field.assignees", .includes, (1...9).map { "p\($0)" }), Self.clause("field.due_at", .before, ["2026-11-01"]),
+        ])
+        let room = ViewDraft.room(for: nil, in: nine, beside: nil, targets: Self.targets, catalogue: Self.catalogue, calendar: Self.london())
+        #expect(room == 0, "nine values and a bound are ten")
+        let atNine = FilterState(clauses: [Self.clause("field.assignees", .includes, (1...9).map { "p\($0)" })])
+        let left = ViewDraft.room(for: nil, in: atNine, beside: nil, targets: Self.targets, catalogue: Self.catalogue, calendar: Self.london())
+        #expect(left == 1)
+        #expect(ViewDraft.startingOperator(for: .date, room: left) == .before)
+        #expect(ViewDraft.startingOperator(for: .status, room: left) == .is)
+        #expect(ViewDraft.startingOperator(for: .date, room: 0) == nil)
+        // The date clause itself: the others leave it one, so On and Between go from its menu.
+        let own = ViewDraft.room(for: 1, in: nine, beside: nil, targets: Self.targets, catalogue: Self.catalogue, calendar: Self.london())
+        #expect(own == 1)
+        let offered = FilterOperatorMenu.sections(for: .date, relative: false, room: own, current: .before).flatMap(\.ops)
+        #expect(!offered.contains(.on) && !offered.contains(.between))
+        #expect(offered.contains(.before) && offered.contains(.after))
+        #expect(FilterOperatorMenu.sections(for: .date, relative: false).flatMap(\.ops).contains(.on))
+    }
+
+    /// The Filter page counts a view's conditions it cannot show, and offers Match Any only where the view can hold it.
+    @Test func theFilterPageCountsLockedConditionsAndOffersAnyOnlyWhereItHolds() {
+        // Conditions on a field no type here declares, which the row cannot show.
+        let locked = LibraryViewQuery(types: [Self.task], filter: (1...9).map { #"properties.mood\#($0) eq "calm""# }.joined(separator: " AND "))
+        let one = FilterState(clauses: [Self.clause("field.priority", .is, ["high"])])
+        let two = FilterState(clauses: [Self.clause("field.priority", .is, ["high"]), Self.clause("field.status", .is, ["done"])])
+        let held = ViewDraft.holdability(of: one, beside: locked, targets: Self.targets, catalogue: Self.catalogue, calendar: Self.london())
+        #expect(held.count == 10)
+        #expect(held.unkept.isEmpty)
+        #expect(ViewDraft.holdability(of: two, beside: locked, targets: Self.targets, catalogue: Self.catalogue).unkept == [.tooManyFilters])
+        #expect(!ViewDraft.canMatchAny(two, beside: locked, targets: Self.targets, catalogue: Self.catalogue))
+        #expect(ViewDraft.canMatchAny(two, beside: LibraryViewQuery(types: [Self.task]), targets: Self.targets, catalogue: Self.catalogue))
+        let range = FilterState(clauses: [Self.clause("field.due_at", .between, ["2026-11-01", "2026-11-09"]), Self.clause("field.status", .is, ["done"])])
+        #expect(!ViewDraft.canMatchAny(range, beside: nil, targets: Self.targets, catalogue: Self.catalogue))
     }
 
     // MARK: A saved view's own conditions

@@ -23,10 +23,7 @@ struct ItemInspectorHost: View {
 
     var body: some View {
         Group {
-            if let browser, details.isEditingView, let panel = browser.viewPanel {
-                ViewEditPanel(browser: browser, panel: panel)
-                    .onExitCommand { browser.escapeViewPanel(in: library) }
-            } else if let id = selectedID, let item = library.headerItem(id) {
+            if let id = selectedID, let item = library.headerItem(id) {
                 ItemPanelLoader(
                     item: item, relationships: library.relationships(for: id), mentions: library.bodyMentions(for: id), editor: editor,
                     details: details, onOpen: open

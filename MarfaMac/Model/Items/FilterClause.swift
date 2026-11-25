@@ -166,7 +166,7 @@ nonisolated enum FilterOp: String, Codable, Hashable, Sendable, CaseIterable {
     }
 }
 
-/// One condition of the filter row, as a chip shows it: a field, an operator and its values. Several may name one field.
+/// One filter condition: a field, an operator and its values. Several may name one field.
 nonisolated struct FilterClause: Hashable, Sendable, Codable {
     /// The field's identifier: a column's (`field.due_at`, `type`, `parent`, `tags`, `collections`, `created`, `edited`,
     /// `occurred`), or `source`.

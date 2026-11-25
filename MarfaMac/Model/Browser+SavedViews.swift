@@ -41,7 +41,9 @@ extension Browser {
         // A change of the view's filters can move it to another home, and the window goes with it.
         let home = PlaceView(Place.home(of: view.query, catalogue: library.catalogue), .saved(id))
         if showing != home { showing = home }
-        if pendingViewWrites.remove(id) != nil { scheduleWrite(of: id) }
+        // A change the store is sending lands in the window by itself (`Browser.pendingChangeLanded`).
+        if pendingViewWrites.remove(id) != nil, !PendingViewChanges.isSending(id) { scheduleWrite(of: id) }
+        defer { noteOpened(view) }
         guard let seed = viewSeeds[id] else {
             apply(layout: ViewLayouts.stored(in: defaults).settings(for: id)?.layout, in: library)
             return self.seed(view, catalogue: library.catalogue)
@@ -67,20 +69,47 @@ extension Browser {
             version: view.version, options: options, viewFilter: options.filter, timelineDate: timelineDate, types: types,
             preview: ViewDraft.previewQuery(of: view.query, seededTypes: types, catalogue: catalogue), mac: mac)
         guard !keepingWindow else {
-            if let earlier { follow(ViewChoices(options: options, timelineDate: timelineDate), in: place, over: earlier, sent: sent) }
+            if let earlier {
+                follow(ViewChoices(options: options, timelineDate: timelineDate), of: view, in: place, over: earlier, sent: sent)
+            }
             return
         }
         options.collapsed = collapsed
         tableOptions[place] = options
         timelineFields[place] = timelineDate
         observedChoices[place] = ViewChoices(options: options, timelineDate: timelineDate)
+        // The view as Marfa now holds it is what Revert View goes back to for each setting this window did not change.
+        if openedView?.id == view.id {
+            var parts = Set(ViewChoices.Part.allCases)
+            // Filters the view says as before, perhaps in other words than the window's, are no other app's change.
+            if let earlier, options.filter.isSame(as: earlier.viewFilter) { parts.remove(.filters) }
+            openedView?.follow(parts, of: ViewChoices(options: options, timelineDate: timelineDate), raw: view)
+        }
+    }
+
+    /// Keeps the view as the window first shows it, for Revert View, until the window shows another place.
+    private func noteOpened(_ view: LibraryView) {
+        guard openedView?.id != view.id, viewSeeds[view.id] != nil else { return }
+        var mac = macSettings(for: view.id)
+        mac.layout = viewMode
+        openedView = OpenedView(id: view.id, choices: choices(in: .saved(view.id)), mac: mac, raw: view)
+    }
+
+    /// Whether the person changed the view the window shows since the window opened it, which Revert View takes back.
+    var isViewChanged: Bool {
+        guard let opened = openedView, shown.isSame(.saved(opened.id)) else { return false }
+        var mac = macSettings(for: opened.id)
+        mac.layout = viewMode
+        return !liveChoices.parts(differingFrom: opened.choices).isEmpty || !mac.sameChoices(as: opened.mac)
     }
 
     /// Shows the settings of a view a write returned that the person has not changed since `earlier`, the seed the
     /// write was compared with, and that the write did not send. The server may have merged another app's change to one
     /// (`views/change-stale`); left out of the window, it would read as the person's own change, and the next write would
     /// send the window's older value back over it. A setting the person changed stays as they chose it, and is written.
-    private func follow(_ returned: ViewChoices, in place: PlaceView, over earlier: ViewSeed, sent: LibraryViewChange) {
+    private func follow(
+        _ returned: ViewChoices, of view: LibraryView, in place: PlaceView, over earlier: ViewSeed, sent: LibraryViewChange
+    ) {
         let held = ViewChoices(options: earlier.options, timelineDate: earlier.timelineDate)
         let dated = shown.isSame(place) ? datedList : nil
         var parts = Set(ViewChoices.Part.allCases).subtracting(choices(in: place).parts(differingFrom: held, dated: dated))
@@ -92,6 +121,7 @@ extension Browser {
         parts = parts.intersection(choices(in: place).parts(differingFrom: returned, dated: dated))
         guard !parts.isEmpty else { return }
         put(returned, in: place, only: parts)
+        if openedView?.id == place.savedView { openedView?.follow(parts, of: returned, raw: view) }
         // Not the person's change: no step of Undo, and nothing to write.
         if var observed = observedChoices[place] {
             observed.take(parts, from: returned)
@@ -365,10 +395,56 @@ extension Browser {
 
     // MARK: Putting the window back to the view
 
-    /// Puts the window back to the view as the library holds it, dropping a choice Marfa has not taken.
+    /// Puts back each setting this window changed since it opened the view, and writes it to Marfa whole, as Marfa held
+    /// it then, with what the window cannot show (`OpenedView.raw`). A setting another app changed since, as Marfa holds
+    /// it, stays and the person is told. One step of Undo brings the person's changes back.
     func revertView(in library: any ItemLibrary) {
-        guard let id = shown.savedView else { return }
-        viewRefused(id, in: library)
+        guard let id = openedView?.id, shown.isSame(.saved(id)), isViewChanged else { return }
+        // A change the window has not yet passed through the funnel is still its own.
+        choicesChanged()
+        guard let opened = openedView, let now = library.views.first(where: { $0.id == id }) else { return }
+        if let layout = opened.mac.layout, layout != viewMode, availableViewModes(in: library).contains(layout) {
+            viewMode = layout
+        }
+        changeViewSettings(id) { settings in
+            let layout = settings.layout
+            settings.take(choicesOf: opened.mac)
+            settings.layout = layout
+        }
+        let settings = OpenedView.settings(of: opened.changed)
+        let kept = settings.filter { !opened.holdsWhatItLeft($0, in: now) }
+        let reverted = settings.subtracting(kept)
+        var reverting = opened.opening(reverted)
+        if !kept.isEmpty {
+            // The window shows the other app's value, and the write leaves Marfa's as it is.
+            let current = ViewChoices(options: ViewDraft.options(for: now, catalogue: library.catalogue), timelineDate: ViewDraft.timelineDate(of: now))
+            let parts = kept.reduce(into: Set<ViewChoices.Part>()) { $0.formUnion(OpenedView.parts(of: $1)) }
+            put(current, in: shown, only: parts)
+            openedView?.choices.take(parts, from: current)
+            openedView?.changed.subtract(parts)
+            for setting in kept { openedView?.take(setting, of: now) }
+            if kept.contains(.sort) { reverting.sort = now.sort }
+            if kept.contains(.group) { reverting.group = now.group.map { .set($0) } ?? .clear }
+            if kept.contains(.query) { reverting.query = now.query }
+        }
+        openedView?.reverting = reverting
+        put(opened.choices, in: shown, only: reverted.reduce(into: []) { $0.formUnion(OpenedView.parts(of: $1)) })
+        choicesChanged()
+        // The steps of one event are one step of Undo.
+        undoManager?.setActionName(String(localized: "Revert View"))
+        tellKept(kept, in: library)
+    }
+
+    private func tellKept(_ kept: Set<PendingViewChanges.Setting>, in library: any ItemLibrary) {
+        guard !kept.isEmpty else { return }
+        let lines = PendingViewChanges.Setting.allCases.filter(kept.contains).map { setting in
+            switch setting {
+            case .sort: String(localized: "Sort was changed in another app, so it was kept.")
+            case .group: String(localized: "Grouping was changed in another app, so it was kept.")
+            case .query: String(localized: "Filters or From were changed in another app, so they were kept.")
+            }
+        }
+        library.notices.tell(String(localized: "View Partly Reverted"), lines.joined(separator: " "))
     }
 
     /// The change that writes the window's choices to the view it shows, the version it is based on, and what of
@@ -380,7 +456,39 @@ extension Browser {
         let update = ViewDraft.change(
             window, options: tableOptions[shown], seed: seed.options, seedTimelineDate: seed.timelineDate, seededTypes: seed.types,
             view: view, catalogue: library.catalogue, replaced: replacedGroups[id] ?? [:])
-        return ViewUpdate(view: view, change: update.change, baseVersion: seed.version, unkept: update.unkept)
+        var change = update.change
+        var unkept = update.unkept
+        // A setting Revert View put back is written as Marfa held it, while the window still shows it as it opened.
+        if let opened = openedView, opened.id == id, let reverting = opened.reverting {
+            let differing = choices(in: shown).parts(differingFrom: opened.choices, dated: datedList)
+            if let sort = reverting.sort, !differing.contains(.sort) {
+                change.sort = sort == view.sort ? nil : sort
+                unkept.removeAll { if case .sort = $0 { true } else { false } }
+            }
+            if let group = reverting.group, !differing.contains(.grouping) {
+                let same = switch group {
+                case .set(let group): view.group == group
+                case .clear: view.group == nil
+                }
+                change.group = same ? nil : group
+                unkept.removeAll { unkept in
+                    switch unkept {
+                    case .group, .groupMode: true
+                    default: false
+                    }
+                }
+            }
+            if let query = reverting.query, differing.isDisjoint(with: [.filters, .listing]) {
+                change.query = query == view.query ? nil : query
+                unkept.removeAll { unkept in
+                    switch unkept {
+                    case .filter, .mixedFilters, .tooManyFilters, .refused: true
+                    default: false
+                    }
+                }
+            }
+        }
+        return ViewUpdate(view: view, change: change, baseVersion: seed.version, unkept: unkept)
     }
 
     struct ViewUpdate {

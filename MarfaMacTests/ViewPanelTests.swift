@@ -4,7 +4,7 @@ import Testing
 @testable import MarfaMac
 
 /// What the panel that edits a view does: each change shows in the window as it is made, is written to a saved view as it
-/// is made, and is taken back by one Undo. Done only closes the panel, except for a new view, which it makes.
+/// is made, and is taken back by one Undo. Closing the panel writes nothing more, except a new view's Create View.
 @MainActor
 // Serialised: each test drives its own undo manager's groups by hand, and tests that interleave on the main actor hung the host.
 @Suite(.serialized, .hangLimit)
@@ -25,7 +25,9 @@ struct ViewPanelTests {
             sort: [LibraryViewSort(field: "updated_at", ascending: false)], group: LibraryViewGroup(field: "properties.status"))
     }
 
-    private static func opened(filter: String? = nil, reachesServer: Bool = true) -> (Browser, FakeItemLibrary, UndoManager) {
+    private static func opened(
+        filter: String? = nil, view custom: LibraryView? = nil, reachesServer: Bool = true
+    ) -> (Browser, FakeItemLibrary, UndoManager) {
         let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let tasks = ["todo", "done", "in_progress"].enumerated().map { index, status in
             Item(
@@ -33,7 +35,7 @@ struct ViewPanelTests {
                 properties: [Property(key: "status", value: .string(status))], version: ItemVersion(1), created: date, modified: date)
         }
         let library = FakeItemLibrary(items: tasks, now: date)
-        library.views = [view(filter: filter)]
+        library.views = [custom ?? view(filter: filter)]
         library.viewMembers[id] = tasks.map(\.id)
         library.reachesServer = reachesServer
         let undo = UndoManager()
@@ -85,6 +87,30 @@ struct ViewPanelTests {
         await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
         #expect(Self.held(library)?.version == 2)
         #expect(Self.held(library)?.query.filter?.contains("todo") == true)
+    }
+
+    /// A view another app wrote, with a sort, a group and a condition this app cannot show, keeps them all when the
+    /// panel changes one setting, and a setting only this Mac keeps writes nothing to it.
+    @Test func oneChangeKeepsWhatTheAppCannotShow() async throws {
+        let sort = [LibraryViewSort(field: "properties.mood", ascending: true), LibraryViewSort(field: "updated_at", ascending: false)]
+        let group = LibraryViewGroup(field: "properties.weather", order: [.string("sunny")], hidden: [.string("rain")], otherBucket: "elsewhere")
+        let unknown = LibraryView(
+            id: Self.id, title: "Open Tasks", version: 1,
+            query: LibraryViewQuery(types: [TypeID("core.task")], states: [.active], filter: #"properties.mood eq "calm""#),
+            sort: sort, group: group)
+        let (browser, library, _) = Self.opened(view: unknown)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        let held = try #require(Self.held(library))
+        #expect(held.version == 2)
+        #expect(held.query.filter?.contains(#""calm""#) == true)
+        #expect(held.query.filter?.contains(#""todo""#) == true)
+        #expect(held.query.types == unknown.query.types)
+        #expect(held.query.states == unknown.query.states)
+        #expect(held.sort == sort)
+        #expect(held.group == group)
+        await Self.change(browser) { browser.setShowsQuickActions(false) }
+        #expect(!browser.showsQuickActions)
+        #expect(Self.held(library)?.version == 2)
     }
 
     @Test func undoOfAFilterWritesTheEarlierValueBack() async {
@@ -495,7 +521,7 @@ struct ViewPanelTests {
         #expect(!undo.canUndo)
     }
 
-    @Test func aSecondDoneOnANewViewIsSilent() async {
+    @Test func aSecondCreateViewOnANewViewIsSilent() async {
         let (browser, library, _) = Self.opened()
         browser.openNewViewPanel(in: library)
         var release: CheckedContinuation<Void, Never>?
@@ -541,9 +567,9 @@ struct ViewPanelTests {
         #expect(browser.viewMode == .list)
     }
 
-    // MARK: Done and Escape
+    // MARK: Closing, Create View and Escape
 
-    @Test func doneOnAViewOnlyClosesThePanelAndWritesNothingMore() async {
+    @Test func closingThePanelOnAViewWritesNothingMore() async {
         let (browser, library, _) = Self.opened()
         browser.openViewPanel(in: library)
         await browser.finishViewPanel(in: library, order: Self.order)
@@ -551,7 +577,7 @@ struct ViewPanelTests {
         #expect(Self.held(library)?.version == 1)
     }
 
-    @Test func aTypedNameIsWrittenOnDoneAndUndoWritesTheOldNameBack() async {
+    @Test func aTypedNameIsWrittenOnClosingAndUndoWritesTheOldNameBack() async {
         let (browser, library, undo) = Self.opened()
         browser.openViewPanel(in: library)
         browser.viewPanel?.name = "Renamed"
@@ -563,7 +589,7 @@ struct ViewPanelTests {
         #expect(Self.held(library)?.title == "Open Tasks")
     }
 
-    @Test func doneOnANewViewMakesItWithTheDefaultNameAndEscapeMakesNothing() async {
+    @Test func createViewMakesItWithTheDefaultNameAndEscapeMakesNothing() async {
         let (browser, library, _) = Self.opened()
         browser.openNewViewPanel(in: library)
         browser.escapeViewPanel(in: library)
@@ -573,5 +599,211 @@ struct ViewPanelTests {
         await browser.finishViewPanel(in: library, order: Self.order)
         #expect(library.views.count == 2)
         #expect(library.views.contains { $0.title == "New View" })
+    }
+
+    // MARK: Revert, offline changes and what a new view keeps
+
+    private static let byTitle = [ItemTableComparator(column: .title, order: .forward)]
+
+    /// Revert View puts back the sort this Mac changed and leaves the grouping another app cleared, whether that change
+    /// came merged into this Mac's write or arrived after it.
+    @Test(arguments: [true, false]) func revertPutsBackOnlyWhatThisMacChanged(mergedIntoTheWrite: Bool) async {
+        let (browser, library, undo) = Self.opened()
+        if mergedIntoTheWrite { library.changedElsewhere = { $0.group = nil } }
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].sort = Self.byTitle }
+        if !mergedIntoTheWrite, var changed = Self.held(library) {
+            changed.version += 1
+            changed.group = nil
+            library.views = [changed]
+            browser.followView(in: library)
+        }
+        #expect(Self.held(library)?.group == nil)
+        undo.beginUndoGrouping()
+        browser.revertView(in: library)
+        Self.close(undo)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.sort == Self.view().sort })
+        #expect(Self.held(library)?.group == nil)
+    }
+
+    /// Revert View writes back a sort whole, with a key the Mac cannot show.
+    @Test func revertWritesBackASortTheMacCannotShow() async {
+        var custom = Self.view()
+        custom.sort = [LibraryViewSort(field: "source", ascending: true), LibraryViewSort(field: "updated_at", ascending: false)]
+        let (browser, library, undo) = Self.opened(view: custom)
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].sort = Self.byTitle }
+        #expect(Self.held(library)?.sort == [LibraryViewSort(field: "title", ascending: true)])
+        undo.beginUndoGrouping()
+        browser.revertView(in: library)
+        Self.close(undo)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.sort == custom.sort })
+        #expect(!library.notices.waiting.contains { $0.title == "View Partly Reverted" })
+    }
+
+    /// Revert View puts back a grouping by day with its group order and hidden groups.
+    @Test func revertWritesBackADayGroupingWithItsOrderAndHiddenGroups() async {
+        var custom = Self.view()
+        custom.group = LibraryViewGroup(field: "updated_at", bucket: .day, order: [.string("2026-11-02")], hidden: [.string("2026-11-01")])
+        let (browser, library, undo) = Self.opened(view: custom)
+        await Self.change(browser) { browser.chooseGrouping(.column(Self.status, by: .value)) }
+        #expect(Self.held(library)?.group?.field == "properties.status")
+        undo.beginUndoGrouping()
+        browser.revertView(in: library)
+        Self.close(undo)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.group == custom.group })
+    }
+
+    /// A sort another app changed in a way the window cannot see, as Marfa holds it, stays through Revert View, and the
+    /// person is told.
+    @Test func revertKeepsASortAnotherAppChangedAndSaysSo() async throws {
+        let (browser, library, undo) = Self.opened()
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].sort = Self.byTitle }
+        var changed = try #require(Self.held(library))
+        changed.version += 1
+        changed.sort = [LibraryViewSort(field: "title", ascending: true), LibraryViewSort(field: "source", ascending: true)]
+        library.views = [changed]
+        browser.followView(in: library)
+        undo.beginUndoGrouping()
+        browser.revertView(in: library)
+        Self.close(undo)
+        #expect(library.notices.waiting.contains { $0.title == "View Partly Reverted" && $0.message.contains("Sort") })
+        await browser.choicesChanged()?.value
+        #expect(Self.held(library)?.sort == changed.sort)
+    }
+
+    /// A name typed while another app renamed the view is not written over that name: it goes to the clipboard.
+    @Test(arguments: [true, false]) func aNameTypedWhileAnotherAppRenamedTheViewGoesToTheClipboard(windowSawIt: Bool) async throws {
+        let (browser, library, _) = Self.opened()
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "Typed"
+        var renamed = try #require(Self.held(library))
+        renamed.title = "Renamed Elsewhere"
+        renamed.version += 1
+        library.views = [renamed]
+        if windowSawIt {
+            browser.reconcileViewPanel(in: library)
+            browser.followView(in: library)
+        }
+        browser.dismissViewPanel(in: library)
+        #expect(await eventually(within: .seconds(20)) { library.notices.waiting.contains { $0.isNotKept && $0.text == "Typed" } })
+        #expect(Self.held(library)?.title == "Renamed Elsewhere")
+    }
+
+    @Test func aNameTypedThenClickedAwayFromOfflineGoesToTheClipboard() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "Typed"
+        browser.dismissViewPanel(in: library)
+        #expect(browser.viewPanel == nil)
+        #expect(await eventually(within: .seconds(20)) { library.notices.waiting.contains { $0.isNotKept && $0.text == "Typed" } })
+    }
+
+    /// A change made offline outlives the view, the window and a relaunch, and another window sends it once the server is back.
+    @Test func anOfflineChangeIsWrittenOnceTheServerIsBackAfterTheWindowClosed() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        let defaults = browser.defaults
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        browser.showing = .library
+        #expect(PendingViewChanges.holds(Self.id, in: defaults))
+        // A window opened after a relaunch, on another place, reads the same defaults.
+        library.reachesServer = true
+        let later = Browser()
+        later.defaults = defaults
+        later.adopt(library)
+        later.showing = .library
+        later.reachabilityChanged(in: library)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
+        #expect(!PendingViewChanges.holds(Self.id, in: defaults))
+    }
+
+    @Test func anOfflineChangeMarfaRefusesLaterGoesToTheClipboard() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        browser.showing = .library
+        library.reachesServer = true
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "No")
+        browser.reachabilityChanged(in: library)
+        #expect(await eventually(within: .seconds(20)) { library.notices.waiting.contains { $0.isNotKept && $0.title == "View Not Saved" } })
+        #expect(!PendingViewChanges.holds(Self.id, in: browser.defaults))
+        #expect(Self.held(library)?.version == 1)
+    }
+
+    /// Two windows that change different settings of a view offline both keep theirs, and both land once the server is back.
+    @Test func twoWindowsOfflineKeepEachTheirOwnSetting() async throws {
+        let (first, library, _) = Self.opened(reachesServer: false)
+        let second = Browser()
+        second.defaults = first.defaults
+        second.adopt(library, undoManager: nil)
+        second.showing = .saved(Self.id)
+        second.viewMode = .table
+        second.followView(in: library)
+        await Self.change(first) { first.tableOptions[first.shown, default: .init()].sort = Self.byTitle }
+        await Self.change(second) { second.setFilter(Self.status, values: ["todo"]) }
+        let pending = try #require(PendingViewChanges.stored(in: first.defaults)[Self.id])
+        #expect(pending.change.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(pending.change.query?.filter?.contains("todo") == true)
+
+        first.showing = .library
+        second.showing = .library
+        library.reachesServer = true
+        first.reachabilityChanged(in: library)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
+        #expect(Self.held(library)?.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(!PendingViewChanges.holds(Self.id, in: first.defaults))
+    }
+
+    /// A window still showing the view writes its offline change itself; when Marfa refuses it, the change goes to the
+    /// clipboard before it is dropped.
+    @Test func anOfflineChangeMarfaRefusesFromTheWindowGoesToTheClipboard() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        library.reachesServer = true
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "No")
+        browser.reachabilityChanged(in: library)
+        #expect(await eventually(within: .seconds(20)) {
+            library.notices.waiting.contains { $0.isNotKept && $0.title == "View Not Saved" && $0.text?.contains("todo") == true }
+        })
+        #expect(!PendingViewChanges.holds(Self.id, in: browser.defaults))
+    }
+
+    /// A From changed alone is said in full on the clipboard.
+    @Test func aRefusedFromChangedAloneIsGivenBackInWords() async throws {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].scope = .feed }
+        #expect(PendingViewChanges.stored(in: browser.defaults)[Self.id]?.change.query?.tier == .feed)
+        browser.showing = .library
+        library.reachesServer = true
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "No")
+        browser.reachabilityChanged(in: library)
+        #expect(await eventually(within: .seconds(20)) { library.notices.waiting.contains { $0.isNotKept } })
+        let text = try #require(library.notices.waiting.first { $0.isNotKept }?.text)
+        #expect(text.contains("View: Open Tasks"))
+        #expect(text.contains("From: Feed"))
+    }
+
+    /// A grouping chosen in a list writes only the group, so a sort the Mac cannot show stays.
+    @Test func aGroupingKeepsASortTheMacCannotShow() async {
+        var custom = Self.view()
+        custom.sort = [LibraryViewSort(field: "source", ascending: true)]
+        custom.group = nil
+        let (browser, library, undo) = Self.opened(view: custom)
+        undo.beginUndoGrouping()
+        browser.viewMode = .list
+        Self.close(undo)
+        await Self.change(browser) { browser.chooseGrouping(.column(Self.status, by: .value)) }
+        #expect(Self.held(library)?.group?.field == "properties.status")
+        #expect(Self.held(library)?.sort == custom.sort)
+    }
+
+    @Test func createViewKeepsOpenItemsAndQuickActions() async throws {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.setOpening(.modal)
+        browser.setShowsQuickActions(false)
+        browser.openNewViewPanel(in: library)
+        await browser.finishViewPanel(in: library, order: Self.order)
+        let made = try #require(library.views.first { $0.id != Self.id })
+        let settings = ViewLayouts.stored(in: browser.defaults).settings(for: made.id)
+        #expect(settings?.opening == .modal)
+        #expect(settings?.quickActions == false)
     }
 }

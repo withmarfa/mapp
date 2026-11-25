@@ -56,12 +56,12 @@ struct GroupByTests {
     }
 
     private static func offer(
-        _ items: [MarfaMac.Item], types: Set<TypeID>, layout: ItemViewMode, isView: Bool = false
+        _ items: [MarfaMac.Item], types: Set<TypeID>, layout: ItemViewMode
     ) -> GroupOffer {
         let rows = rows(items)
         return GroupOffer.make(
             columns: columns(rows, types: types), types: types.union(items.map(\.type)), rows: rows, catalogue: catalogue,
-            layout: layout, isView: isView)
+            layout: layout)
     }
 
     /// Events where some have a start and status, and none fills Precision, Place or Attendees.
@@ -72,12 +72,15 @@ struct GroupByTests {
 
     // MARK: What is offered
 
-    @Test func aSavedViewShowsWhatItCannotKeepAsNotKept() {
-        let offer = Self.offer(Self.events, types: [Self.event], layout: .table, isView: true)
-        let starts = try! #require(offer.entries.first { $0.label == "Starts" })
-        #expect(starts.choices.map(\.isKept) == [true, true, true, true, false])
-        let words = Self.offer([Self.item("t", Self.task, ["status": .string("todo")])], types: [Self.task], layout: .table, isView: true)
-        #expect(words.sections[0][0].choices.map(\.isKept) == [true, false])
+    @Test func aSavedViewCanKeepEveryGroupingOffered() {
+        let rows = Self.rows(Self.events)
+        let columns = Self.columns(rows, types: [Self.event])
+        let offer = Self.offer(Self.events, types: [Self.event], layout: .table)
+        for choice in offer.entries.flatMap(\.choices) {
+            guard case .column(let id, let mode) = choice.grouping else { continue }
+            let kept = ViewDraft.group(columns.first { $0.id == id }, mode: mode)
+            #expect(kept.group != nil && kept.unkept.isEmpty, "\(id) by \(mode)")
+        }
     }
 
     // MARK: The groups
@@ -105,6 +108,41 @@ struct GroupByTests {
         let column = try #require(columns.first { $0.id == "field.ends_at" })
         #expect(ItemTableLayout.groups(of: rows, by: column, mode: .presence, declared: true).map(\.id) == ["false", "true"])
         #expect(ItemTableLayout.groups(of: rows, by: column, mode: .presence).map(\.id) == ["false"])
+    }
+
+    /// In a saved view the groups are Marfa's: a row whose type lacks the field is Not Set, and a status word its type
+    /// does not declare is No Status (`device/view-group-presence`, `device/view-group-status`). A place keeps Not Applicable.
+    @Test func aSavedViewGroupsEveryRowAsMarfaDoes() throws {
+        let items = [
+            Self.item("open-day", Self.event, ["place": .string("Studio")]), Self.item("plan", Self.task),
+            Self.item("odd", Self.task, ["status": .string("someday")]), Self.item("done", Self.task, ["status": .string("done")]),
+        ]
+        let rows = Self.rows(items)
+        let columns = Self.columns(rows)
+        let place = try #require(columns.first { $0.id == "field.place" })
+        #expect(ItemTableLayout.groups(of: rows, by: place, mode: .presence, catalogue: Self.catalogue).map(\.id).contains(GroupKey.notApplicable))
+        let marfa = ItemTableLayout.groups(of: rows, by: place, mode: .presence, catalogue: Self.catalogue, declared: true, asMarfa: true)
+        #expect(marfa.map(\.id) == ["false", "true"])
+        #expect(Set(marfa[0].rows.map(\.item.id.rawValue)) == ["plan", "odd", "done"])
+        let status = try #require(columns.first { $0.id == "field.status" && $0.groups(by: .statusGroups) })
+        let tasks = Self.rows(Array(items.dropFirst()))
+        let none = ItemTableLayout.groups(of: tasks, by: status, mode: .statusGroups, catalogue: Self.catalogue, declared: true, asMarfa: true)
+        #expect(Set(try #require(none.first { $0.id == "" }).rows.map(\.item.id.rawValue)) == ["plan", "odd"])
+        let lanes = ItemBoardLayout.lanes(items: Array(items.dropFirst()), key: "status", catalogue: Self.catalogue, statusGroups: true, asMarfa: true)
+        #expect(Set(try #require(lanes.first { $0.groupKey == "" }).items.map(\.id.rawValue)) == ["plan", "odd"])
+    }
+
+    /// A saved view's board of a choice puts an item whose type lacks the field in the null group, as the table does, so
+    /// hiding that group hides it on the board too.
+    @Test func aSavedViewsBoardOfAChoiceHidesTheNullGroupsItems() {
+        let items = [Self.item("day", Self.event, ["precision": .string("day")]), Self.item("plan", Self.task)]
+        let place = ItemBoardLayout.lanes(items: items, key: "precision", catalogue: Self.catalogue)
+        #expect(place.contains { $0.id == .notApplicable })
+        let view = ItemBoardLayout.lanes(items: items, key: "precision", catalogue: Self.catalogue, asMarfa: true)
+        #expect(!view.contains { $0.id == .notApplicable })
+        #expect(view.first { $0.groupKey == GroupKey.none }?.items.map(\.id.rawValue) == ["plan"])
+        let shown = ItemBoardLayout.arranged(view, order: nil, hidden: [GroupKey.none], hidesEmpty: false)
+        #expect(!shown.flatMap(\.items).contains { $0.id.rawValue == "plan" })
     }
 
     // MARK: In a window
@@ -150,15 +188,14 @@ struct GroupByTests {
         #expect(second.sections(in: library, order: second.storedOrder, now: library.now()).map { $0.group?.title() } == ["Not Set"])
     }
 
-    @Test func saveAsViewNamesTheGroupingAViewCannotKeep() throws {
+    @Test func aNewViewKeepsABoardBySetOrNotSet() throws {
         let library = Self.library(Self.events)
         let browser = Self.window(library, place: .type(Self.event), layout: .board)
         browser.chooseGrouping(.column("field.starts_at", by: .presence))
         let window = SavedViews.window(browser, in: library, order: browser.storedOrder)
         let draft = try #require(ViewDraft.draft(window, catalogue: library.catalogue, views: []))
-        #expect(draft.group == nil)
-        #expect(draft.unkept == [.groupMode(column: "Starts", mode: "Set or Not Set")])
-        #expect(SavedViews.describe(draft.unkept[0]) == "Group by Starts: Set or Not Set")
+        #expect(draft.group == LibraryViewGroup(field: "properties.starts_at", byPresence: true))
+        #expect(draft.unkept.isEmpty)
     }
 
     @Test func aViewWritesTheGroupsItPutsFirstAndHides() {
@@ -178,6 +215,61 @@ struct GroupByTests {
         let opened = ViewDraft.options(for: reread, catalogue: Self.catalogue)
         #expect(opened.groupOrder == ["false"])
         #expect(opened.hiddenGroups == [""])
+    }
+
+    /// Chooses `mode` on `column` in a view that has no grouping, puts `order` first and hides `hidden`, and reads the
+    /// view back as the window opens it.
+    private static func roundTrip(
+        _ column: ItemTableColumn, mode: GroupMode, types: [TypeID] = [], order: [String], hidden: Set<String>
+    ) throws -> (written: LibraryViewGroup, reread: ItemTableOptions) {
+        var view = LibraryView(id: ItemID("v"), title: "V", version: 2)
+        view.query.types = types
+        var window = ViewDraft.Window(place: .saved(view.id), columns: [column], sort: [], grouping: column)
+        window.layout = .table
+        window.groupMode = mode
+        let seed = ViewDraft.options(for: view, catalogue: catalogue)
+        var chosen = seed
+        chosen.grouping = .column(column.id, by: mode)
+        let first = ViewDraft.change(window, options: chosen, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: catalogue)
+        guard case .set(let grouped) = try #require(first.change.group) else { throw CancellationError() }
+        #expect(first.unkept.isEmpty)
+        view.group = grouped
+        let regrouped = ViewDraft.options(for: view, catalogue: catalogue)
+        #expect(regrouped.grouping == .column(column.id, by: mode), "the view opens with the grouping it was given")
+        var arranged = regrouped
+        arranged.groupOrder = order
+        arranged.hiddenGroups = hidden
+        let second = ViewDraft.change(window, options: arranged, seed: regrouped, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: catalogue)
+        guard case .set(let written) = try #require(second.change.group) else { throw CancellationError() }
+        view.group = written
+        return (written, ViewDraft.options(for: view, catalogue: catalogue))
+    }
+
+    @Test func aViewKeepsGroupsByStatusGroupWithTheirOrderAndHiddenGroups() throws {
+        let column = ItemTableColumn(id: "field.status", label: "Status", content: .field(Self.taskStatus), style: .status)
+        let result = try Self.roundTrip(column, mode: .statusGroups, types: [Self.task], order: ["completed", "not_started"], hidden: [""])
+        #expect(result.written == LibraryViewGroup(
+            field: "status_group", order: [.string("completed"), .string("not_started")], hidden: [.null]))
+        #expect(result.reread.grouping == .column("field.status", by: .statusGroups))
+        #expect(result.reread.groupOrder == ["completed", "not_started"])
+        #expect(result.reread.hiddenGroups == [""])
+    }
+
+    @Test func aViewKeepsGroupsBySetOrNotSetWithTheirOrderAndHiddenGroups() throws {
+        let column = ItemTableColumn(id: "field.due_at", label: "Due", content: .field(Self.due), style: .date)
+        let result = try Self.roundTrip(column, mode: .presence, order: [GroupKey.notSet], hidden: [GroupKey.set])
+        #expect(result.written == LibraryViewGroup(field: "properties.due_at", order: [.bool(false)], hidden: [.bool(true)], byPresence: true))
+        #expect(result.reread.grouping == .column("field.due_at", by: .presence))
+        #expect(result.reread.groupOrder == [GroupKey.notSet])
+        #expect(result.reread.hiddenGroups == [GroupKey.set])
+    }
+
+    @Test func aViewKeepsGroupsBySourceWithTheirOrderAndHiddenGroups() throws {
+        let result = try Self.roundTrip(.source, mode: .value, order: ["mail", ""], hidden: ["calendar"])
+        #expect(result.written == LibraryViewGroup(field: "source", order: [.string("mail"), .null], hidden: [.string("calendar")]))
+        #expect(result.reread.grouping == .column(ItemTableColumn.source.id, by: .value))
+        #expect(result.reread.groupOrder == ["mail", ""])
+        #expect(result.reread.hiddenGroups == ["calendar"])
     }
 
     // MARK: The board

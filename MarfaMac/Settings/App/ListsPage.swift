@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The Lists page: how much each row says, and the starting order of a place's list: the sort and the sections by date a
-/// place shows until its own Sort by or Group by is chosen in View Options. What a
+/// place shows until its own Sort or Group is chosen in the View panel. What a
 /// list leaves out belongs to Search, never here.
 struct ListsPage: View {
     @AppStorage(ListKey.density) private var density = Density.standard

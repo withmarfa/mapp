@@ -13,6 +13,7 @@ final class Browser {
             modalItem = nil
             listMemory.scrollOffset = nil
             laterPlace = nil
+            if openedView.map({ showing?.savedView != $0.id }) == true { openedView = nil }
             viewPanelPlaceChanged()
         }
     }
@@ -242,7 +243,7 @@ final class Browser {
     var panelIsOut: Bool { palette != nil || (quickAdd.isPresented && quickAdd.draft != nil) || isModalPresented }
     /// The window's quick-add panel and what is typed in it.
     let quickAdd = QuickAdd()
-    /// Whether the list's search is out as a field, rather than a button beside View Options.
+    /// Whether the list's search is out as a field, rather than a button beside the View button.
     var isSearchExpanded = false
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0
@@ -359,7 +360,7 @@ final class Browser {
 
     /// External links stay in this window even when Open Items is set to New Window.
     func open(itemLink item: Item, in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
-        let way: ItemOpening = !isModalPresented && ItemOpening.stored(in: defaults) == .fullPage ? .fullPage : .modal
+        let way: ItemOpening = !isModalPresented && itemOpening(defaults: defaults) == .fullPage ? .fullPage : .modal
         select(item, in: library, order: order)
         open([item.id], as: way, defaults: defaults)
     }
@@ -452,6 +453,7 @@ final class Browser {
     /// the clipboard, as the window's view of the library left went (`QuickAdd.Departure.libraryChanged`).
     func adopt(_ library: any ItemLibrary, undoManager: UndoManager? = nil) {
         let id = ObjectIdentifier(library)
+        Browser.open.add(self)
         if let undoManager { self.undoManager = undoManager }
         guard libraryID != id else { return }
         self.library = library
@@ -479,13 +481,15 @@ final class Browser {
         viewPanel?.handOff(because: .libraryChanged)
         viewPanel = nil
         observedChoices = [:]
-        filterRowChoice = [:]
         toldUnkept = [:]
         replacedGroups = [:]
         writingViews = []
         pendingViewWrites = []
         placeCards = [:]
         placeHidesEmptyGroups = [:]
+        placeQuickActions = [:]
+        placeOpenings = [:]
+        openedView = nil
         placeProperties = [:]
         placeCalendarScales = [:]
         calendarDay = nil
@@ -523,9 +527,102 @@ final class Browser {
     /// The view the window asks the person to confirm deleting.
     var deletingView: ItemID?
 
-    /// The right sidebar's panel for editing a view, while it is open (`Browser+ViewPanel`). It holds the name typed,
-    /// of a new view or a rename, until the server takes it, so a window that closes or changes library can give it back.
+    /// The active View popover. It holds a typed name so the window can hand it back if the server has yet to take it.
     var viewPanel: ViewPanel?
+
+    /// The saved view the window shows as it was when the window opened it, which Revert View puts back.
+    var openedView: OpenedView?
+
+    struct OpenedView {
+        let id: ItemID
+        /// The view's choices as the window opened it, for the settings this window has not changed since: another
+        /// app's change to one of those moves it, so Revert View never puts back what another app changed.
+        var choices: ViewChoices
+        var mac: ViewMacSettings
+        /// The settings this window changed since it opened the view, and its choices after its last change: Revert
+        /// View puts back only those, and only where the view still holds what this window made.
+        var changed: Set<ViewChoices.Part> = []
+        var mine: ViewChoices?
+        /// Each setting as Marfa held it when the window opened the view, whole, with what the app cannot show: Revert
+        /// View writes these back, never the window's reading of them.
+        var raw: LibraryView
+        /// Each setting as Marfa returned it after this Mac last wrote it. Revert View writes a setting back only while
+        /// Marfa still holds this (or, unwritten, `raw`), so another app's change, even one the window cannot show, stays.
+        var written = LibraryViewChange()
+        /// The settings Revert View put back, as `raw` holds them: while the window shows one as it opened, it is
+        /// written so, through an Undo and a Redo too (`Browser.viewUpdate`).
+        var reverting: LibraryViewChange?
+
+        /// Takes the view's choices as read for `parts`, but where they are still this window's own change: a setting
+        /// another app changed becomes the opening one, and no longer this window's to put back.
+        mutating func follow(_ parts: Set<ViewChoices.Part>, of other: ViewChoices, raw view: LibraryView) {
+            let own = mine.map { changed.subtracting(other.parts(differingFrom: $0)) } ?? []
+            let taken = parts.subtracting(own)
+            choices.take(taken, from: other)
+            changed.subtract(taken)
+            for setting in Self.settings(of: taken) where Self.parts(of: setting).isDisjoint(with: changed) {
+                take(setting, of: view)
+            }
+        }
+
+        /// Takes a setting of the view as it now stands for the opening one, which this window no longer changed.
+        mutating func take(_ setting: PendingViewChanges.Setting, of view: LibraryView) {
+            switch setting {
+            case .sort: raw.sort = view.sort; written.sort = nil; reverting?.sort = nil
+            case .group: raw.group = view.group; written.group = nil; reverting?.group = nil
+            case .query: raw.query = view.query; written.query = nil; reverting?.query = nil
+            }
+        }
+
+        /// Notes what Marfa holds of each setting a write of this Mac's sent.
+        mutating func wrote(_ change: LibraryViewChange, returned view: LibraryView) {
+            if change.sort != nil { written.sort = view.sort }
+            if change.group != nil { written.group = view.group.map { .set($0) } ?? .clear }
+            if change.query != nil { written.query = view.query }
+        }
+
+        /// Whether Marfa still holds a setting as this Mac last left it, compared as Marfa holds it.
+        func holdsWhatItLeft(_ setting: PendingViewChanges.Setting, in view: LibraryView) -> Bool {
+            switch setting {
+            case .sort: view.sort == (written.sort ?? raw.sort)
+            case .group:
+                switch written.group {
+                case .set(let group): view.group == group
+                case .clear: view.group == nil
+                case nil: view.group == raw.group
+                }
+            case .query: view.query == (written.query ?? raw.query)
+            }
+        }
+
+        /// The opening value of each setting, as a change that writes it back.
+        func opening(_ settings: Set<PendingViewChanges.Setting>) -> LibraryViewChange {
+            var change = LibraryViewChange()
+            if settings.contains(.sort) { change.sort = raw.sort }
+            if settings.contains(.group) { change.group = raw.group.map { .set($0) } ?? .clear }
+            if settings.contains(.query) { change.query = raw.query }
+            return change
+        }
+
+        /// The settings of the view that hold these choices: the filters and the listing are both its query.
+        static func settings(of parts: Set<ViewChoices.Part>) -> Set<PendingViewChanges.Setting> {
+            Set(parts.map { part in
+                switch part {
+                case .sort: .sort
+                case .grouping: .group
+                case .filters, .listing: .query
+                }
+            })
+        }
+
+        static func parts(of setting: PendingViewChanges.Setting) -> Set<ViewChoices.Part> {
+            switch setting {
+            case .sort: [.sort]
+            case .group: [.grouping]
+            case .query: [.filters, .listing]
+            }
+        }
+    }
 
     /// Views this window is deleting, whose absence from the library is its own doing and not news from elsewhere.
     @ObservationIgnored var viewsBeingDeleted: Set<ItemID> = []
@@ -546,18 +643,13 @@ final class Browser {
     @ObservationIgnored var viewWaiters: [ItemID: [CheckedContinuation<Void, Never>]] = [:]
     /// Views whose choices changed while the window showed another place, written when it shows them again.
     @ObservationIgnored var pendingViewWrites: Set<ItemID> = []
+    /// What names this window's own changes among those kept offline (`PendingViewChanges`).
+    @ObservationIgnored let pendingOwner = UUID().uuidString
     @ObservationIgnored var toldOffline: Set<ItemID> = []
     @ObservationIgnored var toldUnkept: [ItemID: Set<ViewDraft.Unkept>] = [:]
     /// Each view's groups this window replaced, by field, so grouping by that field again (an Undo, or a choice made
     /// back) gives back the groups another app ordered and hid there.
     @ObservationIgnored var replacedGroups: [ItemID: [String: LibraryViewGroup]] = [:]
-
-    /// Whether the row of filters above the list shows in a place the person chose, which is window state and never
-    /// saved (`Browser+FilterRow`). A place the person did not choose for shows it by what it holds.
-    var filterRowChoice: PlaceMemory<Bool> = [:]
-
-    /// Whether Add Filter… asked for its panel, which the row opens and then clears (`Browser+FilterRow`).
-    var isAddFilterRequested = false
 
     /// What the gallery draws on each card in a place that is not a saved view, as its default view keeps it
     /// (`Browser+PlaceDefaults`).
@@ -566,6 +658,10 @@ final class Browser {
     var placeCalendarScales: PlaceMemory<CalendarScale> = [:]
     /// The places whose default view leaves out the groups with no items.
     var placeHidesEmptyGroups: PlaceMemory<Bool> = [:]
+    /// Whether each place that is not a saved view offers its rows' quick actions, as its default view keeps it.
+    var placeQuickActions: PlaceMemory<Bool> = [:]
+    /// Where each place that is not a saved view opens its items, as its default view keeps it; none follows Settings.
+    var placeOpenings: PlaceMemory<ItemOpening> = [:]
     /// The Properties list of each place that is not a saved view, as its default view keeps it (`properties`).
     var placeProperties: PlaceMemory<ViewProperties> = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.

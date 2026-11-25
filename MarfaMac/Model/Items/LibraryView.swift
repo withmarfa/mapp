@@ -30,7 +30,7 @@ nonisolated struct LibraryView: Identifiable, Hashable, Sendable {
 
 /// Which items a view lists. Every condition given must hold; an empty or nil one places no condition, except
 /// `states`, where nil means active and archived items, as Marfa reads it.
-nonisolated struct LibraryViewQuery: Hashable, Sendable {
+nonisolated struct LibraryViewQuery: Hashable, Sendable, Codable {
     /// Each type with its subtypes.
     var types: [TypeID] = []
     /// Nil lists both tiers.
@@ -43,7 +43,7 @@ nonisolated struct LibraryViewQuery: Hashable, Sendable {
 }
 
 /// One key of a view's order: an item's own field, such as `updated_at`, or `properties.<name>`.
-nonisolated struct LibraryViewSort: Hashable, Sendable {
+nonisolated struct LibraryViewSort: Hashable, Sendable, Codable {
     var field: String
     var ascending: Bool
 }
@@ -52,8 +52,8 @@ nonisolated struct LibraryViewSort: Hashable, Sendable {
 /// `backref[<type>]`. A date field may be grouped by day, week, month or year. `order` and `hidden` name groups by
 /// their keys as Marfa writes them (a value, a bucket's first day as `YYYY-MM-DD`, or `null`); another app may have
 /// set them, so a write keeps them unless the grouping's field changes (`ViewDraft.kept(_:from:)`).
-nonisolated struct LibraryViewGroup: Hashable, Sendable {
-    nonisolated enum Bucket: String, Hashable, Sendable, CaseIterable {
+nonisolated struct LibraryViewGroup: Hashable, Sendable, Codable {
+    nonisolated enum Bucket: String, Hashable, Sendable, CaseIterable, Codable {
         case day, week, month, year
     }
 
@@ -63,7 +63,9 @@ nonisolated struct LibraryViewGroup: Hashable, Sendable {
     var order: [JSONValue] = []
     /// The groups the view leaves out, whose items it still lists.
     var hidden: [JSONValue] = []
-    /// A bucket Marfa names that the app does not show, such as a grouping by presence. Where it is set, `bucket` is nil,
+    /// Whether the view groups by whether the field holds a value (Marfa's `presence` bucket), keyed `true` and `false`.
+    var byPresence = false
+    /// A bucket Marfa names that the app does not know. Where it is set, `bucket` is nil,
     /// the window opens ungrouped (`ViewDraft.options(for:catalogue:)`) and a write that leaves the group alone names
     /// no group, so the view keeps it. `MarfaMapping` hands it back to Marfa as read.
     var otherBucket: String?
@@ -78,8 +80,8 @@ nonisolated struct LibraryViewSettings: Hashable, Sendable {
 }
 
 /// The settings a change replaces, each whole; a nil one is left as it is.
-nonisolated struct LibraryViewChange: Hashable, Sendable {
-    nonisolated enum Grouping: Hashable, Sendable {
+nonisolated struct LibraryViewChange: Hashable, Sendable, Codable {
+    nonisolated enum Grouping: Hashable, Sendable, Codable {
         case set(LibraryViewGroup)
         case clear
     }
@@ -93,7 +95,7 @@ nonisolated struct LibraryViewChange: Hashable, Sendable {
     var isEmpty: Bool { title == nil && query == nil && sort == nil && group == nil }
 }
 
-/// Why the server did not save, change or delete a view. Views are written to the server at once, never queued.
+/// Why the server did not save, change or delete a view. A change made while the server cannot be reached waits on this Mac (`PendingViewChanges`); nothing else is kept to send later.
 nonisolated struct ViewWriteFailure: Error, Hashable, Sendable, LocalizedError {
     nonisolated enum Kind: Hashable, Sendable {
         /// The server could not be reached; nothing was saved.

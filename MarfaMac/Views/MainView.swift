@@ -122,7 +122,6 @@ struct MainView: View {
             sidebarColumn
         } content: {
             ItemList(browser: browser, order: order, pane: $pane).equatable()
-                .filterChips(browser)
                 .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, isBesidePage: true, signal: topRowSignal)
                 // The split view reads the ideal only as it is built, so it comes from the tracker as it stands then.
                 .navigationSplitViewColumnWidth(
@@ -232,7 +231,6 @@ struct MainView: View {
                                     ItemGallery(browser: browser, order: order, pane: $pane)
                                 }
                             }
-                            .filterChips(browser)
                             .viewCorner(browser)
                             .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, signal: topRowSignal)
                         } else {
@@ -276,8 +274,7 @@ struct MainView: View {
             return nil
         }
         if let folds = crossed(Self.panelFoldsBelow) {
-            // A panel opened for the moment, as by the view panel, is not the person's, so it is not opened again.
-            if folds, details.isPresented { foldedPanel = details.isPresentedByPerson; details.isPresented = false }
+            if folds, details.isPresented { foldedPanel = true; details.isPresented = false }
             else if !folds, foldedPanel { foldedPanel = false; details.isPresented = true }
         }
         if let folds = crossed(Self.sidebarFoldsBelow) {
@@ -313,10 +310,10 @@ struct MainView: View {
         .modifier(CommandValuePanels(details: details))
         .modifier(FieldEditSheets(details: details))
         .sheet(item: Binding { details.typeValues } set: { details.typeValues = $0 }) { TypeValuesSheet(request: $0) }
-        .onChange(of: details.isPresentedByPerson) {
+        .onChange(of: details.isPresented) {
             // What the window folded is not the person's choice: the panel the person opens is theirs again.
-            if details.isPresentedByPerson { foldedPanel = false }
-            if restoresWindow { storedDetailsPresented = details.isPresentedByPerson }
+            if details.isPresented { foldedPanel = false }
+            if restoresWindow { storedDetailsPresented = details.isPresented }
         }
         .onChange(of: isSidebarVisible) { if isSidebarVisible { foldedSidebar = false } }
         .overlay(alignment: .top) {
@@ -384,9 +381,8 @@ struct MainView: View {
                 }
             }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-            editor.onEscape = { [browser, details, library] in
-                if details.isEditingView { browser.escapeViewPanel(in: library) }
-                else if details.escapeFromPage() { return }
+            editor.onEscape = { [browser, details] in
+                if details.escapeFromPage() { return }
                 else if browser.isModalPresented { browser.closeModal() }
                 else { browser.focusRequest = .list }
             }
@@ -458,7 +454,7 @@ struct MainView: View {
         .deleteConfirmation(for: details)
         .archiveQuestion(for: details)
         .feedLimitQuestion(for: details)
-        .savedViewDialogs(browser: browser, details: details)
+        .savedViewDialogs(browser: browser)
     }
 
     private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }
@@ -498,7 +494,7 @@ struct MainView: View {
         case .page, .title:
             // The modal's own page takes the request, and no full page is opened behind it.
             // With Beside the List the page is the column beside the layout, so no full page is opened behind it.
-            if browser.showsCollection, !browser.isModalPresented, ItemOpening.stored() != .besideList {
+            if browser.showsCollection, !browser.isModalPresented, browser.itemOpening() != .besideList {
                 browser.isCollectionItemPresented = true
             }
             return
@@ -550,7 +546,7 @@ private struct ItemInspectorColumn: ViewModifier {
                     UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)
                 }
                 .inspectorColumnWidth(min: PanelWidth.standard, ideal: width, max: PanelWidth.widest)
-                .toolbar { InspectorToolbar(details: details, editor: editor, browser: browser) }
+                .toolbar { InspectorToolbar(details: details, browser: browser) }
         }
     }
 }

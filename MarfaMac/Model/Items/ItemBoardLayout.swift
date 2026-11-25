@@ -84,21 +84,25 @@ nonisolated enum ItemBoardLayout {
     }
 
     /// The lanes of a board by `key`: the words the items' types declare, a status field's by their group (as the
-    /// table lists them) and then in declared order, then No Value, and Invalid Value and Not Applicable where an
+    /// table lists them) and then in declared order, then No Status or No and the field's name, and Invalid Value and Not Applicable where an
     /// item needs them. A board's fields are closed, so a word no type declares is an invalid value. Where the types
     /// keep their status in different fields, or the person groups by them (`statusGroups`), the lanes are Marfa's
     /// status groups instead. Within a lane the cards follow `order`, each item's place in the sort the window shows, or
-    /// the title where nothing sorts them.
+    /// the title where nothing sorts them. With `asMarfa`, as a saved view groups, every item is in a group Marfa names:
+    /// status groups put a word no group claims in No Status (`device/view-group-status`), and an item whose type lacks
+    /// the field is in the lane of items with no value, as the table groups it (`ItemTableLayout.groups`).
     static func lanes(
-        items: [Item], key: String, catalogue: Catalogue, order: [ItemID: Int]? = nil, statusGroups: Bool = false
+        items: [Item], key: String, catalogue: Catalogue, order: [ItemID: Int]? = nil, statusGroups: Bool = false, asMarfa: Bool = false
     ) -> [ItemBoardLane] {
-        if statusGroups { return groupLanes(items: items, catalogue: catalogue, order: order) }
+        if statusGroups { return groupLanes(items: items, catalogue: catalogue, order: order, asMarfa: asMarfa) }
         var values: [(word: String, bucket: StatusBucket)] = []
         var isStatus = false
+        var label: String?
         var seen: Set<String> = []
         for type in Set(items.map(\.type)).sorted(by: { $0.rawValue < $1.rawValue }) {
             for field in eligibleFields(of: type, catalogue: catalogue) where field.key == key {
                 if field.isStatus { isStatus = true }
+                label = label ?? field.label
                 for word in field.options where !word.isEmpty && seen.insert(word).inserted {
                     values.append((word, field.isStatus ? field.statusBucket(of: word) : .other))
                 }
@@ -106,13 +110,18 @@ nonisolated enum ItemBoardLayout {
         }
         // Words in one group, and the words of a choice, which has no groups, stay in declared order.
         values = values.enumerated().sorted { ($0.element.bucket.rank, $0.offset) < ($1.element.bucket.rank, $1.offset) }.map(\.element)
-        let groups = Dictionary(grouping: items) { lane(for: $0, key: key, catalogue: catalogue) }
+        let groups = Dictionary(grouping: items) { item in
+            let lane = lane(for: item, key: key, catalogue: catalogue)
+            return asMarfa && lane == .notApplicable ? .missing : lane
+        }
         var lanes = values.map { entry in
             ItemBoardLane(
                 id: .option(entry.word), title: ItemTypeInfo.Field.label(ofOption: entry.word),
                 symbol: isStatus ? StatusSymbol(group: statusGroup(of: entry.bucket)) : nil, items: [])
         }
-        lanes.append(ItemBoardLane(id: .missing, title: String(localized: "No Value"), items: []))
+        // Named as the table names it: No Status for a status, else No and the field's name.
+        let none = isStatus ? String(localized: "No Status") : label.map { String(localized: "No \($0)") } ?? String(localized: "No Value")
+        lanes.append(ItemBoardLane(id: .missing, title: none, items: []))
         if groups[.invalid] != nil {
             lanes.append(ItemBoardLane(id: .invalid, title: String(localized: "Invalid Value"), items: []))
         }
@@ -128,8 +137,11 @@ nonisolated enum ItemBoardLayout {
 
     /// The lanes of a board whose types keep their status in different fields: Marfa's four status groups, which
     /// every type shares, then No Status (which holds a type with no status too), and Invalid Value where an item needs it.
-    private static func groupLanes(items: [Item], catalogue: Catalogue, order: [ItemID: Int]?) -> [ItemBoardLane] {
-        let groups = Dictionary(grouping: items) { groupedLane(for: $0, catalogue: catalogue) }
+    private static func groupLanes(items: [Item], catalogue: Catalogue, order: [ItemID: Int]?, asMarfa: Bool) -> [ItemBoardLane] {
+        let groups = Dictionary(grouping: items) { item in
+            let lane = groupedLane(for: item, catalogue: catalogue)
+            return asMarfa && lane == .invalid ? .missing : lane
+        }
         let types = Set(items.map(\.type))
         let fields = types.compactMap { type in eligibleFields(of: type, catalogue: catalogue).first(where: \.isStatus) }
         var lanes = StatusGroup.allCases.map { group in

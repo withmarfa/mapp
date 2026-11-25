@@ -128,7 +128,7 @@ nonisolated final class WindowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Old packing list"].waitForExistence(timeout: 3))
     }
 
-    /// The list's search, a field only once its button beside View Options is clicked.
+    /// The list's search, a field only once its button beside View is clicked.
     @MainActor private var listSearch: XCUIElement { window.textFields["ColumnSearch"] }
 
     @MainActor func testTheListsSearchFindsItemsAndEscapePutsItAway() {

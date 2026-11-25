@@ -105,7 +105,7 @@ struct ItemWindow: View {
         .modifier(CommandValuePanels(details: details))
         .modifier(FieldEditSheets(details: details))
         .sheet(item: Binding { details.typeValues } set: { details.typeValues = $0 }) { TypeValuesSheet(request: $0) }
-        .onChange(of: details.isPresentedByPerson) { storedDetailsPresented = details.isPresentedByPerson }
+        .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }
         .onAppear {
             details.isPresented = storedDetailsPresented
         }
@@ -164,7 +164,7 @@ struct ItemWindow: View {
             if let id {
                 ItemInspectorHost(itemID: id, details: details, editor: editor)
                     .panelEdgeThroughToolbar()
-                    .toolbar { InspectorToolbar(details: details, editor: editor) }
+                    .toolbar { InspectorToolbar(details: details) }
             }
         }
     }

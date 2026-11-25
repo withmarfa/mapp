@@ -3,7 +3,7 @@ import Foundation
 /// Where an item opens when a person presses Return on it, double-clicks it or chooses Open, as Settings > General >
 /// Open Items says. One value in the defaults (`ListKey.openItemsIn`),
 /// which syncs through the Marfa (`PreferencesMap`).
-nonisolated enum ItemOpening: String, CaseIterable, Identifiable, Hashable, Sendable {
+nonisolated enum ItemOpening: String, Codable, CaseIterable, Identifiable, Hashable, Sendable {
     /// The page in a column beside the list, or beside a table, board or gallery. Choosing another row replaces it.
     case besideList
     /// A large page over the window, which dims what is behind it.

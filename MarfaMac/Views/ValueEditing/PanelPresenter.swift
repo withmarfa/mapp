@@ -1,7 +1,7 @@
 import AppKit
 
-/// One open panel under a view, which `PanelPresenter` keeps and watches: a value's editor (`ValueEditSession`) or a
-/// filter's panel (`FilterPanelSession`). What differs between them is here, and nothing else does.
+/// One open panel under a view, which `PanelPresenter` keeps and watches: a value's editor (`ValueEditSession`). What
+/// differs between kinds of panel is here, and nothing else does.
 @MainActor
 protocol PanelSession: AnyObject {
     /// What the panel is for. The click that closes a panel does not open the same target again.

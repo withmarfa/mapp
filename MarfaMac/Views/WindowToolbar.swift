@@ -26,10 +26,9 @@ struct WindowToolbar: ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
         let isIndex = browser?.showsPlaceIndex == true
         let opensFromCollection = browser?.isCollectionItemPresented == true && !hasListColumn
-        let editsView = browser?.showsViewPanel == true
         // A list beside its page has the page's buttons here; a list that spans the window has Search and View.
         let listsHere = browser != nil && !isIndex && !hasListColumn && !opensFromCollection
-        let showsActions = !isIndex && !listsHere && !editsView
+        let showsActions = !isIndex && !listsHere
         let showsDetails = !tools.showsInspector
         if let browser, leadsWithHistory {
             ToolbarItem(placement: .navigation) { SidebarHistory(browser: browser) }
@@ -141,23 +140,16 @@ struct ScrolledItemTitle: View {
 }
 
 /// Details above the inspector column, where the system sets a toolbar declared inside the inspector's content, so the
-/// inspector can always be closed whatever a person's layout holds, or the view panel's actions while it has the
-/// column. It contributes nothing while the inspector is closed, because the system keeps a closed inspector's toolbar
-/// and would show a second Details beside the page's.
+/// inspector can always be closed whatever a person's layout holds. It contributes nothing while the inspector is
+/// closed, because the system keeps a closed inspector's toolbar and would show a second Details beside the page's.
 struct InspectorToolbar: ToolbarContent {
-    @CurrentLibrary private var library
     let details: DetailsPresentation
-    let editor: EditorController?
     var browser: Browser?
 
     var body: some ToolbarContent {
         if details.isPresented, browser?.isModalPresented != true {
-            if let browser, details.isEditingView, let panel = browser.viewPanel {
-                ViewPanelToolbar(browser: browser, panel: panel, editor: editor)
-            } else {
-                ToolbarItem {
-                    DetailsToggle(details: details)
-                }
+            ToolbarItem {
+                DetailsToggle(details: details)
             }
         }
     }

@@ -1,27 +1,26 @@
 import Foundation
 
-/// One Group by for every layout and place (`GroupOffer`): what it offers, what the layout shows, and the changes View
-/// Options and Edit View make. A choice is the place's grouping (`ItemTableOptions.grouping`), kept in a place's default
+/// One Group by for every layout and place (`GroupOffer`): what it offers, what the layout shows, and the changes the View
+/// panel and the View menu make. A choice is the place's grouping (`ItemTableOptions.grouping`), kept in a place's default
 /// view or written to a saved view by the window's funnel (`choicesChanged`).
 extension Browser {
     /// What Group by offers in the open place and layout.
     func groupOffer(in library: any ItemLibrary) -> GroupOffer {
         let content = tableContent(in: library)
-        if let held = groupOfferMemo, held.content === content, held.layout == viewMode, held.isView == isViewPlace { return held.offer }
+        if let held = groupOfferMemo, held.content === content, held.layout == viewMode { return held.offer }
         let offer = Cost.measure(.groupOffer) {
             GroupOffer.make(
                 columns: content.columns, types: listedTypes(in: library).union(content.allRows.map(\.item.type)), rows: content.allRows,
                 catalogue: library.catalogue,
-                layout: viewMode, isView: isViewPlace)
+                layout: viewMode)
         }
-        groupOfferMemo = GroupOfferMemo(content: content, layout: viewMode, isView: isViewPlace, offer: offer)
+        groupOfferMemo = GroupOfferMemo(content: content, layout: viewMode, offer: offer)
         return offer
     }
 
     struct GroupOfferMemo {
         let content: ItemTableContent
         let layout: ItemViewMode
-        let isView: Bool
         let offer: GroupOffer
     }
 
@@ -47,17 +46,18 @@ extension Browser {
     /// first field offered (`GroupOffer.fallback`), which leaves the place's choice as it is for the layouts that can.
     func boardGrouping(in library: any ItemLibrary) -> ItemTableOptions.Grouping? {
         let offer = groupOffer(in: library)
-        if let stored = tableOptions[shown]?.grouping, case .column = stored, let found = offer.entry(for: stored), found.choice.isKept {
+        if let stored = tableOptions[shown]?.grouping, case .column = stored, offer.entry(for: stored) != nil {
             return stored
         }
         return offer.fallback
     }
 
-    /// Groups the open place as Group by's `grouping` says. A list or gallery that showed the starting order keeps the
-    /// order it showed, now as the place's own.
+    /// Groups the open place as Group by's `grouping` says. A place's list or gallery that showed the starting order keeps
+    /// the order it showed, now as the place's own. A saved view's sort stays as the view holds it, since a grouping is
+    /// written alone and a sort the Mac cannot show (by source, say) must not be replaced.
     func chooseGrouping(_ grouping: ItemTableOptions.Grouping) {
         var options = tableOptions[shown] ?? ItemTableOptions()
-        if let dated = datedList, options.sort == nil { options.sort = dated.sort }
+        if shown.savedView == nil, let dated = datedList, options.sort == nil { options.sort = dated.sort }
         options.group(by: grouping)
         tableOptions[shown] = options
     }
@@ -110,11 +110,31 @@ extension Browser {
         tableOptions[shown, default: .init()].collapsed = []
     }
 
-    /// The groups of the open layout in order, hidden ones too, as Edit View lists them: a board's lanes, else the
+    /// The groups of the open layout in order, hidden ones too, as the View panel's Group lists them: a board's lanes, else the
     /// groups of the list or table.
-    func groupRows(in library: any ItemLibrary) -> [(key: String, title: String)] {
-        if viewMode == .board { return boardLanes(in: library)?.all.map { ($0.groupKey, $0.title) } ?? [] }
-        return tableContent(in: library).allGroups.map { ($0.id, $0.title) }
+    func groupRows(in library: any ItemLibrary) -> [GroupRow] {
+        if viewMode == .board {
+            return boardLanes(in: library)?.all.map { GroupRow(key: $0.groupKey, title: $0.title, count: $0.items.count, status: $0.symbol) } ?? []
+        }
+        let content = tableContent(in: library)
+        let field = content.grouping.flatMap { $0.isStatus ? $0.field : nil }
+        return content.allGroups.map { group in
+            // A status's groups carry its marks, as the board's lanes and the table's headers do; No Status has none.
+            let status: StatusSymbol? = switch (field, group.value) {
+            case (nil, _), (_, nil): nil
+            case (_, let key?) where content.groupMode == .statusGroups: StatusGroup(rawValue: key).map { StatusSymbol(group: $0) }
+            case (let field?, let word?): StatusSymbol(group: field.statusGroup(of: word))
+            }
+            return GroupRow(key: group.id, title: group.title, count: group.rows.count, status: status)
+        }
+    }
+
+    /// One group as the View panel's Group lists it: its key, its name, how many items it holds and a status's mark.
+    struct GroupRow {
+        let key: String
+        let title: String
+        let count: Int
+        var status: StatusSymbol?
     }
 
     /// Moves a group to where another stands, as a drag onto its row (`Reordering.moving(_:onto:in:)`): Marfa's
@@ -161,13 +181,14 @@ extension Browser {
         let key = column.field?.key ?? ""
         let lanes: [ItemBoardLane]
         if mode == .statusGroups {
-            lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: library.catalogue, order: order, statusGroups: true)
+            lanes = ItemBoardLayout.lanes(
+                items: items, key: key, catalogue: library.catalogue, order: order, statusGroups: true, asMarfa: isViewPlace)
         } else if mode == .value, let field = column.field, ItemBoardLayout.isCompatible(field) {
-            lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: library.catalogue, order: order)
+            lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: library.catalogue, order: order, asMarfa: isViewPlace)
         } else {
             let groups = ItemTableLayout.groups(
-                of: content.kept, by: column, mode: mode, catalogue: library.catalogue, declared: true, calendar: content.calendar,
-                now: library.now())
+                of: content.kept, by: column, mode: mode, catalogue: library.catalogue, declared: true, asMarfa: isViewPlace,
+                calendar: content.calendar, now: library.now())
             lanes = ItemBoardLayout.lanes(of: groups, mode: mode, order: order)
         }
         let options = tableOptions[shown]

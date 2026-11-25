@@ -39,7 +39,7 @@ struct ViewToolbarItems: ToolbarContent {
         )
         if offersView {
             ToolbarItem {
-                ViewOptionsMenu(browser: browser)
+                ViewPanelButton(browser: browser)
             }
         }
     }

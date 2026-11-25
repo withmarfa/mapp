@@ -126,7 +126,7 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     var isCategorical: Bool {
         switch style {
         case .status, .priority, .choice, .boolean, .link: true
-        case .title, .date, .number, .text, .duration, .links, .count: content == .type
+        case .title, .date, .number, .text, .duration, .links, .count: content == .type || content == .source
         }
     }
 
@@ -263,7 +263,8 @@ nonisolated extension ItemTableColumn {
         case .type: return row.item.type.rawValue
         case .parent: return row.parent?.id.rawValue
         case .field(let field): return ItemTableValue.string(row, key: field.key)
-        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration, .source: return nil
+        case .source: return row.item.source.flatMap { $0.isEmpty ? nil : $0 }
+        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration: return nil
         }
     }
 
@@ -275,7 +276,8 @@ nonisolated extension ItemTableColumn {
         case .field:
             if style == .boolean { return value == "true" ? String(localized: "Yes") : String(localized: "No") }
             return ItemTypeInfo.Field.label(ofOption: value)
-        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration, .source: return value
+        case .source: return rows.first { $0.item.source == value }.map(\.sourceName).flatMap { $0.isEmpty ? nil : $0 } ?? value
+        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration: return value
         }
     }
 

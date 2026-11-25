@@ -57,7 +57,7 @@ struct ItemBoard: View {
         }
     }
 
-    /// Set from the toolbar's View Options (`ItemBoardOptions`).
+    /// Set in the View panel's Board section (`ViewPanelLayoutRows`).
     private var compact: Bool { browser.compactBoards[browser.shown, default: false] }
 
     private static let laneGap: CGFloat = 12

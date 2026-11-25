@@ -1,17 +1,18 @@
 import Foundation
 import Observation
 
-/// The right sidebar's panel that edits a view, or a place that can become one. It holds what only the panel knows:
-/// the name being typed, and how to put a place back if the person escapes a new view. What the person changes lives in
-/// the window (`Browser.tableOptions`, `viewSeeds`), where it shows at once and, in a saved view, is written as made.
+/// The View panel, the popover under the top row's View button that edits a view, or a place that can become one. It
+/// holds what only the panel knows: the page it shows, the name being typed, and how to put a place back if the person
+/// escapes a new view. What the person changes lives in the window (`Browser.tableOptions`, `viewSeeds`), where it shows
+/// at once and, in a saved view, is written as made.
 @Observable
 final class ViewPanel {
     enum Purpose: Equatable {
-        /// A saved view: each change is written as it is made, and Done closes the panel.
+        /// A saved view: each change is written as it is made.
         case edit(ItemID)
-        /// A view that does not exist yet, made of what the window shows: Done makes it, and Escape makes nothing.
+        /// A view that does not exist yet, made of what the window shows: Create View makes it, and Escape makes nothing.
         case new
-        /// A place that is not a view, such as a type's list: it has no name, keeps its choices in its default view (`PlaceDefaults`), and offers Save as View.
+        /// A place that is not a view, such as a type's list: it has no name, keeps its choices in its default view (`PlaceDefaults`), and offers New View….
         case place
     }
 
@@ -33,7 +34,15 @@ final class ViewPanel {
         let placeDefault: PlaceDefault?
     }
 
+    /// What the popover shows: the view's settings, or one of them opened in place, with a way back.
+    enum Page: Hashable {
+        case main, filter, sort, group, properties, types
+    }
+
     private(set) var purpose: Purpose
+    var page = Page.main
+    /// Whether the head shows the view's name as a field, as Rename… asks. A new view's always does.
+    var isRenaming = false
     @ObservationIgnored private var notices: Notices?
     /// The name being written to the server, which is neither kept nor lost until the write answers.
     @ObservationIgnored var renaming: String?
@@ -42,9 +51,27 @@ final class ViewPanel {
     /// The name already given back, so a quit after a close does not give it twice.
     @ObservationIgnored private var handedOffName: String?
     /// The name of a view being edited. A new view's name is the form's, which keeps it until the server takes it.
-    var name: String
-    /// The view's name as the panel last read it, so a rename elsewhere shows unless the person is typing their own.
+    var name: String {
+        didSet {
+            if typedRename == nil {
+                renameBase = nil
+            } else if renameBase == nil {
+                renameBase = RenameBase(title: knownTitle, version: knownVersion)
+            }
+        }
+    }
+    /// The view's name and version as the panel last read them, so a rename elsewhere shows unless the person is typing
+    /// their own.
     var knownTitle: String
+    @ObservationIgnored var knownVersion: Int64 = 0
+    /// The view's name and version when the person began to type over its name: the rename is written against these,
+    /// so a rename made in another app meanwhile is never written over (`Browser.commitViewName`).
+    @ObservationIgnored private(set) var renameBase: RenameBase?
+
+    struct RenameBase: Equatable {
+        let title: String
+        let version: Int64
+    }
     private(set) var form: ViewTitleForm?
     private(set) var snapshot: Snapshot?
 
@@ -52,6 +79,7 @@ final class ViewPanel {
         purpose = .edit(view.id)
         name = view.title
         knownTitle = view.title
+        knownVersion = view.version
         self.notices = notices
         Self.open.add(self)
     }
@@ -121,6 +149,16 @@ final class ViewPanel {
         }
     }
 
+    /// The panel ends with the name typed still to be written (`Browser.commitViewName`): a write that fails or is
+    /// refused, or a view gone meanwhile, gives the name back, as a panel that ended mid-rename does.
+    func leave(because departure: ViewTitleForm.Departure) {
+        guard case .edit = purpose, typedRename != nil else { return }
+        leftWhileRenaming = leaveReason(departure)
+    }
+
+    /// Whether the panel has ended with a name the view does not yet hold.
+    var hasLeftWithRename: Bool { leftWhileRenaming != nil }
+
     private func leaveReason(_ departure: ViewTitleForm.Departure) -> String {
         switch departure {
         case .closed: String(localized: "The window closed before the view was renamed.")
@@ -131,17 +169,36 @@ final class ViewPanel {
 
     /// The write of `name` answered. From a panel that ended meanwhile, whatever the person typed last and the view does
     /// not hold is given back, once no later write of a name is still under way.
-    func finishRename(name: String, kept: Bool) {
+    func finishRename(name: String, kept: Bool, reason: String? = nil) {
         if renaming == name { renaming = nil }
-        if kept { knownTitle = name }
-        guard let reason = leftWhileRenaming, renaming == nil else { return }
+        if kept {
+            knownTitle = name
+            // A name typed since starts from the one just written.
+            if renaming == nil { renameBase = typedRename.map { _ in RenameBase(title: name, version: knownVersion) } }
+        }
+        guard let left = leftWhileRenaming, renaming == nil else { return }
         leftWhileRenaming = nil
-        giveBackRename(reason: reason)
+        giveBackRename(reason: reason ?? left)
+    }
+
+    /// A rename refused because the view was renamed elsewhere starts again from the view as it is now.
+    func restartRename(from view: LibraryView) {
+        guard renaming == nil, typedRename != nil else { return }
+        renameBase = RenameBase(title: view.title, version: view.version)
+    }
+
+    /// The panel read the view again: a name the person has not typed over follows it.
+    func follow(_ view: LibraryView) {
+        let following = name == knownTitle
+        knownTitle = view.title
+        knownVersion = view.version
+        if following { name = view.title }
     }
 
     /// The view is gone, so the name typed for it has nowhere to go. Whether there was one to give back.
     @discardableResult
     func handOffBecauseGone() -> Bool {
+        leftWhileRenaming = nil
         guard typedRename != nil else { return false }
         giveBackRename(reason: String(localized: "The view was deleted before it was renamed."))
         return true
