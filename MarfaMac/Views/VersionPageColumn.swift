@@ -1,13 +1,14 @@
+import AppKit
 import SwiftUI
 
-/// The version chosen, read as a page: its title, the properties its type pins while Pinned Properties is on, and its
-/// text, with what it added since the version before it marked and what it dropped struck through.
+/// The version chosen, read as a page: its type, title, the property rows the head would list, and its text, with what
+/// it added since the version before it marked in green and what it dropped struck through.
 struct VersionPageColumn: View {
     @CurrentLibrary private var library
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
-    @AppStorage(PageKey.pinsProperties) private var pinsProperties = false
-    @Environment(\.interfaceTextSize) private var textSize
+    @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
+    @StoredPageStyle private var style
     let mode: VersionHistoryMode
     let list: VersionList?
 
@@ -56,21 +57,33 @@ struct VersionPageColumn: View {
     private var isDeleted: Bool { library.item(mode.item)?.state == .trashed }
 
     private func page(of entry: VersionEntry, older: VersionEntry?) -> some View {
-        let pins = !pinsProperties ? [] : entry.content.pins(
-            placement: placements.placement(of: entry.content.type, in: library.catalogue), in: library.catalogue, format: dateFormat)
+        let content = entry.content
+        let rows = content.rows(
+            placement: placements.placement(of: content.type, in: library.catalogue), in: library.catalogue, format: dateFormat)
+        let size = CGFloat(interfaceTextSize)
+        let titleSize = CGFloat(style.textSize) * 28 / 15
         return ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if let title = entry.content.title, !title.isEmpty {
-                    Text(verbatim: title).interfaceFont(.largeTitle.bold()).textSelection(.enabled)
-                } else if entry.content.title != nil {
-                    Text("Untitled").interfaceFont(.largeTitle.bold()).foregroundStyle(.tertiary)
+            VStack(alignment: .leading, spacing: 0) {
+                PageKicker(kicker: kicker(of: content.type)) {}
+                    .padding(.bottom, size * 6 / 13)
+                if let title = content.title, !title.isEmpty {
+                    Text(verbatim: title)
+                        .font(.system(size: titleSize, weight: .bold)).tracking(-titleSize * 0.022)
+                        .textSelection(.enabled)
+                        .accessibilityAddTraits(.isHeader)
+                } else if content.title != nil {
+                    Text("Untitled").font(.system(size: titleSize, weight: .bold)).tracking(-titleSize * 0.022)
+                        .foregroundStyle(.tertiary)
                 }
-                if !pins.isEmpty { pinRow(pins, of: entry.content.type) }
-                if let text = entry.content.text {
-                    VersionTextView(old: older?.content.text, new: text)
-                } else {
-                    Text("No text").foregroundStyle(.secondary)
+                if !rows.isEmpty { propertyRows(rows, size: size) }
+                Group {
+                    if let text = content.text {
+                        VersionTextView(old: older?.content.text, new: text, size: CGFloat(style.textSize))
+                    } else {
+                        Text("No text").foregroundStyle(.secondary)
+                    }
                 }
+                .padding(.top, rows.isEmpty ? 24 : 20)
             }
             .frame(maxWidth: 720, alignment: .leading)
             .padding(.horizontal, 40)
@@ -80,29 +93,37 @@ struct VersionPageColumn: View {
         .accessibilityIdentifier("VersionHistoryPage")
     }
 
-    /// The pins as the item's page draws them: each key above its value, in a slot of the same width.
-    private func pinRow(_ pins: [VersionFactRow], of type: TypeID) -> some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        return TagFlowLayout(spacing: 14 * scale) {
-            ForEach(pins) { pin in
-                VStack(alignment: .leading, spacing: 5 * scale) {
-                    HStack(spacing: 4 * scale) {
-                        if let symbol = pin.symbol {
-                            Image(systemName: symbol).font(.system(size: 11 * scale)).accessibilityHidden(true)
-                        }
-                        Text(LocalizedStringKey(pin.label)).font(.system(size: 12 * scale))
+    /// The type's mark and name over the title, as the head draws it, with no flags and nothing to change.
+    private func kicker(of type: TypeID) -> PageHead.Kicker {
+        let name = library.catalogue.itemTypes[type].map { PageHead.localized($0.label) } ?? library.catalogue.label(for: type)
+        return PageHead.Kicker(typeName: name, typeIcon: library.catalogue.icon(for: type), changesType: false, flags: [])
+    }
+
+    /// The rows as the item's page draws them: a symbol and the name in a column of one width, the value beside it,
+    /// over a hairline. Read only: a version is not edited here.
+    private func propertyRows(_ rows: [VersionFactRow], size: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(rows) { row in
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    HStack(spacing: size * 8 / 13) {
+                        Image(systemName: row.symbol ?? "text.alignleft")
+                            .frame(width: size * 16 / 13)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                        Text(verbatim: row.label).foregroundStyle(.secondary).lineLimit(1)
                     }
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    Text(verbatim: pin.value)
-                        .interfaceFont(.body)
-                        .lineLimit(1)
-                        .frame(minHeight: 22 * scale)
+                    .frame(width: size * 150 / 13, alignment: .leading)
+                    Text(verbatim: row.value).lineLimit(2).textSelection(.enabled).help(row.value)
+                    Spacer(minLength: 0)
                 }
-                .frame(width: 136 * scale, alignment: .leading)
-                .help(pin.value)
+                .frame(minHeight: size * 30 / 13)
+                .accessibilityElement(children: .combine)
             }
         }
+        .font(.system(size: size))
+        .padding(.top, size * 16 / 13)
+        .padding(.bottom, size * 8 / 13)
+        .overlay(alignment: .bottom) { Divider() }
     }
 }
 
@@ -111,6 +132,8 @@ struct VersionPageColumn: View {
 struct VersionTextView: View {
     let old: String?
     let new: String
+    /// The page's text size, which the lines and the headings over them scale from.
+    let size: CGFloat
     @State private var lines: [ReadLine]?
 
     private struct Job: Hashable {
@@ -122,11 +145,13 @@ struct VersionTextView: View {
         let shown = TextExcerpt(new)
         VStack(alignment: .leading, spacing: 6) {
             LazyVStack(alignment: .leading, spacing: 6) {
-                ForEach(lines ?? []) { VersionLineView(line: $0) }
+                ForEach(lines ?? []) { VersionLineView(line: $0, size: size) }
             }
             .textSelection(.enabled)
             if shown.omitted > 0 {
-                Text("\(shown.omitted.formatted()) more characters aren’t shown.").foregroundStyle(.secondary)
+                Text("\(shown.omitted.formatted()) more characters aren’t shown.")
+                    .font(.system(size: size))
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -142,15 +167,20 @@ struct VersionTextView: View {
 
 private struct VersionLineView: View {
     let line: ReadLine
+    let size: CGFloat
 
     var body: some View {
+        content.font(.system(size: size))
+    }
+
+    @ViewBuilder private var content: some View {
         switch line.kind {
         case .blank:
             Color.clear.frame(height: 6)
         case .rule:
             Divider()
         case .heading(let level):
-            Text(attributed).font(Self.font(forHeading: level)).padding(.top, 6)
+            Text(attributed).font(Self.font(forHeading: level, size: size)).padding(.top, 6)
         case .bullet(let depth, let number):
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(number.map { "\($0)." } ?? "•").foregroundStyle(.secondary)
@@ -162,7 +192,7 @@ private struct VersionLineView: View {
                 .padding(.leading, 14)
                 .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 3) }
         case .code:
-            Text(attributed).font(.system(.body, design: .monospaced))
+            Text(attributed).font(.system(size: size, design: .monospaced))
         case .paragraph:
             Text(attributed)
         case .table(let table):
@@ -170,12 +200,14 @@ private struct VersionLineView: View {
         }
     }
 
-    private static func font(forHeading level: Int) -> Font {
+    /// The board's headings as multiples of the text size: 19 and 16 where the text is 15, the next level down at the
+    /// text's own size, and the top level a step above the second.
+    private static func font(forHeading level: Int, size: CGFloat) -> Font {
         switch level {
-        case 1: .title.bold()
-        case 2: .title2.bold()
-        case 3: .title3.bold()
-        default: .headline
+        case 1: .system(size: size * 22 / 15, weight: .bold)
+        case 2: .system(size: size * 19 / 15, weight: .semibold)
+        case 3: .system(size: size * 16 / 15, weight: .semibold)
+        default: .system(size: size, weight: .semibold)
         }
     }
 
@@ -251,7 +283,7 @@ private extension [ReadSpan] {
             if span.wikiLink { piece.foregroundColor = Color.accentColor }
             switch span.change {
             case .same: break
-            case .added: piece.backgroundColor = Color.accentColor.opacity(0.22)
+            case .added: piece.backgroundColor = VersionLooks.added
             case .removed:
                 piece.strikethroughStyle = .single
                 piece.foregroundColor = .secondary
@@ -259,5 +291,28 @@ private extension [ReadSpan] {
             result += piece
         }
         return result
+    }
+}
+
+/// How Version History marks words a version added: green, since the accent marks what is chosen (`docs/look.md`).
+enum VersionLooks {
+    static let addedLightOpacity = 0.15
+    static let addedDarkOpacity = 0.26
+
+    static let added = Color(nsColor: NSColor(name: nil) { appearance in
+        let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return NSColor(srgbRed: 48 / 255, green: 164 / 255, blue: 108 / 255, alpha: isDark ? addedDarkOpacity : addedLightOpacity)
+    })
+
+    /// The board's third text level, for block headings and writers' names: ink at 36%, white at 36% in dark.
+    static let faint = neutral(0.36)
+    /// The wash behind Current: ink at 6%, white at 6% in dark.
+    static let currentWash = neutral(0.06)
+
+    private static func neutral(_ opacity: Double) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return (isDark ? NSColor.white : NSColor.black).withAlphaComponent(opacity)
+        })
     }
 }

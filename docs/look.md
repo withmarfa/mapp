@@ -10,11 +10,11 @@ paths:
 
 # How things look
 
-Each kind of thing has one drawing, used on the page, in the panel, in a row, a card, a table cell and a panel. Measures, colors and fills are tokens in the code; this page has the rules that they serve. Search `docs/rejected.md` before you propose a look.
+Each kind of thing has one drawing, used on the page and in a panel, row, card or table cell. Measures, colors and fills are tokens in the code; this page has the rules they serve. Search `docs/rejected.md` before proposing a look.
 
 ## Where things go
 
-- **The window has three areas:** the sidebar, the list pane and the page. A screen adds no new kind of column or toolbar. A screen that needs one changes this rule first.
+- **The window has three areas:** the sidebar, the list pane and the page. A screen adds no new kind of column or toolbar without changing this rule first.
 - **What a person moves between goes in the list pane.** The page holds at most one main action.
 - **The system's control comes first.** Segmented controls, search fields, switches, alerts, menus and the toolbar's glass are the system's, because a hand-drawn copy misses what the system changes.
 - **Nothing shows until there is something to show.** An option that does not apply is absent from a menu, not dimmed, unless the person would look for it there.
@@ -47,6 +47,9 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 | Chip wash | Ink 3.5% | White 3.5% | Every chip |
 | Tinted type chip | Tone 14% | Tone 20% | `TintedChip` |
 | Person fill | Purple 15% | Purple 26% | `PersonCircle` |
+| Added words | Green 15% | Green 26% | `VersionLooks` |
+| Faint text | Ink 36% | White 36% | `VersionLooks` |
+| Current wash | Ink 6% | White 6% | `VersionLooks` |
 | Chip text | Ink 72% | White 72% | Chips, a fact in a row |
 | Name on a tint | Tone toward black: 28% person, 46% type | Tone 50% toward white | `PersonCircle`, `TintedChip`, `NewTiles` |
 | Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Lists, panels, calendars (`SelectionLooks`) |
@@ -64,7 +67,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 
 - **A chosen row is soft gray and a row under the pointer is lighter**, in every list (`SoftSelection`). Neither is blue.
 - **A chosen card has a soft ring and no fill**, because a fill would cover its picture.
-- **A heading, a date line and a group's header get no hover mark**, because they cannot be clicked. A group's chevron is the only part of its header that reacts.
+- **A heading, a date line and a group's header get no hover mark**, because they cannot be clicked. Only a group's chevron reacts.
 - **A cell that can be edited keeps its own tint** over the row's.
 - **A chosen row in a value panel, filter panel or calendar is the same gray** (`SelectionLooks`), never the accent.
 

@@ -159,12 +159,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Table item | A sheet of its own rows, without properties or margins, row numbers off. The app keeps the order and a column's menu sets it. The last piece, and it may be cut. | new files in `MarfaMac/Views/` | `Rethink-Table-Item`, `Rethink-Table-Item-Full`, `Rethink-Table-Item-Numbers`, `Rethink-Table-Item-Column`, `Rethink-Table-Preview` |
 | Read only | No Aa, and one line in Info. | `PageCorner`, `ItemInspector.swift` | `Rethink-Read-Only`, `Rethink-Read-Only-Full` |
 
-## Version history
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-| Version History | The thread takes the sidebar's place. It shows text, title, type and property changes only, because a version holds no tags or links. Additions in green, Copy Text, no Show in Finder. The loading, failed, offline and thinned states stay. | `VersionHistoryWorkspace.swift`, `VersionThreadColumn.swift`, `VersionPageColumn` | `Rethink-History` |
-
 ## Sync and offline
 
 | Part | What it is | Lands in | Boards |
