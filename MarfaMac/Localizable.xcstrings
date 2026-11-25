@@ -1810,6 +1810,9 @@
     "A change to a connection was still being checked, so it may not have been made. Check it and change it again." : {
 
     },
+    "A change to a view’s settings" : {
+
+    },
     "A change to “%@” is on hold" : {
       "extractionState" : "manual"
     },
@@ -1952,9 +1955,6 @@
     "A run was asked for. It starts at its next run." : {
 
     },
-    "A saved view can’t keep %@" : {
-
-    },
     "A saved view can’t keep %@." : {
 
     },
@@ -2019,19 +2019,10 @@
     "A view can save only conditions that all apply, or all of which any one may apply." : {
 
     },
-    "A view can save only filters that all apply, or all of which any one may apply." : {
-
-    },
     "A view can’t keep the condition on %@." : {
 
     },
-    "A view can’t keep the filter on %@." : {
-
-    },
     "A view keeps up to %lld conditions." : {
-
-    },
-    "A view keeps up to %lld conditions; this one has %lld" : {
 
     },
     "A view keeps up to %lld conditions; this one has %lld." : {
@@ -2205,9 +2196,6 @@
     "Add a Word" : {
 
     },
-    "Add a filter" : {
-
-    },
     "Add a passkey at the new address." : {
 
     },
@@ -2350,9 +2338,6 @@
     },
     "All day" : {
       "extractionState" : "manual"
-    },
-    "All of these" : {
-
     },
     "All versions kept for" : {
       "extractionState" : "manual"
@@ -2597,6 +2582,9 @@
     "Archived Items" : {
 
     },
+    "Archived Items: %@" : {
+
+    },
     "Archived items leave your lists. You can find them in Library > Archive." : {
 
     },
@@ -2670,9 +2658,6 @@
 
     },
     "As media" : {
-
-    },
-    "Ascending" : {
 
     },
     "Ask" : {
@@ -2833,6 +2818,9 @@
 
     },
     "Behind highlighted text." : {
+
+    },
+    "Beneath: %@" : {
 
     },
     "Beside the List" : {
@@ -4135,9 +4123,6 @@
     "Density" : {
 
     },
-    "Descending" : {
-
-    },
     "Description" : {
       "extractionState" : "manual"
     },
@@ -4733,13 +4718,13 @@
     "Filter" : {
 
     },
-    "Filter By" : {
-
-    },
     "Filter: %@" : {
 
     },
     "Filters" : {
+
+    },
+    "Filters or From were changed in another app, so they were kept." : {
 
     },
     "Filters that would join conditions with both “and” and “or”" : {
@@ -4990,13 +4975,13 @@
     "Group By" : {
 
     },
-    "Group by" : {
-
-    },
     "Group by %@" : {
 
     },
     "Group by %@: %@" : {
+
+    },
+    "Group order: %@" : {
 
     },
     "Group: %@" : {
@@ -5008,7 +4993,7 @@
     "Grouping by %@" : {
       "extractionState" : "manual"
     },
-    "Groups" : {
+    "Grouping was changed in another app, so it was kept." : {
 
     },
     "Groups Hidden" : {
@@ -5071,6 +5056,9 @@
     "Hidden" : {
       "extractionState" : "manual"
     },
+    "Hidden groups: %@" : {
+
+    },
     "Hide" : {
 
     },
@@ -5084,9 +5072,6 @@
       "extractionState" : "manual"
     },
     "Hide Empty Groups" : {
-
-    },
-    "Hide Filters" : {
 
     },
     "Hide Formats" : {
@@ -6794,9 +6779,6 @@
     "No Marks Match" : {
 
     },
-    "No Matching Fields" : {
-
-    },
     "No Matching Items" : {
 
     },
@@ -7972,9 +7954,6 @@
     "Reject fields this type doesn’t declare or inherit." : {
 
     },
-    "Relation" : {
-
-    },
     "Relationship Added" : {
 
     },
@@ -8021,9 +8000,6 @@
 
     },
     "Remove Field…" : {
-
-    },
-    "Remove Filter" : {
 
     },
     "Remove Link" : {
@@ -8768,9 +8744,6 @@
     "Show Details" : {
       "extractionState" : "manual"
     },
-    "Show Filters" : {
-
-    },
     "Show Folders" : {
 
     },
@@ -9094,6 +9067,9 @@
     },
     "Sort by Relevance" : {
       "extractionState" : "manual"
+    },
+    "Sort was changed in another app, so it was kept." : {
+
     },
     "Sort: %@" : {
 
@@ -9424,15 +9400,6 @@
 
     },
     "The Feed lets items go after a while" : {
-
-    },
-    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
 
     },
     "The Folder Is Missing Where This Copy Is Kept" : {
@@ -9914,9 +9881,6 @@
     },
     "The file couldn’t be attached." : {
       "extractionState" : "manual"
-    },
-    "The file for this page isn’t in Marfa." : {
-
     },
     "The file may be damaged or unavailable. Try opening it in another app." : {
 
@@ -10849,7 +10813,7 @@
     "This view was renamed elsewhere, so its name was left as it is." : {
 
     },
-    "This view's filter holds a condition that cannot be changed here. It is kept." : {
+    "This view was renamed in another app, so your name wasn’t written." : {
 
     },
     "This view’s filter holds a condition that can’t be changed here. It is kept." : {
@@ -11391,9 +11355,6 @@
     "View Not Saved" : {
       "extractionState" : "manual"
     },
-    "View Options" : {
-
-    },
     "View Options, %lld filters applied" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -11416,6 +11377,9 @@
           }
         }
       }
+    },
+    "View Partly Reverted" : {
+
     },
     "View as Board" : {
       "extractionState" : "manual"
@@ -11445,6 +11409,9 @@
 
     },
     "View, changed" : {
+
+    },
+    "View: %@" : {
 
     },
     "Views" : {
@@ -11797,9 +11764,6 @@
 
     },
     "Your Marfa server can’t be reached. Marfa for Mac keeps your change and saves it once the server is back." : {
-
-    },
-    "Your Marfa server can’t be reached. The window keeps your change and saves it once the server is back." : {
 
     },
     "Your Marfa server no longer has this view." : {
