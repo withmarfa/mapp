@@ -1782,16 +1782,7 @@
     "A" : {
 
     },
-    "A Collection" : {
-
-    },
     "A Folder" : {
-
-    },
-    "A Source" : {
-
-    },
-    "A Type" : {
 
     },
     "A View" : {
@@ -2145,12 +2136,6 @@
 
     },
     "Add Row Below" : {
-
-    },
-    "Add Section" : {
-
-    },
-    "Add Shortcut" : {
 
     },
     "Add Sort" : {
@@ -4965,9 +4950,6 @@
     "Go" : {
 
     },
-    "Go To" : {
-
-    },
     "Go back to settings saved before a change." : {
 
     },
@@ -5112,13 +5094,7 @@
     "Hide Sidebar" : {
 
     },
-    "Hide Views from Sidebar" : {
-
-    },
     "Hide from Page" : {
-
-    },
-    "Hide from Sidebar" : {
 
     },
     "Hide on %@ Pages" : {
@@ -6654,9 +6630,6 @@
     "New Tab" : {
 
     },
-    "New Tab…" : {
-
-    },
     "New Type" : {
 
     },
@@ -8058,9 +8031,6 @@
     "Remove Old Activity" : {
 
     },
-    "Remove Shortcut" : {
-
-    },
     "Remove Sort" : {
 
     },
@@ -8192,9 +8162,6 @@
       "extractionState" : "manual"
     },
     "Rename Source…" : {
-
-    },
-    "Rename Tab" : {
 
     },
     "Rename View" : {
@@ -8460,9 +8427,6 @@
       "extractionState" : "manual"
     },
     "Saved" : {
-
-    },
-    "Saved Views" : {
 
     },
     "Saved as “%@”." : {
@@ -8832,9 +8796,6 @@
     },
     "Show Month" : {
       "extractionState" : "manual"
-    },
-    "Show More" : {
-
     },
     "Show Original" : {
 
@@ -9449,6 +9410,15 @@
     "The Feed lets items go after a while" : {
 
     },
+    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
+
+    },
+    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
+
+    },
+    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
+
+    },
     "The Folder Is Missing Where This Copy Is Kept" : {
 
     },
@@ -9931,6 +9901,9 @@
     },
     "The file couldn’t be attached." : {
       "extractionState" : "manual"
+    },
+    "The file for this page isn’t in Marfa." : {
+
     },
     "The file may be damaged or unavailable. Try opening it in another app." : {
 
@@ -10819,9 +10792,6 @@
     },
     "This needs the server. Try again when you’re back online." : {
       "extractionState" : "manual"
-    },
-    "This place can’t be saved as a view" : {
-
     },
     "This plugin needs Marfa %@ or later. This server runs %@." : {
       "localizations" : {
