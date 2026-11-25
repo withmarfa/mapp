@@ -4,7 +4,7 @@ import SwiftUI
 
 // MARK: Types
 
-/// Types: the types the place lists, each with a tick, which narrow it to those ticked (the Type filter, which a saved
+/// Types: the types the place lists, each with a tick, its mark and how many items it has here, which narrow it to those ticked (the Type filter, which a saved
 /// view keeps as its listed types), and Include Kinds for a type that has kinds.
 struct ViewPanelTypes: View {
     @CurrentLibrary private var library
@@ -24,15 +24,34 @@ struct ViewPanelTypes: View {
                 .padding(.horizontal, ViewPanelMetrics.inset)
                 .padding(.vertical, 4)
                 .accessibilityIdentifier("ViewPanelTypesSearch")
+            let counts = Dictionary(grouping: content.allRows, by: { $0.item.type.rawValue }).mapValues(\.count)
             ForEach(shown, id: \.id) { type in
-                Toggle(isOn: Binding { chosen.contains(type.id) } set: { set(type.id, chosen: $0) }) {
-                    Label(type.title, typeIcon: type.icon)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                let isChosen = chosen.contains(type.id)
+                Button { set(type.id, chosen: !isChosen) } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .opacity(isChosen ? 1 : 0)
+                            .frame(width: 12)
+                        TonedGlyph(id: type.icon)
+                            .frame(width: ViewPanelMetrics.symbolWidth)
+                        Text(verbatim: type.title)
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        if let count = counts[type.id] {
+                            Text(count.formatted())
+                                .monospacedDigit()
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .interfaceFont(.body)
+                    .frame(minHeight: ViewPanelMetrics.rowHeight)
+                    .padding(.horizontal, ViewPanelMetrics.inset)
+                    .contentShape(.rect)
                 }
-                .toggleStyle(.checkbox)
-                .interfaceFont(.body)
-                .frame(minHeight: ViewPanelMetrics.rowHeight)
-                .padding(.horizontal, ViewPanelMetrics.inset)
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isChosen ? .isSelected : [])
                 .accessibilityIdentifier("ViewPanelType.\(type.id)")
             }
             if shown.isEmpty {
@@ -422,9 +441,9 @@ extension Browser {
 
 // MARK: Group
 
-/// Group: Group by, with By for a field grouped more than one way (a date's spans and Set or Not Set, a status's words
-/// and groups), then the groups in order, each with a handle to drag and a switch, then Hide Empty Groups, which this
-/// Mac keeps. The grouping, the order and the hidden groups are Marfa's in a saved view, and the place's own in its
+/// Group: Group By, with By for a field grouped more than one way (a date's spans and Set or Not Set, Each Status and
+/// Status Groups), then the groups in order, each with a handle to drag, a status's mark, its count and an eye that
+/// hides it, then Hide Empty Groups, which this Mac keeps. The grouping, the order and the hidden groups are Marfa's in a saved view, and the place's own in its
 /// default view.
 struct ViewPanelGroup: View {
     @CurrentLibrary private var library
@@ -440,7 +459,7 @@ struct ViewPanelGroup: View {
             GroupByChoices(browser: browser, offer: offer, shown: shown)
         } label: {
             ViewPanelRowLabel(
-                symbol: "rectangle.grid.1x2", label: String(localized: "Group by"),
+                symbol: "rectangle.grid.1x2", label: String(localized: "Group By"),
                 value: found?.entry.label ?? String(localized: "None"), end: .pops)
         }
         .menuStyle(.button)
@@ -470,9 +489,9 @@ struct ViewPanelGroup: View {
                 ? Set<String>() : browser.tableOptions[browser.shown]?.hiddenGroups ?? []
             let rows = browser.groupRows(in: library).filter { $0.key != GroupKey.notApplicable }
             if !rows.isEmpty {
-                ViewPanelSection(title: String(localized: "Groups")) {
+                ViewPanelSection {
                     ForEach(rows, id: \.key) { row in
-                        ViewPanelGroupRow(browser: browser, key: row.key, title: row.title, isShown: !hidden.contains(row.key))
+                        ViewPanelGroupRow(browser: browser, row: row, isShown: !hidden.contains(row.key))
                     }
                 }
             }
@@ -531,29 +550,49 @@ struct GroupByChoices: View {
     }
 }
 
-/// One group: a handle to drag it into order, its name, and the switch that shows or hides it. A hidden group leaves
-/// the layout, and its items still count in the place.
+/// One group: a handle to drag it into order, a status's mark, its name and count, and the eye that shows or hides it.
+/// A hidden group is grey with its eye struck through; it leaves the layout, and its items still count in the place.
 private struct ViewPanelGroupRow: View {
     @CurrentLibrary private var library
     let browser: Browser
-    let key: String
-    let title: String
+    let row: Browser.GroupRow
     let isShown: Bool
 
     private static let prefix = "group:"
+    private var key: String { row.key }
 
     var body: some View {
         HStack(spacing: 8) {
             ViewPanelGrabber()
-            Toggle(isOn: Binding { isShown } set: { browser.setGroup(key, hidden: !$0, in: library) }) {
-                Text(verbatim: title)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if let status = row.status {
+                StatusMark(status)
+                    .opacity(isShown ? 1 : 0.5)
+                    .frame(width: ViewPanelMetrics.symbolWidth)
+                    .accessibilityHidden(true)
             }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
+            Text(verbatim: row.title)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(1)
+            Text(row.count.formatted())
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+            Spacer(minLength: 8)
+            Button {
+                browser.setGroup(key, hidden: isShown, in: library)
+            } label: {
+                if isShown {
+                    Label("Hide \(row.title)", systemImage: "eye").labelStyle(.iconOnly)
+                } else {
+                    Label("Show \(row.title)", systemImage: "eye.slash").labelStyle(.iconOnly)
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(isShown ? .secondary : .tertiary)
+            .help(isShown ? Text("Hide Group") : Text("Show Group"))
+            .accessibilityIdentifier("ViewPanelGroupEye.\(key)")
         }
+        .foregroundStyle(isShown ? .primary : .tertiary)
         .interfaceFont(.body)
         .frame(minHeight: ViewPanelMetrics.rowHeight)
         .padding(.horizontal, ViewPanelMetrics.inset)
@@ -574,8 +613,8 @@ private struct ViewPanelGroupRow: View {
 
 // MARK: Properties
 
-/// Properties, or a table's Columns: what shows after the title, in order, each with a handle to drag it and a switch.
-/// The name is always first. Until the list is changed each item shows its own type's look ("As in Layouts"); Use
+/// Properties, or a table's Columns: what shows after the title, the shown ones first in their order and then the rest,
+/// each with a handle to drag it and a switch. The name is always first. Until the list is changed each item shows its own type's look ("As in Layouts"); Use
 /// Layouts puts that back. Edit Layouts… opens Settings > Layouts at a type's page.
 struct ViewPanelProperties: View {
     @CurrentLibrary private var library
@@ -589,8 +628,19 @@ struct ViewPanelProperties: View {
         ViewPanelHead(title: browser.viewMode == .table ? String(localized: "Columns") : String(localized: "Properties"), back: {
             panel.page = .main
         })
-        ForEach(listed) { column in
-            ViewPanelPropertyRow(browser: browser, columns: all, column: column, isShown: properties.isShown(column))
+        let shown = listed.filter(properties.isShown)
+        let rest = listed.filter { !properties.isShown($0) }
+        ViewPanelSection {
+            ForEach(shown) { column in
+                ViewPanelPropertyRow(browser: browser, columns: all, column: column, isShown: true)
+            }
+        }
+        if !rest.isEmpty {
+            ViewPanelSection {
+                ForEach(rest) { column in
+                    ViewPanelPropertyRow(browser: browser, columns: all, column: column, isShown: false)
+                }
+            }
         }
         ViewPanelSection {
             if properties.isChanged {
@@ -630,6 +680,7 @@ private struct ViewPanelPropertyRow: View {
                 .accessibilityHidden(true)
             Toggle(isOn: Binding { isName || isShown } set: { browser.setColumn(column, shown: $0) }) {
                 Text(verbatim: column.label)
+                    .foregroundStyle(isShown ? .primary : .secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)

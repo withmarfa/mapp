@@ -17,13 +17,14 @@ nonisolated enum GroupMode: Hashable, Sendable {
         if case .bucket(let bucket) = self { bucket } else { nil }
     }
 
-    /// The choice's name under its field: Words, Groups, Day and the rest, Set or Not Set.
+    /// The choice's name under its field: Each Status or Status Groups for a status, the only field grouped by its
+    /// words more than one way; Day and the rest; Set or Not Set.
     var title: String {
         switch self {
-        case .value: String(localized: "Words")
+        case .value: String(localized: "Each Status")
         case .bucket(let bucket): bucket.title
         case .presence: String(localized: "Set or Not Set")
-        case .statusGroups: String(localized: "Groups")
+        case .statusGroups: String(localized: "Status Groups")
         }
     }
 }

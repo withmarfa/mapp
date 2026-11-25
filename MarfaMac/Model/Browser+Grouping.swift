@@ -112,9 +112,29 @@ extension Browser {
 
     /// The groups of the open layout in order, hidden ones too, as the View panel's Group lists them: a board's lanes, else the
     /// groups of the list or table.
-    func groupRows(in library: any ItemLibrary) -> [(key: String, title: String)] {
-        if viewMode == .board { return boardLanes(in: library)?.all.map { ($0.groupKey, $0.title) } ?? [] }
-        return tableContent(in: library).allGroups.map { ($0.id, $0.title) }
+    func groupRows(in library: any ItemLibrary) -> [GroupRow] {
+        if viewMode == .board {
+            return boardLanes(in: library)?.all.map { GroupRow(key: $0.groupKey, title: $0.title, count: $0.items.count, status: $0.symbol) } ?? []
+        }
+        let content = tableContent(in: library)
+        let field = content.grouping.flatMap { $0.isStatus ? $0.field : nil }
+        return content.allGroups.map { group in
+            // A status's groups carry its marks, as the board's lanes and the table's headers do; No Status has none.
+            let status: StatusSymbol? = switch (field, group.value) {
+            case (nil, _), (_, nil): nil
+            case (_, let key?) where content.groupMode == .statusGroups: StatusGroup(rawValue: key).map { StatusSymbol(group: $0) }
+            case (let field?, let word?): StatusSymbol(group: field.statusGroup(of: word))
+            }
+            return GroupRow(key: group.id, title: group.title, count: group.rows.count, status: status)
+        }
+    }
+
+    /// One group as the View panel's Group lists it: its key, its name, how many items it holds and a status's mark.
+    struct GroupRow {
+        let key: String
+        let title: String
+        let count: Int
+        var status: StatusSymbol?
     }
 
     /// Moves a group to where another stands, as a drag onto its row (`Reordering.moving(_:onto:in:)`): Marfa's
