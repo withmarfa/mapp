@@ -26,10 +26,10 @@ paths:
 ## Sidebar
 
 - **Search and New, the Library and the Feed, then Pinned, Types and the person's sections** (`SidebarLayout`). Only the Library has a count. Search opens the Command Palette.
-- **Pinned holds views, collections and items.** A saved view is pinned until the person takes it out.
+- **Pinned holds views, collections and items.** A saved view stays pinned until taken out.
 - **A type counts its items and its kinds'.** Types shows five, then "N More".
 - **Under the pointer** a type, a kind and a collection show a plus for the count, and a heading Add and More. Sections never fold.
-- **Customize Sidebar works in place,** with faint places that each open a menu of what can go there (`SidebarAddPlace`).
+- **Customize Sidebar works in place:** each faint place opens a menu of what can go there (`SidebarAddPlace`).
 - **A row whose thing is gone keeps its place**, so it returns there.
 - **Go lists the same places, views and types** (`GoMenu`).
 
