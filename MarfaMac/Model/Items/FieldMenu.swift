@@ -1,22 +1,37 @@
 import Foundation
 
-/// What a field's name on the item page offers, decided once and drawn by the page's menu. Pure, with no SwiftUI.
+/// What a row's menu on the item page offers, decided once and drawn by the page's menu. Pure, with no SwiftUI.
 ///
-/// The Mac's own placement (pin, move, hide) is offered for every row of the page. What changes the type for every
-/// item (rename, edit choices, remove) is offered only for a field the type declares and no type above it does, on a
-/// type that is not Marfa's own, and only while the server can be reached. A field that is not the person's to change
-/// shows what stops them instead, and none of those entries.
+/// First how the row shows on the type's pages (`RowShows`), with Pin Under the Title only while pinned properties are
+/// on; then Move Up and Move Down; then the field's own menu. What changes the type for every item (rename, edit
+/// choices, remove) is offered only for a field the type declares and no type above it does, on a type that is not
+/// Marfa's own, and only while the server can be reached. A field that is not the person's to change shows what stops
+/// them instead, and none of those entries.
 nonisolated struct FieldMenu: Equatable, Sendable {
     enum Command: Hashable, Sendable {
+        case showWhenSet, alwaysShow, hide
+        case pin, unpin
+        case moveUp, moveDown
         /// The value's own editor, for a value whose click follows a link instead.
         case editValue
         case rename, editChoices, remove
-        case pin, unpin, moveUp, moveDown, hide
     }
 
     struct Entry: Equatable, Sendable {
         let command: Command
         let isEnabled: Bool
+        var isChecked = false
+    }
+
+    /// Where the row is on the type's pages, for the entries that place it.
+    struct Placing: Equatable, Sendable {
+        var shows: RowShows
+        var canMoveUp: Bool
+        var canMoveDown: Bool
+        /// Nil while pinned properties are off, else whether the row is pinned.
+        var isPinned: Bool?
+        /// Whether one more row can be pinned.
+        var canPin = true
     }
 
     /// Why the field cannot be changed, in words, where it cannot.
@@ -24,7 +39,8 @@ nonisolated struct FieldMenu: Equatable, Sendable {
     /// The entries in groups, each group set apart from the next.
     let sections: [[Entry]]
 
-    init(row: String, type: ItemTypeInfo?, layout: PageLayout?, catalogue: Catalogue, editsValue: Bool, reachesServer: Bool) {
+    /// `placing` is nil for a row that is no person's to place, such as an event's When.
+    init(row: String, type: ItemTypeInfo?, placing: Placing?, catalogue: Catalogue, editsValue: Bool, reachesServer: Bool) {
         let field = type?.fields.first { $0.key == row }
 
         var lockText: String?
@@ -51,35 +67,19 @@ nonisolated struct FieldMenu: Equatable, Sendable {
         }
         self.lockText = lockText
 
-        var placing: [Entry] = []
-        if let layout, let group = layout.group(of: row) {
-            if group == .pinned {
-                placing.append(Entry(command: .unpin, isEnabled: true))
-            } else {
-                placing.append(Entry(command: .pin, isEnabled: layout.moving(row, to: .pinned) != nil))
+        var showing: [Entry] = []
+        var moving: [Entry] = []
+        if let placing {
+            showing = [
+                Entry(command: .showWhenSet, isEnabled: true, isChecked: placing.shows == .whenSet),
+                Entry(command: .alwaysShow, isEnabled: true, isChecked: placing.shows == .always),
+                Entry(command: .hide, isEnabled: true, isChecked: placing.shows == .hidden),
+            ]
+            if let pinned = placing.isPinned {
+                showing.append(pinned ? Entry(command: .unpin, isEnabled: true) : Entry(command: .pin, isEnabled: placing.canPin))
             }
-            placing.append(Entry(command: .moveUp, isEnabled: layout.moved(row, by: -1) != nil))
-            placing.append(Entry(command: .moveDown, isEnabled: layout.moved(row, by: 1) != nil))
-            placing.append(Entry(command: .hide, isEnabled: group != .hidden))
+            moving = [Entry(command: .moveUp, isEnabled: placing.canMoveUp), Entry(command: .moveDown, isEnabled: placing.canMoveDown)]
         }
-        sections = [
-            editsValue ? [Entry(command: .editValue, isEnabled: true)] : [],
-            own, placing, remove,
-        ].filter { !$0.isEmpty }
-    }
-}
-
-nonisolated extension PageLayout {
-    /// The layout once a placement command is carried out on `row`, or nil where it changes nothing: a row already
-    /// at the end it moves toward, a fifth pin, or a command that is not placement.
-    func after(_ command: FieldMenu.Command, row: String) -> PageLayout? {
-        switch command {
-        case .pin: moving(row, to: .pinned)
-        case .unpin: moving(row, to: .page)
-        case .moveUp: moved(row, by: -1)
-        case .moveDown: moved(row, by: 1)
-        case .hide: moving(row, to: .hidden)
-        case .editValue, .rename, .editChoices, .remove: nil
-        }
+        sections = [showing, moving, editsValue ? [Entry(command: .editValue, isEnabled: true)] : [], own, remove].filter { !$0.isEmpty }
     }
 }

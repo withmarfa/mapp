@@ -538,15 +538,14 @@ test("the words the app sends mount Inkkit, with the app's own kept out of its l
   const labels = splitLabels(sent)
   expect(Object.keys(labels.header).sort()).toEqual(
     [
-      'customizeLayout',
+      'changeType',
       'discardChanges',
       'empty',
       'linkedFrom',
-      'contents',
       'properties',
+      'reorder',
       'showLess',
       'status',
-      'timeline',
       'title',
       'untitled',
     ].sort(),

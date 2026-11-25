@@ -200,7 +200,7 @@ nonisolated struct RowContent: Hashable, Sendable {
                 return Self.line(item.preview)
             case .site:
                 return item.value(of: MarfaMapping.urlField)?.string
-                    .flatMap { ReadingHeader.webAddress($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+                    .flatMap { BrowserTarget.webAddress($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
                     .flatMap { $0.host() }.map(Self.withoutWWW)
             case .file:
                 return item.isFile ? Self.line(item.preview) : nil
@@ -244,7 +244,7 @@ nonisolated struct RowContent: Hashable, Sendable {
             switch value {
             case .people(let words), .options(let words): return words.first
             case .text(let text), .url(let text), .email(let text), .phone(let text), .date(let text): return Self.line(text)
-            case .boolean, .status, .parent, .type, .source, .items, .tags, .when, .empty: return nil
+            case .boolean, .status, .parent, .items, .tags, .when, .empty: return nil
             }
         }
 
@@ -312,7 +312,7 @@ nonisolated struct RowContent: Hashable, Sendable {
                 return Self.fact(field.label, fieldMoment(field.key).map(text(of:)))
             case .boolean(let flag):
                 return flag ? ([.text(field.label)], 0) : ([], 0)
-            case .status, .parent, .type, .source, .items, .tags, .when, .empty:
+            case .status, .parent, .items, .tags, .when, .empty:
                 return ([], 0)
             }
         }

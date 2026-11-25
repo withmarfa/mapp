@@ -94,14 +94,10 @@ struct VersionPageColumn: View {
                     }
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    if pin.id == PagePlacement.type {
-                        MarkedName(text: pin.value, icon: library.catalogue.icon(for: type))
-                    } else {
-                        Text(verbatim: pin.value)
-                            .interfaceFont(.body)
-                            .lineLimit(1)
-                            .frame(minHeight: 22 * scale)
-                    }
+                    Text(verbatim: pin.value)
+                        .interfaceFont(.body)
+                        .lineLimit(1)
+                        .frame(minHeight: 22 * scale)
                 }
                 .frame(width: 136 * scale, alignment: .leading)
                 .help(pin.value)

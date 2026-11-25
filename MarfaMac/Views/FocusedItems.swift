@@ -34,10 +34,11 @@ final class DetailsPresentation {
     var isPresented = false
     /// The Reader and Original switch of the page showing, while it has an article. The toolbar and the menus hold it.
     private(set) var pageLook: PageLookSwitch?
-    /// The item whose page has scrolled its header away, which the toolbar then names. Both kinds of page feed it: the
-    /// item's page from the editor, a web page from its web view. It names the item, not a flag, so a page that is
-    /// still reporting for the item before cannot show that item's title for the next.
-    private(set) var itemWithHeaderAway: ItemID?
+    /// The head of the page that has scrolled it out of sight, which the toolbar then names: the item, its title and its
+    /// type's icon. Nil while the head shows. Both kinds of page feed it: the item's page from the editor, a web page
+    /// from its web view. It names the item, so a page still reporting for the item before cannot show that item's
+    /// title for the next.
+    private(set) var scrolledHead: ScrolledHead?
     /// The item the window has in Focus: its title is in the toolbar and its properties are hidden. It names the item,
     /// so another item's page is never in Focus, and `pageShows(_:)` forgets it when the page moves on.
     private(set) var focusedItem: ItemID?
@@ -128,12 +129,13 @@ final class DetailsPresentation {
         if look != nil || pageLook?.item == item { pageLook = look }
     }
 
-    /// Says whether `item`'s page has scrolled its header away. Saying so for one item never changes another's.
-    func headerScrolled(away: Bool, for item: ItemID) {
-        if away {
-            if itemWithHeaderAway != item { itemWithHeaderAway = item }
-        } else if itemWithHeaderAway == item {
-            itemWithHeaderAway = nil
+    /// Says that `item`'s page has scrolled its head away, as `head`, or shows it again, with nil. Saying so for one
+    /// item never changes another's.
+    func headerScrolled(_ head: ScrolledHead?, for item: ItemID) {
+        if let head, head.item == item {
+            if scrolledHead != head { scrolledHead = head }
+        } else if scrolledHead?.item == item {
+            scrolledHead = nil
         }
     }
 
@@ -154,7 +156,7 @@ final class DetailsPresentation {
         return offeredFile?.viewing
     }
 
-    func isHeaderAway(of item: ItemID) -> Bool { itemWithHeaderAway == item }
+    func isHeaderAway(of item: ItemID) -> Bool { scrolledHead?.item == item }
 
     func isFocused(on item: ItemID?) -> Bool { item != nil && focusedItem == item }
 
@@ -411,4 +413,13 @@ private final class FirstAnswerRace {
         continuation = nil
         timer?.cancel()
     }
+}
+
+/// What the toolbar shows of an item whose page has scrolled its head out of sight: its title as the head shows it, and
+/// its type's mark.
+struct ScrolledHead: Equatable, Sendable {
+    let item: ItemID
+    let title: String
+    /// The type's icon, an Iconify ID.
+    let typeIcon: String?
 }

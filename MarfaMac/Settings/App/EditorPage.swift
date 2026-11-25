@@ -6,6 +6,7 @@ struct EditorPage: View {
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
     @AppStorage(PageKey.readingWidth) private var readingWidth = PageStyle().readingWidth
     @AppStorage(PageKey.titleLines) private var titleLines = TitleLines.standard
+    @AppStorage(PageKey.pinsProperties) private var pinsProperties = false
     @AppStorage(PageKey.textSize) private var textSize = PageStyle().textSize
     @AppStorage(LineSpacing.key) private var lineSpacing = PageStyle().lineSpacing
     @AppStorage(ParagraphSpacing.key) private var paragraphSpacing = PageStyle().paragraphSpacing
@@ -90,6 +91,9 @@ struct EditorPage: View {
                     ForEach(TitleLines.choices, id: \.self) { Text("Up to \($0) Lines").tag($0) }
                 }
                 .accessibilityIdentifier("TitleLines")
+            }
+            SettingsRow("Pinned Properties", line: "Properties can be pinned under the title from a row’s menu.") {
+                SettingsToggle(title: "Pinned Properties", isOn: $pinsProperties).accessibilityIdentifier("PinsProperties")
             }
         }
     }

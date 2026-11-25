@@ -9,7 +9,8 @@ enum PageKey {
     static let titleLines = "titleLines"
     static let linkLook = LinkLook.key
     /// Whether a Location's latitude and longitude show as rows of their own. Off, they are drawn by the Location row alone.
-    static let showsCoordinates = "showsCoordinates"
+    static let showsCoordinates = ShowsCoordinates.key
+    static let pinsProperties = PinsProperties.key
     static let smartPunctuation = "smartPunctuation"
     static let pairsBrackets = "pairsBrackets"
     static let continuesLists = "continuesLists"
@@ -20,15 +21,23 @@ enum PageKey {
     static let cornerShowsTextSize = "cornerShowsTextSize"
     static let cornerShowsFocus = "cornerShowsFocus"
     static let all = [
-        fullWidth, textSize, checksSpelling, readingWidth, titleLines, linkLook, showsCoordinates, LineSpacing.key, ParagraphSpacing.key,
+        fullWidth, textSize, checksSpelling, readingWidth, titleLines, linkLook, showsCoordinates, pinsProperties, LineSpacing.key, ParagraphSpacing.key,
         IndentWith.key, PasteAs.key, EditingMode.key, smartPunctuation, pairsBrackets, continuesLists, foldsHeadings, showsCodeLineNumbers,
         cornerShowsFormats, cornerShowsTextSize, cornerShowsFocus,
     ]
 }
 
+/// Reads the Pinned Properties setting where the page's head is made, which is not a view.
+nonisolated enum PinsProperties {
+    /// Whether an item's page pins properties under its title, which its rows then leave out. Off by default.
+    static let key = "pinsProperties"
+    static func stored(in defaults: UserDefaults = .standard) -> Bool { defaults.bool(forKey: key) }
+}
+
 /// Reads the Show Coordinates setting where the page's rows are made, which are not views.
-enum ShowsCoordinates {
-    static func stored(in defaults: UserDefaults = .standard) -> Bool { defaults.bool(forKey: PageKey.showsCoordinates) }
+nonisolated enum ShowsCoordinates {
+    static let key = "showsCoordinates"
+    static func stored(in defaults: UserDefaults = .standard) -> Bool { defaults.bool(forKey: key) }
 }
 
 /// How many lines an item page's title shows before an ellipsis cuts it, while the title is not being edited.

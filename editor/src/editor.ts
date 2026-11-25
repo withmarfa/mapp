@@ -64,11 +64,10 @@ const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
   'empty',
   'discardChanges',
   'linkedFrom',
-  'customizeLayout',
-  'contents',
   'showLess',
-  'timeline',
   'properties',
+  'reorder',
+  'changeType',
 ]
 export function splitLabels(all: AppLabels): {
   editor: Partial<EditorLabels>

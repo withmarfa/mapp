@@ -122,8 +122,8 @@ nonisolated extension ItemSnapshot.Writer {
 
 nonisolated extension VersionContent {
     /// The properties the page would pin for this version, as the type's pins name them, so a version reads like the
-    /// page does. Only what a version holds is shown: its type, and the fields it has. The item's tags, parent, location and
-    /// last edit are not in a version, so those pins are left out rather than shown from the item as it is now.
+    /// page does. Only what a version holds is shown: the fields it has. The item's tags, parent and location are not in a
+    /// version, so those pins are left out rather than shown from the item as it is now.
     func pins(
         saved: Date?, placement: PagePlacement, in catalogue: Catalogue, format: DateFormat, now: Date = .now,
         calendar: Calendar = .current, locale: Locale = .current
@@ -132,16 +132,7 @@ nonisolated extension VersionContent {
         var rows: [VersionFactRow] = []
         for pin in placement.pins {
             switch pin {
-            case PagePlacement.type:
-                rows.append(VersionFactRow(id: pin, label: String(localized: "Type"), value: info?.label ?? type.rawValue, symbol: "square.grid.2x2"))
-            case PagePlacement.updated:
-                if let saved {
-                    rows.append(VersionFactRow(
-                        id: pin, label: String(localized: "Updated"),
-                        value: ItemDate.text(of: saved, hasTime: false, format: format, now: now, locale: locale, calendar: calendar),
-                        symbol: "calendar"))
-                }
-            case PagePlacement.source, PagePlacement.tags, PagePlacement.linkedFrom, PagePlacement.parent, PagePlacement.location:
+            case PagePlacement.tags, PagePlacement.linkedFrom, PagePlacement.parent, PagePlacement.location:
                 continue
             default:
                 guard let field = info?.fields.first(where: { $0.key == pin }), let value = fields[pin], value != .null else { continue }

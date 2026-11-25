@@ -9,7 +9,6 @@ let header: ItemHeader
 
 const ticket: HeaderModel = {
   item: 'ticket',
-  hidden: false,
   focused: false,
   title: 'Review the findings',
   draft: null,
@@ -17,26 +16,29 @@ const ticket: HeaderModel = {
   titleRefusal:
     'The title could not be saved. Use a unique file name without slashes or line breaks.',
   editable: true,
-  kind: 'general',
+  kicker: {
+    type: 'Task',
+    icon: 'square.stack',
+    tone: 'blue',
+    changesType: true,
+    flags: [],
+    spoken: 'Task',
+  },
   status: {
     label: 'In Progress',
     enabled: true,
-    empty: false,
     mark: { symbol: 'circle.lefthalf.filled', tint: 'blue' },
   },
-  parent: { label: 'Field Research', enabled: true, empty: false },
+  parent: { label: 'Field Research', enabled: true },
   pins: [],
-  properties: [
+  rows: [
     { id: 'status', label: 'Status', symbol: 'circle.dotted', kind: 'status' },
     { id: 'child-of', label: 'Epic', symbol: 'square.stack', kind: 'parent' },
   ],
-  foldAfter: 6,
-  contents: [],
   linked: [],
   linkedFoldAfter: 20,
   showsText: true,
   showMore: 'Show 0 More',
-  showMoreContents: 'Show 0 More',
   showMoreLinked: 'Show 0 More',
   interfaceTextSize: 13,
   titleLines: 2,
@@ -66,16 +68,6 @@ const icons = {
 const title = () => root.querySelector<HTMLElement>('#ItemPageTitle')!
 const pin = (id: string) => root.querySelector<HTMLElement>('#' + id)!
 const label = (id: string) => pin(id).querySelector('.item-pin-label')!.textContent
-const typeRow = (more = {}): HeaderModel['pins'][number] => ({
-  id: '#type',
-  label: 'Type',
-  symbol: 'square.grid.2x2',
-  kind: 'type',
-  text: 'Task',
-  icon: 'square.stack',
-  tone: 'orange',
-  ...more,
-})
 const pinned = (id: string) => root.querySelector<HTMLElement>(`[data-pin="${id}"]`)!
 
 test('the header shows the item it is given, and nothing before', () => {
@@ -97,76 +89,8 @@ test('the header shows the item it is given, and nothing before', () => {
   expect(pin('ItemStatusPin').hidden).toBe(true)
   expect(pin('ItemParentPin').hidden).toBe(true)
 
-  header.set({ ...ticket, hidden: true })
-  expect(root.hidden).toBe(true)
   header.set(null)
   expect(root.hidden).toBe(true)
-})
-
-test('Focus hides the header and keeps the footer and the kind, where a deleted item hides both', () => {
-  const reading: HeaderModel = {
-    ...ticket,
-    kind: 'reading',
-    linked: [{ item: 'source', title: 'Source', symbol: 'doc', type: 'Note', date: '' }],
-  }
-  header.set(reading)
-  expect(document.body.dataset.header).toBe('reading')
-  expect(root.hidden).toBe(false)
-  expect(footer.hidden).toBe(false)
-
-  header.set({ ...reading, focused: true })
-  expect(root.hidden).toBe(true)
-  expect(footer.hidden).toBe(false)
-  expect(document.body.dataset.header).toBe('reading')
-  expect(header.isHidden).toBe(true)
-
-  header.set({ ...reading, focused: false })
-  expect(root.hidden).toBe(false)
-
-  header.set({ ...reading, hidden: true })
-  expect(root.hidden).toBe(true)
-  expect(footer.hidden).toBe(true)
-  expect(document.body.dataset.header).toBe('general')
-})
-
-test('a status in a row with no value is drawn empty, and a status pin carries its symbol in its tint', () => {
-  const symbol = { url: 'data:image/png;base64,BBBB', width: 15, height: 16 }
-  header.setIcons({
-    ...icons,
-    symbols: { 'circle.lefthalf.filled': symbol, 'largecircle.fill.circle': icon },
-  })
-  header.set(ticket)
-  const mark = () => pin('ItemStatusPin').querySelector<HTMLElement>('.item-status-mark')!
-  expect(pin('ItemParentPin').classList.contains('empty')).toBe(false)
-  expect(mark().dataset.tint).toBe('blue')
-  expect(mark().hidden).toBe(false)
-  expect(mark().style.width).toBe('15px')
-  expect(mark().style.height).toBe('16px')
-  header.set({
-    ...ticket,
-    status: {
-      label: 'Completed',
-      enabled: true,
-      empty: false,
-      mark: { symbol: 'largecircle.fill.circle', tint: 'secondary' },
-    },
-  })
-  expect(mark().dataset.tint).toBe('secondary')
-  expect(mark().style.width).toBe('13px')
-  // Both open a menu, and both are announced as one.
-  expect(pin('ItemParentPin').getAttribute('aria-haspopup')).toBe('menu')
-  expect(pin('ItemStatusPin').getAttribute('aria-haspopup')).toBe('menu')
-  pin('ItemParentPin').dispatchEvent(new MouseEvent('pointerdown', { button: 0 }))
-  expect(posted.map((message) => message.type)).toEqual(['headerMenu'])
-  header.set({
-    ...ticket,
-    status: { label: 'Status', enabled: true, empty: true },
-  })
-  expect(pin('ItemStatusPin').classList.contains('empty')).toBe(true)
-  expect(pin('ItemStatusPin').querySelector('.item-pin-label')!.textContent).toBe('Empty')
-  expect(pin('ItemStatusPin').querySelector('.item-icon-plus')).toBeNull()
-  expect(pin('ItemStatusPin').getAttribute('aria-label')).toBe('Status')
-  expect(pin('ItemStatusPin').getAttribute('aria-description')).toBe('Empty')
 })
 
 test('a refused title shows why and offers to discard the draft', () => {
@@ -247,7 +171,7 @@ test('a pin asks for its menu with its frame, from the mouse or the keyboard', (
   ])
   header.set({
     ...ticket,
-    status: { label: 'Status', enabled: false, empty: true },
+    status: { label: 'Status', enabled: false },
   })
   posted = []
   pin('ItemStatusPin').dispatchEvent(new MouseEvent('pointerdown', { button: 0 }))
@@ -371,7 +295,7 @@ test('a title that cannot be edited, or a request the keyboard has since left, t
   expect(header.isEditingTitle).toBe(false)
 })
 
-const rows = (count: number): HeaderModel['properties'] =>
+const rows = (count: number): HeaderModel['rows'] =>
   Array.from({ length: count }, (_, index) => ({
     id: `field-${index}`,
     label: `Field ${index}`,
@@ -381,17 +305,16 @@ const rows = (count: number): HeaderModel['properties'] =>
   }))
 
 test('the pins follow the title with nothing drawn between them', () => {
-  header.set({ ...ticket, pins: [typeRow()] })
+  header.set({ ...ticket, pins: [pinRows[1]!] })
   const order = [...root.children].map((child) => child.className)
-  expect(order.indexOf('item-pins')).toBeGreaterThan(order.indexOf('item-lead'))
+  expect(order.indexOf('item-pins')).toBe(order.indexOf('item-title') + 2)
   expect(root.querySelector<HTMLElement>('.item-pins')!.hidden).toBe(false)
 })
 
 test('the property block reads as label and value pairs, each drawn by its kind', () => {
   header.set({
     ...ticket,
-    foldAfter: 10,
-    properties: [
+    rows: [
       { id: 'status', label: 'Status', symbol: 'circle.dotted', kind: 'status' },
       { id: 'child-of', label: 'Epic', symbol: 'square.stack', kind: 'parent' },
       {
@@ -441,7 +364,7 @@ test('an item a row links to is a chip in its own tone, with the icon of its typ
   header.setIcons(icons)
   header.set({
     ...ticket,
-    properties: [
+    rows: [
       {
         id: 'blocks',
         label: 'Blocks',
@@ -466,7 +389,7 @@ test('an item a row links to is a chip in its own tone, with the icon of its typ
 test('a value the item does not have yet reads Empty and opens its editor', () => {
   header.set({
     ...ticket,
-    properties: [{ id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', editable: true }],
+    rows: [{ id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', editable: true }],
     pins: [{ id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', editable: true }],
   })
   const text = root.querySelector<HTMLElement>('.item-props .item-prop-value .item-empty')!
@@ -483,7 +406,7 @@ test('a value the item does not have yet reads Empty and opens its editor', () =
 test('a label opens the field menu, and only a value that is not a link opens the editor', () => {
   header.set({
     ...ticket,
-    properties: [
+    rows: [
       { id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', editable: true },
       {
         id: 'source',
@@ -509,7 +432,7 @@ test('a label opens the field menu, and only a value that is not a link opens th
 test('the app is told where the value its editor is open under has moved to, once for each move', () => {
   header.set({
     ...ticket,
-    properties: [
+    rows: [
       { id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', text: 'Due', editable: true },
     ],
   })
@@ -532,8 +455,7 @@ test('the app is told where the value its editor is open under has moved to, onc
 test('each kind of value has its own chip, and its text is never read as markup', () => {
   header.set({
     ...ticket,
-    foldAfter: 10,
-    properties: [
+    rows: [
       {
         id: 'priority',
         label: 'Priority',
@@ -564,7 +486,7 @@ test('each kind of value has its own chip, and its text is never read as markup'
 test('a person is initials in a circle and a name, and a name with nothing in it has no circle', () => {
   header.set({
     ...ticket,
-    properties: [
+    rows: [
       {
         id: 'assignee',
         label: 'Assignee',
@@ -595,7 +517,7 @@ test('the people a list names are all drawn as person chips that open nothing, a
   }))
   header.set({
     ...ticket,
-    properties: [
+    rows: [
       {
         id: 'assignees',
         label: 'Assignees',
@@ -628,7 +550,7 @@ test('the people a list names are all drawn as person chips that open nothing, a
 test('the looks the app sent are set on the header for the appearance the page is in', () => {
   header.set({
     ...ticket,
-    pins: [typeRow()],
+    pins: [pinRows[1]!],
     interfaceTextSize: 26,
     chips: {
       light: { '--chip-height': '22px', '--tone-orange': 'rgb(1, 2, 3)' },
@@ -639,8 +561,6 @@ test('the looks the app sent are set on the header for the appearance the page i
   expect(root.style.getPropertyValue('--tone-orange')).toBe('rgb(1, 2, 3)')
   expect(root.style.getPropertyValue('--chip-scale')).toBe('2')
   expect(footer.style.getPropertyValue('--chip-height')).toBe('22px')
-  expect(pin('ItemTypePin').style.getPropertyValue('--tone')).toBe('var(--tone-orange)')
-  expect(pin('ItemTypePin').dataset.kind).toBe('type')
 })
 
 test('a parent chip takes the icon and tone of its own type, and a read-only status has no menu to open', () => {
@@ -651,7 +571,6 @@ test('a parent chip takes the icon and tone of its own type, and a read-only sta
     parent: {
       label: 'Field Research',
       enabled: true,
-      empty: false,
       icon: 'square.stack',
       tone: 'teal',
     },
@@ -665,20 +584,6 @@ test('a parent chip takes the icon and tone of its own type, and a read-only sta
   expect(posted.map((message) => message.type)).toEqual(['headerMenu'])
 })
 
-test('a row under the pointer is named, and the context menu is left to WebKit', () => {
-  header.set({
-    ...ticket,
-    properties: [{ id: 'repo', label: 'Repo', symbol: 'link', kind: 'text', text: 'x' }],
-  })
-  posted = []
-  const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
-  root.querySelector('.item-prop-value')!.dispatchEvent(event)
-  expect(event.defaultPrevented).toBe(false)
-  expect(posted).toEqual([])
-  expect(header.rowAt(event.target)).toEqual({ item: 'ticket', row: 'repo' })
-  expect(header.rowAt(document.body)).toBeNull()
-})
-
 test('the Linked From heading is a row the menu can name', () => {
   const mention = { item: 'm', title: 'Mention', symbol: 'link', type: 'Note', date: 'Today' }
   header.set({ ...ticket, linked: [mention] })
@@ -690,32 +595,10 @@ test('the Linked From heading is a row the menu can name', () => {
 test('a URL that is not web is shown as text, not as a link', () => {
   header.set({
     ...ticket,
-    properties: [
-      { id: 'u', label: 'Url', symbol: 'globe', kind: 'url', text: 'javascript:alert(1)' },
-    ],
+    rows: [{ id: 'u', label: 'Url', symbol: 'globe', kind: 'url', text: 'javascript:alert(1)' }],
   })
   expect(root.querySelector('.item-link')).toBeNull()
   expect(root.querySelector('.item-prop dd')!.textContent).toBe('javascript:alert(1)')
-})
-
-test('rows past the fold wait behind a button that expands them in place', () => {
-  header.set({ ...ticket, properties: rows(9), showMore: 'Show 3 More' })
-  expect(root.querySelectorAll('.item-prop')).toHaveLength(6)
-  const more = root.querySelector<HTMLButtonElement>('.item-props + .item-more')!
-  expect(more.hidden).toBe(false)
-  expect(more.textContent).toBe('Show 3 More')
-  more.click()
-  expect(root.querySelectorAll('.item-prop')).toHaveLength(9)
-  // The same button folds them again.
-  expect(more.hidden).toBe(false)
-  expect(more.textContent).toBe('Show Less')
-  more.click()
-  expect(root.querySelectorAll('.item-prop')).toHaveLength(6)
-  expect(more.textContent).toBe('Show 3 More')
-  more.click()
-  // Another item starts folded again.
-  header.set({ ...ticket, item: 'other', properties: rows(9), showMore: 'Show 3 More' })
-  expect(root.querySelectorAll('.item-prop')).toHaveLength(6)
 })
 
 test('linked items are folded, then listed with their type and date, and open on a click', () => {
@@ -769,23 +652,6 @@ test('the title is told how many lines to show', () => {
   expect(root.style.getPropertyValue('--title-lines')).toBe('4')
 })
 
-test('a collection lists what it holds under its text, open, apart from what links to it', () => {
-  const member = { item: 'f', title: 'README', symbol: 'doc', type: 'GitHub File', date: 'Today' }
-  const mention = { item: 'n', title: 'Notes', symbol: 'doc', type: 'Note', date: 'Today' }
-  header.set({ ...ticket, contents: [member], linked: [mention], showsText: false })
-  const contents = footer.querySelector<HTMLElement>('.item-contents')!
-  expect(contents.querySelector('.item-linked-title')!.textContent).toBe('Contents')
-  expect(contents.querySelector<HTMLElement>('.item-linked-list')!.hidden).toBe(false)
-  expect(contents.querySelector('.item-linked-name')!.textContent).toBe('README')
-  expect(footer.querySelector<HTMLElement>('.item-linked-from .item-linked-list')!.hidden).toBe(
-    true,
-  )
-  expect(document.body.dataset.text).toBe('none')
-  header.set({ ...ticket, item: 'other' })
-  expect(contents.hidden).toBe(true)
-  expect(document.body.dataset.text).toBe('shown')
-})
-
 test('an item nothing links to has no Linked From section', () => {
   header.set(ticket)
   expect(footer.querySelector<HTMLElement>('.item-linked-from')!.hidden).toBe(true)
@@ -793,78 +659,10 @@ test('an item nothing links to has no Linked From section', () => {
 
 const phone = { id: 'tel', label: 'Phone', symbol: 'phone', kind: 'phone' as const }
 
-test('an event draws no tile: its time is its first pin, with the rest in the hover', () => {
-  header.set({
-    ...ticket,
-    kind: 'event',
-    status: { label: 'Confirmed', enabled: true, empty: false },
-    pins: [
-      {
-        id: '#when',
-        label: 'When',
-        symbol: 'clock',
-        kind: 'date' as const,
-        text: 'Thu 29 Oct, 10:00 to 11:00',
-        help: 'Thu 29 Oct, 10:00 to 11:00\nLondon time (BST), in 2 days',
-      },
-    ],
-    properties: [{ id: 'status', label: 'Status', symbol: 'circle', kind: 'status' as const }],
-  })
-  expect(root.querySelector('.item-calendar, .item-when')).toBeNull()
-  const when = root.querySelector<HTMLElement>('[data-pin="#when"]')!
-  expect(root.querySelector('.item-pin-item')).toBe(when)
-  const value = when.querySelector<HTMLElement>('.item-pin-value')!
-  expect(value.textContent).toBe('Thu 29 Oct, 10:00 to 11:00')
-  expect(value.title).toBe('Thu 29 Oct, 10:00 to 11:00\nLondon time (BST), in 2 days')
-  expect(root.querySelector('.item-prop')!.contains(pin('ItemStatusPin'))).toBe(true)
-  expect(root.dataset.kind).toBe('event')
-})
-
-test('a person shows initials or a picture, a subtitle, and a timeline that starts open', () => {
-  const person = {
-    ...ticket,
-    item: 'ruth',
-    kind: 'person' as const,
-    type: 'Person',
-    subtitle: 'Editor, Okonjo Press',
-    person: { initials: 'RO' },
-    linked: [{ item: 'note', title: 'Lunch', symbol: 'doc', type: 'Note', date: 'Today' }],
-  }
-  header.set(person)
-  expect(root.querySelector<HTMLElement>('.item-avatar')!.textContent).toBe('RO')
-  expect(root.querySelector<HTMLElement>('.item-subtitle')!.textContent).toBe(
-    'Editor, Okonjo Press',
-  )
-  expect(footer.querySelector('.item-linked-from .item-linked-title')!.textContent).toBe('Timeline')
-  expect(footer.querySelector<HTMLElement>('.item-linked-from .item-linked-list')!.hidden).toBe(
-    false,
-  )
-
-  header.set({
-    ...person,
-    item: 'ruth2',
-    person: { initials: 'RO', photo: 'data:image/png;base64,AA==' },
-  })
-  expect(root.querySelector('.item-avatar img')!.getAttribute('src')).toBe(
-    'data:image/png;base64,AA==',
-  )
-
-  header.set({ ...ticket, item: 'plain', linked: person.linked })
-  expect(root.querySelector<HTMLElement>('.item-avatar')!.hidden).toBe(true)
-  expect(footer.querySelector('.item-linked-from .item-linked-title')!.textContent).toBe(
-    'Linked From',
-  )
-  expect(footer.querySelector<HTMLElement>('.item-linked-from .item-linked-list')!.hidden).toBe(
-    true,
-  )
-})
-
 test('a phone number is a link that dials its digits', () => {
   header.set({
     ...ticket,
-    kind: 'person',
-    person: { initials: 'RO' },
-    properties: [{ ...phone, text: '+44 (0)20 7946-0000' }],
+    rows: [{ ...phone, text: '+44 (0)20 7946-0000' }],
   })
   const link = root.querySelector<HTMLAnchorElement>('.item-prop-value a')!
   expect(link.textContent).toBe('+44 (0)20 7946-0000')
@@ -872,16 +670,14 @@ test('a phone number is a link that dials its digits', () => {
   link.click()
   expect(posted).toContainEqual({ type: 'openLink', href: link.getAttribute('href') })
 
-  header.set({ ...ticket, properties: [{ ...phone, text: 'ask Ruth' }] })
+  header.set({ ...ticket, rows: [{ ...phone, text: 'ask Ruth' }] })
   expect(root.querySelector('.item-prop-value a')).toBeNull()
 })
 
 test('a text value is drawn in a span of its own, so it can shrink to its column and wrap', () => {
   header.set({
     ...ticket,
-    properties: [
-      { id: 'note', label: 'Note', symbol: 'text.alignleft', kind: 'text', text: 'plain' },
-    ],
+    rows: [{ id: 'note', label: 'Note', symbol: 'text.alignleft', kind: 'text', text: 'plain' }],
   })
   const value = root.querySelector('.item-prop-value')!
   expect(value.children).toHaveLength(1)
@@ -890,7 +686,7 @@ test('a text value is drawn in a span of its own, so it can shrink to its column
 })
 
 test('rows first drawn where the page has no width are drawn again once it has one', () => {
-  const properties: HeaderModel['properties'] = [
+  const rows: HeaderModel['rows'] = [
     { id: 'note', label: 'Note', symbol: 'text.alignleft', kind: 'text', text: 'plain' },
   ]
   const width = window.innerWidth
@@ -900,7 +696,7 @@ test('rows first drawn where the page has no width are drawn again once it has o
       document.createElement('header'),
       document.createElement('footer'),
     )
-    narrow.set({ ...ticket, properties })
+    narrow.set({ ...ticket, rows })
     const row = narrow.root.querySelector('.item-prop')!
     window.dispatchEvent(new Event('resize'))
     expect(narrow.root.querySelector('.item-prop')).toBe(row)
@@ -916,25 +712,6 @@ test('rows first drawn where the page has no width are drawn again once it has o
   } finally {
     window.innerWidth = width
   }
-})
-
-test('a page for reading draws nothing above its title and its description under it', () => {
-  header.set({ ...ticket, kind: 'reading', subtitle: 'Why startups fail' })
-  const order = [...root.children].map((child) => child.className)
-  expect(order.slice(0, 2)).toEqual(['item-tools', 'item-lead'])
-  expect(root.querySelector('.item-subtitle')!.textContent).toBe('Why startups fail')
-  expect(document.body.dataset.header).toBe('reading')
-})
-
-test('the type pin draws the icon of the item type, and none for a type with no icon', () => {
-  const drawn = { url: 'data:image/png;base64,AAAA', width: 13, height: 13 }
-  const icons = { parent: drawn, indicator: drawn, symbols: { 'type:globe': drawn } }
-  const node = () => pin('ItemTypePin').querySelector<HTMLElement>('.item-chip-mark')
-  header.setIcons(icons)
-  header.set({ ...ticket, pins: [typeRow({ icon: 'type:globe' })] })
-  expect(node()!.hidden).toBe(false)
-  header.set({ ...ticket, pins: [typeRow({ icon: 'type:' })] })
-  expect(node()).toBeNull()
 })
 
 test('an item titled by its text draws no title, and one with a title of its own does', () => {
@@ -953,7 +730,7 @@ test('a title read from the text still ends where the header ends, so the toolba
 })
 
 const pinRows: HeaderModel['pins'] = [
-  typeRow(),
+  { id: 'due', label: 'Due', symbol: 'calendar', kind: 'date', text: '12 Dec' },
   { id: 'status', label: 'Status', symbol: 'circle.dotted', kind: 'status' },
   {
     id: 'child-of',
@@ -962,27 +739,21 @@ const pinRows: HeaderModel['pins'] = [
     kind: 'items',
     items: [{ title: 'Field Research', item: 'parent', symbol: 'square.stack', kind: 'link' }],
   },
-  { id: '#updated', label: 'Updated', symbol: 'calendar', kind: 'date', text: 'Today' },
+  { id: 'done', label: 'Done', symbol: 'calendar', kind: 'date', text: 'Today' },
 ]
 
 test('pins are drawn in the order sent, each with its key above its value and no symbol on the key', () => {
   header.setIcons(icons)
-  header.set({ ...ticket, pins: pinRows, properties: [] })
+  header.set({ ...ticket, pins: pinRows, rows: [] })
   const entries = [...root.querySelectorAll<HTMLElement>('.item-pin-item')]
-  expect(entries.map((entry) => entry.dataset.pin)).toEqual([
-    '#type',
-    'status',
-    'child-of',
-    '#updated',
-  ])
+  expect(entries.map((entry) => entry.dataset.pin)).toEqual(['due', 'status', 'child-of', 'done'])
   expect(entries.map((entry) => entry.querySelector('dt')!.textContent)).toEqual([
-    'Type',
+    'Due',
     'Status',
     'Epic',
-    'Updated',
+    'Done',
   ])
   expect(root.querySelector('.item-pin-key .item-glyph')).not.toBeNull()
-  expect(entries[0]!.querySelector('dd #ItemTypePin .item-chip-mark')).not.toBeNull()
   expect(entries[3]!.querySelector('dd')!.textContent).toBe('Today')
   expect(entries[3]!.querySelector('dd')!.title).toBe('Today')
   expect(entries[2]!.querySelector('dt')!.title).toBe('Epic')
@@ -991,7 +762,7 @@ test('pins are drawn in the order sent, each with its key above its value and no
 })
 
 test('a pinned status is the status button itself, with its menu, and a read-only one has none to open', () => {
-  header.set({ ...ticket, pins: pinRows, properties: [] })
+  header.set({ ...ticket, pins: pinRows, rows: [] })
   expect(pinned('status').contains(pin('ItemStatusPin'))).toBe(true)
   pin('ItemStatusPin').dispatchEvent(new MouseEvent('pointerdown', { button: 0 }))
   expect(posted.map((message) => message.type)).toEqual(['headerMenu'])
@@ -999,7 +770,7 @@ test('a pinned status is the status button itself, with its menu, and a read-onl
   header.set({
     ...ticket,
     pins: pinRows,
-    properties: [],
+    rows: [],
     status: { ...ticket.status!, enabled: false },
   })
   expect((pin('ItemStatusPin') as HTMLButtonElement).disabled).toBe(true)
@@ -1008,19 +779,16 @@ test('a pinned status is the status button itself, with its menu, and a read-onl
 })
 
 test('a pinned parent is a chip that opens it, and a pinned value is read only', () => {
-  header.set({ ...ticket, pins: pinRows, properties: [] })
+  header.set({ ...ticket, pins: pinRows, rows: [] })
   posted = []
   pinned('child-of').querySelector<HTMLElement>('.item-chip')!.click()
   expect(posted).toEqual([{ type: 'openItem', item: 'parent' }])
   posted = []
-  pinned('#updated')
-    .querySelector('dd')!
-    .dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  pinned('#type')
+  pinned('done')
     .querySelector('dd')!
     .dispatchEvent(new MouseEvent('click', { bubbles: true }))
   expect(posted).toEqual([])
-  expect(pinned('#updated').querySelector('button')).toBeNull()
+  expect(pinned('done').querySelector('button')).toBeNull()
 })
 
 test("a pinned list shows what the app sent and the app's words for what it left out", () => {
@@ -1065,40 +833,12 @@ test("a pinned list's hover names every value the app says it holds, not only th
   )
 })
 
-test('a pin is not a row: no pin carries the data-row that Hide from Page reads', () => {
-  header.set({ ...ticket, pins: pinRows, properties: [] })
-  expect(root.querySelector('.item-pin-item[data-row]')).toBeNull()
-  expect(header.rowAt(pinned('#updated').querySelector('dd'))).toBeNull()
-})
-
 test('a header with no pins draws none', () => {
   header.set(ticket)
   expect(root.querySelector<HTMLElement>('.item-pins')!.hidden).toBe(true)
 })
 
-test('the row above the title counts what links here and starts or ends Customize Layout, lit while it is on', () => {
-  header.set({ ...ticket, linkedCount: 6, layoutOn: false })
-  const linked = root.querySelector<HTMLButtonElement>('#ItemLinkedFromTool')!
-  const layout = root.querySelector<HTMLButtonElement>('#ItemCustomizeLayoutTool')!
-  expect(linked.textContent).toBe('6 Linked From')
-  expect(layout.getAttribute('aria-pressed')).toBe('false')
-  linked.click()
-  layout.click()
-  expect(posted).toEqual([{ type: 'showLinked' }, { type: 'toggleLayout' }])
-
-  header.set({ ...ticket, linkedCount: 0, layoutOn: true })
-  expect(root.dataset.layout).toBe('on')
-  expect(layout.getAttribute('aria-pressed')).toBe('true')
-  expect(linked.hidden).toBe(true)
-
-  header.set({ ...ticket, layoutOn: null })
-  expect(
-    root.querySelector<HTMLElement>('.item-tools')!.hidden,
-    'a file has nothing to lay out',
-  ).toBe(true)
-})
-
-/** Draws three rows of 30 points with a fourth folded away, and returns a drag of the first by its key. */
+/** Draws three rows of 30 points with a fourth folded away, and returns a drag of the first by its name. */
 function draggable(): { key: HTMLElement; drag: (y: number) => void; drop: () => void } {
   const rows = ['a', 'b', 'c', 'd'].map((id) => ({
     id,
@@ -1107,8 +847,9 @@ function draggable(): { key: HTMLElement; drag: (y: number) => void; drop: () =>
     kind: 'text' as const,
     text: id,
     editable: true,
+    folded: id === 'd',
   }))
-  header.set({ ...ticket, properties: rows, foldAfter: 3 })
+  header.set({ ...ticket, rows })
   const list = root.querySelector<HTMLElement>('.item-props')!
   list.getBoundingClientRect = () => ({ top: 0, height: 90 }) as DOMRect
   ;[...list.children].forEach((row, index) => {
@@ -1211,4 +952,80 @@ test('a press that starts after a cancelled drag is not swallowed', () => {
   window.dispatchEvent(new MouseEvent('pointerup'))
   key.click()
   expect(posted.map((message) => message.type)).toEqual(['fieldMenu'])
+})
+
+test('the kicker is a heading of the type and its flags, and the type name asks for Change Type', () => {
+  header.setIcons(icons)
+  header.set({
+    ...ticket,
+    kicker: {
+      ...ticket.kicker,
+      flags: [{ id: 'readOnly', words: 'Read Only', symbol: 'lock' }],
+      spoken: 'Task, Read Only',
+    },
+  })
+  const kicker = root.querySelector<HTMLElement>('.item-kicker')!
+  expect(kicker.getAttribute('role')).toBe('heading')
+  expect(kicker.getAttribute('aria-label')).toBe('Task, Read Only')
+  expect(kicker.textContent).toBe('TaskRead Only')
+  expect(root.firstElementChild).toBe(kicker)
+  const type = root.querySelector<HTMLButtonElement>('#ItemKickerType')!
+  type.click()
+  expect(posted).toEqual([
+    { type: 'changeType', item: 'ticket', rect: [0, 0, 0, 0], viewportHeight: window.innerHeight },
+  ])
+  header.set({ ...ticket, kicker: { ...ticket.kicker, changesType: false } })
+  expect(root.querySelector('#ItemKickerType')!.tagName).toBe('SPAN')
+})
+
+test('folded rows wait behind Show More, and a hidden one is grey once shown', () => {
+  const folded = { ...rows(1)[0]!, id: 'hidden', folded: true, muted: true }
+  header.set({ ...ticket, rows: [...rows(2), folded], showMore: 'Show 1 More' })
+  const more = root.querySelector<HTMLButtonElement>('.item-rows > .item-more')!
+  expect(root.querySelectorAll('.item-prop')).toHaveLength(2)
+  expect(more.textContent).toBe('Show 1 More')
+  more.click()
+  expect(root.querySelectorAll('.item-prop')).toHaveLength(3)
+  expect(root.querySelector('[data-row="hidden"]')!.classList.contains('muted')).toBe(true)
+  expect(more.textContent).toBe('Show Less')
+  header.set({ ...ticket, rows: rows(2) })
+  expect(more.hidden).toBe(true)
+})
+
+test("a long text is a row cut after two lines, and an event's When says how far off it is in grey", () => {
+  header.set({
+    ...ticket,
+    rows: [
+      {
+        id: '#when',
+        label: 'When',
+        symbol: 'clock',
+        kind: 'when',
+        text: 'Thu 29 Oct',
+        note: 'In 4 days',
+      },
+      {
+        id: 'notes',
+        label: 'Notes',
+        symbol: 'text.alignleft',
+        kind: 'text',
+        text: 'One\nTwo\nThree',
+        long: true,
+      },
+    ],
+  })
+  expect(root.querySelector('[data-row="#when"] .item-note')!.textContent).toBe('In 4 days')
+  const notes = root.querySelector<HTMLElement>('[data-row="notes"]')!
+  expect(notes.classList.contains('long')).toBe(true)
+  expect(notes.querySelector<HTMLElement>('.item-prop-value')!.title).toBe('One\nTwo\nThree')
+})
+
+test("a right-click on a row opens the row's menu, and anywhere else is left to WebKit", () => {
+  header.set(ticket)
+  posted = []
+  const name = root.querySelector('[data-row="status"] .item-prop-name')!
+  expect(header.openRowMenuAt(name)).toBe(true)
+  expect(posted).toMatchObject([{ type: 'fieldMenu', item: 'ticket', row: 'status' }])
+  expect(header.openRowMenuAt(title())).toBe(false)
+  expect(header.rowAt(name)).toEqual({ item: 'ticket', row: 'status' })
 })

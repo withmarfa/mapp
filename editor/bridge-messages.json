@@ -36,8 +36,7 @@
       "viewportHeight": 1
     },
     "valueMoved": { "item": "x", "row": "x", "rect": [0, 0, 1, 1], "viewportHeight": 1 },
-    "toggleLayout": {},
-    "showLinked": {},
+    "changeType": { "item": "x", "rect": [0, 0, 1, 1], "viewportHeight": 1 },
     "openLink": { "href": "https://example.com" },
     "openItem": { "item": "x" },
     "copy": { "text": "x" },

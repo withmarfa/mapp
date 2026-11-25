@@ -1,57 +1,104 @@
 import SwiftUI
 
-/// The pins under an item page's title, drawn in SwiftUI from `PagePins` for a page the editor does not draw: each a
-/// key with its row's icon above its value, in a slot of a fixed width, as the item page's are, with the same chips
-/// (`PageChip`). The pins are read only, except the status, which opens a native menu and writes as the item page's
-/// does, and a linked item, which opens the item. A value keeps to one line, cut with an ellipsis, with the whole of it
-/// in the help, and a list shows what `PagePins` gave it (its first value) and "+N more", which never truncates, with
-/// every value of the list in the help.
-struct PagePinsView: View {
+/// An item's head drawn in SwiftUI from `PageHead`, for a page the editor does not draw, as the editor's page draws it:
+/// the kicker, then `title`, then the pins while they are on, then the rows with Show More, over a hairline. Values are
+/// shown and links open; the status opens a native menu and writes as the item page's does. A value keeps to one line
+/// but a long text, which keeps to two, with the whole of it in the help.
+struct PageHeadView<Title: View>: View {
+    @CurrentLibrary private var library
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let item: Item
-    let pins: [PropertyRow]
-    /// The item's status field, for a pinned status.
+    let head: PageHead
+    /// The item's status field, for its status.
     let statusField: ItemTypeInfo.Field?
     let drafts: DetailsPresentation
     let open: (ItemID) -> Void
+    @ViewBuilder let title: Title
+    @State private var expanded = false
 
     var body: some View {
         let size = CGFloat(textSize)
         let step = size * 4 / 13
-        PinLayout(step: step, size: size) {
-            ForEach(pins) { pin in
-                VStack(alignment: .leading, spacing: step * 1.25) {
-                    HStack(spacing: step) {
-                        Image(systemName: pin.value.symbol)
-                            .font(.system(size: size * 11 / 13))
-                            .accessibilityHidden(true)
-                        Text(verbatim: pin.label)
-                            .font(.system(size: size * 12 / 13))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+        let shown = expanded ? head.rows : head.rows.filter { !$0.folded }
+        VStack(alignment: .leading, spacing: 0) {
+            PageKicker(kicker: head.kicker)
+                .padding(.bottom, size * 6 / 13)
+            title
+            if !head.pins.isEmpty {
+                PinLayout(step: step, size: size) {
+                    ForEach(head.pins) { pin in
+                        VStack(alignment: .leading, spacing: step * 1.25) {
+                            HStack(spacing: step) {
+                                Image(systemName: pin.symbolName)
+                                    .font(.system(size: size * 11 / 13))
+                                    .accessibilityHidden(true)
+                                Text(verbatim: pin.label)
+                                    .font(.system(size: size * 12 / 13))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                            .foregroundStyle(.secondary)
+                            .frame(minHeight: step * 3.75)
+                            .help(pin.label)
+                            value(of: pin, step: step)
+                                .help(pin.wholeValue)
+                        }
+                        .padding(.trailing, step * 2)
+                        .accessibilityElement(children: .contain)
                     }
-                    .foregroundStyle(.secondary)
-                    .frame(minHeight: step * 3.75)
-                    .help(pin.label)
-                    value(of: pin, step: step)
-                        .help(pin.wholeValue)
                 }
-                .padding(.trailing, step * 2)
-                .accessibilityElement(children: .contain)
+                .padding(.top, step * 4)
+            }
+            if !shown.isEmpty || head.foldedCount > 0 {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(shown) { row in
+                        HStack(alignment: .firstTextBaseline, spacing: 0) {
+                            HStack(spacing: step * 2) {
+                                Image(systemName: row.symbolName)
+                                    .frame(width: size * 16 / 13)
+                                    .foregroundStyle(.tertiary)
+                                    .accessibilityHidden(true)
+                                Text(verbatim: row.label)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            .frame(width: size * 150 / 13, alignment: .leading)
+                            value(of: row, step: step)
+                                .help(row.wholeValue)
+                        }
+                        .frame(minHeight: size * 30 / 13)
+                        .opacity(row.muted ? 0.45 : 1)
+                        .accessibilityElement(children: .contain)
+                    }
+                    if head.foldedCount > 0 {
+                        Button(expanded ? String(localized: "Show Less") : head.showMore) { expanded.toggle() }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.tertiary)
+                            .frame(minHeight: size * 30 / 13)
+                    }
+                }
+                .padding(.top, step * (head.pins.isEmpty ? 4 : 4.5))
+                .padding(.bottom, step * 2)
+                .overlay(alignment: .bottom) { Divider() }
             }
         }
         .font(.system(size: size))
+        .onChange(of: item.id) { expanded = false }
     }
 
-    @ViewBuilder private func value(of pin: PropertyRow, step: CGFloat) -> some View {
-        HStack(spacing: step * 2) {
-            switch pin.value {
+    @ViewBuilder private func value(of row: PropertyRow, step: CGFloat) -> some View {
+        HStack(spacing: step * 1.5) {
+            switch row.value {
             case .status:
                 if let statusField { StatusPin(item: item, field: statusField, drafts: drafts) }
             case .parent:
-                EmptyView()
-            case .type(let name, let icon):
-                MarkedName(text: name, icon: icon)
+                if let target = library.relationships(for: item.id).first(where: { $0.field == PagePlacement.parent })?.targets.first,
+                   let id = target.itemID {
+                    Button { open(id) } label: {
+                        MarkedName(text: target.title, icon: PageHead.typeIcon(of: id, in: library), underlinesOnHover: true)
+                    }
+                    .buttonStyle(.plain)
+                }
             case .items(let targets):
                 ForEach(targets, id: \.item) { target in
                     Button { open(target.item) } label: {
@@ -68,7 +115,7 @@ struct PagePinsView: View {
                 }
             case .options(let words):
                 ForEach(Array(words.enumerated()), id: \.offset) { index, word in
-                    PageChip(text: word, kind: .option(pin.optionTones.indices.contains(index) ? pin.optionTones[index] : OptionTone.tone(for: word)))
+                    PageChip(text: word, kind: .option(row.optionTones.indices.contains(index) ? row.optionTones[index] : OptionTone.tone(for: word)))
                         .layoutPriority(index == words.count - 1 ? 0 : 1)
                 }
             case .tags(let tags):
@@ -77,26 +124,33 @@ struct PagePinsView: View {
                         .layoutPriority(index == tags.count - 1 ? 0 : 1)
                 }
             case .empty:
-                EmptyView()
-            case .source(let text), .date(let text), .when(let text, _), .text(let text):
+                Text("Empty").foregroundStyle(.tertiary)
+            case .when(let time, let note):
+                plain(time)
+                Text(verbatim: note).foregroundStyle(.tertiary).lineLimit(1)
+            case .text(let text):
+                Text(verbatim: text)
+                    .lineLimit(row.long ? 2 : 1)
+                    .truncationMode(.tail)
+            case .date(let text):
                 plain(text)
             case .boolean(let flag):
                 plain(flag ? String(localized: "Yes") : String(localized: "No"))
             case .url(let text):
-                if let url = Self.webAddress(text) { link(text, url) } else { plain(text) }
+                if let url = BrowserTarget.webAddress(text) { link(text, url) } else { plain(text) }
             case .email(let text):
                 if let url = URL(string: "mailto:\(text)") { link(text, url) } else { plain(text) }
             case .phone(let text):
                 if let url = Self.dialAddress(text) { link(text, url) } else { plain(text) }
             }
-            if pin.more > 0 {
-                Text(verbatim: PagePins.moreText(pin.more))
+            if row.more > 0 {
+                Text(verbatim: PageHead.moreText(row.more))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .fixedSize()
             }
         }
-        .frame(maxWidth: .infinity, minHeight: step * 6, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: step * 5, alignment: .leading)
         .clipped()
     }
 
@@ -114,12 +168,6 @@ struct PagePinsView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.tint)
-    }
-
-    /// An address that opens in the browser: only a web address, as on the item page.
-    static func webAddress(_ text: String) -> URL? {
-        guard text.lowercased().hasPrefix("http://") || text.lowercased().hasPrefix("https://") else { return nil }
-        return URL(string: text)
     }
 
     /// A number dialed as its digits and a leading plus, whatever spacing it is written with; nil where it has none.
@@ -144,7 +192,7 @@ private struct StatusPin: View {
     let drafts: DetailsPresentation
 
     var body: some View {
-        let current = PagePins.statusValue(of: item, in: field)
+        let current = PageHead.statusValue(of: item, in: field)
         let label = current.map { ItemTypeInfo.Field.label(ofOption: $0) } ?? String(localized: "Status")
         let mark = StatusSymbol(group: current.flatMap(field.statusGroup(of:)))
         let editable = item.allows(.fields) && field.isPicked
@@ -213,5 +261,36 @@ private struct PinLayout: Layout {
             y += (heights.max() ?? 0) + step * 4
         }
         return (frames, CGSize(width: width, height: max(0, y - step * 4)))
+    }
+}
+
+/// The kicker of a head SwiftUI draws: the type's mark in its tone and its name, 12 points at 500 in grey, then each of
+/// Read Only, Feed and Archived with its symbol, lighter. VoiceOver reads it as one heading.
+struct PageKicker: View {
+    @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
+    let kicker: PageHead.Kicker
+
+    var body: some View {
+        let size = CGFloat(textSize)
+        HStack(spacing: size * 8 / 13) {
+            HStack(spacing: size * 6 / 13) {
+                TonedGlyph(id: kicker.typeIcon, size: size * 12 / 13)
+                Text(verbatim: kicker.typeName)
+            }
+            .foregroundStyle(.secondary)
+            ForEach(kicker.flags, id: \.self) { flag in
+                HStack(spacing: size * 4 / 13) {
+                    Image(systemName: flag.symbol)
+                    Text(verbatim: flag.words)
+                }
+                .fontWeight(.regular)
+                .foregroundStyle(.tertiary)
+            }
+        }
+        .font(.system(size: size * 12 / 13, weight: .medium))
+        .frame(minHeight: size * 20 / 13)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(kicker.spoken)
+        .accessibilityAddTraits(.isHeader)
     }
 }

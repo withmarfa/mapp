@@ -15,9 +15,16 @@ nonisolated enum BrowserTarget: Equatable, Sendable {
     static func of(_ item: Item, fetchedFile: URL?) -> BrowserTarget? {
         for key in addressKeys {
             let text = item.value(of: key)?.string?.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let address = ReadingHeader.webAddress(text) { return .address(address) }
+            if let address = webAddress(text) { return .address(address) }
         }
         return fetchedFile.map { .file($0) }
+    }
+
+    /// `text` as a web address another app may open: `http` or `https`, with a host.
+    static func webAddress(_ text: String?) -> URL? {
+        guard let text, let url = URL(string: text), ["http", "https"].contains(url.scheme?.lowercased()), url.host() != nil
+        else { return nil }
+        return url
     }
 }
 

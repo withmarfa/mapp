@@ -1,10 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// The page owns its title; the inspector is reserved for the rest of the item's details. The page draws the
-/// title and pinned properties above the item, so they scroll with it as one surface, and this carries out what
-/// the person does there: the title is saved as the item's property, and every other value opens in the panel under
-/// it (`ValueEditPresenter`). Applied to the editor's view, whose container the panel's frames arrive in.
+/// The page draws the item's head (`PageHead`) above the text, so the two scroll as one surface, and this carries out
+/// what the person does there: the title is saved as the item's property, every value opens in the panel under it
+/// (`ValueEditPresenter`), a row's name opens the row's menu, and the kicker's type opens Change Type. Applied to the
+/// editor's view, whose container the panel's frames arrive in.
 struct ItemPageHeader: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
@@ -13,6 +13,7 @@ struct ItemPageHeader: ViewModifier {
     @AppStorage(PageKey.titleLines) private var titleLines = TitleLines.standard
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @AppStorage(PageKey.showsCoordinates) private var showsCoordinates = false
+    @AppStorage(PageKey.pinsProperties) private var pinsProperties = false
     let item: Item
     let editor: EditorController
     let drafts: DetailsPresentation
@@ -32,52 +33,43 @@ struct ItemPageHeader: ViewModifier {
             .onChange(of: titleLines) { editor.refreshHeader() }
             .onChange(of: dateFormat) { editor.refreshHeader() }
             .onChange(of: showsCoordinates) { editor.refreshHeader() }
+            .onChange(of: pinsProperties) { editor.refreshHeader() }
             // The page is drawn from the defaults as they are when it is read, so a change made anywhere, in the
-            // inspector, in the sheet or from the page's own menu, needs it read again.
+            // inspector, in Settings or from the page's own menu, needs it read again.
             .onChange(of: placements) { editor.refreshHeader() }
             #if DEBUG
-            // A chip knob in the Tuning panel changes the open page's header at once. Reading the looks here makes the
-            // view depend on them, and the header reads them again as it is rebuilt.
+            // A chip knob in the Tuning panel changes the open page's head at once. Reading the looks here makes the
+            // view depend on them, and the head reads them again as it is rebuilt.
             .onChange(of: Tuning.shared.chipLooks) { editor.refreshHeader() }
             #endif
             .onDisappear { drafts.saveTitle(of: item.id, in: library, undoManager: undoManager) }
     }
 
-    /// What the page's header shows for the item, read from the library and the window's drafts as they are now.
+    /// What the page's head shows for the item, read from the library and the window's drafts as they are now.
     static func header(
         of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, placements: PagePlacements = .stored(),
-        titleLines: Int = TitleLines.stored(), dateFormat: DateFormat = .stored(), showsCoordinates: Bool = ShowsCoordinates.stored()
+        pinsProperties: Bool = PinsProperties.stored(), titleLines: Int = TitleLines.stored(), dateFormat: DateFormat = .stored(),
+        showsCoordinates: Bool = ShowsCoordinates.stored()
     ) -> PageHeader? {
         guard let item = library.headerItem(id) else { return nil }
         let draft = drafts.draft(for: item.id, key: "title")
-        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat, offersEmpty: true, showsCoordinates: showsCoordinates)
-        let (type, placement, relationships, now, kind, lead, pins) =
-            (parts.type, parts.placement, parts.relationships, parts.now, parts.kind, parts.lead, parts.pins)
-        let status = type?.statusField
-        let parent = Self.parent(in: relationships)
-        func typeIcon(of target: ItemID) -> String? { PageHeaderParts.typeIcon(of: target, in: library) }
-        let properties = lead.refine(PropertyRow.block(parts.candidates, placement: placement, excluding: pins.leftOutOfBlock))
-        let isCollection = library.catalogue.isCollection(item.type)
-        let contents = isCollection
+        let head = PageHead(
+            of: item, in: library, placements: placements, pinsProperties: pinsProperties, dateFormat: dateFormat, showsCoordinates: showsCoordinates)
+        let relationships = library.relationships(for: item.id)
+        let status = library.catalogue.itemTypes[item.type]?.statusField
+        let linked = placements.placement(of: item.type, in: library.catalogue).linkedFromPlace == .page
             ? LinkedItem.list(
-                pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, format: dateFormat, members: .only,
+                pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: library.now(), format: dateFormat,
                 item: { library.headerItem($0) })
             : []
-        let allLinked = LinkedItem.list(
-            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, format: dateFormat,
-            members: isCollection ? .excluding : .all, item: { library.headerItem($0) })
-        // Where the person put Linked From: the page's foot, or only the inspector.
-        let linked = placement.linkedFromPlace == .page ? allLinked : []
         let hasText = library.catalogue.itemTypes[item.type]?.bodyKey != nil
-        // A collection with no text, as a folder a connector keeps has, is its members: an editor with nothing in it
-        // would only invite typing that the connector puts back.
-        // The body is read only for a collection, and only for whether its text is empty. A note's header does not
-        // follow the text. `textIsEmpty` changes when that emptiness does, not on an edit that leaves text in place.
-        let showsText = hasText && !(isCollection && library.textIsEmpty(item.id))
+        // A collection with no text, as a folder a connector keeps has, offers nothing to type into: an editor with
+        // nothing in it would only invite typing that the connector puts back. The body is read only for a collection,
+        // and only for whether its text is empty, which changes when that emptiness does, not at every edit.
+        let showsText = hasText && !(library.catalogue.isCollection(item.type) && library.textIsEmpty(item.id))
         return PageHeader(
             item: item.id.rawValue,
-            hidden: item.state == .trashed,
-            // Focus hides the title and the properties only, and the toolbar then names the item from the start.
+            // Focus hides the head only, and the toolbar then names the item from the start.
             focused: drafts.isFocused(on: item.id),
             title: item.title,
             draft: draft.isDirty ? draft.text : nil,
@@ -85,33 +77,28 @@ struct ItemPageHeader: ViewModifier {
             titleRefusal: library.titleRefusal,
             editable: library.canSetTitle(of: item),
             showsTitle: item.titleRule != .firstLine,
-            kind: kind,
-            person: lead.person,
-            subtitle: lead.subtitle,
-            status: status.map { field in
-                let value = PagePins.statusValue(of: item, in: field)
-                // With nothing to pick from, the pin only shows the status the item has.
-                return PageHeader.Pin(label: value.map { ItemTypeInfo.Field.label(ofOption: $0) } ?? "",
-                                      enabled: item.allows(.fields) && field.isPicked, empty: value == nil, mark: .init(StatusSymbol(group: value.flatMap(field.statusGroup(of:)))))
+            kicker: PageHeader.Kicker(head.kicker),
+            status: status.flatMap { field in
+                guard let value = PageHead.statusValue(of: item, in: field) else { return nil }
+                // With nothing to pick from, the pill only shows the status the item has.
+                return PageHeader.Pin(
+                    label: ItemTypeInfo.Field.label(ofOption: value), enabled: item.allows(.fields) && field.isPicked,
+                    mark: .init(StatusSymbol(group: field.statusGroup(of: value))))
             },
-            parent: parent.flatMap { parent in
+            parent: Self.parent(in: relationships).flatMap { parent in
                 guard let target = parent.targets.first else { return nil }
-                let icon = target.itemID.flatMap(typeIcon(of:))
+                let icon = target.itemID.flatMap { PageHead.typeIcon(of: $0, in: library) }
                 return PageHeader.Pin(label: target.title, enabled: true, icon: .init(name: icon), tone: TypeTone(icon: icon).rawValue)
             },
-            pins: pins.pins,
-            properties: properties,
-            contents: contents,
+            pins: head.pins,
+            rows: head.rows,
+            showMore: head.showMore,
             linked: linked,
             showsText: showsText,
-            showMore: String(localized: "Show \(max(0, properties.count - PropertyRow.foldAfter)) More"),
-            showMoreContents: String(localized: "Show \(max(0, contents.count - LinkedItem.foldAfter)) More"),
             showMoreLinked: String(localized: "Show \(max(0, linked.count - LinkedItem.foldAfter)) More"),
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize,
             titleLines: titleLines,
-            chips: .init(),
-            linkedCount: allLinked.count,
-            layoutOn: PageCustomization.isAvailable(for: item) ? drafts.isCustomizingLayout : nil
+            chips: .init()
         )
     }
 
@@ -158,25 +145,20 @@ struct ItemPageHeader: ViewModifier {
             case .fieldMenu(let row, let editsValue, let id, let rect):
                 Self.openFieldMenu(
                     row: row, editsValue: editsValue, of: id, under: rect, library: library, drafts: drafts, undoManager: undoManager, editor: editor)
-            case .toggleLayout:
-                drafts.toggleLayout()
-            case .showLinked:
-                // Linked From is in the inspector, which Customize Layout stands in for.
-                drafts.endLayout()
-                drafts.isPresented = true
+            case .changeType(let id, let rect):
+                guard editor.isShowing(id), library.offersTypeChange(for: [id]) else { return }
+                var request = Self.request(.type, of: id, in: library, undoManager: undoManager, editor: editor)
+                request.needsValues = { type in
+                    drafts.typeValues = TypeValuesRequest(ids: [id], type: type, undoManager: undoManager)
+                }
+                editor.presentEditor(request, under: rect)
             case .hideFromPage(let row, let id):
                 guard editor.isShowing(id), let type = library.item(id)?.type else { return }
                 PagePlacements.update { $0.set(false, row: row, of: type, in: library.catalogue) }
-            case .moveRow(let row, let order, let id):
-                guard editor.isShowing(id), let item = library.item(id) else { return }
-                let rows = PageLayout.rows(
-                    of: item, type: library.catalogue.itemTypes[item.type], hidden: library.hiddenPropertyKeys(of: item),
-                    relationships: library.relationships(for: item.id), catalogue: library.catalogue,
-                    showsCoordinates: ShowsCoordinates.stored())
-                PagePlacements.update { placements in
-                    let layout = PageLayout(rows: rows, placement: placements.placement(of: item.type, in: library.catalogue))
-                    if let moved = layout.listing(order, moving: row) { placements.apply(moved, of: item.type, in: library.catalogue) }
-                }
+            case .moveRow(_, let order, let id):
+                guard editor.isShowing(id), let type = library.item(id)?.type else { return }
+                // The page lists every row it has, folded ones too, so the order it sends is the whole order.
+                PagePlacements.update { $0.setRowOrder(order.filter { $0 != PagePlacement.when }, of: type) }
             }
         }
     }
@@ -193,8 +175,6 @@ struct ItemPageHeader: ViewModifier {
             kind = item.allows(.tags) ? .tags : nil
         case PagePlacement.parent:
             kind = item.allows(.links) ? .parent : nil
-        case PagePlacement.type:
-            kind = library.offersTypeChange(for: [id]) ? .type : nil
         case MarfaMapping.collectionEdge:
             kind = library.canJoinCollection(item) ? .collections : nil
         case ItemLocation.rowID:
@@ -218,8 +198,9 @@ struct ItemPageHeader: ViewModifier {
         editor.presentEditor(request, under: rect)
     }
 
-    /// Opens the menu a field's name asks for, under the name, and carries out what the person chooses. The Mac's own
-    /// placement is stored at once; a change to the type goes through the library, which refuses it in words.
+    /// Opens the menu a row's name asks for, under the name, and carries out what the person chooses. How the row shows
+    /// and where is the Mac's own choice for the type, stored at once; a change to the type goes through the library,
+    /// which refuses it in words.
     private static func openFieldMenu(
         row: String, editsValue: Bool, of id: ItemID, under rect: CGRect, library: any ItemLibrary, drafts: DetailsPresentation,
         undoManager: UndoManager?, editor: EditorController
@@ -227,12 +208,21 @@ struct ItemPageHeader: ViewModifier {
         guard editor.isShowing(id), let item = library.item(id) else { return }
         let catalogue = library.catalogue
         let type = catalogue.itemTypes[item.type]
-        let rows = PageLayout.rows(
-            of: item, type: type, hidden: library.hiddenPropertyKeys(of: item), relationships: library.relationships(for: item.id),
-            catalogue: catalogue, showsCoordinates: ShowsCoordinates.stored())
-        let layout = PageLayout(rows: rows, placement: PagePlacements.stored().placement(of: item.type, in: catalogue))
+        let pinsProperties = PinsProperties.stored()
+        let placement = PagePlacements.stored().placement(of: item.type, in: catalogue)
+        let head = PageHead(of: item, in: library, pinsProperties: pinsProperties)
+        // The rows a move works among: every row the page lists, the When of an event aside, which stays first.
+        let order = head.order.filter { $0 != PagePlacement.when }
+        let placing = row == PagePlacement.when ? nil : order.firstIndex(of: row).map { index in
+            FieldMenu.Placing(
+                shows: placement.shows(row), canMoveUp: index > 0, canMoveDown: index < order.count - 1,
+                isPinned: pinsProperties ? head.pins.contains { $0.id == row } : nil,
+                canPin: head.pins.count < PagePlacement.pinLimit)
+        } ?? (head.pins.contains { $0.id == row }
+            ? FieldMenu.Placing(shows: placement.shows(row), canMoveUp: false, canMoveDown: false, isPinned: true)
+            : nil)
         let menu = FieldMenu(
-            row: row, type: type, layout: layout, catalogue: catalogue, editsValue: editsValue, reachesServer: library.reachesServer)
+            row: row, type: type, placing: placing, catalogue: catalogue, editsValue: editsValue, reachesServer: library.reachesServer)
         guard !menu.sections.isEmpty || menu.lockText != nil else { return }
         let (popup, keeping) = FieldMenuPresenter.build(menu, typeLabel: type?.label ?? "") { [weak editor] command in
             guard let editor, editor.isShowing(id) else { return }
@@ -262,11 +252,15 @@ struct ItemPageHeader: ViewModifier {
                         }
                     }
                 }
-            case .pin, .unpin, .moveUp, .moveDown, .hide:
-                PagePlacements.update { placements in
-                    let layout = PageLayout(rows: rows, placement: placements.placement(of: item.type, in: catalogue))
-                    if let moved = layout.after(command, row: row) { placements.apply(moved, of: item.type, in: catalogue) }
-                }
+            case .showWhenSet, .alwaysShow, .hide:
+                let shows: RowShows = command == .showWhenSet ? .whenSet : command == .alwaysShow ? .always : .hidden
+                PagePlacements.update { $0.setShows(shows, row: row, of: item.type) }
+            case .pin:
+                PagePlacements.update { $0.pin(row, of: item.type, in: catalogue) }
+            case .unpin:
+                PagePlacements.update { $0.unpin(row, of: item.type, in: catalogue) }
+            case .moveUp, .moveDown:
+                PagePlacements.update { $0.move(row, by: command == .moveUp ? -1 : 1, in: order, of: item.type) }
             }
         }
         editor.popUp(popup, under: rect, keeping: keeping)
@@ -289,15 +283,10 @@ struct ItemPageHeader: ViewModifier {
     /// What the status menu offers: the catalogue's values, and the item's own if it holds one the catalogue does
     /// not list, so the menu always shows what is set.
     static func statusChoices(of item: Item, in field: ItemTypeInfo.Field) -> [String] {
-        field.options(including: PagePins.statusValue(of: item, in: field))
+        field.options(including: PageHead.statusValue(of: item, in: field))
     }
 
     private static func parent(in relationships: [ItemRelationship]) -> ItemRelationship? {
         relationships.first { $0.field == PagePlacement.parent }
-    }
-
-    /// A catalogue's words, looked up in the String Catalog as SwiftUI's text would look them up.
-    static func localized(_ key: String) -> String {
-        Bundle.main.localizedString(forKey: key, value: key, table: nil)
     }
 }

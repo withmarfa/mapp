@@ -157,9 +157,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
-  /* The top holds the row above the title, which takes no room of its own, so it appears without moving the page. */
-  padding: calc(var(--step) * 7) var(--inkkit-column-inset) 8px;
+  gap: 0;
+  padding: var(--step) var(--inkkit-column-inset) calc(var(--step) * 4);
   position: relative;
   font-family: -apple-system, system-ui, sans-serif;
   line-height: normal;
@@ -310,10 +309,71 @@ body[data-text='none'] #editor {
   display: none;
 }
 
+/* The kicker: the type's mark and name in grey, 12 points at 500, then what is true of the item in a lighter grey. */
+.item-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 calc(var(--step) * 2);
+  min-height: calc(var(--interface-text-size) * 20 / 13);
+  margin-bottom: calc(var(--interface-text-size) * 6 / 13);
+  color: var(--label-secondary);
+  font-size: calc(var(--interface-text-size) * 12 / 13);
+  font-weight: 500;
+}
+
+.item-kicker-type {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--interface-text-size) * 6 / 13);
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+button.item-kicker-type:hover {
+  color: var(--label-primary);
+}
+
+button.item-kicker-type:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.item-kicker-mark {
+  flex: none;
+  background: var(--tone, var(--label-secondary));
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+
+.item-kicker-mark[hidden] {
+  display: none;
+}
+
+.item-kicker-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--step);
+  color: var(--label-tertiary);
+  font-weight: 400;
+}
+
+.item-kicker-flag .item-glyph {
+  background: currentColor;
+}
+
+/* 28 points bold on 34 beside text of 15, so it keeps that measure as the text size changes. */
 .item-title {
   align-self: stretch;
-  font-size: 1.9rem;
-  font-weight: 600;
+  font-size: calc(1rem * 28 / 15);
+  line-height: calc(34 / 28);
+  font-weight: 700;
+  letter-spacing: -0.022em;
   color: var(--inkkit-text-color);
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -335,11 +395,6 @@ body[data-text='none'] #editor {
   display: none;
 }
 
-#item-header[data-title='derived']
-  .item-lead:has(.item-avatar[hidden]):has(.item-subtitle[hidden]) {
-  display: none;
-}
-
 .item-title[contenteditable='false'] {
   cursor: default;
 }
@@ -348,71 +403,6 @@ body[data-text='none'] #editor {
   content: attr(data-placeholder);
   color: var(--placeholder);
   pointer-events: none;
-}
-
-/* The row above the title: Linked From and Customize Layout. Out of the flow, so showing it moves nothing, and only faded
-   (never hidden) while it rests, so the keyboard and VoiceOver reach it always. It shows with the pointer over it or the
-   title, with keyboard focus in it (`:focus-visible`, so a click that leaves focus on a tool does not keep it lit), and
-   for as long as Customize Layout is on. */
-.item-tools {
-  position: absolute;
-  top: calc(var(--step) * 1);
-  right: 0;
-  left: 0;
-  display: flex;
-  align-items: center;
-  gap: calc(var(--step) * 4.5);
-  box-sizing: border-box;
-  height: calc(var(--step) * 5);
-  padding: 0 var(--inkkit-column-inset);
-  font-size: var(--interface-text-size);
-  color: var(--label-secondary);
-  opacity: 0;
-}
-
-#item-header:has(.item-lead:hover) .item-tools,
-#item-header[data-layout='on'] .item-tools,
-.item-tools:hover,
-.item-tools:has(:focus-visible) {
-  opacity: 1;
-}
-
-.item-tools[hidden],
-.item-tool[hidden] {
-  display: none;
-}
-
-.item-tool {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--step) * 1.25);
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: default;
-}
-
-.item-tool:hover {
-  color: var(--label-primary);
-}
-
-.item-tool .item-glyph {
-  background: currentColor;
-}
-
-.item-tool[aria-pressed='true'] {
-  padding: calc(var(--step) * 0.5) calc(var(--step) * 1.75);
-  margin: 0 calc(var(--step) * -1.75);
-  border-radius: calc(var(--step) * 1.5);
-  background: color-mix(in srgb, var(--inkkit-accent-color) 16%, transparent);
-  color: var(--inkkit-accent-color);
-}
-
-.item-tool:focus-visible {
-  outline: 3px solid var(--focus-ring);
-  outline-offset: 2px;
 }
 
 .item-title-error {
@@ -536,26 +526,6 @@ body[data-text='none'] #editor {
   padding-inline-start: var(--c-status-start);
 }
 
-/* A status the item does not have yet reads as any empty value does: quiet text with no edge. Its fill, under the
-   pointer, runs past the text as a value's does, and the text stays on the column's edge. */
-.item-menu-pin.empty {
-  margin-inline: calc(var(--step) * -1.5);
-  padding-inline: calc(var(--step) * 1.5);
-  background: transparent;
-  box-shadow: none;
-  border-radius: 6px;
-  color: var(--label-placeholder);
-}
-
-.item-menu-pin.empty:not(:disabled):hover {
-  background: var(--label-quinary);
-}
-
-/* The text of a value the item does not have yet. */
-.item-empty {
-  color: var(--label-placeholder);
-}
-
 .item-menu-pin:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 0;
@@ -563,11 +533,6 @@ body[data-text='none'] #editor {
 
 .item-menu-pin:disabled {
   opacity: 1;
-}
-
-.item-menu-pin.empty .item-pin-symbol,
-.item-menu-pin.empty .item-icon-indicator {
-  display: none;
 }
 
 /* An option: neutral, with a dot in its color. */
@@ -695,7 +660,7 @@ body[data-text='none'] #editor {
   --pin-slot: calc(var(--interface-text-size) * 150 / 13);
   container-type: inline-size;
   align-self: stretch;
-  margin-top: calc(var(--step) * 1.5);
+  margin-top: calc(var(--step) * 4);
   font-size: var(--interface-text-size);
 }
 
@@ -723,12 +688,6 @@ body[data-text='none'] #editor {
   min-width: 0;
   max-width: 100%;
   padding-inline-end: calc(var(--step) * 2);
-}
-
-/* An event's time is a range as often as not, so its slot takes the room it needs, and the others wrap round it. */
-.item-pin-item[data-pin='#when'] {
-  width: auto;
-  min-width: min(var(--pin-slot), 100%);
 }
 
 .item-pin-key {
@@ -776,15 +735,26 @@ body[data-text='none'] #editor {
   white-space: nowrap;
 }
 
-/* The property block: a label and its value in two columns, every value on one edge. */
-.item-props {
+/* The rows: a name and its value in two columns, every value on one edge, then Show More, over a hairline. */
+.item-rows {
   align-self: stretch;
+  margin-top: calc(var(--step) * 4);
+  padding-bottom: calc(var(--step) * 2);
+  border-bottom: 1px solid var(--separator);
+}
+
+.item-pins:not([hidden]) + .item-rows {
+  margin-top: calc(var(--interface-text-size) * 18 / 13);
+}
+
+.item-props {
   display: flex;
   flex-direction: column;
-  margin: calc(var(--step) * 2.5) 0 0;
+  margin: 0;
   padding: 0;
 }
 
+.item-rows[hidden],
 .item-props[hidden],
 .item-more[hidden],
 .item-linked[hidden],
@@ -799,9 +769,11 @@ body[data-text='none'] #editor {
   display: flex;
   /* A value drops under its label when the column is too narrow for both, instead of breaking after every character. */
   flex-wrap: wrap;
-  column-gap: calc(var(--step) * 3);
+  column-gap: 0;
   align-items: flex-start;
-  min-height: calc(var(--step) * 7);
+  min-height: calc(var(--interface-text-size) * 30 / 13);
+  padding-block: calc(var(--interface-text-size) * 5 / 13);
+  box-sizing: border-box;
 }
 
 .item-prop-label,
@@ -809,39 +781,42 @@ body[data-text='none'] #editor {
   display: flex;
   align-items: center;
   gap: calc(var(--step) * 2);
-  min-height: calc(var(--step) * 7);
+  min-height: calc(var(--interface-text-size) * 20 / 13);
   margin: 0;
 }
 
+/* A name in a column 150 points wide: its symbol in a slot of 16, so the names line up. */
 .item-prop-label {
   box-sizing: border-box;
   flex: none;
   position: relative;
   isolation: isolate;
-  width: calc(var(--step) * 30);
-  gap: calc(var(--step) * 1.5);
-  padding-block: calc(var(--step) / 2);
-  padding-inline-end: var(--step);
-  min-height: calc(var(--step) * 8);
+  width: calc(var(--interface-text-size) * 150 / 13);
+  padding-inline-end: calc(var(--step) * 2);
   color: var(--label-secondary);
   font-weight: 400;
 }
 
-/* Under the pointer a key shows that it can be dragged: its fill runs past it on the left, as a value's does, and the
-   grip takes the symbol's place. Symbols differ in width, so each sits in the same slot and the names line up. */
+/* Under the pointer a name shows that it can be dragged: a grey fill that runs 8 points past it on the left, and six dots
+   in the symbol's place. */
 .item-prop-label::before {
   content: '';
   position: absolute;
   z-index: -1;
-  inset: 0 0 0 calc(var(--step) * -1.5);
-  border-radius: 6px;
+  inset: calc(var(--interface-text-size) * -3 / 13) calc(var(--step) * 2)
+    calc(var(--interface-text-size) * -3 / 13) calc(var(--step) * -2);
+  border-radius: 7px;
 }
 
 .item-prop-symbol {
   flex: none;
   display: grid;
   place-items: center;
-  width: calc(var(--step) * 5.5);
+  width: calc(var(--interface-text-size) * 16 / 13);
+}
+
+.item-prop-symbol > .item-glyph {
+  background: var(--label-tertiary);
 }
 
 .item-prop-symbol > * {
@@ -852,10 +827,14 @@ body[data-text='none'] #editor {
   visibility: hidden;
 }
 
-.item-prop:not(:only-child) > .item-prop-label:hover::before,
-.item-prop > .item-prop-label[role='button']:hover::before,
+.item-prop > .item-prop-label:hover::before,
 .item-prop.dragged > .item-prop-label::before {
-  background: var(--label-quinary);
+  background: color-mix(in srgb, CanvasText 6%, transparent);
+}
+
+.item-prop > .item-prop-label:hover,
+.item-prop.dragged > .item-prop-label {
+  color: var(--label-primary);
 }
 
 .item-prop:not(:only-child) > .item-prop-label:hover .item-prop-grip,
@@ -898,12 +877,17 @@ body[data-text='none'] #editor {
   white-space: nowrap;
 }
 
+/* A property hidden on the type's pages, listed grey under Show More with the same menu. */
+.item-prop.muted > .item-prop-label,
+.item-prop.muted > .item-prop-value {
+  opacity: 0.45;
+}
+
 .item-prop-value {
   flex: 1 1 10rem;
   min-width: 0;
   flex-wrap: wrap;
-  gap: calc(var(--step) * 1.5) calc(var(--step) * 2);
-  padding-block: calc(var(--step) / 2);
+  gap: calc(var(--interface-text-size) * 6 / 13);
   color: var(--label-primary);
   /* Not `anywhere` here: it breaks a value after every character in a first layout at no width, and WebKit keeps
      that row height once the page has its width. The header is also drawn again then (`ItemHeader`). */
@@ -916,6 +900,25 @@ body[data-text='none'] #editor {
    chip has a fixed height too, and its own `max-width` and ellipsis keep it inside the column. */
 .item-prop-value > :not(.item-chip, .item-person) {
   min-width: 0;
+}
+
+/* A value the item does not have, and what follows an event's time. */
+.item-empty,
+.item-note {
+  color: var(--label-placeholder);
+}
+
+/* A long text is a block of two lines at most, with the whole of it in the help. */
+.item-prop.long > .item-prop-value {
+  display: block;
+}
+
+.item-prop.long .item-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: pre-line;
 }
 
 /* A value the app edits in a panel under it, which the value opens where it holds no link; the label opens the field's menu. The value
@@ -975,17 +978,20 @@ body[data-text='none'] #editor {
 }
 
 .item-more {
-  margin: calc(var(--step) * 1) 0 0;
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--interface-text-size) * 30 / 13);
+  margin: 0;
   padding: 0;
   border: 0;
   background: none;
-  color: var(--label-secondary);
+  color: var(--label-tertiary);
   font: inherit;
   cursor: default;
 }
 
 .item-more:hover {
-  color: var(--label-primary);
+  color: var(--label-secondary);
 }
 
 /* Linked From and a collection's contents: a folded group under a faint hairline. */
@@ -1083,87 +1089,4 @@ body[data-text='none'] #editor {
 .item-link:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
-}
-
-/* The title and what sits beside or under it. A general page has only the title; a person's page puts an avatar
-   beside it, and a page for reading puts a dek under it. */
-.item-lead {
-  align-self: stretch;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: calc(var(--step) * 2) calc(var(--step) * 4);
-}
-
-.item-lead:has(.item-avatar[hidden]) {
-  display: block;
-}
-
-.item-heading {
-  /* Under the avatar, not squeezed beside it, once less than this is left for the name. */
-  flex: 1 1 10rem;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--step) * 1);
-}
-
-.item-subtitle {
-  margin: 0;
-  color: var(--label-secondary);
-  font-size: calc(var(--interface-text-size) * 15 / 13);
-  line-height: 1.4;
-  -webkit-user-select: text;
-  user-select: text;
-}
-
-.item-subtitle[hidden] {
-  display: none;
-}
-
-/* A person: a circle of initials, or the picture the item holds, and the name beside it. */
-.item-avatar {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: calc(var(--step) * 16);
-  height: calc(var(--step) * 16);
-  overflow: hidden;
-  border-radius: 50%;
-  background: var(--label-quinary);
-  box-shadow: inset 0 0 0 0.5px var(--separator);
-  color: var(--label-secondary);
-  font-size: calc(var(--interface-text-size) * 22 / 13);
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
-.item-avatar[hidden] {
-  display: none;
-}
-
-.item-avatar-photo {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* A page for reading: a serif column at the page width the person chose, the description under the title. */
-body[data-header='reading'] {
-  --inkkit-font-family: 'New York', ui-serif, Georgia, serif;
-  --inkkit-font-size: 1.125rem;
-  --inkkit-line-height: 1.65;
-}
-
-#item-header[data-kind='reading'] .item-title {
-  font-family: 'New York', ui-serif, Georgia, serif;
-  font-size: 2.1rem;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-}
-
-#item-header[data-kind='reading'] .item-subtitle {
-  font-family: 'New York', ui-serif, Georgia, serif;
-  font-size: 1.2rem;
-  line-height: 1.45;
 }

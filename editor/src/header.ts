@@ -1,12 +1,12 @@
 import { openLink, postToHost } from './bridge'
 import { dragRows } from './row-drag'
 
-/** The symbol a row's key shows under the pointer, a key of `HeaderIcons.symbols`. */
-const rowGrip = 'line.3.horizontal'
+/** The symbol a row's name shows under the pointer, six dots, a key of `HeaderIcons.symbols`. */
+const rowGrip = 'circle.grid.2x3.fill'
 /** The symbol a tag's chip starts with, a key of `HeaderIcons.symbols`. */
 const tagSymbol = 'number'
 
-/** How a status pin draws its mark: the SF Symbol of the status's group, a key of `HeaderIcons.symbols`, and the tint
+/** How a status pill draws its mark: the SF Symbol of the status's group, a key of `HeaderIcons.symbols`, and the tint
  *  the page colors it in, from its own system colors. */
 export type HeaderTint = 'blue' | 'secondary' | 'tertiary'
 
@@ -19,14 +19,13 @@ export interface HeaderChipStyle {
 }
 
 /** The status or the parent as a button that opens the menu the app builds, wherever the page draws it: in a pin or in
- *  a row of the property block. An empty status, in a row, has no value yet and reads as any empty value does. */
+ *  a row. */
 export interface HeaderPin {
   label: string
   enabled: boolean
-  empty: boolean
-  /** Only the status pin has a mark. */
+  /** Only the status pill has a mark. */
   mark?: { symbol: string; tint: HeaderTint }
-  /** Only the parent pin has these: the parent's type icon, a key of `HeaderIcons.symbols`, and its tone's name. */
+  /** Only the parent pill has these: the parent's type icon, a key of `HeaderIcons.symbols`, and its tone's name. */
   icon?: string | null
   tone?: string | null
 }
@@ -50,9 +49,9 @@ export interface HeaderListedPerson {
   initials?: string | null
 }
 
-/** One row of the property block, or one pin under the title (the app sends both in this shape). The status and parent
- *  rows hold the header's own buttons, which keep their menus; a link opens its item or its address. A row the app
- *  marks `editable` asks the app for its editor under the value; the page never decides which rows are. */
+/** One row of the head, or one pin under the title (the app sends both in this shape). The status and parent rows hold
+ *  the head's own buttons, which keep their menus; a link opens its item or its address. A row the app marks
+ *  `editable` asks the app for its editor under the value; the page never decides which rows are. */
 export interface HeaderRow {
   id: string
   label: string
@@ -63,20 +62,21 @@ export interface HeaderRow {
   kind:
     | 'status'
     | 'parent'
-    | 'type'
     | 'items'
     | 'people'
     | 'options'
     | 'tags'
     | 'date'
+    | 'when'
     | 'url'
     | 'email'
     | 'phone'
     | 'text'
     | 'empty'
   text?: string
-  /** What a pin's hover and accessibility label say in place of its value's words: an event's time, its zone and how
-   *  far off it is, or every value of a list the pin cut to its first. */
+  /** What follows an event's time in grey: how far off it is, or All Day. */
+  note?: string
+  /** The whole value, where the row or the pin shows less of it. */
   help?: string
   /** A tag's words, each after a number sign. */
   texts?: string[]
@@ -84,12 +84,15 @@ export interface HeaderRow {
   options?: { label: string; tone: string }[]
   items?: HeaderItem[]
   people?: HeaderListedPerson[]
-  /** The type's chip: the key of its icon in `HeaderIcons.symbols` and the name of its tone. */
-  icon?: string | null
-  tone?: string | null
   /** What a pin says of the values of a list it left out, such as "+4 more", drawn after the first value. The app
    *  words it; the page never counts. */
   more?: string
+  /** Text that runs to a second line before it is cut. */
+  long?: boolean
+  /** Shown only once Show More is open. */
+  folded?: boolean
+  /** Hidden on the type's pages, so grey under Show More. */
+  muted?: boolean
 }
 
 /** An item that links to the one on the page. */
@@ -101,40 +104,24 @@ export interface HeaderLinked {
   date: string
 }
 
-/**
- * Which header the page draws, chosen by the app from the core type the item's type builds on
- * (`PageHeaderKind`). The page draws the shared parts and never decides a kind or names a type.
- *
- * - `general`: the title, the pins, the properties and Linked From.
- * - `event`: the general page. The app sends the event's time as its first pin, with the zone and a relative phrase in
- *   the pin's help.
- * - `person`: adds an avatar, a subtitle and rows whose email and phone values open `mailto:` and `tel:` links, and
- *   calls Linked From "Timeline", open by default.
- * - `reading` (`core.bookmark`, `core.media`): puts the description under the title as a dek, and sets the text in a
- *   larger serif face through `body[data-header]`, at the page width the person chose like any other page. The
- *   source and the published date are properties, and the pins follow the title.
- *
- * A fifth kind, `webpage` (`core.file.webpage`), never reaches this page: a file has no text to edit, so SwiftUI
- * draws a Web Page's title and pins natively (`WebPageItemPage`) above the sealed HTML view.
- *
- * A kind never loads anything, because the page fetches nothing from the network: a bookmark's `image_url` is not
- * drawn as a hero and leaves the property block (the inspector still shows it), and an event has no map. The fields
- * a kind draws leave the property block (`PageHeaderLead.consumed`).
- */
-export type HeaderKind = 'general' | 'event' | 'person' | 'reading'
-
-/** A person's initials, or the picture the item holds inline. */
-export interface HeaderPerson {
-  initials: string
-  photo?: string | null
+/** The grey line over the title: the type's mark and name, then what is true of the item among Read Only, Feed and
+ *  Archived. The app decides all of it. */
+export interface HeaderKicker {
+  type: string
+  /** The type's icon, a key of `HeaderIcons.symbols`, and its tone's name. */
+  icon: string
+  tone: string
+  /** Whether the type's name asks for Change Type. */
+  changesType: boolean
+  flags: { id: string; words: string; symbol: string }[]
+  /** The whole line as VoiceOver reads it. */
+  spoken: string
 }
 
-/** What the app says the header shows for the item on the page. */
+/** What the app says the head shows for the item on the page. */
 export interface HeaderModel {
   item: string
-  hidden: boolean
-  /** The page is in Focus: the title, the pins and the properties are hidden. The footer, the kind and the text's
-   *  typography are left as they are. */
+  /** The page is in Focus: the head is hidden. The footer is left as it is. */
   focused: boolean
   title: string
   /** The title the person typed and the app has not saved, kept by the app for each item. */
@@ -144,42 +131,27 @@ export interface HeaderModel {
   titleRefusal: string
   editable: boolean
   /** False where the item is titled by the first line of its text (`Item.titleRule` is `.firstLine`), which the page
-   *  already shows as its text, so the page draws no title and the pins lead. The toolbar and the list still show
-   *  the derived title, and `bottom` and the scrolled-away report do not change. Decided from the title rule, never
-   *  from a type. */
+   *  already shows as its text, so the page draws no title and the rows follow the kicker. The toolbar and the list
+   *  still show the derived title, and `bottom` and the scrolled-away report do not change. Decided from the title
+   *  rule, never from a type. */
   showsTitle?: boolean
-  kind: HeaderKind
-  person?: HeaderPerson | null
-  /** The line under the title: a person's work, or a reading item's description. */
-  subtitle?: string | null
+  kicker: HeaderKicker
   status: HeaderPin | null
   parent: HeaderPin | null
-  /** The properties the person pinned under the title, in their order, at most four. The app has left out a pin with
-   *  nothing to show and any that the header draws itself. */
+  /** The properties the person pinned under the title, in their order, while pinned properties are on. */
   pins: HeaderRow[]
-  properties: HeaderRow[]
-  /** How many rows show before the rest wait behind a button. */
-  foldAfter: number
-  /** The items a collection (a type playing the `container` role) holds, listed in a Contents section of its own,
-   *  open, under its text. Empty for any other item, and Linked From then holds only the other links. */
-  contents: HeaderLinked[]
+  /** Every row, in order. Those `folded` wait behind Show More. */
+  rows: HeaderRow[]
   linked: HeaderLinked[]
   linkedFoldAfter: number
-  /** How many items link to this one, for the row above the title, wherever Linked From is shown. */
-  linkedCount?: number
-  /** Customize Layout in the row above the title: absent where the item cannot be laid out, else whether the mode is
-   *  on. The app decides both; the page only draws them and says when they are pressed. */
-  layoutOn?: boolean | null
   /** False where the page has no text to write, so the page draws no empty editor (`body[data-text='none']`): a
    *  collection with no text sends it. An empty editor only invites typing that a connector holding the item puts
-   *  back, and the app cannot tell a connector's item from the person's until Marfa marks them read only (marfa issue
-   *  2415). */
+   *  back. */
   showsText: boolean
-  /** "Show N More", worded by the app for the rows and for the items that are folded away. */
+  /** "Show N More", worded by the app for the rows and for the linked items that are folded away. */
   showMore: string
-  showMoreContents: string
   showMoreLinked: string
-  /** The interface's text size in points, which the pins and messages follow. */
+  /** The interface's text size in points, which the head and messages follow. */
   interfaceTextSize: number
   /** How many lines the title shows before an ellipsis cuts it, while it is not being edited. */
   titleLines: number
@@ -195,7 +167,7 @@ export interface HeaderIcon {
 
 export interface HeaderIcons {
   indicator: HeaderIcon
-  /** The symbols of the property rows and of the types, by SF Symbol name. */
+  /** The symbols of the rows, the kicker's flags and the types, by SF Symbol name or type icon key. */
   symbols: Record<string, HeaderIcon>
 }
 
@@ -203,17 +175,16 @@ export interface HeaderLabels {
   untitled: string
   title: string
   status: string
-  /** What a value the item does not have yet reads. */
+  /** What a value the item does not have reads. */
   empty: string
   discardChanges: string
   linkedFrom: string
-  customizeLayout: string
-  /** What a collection's members are called. */
-  contents: string
   showLess: string
-  /** What Linked From is called on a person's page, where it reads as their timeline. */
-  timeline: string
   properties: string
+  /** What VoiceOver says of a row's grabber. */
+  reorder: string
+  /** What VoiceOver says the kicker's type name does. */
+  changeType: string
 }
 
 export type HeaderMenu = 'status' | 'parent'
@@ -228,11 +199,10 @@ const englishLabels: HeaderLabels = {
   empty: 'Empty',
   discardChanges: 'Discard Changes',
   linkedFrom: 'Linked From',
-  customizeLayout: 'Customize Layout',
-  contents: 'Contents',
   showLess: 'Show Less',
-  timeline: 'Timeline',
   properties: 'Properties',
+  reorder: 'Drag to Reorder',
+  changeType: 'Change Type',
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -249,9 +219,8 @@ function element<K extends keyof HTMLElementTagNameMap>(
 /** Gives a chip the tone the app named, from the custom properties the app sent (`--tone-<name>`); the page chooses no
  *  color. A name that is not a word leaves the chip with no tone. */
 function useTone(node: HTMLElement, name: string | null | undefined) {
-  const tones = ['--tone']
   if (!name || !/^[a-z]+$/.test(name)) {
-    for (const property of tones) node.style.removeProperty(property)
+    node.style.removeProperty('--tone')
     return
   }
   node.style.setProperty('--tone', `var(--tone-${name})`)
@@ -308,9 +277,9 @@ class LinkedSection {
     return [this.open, this.all]
   }
 
-  /** A new item starts folded, or open where its own content is the list. */
-  reset(open: boolean) {
-    this.open = open
+  /** A new item starts folded. */
+  reset() {
+    this.open = false
     this.all = false
   }
 
@@ -349,20 +318,6 @@ class LinkedSection {
   }
 }
 
-/** The item's title and pinned properties, drawn in the page above the item so they scroll with it as one
- *  surface. What they do is the app's: the title is saved as the item's property, and each pin opens a native
- *  menu. The header belongs to the app's page, not to Inkkit; do not move it back into a native overlay that follows
- *  WebKit's scrolling.
- *
- *  Under the title the header draws the pins the app sends (`HeaderModel.pins`, at most four, each a key with its icon
- *  above its value, in a slot of a fixed width), then the property block: the rows Swift sends (`HeaderRow`, one model for every item), folded after
- *  `foldAfter` rows with "Show N More" expanding in place, and "Show Less" once expanded. The status, in a pin or a
- *  row, and the parent, in a row, are one button each, moved into place with its menu unchanged. A link value posts
- *  `openItem` or `openLink`; nothing else here is edited. A pin that is a list shows what the app sent, and its
- *  "+N". The pins wrap by the width of the page's column (`style.css`).
- *
- *  Linked From (a folded section of the items that link to this one) and a collection's Contents are drawn in the
- *  footer, under the text. */
 /** A frame as whole points, which is how far a value has to move before the app is told. */
 function rectKey(rect: DOMRect): string {
   return [rect.left, rect.top, rect.width, rect.height].map(Math.round).join(',')
@@ -378,39 +333,45 @@ function valueFrame(value: HTMLElement): DOMRect {
   return new DOMRect(left, box.top, box.right - left, box.height)
 }
 
+/** The item's head, drawn in the page above the item so it scrolls with the text as one surface: the kicker (the type
+ *  and what is true of the item), the title, the pins while the person has them on, and the rows. What each does is the
+ *  app's: the title is saved as the item's property, the type name opens Change Type, a row's name opens the row's
+ *  menu, and a value opens its editor. The head belongs to the app's page, not to Inkkit; do not move it back into a
+ *  native overlay that follows WebKit's scrolling.
+ *
+ *  The rows are those the app sends (`HeaderRow`, one model for every item). The page draws those not `folded`, then
+ *  "Show N More", which draws them all in place, and "Show Less" once open. The status and the parent are one button
+ *  each, moved into their row with their menu unchanged. A row is dragged by its name.
+ *
+ *  Linked From (a folded section of the items that link to this one) is drawn in the footer, under the text. */
 export class ItemHeader {
   private model?: HeaderModel
   private readonly labels: HeaderLabels
-  private readonly tools: HTMLDivElement
-  private readonly linkedTool: HTMLButtonElement
-  private readonly layoutTool: HTMLButtonElement
-  private readonly lead: HTMLDivElement
-  private readonly avatar: HTMLSpanElement
+  private readonly kicker: HTMLDivElement
   private readonly title: HTMLDivElement
-  private readonly subtitle: HTMLParagraphElement
   private readonly titleError: HTMLDivElement
   private readonly titleRefusal: HTMLParagraphElement
   private readonly pins: HTMLDListElement
   private readonly pinsBox: HTMLDivElement
   private readonly properties: HTMLDListElement
   private readonly moreProperties: HTMLButtonElement
-  private readonly contents: LinkedSection
+  private readonly rowsBox: HTMLDivElement
   private readonly linked: LinkedSection
   private symbols: Record<string, HeaderIcon> = {}
-  /** What the property block and the linked items were last drawn from, so an unchanged header is not drawn
-   *  again under the pointer. */
+  /** What the rows and the linked items were last drawn from, so an unchanged head is not drawn again under the
+   *  pointer. */
   private drawn = ''
-  /** Whether the person has expanded the rows, for the item on the page. */
+  /** Whether the person has opened Show More, for the item on the page. */
   private expanded = { item: '', properties: false }
   private readonly statusPin: HTMLButtonElement
   private readonly parentPin: HTMLButtonElement
   /** The item whose title is being edited, so a blur after the page moved to another item commits nothing. */
   private editing?: string
-  /** The item whose title is to take the keyboard as soon as the header shows it, since the app may ask before
-   *  it has sent that item's header. */
+  /** The item whose title is to take the keyboard as soon as the head shows it, since the app may ask before
+   *  it has sent that item's head. */
   private wantedTitle?: string
 
-  /** `footer` holds what follows the text, the contents of a collection and Linked From. */
+  /** `footer` holds what follows the text, Linked From. */
   constructor(
     readonly root: HTMLElement,
     readonly footer: HTMLElement,
@@ -419,27 +380,16 @@ export class ItemHeader {
     this.labels = { ...englishLabels, ...labels }
     root.hidden = true
     footer.hidden = true
-    // The row above the title takes no room of its own (`style.css`), so it appears under the pointer without moving the
-    // page, and it is in the page for the keyboard and for VoiceOver always.
-    this.tools = element('div', 'item-tools', root)
-    this.linkedTool = this.toolButton('ItemLinkedFromTool', () =>
-      postToHost({ type: 'showLinked' }),
-    )
-    this.layoutTool = this.toolButton('ItemCustomizeLayoutTool', () =>
-      postToHost({ type: 'toggleLayout' }),
-    )
-    this.lead = element('div', 'item-lead', root)
-    this.avatar = element('span', 'item-avatar', this.lead)
-    this.avatar.setAttribute('aria-hidden', 'true')
-    const heading = element('div', 'item-heading', this.lead)
-    this.title = element('div', 'item-title', heading)
+    this.kicker = element('div', 'item-kicker', root)
+    this.kicker.setAttribute('role', 'heading')
+    this.kicker.setAttribute('aria-level', '2')
+    this.title = element('div', 'item-title', root)
     this.title.id = 'ItemPageTitle'
     this.title.setAttribute('role', 'textbox')
     this.title.setAttribute('aria-label', this.labels.title)
     this.title.setAttribute('aria-placeholder', this.labels.untitled)
     this.title.dataset.placeholder = this.labels.untitled
     this.title.spellcheck = false
-    this.subtitle = element('p', 'item-subtitle', heading)
     this.titleError = element('div', 'item-title-error', root)
     this.titleError.hidden = true
     this.titleRefusal = element('p', 'item-error', this.titleError)
@@ -456,17 +406,22 @@ export class ItemHeader {
     this.statusPin = this.menuPin('ItemStatusPin', 'status', buttons)
     this.statusPin.setAttribute('aria-label', this.labels.status)
     this.parentPin = this.menuPin('ItemParentPin', 'parent', buttons)
-    this.properties = element('dl', 'item-props', root)
+    this.rowsBox = element('div', 'item-rows', root)
+    this.properties = element('dl', 'item-props', this.rowsBox)
     dragRows(this.properties, (row, shown) => this.moveRow(row, shown))
     this.properties.setAttribute('aria-label', this.labels.properties)
-    this.moreProperties = this.moreButton(root, () => {
+    this.moreProperties = moreButton(this.rowsBox, () => {
       this.expanded.properties = !this.expanded.properties
       this.redraw()
     })
-    const redraw = () => this.redraw()
     const glyph = (name: string, parent: HTMLElement) => this.glyph(name, parent)
-    this.contents = new LinkedSection(footer, 'item-contents', redraw, glyph)
-    this.linked = new LinkedSection(footer, 'item-linked-from', redraw, glyph, '#linked')
+    this.linked = new LinkedSection(
+      footer,
+      'item-linked-from',
+      () => this.redraw(),
+      glyph,
+      '#linked',
+    )
 
     this.title.addEventListener('focus', () => {
       this.editing = this.model?.item
@@ -526,12 +481,12 @@ export class ItemHeader {
       this.editing = this.model.item
       postToHost({ type: 'titleInput', item: this.model.item, text: this.text })
     })
-    // The app sends the header before the window has sized the page. WebKit keeps the row heights of that first
-    // layout at no width, where a shrinking value breaks after every character, so the rows are drawn anew once the
-    // page has a width.
     window
       .matchMedia?.('(prefers-color-scheme: dark)')
       .addEventListener?.('change', () => this.applyChips())
+    // The app sends the head before the window has sized the page. WebKit keeps the row heights of that first
+    // layout at no width, where a shrinking value breaks after every character, so the rows are drawn anew once the
+    // page has a width.
     let width = window.innerWidth
     window.addEventListener('resize', () => {
       const had = width
@@ -564,14 +519,14 @@ export class ItemHeader {
    *  From follows the text directly (`main.ts` sets `--inkkit-min-height` to zero); the text fills the window only
    *  when it holds nothing. */
   get hasFooterItems(): boolean {
-    return !!this.model && (this.model.contents.length > 0 || this.model.linked.length > 0)
+    return !!this.model && this.model.linked.length > 0
   }
 
   get isHidden(): boolean {
     return this.root.hidden !== false
   }
 
-  /** Where the header ends in the document, which the toolbar's title waits for. */
+  /** Where the head ends in the document, which the toolbar's title waits for. */
   get bottom(): number {
     return this.isHidden ? 0 : this.root.offsetTop + this.root.offsetHeight
   }
@@ -583,7 +538,6 @@ export class ItemHeader {
       if (this.isEditingTitle) this.title.blur()
       this.root.hidden = true
       this.footer.hidden = true
-      document.body.dataset.header = 'general'
       document.body.dataset.text = 'shown'
       return
     }
@@ -592,17 +546,13 @@ export class ItemHeader {
       this.editing = undefined
       this.title.blur()
     }
-    this.root.hidden = model.hidden || model.focused === true
-    this.footer.hidden = model.hidden
+    this.root.hidden = model.focused === true
+    this.footer.hidden = false
     this.root.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.footer.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.root.style.setProperty('--title-lines', String(model.titleLines))
     this.applyChips()
     document.body.dataset.text = model.showsText ? 'shown' : 'none'
-    this.root.dataset.kind = model.kind
-    document.body.dataset.header = model.hidden ? 'general' : model.kind
-    this.subtitle.textContent = model.subtitle ?? ''
-    this.subtitle.hidden = !model.subtitle
     this.title.hidden = model.showsTitle === false
     this.root.dataset.title = model.showsTitle === false ? 'derived' : 'own'
     const editable = model.editable ? 'plaintext-only' : 'false'
@@ -618,21 +568,16 @@ export class ItemHeader {
     this.showPin(this.parentPin, model.parent)
     if (previous?.item !== model.item) {
       this.expanded = { item: model.item, properties: false }
-      // A person's timeline and a collection's contents are the page's own content, so they open with the page.
-      this.contents.reset(true)
-      this.linked.reset(model.kind === 'person')
+      this.linked.reset()
     }
     this.redraw()
     requestAnimationFrame(() => this.reportValueMoved())
-    // The status pin is named for what it sets; what it is set to is read after.
-    this.statusPin.setAttribute(
-      'aria-description',
-      model.status ? (model.status.empty ? this.labels.empty : model.status.label) : '',
-    )
+    // The status pill is named for what it sets; what it is set to is read after.
+    this.statusPin.setAttribute('aria-description', model.status?.label ?? '')
   }
 
   /** Gives the title of `item` the keyboard with its text selected, so typing replaces it, for a new item. Held until
-   *  the header shows that item and can be edited; `focus`, `focusText` and `load` cancel the wait. Used once. */
+   *  the head shows that item and can be edited; `focus`, `focusText` and `load` cancel the wait. Used once. */
   focusTitle(item: string) {
     this.wantedTitle = item
     this.takeWantedTitle()
@@ -657,7 +602,7 @@ export class ItemHeader {
     selection.addRange(range)
   }
 
-  /** Sets the chip looks the app sent for the appearance the page is in, on the header and the footer, with the scale
+  /** Sets the chip looks the app sent for the appearance the page is in, on the head and the footer, with the scale
    *  that follows the interface's text size. A tone or size the app changes reaches an open page this way. */
   private applyChips() {
     const model = this.model
@@ -689,8 +634,8 @@ export class ItemHeader {
     }
   }
 
-  /** The status pin's symbol is the one the app drew for the group, in the tint the app chose, since the catalogue holds
-   *  neither. */
+  /** The status pill's symbol is the one the app drew for the group, in the tint the app chose, since the catalogue
+   *  holds neither. */
   private drawStatusMark() {
     const mark = this.statusPin.querySelector<HTMLElement>('.item-status-mark')!
     const status = this.model?.status?.mark
@@ -721,10 +666,7 @@ export class ItemHeader {
   private showPin(pin: HTMLButtonElement, model: HeaderPin | null) {
     pin.hidden = model == null
     pin.disabled = !(model?.enabled ?? false)
-    pin.classList.toggle('empty', model?.empty ?? false)
-    pin.querySelector('.item-pin-label')!.textContent = model?.empty
-      ? this.labels.empty
-      : (model?.label ?? '')
+    pin.querySelector('.item-pin-label')!.textContent = model?.label ?? ''
     if (pin === this.statusPin) this.drawStatusMark()
     if (pin === this.parentPin) {
       useTone(pin, model?.tone)
@@ -760,10 +702,6 @@ export class ItemHeader {
     return pin
   }
 
-  private moreButton(parent: HTMLElement, action: () => void): HTMLButtonElement {
-    return moreButton(parent, action)
-  }
-
   /** A symbol the app drew, as a mask in the text's secondary color; nothing for one it did not draw. */
   private glyph(name: string, parent: HTMLElement, scale = 1): HTMLElement {
     const icon = this.symbols[name]
@@ -777,30 +715,36 @@ export class ItemHeader {
     return node
   }
 
-  private toolButton(id: string, action: () => void): HTMLButtonElement {
-    const button = element('button', 'item-tool', this.tools)
-    button.type = 'button'
-    button.id = id
-    button.addEventListener('click', action)
-    return button
-  }
-
-  /** The row above the title: how many items link here, and Customize Layout, lit while the mode is on. */
-  private drawTools(model: HeaderModel) {
-    const count = model.linkedCount ?? 0
-    this.linkedTool.hidden = count === 0
-    this.linkedTool.replaceChildren()
-    this.glyph('arrow.down.left', this.linkedTool)
-    element('span', 'item-tool-text', this.linkedTool).textContent =
-      `${count} ${this.labels.linkedFrom}`
-    const on = model.layoutOn
-    this.layoutTool.hidden = on === undefined || on === null
-    this.layoutTool.replaceChildren()
-    this.glyph('rectangle.split.2x1', this.layoutTool)
-    element('span', 'item-tool-text', this.layoutTool).textContent = this.labels.customizeLayout
-    this.layoutTool.setAttribute('aria-pressed', String(on === true))
-    this.tools.hidden = this.linkedTool.hidden && this.layoutTool.hidden
-    this.root.dataset.layout = on ? 'on' : 'off'
+  /** The kicker: the type's mark in its tone and its name, a button where it opens Change Type, then each flag with its
+   *  symbol. VoiceOver reads it as one heading in the app's words. */
+  private drawKicker(model: HeaderModel) {
+    const kicker = model.kicker
+    this.kicker.replaceChildren()
+    this.kicker.setAttribute('aria-label', kicker.spoken)
+    const type = element(kicker.changesType ? 'button' : 'span', 'item-kicker-type', this.kicker)
+    type.id = 'ItemKickerType'
+    useTone(type, kicker.tone)
+    const mark = element('span', 'item-kicker-mark', type)
+    mark.setAttribute('aria-hidden', 'true')
+    const icon = this.symbols[kicker.icon]
+    maskSymbol(mark, icon)
+    if (icon) {
+      mark.style.width = `${icon.width * (12 / 13)}px`
+      mark.style.height = `${icon.height * (12 / 13)}px`
+    }
+    element('span', 'item-kicker-name', type).textContent = kicker.type
+    if (type instanceof HTMLButtonElement) {
+      type.type = 'button'
+      type.setAttribute('aria-label', `${kicker.spoken}, ${this.labels.changeType}`)
+      type.setAttribute('aria-haspopup', 'dialog')
+      type.addEventListener('click', () => this.changeType(type))
+    }
+    for (const flag of kicker.flags) {
+      const entry = element('span', 'item-kicker-flag', this.kicker)
+      entry.dataset.flag = flag.id
+      this.glyph(flag.symbol, entry)
+      element('span', '', entry).textContent = flag.words
+    }
   }
 
   /** An address or number as plain text that opens it, in the link color. */
@@ -873,88 +817,71 @@ export class ItemHeader {
     link.addEventListener('click', open)
   }
 
-  /** Draws the pins, the property block and the linked items from the model. */
+  /** Draws the kicker, the pins, the rows and the linked items from the model. */
   private redraw() {
     const model = this.model
     if (!model) return
     const key = JSON.stringify([
-      model.kind,
-      model.person,
+      model.kicker,
       model.pins,
-      model.properties,
-      model.contents,
+      model.rows,
       model.linked,
-      model.linkedCount,
-      model.layoutOn,
       model.showMore,
-      model.showMoreContents,
       model.showMoreLinked,
       this.expanded,
-      this.contents.state,
       this.linked.state,
       Object.keys(this.symbols).length,
     ])
     if (key === this.drawn) return
     this.drawn = key
 
-    this.drawTools(model)
+    this.drawKicker(model)
     this.pins.replaceChildren(...model.pins.map((pin) => this.pin(pin, model)))
     this.pinsBox.hidden = model.pins.length === 0
 
-    const shown = this.expanded.properties
-      ? model.properties
-      : model.properties.slice(0, model.foldAfter)
+    const shown = this.expanded.properties ? model.rows : model.rows.filter((row) => !row.folded)
     this.properties.replaceChildren(...shown.map((row) => this.row(row, model)))
     this.properties.hidden = shown.length === 0
-    this.drawLead(model)
-    this.moreProperties.hidden = model.properties.length <= model.foldAfter
+    const folded = model.rows.some((row) => row.folded)
+    this.moreProperties.hidden = !folded
     this.moreProperties.textContent = this.expanded.properties
       ? this.labels.showLess
       : model.showMore
+    this.moreProperties.setAttribute('aria-expanded', String(this.expanded.properties))
+    this.rowsBox.hidden = shown.length === 0 && !folded
 
-    const linkedName = model.kind === 'person' ? this.labels.timeline : this.labels.linkedFrom
-    this.contents.draw(this.labels.contents, model.contents, model.linkedFoldAfter, {
-      more: model.showMoreContents,
-      less: this.labels.showLess,
-    })
-    this.linked.draw(linkedName, model.linked, model.linkedFoldAfter, {
+    this.linked.draw(this.labels.linkedFrom, model.linked, model.linkedFoldAfter, {
       more: model.showMoreLinked,
       less: this.labels.showLess,
     })
   }
 
-  /** What the kind adds above the properties: a person's avatar. */
-  private drawLead(model: HeaderModel) {
-    const person = model.kind === 'person' ? model.person : null
-    this.avatar.hidden = !person
-    this.avatar.replaceChildren()
-    this.avatar.classList.toggle('photo', !!person?.photo)
-    if (person?.photo) {
-      const picture = element('img', 'item-avatar-photo', this.avatar)
-      picture.alt = ''
-      picture.src = person.photo
-    } else if (person) {
-      this.avatar.textContent = person.initials
-    }
-  }
-
+  /** A row: its grabber in the symbol's place, its name, and its value, three elements for VoiceOver. */
   private row(row: HeaderRow, model: HeaderModel): HTMLElement {
     const entry = element('div', 'item-prop')
     entry.dataset.row = row.id
+    entry.classList.toggle('long', row.long === true)
+    entry.classList.toggle('muted', row.muted === true)
     const term = element('dt', 'item-prop-label', entry)
     const symbol = element('span', 'item-prop-symbol', term)
     this.glyph(row.symbol, symbol)
-    this.glyph(rowGrip, symbol).classList.add('item-prop-grip')
+    const grip = this.glyph(rowGrip, symbol)
+    grip.classList.add('item-prop-grip')
+    grip.removeAttribute('aria-hidden')
+    grip.setAttribute('role', 'img')
+    grip.setAttribute('aria-label', this.labels.reorder)
     const name = element('span', 'item-prop-name', term)
     name.textContent = row.label
     name.title = row.label
     const value = element('dd', 'item-prop-value', entry)
     this.value(value, row, model)
+    if (row.long && row.text) value.title = row.text
+    if (row.help) value.title = row.help
     this.editor(entry, term, value, row, model)
     return entry
   }
 
-  /** Makes a row's label ask for the field's menu, which the app opens under it, and an editable row's value ask for
+  /** Makes a row's name ask for the row's menu, which the app opens under it, and an editable row's value ask for
    *  its editor, which opens under the value. A value that is itself a link keeps its click, so for that row the menu
    *  also offers the editor (`editsValue`). */
   private editor(
@@ -998,7 +925,7 @@ export class ItemHeader {
     element('span', 'item-pin-name', key).textContent = row.label
     const value = element('dd', 'item-pin-value', entry)
     if (row.kind !== 'empty') value.title = this.wholeValue(row, model)
-    this.value(value, row, model, true)
+    this.value(value, row, model)
     this.editor(entry, key, value, row, model)
     if (row.more) {
       const more = element('span', 'item-pin-more', value)
@@ -1007,7 +934,7 @@ export class ItemHeader {
     return entry
   }
 
-  /** The words of a pin's value, for its help. */
+  /** The words of a value, for its help. */
   private wholeValue(row: HeaderRow, model: HeaderModel): string {
     if (row.help) return row.help
     switch (row.kind) {
@@ -1025,12 +952,14 @@ export class ItemHeader {
         return (row.options ?? []).map((option) => option.label).join(', ')
       case 'tags':
         return (row.texts ?? []).join(', ')
+      case 'when':
+        return [row.text, row.note].filter(Boolean).join(', ')
       default:
         return row.text ?? ''
     }
   }
 
-  private value(value: HTMLElement, row: HeaderRow, model: HeaderModel, pinned = false) {
+  private value(value: HTMLElement, row: HeaderRow, model: HeaderModel) {
     switch (row.kind) {
       case 'status':
         if (model.status) value.append(this.statusPin)
@@ -1038,18 +967,6 @@ export class ItemHeader {
       case 'parent':
         if (model.parent) value.append(this.parentPin)
         break
-      case 'type': {
-        const chip = this.chip(value, 'type', row.text ?? '', row.tone)
-        if (pinned) chip.id = 'ItemTypePin'
-        const symbol = row.icon ? this.symbols[row.icon] : undefined
-        if (symbol) {
-          const mark = element('span', 'item-chip-mark')
-          mark.setAttribute('aria-hidden', 'true')
-          maskSymbol(mark, symbol)
-          chip.prepend(mark)
-        }
-        break
-      }
       case 'items':
         for (const target of row.items ?? []) this.linkedItem(value, target)
         break
@@ -1064,8 +981,12 @@ export class ItemHeader {
         for (const tag of row.texts ?? []) this.chip(value, 'tag', tag)
         break
       case 'empty':
-        // A value the item does not have yet is quiet text, and its editor opens as any value's does.
+        // A value the item does not have is quiet text, and its editor opens as any value's does.
         element('span', 'item-text item-empty', value).textContent = this.labels.empty
+        break
+      case 'when':
+        element('span', 'item-text', value).textContent = row.text ?? ''
+        element('span', 'item-text item-note', value).textContent = row.note ?? ''
         break
       case 'url': {
         const href = row.text ?? ''
@@ -1092,14 +1013,23 @@ export class ItemHeader {
     }
   }
 
-  /** The row of the property block, or Linked From, that an event's target is in, for the app to add Hide from
-   *  Page to the menu WebKit is opening there; the inspector still lists it. The page leaves WebKit's own menu alone
-   *  and posts `rowMenu` just before it, with the row's identifier (a field key, a relationship's field, `#tags` or
-   *  `#linked`) and the item, or null over anything else. The app keeps each person's choice for a type
-   *  (`PagePlacements`), and a hidden row is simply not sent. */
+  /** The row that an event's target is in, for a context menu: a row of the head, or Linked From. Null over anything
+   *  else. */
   rowAt(target: EventTarget | null): { item: string; row: string } | null {
     const row = (target as Element | null)?.closest?.<HTMLElement>('[data-row]')?.dataset.row
     return this.model && row ? { item: this.model.item, row } : null
+  }
+
+  /** A right-click on a row of the head opens the row's menu, under its name, in place of WebKit's own. Whether it did. */
+  openRowMenuAt(target: EventTarget | null): boolean {
+    const entry = (target as Element | null)?.closest?.<HTMLElement>('.item-prop[data-row]')
+    const term = entry?.querySelector<HTMLElement>('.item-prop-label')
+    if (!entry?.dataset.row || !term || !this.root.contains(entry)) return false
+    const row = this.model?.rows.find((candidate) => candidate.id === entry.dataset.row)
+    const value = entry.querySelector<HTMLElement>('.item-prop-value')
+    const holdsLink = !!value?.querySelector('a, button')
+    this.openFieldMenu(term, entry.dataset.row, !!row?.editable && holdsLink)
+    return true
   }
 
   /** Asks the app to list the rows in the order the page now shows: those on screen as dragged, then any folded away
@@ -1107,13 +1037,23 @@ export class ItemHeader {
   private moveRow(row: string, shown: string[]) {
     if (!this.model) return
     const kept = new Set(shown)
-    const folded = this.model.properties
-      .map((property) => property.id)
-      .filter((id) => !kept.has(id))
+    const folded = this.model.rows.map((property) => property.id).filter((id) => !kept.has(id))
     postToHost({ type: 'moveRow', item: this.model.item, row, order: [...shown, ...folded] })
   }
 
-  /** Asks the app for the menu of a row's or a pin's field, under its label. */
+  /** Asks the app for Change Type, under the kicker's type name. */
+  private changeType(type: HTMLElement) {
+    if (!this.model) return
+    const rect = type.getBoundingClientRect()
+    postToHost({
+      type: 'changeType',
+      item: this.model.item,
+      rect: [rect.left, rect.top, rect.width, rect.height],
+      viewportHeight: window.innerHeight,
+    })
+  }
+
+  /** Asks the app for a row's menu, under its name. */
   private openFieldMenu(term: HTMLElement, row: string, editsValue: boolean) {
     if (!this.model) return
     const rect = term.getBoundingClientRect()
@@ -1145,7 +1085,7 @@ export class ItemHeader {
    *  editor that is closed or open for another value. */
   private openValue?: { row: string; rect: string }
 
-  /** A value moves as the page changes under it: a row set for the first time joins the filled ones, and a narrower
+  /** A value moves as the page changes under it: a row set for the first time moves out of Show More, and a narrower
    *  window wraps what it holds. The editor open under it is told where it is now. */
   private reportValueMoved() {
     const model = this.model

@@ -13,6 +13,8 @@ enum FieldMenuPresenter {
 
     static func title(of command: FieldMenu.Command, typeLabel: String) -> String {
         switch command {
+        case .showWhenSet: String(localized: "Show When It Has a Value")
+        case .alwaysShow: String(localized: "Always Show")
         case .editValue: String(localized: "Edit Value")
         case .rename: String(localized: "Rename Field…")
         case .editChoices: String(localized: "Edit Choices…")
@@ -27,6 +29,7 @@ enum FieldMenuPresenter {
 
     private static func symbol(of command: FieldMenu.Command) -> String? {
         switch command {
+        case .showWhenSet, .alwaysShow, .hide: nil
         case .editValue: "pencil"
         case .rename: "character.cursor.ibeam"
         case .editChoices: "list.bullet"
@@ -35,7 +38,6 @@ enum FieldMenuPresenter {
         case .unpin: "pin.slash"
         case .moveUp: "arrow.up"
         case .moveDown: "arrow.down"
-        case .hide: "eye.slash"
         }
     }
 
@@ -63,6 +65,7 @@ enum FieldMenuPresenter {
                 let item = NSMenuItem(title: words, action: #selector(Choice.fire(_:)), keyEquivalent: "")
                 item.target = chosen
                 item.isEnabled = entry.isEnabled
+                item.state = entry.isChecked ? .on : .off
                 if let name = symbol(of: entry.command) { item.image = NSImage(systemSymbolName: name, accessibilityDescription: nil) }
                 // A menu item has no destructive role of its own, so the removal is drawn red as the alert's button is.
                 if entry.command == .remove, entry.isEnabled {
