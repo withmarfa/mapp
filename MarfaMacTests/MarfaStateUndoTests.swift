@@ -32,6 +32,7 @@ import Testing
         try await show(id, state, in: library, source)
         source.send(.taken(write))
         source.send(.answered(write, .accepted))
+        try #require(await eventually { library.stateJudging[write] == nil })
     }
 
     /// An archived item this Mac moved to Recently Deleted, the move taken and accepted.
@@ -76,7 +77,6 @@ import Testing
         let undo = UndoManager()
         library.delete([F.n1], undoManager: undo)
         try await accept(F.n1, .trashed, in: library, source)
-        try #require(await eventually { library.stateJudging.isEmpty })
         source.clearWrites()
         // Another device recovers the item, and the copy syncs it.
         try await show(F.n1, .active, in: library, source)
@@ -184,6 +184,7 @@ import Testing
             source.send(.taken(bin.id))
             source.send(.answered(bin.id, .accepted))
         }
+        try #require(await eventually { library.stateJudging.isEmpty })
         source.clearWrites()
 
         undo.undo()

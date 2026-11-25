@@ -155,6 +155,9 @@ final class StepCountingUndoManager: UndoManager {
         let undo = StepCountingUndoManager()
         library.delete([a, b, binned], undoManager: undo)
         #expect(undo.steps == 1)
+        // The Undo waits for the engine to queue the moves.
+        for write in source.submitted { source.send(.taken(write.id)) }
+        try #require(await eventually { library.stateJudging.isEmpty })
         source.clearWrites()
         undo.undo()
         #expect(Set(source.writes) == [.restore(a), .restore(b)])

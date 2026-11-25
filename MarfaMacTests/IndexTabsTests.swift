@@ -37,6 +37,9 @@ import Testing
             #expect(member.collectionIDs.contains(holiday), "a member keeps its place in the collection that is in Recently Deleted")
         }
 
+        // The Undo waits for the engine to queue the move.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try #require(await eventually { library.stateJudging.isEmpty })
         source.clearWrites()
         toasts.undo()
         #expect(source.writes == [.restore(holiday)], "Undo brings back the collection alone")
