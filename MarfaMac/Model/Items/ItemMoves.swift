@@ -28,10 +28,18 @@ nonisolated struct CommandOutcome: Equatable, Sendable {
     }
 }
 
-/// The question before Move to Feed of items older than the type's feed window, which the Feed would let go.
+/// The question before Move to Feed or Unarchive of items older than the type's feed window, which the Feed would let go.
 nonisolated struct FeedLimitQuestion: Equatable, Sendable {
+    /// What the items past the window share, where they are of one type.
+    struct Window: Equatable, Sendable {
+        /// What the core calls a list of the type's items, such as `Messages`.
+        let typePlural: String
+        let days: Int
+    }
+
     /// How many of the items are older than the window.
     let pastWindow: Int
+    var window: Window?
 }
 
 extension ItemMove {
@@ -203,12 +211,51 @@ extension ItemLibrary {
         return offered
     }
 
-    /// Nil for now: the question waits for the type's feed window in the catalogue (withmarfa/marfa#3560,
-    /// withmarfa/marfa-swift#559), which `GET /types` alone does not give the copy.
-    func feedLimitQuestion(for ids: Set<ItemID>) -> FeedLimitQuestion? { nil }
+    /// Asks only where the move would leave an item in the bin within the hour, the `feed-expiry` job running hourly:
+    /// an active item that Move to Feed moves, or an archived item in the Feed that Unarchive makes active, past its
+    /// type's window (`Catalogue.feedExpiry`). Nothing is asked of a type the catalogue does not hold or that keeps its
+    /// feed items, nor of an archived item Move to Feed moves, which the job leaves.
+    func feedLimitQuestion(_ move: ItemMove, for ids: Set<ItemID>) -> FeedLimitQuestion? {
+        feedLimitQuestion(move, for: ids, now: .now)
+    }
+
+    func feedLimitQuestion(_ move: ItemMove, for ids: Set<ItemID>, now: Date) -> FeedLimitQuestion? {
+        let moving: [Item]
+        switch move {
+        case .moveToFeed: moving = tierPlan(ids, to: .feed).changing.compactMap(item).filter { $0.state == .active }
+        case .unarchive: moving = unarchivePlan(ids).changing.compactMap(item).filter { $0.tier == .feed }
+        case .keep, .archive: return nil
+        }
+        let past = moving.filter { item in catalogue.feedExpiry(of: item).map { now > $0 } == true }
+        guard let first = past.first else { return nil }
+        let days = catalogue.itemTypes[first.type]?.feedDays
+        let window = days.flatMap { days in
+            past.allSatisfy { $0.type == first.type }
+                ? FeedLimitQuestion.Window(typePlural: catalogue.plural(for: first.type), days: days) : nil
+        }
+        return FeedLimitQuestion(pastWindow: past.count, window: window)
+    }
 
     /// A collection, a view or the app's settings stays in the Library.
     private func canGoToFeed(_ item: Item) -> Bool {
         !catalogue.isCollection(item.type) && !item.type.isHidden
+    }
+}
+
+nonisolated extension Catalogue {
+    /// When the type's feed window ends for `item`: its creation plus the type's days of 24 hours, as Marfa's `feed-expiry`
+    /// job counts them. Once it has passed, the job moves the item to the bin if it is active in the Feed and nothing it
+    /// would take with it is still held. Nil where the type keeps its feed items, the catalogue does not hold the type, or
+    /// the item's creation is unknown (`MarfaMapping.timestamp` gives the oldest moment, which is no age).
+    func feedExpiry(of item: Item) -> Date? {
+        guard let days = itemTypes[item.type]?.feedDays, days > 0, item.created > .distantPast else { return nil }
+        return item.created.addingTimeInterval(Double(days) * 86_400)
+    }
+
+    /// The day Info says `item` leaves the Feed: an active Feed item whose window has not yet ended. A date already past
+    /// says nothing, since the job may be behind or off, or the item may have been restored from the bin, which keeps it.
+    func leavesTheFeed(_ item: Item, now: Date = .now) -> Date? {
+        guard item.tier == .feed, item.state == .active, let expiry = feedExpiry(of: item), expiry > now else { return nil }
+        return expiry
     }
 }

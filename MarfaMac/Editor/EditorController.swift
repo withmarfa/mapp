@@ -54,6 +54,10 @@ final class EditorController: NSObject {
     @ObservationIgnored var headerTypeIcons: Set<String?> = []
     /// What the person does in the page's item header, for the window showing it to carry out.
     @ObservationIgnored var onHeaderEvent: (PageHeaderEvent) -> Void = { _ in }
+    /// Carries out the page's notice action for an item, by the notice's kind (`PageNotice.Kind`).
+    @ObservationIgnored var onNoticeAction: (ItemID, String) -> Void = { _, _ in }
+    /// What the page's notices say, which the page keeps in front of its own about pictures.
+    @ObservationIgnored private(set) var notices: [PageNotice] = []
     /// The window's drafts of item titles, which are saved before the window closes or the library changes.
     @ObservationIgnored var titleDrafts: DetailsPresentation?
     /// Shows the item whose refused title is being told, in the window holding the draft.
@@ -80,7 +84,7 @@ final class EditorController: NSObject {
     @ObservationIgnored var menuRow: (item: ItemID, row: String)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
-    /// A link in the page names this item, which the window opens as choosing it in the list does.
+    /// A window that shows an item beside the list reveals it as choosing it in the list does.
     @ObservationIgnored var onOpenItem: (ItemID) -> Void = { _ in }
     /// A link in the item's text names this item. A window that opens items as Settings > General > Open Items says
     /// sets this; without it the link opens as any other (`onOpenItem`).
@@ -146,6 +150,10 @@ final class EditorController: NSObject {
     private(set) var pageItemID: ItemID?
     /// An explicit selection can outlive a missing body, so its next update can retry the load.
     @ObservationIgnored var requestedItemID: ItemID?
+    /// The item every form of the page shows as its own, in its head, title and panel: the one whose open last handed
+    /// the item before it over, a text item on the page or a file beside it. A form that read the item from anywhere
+    /// else could show one item over another's text, and typing there would reach the item it does not name.
+    private(set) var heldItemID: ItemID?
 
     /// Whether the page is showing this item's header, which an item of a type with no text is too: it has no item on
     /// the page (`pageItemID`), only its header. What the page sends for any other item is stale.
@@ -298,9 +306,39 @@ final class EditorController: NSObject {
         else { load(item) }
     }
 
+    /// Puts `item` on the page, or a file's item beside it once the text is in, for a form that changes its history
+    /// only once the editor holds the item, and answers whether it does: false where the item on the page could not
+    /// be handed over, or another item was asked for meanwhile. A failed hand-over leaves the page the held item's in
+    /// every way, so outside changes and its head's events still reach it, and the person has been told.
+    func open(_ item: Item, then shown: @escaping (Bool) -> Void) {
+        guard library?.pageLayout(of: item) == .text else { return hold(item.id, then: shown) }
+        guard pageItemID != item.id || !isPresented else {
+            select(item)
+            return shown(true)
+        }
+        load(item, staysOnFailure: true, then: shown)
+    }
+
+    /// A file's page has no editor, so the page is left for it once the text on it is handed over.
+    private func hold(_ id: ItemID, then shown: @escaping (Bool) -> Void) {
+        loadRequest += 1
+        let request = loadRequest
+        flush { [self] kept in
+            guard request == loadRequest else { return shown(false) }
+            guard kept else {
+                loading = nil
+                requestedItemID = heldItemID
+                return shown(false)
+            }
+            close()
+            heldItemID = id
+            shown(true)
+        }
+    }
+
     /// Shows an item for reading. A deleted item is shown read-only. The item shown before is
     /// left once its last edit is in.
-    func load(_ item: Item) {
+    func load(_ item: Item, staysOnFailure: Bool = false, then shown: @escaping (Bool) -> Void = { _ in }) {
         requestedItemID = item.id
         if wantsFocus?.id != item.id { wantsFocus = nil }
         if pendingHeading?.itemID != item.id { pendingHeading = nil }
@@ -314,20 +352,27 @@ final class EditorController: NSObject {
         loading = item.id
         let present = { [self] in
             defer { handoff.end() }
-            guard request == loadRequest else { return }
+            guard request == loadRequest else { return shown(false) }
             loading = nil
             // What changed while the last item was handed over is read now, so it is not loaded a second time.
             let item = library?.item(item.id) ?? item
+            heldItemID = item.id
             isHeaderScrolledAway = false
             isContentUnderToolbar = false
             show(item, as: "load")
             if isReady, isPresented, pageItemID == item.id { opening = (generation, interval) }
+            shown(true)
         }
         if pageItemID != nil, pageItemID != item.id {
             flush { [self] kept in
                 if kept { return present() }
-                if request == loadRequest { loading = nil }
+                if request == loadRequest {
+                    loading = nil
+                    // Never an item asked for meanwhile: the request is the one the page still holds.
+                    if staysOnFailure { requestedItemID = heldItemID }
+                }
                 handoff.end()
+                shown(false)
             }
         } else { present() }
     }
@@ -370,6 +415,17 @@ final class EditorController: NSObject {
         guard header != self.header else { return }
         self.header = header
         if isReady { sendHeader() }
+    }
+
+    /// Shows `notices` at the top of the page, or none, and again after the page reloads.
+    func setNotices(_ notices: [PageNotice]) {
+        guard notices != self.notices else { return }
+        self.notices = notices
+        if isReady { sendNotices() }
+    }
+
+    func sendNotices() {
+        call("setNotices", json(notices))
     }
 
     func sendHeader() {
@@ -460,6 +516,7 @@ final class EditorController: NSObject {
     /// commands for the item on the page (Print, Find) stop acting on one out of sight.
     func close() {
         requestedItemID = nil
+        heldItemID = nil
         hide()
     }
 

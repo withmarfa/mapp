@@ -27,8 +27,6 @@ nonisolated struct SyncedSetting: Sendable {
         case serverRows(PreferencesTable, setting: String, SetAside)
         /// A JSON list of words, each a row whose value is `true`.
         case set(PreferencesTable, setting: String)
-        /// One key for each of `places` (`key` followed by a dot and the place), each a row of the place.
-        case placeRows(PreferencesTable, setting: String, places: [String])
         /// The connected server's sidebar layout (`PreferencesSidebar`).
         case sidebar(SetAside)
     }
@@ -40,7 +38,7 @@ nonisolated struct SyncedSetting: Sendable {
     var setAsideKind: SetAside? {
         switch place {
         case .serverMember(_, let kind), .rows(_, _, _, _, _, let kind), .serverRows(_, _, let kind), .sidebar(let kind): kind
-        case .member, .set, .placeRows: nil
+        case .member, .set: nil
         }
     }
 
@@ -48,15 +46,12 @@ nonisolated struct SyncedSetting: Sendable {
     var isPerServer: Bool {
         switch place {
         case .serverMember, .serverRows, .sidebar: true
-        case .member, .rows, .set, .placeRows: false
+        case .member, .rows, .set: false
         }
     }
 
     /// The defaults keys this setting reads and writes.
-    var defaultsKeys: [String] {
-        if case .placeRows(_, _, let places) = place { return places.map { "\(key).\($0)" } }
-        return [key]
-    }
+    var defaultsKeys: [String] { [key] }
 }
 
 enum PreferencesMap {
@@ -77,7 +72,7 @@ enum PreferencesMap {
             DateFormat.key, WeekStart.key, StartWith.key, NewItemType.key, ListKey.openItemsIn, RemotePictureSetting.key,
         ], in: .general)
         + members(PageKey.all + [SourceViewMode.key], in: .editor)
-        + members([ListKey.density, ListKey.showsQuickAdd, CalendarHourHeight.key, NewRowTypes.key, ListScope.defaultScopeKey] + OrderKey.all, in: .lists)
+        + members([ListKey.density, CalendarHourHeight.key, ListScope.defaultScopeKey] + OrderKey.all, in: .lists)
         + members(SearchOptions.keys, in: .search)
         + [SyncedSetting(key: SearchLeaveOuts.defaultsKey, place: .serverMember(.search, .data(SearchLeaveOuts.setAsideKey)))]
 
@@ -98,8 +93,6 @@ enum PreferencesMap {
             .places, setting: "placeDensity", .data, wrapper: nil, local: [], .data(PlaceDensities.setAsideKey))),
         SyncedSetting(key: ViewOrders.key, place: .rows(
             .places, setting: "viewOrder", .data, wrapper: nil, local: [], .data(ViewOrders.setAsideKey))),
-        SyncedSetting(key: "indexTab", place: .placeRows(.places, setting: "indexTab", places: IndexPlace.allCases.map(\.rawValue))),
-        SyncedSetting(key: "indexSort", place: .placeRows(.places, setting: "indexSort", places: IndexPlace.allCases.map(\.rawValue))),
         SyncedSetting(key: SidebarLayouts.defaultsKey, place: .sidebar(.data(SidebarLayouts.setAsideKey))),
     ]
 

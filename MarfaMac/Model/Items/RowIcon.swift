@@ -1,7 +1,7 @@
 import Foundation
 
 /// The mark beside a name in a place that lists both types' icons and symbols the app chose for itself, such as the
-/// command palette's rows, an index page's tiles and a list row's line of facts.
+/// command palette's rows, Library › Sources and a list row's line of facts.
 nonisolated enum RowIcon: Hashable, Sendable {
     /// An SF Symbol for something that is not a type: a place, a command, a state.
     case symbol(String)

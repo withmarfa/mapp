@@ -68,6 +68,7 @@ const host: Fields<EditorMessage> = {
   fieldMenu: { item: true, row: true, editsValue: true, rect: true, viewportHeight: true },
   valueMoved: { item: true, row: true, rect: true, viewportHeight: true },
   changeType: { item: true, rect: true, viewportHeight: true },
+  noticeAction: { item: true, kind: true },
   openLink: { href: true },
   openItem: { item: true },
   copy: { text: true },

@@ -81,6 +81,10 @@ export interface HeaderRow {
   /** A choice or a list of words, each with the tone of its dot. */
   options?: { label: string; tone: string }[]
   items?: HeaderItem[]
+  /** How many of `items` the row draws before `moreItems`, a button that draws the rest. Absent where it draws all. */
+  itemsAfter?: number
+  /** The words of that button, such as "12 More". The app words it; the page never counts. */
+  moreItems?: string
   people?: HeaderListedPerson[]
   /** What a pin says of the values of a list it left out, such as "+4 more", drawn after the first value. The app
    *  words it; the page never counts. */
@@ -91,6 +95,9 @@ export interface HeaderRow {
   folded?: boolean
   /** Hidden on the type's pages, so grey under Show More. */
   muted?: boolean
+  /** The heading of the group a row sits under, after the rows with none: the app words it and decides which rows are
+   *  in it. Such a row is drawn but never dragged. */
+  section?: string
 }
 
 /** An item that links to the one on the page. */
@@ -352,6 +359,8 @@ export class ItemHeader {
   private readonly pins: HTMLDListElement
   private readonly pinsBox: HTMLDivElement
   private readonly properties: HTMLDListElement
+  /** The rows the app put under a heading of their own, after the rows that can be dragged. */
+  private readonly sections: HTMLElement
   private readonly moreProperties: HTMLButtonElement
   private readonly rowsBox: HTMLDivElement
   private readonly linked: LinkedSection
@@ -360,7 +369,11 @@ export class ItemHeader {
    *  pointer. */
   private drawn = ''
   /** Whether the person has opened Show More, for the item on the page. */
-  private expanded = { item: '', properties: false }
+  private expanded: { item: string; properties: boolean; rows: string[] } = {
+    item: '',
+    properties: false,
+    rows: [],
+  }
   private readonly statusPin: HTMLButtonElement
   private readonly parentPin: HTMLButtonElement
   /** The item whose title is being edited, so a blur after the page moved to another item commits nothing. */
@@ -412,6 +425,7 @@ export class ItemHeader {
       () => this.drawn,
     )
     this.properties.setAttribute('aria-label', this.labels.properties)
+    this.sections = element('div', 'item-prop-sections', this.rowsBox)
     this.moreProperties = moreButton(this.rowsBox, () => {
       this.expanded.properties = !this.expanded.properties
       this.redraw()
@@ -533,6 +547,16 @@ export class ItemHeader {
     return this.isHidden ? 0 : this.root.offsetTop + this.root.offsetHeight
   }
 
+  /** Whether the toolbar should name the item: the page is in Focus, which draws no head, or the head has gone
+   *  under the toolbar. A head the app has not sent yet, or one with no height yet, is not away: its title is not
+   *  shown anywhere else, and a page at its start has scrolled nowhere. */
+  isAway(scrolled: number): boolean {
+    if (!this.model) return false
+    if (this.model.focused) return true
+    const bottom = this.bottom
+    return bottom > 0 && scrolled >= bottom
+  }
+
   set(model: HeaderModel | null) {
     const previous = this.model
     this.model = model ?? undefined
@@ -569,7 +593,7 @@ export class ItemHeader {
     this.showPin(this.statusPin, model.status)
     this.showPin(this.parentPin, model.parent)
     if (previous?.item !== model.item) {
-      this.expanded = { item: model.item, properties: false }
+      this.expanded = { item: model.item, properties: false, rows: [] }
       this.linked.reset()
     }
     this.redraw()
@@ -819,6 +843,23 @@ export class ItemHeader {
     link.addEventListener('click', open)
   }
 
+  /** The items a row links to: the first the app names, then a button that draws the rest. */
+  private itemsOf(value: HTMLElement, row: HeaderRow) {
+    const items = row.items ?? []
+    const after = row.itemsAfter
+    const all = after === undefined || this.expanded.rows.includes(row.id)
+    for (const target of all ? items : items.slice(0, after)) this.linkedItem(value, target)
+    if (all || !row.moreItems) return
+    const more = element('button', 'item-more-items', value)
+    more.type = 'button'
+    more.textContent = row.moreItems
+    more.addEventListener('click', (event) => {
+      event.stopPropagation()
+      this.expanded.rows = [...this.expanded.rows, row.id]
+      this.redraw()
+    })
+  }
+
   /** Draws the kicker, the pins, the rows and the linked items from the model. */
   private redraw() {
     const model = this.model
@@ -841,22 +882,47 @@ export class ItemHeader {
     this.pins.replaceChildren(...model.pins.map((pin) => this.pin(pin, model)))
     this.pinsBox.hidden = model.pins.length === 0
 
-    const shown = this.expanded.properties ? model.rows : model.rows.filter((row) => !row.folded)
+    const visible = this.expanded.properties ? model.rows : model.rows.filter((row) => !row.folded)
+    const shown = visible.filter((row) => !row.section)
     this.properties.replaceChildren(...shown.map((row) => this.row(row, model)))
     this.properties.hidden = shown.length === 0
+    this.drawSections(
+      visible.filter((row) => row.section),
+      model,
+    )
     const folded = model.rows.some((row) => row.folded)
     this.moreProperties.hidden = !folded
     this.moreProperties.textContent = this.expanded.properties
       ? this.labels.showLess
       : model.showMore
     this.moreProperties.setAttribute('aria-expanded', String(this.expanded.properties))
-    this.rowsBox.hidden = shown.length === 0 && !folded
-    this.rowsBox.classList.toggle('bare', shown.length === 0)
+    this.rowsBox.hidden = visible.length === 0 && !folded
+    this.rowsBox.classList.toggle('bare', visible.length === 0)
 
     this.linked.draw(this.labels.linkedFrom, model.linked, model.linkedFoldAfter, {
       more: model.showMoreLinked,
       less: this.labels.showLess,
     })
+  }
+
+  /** The rows under a heading, each heading once with its rows below it, in the order the app sent them. */
+  private drawSections(rows: HeaderRow[], model: HeaderModel) {
+    const groups = new Map<string, HeaderRow[]>()
+    for (const row of rows) groups.set(row.section!, [...(groups.get(row.section!) ?? []), row])
+    this.sections.replaceChildren(
+      ...[...groups].map(([heading, members]) => {
+        const group = element('div', 'item-prop-section')
+        const title = element('div', 'item-prop-heading', group)
+        title.setAttribute('role', 'heading')
+        title.setAttribute('aria-level', '3')
+        title.textContent = heading
+        const list = element('dl', 'item-props', group)
+        list.setAttribute('aria-label', heading)
+        list.replaceChildren(...members.map((row) => this.row(row, model)))
+        return group
+      }),
+    )
+    this.sections.hidden = groups.size === 0
   }
 
   /** A row: its grabber in the symbol's place, its name, and its value, three elements for VoiceOver. */
@@ -969,7 +1035,7 @@ export class ItemHeader {
         if (model.parent) value.append(this.parentPin)
         break
       case 'items':
-        for (const target of row.items ?? []) this.linkedItem(value, target)
+        this.itemsOf(value, row)
         break
       case 'people':
         for (const person of row.people ?? []) this.person(value, 'span', person)

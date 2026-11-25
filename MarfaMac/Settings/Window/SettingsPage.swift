@@ -122,7 +122,6 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .lists:
             [
                 String(localized: "Density"), String(localized: "Sort By"), String(localized: "Group By"), String(localized: "Order"),
-                String(localized: "Items Page"), String(localized: "Show Quick Add Options"),
             ]
         case .editor:
             [

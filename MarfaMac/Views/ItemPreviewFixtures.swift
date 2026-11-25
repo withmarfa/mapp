@@ -113,22 +113,12 @@ private struct WhenLoaded<Content: View>: View {
                           type: library.catalogue.itemTypes[item.type],
                           catalogue: library.catalogue,
                           hiddenKeys: library.hiddenPropertyKeys(of: item),
-                          relationships: [.init(field: "child-of", label: library.catalogue.edgeTypes[MarfaMapping.parentEdge]?.reverseLabel ?? "", targets: [.init(title: "Missing project", itemID: nil, resolution: .missing)], isEditable: true, allowsMultiple: false)],
-                          onProperty: { _, _ in true }, onOpen: { _ in }, onEdit: { _ in }, onRemove: { _, _ in true })
+                          relationships: [.init(field: "child-of", label: library.catalogue.edgeTypes[MarfaMapping.parentEdge]?.reverseLabel ?? "", targets: [.init(title: "Missing project", itemID: nil, resolution: .missing)], isEditable: true)],
+                          onProperty: { _, _ in true }, onOpen: { _ in }, onRemove: { _, _ in true })
         }
     }
     .interfaceTextStyle()
     .frame(width: 330, height: 650)
-}
-
-#Preview("Relationship Selection") {
-    WhenLoaded(library: ItemPreviewFixtures.library) { library in
-        if let relationship = library.relationships(for: ItemPreviewFixtures.ticketID).first {
-            ItemRelationshipPicker(owner: ItemPreviewFixtures.ticketID, relationship: relationship,
-                                   candidates: library.relationshipCandidates(for: ItemPreviewFixtures.ticketID, field: relationship.field), onSave: { _, _ in true })
-                .environment(\.library, library)
-        }
-    }
 }
 
 #Preview("Complete Item Window") {

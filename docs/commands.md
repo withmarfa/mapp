@@ -42,8 +42,8 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 - **Archive and Unarchive are one command, ⌃⌘A,** which toggles by state and archives a mixed selection.
 - **A toast follows each move** (`Browser.move`): "Kept “x” in the Library", "Moved “x” to the Feed", "Archived “x”" or "Unarchived “x”", or the count. It shows only what the copy queued. Its Undo is the step the move registered, and the library says so if it puts the step back.
 - **Archive asks when items are under the selection:** Archive All, Archive Only This Item or Cancel, with the count `archivePlan` puts beneath (`ArchiveRequest`).
-- **Move to Feed asks when the Feed would let the items go** (`FeedLimitRequest`). `feedLimitQuestion` answers nil until the catalogue gives a type's feed window (withmarfa/marfa#3560, withmarfa/marfa-swift#559), so no question is asked yet.
-- **A collection can be archived and is never moved to the Feed.** A table gets no Move to Feed once the package says which types hold one (withmarfa/marfa-swift#561).
+- **Move to Feed and Unarchive ask when the Feed would let the items go** (`FeedLimitRequest`, worked out by `feedLimitQuestion` from the type's `feedDays` and each item's `created`). It counts only the items the move would leave active in the Feed past their window, and names the type and days where they share one type.
+- **A collection can be archived and is never moved to the Feed.** A table is not yet kept out of the Feed: the package now says which types hold one, and the app does not use that yet.
 - **These queue offline,** so none waits on `reachesServer`.
 
 ## Shortcuts
@@ -69,8 +69,7 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | File | Keep in Library | ⌃⌘K | Yes |
 | File | Archive, Unarchive | ⌃⌘A | Yes |
 | File | Print… | ⌘P | Yes |
-| File | Open, Open as Modal, Open as Full Page, Quick Look, Open Original, Open in Browser, Share…, Add to Favorites, Add Tag…, Change Type…, Add to Collection…, Customize Layout…, Version History…, Move to Feed, Delete, Recover, Rename Source…, Choose Source Mark…, Delete Collection…, Export Layouts…, Import Layouts…, Export as PDF… | – | Yes |
-| File | Open Beside the List | – | Agreed |
+| File | Open, Open Beside the List, Open as Modal, Open as Full Page, Quick Look, Open in Default App, Share…, Add to Favorites, Add Tag…, Change Type…, Add to Collection…, Customize Layout…, Version History…, Move to Feed, Delete, Recover, Rename Source…, Choose Source Mark…, Delete Collection…, Export Layouts…, Import Layouts…, Export as PDF… | – | Yes |
 | Edit | Copy Link | ⇧⌘C | Yes |
 | Edit | Add Attachment… | ⇧⌘A | Yes |
 | Edit | Search Items… | ⇧⌘P | Yes |

@@ -9,6 +9,10 @@ paths:
   - MarfaMac/Views/Sidebar*.swift
   - MarfaMac/Views/Window*.swift
   - MarfaMac/Views/ItemModal.swift
+  - MarfaMac/Views/ItemBesideColumn.swift
+  - MarfaMac/Views/ItemWindow*.swift
+  - MarfaMac/Model/ItemWindowHistory.swift
+  - MarfaMac/Model/BesideSettler.swift
   - MarfaMac/Views/CommandPalette*.swift
 ---
 
@@ -64,8 +68,8 @@ paths:
 
 ## Corner
 
-- **The corner holds only controls for viewing** the page or list in front (`WindowCorner`, `PageCorner`): formats, text size, focus, zoom, pages.
-- **A control turned off in Settings is in More instead.** The modal has no corner.
+- **The corner holds only controls for viewing** the page or list in front (`WindowCorner`, `PageCorner`): formats, text size, focus, zoom, pages. A control turned off in Settings is in More instead.
+- **The modal has no corner,** and the column beside a layout has Open as Page alone.
 
 ## Menus and palettes
 
@@ -76,11 +80,12 @@ paths:
 
 ## Opening an item
 
-- **Open, Return, a double click and a link follow Open Items** (`ItemOpening`).
-- **A modal and a full page show one item.** New Window takes several and asks first above a limit (`ItemWindows`).
-- **The modal hosts the page with the window's one editor** (`ItemModal`), so two never write one item; the page beside the list steps aside.
-- **Escape, Close and a click outside save and close the modal.** Up and down follow the list behind it (`ListNeighbors`).
-- **A full page's Back returns to the layout**, without the list's view options.
+- **Open, Return, a double click and a link follow Open Items** (`ItemOpening`), and the menu offers the other ways.
+- **Beside the List is the standard:** a layout that spans the window shows the chosen item's page in a column of 372 (`BesideColumn`), and a new row replaces it once the selection rests (`BesideSettler`).
+- **A column, a modal and a full page show one item** with the window's one editor, one at a time. New Window takes several and asks first above a limit (`ItemWindows`).
+- **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`), Keep moves on once queued, and a followed link stays in it.
+- **An item's window has the modal's controls and the panel** (`ItemWindowToolbar`); Back and Forward walk its links (`ItemWindow.go`).
+- **A full page's Back returns to the layout**, and the list's view options are not offered.
 
 ## Item links
 

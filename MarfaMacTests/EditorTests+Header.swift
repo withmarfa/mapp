@@ -9,6 +9,39 @@ import WebKit
 extension EditorTests {
     // MARK: The item header
 
+    /// A new selection in the main window leaves the head on the item whose text the page still holds until that text
+    /// is handed over, so typing in the wait never shows under the head of an item it does not reach.
+    @Test @MainActor func theHeadStaysOnTheItemThePageHoldsUntilItsTextIsHandedOver() async throws {
+        let library = FakeItemLibrary()
+        let first = library.add("First\n")
+        let second = library.add("Second\n")
+        let page = try await Page(library: library)
+        page.editor.onChange = { [library] id, text, read in library.updateBody(of: id, to: text, readAt: read) }
+        page.editor.showHeader(ItemPageHeader.heldHeader(of: page.editor, in: library, drafts: DetailsPresentation()))
+        try await page.show(first.id)
+        try await page.wait { page.editor.header?.item == first.id.rawValue }
+        let leaving = page.editor.generation
+        try await page.run("""
+            window.held = true
+            const flush = window.editor.flush.bind(window.editor)
+            window.editor.flush = generation => {
+                if (window.held) return { commandError: 'composition', message: 'Text composition is in progress' }
+                return generation === \(leaving) ? 'First, typed\\n' : flush(generation)
+            }
+            """)
+
+        // As the main window's page does when the selection moves.
+        page.editor.select(try #require(library.item(second.id)))
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(page.editor.header?.item == first.id.rawValue, "the head waits for the text on the page")
+        #expect(page.editor.pageItemID == first.id)
+
+        try await page.run("window.held = false")
+        try await page.wait { page.editor.pageItemID == second.id && page.editor.header?.item == second.id.rawValue }
+        #expect(library.body(of: first.id)?.text == "First, typed\n")
+        #expect(library.body(of: second.id)?.text == "Second\n")
+    }
+
     static func header(_ title: String, id: ItemID = ItemID("note")) -> PageHeader {
         PageHeader(item: id.rawValue, title: title, draft: nil, titleRejected: false,
                    titleRefusal: "The title could not be saved.", editable: true,
@@ -410,5 +443,43 @@ extension EditorTests {
         host.library.recover([host.ticket], undoManager: nil)
         try await host.page.wait { host.page.editor.isEditable }
         try await host.waitFor("the title to unlock") { try await host.value(titleEditable) as? String == "plaintext-only" }
+    }
+
+    /// The toolbar names the item only once its head is off the screen, so a page that is opened, or moved to another
+    /// item, never says the head is away while it sits at the top, not even for the moment before the head is laid out.
+    @Test @MainActor func aPageAtItsStartNeverSaysItsHeadIsAway() async throws {
+        let library = FakeItemLibrary()
+        let first = library.add("First\n")
+        let second = library.add("Second\n")
+        let page = try await Page(library: library)
+        let recorder = AwayRecorder(page.editor)
+        page.editor.showHeader(ItemPageHeader.heldHeader(of: page.editor, in: library, drafts: DetailsPresentation()))
+        for item in [first, second] {
+            try await page.show(item.id)
+            try await page.wait { page.editor.header?.item == item.id.rawValue }
+            try await Task.sleep(for: .milliseconds(300))
+            #expect(page.editor.isHeaderScrolledAway == false)
+        }
+        #expect(!recorder.told.contains(true), "the page said its head was away while it showed")
+    }
+}
+
+/// Every value the editor's report of its head being away takes, in order.
+@MainActor private final class AwayRecorder {
+    private let editor: EditorController
+    private(set) var told: [Bool] = []
+
+    init(_ editor: EditorController) {
+        self.editor = editor
+        watch()
+    }
+
+    private func watch() {
+        withObservationTracking { _ = editor.isHeaderScrolledAway } onChange: {
+            Task { @MainActor [self] in
+                told.append(editor.isHeaderScrolledAway)
+                watch()
+            }
+        }
     }
 }

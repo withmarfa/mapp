@@ -5,7 +5,6 @@ import SwiftUI
 struct PlainTextFilePage: View {
     let text: String
     let title: String
-    let openFile: () -> Void
     @StoredPageStyle private var style
 
     /// Text longer than this many UTF-8 bytes is drawn by an `NSTextView`, which lays out only what is on screen.
@@ -32,8 +31,6 @@ struct PlainTextFilePage: View {
                         .lineLimit(1)
                         .accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 0)
-                    Button("Open", systemImage: "arrow.up.forward.app", action: openFile)
-                        .appButton(.secondary)
                 }
                 .padding(.horizontal, inset)
                 .padding(.top, 16)
@@ -53,8 +50,6 @@ struct PlainTextFilePage: View {
                             .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .bold))
                             .accessibilityAddTraits(.isHeader)
                         Spacer(minLength: 0)
-                        Button("Open", systemImage: "arrow.up.forward.app", action: openFile)
-                            .appButton(.secondary)
                     }
                     Text(verbatim: text)
                         .font(.system(size: CGFloat(style.textSize)))

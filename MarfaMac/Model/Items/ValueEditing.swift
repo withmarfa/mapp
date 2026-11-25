@@ -20,10 +20,10 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     case words(ItemTypeInfo.Field)
     /// The item's own tags, which no field holds.
     case tags
-    /// The collections the item is in, which no field holds: an item is added to one or taken out of it.
-    case collections
-    /// The item's parent, which no field holds: a link to another item.
-    case parent
+    /// The items the item is linked to through one edge field, named as `ItemLibrary.relationFields(of:)` names it (the
+    /// parent's `child-of`, the collections' `in-collection`, an inverse as `inverse:` and the edge type): no field of the
+    /// type holds them. Several items at once take only the collections.
+    case relation(String)
     /// The item's type, which no field holds. A person chooses one of the types the item can become.
     case type
     /// The item's Location: a point on a map and, where the type has one, a name for the place. It is made of fields, so
@@ -53,7 +53,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         case .status(let field), .choice(let field), .date(let field), .people(let field, _), .text(let field), .number(let field),
              .words(let field), .yesNo(let field), .entries(let field, _):
             field
-        case .tags, .collections, .parent, .type, .location, .eventTime: nil
+        case .tags, .relation, .type, .location, .eventTime: nil
         }
     }
 
@@ -61,8 +61,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     var change: ItemChange {
         switch self {
         case .tags: .tags
-        case .collections: .collections
-        case .parent: .links
+        case .relation: .links
         case .type: .type
         default: .fields
         }
@@ -72,8 +71,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     var rowID: String {
         switch self {
         case .tags: PagePlacement.tags
-        case .collections: MarfaMapping.collectionEdge
-        case .parent: PagePlacement.parent
+        case .relation(let field): field
         case .type: PagePlacement.type
         case .location: ItemLocation.rowID
         case .eventTime: EventTime.rowID
@@ -95,11 +93,12 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     }
 
     /// Whether choosing a value is the whole of the edit, so the panel closes on it. The value held then shows as one
-    /// chip in the search field; a value that holds several shows one chip each, and the panel stays open.
+    /// chip in the search field; a value that holds several shows one chip each, and the panel stays open. A link closes
+    /// it only where its field holds one (`ValueEditModel.holdsOne`).
     var closesOnChoice: Bool {
         switch self {
-        case .status, .choice, .parent, .type, .yesNo: true
-        case .date, .people, .tags, .collections, .text, .number, .words, .location, .eventTime, .entries: false
+        case .status, .choice, .type, .yesNo: true
+        case .date, .people, .tags, .relation, .text, .number, .words, .location, .eventTime, .entries: false
         }
     }
 }
@@ -113,6 +112,8 @@ nonisolated struct ValueChip: Identifiable, Hashable, Sendable {
     var isRemovable = true
     /// Whether the chip is the type being given to an item, the one chip that takes a tint.
     var givesType = false
+    /// Whether the chip is "N More", which shows the chips it left out and takes nothing away.
+    var revealsMore = false
 }
 
 /// One line of a list in a value panel or a menu.

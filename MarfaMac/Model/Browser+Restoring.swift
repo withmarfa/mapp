@@ -110,7 +110,7 @@ extension Browser {
         if selection.isEmpty { selectFirstItem(in: library, order: order) }
         // Only where the window is back in the place it was left, and not with another item chosen in its stead.
         guard shown == place else { return }
-        if snapshot.opensItem == true, keptSelection, selection.count == 1, usesCollection || shown == .library {
+        if snapshot.opensItem == true, keptSelection, selection.count == 1, usesCollection {
             isCollectionItemPresented = true
         }
         if let offset = snapshot.scrollOffset, offset > 0 { listMemory.restore(to: CGFloat(offset)) }

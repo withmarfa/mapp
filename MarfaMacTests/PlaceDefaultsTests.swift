@@ -85,11 +85,12 @@ struct PlaceDefaultsTests {
         #expect(Self.window(defaults, library: library, place: .feed).tableOptions[.feed]?.isFiltering != true)
     }
 
-    @Test func aSavedViewAndTheThreeIndexesHaveNoDefaultView() {
+    @Test func aSavedViewAndTheIndexesOfPlacesHaveNoDefaultView() {
         #expect(!Browser.hasDefaultView(.saved(ItemID("v"))))
         #expect(!Browser.hasDefaultView(.sources))
         #expect(!Browser.hasDefaultView(.collections))
-        #expect(!Browser.hasDefaultView(.library))
+        #expect(!Browser.hasDefaultView(.types))
+        #expect(Browser.hasDefaultView(.library))
         #expect(Browser.hasDefaultView(.collection(ItemID("c"))))
     }
 
@@ -128,7 +129,7 @@ struct PlaceDefaultsTests {
 
         browser.resetView(in: library)
         #expect(browser.tableOptions[browser.shown]?.isFiltering != true)
-        #expect(browser.viewMode == Browser.naturalLayout(of: browser.shown))
+        #expect(browser.viewMode == browser.naturalLayout(of: browser.shown))
         #expect(browser.density == nil)
         #expect(!browser.isDefaultViewChanged)
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)
@@ -258,6 +259,29 @@ struct PlaceDefaultsTests {
         #expect(options?.filter.clauses.map(\.op) == [.isNot])
         #expect(options?.sort?.map(\.column.id) == ["title"])
         #expect(options?.grouping == .automatic)
+    }
+
+    @Test func aSortAndGroupingTheWindowCouldNotApplyOutliveAnotherChange() {
+        let defaults = ViewPanelTests.defaults()
+        var stored = PlaceDefault()
+        stored.sort = [.init(column: "field.gone", reversed: false), .init(column: "title", reversed: true)]
+        stored.grouping = .column("field.gone")
+        stored.groupOrder = ["a"]
+        Self.store(stored, for: Self.tasks, in: defaults)
+        let browser = Self.window(defaults, library: Self.library())
+        browser.setFilter(Self.status, values: ["todo"], negated: true)
+        browser.choicesChanged()
+        var kept = PlaceDefaults.stored(in: defaults).default(for: Self.tasks)
+        #expect(kept?.sort == stored.sort)
+        #expect(kept?.grouping == stored.grouping)
+        #expect(kept?.groupOrder == ["a"])
+        #expect(kept?.filter.map(\.field) == [Self.status])
+
+        // A sort the person sets replaces it.
+        browser.tableOptions[Self.tasks, default: .init()].sort = [ItemTableComparator(column: .edited, order: .forward)]
+        browser.choicesChanged()
+        kept = PlaceDefaults.stored(in: defaults).default(for: Self.tasks)
+        #expect(kept?.sort == [.init(column: "edited", reversed: false)])
     }
 
     @Test func aTypeThatNoLongerExistsIsIgnored() {

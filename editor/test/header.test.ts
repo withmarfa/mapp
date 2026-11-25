@@ -647,6 +647,37 @@ test('a long list of linked items expands, and folds again', () => {
   expect(section.querySelectorAll('.item-linked-row')).toHaveLength(3)
 })
 
+test('a row of many links draws the first the app names, then a button that draws the rest', () => {
+  const items = Array.from({ length: 5 }, (_, index) => ({
+    title: `Item ${index}`,
+    item: `i${index}`,
+    symbol: 'doc',
+    kind: 'link' as const,
+    tone: 'blue',
+  }))
+  header.set({
+    ...ticket,
+    rows: [
+      {
+        id: 'blocks',
+        label: 'Blocks',
+        symbol: 'link',
+        kind: 'items',
+        items,
+        itemsAfter: 3,
+        moreItems: '2 More',
+      },
+    ],
+  })
+  const count = () => root.querySelectorAll('.item-prop-value .item-chip').length
+  expect(count()).toBe(3)
+  const more = root.querySelector<HTMLButtonElement>('.item-more-items')!
+  expect(more.textContent).toBe('2 More')
+  more.click()
+  expect(count()).toBe(5)
+  expect(root.querySelector('.item-more-items')).toBeNull()
+})
+
 test('the title is told how many lines to show', () => {
   header.set({ ...ticket, titleLines: 4 })
   expect(root.style.getPropertyValue('--title-lines')).toBe('4')
@@ -1046,6 +1077,21 @@ test('a page with every row folded keeps Show More and draws no hairline until a
   expect(box.classList.contains('bare')).toBe(false)
 })
 
+test('rows the app puts under a heading come last under it, and are not dragged', () => {
+  const other = { ...rows(1)[0]!, id: 'other:odd', label: 'Odd', folded: true, section: 'Other' }
+  header.set({ ...ticket, rows: [...rows(2), other], showMore: 'Show 1 More' })
+  expect(root.querySelector('.item-prop-sections')!.hasAttribute('hidden')).toBe(true)
+  root.querySelector<HTMLButtonElement>('.item-rows > .item-more')!.click()
+  const section = root.querySelector('.item-prop-section')!
+  expect(section.querySelector('.item-prop-heading')!.textContent).toBe('Other')
+  expect(section.querySelectorAll('.item-prop')).toHaveLength(1)
+  expect(
+    root
+      .querySelector('.item-props:not(.item-prop-section .item-props)')!
+      .querySelectorAll('.item-prop'),
+  ).toHaveLength(2)
+})
+
 test("a long text is a row cut after two lines, and an event's When says how far off it is in grey", () => {
   header.set({
     ...ticket,
@@ -1082,4 +1128,29 @@ test("a right-click on a row opens the row's menu, and anywhere else is left to 
   expect(posted).toMatchObject([{ type: 'fieldMenu', item: 'ticket', row: 'status' }])
   expect(header.openRowMenuAt(title())).toBe(false)
   expect(header.rowAt(name)).toEqual({ item: 'ticket', row: 'status' })
+})
+
+test('the toolbar names the item only once its head has scrolled away, or in Focus', () => {
+  // No head sent yet: nothing is shown to have scrolled, however far the page is.
+  expect(header.isAway(0)).toBe(false)
+  expect(header.isAway(500)).toBe(false)
+  header.set(ticket)
+  expect(header.isAway(0)).toBe(false)
+  // A head with no height yet, as before layout, is not away at the start.
+  Object.defineProperty(root, 'offsetHeight', { configurable: true, value: 0 })
+  Object.defineProperty(root, 'offsetTop', { configurable: true, value: 0 })
+  expect(header.isAway(0)).toBe(false)
+  Object.defineProperty(root, 'offsetHeight', { configurable: true, value: 200 })
+  Object.defineProperty(root, 'offsetTop', { configurable: true, value: 20 })
+  expect(header.isAway(0)).toBe(false)
+  expect(header.isAway(219)).toBe(false)
+  expect(header.isAway(220)).toBe(true)
+  // Focus draws no head, and the toolbar names the item from the start.
+  header.set({ ...ticket, focused: true })
+  expect(header.isAway(0)).toBe(true)
+  header.set(ticket)
+  expect(header.isAway(0)).toBe(false)
+  // The head goes away with the item, so nothing is away.
+  header.set(null)
+  expect(header.isAway(500)).toBe(false)
 })

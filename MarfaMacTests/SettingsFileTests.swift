@@ -55,10 +55,6 @@ import Testing
             $0.set(choice, for: .favorites)
         }
         PlaceDensities.update(in: defaults) { $0.set(.compact, for: .favorites) }
-        for place in IndexPlace.allCases {
-            IndexPreferences.set(place.tabs[1], for: place, in: defaults)
-            IndexPreferences.set(IndexSort(column: place.defaultSort.column, ascending: !place.defaultSort.ascending), for: place, in: defaults)
-        }
         libraries.preferences.reload()
     }
 

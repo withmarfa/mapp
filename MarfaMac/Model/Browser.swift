@@ -31,10 +31,6 @@ final class Browser {
     @ObservationIgnored let listMemory = ColumnMemory()
     /// The place a later copy wrote for this window, kept as written until the person goes elsewhere.
     @ObservationIgnored var laterPlace: [String: String]?
-    /// The rows of the Items index under each tab, kept by the window so they survive an item's full page (`ItemIndexModel`).
-    @ObservationIgnored let itemIndex = ItemIndexModel()
-    /// The item whose row Items scrolls into view once it shows it, asked for by a reveal (`revealOnItems`).
-    var itemToScrollTo: ItemID?
     var selection: Set<ItemID> = [] {
         didSet {
             // The modal shows the one item it was opened on, so any other selection, whoever made it, is the end of it.
@@ -69,6 +65,22 @@ final class Browser {
     /// (`selection`'s observer ends the modal otherwise), so the page, the toolbar and the commands read the selection
     /// as they do anywhere else. Set only through `open(_:as:)`, `moveModal` and `closeModal` (`Browser+Opening`).
     var modalItem: ItemID?
+    /// The column beside a layout that has the page, by the identity it gave itself, or nil. The window's one editor is
+    /// then on that page. A column that is shown puts itself here and one that goes, with the layout it stood beside,
+    /// takes itself away, so a window on an index or on Version History never reads as one with a page. Only the
+    /// column that is named here can clear it, since a layout's column may be replaced by the next one's before it goes.
+    private(set) var besideColumnHost: UUID?
+    /// Whether the page is in the column beside a layout that spans the window (`showsBesidePage`).
+    var showsBesideColumn: Bool { besideColumnHost != nil }
+
+    /// Says whether the column `host` shows the page now. Only a column that shows it, or the one that did, changes the answer.
+    func columnBeside(_ host: UUID, isShown: Bool) {
+        if isShown {
+            if besideColumnHost != host { besideColumnHost = host }
+        } else if besideColumnHost == host {
+            besideColumnHost = nil
+        }
+    }
     /// Opens items in windows of their own, which only a view can do. The window wires it where it makes its editor.
     @ObservationIgnored var windowOpener: ((Set<ItemID>) -> Void)?
 
@@ -148,10 +160,10 @@ final class Browser {
         var timeline: [ItemTypeInfo.Field]?
     }
 
-    /// A window left on a layout its place cannot show goes back to the list without saying so. The indexes of
-    /// collections and sources have no layout, so they leave it as it is for the place that follows to judge.
+    /// A window left on a layout its place cannot show goes back to the list without saying so. Types, Collections and
+    /// Sources have no layout, so they leave it as it is for the place that follows to judge.
     func fallBackToListIfUnavailable(in library: any ItemLibrary) {
-        guard !showsSidebarIndex, !availableViewModes(in: library).contains(viewMode) else { return }
+        guard !showsPlaceIndex, !availableViewModes(in: library).contains(viewMode) else { return }
         set(layout: .list)
     }
     /// How each place's table is grouped, sorted and filtered, as the person left it. A place that is not a saved view
@@ -161,6 +173,18 @@ final class Browser {
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
     @ObservationIgnored var tableMemo: (key: TableKey, content: ItemTableContent)?
+    /// The last table of each large place, shown while its next is arranged off the main actor (`Browser+PlaceContent`).
+    @ObservationIgnored var heldTables: PlaceMemory<(key: TableKey, content: ItemTableContent)> = [:]
+    /// The last table of a large search, shown while the next is arranged off the main actor. Apart from `heldTables`, so
+    /// a search never drops the Library's table nor shows it for its results.
+    @ObservationIgnored var heldSearch: (key: TableKey, content: ItemTableContent)?
+    /// The arrangement under way, what it is for, and the token its task ends it by, so a task that was replaced never
+    /// ends its successor's record.
+    @ObservationIgnored var arranging: (key: TableKey, token: UUID, task: Task<Void, Never>)?
+    /// Counts the arrangements that landed, which a view reads through `tableContent(in:)` to draw the new one.
+    var tableArrangements = 0
+    /// The rows of Types, Collections or Sources, held while what they read stands (`Browser+PlaceIndex`).
+    @ObservationIgnored var indexRowsMemo: (key: IndexRowsKey, rows: [IndexRow])?
     @ObservationIgnored var sectionsMemo: (key: SectionsKey, sections: [ItemSection])?
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
@@ -245,15 +269,12 @@ final class Browser {
     }
 
     var shown: PlaceView { showing ?? .library }
-    /// Whether the window shows Items as an index, the table of every item with its right sidebar. Items has no list
-    /// column and no layout, so whatever layout the window was last left on is not shown there. An item opened from it
-    /// as a full page takes the window until Back.
-    var showsItemsIndex: Bool { shown == .library && !isCollectionItemPresented }
-    var showsSidebarIndex: Bool { shown == .sources || shown == .collections || showsItemsIndex }
+    /// Whether the window shows Library › Types, Collections or Sources: a table of places, with no layout.
+    var showsPlaceIndex: Bool { !shown.listsItems }
     /// Whether an item's page is what the window shows, as against a collection, an index or Settings. The editor
     /// stays mounted behind the others, so every command that acts on the page asks this first. An item open in the
     /// modal is shown over an index as over any layout.
-    var showsPage: Bool { isModalPresented || (!showsCollection && !showsSidebarIndex) }
+    var showsPage: Bool { isModalPresented || showsBesideColumn || (!showsCollection && !showsPlaceIndex) }
 
     /// Shows Settings, at `page` when one is given and where it was left otherwise.
     func showSettings(_ page: SettingsPage? = nil, subpage: SettingsSubpage? = nil) {
@@ -262,10 +283,10 @@ final class Browser {
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    /// Whether the search lists its results as the library ranked them rather than by a sort. The list and Items start on
-    /// relevance; the gallery and the table start on their own sorts and use relevance only once it is picked there.
+    /// Whether the search lists its results as the library ranked them rather than by a sort. The list starts on
+    /// relevance; the other layouts start on their own sorts and use relevance only once it is picked there.
     var ordersByRelevance: Bool {
-        isSearching && (relevanceChoice ?? (viewMode == .list || shown == .library))
+        isSearching && (relevanceChoice ?? (viewMode == .list))
     }
 
     /// Picks relevance or one of the sorts for the search under way. Outside a search there is nothing to pick.
@@ -273,9 +294,8 @@ final class Browser {
         if isSearching { relevanceChoice = byRelevance }
     }
 
-    /// Whether the window shows the gallery or the table, which span it, rather than the list beside the page. Items is
-    /// an index, not a layout, so it never does.
-    var usesCollection: Bool { viewMode.spansWindow && shown != .library }
+    /// Whether the window shows a layout that spans it, rather than the list beside the page.
+    var usesCollection: Bool { viewMode.spansWindow }
     var showsCollection: Bool { usesCollection && !isCollectionItemPresented }
 
     /// Whether the view's options are on offer: the list and the gallery always, the table, board and timeline only
@@ -304,7 +324,7 @@ final class Browser {
         let staysInModal = isModalPresented
         select(item, in: library, order: order)
         if staysInModal { open([item.id], as: .modal) }
-        else if followsCollection { open([item.id], as: .fullPage) }
+        else if followsCollection { open([item.id], as: wayToFollowInCollection()) }
         else { focusRequest = .list }
     }
 
@@ -314,7 +334,6 @@ final class Browser {
             showListing(item, in: library, order: order)
         }
         selection = [item.id]
-        if shown == .library { revealOnItems(item) }
     }
 
     /// Shows the item a link in the page names, as choosing it in the list does: the window's place, search, undo
@@ -322,7 +341,7 @@ final class Browser {
     /// that lists it (`showListing`). The keyboard stays with the page, as it does when a link is followed anywhere.
     func open(linked item: Item, in library: any ItemLibrary, order: ItemOrder) {
         reveal(item, in: library, order: order)
-        if !followsCollection, !showsItemsIndex { focusRequest = .page }
+        if !followsCollection { focusRequest = .page }
     }
 
     /// Opens the item a link in the item's text names the way Settings > General > Open Items says, as Return does in
@@ -384,7 +403,6 @@ final class Browser {
         }
         if !items(in: library).contains(where: { $0.id == entry.id }) { showing = .library }
         selection = [entry.id]
-        if shown == .library, let held = library.item(entry.id) { revealOnItems(held) }
         history.move(to: index)
         focusRequest = .list
     }
@@ -437,9 +455,12 @@ final class Browser {
         let isFirst = libraryID == nil
         libraryID = id
         pagingState = nil
-        itemIndex.reset()
-        itemToScrollTo = nil
         tableMemo = nil
+        heldTables = [:]
+        heldSearch = nil
+        arranging?.task.cancel()
+        arranging = nil
+        indexRowsMemo = nil
         sectionsMemo = nil
         viewModesMemo = nil
         fieldsMemo = nil
@@ -534,16 +555,6 @@ final class Browser {
 
     /// Whether Add Filter… asked for its panel, which the row opens and then clears (`Browser+FilterRow`).
     var isAddFilterRequested = false
-
-    /// Whether the index page has scrolled its title and tabs out of view, which brings the tabs and their buttons into
-    /// the window's toolbar (`Browser+IndexPage`). The page reports it; nothing else sets it.
-    var isIndexHeaderAway = false
-
-    /// Whether the Items page's Edit popover is out, which puts a minus badge on each tile of the New row.
-    var isEditingNewRow = false
-
-    /// The sources the Collections page is narrowed to, by name; empty lists every collection (`Browser+IndexPage`).
-    var collectionSourceFilter: Set<String> = []
 
     /// What the gallery draws on each card in a place that is not a saved view, as its default view keeps it
     /// (`Browser+PlaceDefaults`).

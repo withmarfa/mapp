@@ -7,7 +7,10 @@ import Foundation
 /// The rows are every property the type offers, in the person's order for the type (`PagePlacement.ordered`), each
 /// once. Those shown before Show More are the first `shownLimit` of the rows that have a value or that the person set
 /// to Always Show, or, for a type with no text, of every row the person has not hidden. The rest are `folded`, and a
-/// hidden row is also `muted`. An event's time is its first row, When, whatever the person chose.
+/// hidden row is also `muted`. An event's time is its first row, When, hidden like any other row if the person chose so.
+///
+/// The values no field describes (`PropertyRow.section`) come last, always folded and read only, under a heading of their
+/// own, and have no place in the person's order.
 ///
 /// Pins are made only while pinned properties are on (`PinsProperties`). A pinned row leaves the rows.
 nonisolated struct PageHead: Equatable, Sendable {
@@ -59,8 +62,9 @@ nonisolated struct PageHead: Equatable, Sendable {
     /// "Show 10 More". The page draws these words and never counts.
     var showMore: String { String(localized: "Show \(foldedCount) More") }
 
-    /// The rows' identifiers in the order the page lists them, which a move in the row's menu works from.
-    var order: [String] { rows.map(\.id) }
+    /// The rows' identifiers in the order the page lists them, which a move in the row's menu works from. The rows for
+    /// values no field describes (`section`) are in no order.
+    var order: [String] { rows.filter { $0.section == nil }.map(\.id) }
 
     init(kicker: Kicker, pins: [PropertyRow], rows: [PropertyRow]) {
         self.kicker = kicker
@@ -81,11 +85,14 @@ nonisolated struct PageHead: Equatable, Sendable {
         let event = PageHeaderKind.of(item.type, in: catalogue) == .event ? EventHeader(item: item, now: now) : nil
         let candidates = PropertyRow.candidates(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(event == nil ? [] : EventHeader.keys),
-            relationships: library.relationships(for: item.id), format: dateFormat, tags: library.tags(of: item),
+            links: library.relationFields(of: item.id), format: dateFormat, tags: library.tags(of: item),
             showsCoordinates: showsCoordinates, isPriority: { catalogue.isPriority($0, of: $0.declaredBy) },
-            icon: { PageHead.typeIcon(of: $0, in: library) }, isPerson: { PageHead.isPerson($0, in: library) })
+            icon: { PageHead.typeIcon(of: $0, in: library) }, isPerson: { PageHead.isPerson($0, in: library) },
+            label: { catalogue.label(ofField: $0, for: item.type) })
         let when = event.map {
-            PropertyRow(id: PagePlacement.when, label: String(localized: "When"), value: .when($0.time, note: $0.note), help: $0.help)
+            PropertyRow(
+                id: PagePlacement.when, label: String(localized: "When"), value: .when($0.time, note: $0.note), help: $0.help,
+                editable: item.allows(.fields))
         }
         self.init(
             kicker: Kicker(
@@ -108,7 +115,12 @@ nonisolated struct PageHead: Equatable, Sendable {
             pins = placement.pins.compactMap { id in candidates.first { $0.id == id && (!$0.isEmpty || $0.editable) } }.map(Self.capped)
         }
         let pinned = Set(pins.map(\.id))
-        let listed = placement.ordered(candidates.filter { !pinned.contains($0.id) }, id: \.id)
+        let listed = placement.ordered(candidates.filter { !pinned.contains($0.id) && $0.section == nil }, id: \.id)
+        let others = candidates.filter { $0.section != nil }.map { row in
+            var row = row
+            row.folded = true
+            return row
+        }
         let leading = listed.filter { row in
             switch placement.shows(row.id) {
             case .hidden: false
@@ -116,18 +128,24 @@ nonisolated struct PageHead: Equatable, Sendable {
             case .whenSet: !hasText || !row.isEmpty
             }
         }
-        let shown = Set(([when].compactMap { $0 } + leading).prefix(Self.shownLimit).map(\.id))
+        let shown = Set(([when].compactMap { $0 }.filter { placement.shows($0.id) != .hidden } + leading).prefix(Self.shownLimit).map(\.id))
         let rows = ([when].compactMap { $0 } + listed).map { row in
             var row = row
             row.folded = !shown.contains(row.id)
             row.muted = placement.shows(row.id) == .hidden
             return row
-        }
+        } + others
         self.init(kicker: kicker, pins: pins, rows: rows)
     }
 
     /// Most values of a list a pin shows before "+N more": the first, so it can be shown whole.
     static let listLimit = 1
+
+    /// Most links a row or a link panel shows before "N More", which reveals the rest.
+    static let linkLimit = 30
+
+    /// "12 More", the button that shows the links past the limit. The page draws these words and never counts.
+    static func moreLinksText(_ count: Int) -> String { String(localized: "\(count) More") }
 
     /// What a pin says of the values of a list it left out: "+4 more". The page draws these words and never makes them.
     static func moreText(_ count: Int) -> String { String(localized: "+\(count) more") }

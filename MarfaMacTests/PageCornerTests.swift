@@ -11,7 +11,7 @@ struct PageCornerTests {
     // MARK: Which buttons
 
     @Test func aPageThatCannotBeWrittenHasNoFormats() {
-        #expect(PageCorner.buttons(layout: .text, hasReader: false, canWrite: false) == [.textSize, .focus])
+        #expect(PageCorner.buttons(PageCornerKind(layout: .text, canWrite: false)) == [.textSize, .focus])
     }
 
     @Test func theCornerChoicesAreMacSettings() {

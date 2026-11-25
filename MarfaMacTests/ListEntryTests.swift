@@ -213,7 +213,7 @@ struct ListEntryTests {
     @Test func aLabelledNumberIsStillANumberToCall() {
         let item = Self.personItem(["phones": .array([Self.entry(["value": .string("+44 20 7946 0000"), "label": .string("work")])])])
         let rows = PropertyRow.candidates(
-            of: item, type: Self.person, hidden: ["title"], relationships: [], format: .standard, tags: [], icon: { _ in nil }, isPerson: { _ in false })
+            of: item, type: Self.person, hidden: ["title"], links: [], format: .standard, tags: [], icon: { _ in nil }, isPerson: { _ in false })
         #expect(rows.first { $0.id == "phones" }?.value == .phone("+44 20 7946 0000"))
     }
 
@@ -224,7 +224,7 @@ struct ListEntryTests {
             titleField: "title"))
         let item = Self.personItem(["addresses": .array([Self.entry(["postal_code": .string("90210 12345")])])])
         let rows = PropertyRow.candidates(
-            of: item, type: person, hidden: ["title"], relationships: [], format: .standard, tags: [], icon: { _ in nil }, isPerson: { _ in false })
+            of: item, type: person, hidden: ["title"], links: [], format: .standard, tags: [], icon: { _ in nil }, isPerson: { _ in false })
         #expect(rows.first?.value == .text("90210 12345"))
         // Only a list whose first member is required plain text holds a number to call, and only in that member.
         #expect(try Self.shape(postcodes).numberToCall(in: ["postal_code": .string("90210 12345")]) == nil)

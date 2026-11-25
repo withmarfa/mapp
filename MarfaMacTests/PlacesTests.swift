@@ -106,10 +106,7 @@ struct PlacesTests {
         let columns = try JSONEncoder().encode([#"{"itemType":{"_0":"core.task"}}"#: TableColumnCustomization<ItemTableRow>()])
         defaults.set(columns, forKey: ItemTableColumnLayouts.key)
         defaults.set(try JSONEncoder().encode([#"{"recents":{}}"#: "compact"]), forKey: PlaceDensities.key)
-        IndexPreferences.set(.feed, for: .items, in: defaults)
         EarlierPlace.readIn(in: defaults)
-        // The Items page's From Apps tab would open the Library on an empty tab.
-        #expect(IndexPreferences.tab(for: .items, in: defaults) == .all)
 
         let stored = PlaceDefaults.stored(in: defaults)
         #expect(stored.default(for: .type(TypeID("core.task"))) == sort)

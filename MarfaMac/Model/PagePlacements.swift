@@ -264,13 +264,17 @@ nonisolated enum RowShows: String, Codable, CaseIterable, Sendable {
 nonisolated struct PagePlacement: Equatable, Sendable {
     /// The item's type, which the kicker's type name opens the panel for. It is not a row.
     static let type = "#type"
-    /// An event's time, the one row an event's start, end, day and zone show in. It leads the rows and is no person's
-    /// choice, so it is in no placement.
-    static let when = "#when"
+    /// An event's time, the one row an event's start, end, day and zone show in. It leads the rows, and a choice stored
+    /// under this key hides it as any other row's does.
+    static let when = "when"
     static let tags = "#tags"
     /// The Location row, which stands for an item's latitude and longitude, and its name for the place where it has one.
     static let location = "#location"
     static let linkedFrom = "#linked"
+    /// The relationship a parent's sub-items are held in.
+    static let subItems = RelationField.inversePrefix + MarfaMapping.parentEdge
+    /// The relationship the links in other items' text are held in, which Referenced By lists.
+    static let referencedBy = RelationField.inversePrefix + MarfaMapping.bodyLinkEdge
     /// The relationship the parent is held in.
     static let parent = "child-of"
     /// The most properties a page pins.
@@ -353,5 +357,9 @@ nonisolated struct PagePlacement: Equatable, Sendable {
     /// Where Linked From goes for this type when the person has chosen nothing.
     var defaultLinkedFromPlace: LinkedFromPlace { defaultLinkedFrom }
 
-    private func defaultShows(_ row: String) -> Bool { row != linkField && !bookkeeping.contains(row) }
+    /// Unless chosen, a row shows when it has a value, but for the type's connector link, a connector's bookkeeping and a
+    /// parent's sub-items and Referenced By, which the foot lists.
+    private func defaultShows(_ row: String) -> Bool {
+        row != linkField && !bookkeeping.contains(row) && row != Self.subItems && row != Self.referencedBy
+    }
 }

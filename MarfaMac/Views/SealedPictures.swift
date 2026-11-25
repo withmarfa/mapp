@@ -54,7 +54,7 @@ import WebKit
         documentVersion = version
     }
 
-    /// The person chose to load the pictures waiting, those the callout counts.
+    /// The person chose to load the pictures waiting, those the page's notice counts.
     func loadWaiting() {
         chosen.formUnion(shown.filter(waiting.contains))
         redraw()

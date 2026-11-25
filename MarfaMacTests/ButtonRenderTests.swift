@@ -51,57 +51,6 @@ import Testing
         }
     }
 
-    // MARK: An index page
-
-    private func indexRows() -> [IndexRow] {
-        let now = Date()
-        func row(_ title: String, count: Int, minutesAgo: Double) -> IndexRow {
-            IndexRow(
-                place: .collection(ItemID(UUID().uuidString)), title: title, icon: .symbol("rectangle.stack"), types: "Notes, Tasks",
-                count: count, latest: now.addingTimeInterval(-minutesAgo * 60), breakdown: [])
-        }
-        return [
-            row("Field Research", count: 24, minutesAgo: 3), row("Kitchen quotes", count: 8, minutesAgo: 95),
-            row("Reading list", count: 112, minutesAgo: 60 * 30), row("Archive", count: 3, minutesAgo: 60 * 24 * 40),
-        ]
-    }
-
-    private struct IndexHost: View {
-        let browser: Browser
-        let rows: [IndexRow]
-        @FocusState private var pane: Browser.Pane?
-
-        var body: some View {
-            IndexPage(
-                place: .collections, title: "Collections", browser: browser, pane: $pane, rows: rows,
-                tabs: [(.all, rows.count), (.library, 3), (.feed, 1)], tab: .constant(.library), choice: IndexChoice(), open: { _ in },
-                newCollection: {}, emptyTab: EmptyState("Nothing Here"))
-        }
-    }
-
-    private func indexPage(searching: Bool) -> some View {
-        let browser = Browser()
-        browser.showing = .collections
-        browser.isSearchExpanded = searching
-        return IndexHost(browser: browser, rows: indexRows())
-    }
-
-    @Test func indexPageWithSearch() async throws {
-        let libraries = ItemPreviewFixtures.libraries(named: "MarfaMac.ButtonRender")
-        let library = try await sampleLibrary()
-        try await draw("Index page, search open", size: CGSize(width: 820, height: 380)) {
-            indexPage(searching: true).environment(\.library, library).environment(libraries)
-        }
-    }
-
-    @Test func indexPageAtRest() async throws {
-        let libraries = ItemPreviewFixtures.libraries(named: "MarfaMac.ButtonRender")
-        let library = try await sampleLibrary()
-        try await draw("Index page, at rest", size: CGSize(width: 820, height: 380)) {
-            indexPage(searching: false).environment(\.library, library).environment(libraries)
-        }
-    }
-
     // MARK: The link picker
 
     @Test func linkPicker() async throws {
@@ -112,14 +61,29 @@ import Testing
         }
     }
 
-    // MARK: Banners and the toast
+    // MARK: Page notices and the toast
 
-    @Test func banners() async throws {
+    @Test func notices() async throws {
         let toast = ToastPresenter()
-        try await draw("Banners and the toast", size: CGSize(width: 760, height: 300)) {
+        try await draw("Page notices and the toast", size: CGSize(width: 760, height: 300)) {
             VStack(alignment: .leading, spacing: 16) {
-                SavedAsCopyBanner(copy: ItemID("10000000-0000-0000-0000-000000000009"))
-                PicturesWaitingCallout(count: 2, load: {}, close: {}).padding(.horizontal, 16)
+                PageNoticeView(
+                    notices: [
+                        PageNotice(
+                            kind: .copySaved, item: ItemID("10000000-0000-0000-0000-000000000001"),
+                            words: "This item changed elsewhere, so your changes were saved as a copy.",
+                            action: .openCopy(ItemID("10000000-0000-0000-0000-000000000009")))
+                    ],
+                    run: { _ in }
+                ).padding(.horizontal, 28)
+                PageNoticeView(
+                    notices: [
+                        PageNotice(
+                            kind: .picturesWaiting, item: ItemID("10000000-0000-0000-0000-000000000001"),
+                            words: PageNotice.picturesWaiting(2), action: .loadPictures, waitingPictures: 2)
+                    ],
+                    run: { _ in }, close: {}
+                ).padding(.horizontal, 28)
                 ToastView(
                     toast: .init(message: "Moved “Kitchen quotes” to Recently Deleted", symbol: "trash", undo: {}), presenter: toast)
                     .padding(.horizontal, 16)

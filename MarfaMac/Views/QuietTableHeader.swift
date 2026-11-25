@@ -197,8 +197,8 @@ private final class QuietHeaderView: NSTableHeaderView {
     }
 }
 
-/// A column heading's cell, drawn without the separators and the bottom line AppKit draws with it, in the font of the
-/// New row's label (callout, medium) and the secondary color, whether or not its column is the sorted one. The sort
+/// A column heading's cell, drawn without the separators and the bottom line AppKit draws with it, in the callout font,
+/// medium, and the secondary color, whether or not its column is the sorted one. The sort
 /// indicator follows the title, wherever the column aligns it, so every table's reads the same.
 private final class QuietHeaderCell: NSTableHeaderCell {
     static let headingFont = NSFont.systemFont(ofSize: 12, weight: .medium)
@@ -206,7 +206,7 @@ private final class QuietHeaderCell: NSTableHeaderCell {
     /// The room a column keeps between its edge and its content, which a heading shares with its cells.
     private static let edge: CGFloat = 6
     /// The room a right-aligned heading keeps after its title, which is the room its column's numbers keep after theirs
-    /// (`IndexMetrics.countRoom`) on top of the column's own.
+    /// (`PlaceIndexMetrics.countRoom`) on top of the column's own.
     static let trailingRoom: CGFloat = 20
     private static let indicatorGap: CGFloat = 3
     private static let indicatorFont = NSFont.systemFont(ofSize: 9, weight: .semibold)

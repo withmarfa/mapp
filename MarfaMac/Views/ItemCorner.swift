@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The corner of an item's page: Aa where the page can be written, Reader or Original where a web page has a Reader
-/// view, the text size of every page of text, and Focus last on every page (`PageCorner.buttons`), less the controls the
+/// The corner of an item's page: Open where the page has somewhere outside the app to go, Aa where the page can be written,
+/// Reader or Original where a web page has a Reader view, the text size of every page of text, and Focus last on every
+/// page (`PageCorner.buttons`), less the controls the
 /// person turned off in Settings > Editor, which the page's More menu offers instead. It is drawn by
 /// `WindowCorner`, so Aa's formats open as a bar along the foot of the page. Each control is also a menu command and a
 /// palette entry (`ItemCommand`), and runs the same code.
@@ -20,19 +21,20 @@ struct ItemCorner: View {
 
     var body: some View {
         let layout = library.pageLayout(of: item)
+        let kind = PageCornerKind(for: item, in: library, details: details, hasEditor: editor != nil)
         let fileView = details.fileViewing(of: item.id)
-        let hasReader = details.pageLook?.item == item.id
-        let canWrite = item.allows(.text) && editor != nil
         let choice = PageCornerChoice(formats: showsFormats, textSize: showsTextSize, focus: showsFocus)
-        let buttons = PageCorner.buttons(
-            layout: layout, hasReader: hasReader, canWrite: canWrite, file: fileView?.kind, shows: choice)
+        let buttons = PageCorner.buttons(kind, shows: choice)
+        let target = PageOpenTarget.of(item, in: library, file: details.fileURL(of: item.id))
         // The bar belongs to the page, not to Aa: View > Show Formats opens it with Aa left out of the corner.
-        let formatsEditor = PageCorner.buttons(layout: layout, hasReader: hasReader, canWrite: canWrite).contains(.formats) ? editor : nil
+        let formatsEditor = PageCorner.buttons(kind).contains(.formats) ? editor : nil
         let isBarOpen = formatsEditor != nil && details.isFormatsOpen(on: item.id)
         let isFocused = details.isFocused(on: item.id)
         WindowCorner(isCardOpen: isBarOpen, cardPlacement: .centeredAtFoot) {
             ForEach(buttons, id: \.self) { button in
                 switch button {
+                case .open:
+                    if let target { PageOpenButton(target: target, item: item) }
                 case .formats:
                     Button {
                         details.toggleFormats(on: item.id)
@@ -102,5 +104,18 @@ extension View {
     /// in a modal, whose page has no corner.
     func itemCorner(_ item: Item, editor: EditorController?, details: DetailsPresentation, isShown: Bool = true) -> some View {
         modifier(ItemCornerModifier(item: item, editor: editor, details: details, isShown: isShown))
+    }
+}
+
+extension PageCornerKind {
+    /// The corner's kind for `item`'s page, from what the page and the window have ready.
+    @MainActor
+    init(for item: Item, in library: any ItemLibrary, details: DetailsPresentation, hasEditor: Bool) {
+        let fileView = details.fileViewing(of: item.id)
+        self.init(
+            layout: library.pageLayout(of: item), hasReader: details.pageLook?.item == item.id,
+            canWrite: item.allows(.text) && hasEditor, keepsText: library.catalogue.itemTypes[item.type]?.bodyKey != nil,
+            file: fileView?.kind, pageCount: fileView?.pages?.count,
+            opens: PageOpenTarget.of(item, in: library, file: details.fileURL(of: item.id)) != nil)
     }
 }

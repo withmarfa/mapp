@@ -18,7 +18,7 @@ struct TextSizeControl: View {
             } label: {
                 HStack(spacing: 6) {
                     Text("\(PageStyle.nearestTextSize(textSize)) pt").monospacedDigit()
-                    Image(systemName: "chevron.down").font(.system(size: 9 * InterfaceStyle.scale(for: interfaceSize), weight: .semibold))
+                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 9 * InterfaceStyle.scale(for: interfaceSize), weight: .semibold))
                 }
                 .padding(.horizontal, 6)
             }

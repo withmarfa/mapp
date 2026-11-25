@@ -7,15 +7,22 @@ struct ValueEditContent: View {
     @Environment(\.interfaceTextSize) private var textSize
     @FocusState private var fieldFocused: Bool
     @FocusState private var timeFocused: Bool
+    /// The height the chips and the field want, which the field is held to until eight lines of chips.
+    @State private var chipsHeight: CGFloat = 0
 
     private var scale: CGFloat { InterfaceStyle.scale(for: textSize) }
+
+    /// Eight lines of chips with the field's own padding.
+    private var chipsLimit: CGFloat {
+        (CGFloat(ValueEditMetrics.chipLines) * (ValueEditMetrics.fieldLine + 5) + 7) * scale
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if model.hasSearch { searchArea }
             listArea
             if let type = model.typeToEditStatuses { editStatuses(type) }
-            if let notice = model.notice { noticeArea(notice) }
+            if let notice = model.notice { noticeArea(notice) } else if let moved = model.moved { movedLine(moved) }
         }
         .padding(ValueEditMetrics.padding * scale)
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -32,20 +39,26 @@ struct ValueEditContent: View {
 
     @ViewBuilder private var searchArea: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ChipFieldLayout(spacing: 5 * scale, lineHeight: ValueEditMetrics.fieldLine * scale, queryFloor: (model.query.isEmpty ? 16 : 48) * scale) {
-                ForEach(model.chips) { chip in
-                    ValueChipView(chip: chip, scale: scale) { model.remove(chip) }
+            // Past eight lines of chips the field scrolls, so the list under it keeps its room.
+            ScrollView {
+                ChipFieldLayout(spacing: 5 * scale, lineHeight: ValueEditMetrics.fieldLine * scale, queryFloor: (model.query.isEmpty ? 16 : 48) * scale) {
+                    ForEach(model.chips) { chip in
+                        ValueChipView(chip: chip, scale: scale) { model.remove(chip) }
+                    }
+                    TextField(model.chips.isEmpty ? model.searchPrompt : "", text: Bindable(model).query)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: ValueEditMetrics.textSize * scale))
+                        .focused($fieldFocused)
+                        .accessibilityLabel(model.searchPrompt)
+                        .accessibilityIdentifier("ValueEditSearch")
                 }
-                TextField(model.chips.isEmpty ? model.searchPrompt : "", text: Bindable(model).query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: ValueEditMetrics.textSize * scale))
-                    .focused($fieldFocused)
-                    .accessibilityLabel(model.searchPrompt)
-                    .accessibilityIdentifier("ValueEditSearch")
+                .padding(.horizontal, 7 * scale)
+                .padding(.top, 4 * scale)
+                .padding(.bottom, 3 * scale)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { chipsHeight = $0 }
             }
-            .padding(.horizontal, 7 * scale)
-            .padding(.top, 4 * scale)
-            .padding(.bottom, 3 * scale)
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: min(max(chipsHeight, (ValueEditMetrics.fieldLine + 7) * scale), chipsLimit))
             Divider()
         }
         .padding(.bottom, 4 * scale)
@@ -246,6 +259,19 @@ struct ValueEditContent: View {
         }
     }
 
+    private func movedLine(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider().padding(.vertical, 4 * scale)
+            Text(verbatim: text)
+                .font(.system(size: 11 * scale))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 8 * scale)
+                .padding(.bottom, 2 * scale)
+                .accessibilityIdentifier("ValueEditMoved")
+        }
+    }
+
     private var conflictFoot: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 1 * scale) {
@@ -286,16 +312,20 @@ private struct ValueEditRow: View {
     var body: some View {
         HStack(spacing: 8 * scale) {
             ValueMarkView(mark: row.mark, scale: scale)
-            Text(verbatim: row.title).lineLimit(1).truncationMode(.tail)
+            // A detail that is a line of its own ("In <name>") gives the name the width first, and is cut itself; a count
+            // is short and keeps its room.
+            Text(verbatim: row.title).lineLimit(1).truncationMode(.tail).layoutPriority(row.detail == nil ? 0 : 1)
             Spacer(minLength: 8 * scale)
             if row.role == .create {
                 // The key cap shows only while Return takes this row.
                 if isActive { ShortcutKeys("↩").layoutPriority(1) }
-            } else if let detail = row.detail ?? model.countText(of: row) {
+            } else if case let detail = [row.detail, model.countText(of: row)].compactMap(\.self).joined(separator: ", "), !detail.isEmpty {
                 Text(verbatim: detail)
                     .font(.system(size: 12 * scale))
                     .monospacedDigit()
-                    .layoutPriority(1)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .layoutPriority(row.detail == nil ? 1 : 0)
                     .foregroundStyle(.secondary)
             }
         }

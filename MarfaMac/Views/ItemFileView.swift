@@ -43,9 +43,15 @@ enum ItemFileResolution: Equatable {
     }
 }
 
-/// A file item's file, shown once it is fetched. An item the library has no file for shows that it has none.
+/// A file item's file, shown once it is fetched, under the page's notice (`PageNotice`) where it has one: a deleted item,
+/// a held write, and a file the library does not have. Its viewer keeps its own scroller, so the notice stays above it.
 struct ItemFileView: View {
     @CurrentLibrary private var library
+    @StoredPageStyle private var style
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.settingsLauncher) private var settingsLauncher
+    @State private var width: CGFloat = 0
     let id: ItemID
     /// The window the file's size and page are offered to once it is ready (`FileItemContent`).
     var details: DetailsPresentation?
@@ -55,6 +61,12 @@ struct ItemFileView: View {
     @State private var loader = ItemFileLoader()
 
     private var item: Item? { library.item(id) }
+
+    private var notices: [PageNotice] {
+        guard let item else { return [] }
+        if case .unavailable? = loader.resolution(of: id) { return PageNotice.all(for: item, fileIsMissing: true) }
+        return PageNotice.all(for: item)
+    }
 
     var body: some View {
         // The task sits on one container. On the switch itself (`Group` hands a modifier to each branch) it would
@@ -66,8 +78,9 @@ struct ItemFileView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .ready(let url):
                 FileItemContent(url: url, title: item?.name ?? url.lastPathComponent, contentType: item?.fileType, item: id, details: details)
+            // The page's notice says so.
             case .unavailable:
-                ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
+                Color.clear
             case .failed(let reason):
                 ContentUnavailableView {
                     Label("Can’t Get This File", systemImage: "exclamationmark.icloud")
@@ -80,6 +93,16 @@ struct ItemFileView: View {
                 } actions: {
                     Button("Try Again") { Task { await load() } }
                 }
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if !notices.isEmpty {
+                PageNoticeView(notices: notices) { notice in
+                    notice.run(in: library, undoManager: undoManager, openWindow: openWindow, openSettings: { [settingsLauncher] in settingsLauncher?.show($0) })
+                }
+                .padding(.horizontal, style.horizontalInset(for: width))
+                .padding(.vertical, 12)
             }
         }
         .task(id: id) { await load() }
@@ -104,12 +127,17 @@ struct FileItemPage: View {
     var backsToolbar = true
 
     var body: some View {
+        // The corner's Open takes the file from the window's presentation, so every window tells it.
+        let resolved: (URL?) -> Void = { [id = item.id, drafts] url in
+            drafts.fileResolved(url, for: id)
+            onResolved(url)
+        }
         if case .webPage(let document, let runsScripts) = library.pageLayout(of: item) {
             WebPageItemPage(
-                item: item, document: document, runsScripts: runsScripts, drafts: drafts, open: open, onResolved: onResolved,
+                item: item, document: document, runsScripts: runsScripts, drafts: drafts, open: open, onResolved: resolved,
                 backsToolbar: backsToolbar)
         } else {
-            ItemFileView(id: item.id, details: drafts, onResolved: onResolved)
+            ItemFileView(id: item.id, details: drafts, onResolved: resolved)
         }
     }
 }

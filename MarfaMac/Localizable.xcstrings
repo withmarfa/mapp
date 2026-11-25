@@ -328,6 +328,16 @@
     "%@ kept the mapping as it was." : {
 
     },
+    "%@ leave the Feed after ^[%lld day](inflect: true)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ leave the Feed after ^[%2$lld day](inflect: true)"
+          }
+        }
+      }
+    },
     "%@ lists its jobs once it has started them." : {
 
     },
@@ -551,9 +561,6 @@
           }
         }
       }
-    },
-    "%@, Archived" : {
-
     },
     "%@, ^[%lld item](inflect: true)" : {
       "localizations" : {
@@ -1624,10 +1631,29 @@
     "%llu waiting to download" : {
       "extractionState" : "manual"
     },
-    "+%lld" : {
+    "+%lld more" : {
 
     },
-    "+%lld more" : {
+    ", and %lld of the %lld items are older." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : ", and %1$lld of the %2$lld items are older."
+          }
+        }
+      }
+    },
+    ", and 1 of the %lld items is older." : {
+
+    },
+    ", and all %lld are older." : {
+
+    },
+    ", and both are older." : {
+
+    },
+    ", and this one is older." : {
 
     },
     "0 sets no limit." : {
@@ -2200,6 +2226,9 @@
     "Add to Favorites" : {
 
     },
+    "Add to Sidebar" : {
+
+    },
     "Add “%@”" : {
 
     },
@@ -2511,9 +2540,6 @@
     "Apps and keys using this rule will see items from every source for the types you limited, including subtypes." : {
 
     },
-    "Apps you sign in show here." : {
-
-    },
     "Archive" : {
 
     },
@@ -2788,6 +2814,9 @@
 
     },
     "Behind highlighted text." : {
+
+    },
+    "Beside the List" : {
 
     },
     "Best Match" : {
@@ -3288,9 +3317,6 @@
     "Choose Parent…" : {
       "extractionState" : "manual"
     },
-    "Choose Source Mark…" : {
-
-    },
     "Choose Undo again to try it as things are now." : {
       "extractionState" : "manual"
     },
@@ -3299,9 +3325,6 @@
     },
     "Choose a Version" : {
       "extractionState" : "manual"
-    },
-    "Choose a collection to see what’s in it." : {
-
     },
     "Choose a date before the app’s sign-in ends." : {
 
@@ -3324,17 +3347,11 @@
     "Choose a plugin bundle." : {
 
     },
-    "Choose a source to see what it sends." : {
-
-    },
     "Choose a value" : {
 
     },
     "Choose an Icon" : {
       "extractionState" : "manual"
-    },
-    "Choose an item to see its details." : {
-
     },
     "Choose how often to back up." : {
 
@@ -3475,9 +3492,6 @@
 
     },
     "Collections" : {
-
-    },
-    "Collections that apps make show here." : {
 
     },
     "Collections you make show here." : {
@@ -3994,9 +4008,6 @@
     "Delete %@?" : {
 
     },
-    "Delete Collection…" : {
-
-    },
     "Delete Column" : {
 
     },
@@ -4289,9 +4300,6 @@
     "Edit Meaning…" : {
 
     },
-    "Edit New Row…" : {
-
-    },
     "Edit Pages As" : {
 
     },
@@ -4304,13 +4312,13 @@
     "Edit Time" : {
 
     },
+    "Edit Type…" : {
+
+    },
     "Edit Value" : {
 
     },
     "Edit View" : {
-
-    },
-    "Edit the New row" : {
 
     },
     "Edited" : {
@@ -5198,6 +5206,9 @@
     "In" : {
 
     },
+    "In %@" : {
+
+    },
     "In %@." : {
 
     },
@@ -5476,6 +5487,9 @@
     "It will send events for %@." : {
 
     },
+    "It would go to Recently Deleted within the hour." : {
+
+    },
     "Italic" : {
 
     },
@@ -5515,9 +5529,6 @@
     "Items About This" : {
       "extractionState" : "manual"
     },
-    "Items Page" : {
-
-    },
     "Items deleted more than %@ ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered." : {
       "extractionState" : "manual"
     },
@@ -5543,9 +5554,6 @@
     "Items that already hold a choice you take out keep it." : {
 
     },
-    "Items that apps send show here." : {
-
-    },
     "Items this sign-in can’t see are still of this type, so %@ was kept." : {
 
     },
@@ -5559,9 +5567,6 @@
 
     },
     "Items you favorite show here." : {
-
-    },
-    "Items you make or apps send show here." : {
 
     },
     "Items you make show here." : {
@@ -5720,6 +5725,9 @@
     "Jobs" : {
 
     },
+    "Keep" : {
+
+    },
     "Keep All Downloads" : {
 
     },
@@ -5836,17 +5844,11 @@
     "Keys keep working" : {
 
     },
-    "Keys you make show here." : {
-
-    },
     "Kind" : {
       "extractionState" : "manual"
     },
     "Kind of Item" : {
       "extractionState" : "manual"
-    },
-    "Kinds" : {
-
     },
     "Large" : {
       "extractionState" : "manual"
@@ -5957,6 +5959,9 @@
     "Leave a field empty to use %@’s own default." : {
 
     },
+    "Leaves the Feed" : {
+
+    },
     "Left Out of Search" : {
 
     },
@@ -6009,6 +6014,9 @@
 
     },
     "Link" : {
+
+    },
+    "Link Not Saved" : {
 
     },
     "Link Type Not Made" : {
@@ -6213,9 +6221,6 @@
 
     },
     "Manage Backups" : {
-
-    },
-    "Manage Connections…" : {
 
     },
     "Manage Connectors" : {
@@ -6543,9 +6548,6 @@
     "New Child Type…" : {
 
     },
-    "New Collection" : {
-
-    },
     "New Field Choices Not Kept" : {
 
     },
@@ -6686,12 +6688,6 @@
     "No Collections" : {
       "extractionState" : "manual"
     },
-    "No Collections in the Feed" : {
-
-    },
-    "No Collections in the Library" : {
-
-    },
     "No Connectors" : {
 
     },
@@ -6722,16 +6718,7 @@
     "No Items" : {
       "extractionState" : "manual"
     },
-    "No Items in the Feed" : {
-
-    },
-    "No Items in the Library" : {
-
-    },
     "No Jobs Yet" : {
-
-    },
-    "No Keys" : {
 
     },
     "No Library Open" : {
@@ -6798,6 +6785,9 @@
 
     },
     "No Tags" : {
+
+    },
+    "No Types" : {
 
     },
     "No Types of Your Own" : {
@@ -7304,6 +7294,9 @@
         }
       }
     },
+    "Open Beside the List" : {
+
+    },
     "Open Connection…" : {
 
     },
@@ -7343,7 +7336,13 @@
     "Open as Modal" : {
 
     },
-    "Open in Browser" : {
+    "Open as Page" : {
+
+    },
+    "Open in %@" : {
+
+    },
+    "Open in Default App" : {
 
     },
     "Open in New Window" : {
@@ -7495,9 +7494,6 @@
     },
     "Parent" : {
       "extractionState" : "manual"
-    },
-    "Parent Not Saved" : {
-
     },
     "Part of a type Marfa or a plugin provides" : {
 
@@ -7957,9 +7953,6 @@
     "Remove %@" : {
 
     },
-    "Remove %@ From New" : {
-
-    },
     "Remove %@?" : {
 
     },
@@ -8099,6 +8092,9 @@
     "Rename" : {
       "extractionState" : "manual"
     },
+    "Rename Collection" : {
+
+    },
     "Rename Field" : {
 
     },
@@ -8119,9 +8115,6 @@
     },
     "Rename Source" : {
       "extractionState" : "manual"
-    },
-    "Rename Source…" : {
-
     },
     "Rename View" : {
       "extractionState" : "manual",
@@ -8153,9 +8146,6 @@
 
     },
     "Replaced an item’s tags" : {
-
-    },
-    "Replace…" : {
 
     },
     "Replacing" : {
@@ -8708,6 +8698,9 @@
     "Show Backups" : {
 
     },
+    "Show Changes" : {
+
+    },
     "Show Command Palette" : {
 
     },
@@ -8766,9 +8759,6 @@
 
     },
     "Show Property" : {
-
-    },
-    "Show Quick Add Options" : {
 
     },
     "Show Reader" : {
@@ -9369,13 +9359,7 @@
     "The Connector" : {
 
     },
-    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
+    "The Feed lets items go after a while" : {
 
     },
     "The Folder Is Missing Where This Copy Is Kept" : {
@@ -9861,9 +9845,6 @@
     "The file couldn’t be attached." : {
       "extractionState" : "manual"
     },
-    "The file for this page isn’t in Marfa." : {
-
-    },
     "The file may be damaged or unavailable. Try opening it in another app." : {
 
     },
@@ -9958,6 +9939,9 @@
       "extractionState" : "manual"
     },
     "The library sets this tag itself." : {
+
+    },
+    "The link could not be saved." : {
 
     },
     "The link types couldn’t be read again to choose an unused ID, so nothing was sent. %@" : {
@@ -10058,9 +10042,6 @@
     },
     "The panel closed before the view was saved." : {
       "extractionState" : "manual"
-    },
-    "The parent could not be saved." : {
-
     },
     "The picture couldn’t be loaded." : {
 
@@ -10422,6 +10403,9 @@
     "They were removed from %@. This Mac keeps its own." : {
 
     },
+    "They would go to Recently Deleted within the hour." : {
+
+    },
     "They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it." : {
       "extractionState" : "manual"
     },
@@ -10647,6 +10631,9 @@
     "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The app reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected." : {
       "extractionState" : "manual"
     },
+    "This item couldn’t be read on this Mac." : {
+
+    },
     "This item doesn’t have a link yet. Try again once Marfa has finished syncing." : {
 
     },
@@ -10681,6 +10668,9 @@
       "extractionState" : "manual"
     },
     "This item isn’t ready to link yet. Try again once its copy has loaded." : {
+
+    },
+    "This item’s file isn’t in Marfa." : {
 
     },
     "This item’s tags can’t be changed." : {
@@ -10823,9 +10813,6 @@
 
     },
     "Tight" : {
-
-    },
-    "Tiles above the table for making a new item of a type." : {
 
     },
     "Time" : {
@@ -11037,6 +11024,9 @@
     "Types that Marfa or a plugin provides can’t be changed. Add the field to a type of your own instead." : {
 
     },
+    "Types that hold items show here." : {
+
+    },
     "Types, Collections, or Sources" : {
 
     },
@@ -11049,7 +11039,19 @@
     "Unarchive" : {
 
     },
+    "Unarchive ^[%lld item](inflect: true)?" : {
+
+    },
+    "Unarchive “%@”?" : {
+
+    },
     "Unarchived “%@”" : {
+
+    },
+    "Unarchived, it would go to Recently Deleted within the hour." : {
+
+    },
+    "Unarchived, they would go to Recently Deleted within the hour." : {
 
     },
     "Unavailable" : {
@@ -11639,7 +11641,7 @@
     "Writes to this address" : {
       "extractionState" : "manual"
     },
-    "Written by" : {
+    "Written By" : {
 
     },
     "Wrote items in bulk" : {
@@ -11729,6 +11731,9 @@
     "Your changes are kept on this Mac and sent when you’re back online." : {
       "extractionState" : "manual"
     },
+    "Your changes to this item haven’t reached the server." : {
+
+    },
     "Your changes to “%@” were saved as a copy" : {
       "extractionState" : "manual"
     },
@@ -11742,6 +11747,9 @@
 
     },
     "Your items are still loading." : {
+
+    },
+    "Your latest changes were too large to save to Marfa. They’re kept on this Mac, where you can copy them." : {
 
     },
     "Your settings are back as they were before Import, %@." : {
@@ -11837,6 +11845,9 @@
 
     },
     "^[%lld version](inflect: true)" : {
+
+    },
+    "^[%lld view](inflect: true)" : {
 
     },
     "^[Archived %lld item](inflect: true)" : {
@@ -12258,6 +12269,16 @@
     },
     "“%@” may remove items sooner than the server’s current setting." : {
       "extractionState" : "manual"
+    },
+    "“%@” moved from “%@”." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” moved from “%2$@”."
+          }
+        }
+      }
     },
     "“%@” was added but runs nothing yet." : {
 

@@ -18,6 +18,9 @@ struct ToolbarBand: View {
     var showsLine = true
     /// How much of the blur shows.
     var strength = Self.strength
+    /// Whether the material is backed by the content's own ground. Over AppKit's table and list the material blurs
+    /// nothing, so rows would read sharp through it; backed, they read only as the faint ghost `strength` leaves.
+    var isBacked = false
 
     /// How much of the blur shows, so the content behind reads only as a faint ghost.
     static let strength: Double = 0.9
@@ -33,6 +36,7 @@ struct ToolbarBand: View {
     var body: some View {
         Rectangle()
             .fill(.bar)
+            .background { if isBacked { Color(nsColor: .controlBackgroundColor) } }
             .opacity(strength)
             .overlay(alignment: edge == .top ? .bottom : .top) {
                 // One physical pixel, whatever the display's scale.
@@ -53,11 +57,6 @@ struct ToolbarBand: View {
 }
 
 extension View {
-    /// Draws the toolbar's band over the full width of this view once `isUnderToolbar`, for an index page's own scroll.
-    func toolbarBand(isUnderToolbar: Bool) -> some View {
-        overlay(alignment: .top) { ToolbarBandOverlay(isUnderToolbar: isUnderToolbar) }
-    }
-
     /// Gives a sidebar list a foot that draws a translucent band, as the toolbar's does mirrored and without its line,
     /// while rows pass under it (the content's end lies below the top of the foot). Otherwise the foot sits on the
     /// plain sidebar, with no fill. The pointer changes nothing: the foot looks the same hovered or not. The list's
@@ -67,18 +66,6 @@ extension View {
     /// foot, so the first frame already draws the band or not as the last one did.
     func bandsFoot<Foot: View>(memory: ColumnMemory? = nil, @ViewBuilder _ foot: () -> Foot) -> some View {
         modifier(BandsFoot(foot: foot(), memory: memory))
-    }
-}
-
-/// The band over the toolbar, with Show Toolbar Background When Scrolling applied.
-private struct ToolbarBandOverlay: View {
-    @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true
-    let isUnderToolbar: Bool
-
-    var body: some View {
-        GeometryReader { proxy in
-            ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: showsBackground && isUnderToolbar)
-        }
     }
 }
 

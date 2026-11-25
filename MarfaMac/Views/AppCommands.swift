@@ -12,7 +12,6 @@ struct AppCommands: Commands {
     @FocusedValue(\.focusedItems) private var focused
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.detailsPresentation) private var details
-    @FocusedValue(\.indexActions) private var indexActions
     @FocusedValue(\.settingsNavigation) private var settingsNavigation
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
@@ -65,12 +64,12 @@ struct AppCommands: Commands {
                 let shown = ids.compactMap { library?.headerItem($0) }.filter { !$0.isFile }
                 let one = ids.count == 1 ? shown.first : nil
                 command(.open)
+                command(.openBesideList)
                 command(.openAsModal)
                 command(.openAsFullPage)
                 command(.openInNewWindow)
                 command(.quickLook)
-                command(.openOriginal)
-                command(.openInBrowser)
+                command(.openOutside)
                 Divider()
                 ItemShareLink(
                     item: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, library: library)
@@ -80,19 +79,6 @@ struct AppCommands: Commands {
                         .environment(details)
                 }
                 VersionHistoryCommands(details: details, library: library, undoManager: focused?.undoManager)
-                // The row menu of the index in front: sources are renamed and marked, collections deleted.
-                if browser?.showsSidebarIndex == true {
-                    Divider()
-                    if browser?.indexPlace == .sources {
-                        Button("Rename Source…", systemImage: "pencil") { indexActions?.rename?() }
-                            .disabled(indexActions?.rename == nil)
-                        Button("Choose Source Mark…", systemImage: "face.smiling") { indexActions?.chooseMark?() }
-                            .disabled(indexActions?.chooseMark == nil)
-                    } else {
-                        Button("Delete Collection…", systemImage: "trash") { indexActions?.delete?() }
-                            .disabled(indexActions?.delete == nil)
-                    }
-                }
             }
             // On macOS a menu item draws its symbol only when the menu asks for it.
             .labelStyle(.titleAndIcon)
@@ -142,11 +128,7 @@ struct AppCommands: Commands {
                 command(.toggleFormats)
                 command(.toggleFocus)
                 Divider()
-                if let place = browser?.indexPlace {
-                    if let browser { IndexPageCommands(browser: browser, place: place, shortcuts: shortcuts) }
-                    Divider()
-                    IndexViewOptions(place: place, browser: browser)
-                } else {
+                if browser?.showsPlaceIndex != true {
                     ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, shortcuts: shortcuts)
                 }
                 Divider()
@@ -161,12 +143,12 @@ struct AppCommands: Commands {
                     details?.isPresented.toggle()
                 }
                 .shortcut(.toggleDetails, shortcuts)
-                .disabled(details == nil || (browser?.showsSidebarIndex != true && focused?.ids.count != 1))
+                .disabled(details == nil || focused?.ids.count != 1)
                 Divider()
                 // The toolbar's View Options and its filters, for the view in front.
                 if let library, let browser {
                     // A table, board or timeline with an item page open has no view options to offer.
-                    if browser.offersViewOptions, !browser.showsSidebarIndex {
+                    if browser.offersViewOptions, !browser.showsPlaceIndex {
                         // The library is given inside the branch that shows it, so the menu's views never read it while it is
                         // gone: SwiftUI can update a view of a branch it is about to drop, which then still has its old one.
                         Group {

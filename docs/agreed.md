@@ -19,16 +19,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 
-## Library and its places
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-| Library | Lists active library items in the one table every place uses, with a row of views and, at its end, Types, Collections, Sources and Archive. Its first view is named All. It opens as a table, and as a list with ten items or fewer. Its off-main arrangement of rows (`ItemIndexModel`) moves into the shared list and is not lost. | `ItemsIndex.swift`, `IndexPage.swift`, `ItemTable.swift` | `Rethink-Library`, `Rethink-Library-New`, `Rethink-Library-Heavy` |
-| Types | A table of Name (nested), Items, Views, Made By, Latest. Its row menu has Open, Open in New Window, New, New View…, Add to Sidebar, Copy Link, Edit Type…. Made By waits for the package to give a type's provenance, and Copy Link for a link form (`ItemLinkRoute` has only items). | `SidebarIndex.swift`, `ItemLinkRoute` | `Rethink-Types`, `Rethink-Types-Ordinary`, `Rethink-Types-Agents` |
-| Collections | Name, Items, Source, Edited. The tabs, the source filter and the index's sidebar go. A collection can be archived, and cannot be moved to the Feed. | `SidebarIndex.swift`, `IndexInspector.swift` | `Rethink-Collections`, `Rethink-Collections-Full` |
-| Sources | Name, Items, Latest, and the types a source writes as marks and names, three and a count. Its page's panel has the facts. A source's Kind can be read by any app today: `GET /plugins` names each connector's source and the direction of its kinds, and an app's source starts with `oauth:`. Only New Items Go To waits, because it needs the owner's permission and the main window makes no owner calls. | `SidebarIndex.swift`, `SourceLook.swift` | `Rethink-Sources`, `Rethink-Sources-Full`, `Rethink-Source`, `Rethink-Sources-Waiting` |
-| Index pages go | The tabs, the New tiles, the index's own toolbar and filters. | `IndexPage.swift`, `NewTiles.swift`, `IndexToolbar.swift` | `Rethink-Library` |
-
 ## Feed, and moving between the two
 
 | Part | What it is | Lands in | Boards |
@@ -36,9 +26,8 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Feed | No count on its row, no words of waiting. Its first view is named All. | `SidebarGroups.swift`, `Browser` | `Rethink-Inbox`, `Rethink-Inbox-View`, `Rethink-Inbox-Page`, `Rethink-Inbox-Modal` |
 | Default From | Settings > Lists offers All Items (the default) and Library. | `PreferencesMap`, Settings > Lists | `Rethink-Scope-Menu` |
 | Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. The table of both tiers has it; the list and gallery do not yet. | `ItemRow.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
-| A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. **Waits for the package:** its catalogue does not say which types hold a table, and the app names no type (marfa-swift#561). | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |
+| A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. The package now says which types hold a table; the app does not use that yet. | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |
 | Quick Actions | Keep, Archive and Delete on the row under the pointer, a choice of each view, with the default that `docs/concepts.md` gives. | `ItemRow.swift`, `ViewMacSettings` | `Rethink-Inbox-Actions`, `Rethink-View-Quick-Actions` |
-| Leaves the Feed | A date beside In, only where the type has a limit and the item is active in the Feed. Move to Feed asks first only where the limit would remove the item at once: the alert is built and asks `ItemLibrary.feedLimitQuestion`, which answers nothing until the limit is in the catalogue. **Waits for Marfa and the package:** a type's feed window in the catalogue (marfa#3560, marfa-swift#559). | `PanelInfoView.swift`, `ItemMoves.swift` | `Rethink-Feed-Limit`, `Rethink-Feed-Limit-Move` |
 
 ## Archiving
 
@@ -117,11 +106,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Stored `rows` | A page placement is stored with `rows` beside `shows`, because a copy from before `shows` sets the whole map aside without `rows`. Removed after the first v0.1 release: write `shows` only and keep reading an old `rows` once. | `PagePlacements.swift` | – |
 | Scrolled | The title sits in the toolbar on one line. | `ItemDetail.swift`, `WindowToolbar.swift` | `Rethink-Page-Scrolled`, `Rethink-White-Page` |
 | Foot | Sub-Items with nesting on any item that has them; a Timeline of mentions on a person and a place; more after 30. | `LinkedFromPlace`, `editor/src/header.ts` | `Rethink-Sub-Items`, `Rethink-Person`, `Rethink-Place` |
-| Corner | Formats, text size and Focus on a written page; size and Focus otherwise; Open on a file. | `PageCorner` | `Rethink-Formats`, `Rethink-Focus` |
 | Blocks | A callout as a tinted block without a rail. A code block's actions in its corner; the place of its language is open. | `editor/src/style.css` | `Rethink-Blocks`, `Rethink-Blocks-Code` |
-| Beside the list | Open Items gains Beside the List: the page in a column, one editor to a window. | `ItemOpening`, `EditorSlot` | `Rethink-Notes`, `Rethink-Library-New` |
-| Modal | Close, Up and Down lead; Favorite, Share and More trail, with Keep first on a Feed item; Open as Page in the corner. | `ItemModal.swift` | `Rethink-Modal`, `Rethink-Inbox-Modal` |
-| Own window | An item's window has the same page, panel and controls. | `ItemWindow.swift` | `Rethink-Item-Window` |
 
 ## The panel beside it
 
@@ -133,18 +118,12 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Edges as rows | Each edge field a type may hold gets a row and a value panel: filled ones in place, the rest under Show More, and inverses where Marfa allows. The panel obeys Marfa's answer. One commit is one undo. Only a reference in the text is not editable. An item in no collection has an empty In Collection row. | `ValueEditKind`, `ItemRelationshipPicker`, `PropertyRow` | `Rethink-Properties-Rule`, `Rethink-Edit-Values` |
+| Links in the panel | A plus on the heading of a group of links whose field takes a change, which opens the field's panel, and Remove in a link's menu. The panel's Relationships section, which the Inspector lists today, goes with the Inspector. | `ItemRelationships.swift`, the panel's Links | `Rethink-Properties-Rule` |
 | Undo of a link in one call | Undo checks a link's id, type and ends, then deletes it by id in a second package call, so a move synced between the two is lost, as with state moves. **Waits for Marfa:** one package call that checks and deletes. | `MarfaEngine+Writing.swift` | – |
 | Conflict | A calm line with Keep My Edit and Use Current Value. | `ValueEditModel` | `Rethink-Edit-Conflict` |
 | Status where it is seen | A click on a status in a row or a lane opens its panel; the row stays until it is left. | `StatusSymbol`, `ItemRow.swift` | `Rethink-Status-In-List` |
 | Every link follows Open Items | In the text, rows, foot and panel, through one function of the browser. A picture in the text has Open Item and Copy Link on its menu. | `Browser`, `EditorController` | – |
 | Link card | After a pause on a linked item, a small card with its type, name and two lines. No keyboard focus, no server call. | new files in `MarfaMac/Views/`, `editor/src/` | `Rethink-Link-Card` |
-
-## Page notices
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-| One notice | One line in the page's column for a deleted item, a copy saved beside it, text that cannot be read, pictures not loaded, a held write or a missing file. It replaces the banners and the picture bar. Its one action has no fill. | `DeletedItemBanner`, `SavedAsCopyBanner`, `UnreadableItemBanner`, `PicturesWaitingCallout`, `editor/src/pictures.ts` | `Rethink-Page-Notice`, `Rethink-Page-Notices` |
 
 ## Each kind of item
 
@@ -162,12 +141,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Table item | A sheet of its own rows, without properties or margins, row numbers off. The app keeps the order and a column's menu sets it. The last piece, and it may be cut. | new files in `MarfaMac/Views/` | `Rethink-Table-Item`, `Rethink-Table-Item-Full`, `Rethink-Table-Item-Numbers`, `Rethink-Table-Item-Column`, `Rethink-Table-Preview` |
 | Read only | No Aa, and one line in Info. | `PageCorner`, `ItemInspector.swift` | `Rethink-Read-Only`, `Rethink-Read-Only-Full` |
 
-## Version history
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-| Version History | The thread takes the sidebar's place. It shows text, title, type and property changes only, because a version holds no tags or links. Additions in green, Copy Text, no Show in Finder. The loading, failed, offline and thinned states stay. | `VersionHistoryWorkspace.swift`, `VersionThreadColumn.swift`, `VersionPageColumn` | `Rethink-History` |
-
 ## Sync and offline
 
 | Part | What it is | Lands in | Boards |
@@ -179,7 +152,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Areas, glass, measures | Three areas, where glass is used, and one set of measures, radii and type sizes. Dark values are in one table before they are used. | `InterfaceStyle`, `MarfaMac/Views/Looks/` | `Rethink-Found-Areas`, `Rethink-Found-Glass`, `Rethink-Found-Measures`, `Rethink-Found-Measures-Page`, `Rethink-Found-Radii`, `Rethink-Found-Type`, `Rethink-Found-Selection` |
-| Buttons | Small is a rounded rectangle, larger is a capsule. A text action has a fill, but for a page notice's. | `AppButton.swift` | `Rethink-Page-Notices` |
 | Messages | A toast is a symbol, what happened and Undo; a second replaces the first. An alert with a red button has a gray Cancel. | `ToastView.swift`, `LibraryDialogs.swift` | `Rethink-Keep-Toast`, `Rethink-Delete-Toast`, `Rethink-Delete-Alert` |
 
 ## Small ideas

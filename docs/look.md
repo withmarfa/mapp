@@ -10,11 +10,11 @@ paths:
 
 # How things look
 
-Each kind of thing has one drawing, used on the page, in the panel, in a row, a card, a table cell and a panel. Measures, colors and fills are tokens in the code; this page has the rules that they serve. Search `docs/rejected.md` before you propose a look.
+Each kind of thing has one drawing, used on the page and in a panel, row, card or table cell. Measures, colors and fills are tokens in the code; this page has the rules they serve. Search `docs/rejected.md` before proposing a look.
 
 ## Where things go
 
-- **The window has three areas:** the sidebar, the list pane and the page. A screen adds no new kind of column or toolbar. A screen that needs one changes this rule first.
+- **The window has three areas:** the sidebar, the list pane and the page. A screen adds no new kind of column or toolbar without changing this rule first.
 - **What a person moves between goes in the list pane.** The page holds at most one main action.
 - **The system's control comes first.** Segmented controls, search fields, switches, alerts, menus and the toolbar's glass are the system's, because a hand-drawn copy misses what the system changes.
 - **Nothing shows until there is something to show.** An option that does not apply is absent from a menu, not dimmed, unless the person would look for it there.
@@ -47,8 +47,11 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 | Chip wash | Ink 3.5% | White 3.5% | Every chip |
 | Tinted type chip | Tone 14% | Tone 20% | `TintedChip` |
 | Person fill | Purple 15% | Purple 26% | `PersonCircle` |
+| Added words | Green 15% | Green 26% | `VersionLooks` |
+| Faint text | Ink 36% | White 36% | `VersionLooks` |
+| Current wash | Ink 6% | White 6% | `VersionLooks` |
 | Chip text | Ink 72% | White 72% | Chips, a fact in a row |
-| Name on a tint | Tone toward black: 28% person, 46% type | Tone 50% toward white | `PersonCircle`, `TintedChip`, `NewTiles` |
+| Name on a tint | Tone toward black: 28% person, 46% type | Tone 50% toward white | `PersonCircle`, `TintedChip` |
 | Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Lists, panels, calendars (`SelectionLooks`) |
 | Keycap edge | Ink 20% | White 20% | `KeyCap` |
 | Focus ring | Ink 26% | White 26% | Every keyboard control (`appFocusRing`) |
@@ -64,17 +67,17 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 
 - **A chosen row is soft gray and a row under the pointer is lighter**, in every list (`SoftSelection`). Neither is blue.
 - **A chosen card has a soft ring and no fill**, because a fill would cover its picture.
-- **A heading, a date line and a group's header get no hover mark**, because they cannot be clicked. A group's chevron is the only part of its header that reacts.
+- **A heading, a date line and a group's header get no hover mark**, because they cannot be clicked. Only a group's chevron reacts.
 - **A cell that can be edited keeps its own tint** over the row's.
 - **A chosen row in a value panel, filter panel or calendar is the same gray** (`SelectionLooks`), never the accent.
 
 ## Buttons
 
-- **A button's shape follows its size** (`AppButtonSize`): regular and large are capsules, small has soft corners. Regular stands on its own, small goes in tables, banners and panels, and large is the first-run action.
-- **A text action has a fill:** pale gray, or the accent for the one main action. Destructive is pale red with red text, and is never the default.
-- **A symbol on its own is a gray circle.** On a header row, and for a close button inside a banner or chip, it is plain until the pointer is over it.
+- **A button's shape follows its size** (`AppButtonSize`): regular and large are capsules, small has soft corners. Regular stands on its own, small goes in tables and panels, and large is the first-run action.
+- **A text action has a fill:** pale gray, or the accent for the main action, but a page notice's has none. Destructive is pale red with red text, never the default.
+- **A symbol on its own is a gray circle.** On a header row, and for a close button inside a notice or chip, it is plain until the pointer is over it.
 - **Two arrows choose a value and one arrow opens a menu of commands** (`appMenu`, with `.value` or `.commands`).
-- **A label ends in an ellipsis when the button opens** a sheet, a dialog, a chooser, a confirmation or a browser page. A button that acts at once, or is a menu, has none.
+- **A label ends in an ellipsis when the button opens** a sheet, dialog, chooser, confirmation or browser page. A button that acts at once, or is a menu, has none.
 - **Keyboard focus is the app's own 3 point gray ring** in the control's shape, on every control that takes the keyboard: `appFocusRing` on a field, `AppButtonStyle` on a button.
 - **In a sheet, a destructive action stands alone at the leading edge**, and Cancel and the main action are at the trailing edge. The button says Delete, not Delete Collection.
 - **A field, a chip and a token keep soft corners**, so a value never reads as a button.

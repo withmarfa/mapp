@@ -1,13 +1,13 @@
 import Foundation
 
-/// Opening an item the way Settings > General > Open Items says (`ItemOpening`): in the modal over the window, as a
-/// full page, or in a window of its own. Every layout and the list open through here.
+/// Opening an item the way Settings > General > Open Items says (`ItemOpening`): beside the list, in the modal over
+/// the window, as a full page, or in a window of its own. Every layout and the list open through here.
 extension Browser {
     /// Whether an item is open in the modal.
     var isModalPresented: Bool { modalItem != nil }
 
-    /// Opens `ids` as `way`, or as Settings says when none is given. A modal and a full page need exactly one item;
-    /// windows take every item chosen (the ask before many is the window opener's).
+    /// Opens `ids` as `way`, or as Settings says when none is given. A column, a modal and a full page need exactly
+    /// one item; windows take every item chosen (the ask before many is the window opener's).
     /// Whether it opened anything, which a key handler answers with.
     @discardableResult
     func open(_ ids: Set<ItemID>, as way: ItemOpening? = nil, defaults: UserDefaults = .standard) -> Bool {
@@ -15,6 +15,7 @@ extension Browser {
         guard way.canOpen(ids.count), let id = ids.first else { return false }
         switch way {
         case .newWindow: windowOpener?(ids)
+        case .besideList: presentBeside(id)
         case .modal: presentModal(id)
         case .fullPage: presentFullPage(id)
         }
@@ -24,6 +25,27 @@ extension Browser {
     /// Opens the selection, which is what Return opens.
     @discardableResult
     func openSelection(as way: ItemOpening? = nil) -> Bool { open(selection, as: way) }
+
+    /// Chooses the item, whose page is then in the column beside the layout, and gives it the keyboard. A layout that
+    /// spans the window keeps its place, and a full page that was open gives the layout back.
+    private func presentBeside(_ id: ItemID) {
+        isCollectionItemPresented = false
+        modalItem = nil
+        if selection != [id] { selection = [id] }
+        focusRequest = .page
+    }
+
+    /// Whether the page is in a column beside a layout that spans the window, which `opening` says it is to be and
+    /// the window can show: one item is chosen and nothing has taken the window's editor (the modal, a full page).
+    func showsBesidePage(opening: ItemOpening) -> Bool {
+        opening == .besideList && showsCollection && !isModalPresented && selection.count == 1
+    }
+
+    /// How a link followed from a page in a layout that spans the window opens: where the page already is, beside
+    /// the layout, with Beside the List, and as a full page otherwise, since the modal and a window are chosen apart.
+    func wayToFollowInCollection(defaults: UserDefaults = .standard) -> ItemOpening {
+        ItemOpening.stored(in: defaults) == .besideList ? .besideList : .fullPage
+    }
 
     private func presentModal(_ id: ItemID) {
         // A full page and the modal never show the page at once: the modal is over the layout the full page left.
@@ -58,10 +80,9 @@ extension Browser {
 
     nonisolated enum ModalStep: Sendable { case previous, next }
 
-    /// The items in the order of what is behind the modal: the Items index's rows, the table's rows, and for every other
+    /// The items in the order of what is behind the modal: the table's rows, and for every other
     /// layout the list's sections, which follow the filters and the sort.
     func orderBehind(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
-        if showsItemsIndex { return itemIndexRows(in: library).map(\.id) }
         if viewMode == .table {
             let content = tableContent(in: library)
             let rows = content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)
@@ -81,6 +102,11 @@ extension Browser {
     func moveModal(_ step: ModalStep, in library: any ItemLibrary, order: ItemOrder) {
         let neighbors = modalNeighbors(in: library, order: order)
         guard let target = step == .previous ? neighbors.previous : neighbors.next else { return }
+        moveModal(to: target)
+    }
+
+    /// Moves the modal, and the selection with it, to `target`, which Keep does for the item after the one it kept.
+    func moveModal(to target: ItemID) {
         // First, so the selection that follows is the modal's item and does not end it.
         modalItem = target
         selectAutomatically([target])

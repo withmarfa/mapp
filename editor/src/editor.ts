@@ -202,7 +202,7 @@ export interface EditorEvents {
   openLink(href: string): void
   copy(text: string): void
   /** How many pictures at web addresses wait for the person to load them, the sentence that says so, the words for
-   *  the button that loads them together, and whether the callout shows: not once the person has closed it for the
+   *  the button that loads them together, and whether the notice shows: not once the person has closed it for the
    *  page. */
   picturesWaiting?(count: number, sentence: string, button: string, shown: boolean): void
   /** A loaded document has had its first frame: said once for each `load`, after the browser has drawn it. */
@@ -394,7 +394,7 @@ export class ItemEditor {
             if (address) {
               if (host.pictures.opensInBrowser(address)) return events.openLink(address)
               // Load on a placeholder box, or Open on a refused picture that can be tried again, loads that picture
-              // alone; the callout's button is the one that loads them all.
+              // alone; the notice's action is the one that loads them all.
               void host.pictures.choose(address)
               return
             }
@@ -480,7 +480,7 @@ export class ItemEditor {
   loadPictures() {
     this.pictures.chooseAll()
   }
-  /** The person closed the callout that counts the pictures that wait: it stays hidden until an item is opened. */
+  /** The person closed the notice that counts the pictures that wait: it stays hidden until an item is opened. */
   dismissPictures() {
     this.pictures.dismiss()
   }
