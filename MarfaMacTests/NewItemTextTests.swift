@@ -84,8 +84,32 @@ struct NewItemTextTests {
         #expect(Self.day("sat on the step", "en_GB") == nil, "a short name inside a sentence is not a weekday")
     }
 
+    static func removingDay(_ text: String, _ locale: String = "en_GB") -> String? {
+        Self.day(text, locale).map { NewItemText.removing($0, from: text) }
+    }
+
     @Test func theDaysWordsLeaveTheTitle() {
-        #expect(NewItemText.removing("Fri 27 Nov", from: "Call Sam Fri 27 Nov about rent") == "Call Sam about rent")
+        #expect(Self.removingDay("Call Sam Fri 27 Nov about rent") == "Call Sam about rent")
+    }
+
+    @Test func onlyTheWordsMatchedLeaveNotTheFirstTextLikeThem() {
+        #expect(Self.removingDay("Read Saturn data Sat") == "Read Saturn data ")
+        #expect(Self.removingDay("Fri 27 Nov: Fri report", "en_US") == ": Fri report")
+    }
+
+    @Test(arguments: ["en_GB", "en_US"])
+    func nextAndAWeekdayLeaveTogether(_ locale: String) throws {
+        let found = try #require(Self.day("Call next Friday", locale))
+        #expect(found.phrase == "next Friday")
+        #expect(Self.removingDay("Call next Friday", locale) == "Call ")
+    }
+
+    @Test(arguments: ["en_GB", "en_US"])
+    func aDayNeedsWholeWordsAndAPossessiveIsNone(_ locale: String) {
+        #expect(Self.day("Send Friday's report", locale) == nil)
+        #expect(Self.day("Send Friday’s report", locale) == nil)
+        #expect(Self.day("Fix Saturnalia lights", locale) == nil)
+        #expect(Self.day("Plan Mondayish", locale) == nil)
     }
 
     // MARK: Tags

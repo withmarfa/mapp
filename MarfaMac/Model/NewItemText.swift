@@ -71,7 +71,8 @@ nonisolated enum NewItemText {
         return (tags, kept)
     }
 
-    private static func isTag(_ word: String) -> Bool {
+    /// Whether the word, after its `#`, is a tag as the line reads one.
+    static func isTag(_ word: String) -> Bool {
         guard let first = word.first, first.isLetter else { return false }
         return word.allSatisfy { $0.isLetter || $0.isNumber || "-_/.".contains($0) } && ItemTag.refusal(of: word) == nil
     }
@@ -93,6 +94,8 @@ nonisolated enum NewItemText {
     struct FoundDay: Equatable, Sendable {
         /// The words as typed, which leave the title when the item is added.
         let phrase: String
+        /// Where the words stand in the text, in characters, so only they leave it.
+        let range: Range<Int>
         let date: Date
         let hasTime: Bool
     }
@@ -109,18 +112,28 @@ nonisolated enum NewItemText {
         for start in words.indices {
             if let found = numericDay(words, from: start, in: text, now: now, calendar: calendar, locale: locale)
                 ?? namedDay(words, from: start, in: text, now: now, calendar: calendar) {
-                return found
+                // A weekday alone may be part of more words the system's reader knows, as `next Friday`.
+                guard !found.phrase.contains(where: \.isNumber), let detected = detectedDay(in: text, calendar: calendar),
+                      detected.range.lowerBound <= found.range.lowerBound, detected.range.upperBound >= found.range.upperBound,
+                      detected.range.count > found.range.count
+                else { return found }
+                return detected
             }
         }
         return detectedDay(in: text, calendar: calendar)
     }
 
-    /// The text with the words that named a day taken out, and the spaces around them made one.
-    static func removing(_ phrase: String, from text: String) -> String {
-        guard let range = text.range(of: phrase) else { return text }
-        var kept = text
-        kept.replaceSubrange(range, with: " ")
-        return kept.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    /// The text with the words that named `day` taken out where they stand, and the spaces either side made one.
+    /// Text that no longer holds those words there is left as it is.
+    static func removing(_ day: FoundDay, from text: String) -> String {
+        guard day.range.upperBound <= text.count else { return text }
+        let start = text.index(text.startIndex, offsetBy: day.range.lowerBound)
+        let end = text.index(start, offsetBy: day.range.count)
+        guard text[start..<end] == day.phrase else { return text }
+        let before = text[..<start]
+        var after = text[end...]
+        if before.last?.isWhitespace != false { after = after.drop { $0.isWhitespace } }
+        return String(before) + after
     }
 
     /// The value a day is written as in `field`: an instant where the field and the words hold a time, else the day.
@@ -231,16 +244,24 @@ nonisolated enum NewItemText {
     /// `Fri 27 Nov 3 copies` names no hour.
     private static func timed(_ day: Date, words: [Word], span: ClosedRange<Int>, in text: String, calendar: Calendar) -> FoundDay {
         let next = span.upperBound + 1
-        func phrase(to last: Int) -> String { String(text[words[span.lowerBound].range.lowerBound..<words[last].range.upperBound]) }
+        func found(to last: Int, date: Date, hasTime: Bool) -> FoundDay {
+            let range = words[span.lowerBound].range.lowerBound..<words[last].range.upperBound
+            return FoundDay(phrase: String(text[range]), range: offsets(of: range, in: text), date: date, hasTime: hasTime)
+        }
         for length in [2, 1] where next + length - 1 < words.count {
             let typed = words[next...(next + length - 1)].map(\.text).joined(separator: " ")
             guard typed.contains(where: { ":.".contains($0) }) || typed.lowercased().hasSuffix("m"),
                   let time = TimeOfDay.parse(typed),
                   let moment = TimeOfDay.moment(hour: time.hour, minute: time.minute, on: day, calendar: calendar)
             else { continue }
-            return FoundDay(phrase: phrase(to: next + length - 1), date: moment, hasTime: true)
+            return found(to: next + length - 1, date: moment, hasTime: true)
         }
-        return FoundDay(phrase: phrase(to: span.upperBound), date: day, hasTime: false)
+        return found(to: span.upperBound, date: day, hasTime: false)
+    }
+
+    private static func offsets(of range: Range<String.Index>, in text: String) -> Range<Int> {
+        let start = text.distance(from: text.startIndex, to: range.lowerBound)
+        return start..<(start + text.distance(from: range.lowerBound, to: range.upperBound))
     }
 
     private static func dayNumber(_ word: Word) -> Int? {
@@ -270,15 +291,27 @@ nonisolated enum NewItemText {
     }
 
     /// The system's date reader, for words such as `tomorrow` or `next Tuesday`. It reads digits in an order of its
-    /// own, so a match with a numeric day in it is passed over: those are read above, in the locale's order.
+    /// own, so a match with a numeric day in it is passed over: those are read above, in the locale's order. A match
+    /// must be whole words, and a possessive, as in `Friday's report`, names no day.
     private static func detectedDay(in text: String, calendar: Calendar) -> FoundDay? {
         guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue) else { return nil }
         let whole = NSRange(text.startIndex..., in: text)
-        guard let match = detector.firstMatch(in: text, options: [], range: whole), let date = match.date,
-              let range = Range(match.range, in: text)
-        else { return nil }
+        for match in detector.matches(in: text, options: [], range: whole) {
+            if let found = detected(match, in: text, calendar: calendar) { return found }
+        }
+        return nil
+    }
+
+    private static func detected(_ match: NSTextCheckingResult, in text: String, calendar: Calendar) -> FoundDay? {
+        guard let date = match.date, let range = Range(match.range, in: text) else { return nil }
         let phrase = String(text[range])
         guard phrase.contains(where: \.isLetter), phrase.wholeMatch(of: /.*\d+\s*[\/.\-]\s*\d+.*/) == nil else { return nil }
+        if range.lowerBound > text.startIndex, isWordCharacter(text[text.index(before: range.lowerBound)]) { return nil }
+        let rest = text[range.upperBound...]
+        if let next = rest.first, isWordCharacter(next) || (["'", "’"].contains(next) && rest.dropFirst().first?.isLetter == true) {
+            return nil
+        }
+        let offsets = offsets(of: range, in: text)
         let hasTime = phrase.firstMatch(of: /\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)|\d{1,2}:\d{2}/.ignoresCase()) != nil
         // The reader places the moment in the system's zone; the day and clock time are what the words named.
         let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
@@ -286,8 +319,10 @@ nonisolated enum NewItemText {
         guard let start = calendar.date(from: day) else { return nil }
         if hasTime, let hour = parts.hour, let minute = parts.minute,
            let moment = TimeOfDay.moment(hour: hour, minute: minute, on: start, calendar: calendar) {
-            return FoundDay(phrase: phrase, date: moment, hasTime: true)
+            return FoundDay(phrase: phrase, range: offsets, date: moment, hasTime: true)
         }
-        return FoundDay(phrase: phrase, date: calendar.startOfDay(for: start), hasTime: false)
+        return FoundDay(phrase: phrase, range: offsets, date: calendar.startOfDay(for: start), hasTime: false)
     }
+
+    private static func isWordCharacter(_ character: Character) -> Bool { character.isLetter || character.isNumber }
 }
