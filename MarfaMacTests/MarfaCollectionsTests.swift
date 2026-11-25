@@ -132,6 +132,7 @@ import Testing
 
     @Test func undoingAFileDropOnACollectionUnlinksBeforeItBinsAndRedoRestoresBeforeItLinks() async throws {
         let (library, source) = try await loaded()
+        let disk = TestFiles()
         let dropped = ItemID("dropped")
         source.attaching.made.withLock { $0 = [dropped] }
         source.send(.upserted([F.item(dropped, F.note, "a.txt", age: 0)]))
@@ -142,7 +143,7 @@ import Testing
         undo.groupsByEvent = false
         let target = browser.fileDropTarget(onCollection: Self.holiday, in: library)
         await browser.importFiles(
-            [TestFiles().url("a.txt")], to: target, in: library, order: ItemOrder(), undoManager: undo)
+            [disk.url("a.txt")], to: target, in: library, order: ItemOrder(), undoManager: undo)
         try #require(source.writes.count == 1)
         guard case .link = source.writes[0] else {
             Issue.record("The drop wrote no link.")
