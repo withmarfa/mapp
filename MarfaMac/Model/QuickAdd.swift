@@ -284,6 +284,8 @@ final class QuickAdd {
     var lastAdded: String?
     /// The Undo of the last Added line, while it is still the undo manager's latest step.
     var lastUndo: StepUndo?
+    var mayBeInMarfa = false
+    var asksAgain = false
 
     /// Writes the draft as it now is, or drops it where it is empty.
     private func keep() {
@@ -835,7 +837,7 @@ extension Browser {
     @discardableResult
     func saveQuickAdd(
         in library: any ItemLibrary, undoManager: UndoManager?, opening: Bool = true, toasts: ToastPresenter? = nil,
-        now: Date = .now, calendar: Calendar = .current, locale: Locale = .current
+        again: Bool = false, now: Date = .now, calendar: Calendar = .current, locale: Locale = .current
     ) async -> ItemID? {
         // The line's words stay as typed until the item is made; only what is sent has the read words taken out.
         guard let typed = quickAdd.draft else { return nil }

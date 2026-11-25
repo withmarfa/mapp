@@ -444,6 +444,53 @@ struct QuickAddTests {
         #expect(library.notices.told > told + 1, "the library's reason, then where the title is")
     }
 
+    @Test func clearingTheEditorWhileAFileIsSentKeepsWhatWasSent() async throws {
+        let library = FakeItemLibrary(now: start)
+        let (release, released) = AsyncStream<Void>.makeStream()
+        library.sendingFile = { for await _ in release { break } }
+        let browser = Browser()
+        browser.openNewItem(kind: TypeID.file.rawValue, form: .text, in: library)
+        browser.quickAdd.draft?.files = [try disk.file("photo.png")]
+        browser.quickAdd.draft?.title = "Holiday"
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        browser.quickAdd.draft = QuickAdd.Draft(typeID: TypeID.file.rawValue)
+        library.refusesFiles = true
+        released.yield()
+        #expect(await saving.value == nil)
+
+        let back = try #require(browser.quickAdd.drafts.takeReturned(.line, in: library.serverKey), "what was sent is kept")
+        #expect(back.draft.title == "Holiday")
+        #expect(library.notices.waiting.contains { $0.title == "File Not Added" }, "\(library.notices.waiting.map(\.title))")
+    }
+
+    @Test func aFileThatMayAlreadyBeInMarfaAsksBeforeItIsAddedAgain() async throws {
+        let library = FakeItemLibrary(now: start)
+        let file = disk.directory.appending(path: "Drafts.json")
+        let photo = try disk.file("photo.png")
+        do {
+            let drafts = NewItemDrafts(file: file)
+            let id = drafts.make(.line, QuickAdd.Draft(typeID: TypeID.file.rawValue), in: library.serverKey)
+            var draft = QuickAdd.Draft(typeID: TypeID.file.rawValue)
+            draft.title = "Holiday"
+            draft.files = [photo]
+            drafts.update(id, draft)
+            drafts.sendingFile(id)
+        }
+        let browser = Browser()
+        browser.quickAdd.drafts = NewItemDrafts(file: file)
+        browser.openNewItem(form: .text, in: library)
+        #expect(browser.quickAdd.draft?.title == "Holiday")
+        #expect(browser.quickAdd.mayBeInMarfa)
+        #expect(browser.quickAdd.lastAdded != nil, "a notice says it may already be in Marfa")
+
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(browser.quickAdd.asksAgain)
+        #expect(library.addedFiles.isEmpty, "nothing is added before the person says so")
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil, again: true) != nil)
+        #expect(library.addedFiles.count == 1)
+    }
+
     @Test func aFileAddedAfterTheWindowClosesWaitsForMarfaWithItsTitle() async throws {
         let library = FakeItemLibrary(now: start)
         let (release, released) = AsyncStream<Void>.makeStream()

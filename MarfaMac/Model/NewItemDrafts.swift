@@ -114,19 +114,21 @@ final class NewItemDrafts {
     }
 
     /// What was typed: kept where it holds something, and dropped where it is empty again.
-    func update(_ id: UUID, _ draft: QuickAdd.Draft) {
+    @discardableResult
+    func update(_ id: UUID, _ draft: QuickAdd.Draft) -> UUID {
         if entries[id] != nil {
-            guard draft.hasContent else { return remove(id, keepingClaim: true) }
+            guard draft.hasContent else { remove(id, keepingClaim: true); return id }
             entries[id]?.draft = draft
             entries[id]?.updated = now()
         } else if let start = pending[id] {
             pending[id] = (start.slot, start.library, draft)
-            guard draft.hasContent else { return }
+            guard draft.hasContent else { return id }
             entries[id] = Entry(id: id, slot: start.slot, library: start.library, draft: draft, updated: now())
         } else {
-            return
+            return id
         }
         save()
+        return id
     }
 
     /// The holder stepped away, as Escape does: an empty draft is dropped and a typed one kept. Returns whether it

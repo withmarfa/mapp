@@ -295,6 +295,152 @@ struct NewItemDraftsTests {
         #expect(reopened.takeReturned(.line, in: "a")?.draft.title == "Refused with no window")
     }
 
+    // MARK: Round 1
+
+    @Test func clearingTheEditorWhileAFileIsSentKeepsTheSentDraftUntilItsAnswer() throws {
+        let disk = TestFiles()
+        let file = disk.directory.appending(path: "Drafts.json")
+        let drafts = NewItemDrafts(file: file)
+        let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.file"), in: "a")
+        var draft = Self.typed("Holiday", kind: "core.file")
+        draft.files = [try disk.file("photo.png")]
+        drafts.update(id, draft)
+        drafts.sendingFile(id)
+
+        let next = drafts.update(id, QuickAdd.Draft(typeID: "core.file"))
+        #expect(next != id, "the editor goes on in a new draft")
+        #expect(!drafts.holdsDraft(.line, in: "a"), "the sent draft stays hidden until its answer")
+        #expect(NewItemDrafts(file: file).takeReturned(.line, in: "a")?.draft.title == "Holiday", "a quit keeps it on disk")
+        drafts.giveBack(id)
+        #expect(drafts.takeReturned(.line, in: "a")?.draft.title == "Holiday")
+    }
+
+    @Test func clearingTheEditorKeepsADraftWhoseCreateIsSent() throws {
+        let drafts = NewItemDrafts(file: nil)
+        let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.task"), in: "a")
+        drafts.update(id, Self.typed("On its way"))
+        #expect(drafts.sending(id, as: .mint()))
+        #expect(drafts.update(id, Self.typed("")) != id)
+        drafts.drop(id)
+        drafts.giveBack(id)
+        #expect(drafts.takeReturned(.line, in: "a")?.draft.title == "On its way", "neither update nor drop removes it")
+    }
+
+    @Test func aFileCutOffByAQuitStaysMarkedUntilItIsAddedAgain() throws {
+        let disk = TestFiles()
+        let file = disk.directory.appending(path: "Drafts.json")
+        do {
+            let drafts = NewItemDrafts(file: file)
+            let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.file"), in: "a")
+            var draft = Self.typed("Holiday", kind: "core.file")
+            draft.files = [try disk.file("photo.png")]
+            drafts.update(id, draft)
+            drafts.sendingFile(id)
+        }
+        let first = NewItemDrafts(file: file)
+        let kept = try #require(first.take(.line, in: "a"))
+        #expect(kept.interrupted)
+        first.release(kept.id)
+        #expect(first.take(.line, in: "a")?.interrupted == true, "taken and let go, it still may be in Marfa")
+        let again = try #require(NewItemDrafts(file: file).take(.line, in: "a"))
+        #expect(again.interrupted, "and after another relaunch")
+    }
+
+    @Test func aCreateMissingFromAWholeCurrentCopyComesBackAsMaybeAdded() throws {
+        let disk = TestFiles()
+        let file = disk.directory.appending(path: "Drafts.json")
+        let absent = ItemID.mint()
+        do {
+            let drafts = NewItemDrafts(file: file)
+            let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.task"), in: "a")
+            drafts.update(id, Self.typed("Force quit"))
+            #expect(drafts.sending(id, as: absent))
+        }
+        let library = FakeItemLibrary()
+        library.serverKey = "a"
+        library.syncReport.fill = LibraryFill(state: .complete)
+        let reopened = NewItemDrafts(file: file)
+        reopened.settle(in: library)
+        #expect(reopened.takeReturned(.line, in: "a") == nil, "not synced since the launch, the copy may not hold it yet")
+
+        library.syncReport.lastSynced = .now
+        library.syncReport.problems = [Self.problem(.blocked(.failingAlone), creating: absent)]
+        reopened.settle(in: library)
+        #expect(reopened.takeReturned(.line, in: "a") == nil, "a queued create may still be made")
+
+        library.syncReport.problems = []
+        reopened.settle(in: library)
+        let back = try #require(reopened.takeReturned(.line, in: "a"))
+        #expect(back.draft.title == "Force quit")
+        #expect(back.interrupted, "it may already be in Marfa")
+    }
+
+    @Test func aCreateMadeThisRunIsNeverCalledMissing() throws {
+        let library = FakeItemLibrary()
+        library.serverKey = "a"
+        library.syncReport.fill = LibraryFill(state: .complete)
+        library.syncReport.lastSynced = .now
+        let drafts = NewItemDrafts(file: nil)
+        _ = Self.sent("In flight", as: .mint(), in: drafts)
+        drafts.settle(in: library)
+        #expect(drafts.takeReturned(.line, in: "a") == nil, "the copy has not taken it yet")
+    }
+
+    @Test func aRefusalHeardBeforeTheLibraryKnowsItsKeyIsTakenOnceItDoes() async throws {
+        let library = FakeItemLibrary()
+        library.serverKey = ""
+        let drafts = NewItemDrafts(file: nil)
+        let following = drafts.follow(library)
+        defer { following.cancel() }
+        let item = ItemID.mint()
+        _ = Self.sent("Refused at startup", as: item, in: drafts)
+        library.refusedCreations = [item]
+        // Lets the watcher hear the refusal while the key is still unknown.
+        try await Task.sleep(for: .milliseconds(50))
+        library.serverKey = "a"
+        #expect(await eventually { drafts.holdsDraft(.line, in: "a") })
+    }
+
+    @Test func theWatcherHoldsTheLibraryWeakly() async throws {
+        let drafts = NewItemDrafts(file: nil)
+        weak var gone: FakeItemLibrary?
+        var following: Task<Void, Never>?
+        do {
+            let library = FakeItemLibrary()
+            gone = library
+            following = drafts.follow(library)
+        }
+        #expect(await eventually { gone == nil })
+        following?.cancel()
+    }
+
+    @Test func aFileRefusedAfterItsWindowClosedIsToldOnceWithTheReason() throws {
+        let disk = TestFiles()
+        let library = FakeItemLibrary()
+        library.serverKey = "a"
+        let notices = Notices()
+        let drafts = NewItemDrafts(file: nil)
+        drafts.notices = notices
+        let item = ItemID.mint()
+        let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.file"), in: "a")
+        var draft = Self.typed("Holiday", kind: "core.file")
+        draft.files = [try disk.file("photo.png")]
+        drafts.update(id, draft)
+        drafts.sendingFile(id)
+        drafts.release(id, sending: draft, rest: QuickAdd.Draft(typeID: "core.file"))
+        drafts.added(id, as: item)
+        library.refusedCreations = [item]
+        library.createRefusalReasons = [item: "The file is too large."]
+
+        drafts.settle(in: library)
+        drafts.settle(in: library)
+        #expect(notices.told == 1)
+        let told = try #require(notices.waiting.last)
+        #expect(told.title == "File Not Added")
+        #expect(told.message.contains("The file is too large."), "\(told.message)")
+        #expect(drafts.takeReturned(.line, in: "a")?.draft.title == "Holiday")
+    }
+
     @Test func aSentIDThatCannotBeWrittenIsNotSent() throws {
         let disk = TestFiles()
         let blocker = disk.url("Blocker")

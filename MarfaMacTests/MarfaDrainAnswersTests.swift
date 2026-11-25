@@ -31,8 +31,9 @@ struct MarfaDrainAnswersTests {
         #expect(sqlite3_changes(db) == 1)
     }
 
-    private func open() async throws -> (MarfaSource, ChangeLog, URL) {
-        let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
+    private func open(
+        at root: URL = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
+    ) async throws -> (MarfaSource, ChangeLog, URL) {
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, signIns: ScriptedSignIns([connection.address: "unused"]), location: location)
@@ -186,6 +187,56 @@ struct MarfaDrainAnswersTests {
         }
         #expect(told, "told: \(library.notices.waiting.map(\.message))")
         #expect(library.item(child) != nil, "the item stays")
+        await source.close()
+    }
+
+    /// The copy's queue does not say a link was a new item's, so the app keeps that with the write across a relaunch.
+    @Test @MainActor
+    func aParentLinkRefusedAfterARelaunchIsToldAtTheItem() async throws {
+        let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let parent = ItemID.mint()
+        let child = ItemID.mint()
+        do {
+            let (source, log, _) = try await open(at: root)
+            source.submit(.create(id: parent, ItemDraft(type: TypeID("core.note"), title: "Garden", body: "Plans")), as: WriteID())
+            source.submit(.create(id: child, ItemDraft(type: TypeID("core.note"), title: "Seeds", body: "List", parent: parent)), as: WriteID())
+            await source.queueSubmitted()
+            _ = try #require(await log.wait { $0.snapshot?.items.first { $0.id == child }?.edgesOut.isEmpty == false })
+            await source.close()
+        }
+        let (source, _, store) = try await open(at: root)
+        let library = MarfaLibrary(source: source, notices: Notices())
+        try #require(await eventually { library.isLoaded })
+        let link = try #require(try await source.copy.queue.all().first { $0.kind == .createEdge })
+        try Self.record(link.id, "UPDATE queue SET verdict = 'refused', reason = 'edge_constraint_violation', sent = 1 WHERE id = ?", at: store)
+        await source.tellAnswers()
+
+        let told = await eventually {
+            library.notices.waiting.contains {
+                $0.title == "Can’t Put Item Under Its Parent" && $0.message.contains("“Seeds”") && $0.message.contains("“Garden”")
+            }
+        }
+        #expect(told, "told: \(library.notices.waiting.map(\.message))")
+        await source.close()
+    }
+
+    /// A file's create is followed to its answer like any other, so a refusal after its window closed is known.
+    @Test @MainActor
+    func aFileRefusedLaterIsARefusedCreateWithItsReason() async throws {
+        let (source, _, store) = try await open()
+        defer { try? FileManager.default.removeItem(at: store.deletingLastPathComponent()) }
+        let library = MarfaLibrary(source: source, notices: Notices())
+        try #require(await eventually { library.isLoaded })
+        let file = store.deletingLastPathComponent().appending(path: "Plan.txt")
+        try Data("plan".utf8).write(to: file)
+        let id = try #require(await library.addFile(file, title: "Plan", parentID: nil, tier: .library, tags: []))
+        let create = try #require(try await source.copy.queue.all().first { $0.kind == .createItem && $0.itemId == id.rawValue })
+        try Self.record(create.id, "UPDATE queue SET verdict = 'refused', reason = 'validation_failed', sent = 1 WHERE id = ?", at: store)
+        await source.tellAnswers()
+
+        #expect(await eventually { library.refusedCreates.contains(id) })
+        #expect(library.createRefusalReasons[id] != nil)
         await source.close()
     }
 

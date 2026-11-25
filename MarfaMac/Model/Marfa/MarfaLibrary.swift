@@ -263,6 +263,7 @@ import Observation
     @ObservationIgnored var takenMarks: Set<Int> = []
     /// Creates the source refused, before or after it held the item (`ItemLibrary.refusedCreations`).
     var refusedCreations: Set<ItemID> = []
+    var createRefusalReasons: [ItemID: String] = [:]
     /// Why text typed over an item that can no longer be written is not kept.
     static var cantChange: String {
         String(localized: "This item can’t be changed now, so the app couldn’t keep what you typed.")

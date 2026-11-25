@@ -225,6 +225,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// The creates Marfa refused after `createItem` answered, before or after the library showed the item, which the
     /// library has told the person of. A library that refuses a create at once answers nil from `createItem` instead.
     var refusedCreations: Set<ItemID> { get }
+    /// The server's reason for each create in `refusedCreations` it gave one for.
+    var createRefusalReasons: [ItemID: String] { get }
     @discardableResult
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool
     /// Several properties of one item in one edit and one undo step named `actionName`, each given its value or, where
