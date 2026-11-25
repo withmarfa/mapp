@@ -59,7 +59,11 @@ nonisolated struct SidebarGroupPlan: Identifiable, Equatable {
     /// then what is pinned, each of those in the person's order within it. Once something has been put in the section by hand
     /// (`SidebarLayout.put`, or dragging its rows in place), the section is one list in the person's order.
     private static func ordered(_ places: [SidebarPlace], in group: String, layout: SidebarLayout) -> [SidebarPlace] {
-        if places.contains(where: { layout.homes?[$0.key] == group }) { return layout.ordered(places) }
+        if places.contains(where: { layout.homes?[$0.key] == group }) {
+            // The Library and the Feed lead until the person moves them, so a page put under them goes after them.
+            let leading = SidebarPlace.places.filter { places.contains($0) && !layout.order.contains($0.key) }
+            return leading + layout.ordered(places).filter { !leading.contains($0) }
+        }
         // An earlier copy kept the Library and the Feed in two sections, so their order there says nothing here.
         return SidebarPlace.places.filter(places.contains)
             + [SidebarPlace.pages, places.filter(\.isPinnable)].flatMap { layout.ordered($0.filter(places.contains)) }
