@@ -308,6 +308,15 @@ extension MarfaLibrary {
         var isEmpty: Bool { adding.isEmpty && removing.isEmpty && moving.isEmpty }
     }
 
+    /// An edge's type and ends, which a removal is matched by from one look at the copy to the next.
+    private nonisolated struct EdgeEnds: Hashable {
+        let type: String
+        let from: ItemID
+        let to: ItemID
+
+        init(_ draft: EdgeDraft) { (type, from, to) = (draft.type, draft.from, draft.to) }
+    }
+
     /// A link a change makes, which the core is asked about as it would be written: a new link, or an end moved.
     nonisolated enum MadeLink: Hashable {
         case added(EdgeDraft)
@@ -344,27 +353,31 @@ extension MarfaLibrary {
     /// Changes run one after another in the order they were made, each once the copy has taken the writes of the one
     /// before (see `relationshipChain`). Nothing is written until the core has answered.
     ///
-    /// A removal-only change waits for the copy to queue or refuse its writes. A change that adds or moves a link
-    /// returns `taken` after the preflight and submission, before the copy judges those writes. The library reports
-    /// any later refusal in a notice.
-    /// `finish` waits for a change in flight.
+    /// The answer waits for the copy to queue or refuse the writes sent at once, since the copy judges each again
+    /// against what it holds then: a move whose edge another device changed since the core was asked, or a removal of
+    /// an edge gone, is never answered `taken`. A removal held back for the new links is answered later, in a notice.
+    /// `finish` waits for a change still being checked, not for the copy's answer.
     @discardableResult
     func changeLinks(
         _ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?
     ) async -> EdgeVerdict {
         relationshipChangesInFlight += 1
         let previous = relationshipChain
-        let work = Task { () -> (verdict: EdgeVerdict, writes: Set<WriteID>) in
+        let work = Task { () -> (verdict: EdgeVerdict, step: LinkStep?) in
             await previous?.value
             let done = await self.applyRelationship(id, field: field, adding: adding, removing: removing, undoManager: undoManager)
             self.relationshipChangesInFlight -= 1
             return done
         }
         // The next change reads the copy, which shows this one's writes once the source has taken or answered each.
-        relationshipChain = Task {
-            await self.untilSettled(work.value.writes)
+        let settled = Task {
+            await self.untilSettled(work.value.step?.sent ?? [])
         }
-        return await work.value.verdict
+        relationshipChain = settled
+        let done = await work.value
+        guard let step = done.step else { return done.verdict }
+        await settled.value
+        return step.verdict
     }
 
     /// Returns once each write has been taken into the copy (`SourceChange.taken`) or answered before that
@@ -381,19 +394,26 @@ extension MarfaLibrary {
 
     private func applyRelationship(
         _ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?
-    ) async -> (verdict: EdgeVerdict, writes: Set<WriteID>) {
+    ) async -> (verdict: EdgeVerdict, step: LinkStep?) {
         let cantChange = String(localized: "Can’t Change This Relationship")
         var asked: Set<MadeLink> = []
+        // Each removal names the edge this Mac held when the change was first worked out, before any wait for the
+        // core, so an edge another device puts between the same ends meanwhile is never the one removed.
+        var seenRemovals: [EdgeEnds: EdgeDraft]?
         while true {
-            let plan: (change: RelationshipChange, made: [MadeLink])
+            var plan: (change: RelationshipChange, made: [MadeLink])
             switch self.plan(id, field: field, adding: adding, removing: removing) {
-            case .unavailable: return (.unknown, [])
+            case .unavailable: return (.unknown, nil)
             case .refused(let reason):
                 notices.tell(cantChange, reason)
-                return (.refused(reason), [])
+                return (.refused(reason), nil)
             case .change(let change, let made): plan = (change, made)
             }
-            guard !plan.change.isEmpty else { return (.taken, []) }
+            let firstLook = seenRemovals ?? Dictionary(
+                plan.change.removing.compactMap(seen).map { (EdgeEnds($0), $0) }, uniquingKeysWith: { first, _ in first })
+            seenRemovals = firstLook
+            plan.change.removing = plan.change.removing.compactMap { firstLook[EdgeEnds($0)] }
+            guard !plan.change.isEmpty else { return (.taken, nil) }
             let unasked = plan.made.filter { !asked.contains($0) }
             guard !unasked.isEmpty else {
                 let name = fieldEnd(field).map { String(localized: "Change \(label($0))") } ?? cantChange
@@ -401,21 +421,17 @@ extension MarfaLibrary {
                 gatheringSkips(failing: cantChange) {
                     made = relink(plan.change, name: name, failing: cantChange, undoManager: undoManager)
                 }
-                guard let step = made else { return (.unknown, []) }
-                guard plan.made.isEmpty else { return (.taken, step.sent) }
-                // Nothing was asked of the core, as for a removal, so the copy's judgement of the writes is the verdict.
-                guard !step.sent.isEmpty else { return (.unknown, []) }
-                await untilSettled(step.sent)
-                return (step.verdict, step.sent)
+                guard let step = made, !step.sent.isEmpty else { return (.unknown, nil) }
+                return (.taken, step)
             }
             for link in unasked {
                 switch await verdict(of: link) {
                 case .refused(let reason):
                     notices.tell(cantChange, reason)
-                    return (.refused(reason), [])
+                    return (.refused(reason), nil)
                 case .incomplete:
                     notices.tell(cantChange, MarfaEngine.notCurrent)
-                    return (.incomplete, [])
+                    return (.incomplete, nil)
                 case .taken, .unknown:
                     asked.insert(link)
                 }

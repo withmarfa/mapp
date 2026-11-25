@@ -352,3 +352,27 @@ nonisolated final class FakeItemSource: ItemSource {
         return .closed
     }
 }
+
+extension FakeItemSource {
+    /// Makes a change of links and takes each write it sends at once, as the engine takes a write it judges sound,
+    /// since the change answers only once the copy has taken or refused them.
+    @MainActor
+    func taking(_ change: @escaping @MainActor () async -> EdgeVerdict) async -> EdgeVerdict {
+        let done = Flag()
+        var taken = submitted.count
+        let work = Task { @MainActor in
+            let verdict = await change()
+            done.isSet = true
+            return verdict
+        }
+        while await eventually({ done.isSet || submitted.count > taken }), !done.isSet {
+            for sent in submitted[taken...] { send(.taken(sent.id)) }
+            taken = submitted.count
+        }
+        return await work.value
+    }
+
+    @MainActor private final class Flag {
+        var isSet = false
+    }
+}
