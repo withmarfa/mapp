@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 extension Browser {
     func searchScope(in library: any ItemLibrary) -> SearchScope {
@@ -33,6 +34,25 @@ extension Browser {
 
     /// The From, Archived Items and Include Kinds of the open place.
     var listing: PlaceListing { listing(in: shown) }
+
+    /// Whether the window shows the Archive's own list, as against a view or a place's list of archived items.
+    var listsArchive: Bool { shown.place == .archive && shown.view == .own }
+
+    /// The title a layout gives the window: the Archive is a page of the Library and keeps its title through a search.
+    func pageTitle(in library: any ItemLibrary) -> String {
+        if listsArchive { return String(localized: "Library") }
+        return isSearching ? String(localized: "Search") : library.name(of: shown)
+    }
+
+    /// The count the window carries beside its title. The Archive says how many items it holds, and how many of them a
+    /// search or a filter leaves; every other place says how many items it lists, or how many results a search found.
+    func countLine(_ listed: Int, in library: any ItemLibrary) -> Text {
+        guard listsArchive else {
+            return isSearching ? Text("^[\(listed) result](inflect: true)") : Text("^[\(listed) item](inflect: true)")
+        }
+        let held = library.count(in: .archive, scope: .all)
+        return listed == held ? Text(held, format: .number) : Text("\(listed) of \(held)")
+    }
 
     /// What `shown` lists besides its filters, as the person or a saved view chose, else the place's own: the Library
     /// lists its tier and the Feed its own; the Favorites view starts on the Library whatever Settings says, and a type,
@@ -222,7 +242,7 @@ extension Browser {
         let derived = derivedKey(in: library)
         let key = TableKey(
             derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, counts: library.counts.revision,
-            hidesEmpty: hidesEmptyGroups,
+            hidesEmpty: hidesEmptyGroups, sources: library.sources.infos,
             relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()))
         if let held = tableMemo, held.key == key { return held.content }
         let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
@@ -273,6 +293,8 @@ extension Browser {
         /// A changed or evicted answer invalidates the cached table rows.
         let counts: Int
         let hidesEmpty: Bool
+        /// The names the server gave sources, which a row holds from when it was made, so the Source column sorts by them.
+        let sources: [String: SourceInfo]
         /// The day a filter relative to the day is worked out for, so the table is made again when it changes.
         let relativeDay: Date?
     }

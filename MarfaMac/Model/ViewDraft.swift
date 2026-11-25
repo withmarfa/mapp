@@ -192,7 +192,7 @@ nonisolated enum ViewDraft {
         case .edited: "updated_at"
         case .occurred: "occurred_at"
         case .field(let field): isPropertyName(field.key) ? "properties." + field.key : nil
-        case .parent, .children, .collections, .count, .duration, .tags: nil
+        case .parent, .children, .collections, .count, .duration, .tags, .source: nil
         }
     }
 

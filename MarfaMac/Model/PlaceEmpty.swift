@@ -28,7 +28,7 @@ nonisolated struct PlaceEmpty: Equatable {
         case .feed:
             return plain(String(localized: "Feed Is Empty"), String(localized: "Items from your apps wait here."))
         case .archive:
-            return plain(String(localized: "Archive Is Empty"), String(localized: "Items you archive show here."))
+            return plain(String(localized: "Nothing is archived."))
         case .collection:
             return plain(String(localized: "No Items"), String(localized: "Items you add show here."))
         case .source:

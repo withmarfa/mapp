@@ -22,173 +22,201 @@ struct AppCommands: Commands {
         SidebarCommands()
 
         CommandGroup(after: .sidebar) {
-            if browser?.customizesSidebar == true {
-                Button("Finish Customizing Sidebar", systemImage: "checkmark") { browser?.customizesSidebar = false }
-                    .shortcut(.customizeSidebar, shortcuts)
-            } else {
-                Button("Customize Sidebar…", systemImage: "sidebar.squares.leading") { browser?.customizesSidebar = true }
-                    .shortcut(.customizeSidebar, shortcuts)
-                    .disabled(browser == nil)
+            Group {
+                if browser?.customizesSidebar == true {
+                    Button("Finish Customizing Sidebar", systemImage: "checkmark") { browser?.customizesSidebar = false }
+                        .shortcut(.customizeSidebar, shortcuts)
+                } else {
+                    Button("Customize Sidebar…", systemImage: "sidebar.squares.leading") { browser?.customizesSidebar = true }
+                        .shortcut(.customizeSidebar, shortcuts)
+                        .disabled(browser == nil)
+                }
             }
+            // On macOS a menu item draws its symbol only when the menu asks for it.
+            .labelStyle(.titleAndIcon)
         }
 
         CommandGroup(replacing: .newItem) {
-            Button("New Item", systemImage: "plus") {
-                if let library { browser?.openQuickAdd(remembered: lastType, in: library) }
+            Group {
+                Button("New Item", systemImage: "plus") {
+                    if let library { browser?.openQuickAdd(remembered: lastType, in: library) }
+                }
+                    .shortcut(.newItem, shortcuts)
+                    .disabled(browser == nil || library?.isLoaded != true)
+                Button("New Window", systemImage: "macwindow.badge.plus") {
+                    openWindow(id: MarfaMacApp.mainWindowID)
+                }
+                .shortcut(.newWindow, shortcuts)
+                Divider()
+                // Pulls what the server has changed and sends what waits; the sidebar's instance menu and the palette have it too.
+                Button("Refresh", systemImage: "arrow.clockwise") { host.refresh() }
+                    .shortcut(.refresh, shortcuts)
+                    .disabled(!host.canRefresh)
             }
-                .shortcut(.newItem, shortcuts)
-                .disabled(browser == nil || library?.isLoaded != true)
-            Button("New Window", systemImage: "macwindow.badge.plus") {
-                openWindow(id: MarfaMacApp.mainWindowID)
-            }
-            .shortcut(.newWindow, shortcuts)
-            Divider()
-            // Pulls what the server has changed and sends what waits; the sidebar's instance menu and the palette have it too.
-            Button("Refresh", systemImage: "arrow.clockwise") { host.refresh() }
-                .shortcut(.refresh, shortcuts)
-                .disabled(!host.canRefresh)
+            // On macOS a menu item draws its symbol only when the menu asks for it.
+            .labelStyle(.titleAndIcon)
         }
 
         // The item commands sit with the File menu's making and opening, above Close, as Notes has them.
         CommandGroup(after: .newItem) {
-            let ids: Set<ItemID> = focused?.ids ?? []
-            // Sharing an item reads one item; the commands below act on files too.
-            let shown = ids.compactMap { library?.headerItem($0) }.filter { !$0.isFile }
-            let one = ids.count == 1 ? shown.first : nil
-            command(.open)
-            command(.openAsModal)
-            command(.openAsFullPage)
-            command(.openInNewWindow)
-            command(.quickLook)
-            command(.openOriginal)
-            command(.openInBrowser)
-            Divider()
-            ItemShareLink(
-                item: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, library: library)
-            if let library {
-                ItemActions(ids: ids, undoManager: focused?.undoManager, inMenuBar: true, shortcuts: shortcuts)
-                    .environment(\.library, library)
-                    .environment(details)
-            }
-            VersionHistoryCommands(details: details, library: library, undoManager: focused?.undoManager)
-            // The row menu of the index in front: sources are renamed and marked, collections deleted.
-            if browser?.showsSidebarIndex == true {
+            Group {
+                let ids: Set<ItemID> = focused?.ids ?? []
+                // Sharing an item reads one item; the commands below act on files too.
+                let shown = ids.compactMap { library?.headerItem($0) }.filter { !$0.isFile }
+                let one = ids.count == 1 ? shown.first : nil
+                command(.open)
+                command(.openAsModal)
+                command(.openAsFullPage)
+                command(.openInNewWindow)
+                command(.quickLook)
+                command(.openOriginal)
+                command(.openInBrowser)
                 Divider()
-                if browser?.indexPlace == .sources {
-                    Button("Rename Source…", systemImage: "pencil") { indexActions?.rename?() }
-                        .disabled(indexActions?.rename == nil)
-                    Button("Choose Source Mark…", systemImage: "face.smiling") { indexActions?.chooseMark?() }
-                        .disabled(indexActions?.chooseMark == nil)
-                } else {
-                    Button("Delete Collection…", systemImage: "trash") { indexActions?.delete?() }
-                        .disabled(indexActions?.delete == nil)
+                ItemShareLink(
+                    item: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, library: library)
+                if let library {
+                    ItemActions(ids: ids, undoManager: focused?.undoManager, inMenuBar: true, shortcuts: shortcuts)
+                        .environment(\.library, library)
+                        .environment(details)
+                }
+                VersionHistoryCommands(details: details, library: library, undoManager: focused?.undoManager)
+                // The row menu of the index in front: sources are renamed and marked, collections deleted.
+                if browser?.showsSidebarIndex == true {
+                    Divider()
+                    if browser?.indexPlace == .sources {
+                        Button("Rename Source…", systemImage: "pencil") { indexActions?.rename?() }
+                            .disabled(indexActions?.rename == nil)
+                        Button("Choose Source Mark…", systemImage: "face.smiling") { indexActions?.chooseMark?() }
+                            .disabled(indexActions?.chooseMark == nil)
+                    } else {
+                        Button("Delete Collection…", systemImage: "trash") { indexActions?.delete?() }
+                            .disabled(indexActions?.delete == nil)
+                    }
                 }
             }
+            // On macOS a menu item draws its symbol only when the menu asks for it.
+            .labelStyle(.titleAndIcon)
         }
 
         // Print has ⌘P, as everywhere; the print panel sets the paper.
         // Where Notes keeps Attach File, after the pasteboard's commands.
         CommandGroup(after: .pasteboard) {
-            command(.copyLink)
-            command(.addAttachment)
+            Group {
+                command(.copyLink)
+                command(.addAttachment)
+            }
+            // On macOS a menu item draws its symbol only when the menu asks for it.
+            .labelStyle(.titleAndIcon)
         }
 
         CommandGroup(replacing: .printItem) {
-            command(.exportPDF)
-            command(.print)
+            Group {
+                command(.exportPDF)
+                command(.print)
+            }
+            // On macOS a menu item draws its symbol only when the menu asks for it.
+            .labelStyle(.titleAndIcon)
         }
 
         CommandGroup(after: .textEditing) {
-            palette("Search Items…", systemImage: "magnifyingglass", .search)
-                .shortcut(.searchItems, shortcuts)
-            palette("Command Palette", systemImage: "command", .commands)
-                .shortcut(.commandPalette, shortcuts)
-            Button("Palette Actions", systemImage: "ellipsis.circle") { browser?.paletteActionsRequests += 1 }
-                .disabled(browser?.palette == nil)
-                .shortcut(.paletteActions, shortcuts)
+            Group {
+                palette("Search Items…", systemImage: "magnifyingglass", .search)
+                    .shortcut(.searchItems, shortcuts)
+                palette("Command Palette", systemImage: "command", .commands)
+                    .shortcut(.commandPalette, shortcuts)
+                Button("Palette Actions", systemImage: "ellipsis.circle") { browser?.paletteActionsRequests += 1 }
+                    .disabled(browser?.palette == nil)
+                    .shortcut(.paletteActions, shortcuts)
+            }
+            // On macOS a menu item draws its symbol only when the menu asks for it.
+            .labelStyle(.titleAndIcon)
         }
 
         // The dividers here are drawn whether or not the views between them render anything, and the system adds its
         // own around the toolbar and tab groups, so the menu can open with two in a row. `MenuSeparatorTidy` hides
         // the surplus as the menu opens; write a divider wherever one belongs and leave that to it.
         CommandGroup(before: .sidebar) {
-            command(.toggleSource)
-            command(.toggleReader)
-            command(.toggleFormats)
-            command(.toggleFocus)
-            Divider()
-            if let place = browser?.indexPlace {
-                if let browser { IndexPageCommands(browser: browser, place: place, shortcuts: shortcuts) }
+            Group {
+                command(.toggleSource)
+                command(.toggleReader)
+                command(.toggleFormats)
+                command(.toggleFocus)
                 Divider()
-                IndexViewOptions(place: place, browser: browser)
-            } else {
-                ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, shortcuts: shortcuts)
-            }
-            Divider()
-            SavedViewMenu(browser: browser, library: library, shortcuts: shortcuts)
-            // The toolbar's Done for a view's panel.
-            Button("Finish Editing View", systemImage: "checkmark") {
-                if let browser, let library { Task { await browser.finishViewPanel(in: library, order: order) } }
-            }
-            .disabled(browser?.showsViewPanel != true)
-            Divider()
-            Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
-                details?.isPresented.toggle()
-            }
-            .shortcut(.toggleDetails, shortcuts)
-            .disabled(details == nil || (browser?.showsSidebarIndex != true && focused?.ids.count != 1))
-            Divider()
-            // The toolbar's View Options and its filters, for the view in front.
-            if let library, let browser {
-                // A table, board or timeline with an item page open has no view options to offer.
-                if browser.offersViewOptions, !browser.showsSidebarIndex {
-                    // The library is given inside the branch that shows it, so the menu's views never read it while it is
-                    // gone: SwiftUI can update a view of a branch it is about to drop, which then still has its old one.
-                    Group {
-                        FilterCommands(browser: browser, shortcuts: shortcuts)
-                        CurrentViewOptions(browser: browser, shortcuts: shortcuts)
-                    }
-                    .environment(\.library, library)
+                if let place = browser?.indexPlace {
+                    if let browser { IndexPageCommands(browser: browser, place: place, shortcuts: shortcuts) }
+                    Divider()
+                    IndexViewOptions(place: place, browser: browser)
+                } else {
+                    ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, shortcuts: shortcuts)
                 }
-            } else {
-                CurrentViewOptions(browser: nil)
+                Divider()
+                SavedViewMenu(browser: browser, library: library, shortcuts: shortcuts)
+                // The toolbar's Done for a view's panel.
+                Button("Finish Editing View", systemImage: "checkmark") {
+                    if let browser, let library { Task { await browser.finishViewPanel(in: library, order: order) } }
+                }
+                .disabled(browser?.showsViewPanel != true)
+                Divider()
+                Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
+                    details?.isPresented.toggle()
+                }
+                .shortcut(.toggleDetails, shortcuts)
+                .disabled(details == nil || (browser?.showsSidebarIndex != true && focused?.ids.count != 1))
+                Divider()
+                // The toolbar's View Options and its filters, for the view in front.
+                if let library, let browser {
+                    // A table, board or timeline with an item page open has no view options to offer.
+                    if browser.offersViewOptions, !browser.showsSidebarIndex {
+                        // The library is given inside the branch that shows it, so the menu's views never read it while it is
+                        // gone: SwiftUI can update a view of a branch it is about to drop, which then still has its old one.
+                        Group {
+                            FilterCommands(browser: browser, shortcuts: shortcuts)
+                            CurrentViewOptions(browser: browser, shortcuts: shortcuts)
+                        }
+                        .environment(\.library, library)
+                    }
+                } else {
+                    CurrentViewOptions(browser: nil)
+                }
+                Divider()
+                PageWidthOptions()
+                Divider()
+                if let fileView {
+                    FileViewCommands(viewing: fileView, shortcuts: shortcuts)
+                } else {
+                    TextZoomCommands(pageFocused: pageKeepsHistoryKeys, shortcuts: shortcuts)
+                }
+                Divider()
+                // ⌘[ and ⌘], as in Safari and the Finder.
+                // The page uses the same keys to outdent and indent a list item and to move between table cells, so
+                // while it has the keyboard the menu items give the keys up (the items still work from the menu).
+                // While the Settings window is key the same keys move through its pages.
+                Button(String(localized: browser?.viewMode.backTitle ?? "Back"), systemImage: "chevron.backward") {
+                    if let settingsNavigation { settingsNavigation.back() }
+                    else if let browser, let library { browser.stepBack(in: library) }
+                }
+                    .keyboardShortcut(pageKeepsHistoryKeys ? nil : shortcuts.shortcut(for: .back)?.keyboardShortcut)
+                    .disabled(!canGoBack)
+                Button("Forward", systemImage: "chevron.forward") {
+                    if let settingsNavigation { settingsNavigation.forward() }
+                    else if let browser, let library { browser.stepForward(in: library) }
+                }
+                    .keyboardShortcut(pageKeepsHistoryKeys ? nil : shortcuts.shortcut(for: .forward)?.keyboardShortcut)
+                    .disabled(!canGoForward)
+                Divider()
+                // The modal's own moves: through the items behind it, and out.
+                Button("Previous Item", systemImage: "chevron.up") { step(.previous) }
+                    .shortcut(.previousItem, shortcuts)
+                    .disabled(!canStep(.previous))
+                Button("Next Item", systemImage: "chevron.down") { step(.next) }
+                    .shortcut(.nextItem, shortcuts)
+                    .disabled(!canStep(.next))
+                Button("Close Modal", systemImage: "xmark") { browser?.closeModal() }
+                    .disabled(browser?.isModalPresented != true)
+                Divider()
             }
-            Divider()
-            PageWidthOptions()
-            Divider()
-            if let fileView {
-                FileViewCommands(viewing: fileView, shortcuts: shortcuts)
-            } else {
-                TextZoomCommands(pageFocused: pageKeepsHistoryKeys, shortcuts: shortcuts)
-            }
-            Divider()
-            // ⌘[ and ⌘], as in Safari and the Finder.
-            // The page uses the same keys to outdent and indent a list item and to move between table cells, so
-            // while it has the keyboard the menu items give the keys up (the items still work from the menu).
-            // While the Settings window is key the same keys move through its pages.
-            Button(String(localized: browser?.viewMode.backTitle ?? "Back"), systemImage: "chevron.backward") {
-                if let settingsNavigation { settingsNavigation.back() }
-                else if let browser, let library { browser.stepBack(in: library) }
-            }
-                .keyboardShortcut(pageKeepsHistoryKeys ? nil : shortcuts.shortcut(for: .back)?.keyboardShortcut)
-                .disabled(!canGoBack)
-            Button("Forward", systemImage: "chevron.forward") {
-                if let settingsNavigation { settingsNavigation.forward() }
-                else if let browser, let library { browser.stepForward(in: library) }
-            }
-                .keyboardShortcut(pageKeepsHistoryKeys ? nil : shortcuts.shortcut(for: .forward)?.keyboardShortcut)
-                .disabled(!canGoForward)
-            Divider()
-            // The modal's own moves: through the items behind it, and out.
-            Button("Previous Item", systemImage: "chevron.up") { step(.previous) }
-                .shortcut(.previousItem, shortcuts)
-                .disabled(!canStep(.previous))
-            Button("Next Item", systemImage: "chevron.down") { step(.next) }
-                .shortcut(.nextItem, shortcuts)
-                .disabled(!canStep(.next))
-            Button("Close Modal", systemImage: "xmark") { browser?.closeModal() }
-                .disabled(browser?.isModalPresented != true)
-            Divider()
+            // On macOS a menu item draws its symbol only when the menu asks for it.
+            .labelStyle(.titleAndIcon)
         }
     }
 }

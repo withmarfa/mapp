@@ -8,16 +8,16 @@ import Foundation
 struct GoMenu: Equatable {
     /// One command of the menu.
     struct Entry: Identifiable, Equatable {
-        let place: SidebarPlace
+        let id: String
         let item: PlaceView
         let title: String
         let icon: RowIcon
-
-        var id: String { place.key }
     }
 
-    /// The Library group's places, then the Feed and Favorites.
+    /// The Library, Sources, Collections and Archive.
     let places: [Entry]
+    /// The Feed and Favorites.
+    let builtInViews: [Entry]
     /// The saved views, in the sidebar's order.
     let views: [Entry]
     /// The first `SidebarPlan.shownTypeCount` types with their subtypes, as the sidebar shows them before Show More.
@@ -27,12 +27,16 @@ struct GoMenu: Equatable {
 
     init(library: any ItemLibrary, layout: SidebarLayout) {
         let plan = SidebarPlan(library, layout: layout)
-        places = (SidebarPlace.destinations + SidebarPlace.builtInViews).compactMap { place in
-            guard let item = place.opens, let symbol = place.symbol else { return nil }
-            return Entry(place: place, item: item, title: library.name(of: item), icon: .symbol(symbol))
+        func entries(_ places: [SidebarPlace]) -> [Entry] {
+            places.compactMap { place in
+                guard let item = place.opens, let symbol = place.symbol else { return nil }
+                return Entry(id: place.key, item: item, title: library.name(of: item), icon: .symbol(symbol))
+            }
         }
+        places = entries(SidebarPlace.destinations) + [Self.archive(in: library)]
+        builtInViews = entries(SidebarPlace.builtInViews)
         views = layout.isHidden(.views) ? [] : plan.views.filter { plan.isShown(.view($0.id)) }.map {
-            Entry(place: .view($0.id), item: .saved($0.id), title: $0.title, icon: .symbol(SidebarPlace.viewSymbol))
+            Entry(id: SidebarPlace.view($0.id).key, item: .saved($0.id), title: $0.title, icon: .symbol(SidebarPlace.viewSymbol))
         }
         let nodes = layout.isHidden(.types) ? [] : plan.shownTypes
         types = nodes.prefix(SidebarPlan.shownTypeCount).flatMap { Self.entries(of: $0, under: nil) }
@@ -40,12 +44,20 @@ struct GoMenu: Equatable {
         moreTypes = plan.types.flatMap { Self.entries(of: $0, under: nil) }.filter { !listed.contains($0.id) }
     }
 
+    /// The Archive: no sidebar row opens it, so it stands here and in the palette by its own mark.
+    static let archiveSymbol = "archivebox"
+    static let archiveID = "archive"
+
+    private static func archive(in library: any ItemLibrary) -> Entry {
+        Entry(id: archiveID, item: .archive, title: library.name(of: .archive), icon: .symbol(archiveSymbol))
+    }
+
     /// The commands a type row stands for: its own list where it opens one, then each subtype's, named by their path
     /// so a menu with no indentation still tells Session under Agent from Session under Chat.
     private static func entries(of node: TypeNode, under parent: String?) -> [Entry] {
         let title = parent.map { $0 + " > " + node.label } ?? node.label
         let own = node.opens && node.type != nil
-            ? [Entry(place: .type(node.id), item: .type(TypeID(node.type?.rawValue ?? node.id)), title: title, icon: .type(node.icon))]
+            ? [Entry(id: SidebarPlace.type(node.id).key, item: .type(TypeID(node.type?.rawValue ?? node.id)), title: title, icon: .type(node.icon))]
             : []
         return own + node.children.flatMap { entries(of: $0, under: title) }
     }
