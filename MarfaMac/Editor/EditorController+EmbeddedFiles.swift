@@ -87,7 +87,7 @@ extension EditorController {
     /// How long the page waits for Marfa to bind an embed not yet bound, as one just pasted is once its text is saved.
     nonisolated static let embedWait = Duration.seconds(10)
 
-    /// Puts what the page writes for files quick add attached to a new item at the end of its text, leaving the
+    /// Puts what the page writes for files the new-item form attached to a new item at the end of its text, leaving the
     /// caret where it is: now if the page shows that item, otherwise once it does. The page saves the change as it
     /// does typing. Where the page never shows the item again, the files stay attached without being in its text.
     func append(_ embeds: [Embed], to id: ItemID) {

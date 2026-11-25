@@ -106,6 +106,9 @@ import Observation
     /// How the server stands, for the app to show beside the library. The library is the one subscriber to the
     /// source's states; the host reads this while the copy is open.
     private(set) var connection: MarfaConnectionState
+    /// Read from the copy each time it is read whole (`readServerKey`), so a server replaced at the same address finds
+    /// nothing the old one's library kept (`ItemLibrary.serverKey`).
+    var serverKey = ""
     let now: () -> Date
 
     /// Bumped when any item changes, for the lists and search.
@@ -258,8 +261,7 @@ import Observation
     @ObservationIgnored var newestEdits: [ItemID: [String: PropertyEdit]] = [:]
     @ObservationIgnored var lastPropertyWrite: Int? = 0
     @ObservationIgnored var takenMarks: Set<Int> = []
-    /// Creates the source refused before it held the item, such as one made while the copy is brought up to date,
-    /// so the window has no item to open and gives the New up.
+    /// Creates the source refused, before or after it held the item (`ItemLibrary.refusedCreations`).
     var refusedCreations: Set<ItemID> = []
     /// Why text typed over an item that can no longer be written is not kept.
     static var cantChange: String {

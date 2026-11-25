@@ -22,7 +22,7 @@ The Swift side of the item editor. The page is in `editor/`; read `editor/AGENTS
 - **A page that ends again before it settles, or is not ready in time, is not reloaded** (`settleTime`, `reloadLimit`). A page still loading for the first time holds nothing typed.
 - **Hand-overs take turns.** A close, quit or library change asked for during one waits for it (`EditorCloseDelegate`).
 - **While Writing Tools run, an edit is held in `heldEdit`,** so a half-finished rewrite never reaches the item. Anything that ends its generation saves it first, on the version it was made on.
-- **Each image that could not be placed in the text is named to the person,** and one that fails never stops the others. Quick add's files wait in `EditorController.pendingEmbeds` until the page shows that item.
+- **Each image that could not be placed in the text is named to the person,** and one that fails never stops the others. A new item's files wait in `EditorController.pendingEmbeds` until the page shows that item.
 - **Text typed into folded text is lost by Inkkit** (`EditorMessage.hiddenText`), so the person is told that it was not added.
 - **Address rules are Inkkit's** (`normalizeLinkAddress`, `canOpenLink`). The app keeps none of its own.
 - **The Outline lists only headings the page reported for the load now on it** (`EditorController.outline`). The app parses no headings.

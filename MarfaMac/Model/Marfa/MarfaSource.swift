@@ -517,9 +517,9 @@ nonisolated struct MarfaEmbeds: EmbedResolver {
         return try result.get()
     }
 
-    func addFile(_ file: URL, title: String?, tier: Tier?, parent: ItemID?) async throws -> ItemID {
+    func addFile(_ file: URL, title: String?, tier: Tier?, tags: [String], parent: ItemID?) async throws -> ItemID {
         let result = await withCheckedContinuation { continuation in
-            if case .terminated = events.yield(.addFile(file, title: title, tier: tier, parent: parent, continuation)) {
+            if case .terminated = events.yield(.addFile(file, title: title, tier: tier, tags: tags, parent: parent, continuation)) {
                 continuation.resume(returning: .failure(SourceFailure(kind: .missing, message: MarfaEngine.closedLibrary)))
             }
         }

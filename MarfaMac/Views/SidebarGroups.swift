@@ -144,7 +144,6 @@ struct SidebarShortcutsSection: View, Equatable {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     @Environment(ShortcutBindings.self) private var bindings: ShortcutBindings?
-    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     let section: SidebarSectionData
     let tab: String
     let canCreate: Bool
@@ -203,8 +202,8 @@ struct SidebarShortcutsSection: View, Equatable {
 
     private func perform(_ data: SidebarShortcutRowData) {
         switch data.shortcut {
-        case .new: browser.openQuickAdd(remembered: lastType, in: library)
-        case .create(let type): browser.openQuickAdd(typeID: type, in: library)
+        case .new: browser.openNewItem(in: library)
+        case .create(let type): browser.openNewItem(kind: type, in: library)
         case .search: browser.palette = .commands
         case .settings: browser.showSettings()
         case .go:
@@ -310,7 +309,6 @@ struct SidebarPlacesSection: View, Equatable {
 struct SidebarPlaceRow: View, Equatable {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
-    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     @State private var isHovering = false
     let data: SidebarPlaceRowData
     let groups: [SidebarGroupChoice]
@@ -362,7 +360,7 @@ struct SidebarPlaceRow: View, Equatable {
                     }
                     if data.adds, isHovering {
                         SidebarPlus(name: addName) {
-                            // The quick add's window takes the pointer, which then never leaves the row.
+                            // The new item's panel takes the pointer, which then never leaves the row.
                             isHovering = false
                             add()
                         }
@@ -379,7 +377,7 @@ struct SidebarPlaceRow: View, Equatable {
     private func add() {
         guard let opens = data.opens else { return }
         browser.show(opens, in: library, order: order)
-        browser.openQuickAdd(remembered: lastType, in: library)
+        browser.openNewItem(in: library)
     }
 
     private func open(_ id: ItemID) {

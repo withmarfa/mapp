@@ -161,7 +161,7 @@ struct PaletteFooter: View {
     let onActions: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 0) {
+        SegmentCapsule {
             Button(action: onOpen) {
                 HStack(spacing: 6) {
                     Text(openTitle)
@@ -183,11 +183,23 @@ struct PaletteFooter: View {
                 .accessibilityIdentifier("CommandPaletteActions")
             }
         }
-        .buttonStyle(PaletteSegmentStyle())
-        .font(.system(size: PaletteBar.fontSize))
-        .padding(PaletteBar.fillInset)
-        .frame(height: PaletteBar.height)
-        .glassEffect(.regular, in: .capsule)
+    }
+}
+
+/// Buttons as the segments of one glass capsule of the palette bar's height, as the palette's Open and Actions and the
+/// new-item line's Add and Add and Open are: pointing at a segment fills only that segment.
+struct SegmentCapsule<Content: View>: View {
+    var fontSize: CGFloat = PaletteBar.fontSize
+    var weight: Font.Weight = .regular
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 0) { content }
+            .buttonStyle(PaletteSegmentStyle())
+            .font(.system(size: fontSize, weight: weight))
+            .padding(PaletteBar.fillInset)
+            .frame(height: PaletteBar.height)
+            .glassEffect(.regular, in: .capsule)
     }
 }
 

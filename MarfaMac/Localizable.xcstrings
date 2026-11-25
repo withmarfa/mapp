@@ -288,6 +288,9 @@
         }
       }
     },
+    "%@ is no longer where it was, so it was taken out of the new item." : {
+
+    },
     "%@ is no longer where it was, so it was taken out of the new item. Add it again, or add the item without it." : {
       "extractionState" : "manual"
     },
@@ -1925,9 +1928,6 @@
     "A new item wasn’t created" : {
       "extractionState" : "manual"
     },
-    "A new item, over any app." : {
-
-    },
     "A new source can’t add these types until you check it." : {
 
     },
@@ -2266,6 +2266,9 @@
 
     },
     "Added a file" : {
+
+    },
+    "Added “%@”" : {
 
     },
     "Adding will be refused: this kind of item needs %@, which the app can’t fill in. Choose another kind." : {
@@ -3346,6 +3349,9 @@
     "Choose Undo again to try it as things are now." : {
       "extractionState" : "manual"
     },
+    "Choose a File…" : {
+
+    },
     "Choose a Mark" : {
       "extractionState" : "manual"
     },
@@ -3363,6 +3369,9 @@
     },
     "Choose a kind of item and give it a title." : {
       "extractionState" : "manual"
+    },
+    "Choose a kind of item." : {
+
     },
     "Choose a new type for %lld items." : {
       "extractionState" : "manual"
@@ -3550,7 +3559,7 @@
     "Command Palette" : {
 
     },
-    "Command Palette, Search Items and Quick Add." : {
+    "Command Palette, Search Items and New Item." : {
 
     },
     "Command to Paste There" : {
@@ -4452,6 +4461,9 @@
     "Entry Actions" : {
       "extractionState" : "manual"
     },
+    "Entry Not Added" : {
+
+    },
     "Environment" : {
 
     },
@@ -4954,6 +4966,9 @@
     },
     "Getting the latest changes from the server." : {
       "extractionState" : "manual"
+    },
+    "Give the item a title." : {
+
     },
     "Glass" : {
 
@@ -5836,6 +5851,9 @@
     "Keep things for less time?" : {
       "extractionState" : "manual"
     },
+    "Keep “%@” as Text" : {
+
+    },
     "Keeps %@ in step with %@. " : {
       "localizations" : {
         "en" : {
@@ -6629,6 +6647,9 @@
     "New Items Go To" : {
 
     },
+    "New Items Not Saved" : {
+
+    },
     "New Key" : {
 
     },
@@ -6644,6 +6665,9 @@
     "New Link Type…" : {
 
     },
+    "New Opens" : {
+
+    },
     "New Password" : {
 
     },
@@ -6651,6 +6675,9 @@
 
     },
     "New Tab" : {
+
+    },
+    "New Tag" : {
 
     },
     "New Type" : {
@@ -6798,6 +6825,9 @@
     "No Marks Match" : {
 
     },
+    "No Matches" : {
+
+    },
     "No Matching Items" : {
 
     },
@@ -6937,6 +6967,9 @@
 
     },
     "None yet." : {
+
+    },
+    "Not Added to the Item" : {
 
     },
     "Not Answering" : {
@@ -7240,7 +7273,16 @@
     "On this Mac" : {
 
     },
+    "One Line" : {
+
+    },
     "One command uses %@." : {
+
+    },
+    "One line, or a form that also takes text and files." : {
+
+    },
+    "One line, over any app." : {
 
     },
     "One of them removes this app’s settings from %@. Discard the copy and the settings stay there." : {
@@ -7799,6 +7841,9 @@
     "Properties can be pinned under the title from a row’s menu." : {
 
     },
+    "Property" : {
+
+    },
     "Property Not Saved" : {
       "extractionState" : "manual"
     },
@@ -7815,9 +7860,6 @@
 
     },
     "Quick Actions" : {
-
-    },
-    "Quick Add" : {
 
     },
     "Quick Look" : {
@@ -8037,6 +8079,9 @@
 
     },
     "Remove Tag" : {
+
+    },
+    "Remove Tag “%@”" : {
 
     },
     "Remove This App’s Settings from %@?" : {
@@ -9309,6 +9354,9 @@
     "Tabs" : {
 
     },
+    "Tag" : {
+
+    },
     "Tag Not Added" : {
 
     },
@@ -9368,6 +9416,9 @@
 
     },
     "Text Font" : {
+
+    },
+    "Text Form" : {
 
     },
     "Text Size" : {
@@ -9523,6 +9574,9 @@
     "The app can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit the app first, then move the folder “%@” to the Trash. Anything in it that hasn’t reached the server is lost." : {
       "extractionState" : "manual"
     },
+    "The app can’t save what you type in new items on this Mac, so it would be lost if the app quit. It keeps trying." : {
+
+    },
     "The app can’t tell whether that copy holds changes that haven’t reached the server." : {
       "extractionState" : "manual"
     },
@@ -9596,6 +9650,9 @@
 
     },
     "The app couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again." : {
+
+    },
+    "The app couldn’t save the new item on this Mac before sending it, so nothing was added. What you typed is still there. Try again." : {
 
     },
     "The app couldn’t send this change." : {
@@ -9781,6 +9838,9 @@
     "The app needs a window to show the server’s sign-in page over. Open one of its windows, then try again, or use a code instead." : {
 
     },
+    "The app quit while this file was being added. Check that it isn’t in the library before you add it again." : {
+
+    },
     "The app ran into a problem it can’t resolve itself. Choose Refresh to try again." : {
 
     },
@@ -9964,6 +10024,9 @@
     "The item wasn’t added, so its files weren’t attached." : {
       "extractionState" : "manual"
     },
+    "The item wasn’t added. What you typed is back." : {
+
+    },
     "The item's title and path cannot be represented as an unambiguous file link." : {
       "extractionState" : "manual"
     },
@@ -9974,6 +10037,9 @@
 
     },
     "The key “%@” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page." : {
+
+    },
+    "The kind of item added can’t hold these, so they were left out." : {
 
     },
     "The last backup didn’t finish" : {
@@ -10369,6 +10435,9 @@
     "The widths this window has now." : {
 
     },
+    "The window changed to another library before the entry was added to the new item." : {
+
+    },
     "The window changed to another library before the item was added." : {
       "extractionState" : "manual"
     },
@@ -10377,6 +10446,9 @@
     },
     "The window changed to another library before the view was saved." : {
       "extractionState" : "manual"
+    },
+    "The window closed before the entry was added to the new item." : {
+
     },
     "The window closed before the view was renamed." : {
       "extractionState" : "manual"
@@ -10903,6 +10975,9 @@
     },
     "Title (Optional)" : {
       "extractionState" : "manual"
+    },
+    "Title (optional)" : {
+
     },
     "Title Length" : {
 
@@ -11653,6 +11728,9 @@
     "Where it put things, and any rewrite it asked for. Map it again if you install it later." : {
 
     },
+    "Where the Item Goes" : {
+
+    },
     "Where the database is." : {
 
     },
@@ -12185,6 +12263,9 @@
     },
     "on" : {
       "comment" : "Typed in the list's search: a date field is on a day"
+    },
+    "or drop one here" : {
+
     },
     "pt" : {
 

@@ -65,7 +65,7 @@ extension MarfaEngine {
     /// The package queues the upload and the file's item, whose file type the core chooses from its media type;
     /// the item is then put under its parent, as a create's is.
     func addFile(
-        _ file: URL, title: String?, tier: Tier?, under parent: ItemID?,
+        _ file: URL, title: String?, tier: Tier?, tags: [String], under parent: ItemID?,
         answering done: CheckedContinuation<Result<ItemID, SourceFailure>, Never>
     ) {
         let attachment = Attachment(
@@ -75,7 +75,7 @@ extension MarfaEngine {
         besideTheLane[token] = Task { [copy, tell] in
             let result: Result<Marfa.Added, SourceFailure>
             do {
-                result = .success(try await Self.asking { try await copy.items.addFile(file, attachment) })
+                result = .success(try await Self.asking { try await copy.items.addFile(file, attachment, tags: tags) })
             } catch {
                 result = .failure(Self.failure(error))
             }

@@ -19,7 +19,7 @@ nonisolated extension ItemTypeInfo.Field.Kind {
         }
     }
 
-    /// A shape the forms that fill a new or changed item (Quick Add, Change Type) and the table's columns leave alone:
+    /// A shape the forms that fill a new or changed item (the new-item forms, Change Type) and the table's columns leave alone:
     /// an object, or a list of words, which only the item's own value panel edits.
     var isOutsideForms: Bool {
         switch self {

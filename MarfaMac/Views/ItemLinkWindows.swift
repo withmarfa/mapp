@@ -14,6 +14,9 @@ private struct ItemLinkWindows: ViewModifier {
     @Environment(\.openWindow) private var openWindow
 
     func body(content: Content) -> some View {
-        content.onAppear { opener.openMainWindow = { openWindow(id: MarfaMacApp.mainWindowID) } }
+        content.onAppear {
+            opener.openMainWindow = { openWindow(id: MarfaMacApp.mainWindowID) }
+            FrontBrowser.shared.openMainWindow = { openWindow(id: MarfaMacApp.mainWindowID) }
+        }
     }
 }

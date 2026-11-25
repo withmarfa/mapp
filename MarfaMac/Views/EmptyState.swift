@@ -43,7 +43,7 @@ struct HiddenGroupsEmptyState: View {
 }
 
 /// What the window's place says when it holds nothing (`PlaceEmpty`): its own title and line, and for a type, New and the
-/// type's name, which opens quick add holding that type.
+/// type's name, which opens the new item holding that type.
 struct PlaceEmptyState: View {
     @CurrentLibrary private var library
     let browser: Browser
@@ -53,7 +53,7 @@ struct PlaceEmptyState: View {
         let empty = PlaceEmpty.of(browser.shown, in: library.catalogue, offered: offered)
         EmptyState(title: Text(verbatim: empty.title), detail: empty.line.map { Text(verbatim: $0) }) {
             if let type = empty.makes, let title = empty.buttonTitle {
-                Button(title, systemImage: "plus") { browser.openQuickAdd(typeID: type, in: library) }
+                Button(title, systemImage: "plus") { browser.openNewItem(kind: type, in: library) }
                     .appButton(.secondary)
                     .padding(.top, 6)
                     .accessibilityIdentifier("EmptyStateNew")

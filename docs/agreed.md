@@ -86,10 +86,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The new-item line | One line with rows for its keys: Tab a kind, # a tag, @ a parent, / a property, and In at the foot. Before typing it offers the most recent. It stays open after Add with the same kind; ⇧↩ opens the text form. | `QuickAdd`, `QuickAddPanel.swift` | `Rethink-New`, `Rethink-New-Line`, `Rethink-New-Line-Kinds`, `Rethink-New-Line-Task`, `Rethink-New-Line-Bookmark`, `Rethink-New-Kinds`, `Rethink-New-Filled` |
 | In place | A table's last row, a board lane's plus, a calendar's drag. The item stays where it was typed until the row is left. In a nested table it is top-level; in a grouped one it joins the group under the pointer, or the first. Escape drops an empty row and keeps typed text; leaving adds. | `ItemTable.swift`, `ItemBoard.swift`, `CalendarWeekView.swift` | `Rethink-New-In-Table`, `Rethink-New-In-Board`, `Rethink-New-In-Calendar` |
-| From any app | The same panel in the screen's upper third, with a drop of files. | `QuickAddPanel.swift` | `Rethink-New-Anywhere`, `Rethink-New-Drop` |
-| New Opens | A setting, One Line or the text form. | `PreferencesMap` | `Rethink-New-Line` |
 
 ## The item's page
 

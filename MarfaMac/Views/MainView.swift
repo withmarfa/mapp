@@ -331,7 +331,13 @@ struct MainView: View {
                     browser.putAwayQuickAdd()
                     if browser.focusRequest == nil { browser.focusRequest = .list }
                 } content: {
-                    QuickAddPanel(browser: browser, quickAdd: browser.quickAdd, editor: editor)
+                    if browser.quickAdd.form == .line {
+                        NewItemLinePanel(browser: browser, quickAdd: browser.quickAdd, toasts: details.toasts) {
+                            if browser.focusRequest == nil { browser.focusRequest = .list }
+                        }
+                    } else {
+                        QuickAddPanel(browser: browser, quickAdd: browser.quickAdd, editor: editor)
+                    }
                 }
             }
         }
@@ -364,8 +370,8 @@ struct MainView: View {
             editorSlot.made?.flush()
             editorSlot.made?.windowWent()
             let changed = libraries.current.map { ObjectIdentifier($0) != ObjectIdentifier(library) } ?? true
-            browser.quickAdd.handOff(to: library.notices, because: changed ? .libraryChanged : .closed, in: library)
-            browser.giveUpNewItem(because: .windowLeft)
+            browser.quickAdd.leave(because: changed ? .libraryChanged : .closed, telling: library.notices)
+            browser.giveUpNewItems(because: .windowLeft)
             browser.viewPanel?.handOff(because: changed ? .libraryChanged : .closed)
         }
         .onAppear {
@@ -427,13 +433,16 @@ struct MainView: View {
                 #endif
                 isRestored = true
                 takeItemLink()
+                FrontBrowser.shared.takeHanded(into: browser, in: library)
             }
         }
         // A new item reaches a server's library when its source says so, which the window waits for to open it.
         .onChange(of: newItemIsSettled) {
-            if newItemIsSettled { browser.finishNewItem(in: library) }
+            if newItemIsSettled { browser.finishNewItems(in: library) }
         }
-        // The files quick add attached go at the end of the new item's text, once the page shows it.
+        // Marfa can refuse a create after the copy showed its row, which gives the draft back to the line.
+        .onChange(of: library.refusedCreates) { browser.finishNewItems(in: library) }
+        // The files the new item attached go at the end of the new item's text, once the page shows it.
         .onChange(of: browser.newEmbeds) {
             guard let attached = browser.newEmbeds else { return }
             browser.newEmbeds = nil

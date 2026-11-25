@@ -73,8 +73,8 @@ nonisolated protocol EmbedResolver: Sendable {
     /// file was not attached.
     func attach(_ file: URL, to item: ItemID) async throws -> Embed
     /// Adds a file as an item of its own, of the file type its media type calls for, titled `title` or by its name,
-    /// under `parent` where one is given.
-    func addFile(_ file: URL, title: String?, tier: Tier?, parent: ItemID?) async throws -> ItemID
+    /// with `tags`, under `parent` where one is given.
+    func addFile(_ file: URL, title: String?, tier: Tier?, tags: [String], parent: ItemID?) async throws -> ItemID
 }
 
 /// What attaching files gave: the text to write for each file attached, in order, and the name of each that

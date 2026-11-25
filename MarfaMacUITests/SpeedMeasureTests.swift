@@ -263,7 +263,7 @@ nonisolated final class SpeedMeasureTests: XCTestCase {
     @MainActor func testNewOpensQuickAdd() throws {
         try launchWarm()
         try begin("quickAdd")
-        let field = element("QuickAddTitle")
+        let field = element("NewItemLineTitle")
         measure(metrics: [signpost("quickAdd.open"), XCTClockMetric()], options: options) {
             // Both calls return once the app is idle, so a letter typed before the field had the keyboard would be lost.
             time("ready") {
@@ -305,7 +305,7 @@ nonisolated final class SpeedMeasureTests: XCTestCase {
         try begin("typing")
         let title = "Speed measure \(UUID().uuidString.prefix(8))"
         // The helper's waits allow for a small library; querying a tree this size takes seconds.
-        let field = element("QuickAddTitle")
+        let field = element("NewItemLineTitle")
         element("SidebarNew").click()
         XCTAssertTrue(field.waitForExistence(timeout: 30))
         // A new item starts as a Note, which is what this types into.

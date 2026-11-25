@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MarfaMac
 
-/// The item kind and defaults used in Quick Add.
+/// The item kind and defaults a new item uses.
 @Suite(.hangLimit)
 struct MakingAnItemTests {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
@@ -13,7 +13,7 @@ struct MakingAnItemTests {
         return suite
     }
 
-    /// A kind with a status of four words, a kind whose status has no not-started word and which needs a field quick add
+    /// A kind with a status of four words, a kind whose status has no not-started word and which needs a field the new item
     /// cannot edit, and kinds with no status.
     private static let catalogue: Catalogue = {
         let task = TypeID("core.task")
@@ -59,7 +59,8 @@ struct MakingAnItemTests {
     private func opened(in place: PlaceView, remembered: String? = nil, asked: String? = nil) -> String? {
         let browser = Browser()
         browser.showing = place
-        browser.openQuickAdd(typeID: asked, remembered: remembered, in: library())
+        if let remembered { NewItemRecents.remember(kind: remembered, tags: [], parent: nil, for: "", in: browser.defaults) }
+        browser.openNewItem(kind: asked, form: .text, in: library())
         return browser.quickAdd.draft?.typeID
     }
 
@@ -80,7 +81,7 @@ struct MakingAnItemTests {
 
     @Test func theStatusIsAChipButNotTheirWorkToKeep() throws {
         let browser = Browser()
-        browser.openQuickAdd(typeID: "core.task", in: library())
+        browser.openNewItem(kind: "core.task", form: .text, in: library())
         let draft = try #require(browser.quickAdd.draft)
         #expect(draft.properties == ["status": .string("todo")])
         #expect(QuickAdd.shownChips(draft, in: Self.catalogue) == [.field("status")])
@@ -92,7 +93,7 @@ struct MakingAnItemTests {
     @Test func theStatusLeavesWithItsKindUnlessThePersonChangedIt() {
         let library = library()
         let browser = Browser()
-        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.openNewItem(kind: "core.task", form: .text, in: library)
         browser.chooseQuickAddType("core.note", in: library)
         #expect(browser.quickAdd.draft?.properties.isEmpty == true)
         browser.chooseQuickAddType("core.task", in: library)
@@ -105,7 +106,7 @@ struct MakingAnItemTests {
     @Test func aStatusThePersonRemovedStaysRemovedWhenTheKindChanges() throws {
         let library = library()
         let browser = Browser()
-        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.openNewItem(kind: "core.task", form: .text, in: library)
         browser.quickAdd.draft?.remove(.field("status"), in: Self.catalogue)
         #expect(browser.quickAdd.draft?.properties.isEmpty == true)
         browser.chooseQuickAddType("core.note", in: library)
@@ -117,9 +118,9 @@ struct MakingAnItemTests {
     @Test func theStatusTheKindGaveIsAddedWithTheItem() async throws {
         let library = library()
         let browser = Browser()
-        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.openNewItem(kind: "core.task", form: .text, in: library)
         browser.quickAdd.draft?.title = "Pack the samples"
-        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, defaults: defaults()))
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
         #expect(library.items.first { $0.id == id }?.properties.first { $0.key == "status" }?.value == .string("todo"))
     }
 

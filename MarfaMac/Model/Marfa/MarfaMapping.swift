@@ -44,6 +44,8 @@ nonisolated enum MarfaMapping {
     /// The type an event is, or descends from; with a task, the types whose `starts_at` is read as a start date.
     static let eventType = TypeID("core.event")
     static let startField = "starts_at"
+    /// The type a bookmark is, or descends from, and whose `urlField` a pasted address fills.
+    static let bookmarkType = TypeID("core.bookmark")
     /// Where an event or a session ends, which the table's hidden Duration column reads with `startField`.
     static let endField = "ends_at"
     /// The fields a look's presets read (`LookPreset`). Some are Marfa's core names (`from`, `emails`, `street_address`);

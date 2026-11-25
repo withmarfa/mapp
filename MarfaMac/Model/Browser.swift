@@ -225,7 +225,7 @@ final class Browser {
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
     /// The palette that is out, if any: ⌘K's commands, or ⇧⌘P's search of every item. One panel is out at a time,
-    /// so the palette puts quick add away, keeping its draft.
+    /// so the palette puts the new item away, keeping its draft.
     var palette: Palette? {
         didSet {
             guard palette != nil else { return }
@@ -238,24 +238,24 @@ final class Browser {
     /// Counts the ⌘J (Palette Actions) pressed while a palette is out, which opens or shuts its Actions.
     var paletteActionsRequests = 0
 
-    /// Whether a floating panel, the palette or quick add, is out over the window, which the views beneath it
+    /// Whether a floating panel, the palette or the new item, is out over the window, which the views beneath it
     /// are sent no pointer exit for.
     var panelIsOut: Bool { palette != nil || (quickAdd.isPresented && quickAdd.draft != nil) || isModalPresented }
-    /// The window's quick-add panel and what is typed in it.
+    /// The window's new item, in the line or the text form, and what is typed in it.
     let quickAdd = QuickAdd()
     /// Whether the list's search is out as a field, rather than a button beside the View button.
     var isSearchExpanded = false
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0
-    /// The item quick add made that the window opens once its library holds it (see `NewItem`).
-    var newItem: NewItem?
+    /// The items the window made that it waits for its library to hold (see `NewItem`).
+    var newItems: [NewItem] = []
     /// What Quick Look shows for the window, while it is open.
     var quickLook: QuickLookRequest?
     /// Counts Quick Look requests, so a slow one the person has since replaced or closed knows to stop.
     @ObservationIgnored var quickLookGeneration = 0
     /// Where the page puts the caret when it next takes the keyboard for a new item.
     var focusCaret: PageCaret?
-    /// What the page writes for the files quick add attached to a new item, which it puts at the end of the text
+    /// What the page writes for the files the new-item form attached to a new item, which it puts at the end of the text
     /// once it shows that item.
     var newEmbeds: NewEmbeds?
     /// A file the library had to fetch to show, so the commands that share it have its location too.
@@ -449,8 +449,8 @@ final class Browser {
 
     /// Starts the window afresh for a library other than the one it showed, the first time it is shown one: what
     /// it selected or searched named items the new library may not have, and the window's undo
-    /// would act on the library left. A new item awaited there will not come. Quick add's draft has already gone to
-    /// the clipboard, as the window's view of the library left went (`QuickAdd.Departure.libraryChanged`).
+    /// would act on the library left. A new item awaited there will not come. The new item's draft is kept already,
+    /// for that library, as the window's view of the library left went (`QuickAdd.leave`).
     func adopt(_ library: any ItemLibrary, undoManager: UndoManager? = nil) {
         let id = ObjectIdentifier(library)
         Browser.open.add(self)
@@ -508,7 +508,7 @@ final class Browser {
         clearSearch()
         palette = nil
         fetchedFile = nil
-        giveUpNewItem(because: .windowLeft)
+        giveUpNewItems(because: .windowLeft)
         focusCaret = nil
         newEmbeds = nil
     }

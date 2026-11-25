@@ -18,12 +18,12 @@ nonisolated final class FakeEmbeds: EmbedResolver {
         return Embed(link: file.lastPathComponent, name: file.lastPathComponent)
     }
 
-    let added = Mutex<[(file: String, data: Data, title: String?, tier: Tier?, parent: ItemID?)]>([])
+    let added = Mutex<[(file: String, data: Data, title: String?, tier: Tier?, tags: [String], parent: ItemID?)]>([])
 
-    func addFile(_ file: URL, title: String?, tier: Tier?, parent: ItemID?) async throws -> ItemID {
+    func addFile(_ file: URL, title: String?, tier: Tier?, tags: [String], parent: ItemID?) async throws -> ItemID {
         if let failure = failure.withLock({ $0 }) { throw failure }
         let data = try Data(contentsOf: file)
-        added.withLock { $0.append((file.lastPathComponent, data, title, tier, parent)) }
+        added.withLock { $0.append((file.lastPathComponent, data, title, tier, tags, parent)) }
         return ItemID.mint()
     }
 }
