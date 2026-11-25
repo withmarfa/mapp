@@ -137,12 +137,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Every link follows Open Items | In the text, rows, foot and panel, through one function of the browser. A picture in the text has Open Item and Copy Link on its menu. | `Browser`, `EditorController` | – |
 | Link card | After a pause on a linked item, a small card with its type, name and two lines. No keyboard focus, no server call. | new files in `MarfaMac/Views/`, `editor/src/` | `Rethink-Link-Card` |
 
-## Page notices
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-| One notice | One line in the page's column for a deleted item, a copy saved beside it, text that cannot be read, pictures not loaded, a held write or a missing file. It replaces the banners and the picture bar. Its one action has no fill. | `DeletedItemBanner`, `SavedAsCopyBanner`, `UnreadableItemBanner`, `PicturesWaitingCallout`, `editor/src/pictures.ts` | `Rethink-Page-Notice`, `Rethink-Page-Notices` |
-
 ## Each kind of item
 
 | Part | What it is | Lands in | Boards |
@@ -171,7 +165,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Areas, glass, measures | Three areas, where glass is used, and one set of measures, radii and type sizes. Dark values are in one table before they are used. | `InterfaceStyle`, `MarfaMac/Views/Looks/` | `Rethink-Found-Areas`, `Rethink-Found-Glass`, `Rethink-Found-Measures`, `Rethink-Found-Measures-Page`, `Rethink-Found-Radii`, `Rethink-Found-Type`, `Rethink-Found-Selection` |
-| Buttons | Small is a rounded rectangle, larger is a capsule. A text action has a fill, but for a page notice's. | `AppButton.swift` | `Rethink-Page-Notices` |
 | Messages | A toast is a symbol, what happened and Undo; a second replaces the first. An alert with a red button has a gray Cancel. | `ToastView.swift`, `LibraryDialogs.swift` | `Rethink-Keep-Toast`, `Rethink-Delete-Toast`, `Rethink-Delete-Alert` |
 
 ## Small ideas

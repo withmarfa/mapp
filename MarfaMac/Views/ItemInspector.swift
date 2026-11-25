@@ -138,10 +138,6 @@ struct ItemInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.sectionGap) {
-            if let message = item.problem?.message {
-                Label(message, systemImage: "exclamationmark.triangle")
-                    .interfaceFont(.callout).foregroundStyle(.red)
-            }
             if hasProperties { properties }
             if hasRelationships { relationshipSection }
             if hasTags { tagSection }
