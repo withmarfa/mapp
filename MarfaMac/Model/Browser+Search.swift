@@ -9,6 +9,22 @@ extension Browser {
     /// Whether the list is narrowed by its search in any way.
     var narrowsBySearch: Bool { isSearching || hasSearchTokens }
 
+    /// The From tokens This Search took as a new view's From that its From no longer says, as after the person chose
+    /// another From: they no longer narrow the list, and the panel names them as not saved.
+    var fromTokensSetAside: [FilterClause] {
+        guard let panel = viewPanel, panel.isNew, !panel.tokensInFrom.isEmpty else { return [] }
+        let scope = listing.scope
+        return panel.tokensInFrom.filter { token in
+            token.values.count != 1 || token.values.first.flatMap(Tier.init(word:)).map { ListScope(tier: $0) != scope } ?? true
+        }
+    }
+
+    /// The tokens that narrow the list: every one but those set aside (`fromTokensSetAside`).
+    var narrowingSearchTokens: [FilterClause] {
+        let aside = fromTokensSetAside
+        return aside.isEmpty ? searchTokens : searchTokens.filter { !aside.contains($0) }
+    }
+
     /// Puts the search away: its text, its tokens and the field.
     func clearSearch() {
         searchText = ""

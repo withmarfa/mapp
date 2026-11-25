@@ -46,9 +46,10 @@ enum SavedViews {
             layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.shown],
             seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.hasDateSections) : nil,
             listing: browser.listing,
-            // A token This Search says with its From is kept as the view's tier.
-            searchTokens: browser.searchTokens.filter {
-                !options.filter.clauses.contains($0) && browser.viewPanel?.tokensInFrom.contains($0) != true
+            // A token This Search says with its From is kept as the view's tier, while the From still says it.
+            searchTokens: browser.searchTokens.filter { token in
+                let inFrom = browser.viewPanel?.tokensInFrom.contains(token) == true && !browser.fromTokensSetAside.contains(token)
+                return !options.filter.clauses.contains(token) && !inFrom
             }.map { token in
                 browser.tokenParts(of: token, in: library)?.sentence ?? token.values.joined(separator: ", ")
             })
