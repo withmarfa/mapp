@@ -52,6 +52,7 @@ struct FileZoomControl: View {
                     .foregroundStyle(isInvalid ? Color.red : Color.primary)
                     .frame(width: 64 * scale)
                     .focused($isFocused)
+                    .appFocusRing(isFocused: isFocused)
                     .onSubmit(apply)
                     .onExitCommand(perform: stopTyping)
                     .onChange(of: text) { isInvalid = false }

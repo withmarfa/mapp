@@ -135,13 +135,14 @@ struct InlineSearchField: NSViewRepresentable {
             layer?.masksToBounds = false
             if ring.superlayer == nil {
                 ring.fillColor = nil
-                ring.lineWidth = 3
+                ring.lineWidth = ChipLooks.defaults.focusRingWidth
                 layer?.addSublayer(ring)
             }
-            let edge = bounds.insetBy(dx: -1.5, dy: -1.5)
+            let outset = ChipLooks.defaults.focusRingWidth / 2
+            let edge = bounds.insetBy(dx: -outset, dy: -outset)
             ring.path = CGPath(roundedRect: edge, cornerWidth: edge.height / 2, cornerHeight: edge.height / 2, transform: nil)
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                ring.strokeColor = NSColor.labelColor.withAlphaComponent(0.26).cgColor
+                ring.strokeColor = NSColor.labelColor.withAlphaComponent(ChipLooks.defaults.focusRingOpacity).cgColor
             }
             ring.isHidden = false
         }

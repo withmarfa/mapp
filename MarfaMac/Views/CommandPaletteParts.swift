@@ -504,6 +504,7 @@ struct PaletteActionsPanel: View {
             TextField("Search for Actions", text: $query)
                 .textFieldStyle(.plain)
                 .focused(focus, equals: .actions)
+                .appFocusRing(isFocused: focus.wrappedValue == .actions)
                 .onSubmit(submit)
                 .onExitCommand(perform: close)
                 .padding(.horizontal, 12)

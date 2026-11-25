@@ -71,6 +71,7 @@ private struct TagField: View {
                 .textFieldStyle(.plain)
                 .interfaceFont(.body)
                 .focused($isFocused)
+                .appFocusRing(isFocused: isFocused)
                 .onSubmit {
                     model.submitTyped()
                     isFocused = true

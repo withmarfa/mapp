@@ -212,6 +212,7 @@ private struct MemberField: View {
                 .labelsHidden()
                 .textFieldStyle(.plain)
                 .focused($focused)
+                .appFocusRing(isFocused: focused)
                 .onSubmit { _ = commit(false) }
                 .onChange(of: focused) { if !focused { _ = commit(false) } }
                 .onExitCommand { discard(); focused = false }

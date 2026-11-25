@@ -43,6 +43,7 @@ struct FieldEditSheet: View {
                 TextField("Name", text: $label)
                     .labelsHidden()
                     .textFieldStyle(.roundedBorder)
+                    .appFocusRing()
                     .onSubmit(save)
                     .accessibilityIdentifier("FieldRenameField")
             case .choices:
@@ -85,6 +86,7 @@ struct FieldEditSheet: View {
                             TextField("Choice", text: $row.text)
                                 .labelsHidden()
                                 .textFieldStyle(.plain)
+                                .appFocusRing()
                                 .onChange(of: row.text) { problem = nil }
                         } else {
                             Text(row.text).frame(maxWidth: .infinity, alignment: .leading)

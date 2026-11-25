@@ -140,6 +140,7 @@ struct FilterSetBody: View {
                     .padding(.horizontal, 8 * scale)
                     .frame(height: 28 * scale)
                     .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7 * scale, style: .continuous))
+                    .appFocusRing(.rect(cornerRadius: 7 * scale, style: .continuous))
                     .padding(.horizontal, ValueEditMetrics.padding * scale)
                     .accessibilityIdentifier("FilterValueSearch")
             }
@@ -249,6 +250,7 @@ struct FilterCountBody: View {
                 .frame(width: 56 * scale, height: 26 * scale)
                 .padding(.horizontal, 6 * scale)
                 .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7 * scale, style: .continuous))
+                .appFocusRing(.rect(cornerRadius: 7 * scale, style: .continuous), isFocused: isFocused)
                 .accessibilityIdentifier("FilterCount")
             Text("days").foregroundStyle(.secondary)
             Spacer(minLength: 0)
@@ -276,6 +278,7 @@ struct FilterTextBody: View {
             .padding(.horizontal, 8 * scale)
             .frame(height: 28 * scale)
             .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7 * scale, style: .continuous))
+            .appFocusRing(.rect(cornerRadius: 7 * scale, style: .continuous), isFocused: isFocused)
             .padding(.horizontal, ValueEditMetrics.padding * scale)
             .onAppear { isFocused = true }
             .accessibilityIdentifier("FilterText")
@@ -388,6 +391,7 @@ struct FilterFieldPanel: View {
                 .padding(.horizontal, 8 * scale)
                 .frame(height: 28 * scale)
                 .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7 * scale, style: .continuous))
+                .appFocusRing(.rect(cornerRadius: 7 * scale, style: .continuous), isFocused: isFocused)
                 .padding(.horizontal, ValueEditMetrics.padding * scale)
                 .padding(.top, ValueEditMetrics.padding * scale)
                 .onSubmit { if let first { pick(first.id) } }

@@ -70,6 +70,7 @@ struct LocationPanelContent: View {
             TextField("Search for a Place", text: Bindable(model).query)
                 .textFieldStyle(.plain)
                 .focused($focus, equals: .search)
+                .appFocusRing(isFocused: focus == .search)
                 .accessibilityIdentifier("LocationSearch")
                 .onChange(of: model.query) { model.queryChanged() }
             if !model.query.isEmpty {
@@ -214,6 +215,7 @@ struct LocationPanelContent: View {
                     .padding(.horizontal, 6 * scale)
                     .frame(height: 22 * scale)
                     .background(.quaternary, in: .rect(cornerRadius: 5 * scale, style: .continuous))
+                    .appFocusRing(.rect(cornerRadius: 5 * scale, style: .continuous), isFocused: focus == .name)
                     .accessibilityIdentifier("LocationName")
             }
             .padding(.horizontal, 3 * scale)

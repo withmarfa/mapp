@@ -53,7 +53,7 @@ enum SettingsTokens {
     static let warning = Color(nsColor: .systemOrange)
     static let ok = Color(nsColor: .systemGreen)
     /// The one color a chosen choice's ring and a focused control's ring take: gray, never the accent.
-    static let focusRing = Color.primary.opacity(0.26)
+    static let focusRing = Color.primary.opacity(ChipLooks.defaults.focusRingOpacity)
     /// The scrim behind a centered sheet.
     static let scrim = Color.black.opacity(0.18)
     /// The shadow under a sheet.

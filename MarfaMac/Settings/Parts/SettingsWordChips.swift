@@ -38,8 +38,9 @@ struct SettingsWordChips: View {
                     .padding(.horizontal, SettingsTokens.Metric.chipPadding)
                     .frame(width: SettingsTokens.Metric.chipFieldWidth, height: SettingsTokens.Metric.chipHeight)
                     .background(SettingsTokens.field, in: .rect(cornerRadius: SettingsTokens.Metric.chipRadius))
-                    .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.chipRadius).strokeBorder(isError ? SettingsTokens.errorRed : SettingsTokens.focusRing, lineWidth: isError ? 1.5 : 1) }
+                    .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.chipRadius).strokeBorder(SettingsTokens.errorRed, lineWidth: 1.5).opacity(isError ? 1 : 0) }
                     .focused($isFocused)
+                    .appFocusRing(.rect(cornerRadius: SettingsTokens.Metric.chipRadius), isFocused: isFocused)
                     .onSubmit(commit)
                     .onExitCommand(perform: cancel)
                     .onAppear { isFocused = true }

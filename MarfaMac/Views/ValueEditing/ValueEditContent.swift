@@ -38,6 +38,7 @@ struct ValueEditContent: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: ValueEditMetrics.textSize * scale))
                     .focused($fieldFocused)
+                    .appFocusRing(isFocused: fieldFocused)
                     .accessibilityLabel(model.searchPrompt)
                     .accessibilityIdentifier("ValueEditSearch")
             }
@@ -133,6 +134,7 @@ struct ValueEditContent: View {
             .padding(.horizontal, 8 * scale)
             .padding(.vertical, 4 * scale)
             .frame(maxWidth: .infinity, minHeight: ValueEditMetrics.rowHeight * scale, alignment: .leading)
+            .appFocusRing(isFocused: fieldFocused)
             .accessibilityLabel(field?.label ?? "")
             .accessibilityIdentifier("ValueEditText")
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
@@ -185,6 +187,7 @@ struct ValueEditContent: View {
                 .padding(.horizontal, 6 * scale)
                 .frame(height: 22 * scale)
                 .background(.quaternary, in: .rect(cornerRadius: 5 * scale, style: .continuous))
+                .appFocusRing(.rect(cornerRadius: 5 * scale, style: .continuous), isFocused: timeFocused)
                 .overlay(alignment: .trailing) {
                     if (model.timeDraft ?? model.timeText).isEmpty {
                         Text(verbatim: "--:--").foregroundStyle(.tertiary).padding(.trailing, 6 * scale).allowsHitTesting(false)

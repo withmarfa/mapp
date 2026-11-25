@@ -256,6 +256,7 @@ struct ItemRelationshipPicker: View {
             Text(LocalizedStringKey(relationship.label)).interfaceFont(.title2.bold())
             TextField("Search Items", text: $query)
                 .textFieldStyle(.roundedBorder)
+                .appFocusRing()
                 .accessibilityIdentifier("RelationshipSearch")
             List(filtered) { candidate in
                 RelationshipCandidateRow(
