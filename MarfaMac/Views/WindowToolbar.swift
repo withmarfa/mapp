@@ -552,6 +552,8 @@ private struct MoreMenu: View {
             ItemRemoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
         }
         .menuIndicator(.hidden)
+        // On macOS a menu item draws its symbol only when the menu asks for it.
+        .labelStyle(.titleAndIcon)
         .help("More")
         .accessibilityIdentifier("MoreToolbar")
     }
