@@ -3076,6 +3076,9 @@
     "Can’t Discard This Copy" : {
       "extractionState" : "manual"
     },
+    "Can’t Duplicate View" : {
+
+    },
     "Can’t Edit This Property" : {
       "extractionState" : "manual"
     },
@@ -3470,6 +3473,9 @@
     },
     "Choose an Icon" : {
       "extractionState" : "manual"
+    },
+    "Choose at least one source for the inbox." : {
+
     },
     "Choose how often to back up." : {
 
@@ -4266,6 +4272,9 @@
     },
     "Discard Copy" : {
       "extractionState" : "manual"
+    },
+    "Discard the New View?" : {
+
     },
     "Discard this change?" : {
       "extractionState" : "manual"
@@ -7525,6 +7534,9 @@
     },
     "Open Settings…" : {
       "extractionState" : "manual"
+    },
+    "Open View" : {
+
     },
     "Open a window to use its column widths." : {
 
@@ -11035,6 +11047,9 @@
     "This view was changed elsewhere since this window read it, so nothing was saved. The window now shows the view as it is; make your changes again." : {
       "extractionState" : "manual"
     },
+    "This view was deleted in another app." : {
+
+    },
     "This view was renamed elsewhere, so its name was left as it is." : {
 
     },
@@ -12440,6 +12455,9 @@
     "no limit" : {
       "extractionState" : "manual"
     },
+    "no source" : {
+
+    },
     "object store address" : {
 
     },
@@ -12650,6 +12668,9 @@
           }
         }
       }
+    },
+    "“%@” opens in its place, and what you chose for the new view is lost." : {
+
     },
     "“%@” was added but runs nothing yet." : {
 
