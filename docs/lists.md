@@ -39,9 +39,8 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 ## Layouts
 
-- **The Archive is a place of its own,** listing the archived items of both tiers. It opens as a table of Name, Type, Source and Edited, newest first, and keeps its layout, columns and sort as any place does. Its title is the Library's, with the Archive's count beside it ("10 of 213" while a search or filter narrows it). Empty, it says "Nothing is archived." (`PlaceEmpty`).
-- **A row of the Archive has Unarchive and Delete on it** while the pointer is on it (`RowQuickActions`), through the calls the menu uses, so Unarchive toasts with Undo and Delete asks as it does there. The same view will serve the Quick Actions setting.
-- **A Feed item in a table of both tiers has the Feed's mark after its name.**
+- **The Archive, reached from the Library page's tabs and Go, opens as a table of Name, Type, Source and Edited.** Its title is the Library's, with its count ("10 of 213" when narrowed); empty, it says "Nothing is archived."
+- **Unarchive and Delete stand on an Archive row under the pointer** (`RowQuickActions`)
 - **A layout draws the list it is given** (`ItemViewMode`) and never changes which items show.
 - **One row menu, one density and one drag serve every layout.**
 - **An item's date is its own type's** (`ItemPlacement`), so a place of several types puts each where it belongs. A person can point the view at one field.
@@ -99,7 +98,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 - **The Library's index, Collections and Sources are lists of things, not of items of one view** (`IndexPage`). The Library's tabs are All, Library and Feed. A long list of items is worked out off the main actor (`ItemIndexModel`).
 - **Trap:** an index page's body must not read the choice, or choosing a row draws every row.
-- **A row's count is of what the place lists.** A file attached to an item the library holds shows on that item's page, so no list or count but search takes it, Archive, a collection and Favorites included. The Feed's row has no count. The counts are worked out once for each change of membership (`MarfaLibrary.scopeCounts`).
+- **A row's count is of what the place lists.** A file attached to an item the library holds shows on that item's page, so no list or count but search takes it, Archive, a collection and Favorites included. The Feed's row has none. Counts are worked out once for each change of membership (`MarfaLibrary.scopeCounts`).
 - **The Library's Feed tab holds what a search finds there.** An Items page left on From Apps opens on All once.
 
 ## Search
