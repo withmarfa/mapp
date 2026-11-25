@@ -7,10 +7,12 @@ import Testing
 
 /// What a sync costs the window on about fifty thousand items (`BigLibrary` at 75 times its mix), in each layout, with the
 /// real window hosted in one nobody sees. For each move it prints
-/// `BUSY|<layout>|<move>|main=<ms>|busy=<percent>|stall=<ms>|window=<ms>`: the main thread's own CPU time over the window
-/// after the move, that as a share of the window, and the longest time the main actor did not answer, which is a hang at 250 ms
-/// or more. Run it with the Measure test plan, which sets
-/// `MARFA_MAC_MEASURE`; the other plans leave it out.
+/// `BUSY|<layout>|<move>|main=<ms>|busy=<percent>|stall=<ms>|window=<ms>|landed=<ms>`: the main thread's own CPU time over
+/// the window after the move, that as a share of the window, the longest time the main actor did not answer, the move itself
+/// included, which is a hang at 250 ms or more, and when the layout first showed the change: the new titles of changed items
+/// it shows, or the new items. A move whose change has not shown by the end of the window is waited for, outside the
+/// measure, and one that never shows fails. Run it with the Measure test plan, which sets `MARFA_MAC_MEASURE`; the other
+/// plans leave it out.
 @MainActor
 @Suite(.tags(.measure), .enabled(if: ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE"] != nil), .serialized)
 struct PlaceChangeCostTests {
@@ -24,13 +26,24 @@ struct PlaceChangeCostTests {
         for (layout, setUp) in Self.layouts where named?.contains(layout.name) ?? true {
             try await hosted(layout) { browser, library, source, step in
                 setUp(browser)
-                try await step("idle") {}
-                try await step("open (\(library.items(in: .library).count))") { browser.viewMode = layout.mode }
-                try await step("2000 edited") { source.send(.upserted(Self.edited(library, round: 1))) }
-                try await step("2000 edited again") { source.send(.upserted(Self.edited(library, round: 2))) }
-                try await step("2000 new") { source.send(.upserted(Self.added(round: 1))) }
-                let snapshot = SourceSnapshot(items: library.items(in: .library), catalogue: BigLibrary.catalogue)
-                try await step("whole copy read again") { source.send(.loaded(snapshot)) }
+                try await step("idle", [:]) {}
+                try await step("open (\(library.items(in: .library).count))", [:]) { browser.viewMode = layout.mode }
+                for (round, name) in [(1, "2000 edited"), (2, "2000 edited again")] {
+                    let edited = Self.edited(library, round: round)
+                    try await step(name, Self.awaited(edited, in: browser, mode: layout.mode)) { source.send(.upserted(edited)) }
+                }
+                let added = Self.added(round: 1)
+                try await step("2000 new", Self.awaited(added, in: browser, mode: layout.mode, joining: true)) {
+                    source.send(.upserted(added))
+                }
+                // The copy read whole again, with a sync's edits in it, as a rehydration brings them.
+                let reread = Self.edited(library, round: 3)
+                let rereadIDs = Set(reread.map(\.id))
+                let rest = library.records.values.map(\.item).filter { !rereadIDs.contains($0.id) }
+                let snapshot = SourceSnapshot(items: reread + rest, catalogue: BigLibrary.catalogue)
+                try await step("whole copy read again", Self.awaited(reread, in: browser, mode: layout.mode)) {
+                    source.send(.loaded(snapshot))
+                }
             }
         }
     }
@@ -39,11 +52,11 @@ struct PlaceChangeCostTests {
     @Test func openingSortingAndScrolling() async throws {
         for layout in [Layout(name: "table", mode: .table), Layout(name: "list", mode: .list)] {
             try await hosted(layout) { browser, _, _, step in
-                try await step("open") { browser.viewMode = layout.mode }
-                try await step("sort by name") {
+                try await step("open", [:]) { browser.viewMode = layout.mode }
+                try await step("sort by name", [:]) {
                     Self.sortByName(browser)
                 }
-                for index in 1...3 { try await step("scroll \(index)") { Self.scroll(by: 2_000) } }
+                for index in 1...3 { try await step("scroll \(index)", [:]) { Self.scroll(by: 2_000) } }
             }
         }
     }
@@ -90,6 +103,46 @@ struct PlaceChangeCostTests {
         }
     }
 
+    /// Up to five of `items` the layout shows now, spread through them, with the titles it is to show once it takes them;
+    /// for items `joining` the place, up to five of them.
+    private static func awaited(_ items: [Item], in browser: Browser, mode: ItemViewMode, joining: Bool = false) -> [ItemID: String] {
+        let candidates = joining ? items : items.filter { shown($0.id, in: browser, mode: mode) != nil }
+        let step = max(1, candidates.count / 5)
+        return Dictionary(stride(from: 0, to: candidates.count, by: step).prefix(5).map { (candidates[$0].id, candidates[$0].title) },
+            uniquingKeysWith: { first, _ in first })
+    }
+
+    /// The title the layout last worked out for `id`, as it draws it, or nil where it does not show the item. Read from what
+    /// the browser holds, so asking starts no work.
+    private static func shown(_ id: ItemID, in browser: Browser, mode: ItemViewMode) -> String? {
+        func nth<Group>(_ position: Int?, of groups: [Group], _ items: (Group) -> [Item]) -> String? {
+            guard var position else { return nil }
+            for group in groups {
+                let held = items(group)
+                if position < held.count { return held[position].title }
+                position -= held.count
+            }
+            return nil
+        }
+        switch mode {
+        case .table:
+            guard let content = browser.tableMemo?.content, let at = content.made.positions[id] else { return nil }
+            return content.allRows[at].item.title
+        case .list, .gallery:
+            guard let held = browser.sectionsWork.held?.value else { return nil }
+            return nth(held.positions[id], of: held.sections, \.items)
+        case .timeline:
+            guard let held = browser.timelineWork.held?.value else { return nil }
+            return nth(held.positions[id], of: held.groups) { $0.rows.map(\.item) }
+        case .board:
+            return browser.boardWork.held?.value.all.lazy.flatMap(\.items).first { $0.id == id }?.title
+        case .calendar:
+            return browser.calendarWork.held?.value.entries.first { $0.id == id }?.title
+        default:
+            return nil
+        }
+    }
+
     private static func scroll(by points: CGFloat) {
         func tables(in view: NSView) -> [NSTableView] {
             (view as? NSTableView).map { [$0] } ?? view.subviews.flatMap { tables(in: $0) }
@@ -123,7 +176,7 @@ struct PlaceChangeCostTests {
     /// Hosts the real window on the Library, in `layout`, and hands `script` the browser, the library, the source and `step`.
     private func hosted(
         _ layout: Layout,
-        _ script: (Browser, MarfaLibrary, FakeItemSource, (String, () -> Void) async throws -> Void) async throws -> Void
+        _ script: (Browser, MarfaLibrary, FakeItemSource, (String, [ItemID: String], () -> Void) async throws -> Void) async throws -> Void
     ) async throws {
         #if DEBUG
         let (library, source) = try await BigLibrary.loaded(scale: 75)
@@ -141,26 +194,38 @@ struct PlaceChangeCostTests {
         // Lets the window draw the Library first, so the first move is measured on its own.
         try await Task.sleep(for: .seconds(3))
 
-        func step(_ name: String, _ move: () -> Void) async throws {
+        /// Runs `move` and watches the main thread; `awaited` names the items whose titles the layout is to show after it.
+        func step(_ name: String, _ awaited: [ItemID: String], _ move: () -> Void) async throws {
             // Lets earlier work finish, so it is not counted in the measure.
             try await Task.sleep(for: .seconds(1))
+            func took() -> Bool { awaited.allSatisfy { Self.shown($0.key, in: browser, mode: layout.mode) == $0.value } }
             Cost.resetTallies()
             let cpu = Self.threadMilliseconds()
             let start = ContinuousClock.now
             move()
-            var stall = 0.0
+            // The move itself holds the main actor too.
+            var stall = Self.milliseconds(ContinuousClock.now - start)
+            var landed: Duration? = awaited.isEmpty ? .zero : nil
+            var checked = start
             while ContinuousClock.now - start < Self.watched {
                 let before = ContinuousClock.now
                 try await Task.sleep(for: .milliseconds(5))
                 stall = max(stall, Self.milliseconds(ContinuousClock.now - before - .milliseconds(5)))
+                // Checked a few times a second, so the check costs the main thread next to nothing.
+                if landed == nil, ContinuousClock.now - checked >= .milliseconds(50) {
+                    checked = ContinuousClock.now
+                    if took() { landed = checked - start }
+                }
             }
             let window = Self.milliseconds(ContinuousClock.now - start)
             let main = Self.threadMilliseconds() - cpu
+            if landed == nil, await eventually(within: .seconds(60), took) { landed = ContinuousClock.now - start }
             let costs = Cost.tallies.sorted { $0.value.milliseconds > $1.value.milliseconds }.prefix(6)
                 .map { "\($0.key.rawValue)=\($0.value.count)x\(String(format: "%.1f", $0.value.milliseconds))ms" }.joined(separator: " ")
             print(String(
-                format: "BUSY|%@|%@|main=%.0fms|busy=%.1f%%|stall=%.0fms|window=%.0fms|%@", layout.name, name, main, main / window * 100,
-                stall, window, costs))
+                format: "BUSY|%@|%@|main=%.0fms|busy=%.1f%%|stall=%.0fms|window=%.0fms|landed=%@|%@", layout.name, name, main,
+                main / window * 100, stall, window, landed.map { String(format: "%.0fms", Self.milliseconds($0)) } ?? "never", costs))
+            #expect(landed != nil, "\(layout.name), \(name): the layout showed the change")
         }
 
         try await script(browser, library, source, step)
