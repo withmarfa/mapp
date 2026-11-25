@@ -31,7 +31,7 @@ extension Browser {
     func shownGrouping(in library: any ItemLibrary, layout: ItemViewMode? = nil) -> ItemTableOptions.Grouping {
         let layout = layout ?? viewMode
         if layout == .board { return boardGrouping(in: library) ?? .none }
-        if let dated = datedList(for: layout) {
+        if let dated = groupingOrder(for: layout) {
             guard dated.hasSections, let column = dated.sort.first?.column else { return .none }
             return .column(column.id, by: .bucket(.day))
         }
@@ -59,7 +59,7 @@ extension Browser {
     /// written alone and a sort the Mac cannot show (by source, say) must not be replaced.
     func chooseGrouping(_ grouping: ItemTableOptions.Grouping, layout: ItemViewMode? = nil) {
         var options = tableOptions[shown] ?? ItemTableOptions()
-        if shown.savedView == nil, let dated = datedList(for: layout ?? viewMode), options.sort == nil { options.sort = dated.sort }
+        if shown.savedView == nil, let dated = groupingOrder(for: layout ?? viewMode), options.sort == nil { options.sort = dated.sort }
         options.group(by: grouping)
         tableOptions[shown] = options
     }
@@ -68,12 +68,20 @@ extension Browser {
     /// where the new sort is by one of the list's own dates, now as that date by day.
     func chooseSort(_ sort: [ItemTableComparator]) {
         var options = tableOptions[shown] ?? ItemTableOptions()
-        if let dated = datedList, options.sort == nil, dated.hasSections, let column = sort.first?.column,
+        if let dated = groupingOrder(for: viewMode), options.sort == nil, dated.hasSections, let column = sort.first?.column,
            [ItemTableColumn.created.id, ItemTableColumn.edited.id].contains(column.id) {
             options.group(by: .column(column.id, by: .bucket(.day)))
         }
         options.sort = sort
         tableOptions[shown] = options
+    }
+
+    private func groupingOrder(for layout: ItemViewMode) -> ViewDraft.Dated? {
+        if layout == .digest, listShape?.arranged != true {
+            let order = SavedViews.datedArrangement(DigestLayout.order)
+            return ViewDraft.Dated(sort: order.sort, hasSections: order.hasDateSections)
+        }
+        return datedList(for: layout)
     }
 
     /// Folds every group of the list or table, or opens them all. The window's own, kept with the place's options.

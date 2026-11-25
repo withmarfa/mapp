@@ -38,10 +38,16 @@ nonisolated enum SampleLibrary {
     /// `-MarfaMacLayout` or the place's look says.
     @MainActor static func forgetStoredChoices(in defaults: UserDefaults) {
         MacSettings.reset(in: defaults)
-        if SampleCastell.requested != nil {
+        if SampleCastell.requested == .studio {
             ViewLayouts.update(in: defaults) {
-                $0.set(ViewMacSettings(layout: .digest), for: ItemID(readingViewID))
-                $0.set(ViewMacSettings(layout: .table), for: ItemID(gitHubViewID))
+                for entry in feedViews {
+                    var settings = ViewMacSettings(layout: entry.layout)
+                    settings.opening = .modal
+                    $0.set(settings, for: ItemID(entry.id))
+                }
+            }
+            ViewOrders.update(in: defaults) {
+                $0.set([.own] + feedViews.map { .saved(ItemID($0.id)) }, in: .feed)
             }
         }
     }
@@ -75,15 +81,16 @@ nonisolated enum SampleLibrary {
     ) -> MarfaSource {
         let gallery = given == nil && !galleryFiles.isEmpty
         let castell = given == nil ? size.map { SampleCastell.world($0, now: now) } : nil
+        let feed = castell != nil && size == .studio ? feedViews : []
         let fake = WorkingCopy.fake(
             items: given ?? castell?.items ?? (items(now: now, tasksAndEvents: withCollections) + (gallery ? SampleGallery.rows(now: now, files: galleryFiles) : [])),
             edges: edges ?? (given == nil
                 ? castell?.edges ?? (memberships(now: now) + (withCollections ? taskLinks(now: now) : []) + SampleGallery.edges(now: now, files: galleryFiles))
                 : []),
             itemTypes: castell == nil ? itemTypes + (gallery ? SampleGallery.types : []) : SampleCastell.itemTypes,
-            edgeTypes: edgeTypes, views: castell == nil ? views : views + feedViews, displays: display)
+            edgeTypes: edgeTypes, views: views + feed.map(\.view), displays: display)
         if gallery { SampleGallery.writeFiles(galleryFiles) }
-        let server = SampleServer(copy: fake.copy, instance: castell == nil ? instanceID : SampleCastell.instanceID)
+        let server = SampleServer(copy: fake.copy, instance: castell == nil ? instanceID : SampleCastell.instanceID, feed: feed)
         let source = MarfaSource(
             copy: fake.copy, connection: connection, reading: server, refreshing: server)
         source.events.yield(.paint)
@@ -234,22 +241,26 @@ nonisolated enum SampleLibrary {
 
     // MARK: Views
 
-    private static let readingViewID = "view-feed-reading"
-    private static let gitHubViewID = "view-feed-github"
+    fileprivate struct FeedView: Sendable {
+        let id: String
+        let title: String
+        let sources: [String]
+        let layout: ItemViewMode
+        let sortBy: String
 
-    private static let feedViews: [SavedView] = [
-        SavedView(
-            id: readingViewID, version: 1,
-            settings: ViewSettings(
-                title: "Reading",
-                query: ViewQuery(types: [SampleCastell.Kind.bookmark, SampleCastell.Kind.highlight, SampleCastell.Kind.article], tier: .feed, states: [.active]),
-                sort: [ViewSort(by: "created_at", direction: .descending)])),
-        SavedView(
-            id: gitHubViewID, version: 1,
-            settings: ViewSettings(
-                title: "GitHub",
-                query: ViewQuery(types: [SampleCastell.Kind.issue, SampleCastell.Kind.pullRequest], tier: .feed, states: [.active]),
-                sort: [ViewSort(by: "updated_at", direction: .descending)])),
+        var view: SavedView {
+            let filter = sources.map { "source eq \"\($0)\"" }.joined(separator: " OR ")
+            return SavedView(id: id, version: 1, settings: ViewSettings(
+                title: title, query: ViewQuery(tier: .feed, states: [.active], filter: filter),
+                sort: [ViewSort(by: sortBy, direction: .descending)]))
+        }
+    }
+
+    private static let feedViews: [FeedView] = [
+        FeedView(id: "view-feed-reading", title: "Reading", sources: [SampleCastell.Code.rss, SampleCastell.Code.readwise],
+                 layout: .digest, sortBy: "created_at"),
+        FeedView(id: "view-feed-github", title: "GitHub", sources: [SampleCastell.Code.github, "oauth:github"],
+                 layout: .table, sortBy: "updated_at"),
     ]
 
     /// Views as another app might have saved them, held by the fake copy and read through it like a real copy's.
@@ -453,6 +464,7 @@ nonisolated enum SampleLibrary {
 private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
     let copy: WorkingCopy
     let instance: String
+    let feed: [SampleLibrary.FeedView]
 
     private var whole: Status {
         Status(
@@ -472,7 +484,19 @@ private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
         try await MarfaRead(copy: copy).changes(since: cursor, most: most)
     }
     func views() async throws -> Rows<LibraryView> { try await MarfaRead(copy: copy).views() }
-    func items(inView id: String) async throws -> [Marfa.Item] { try await MarfaRead(copy: copy).items(inView: id) }
+    func items(inView id: String) async throws -> [Marfa.Item] {
+        // The fake copy cannot evaluate a filter. The seeded Feed views use a union of source lists.
+        if let entry = feed.first(where: { $0.id == id }),
+           let held = try await copy.items.views().rows.first(where: { $0.id == id }),
+           held.settings.query == entry.view.settings.query {
+            var items: [Marfa.Item] = []
+            for source in entry.sources {
+                items += try await copy.items.list(ListFilters(tier: .feed, source: source)).rows
+            }
+            return items
+        }
+        return try await MarfaRead(copy: copy).items(inView: id)
+    }
     func items(matching filters: ListFilters) async throws -> [Marfa.Item] { try await MarfaRead(copy: copy).items(matching: filters) }
     func links(in id: String) async throws -> BodyLinks { try await MarfaRead(copy: copy).links(in: id) }
     func links(in ids: [String]) async throws -> [String: BodyLinks] { try await MarfaRead(copy: copy).links(in: ids) }
