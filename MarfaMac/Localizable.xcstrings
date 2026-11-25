@@ -1747,16 +1747,7 @@
     "A" : {
 
     },
-    "A Collection" : {
-
-    },
     "A Folder" : {
-
-    },
-    "A Source" : {
-
-    },
-    "A Type" : {
 
     },
     "A View" : {
@@ -2110,12 +2101,6 @@
 
     },
     "Add Row Below" : {
-
-    },
-    "Add Section" : {
-
-    },
-    "Add Shortcut" : {
 
     },
     "Add Sort" : {
@@ -4909,9 +4894,6 @@
     "Go" : {
 
     },
-    "Go To" : {
-
-    },
     "Go back to settings saved before a change." : {
 
     },
@@ -5056,13 +5038,7 @@
     "Hide Sidebar" : {
 
     },
-    "Hide Views from Sidebar" : {
-
-    },
     "Hide from Page" : {
-
-    },
-    "Hide from Sidebar" : {
 
     },
     "Hide on %@ Pages" : {
@@ -6574,9 +6550,6 @@
     "New Tab" : {
 
     },
-    "New Tab…" : {
-
-    },
     "New Type" : {
 
     },
@@ -7963,9 +7936,6 @@
     "Remove Old Activity" : {
 
     },
-    "Remove Shortcut" : {
-
-    },
     "Remove Sort" : {
 
     },
@@ -8098,12 +8068,6 @@
     },
     "Rename Source" : {
       "extractionState" : "manual"
-    },
-    "Rename Source…" : {
-
-    },
-    "Rename Tab" : {
-
     },
     "Rename View" : {
       "extractionState" : "manual",
@@ -8368,9 +8332,6 @@
       "extractionState" : "manual"
     },
     "Saved" : {
-
-    },
-    "Saved Views" : {
 
     },
     "Saved as “%@”." : {
@@ -8737,9 +8698,6 @@
     },
     "Show Month" : {
       "extractionState" : "manual"
-    },
-    "Show More" : {
-
     },
     "Show Original" : {
 
@@ -10721,9 +10679,6 @@
     },
     "This needs the server. Try again when you’re back online." : {
       "extractionState" : "manual"
-    },
-    "This place can’t be saved as a view" : {
-
     },
     "This plugin needs Marfa %@ or later. This server runs %@." : {
       "localizations" : {

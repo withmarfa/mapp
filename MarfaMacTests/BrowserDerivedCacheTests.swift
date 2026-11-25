@@ -86,14 +86,17 @@ struct BrowserDerivedCacheTests {
     @Test func aNewViewFromASortedListKeepsNoGroupingTheListDoesNotShow() {
         let library = tasks()
         let browser = Browser()
-        browser.tableOptions[.library] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        // A type's table groups by status on its own; the Library lists by origin and shows no status.
+        let place = PlaceView.type(TypeID("test.ticket"))
+        browser.showing = place
+        browser.tableOptions[place] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
         browser.viewMode = .table
         #expect(SavedViews.window(browser, in: library, order: ItemOrder()).grouping != nil)
         for mode in [ItemViewMode.list, .gallery] {
             browser.viewMode = mode
             #expect(SavedViews.window(browser, in: library, order: ItemOrder()).grouping == nil, "\(mode) kept the table's grouping")
         }
-        browser.tableOptions[.library]?.grouping = .column("field.status")
+        browser.tableOptions[place]?.grouping = .column("field.status")
         browser.viewMode = .list
         #expect(SavedViews.window(browser, in: library, order: ItemOrder()).grouping != nil)
     }

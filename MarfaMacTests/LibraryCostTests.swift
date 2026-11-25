@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import MarfaMac
 
@@ -60,4 +61,74 @@ struct LibraryCostTests {
             line("\(place.place.word)Rows", milliseconds(since: start))
         }
     }
+    /// The Library grouped, as a person who groups it sees it: grouping and the choices of Add Sort and Filter By are made off the
+    /// main actor with the rows, so an edit holds the window no longer than an ungrouped one.
+    @Test func theGroupedLibraryEdited() async throws {
+        let (library, source) = try await BigLibrary.loaded(scale: 75)
+        let browser = Browser()
+        browser.adopt(library)
+        browser.showing = .library
+        browser.tableOptions[.library, default: ItemTableOptions()].grouping = .column("field.status")
+        let count = library.items(in: .library).count
+
+        var start = ContinuousClock.now
+        let content = browser.tableContent(in: library)
+        _ = (content.groups.count, content.sortChoices.count, content.filterOffer.placeFields.count)
+        line("groupedShow(\(count))", milliseconds(since: start))
+
+        let before = browser.tableArrangements
+        Cost.resetTallies()
+        var edited = try #require(library.items(in: .library).first)
+        edited.title = "Edited"
+        edited.modified = .now
+        let revision = library.contentRevision
+        source.send(.upserted([edited]))
+        try #require(await eventually { library.contentRevision != revision })
+        try #require(await eventually(within: .seconds(60)) { _ = browser.tableContent(in: library); return browser.tableArrangements > before })
+        // What the window reads of the landed table: its groups and the choices its menus offer.
+        start = ContinuousClock.now
+        let landed = browser.tableContent(in: library)
+        _ = (landed.groups.count, landed.allGroups.count, landed.sortChoices.count, landed.filterOffer.placeFields.count)
+        line("groupedAfterEditReadMainActor", milliseconds(since: start))
+        line("groupedAfterEditArrangeMainActor", Cost.tallies[.tableArrange]?.milliseconds ?? 0)
+    }
+
+    /// A search with many results is arranged beside the Library's table, which stays held, so ending the search never builds
+    /// the Library again on the main actor. The copy lists at most `SearchResults.limit` hits for a person, so the source
+    /// here answers more, to reach the size a large search would.
+    @Test func aSearchAndItsEnd() async throws {
+        let (library, source) = try await BigLibrary.loaded(scale: 75)
+        let browser = Browser()
+        browser.adopt(library)
+        browser.showing = .library
+        let everything = count(of: library)
+        _ = browser.tableContent(in: library).rows.count
+        let ids = library.items(in: .library).map(\.id)
+        source.hits.withLock { $0["aa"] = Array(ids.prefix(3_000)); $0["aab"] = Array(ids.prefix(2_500)) }
+
+        browser.searchText = "aa"
+        try #require(await eventually(within: .seconds(30)) { browser.searchResults(in: library)?.items.count == 3_000 })
+        var start = ContinuousClock.now
+        _ = browser.tableContent(in: library).rows.count
+        line("searchShow(3000)", milliseconds(since: start))
+
+        browser.searchText = "aab"
+        try #require(await eventually(within: .seconds(30)) { browser.searchResults(in: library)?.items.count == 2_500 })
+        let before = browser.tableArrangements
+        start = ContinuousClock.now
+        let shown = browser.tableContent(in: library)
+        line("searchNextMainActor", milliseconds(since: start))
+        #expect(shown.allRows.count == 3_000, "the last search's table stays while the next is arranged, never the whole Library")
+        try #require(await eventually(within: .seconds(60)) { _ = browser.tableContent(in: library); return browser.tableArrangements > before })
+        #expect(browser.tableContent(in: library).allRows.count == 2_500)
+
+        browser.searchText = ""
+        start = ContinuousClock.now
+        let back = browser.tableContent(in: library)
+        _ = back.rows.count
+        line("searchEndedMainActor", milliseconds(since: start))
+        #expect(back.allRows.count == everything)
+    }
+
+    private func count(of library: any ItemLibrary) -> Int { library.items(in: .library).count }
 }

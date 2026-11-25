@@ -175,8 +175,12 @@ final class Browser {
     @ObservationIgnored var tableMemo: (key: TableKey, content: ItemTableContent)?
     /// The last table of each large place, shown while its next is arranged off the main actor (`Browser+PlaceContent`).
     @ObservationIgnored var heldTables: PlaceMemory<(key: TableKey, content: ItemTableContent)> = [:]
-    /// The arrangement under way, and what it is for.
-    @ObservationIgnored var arranging: (key: TableKey, task: Task<Void, Never>)?
+    /// The last table of a large search, shown while the next is arranged off the main actor. Apart from `heldTables`, so
+    /// a search never drops the Library's table nor shows it for its results.
+    @ObservationIgnored var heldSearch: (key: TableKey, content: ItemTableContent)?
+    /// The arrangement under way, what it is for, and the token its task ends it by, so a task that was replaced never
+    /// ends its successor's record.
+    @ObservationIgnored var arranging: (key: TableKey, token: UUID, task: Task<Void, Never>)?
     /// Counts the arrangements that landed, which a view reads through `tableContent(in:)` to draw the new one.
     var tableArrangements = 0
     /// The rows of Types, Collections or Sources, held while what they read stands (`Browser+PlaceIndex`).
@@ -453,6 +457,7 @@ final class Browser {
         pagingState = nil
         tableMemo = nil
         heldTables = [:]
+        heldSearch = nil
         arranging?.task.cancel()
         arranging = nil
         indexRowsMemo = nil

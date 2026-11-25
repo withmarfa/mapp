@@ -246,7 +246,12 @@ extension Browser {
             hidesEmpty: hidesEmptyGroups, sources: library.sources.infos,
             relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()))
         if let held = tableMemo, held.key == key { return held.content }
-        let held = heldTables[shown].flatMap { $0.key.derived.library == key.derived.library ? $0 : nil }
+        // A search's table is held apart, so its results never show the Library's table nor drop it.
+        let searching = isSearching
+        let held = (searching ? heldSearch : heldTables[shown])
+            .flatMap { $0.key.derived.library == key.derived.library && $0.key.derived.place == shown ? $0 : nil }
+        // The table the place held is the one asked for again, as when a search ends on the place it began on.
+        if let held, held.key == key { tableMemo = held; return held.content }
         if let held, arranging?.key == key { return held.content }
         let listed = derived.items ?? items(in: library)
         if let held, listed.count > Self.arrangesAlongsideAbove {
@@ -257,7 +262,13 @@ extension Browser {
         arranging = nil
         let content = ItemTableContent(browser: self, library: library, items: listed)
         tableMemo = (key, content)
-        hold(listed.count > Self.arrangesAlongsideAbove ? (key, content) : nil, for: shown)
+        let isLarge = listed.count > Self.arrangesAlongsideAbove
+        if searching {
+            heldSearch = isLarge ? (key, content) : nil
+        } else {
+            heldSearch = nil
+            hold(isLarge ? (key, content) : nil, for: shown)
+        }
         return content
     }
 
@@ -292,45 +303,55 @@ extension Browser {
         // The arrangement replaced ends once the work it has off the main actor ends.
         let previous = arranging?.task
         let options = tableOptions[shown] ?? ItemTableOptions()
+        let searching = isSearching
+        let token = UUID()
         let task = Task { [weak self] in
             if settles { try? await Task.sleep(for: Browser.arrangeSettling) }
             await previous?.value
-            guard let self, !Task.isCancelled, self.shown == place, self.isShowing(library) else { self?.endArranging(key); return }
+            guard let self, !Task.isCancelled, self.shown == place, self.isShowing(library) else { self?.endArranging(token); return }
             // The main actor only reads what the rows are made of, and takes the table as it lands.
             let looks = self.looks(in: library)
             let shownRelations = self.shownRelations
             let wants = await Task.detached(priority: .userInitiated) {
                 ItemTableContent.Wants(items: items, looks: looks, options: options, shown: shownRelations)
             }.value
-            guard !Task.isCancelled, self.arranging?.key == key, self.shown == place else { return self.endArranging(key) }
+            guard self.isLive(token, place, searching) else { return self.endArranging(token) }
             var start = ContinuousClock.now
             let reading = ItemTableContent.reading(browser: self, library: library, items: items, wants: wants)
             Cost.record(.tableArrange, since: start)
             let made = await Task.detached(priority: .userInitiated) { ItemTableContent.Made(reading) }.value
-            guard !Task.isCancelled, self.arranging?.key == key, self.shown == place else { return self.endArranging(key) }
+            guard self.isLive(token, place, searching) else { return self.endArranging(token) }
             start = ContinuousClock.now
-            let content = ItemTableContent(browser: self, library: library, made: made)
+            // The options the rows and the key were made from, not the window's now.
+            let content = ItemTableContent(browser: self, library: library, made: made, options: options, hidesEmptyGroups: key.hidesEmpty)
             let ordering = content.ordering
             Cost.record(.tableArrange, since: start)
             let ordered = await Task.detached(priority: .userInitiated) { ordering.ordered() }.value
-            guard !Task.isCancelled, self.arranging?.key == key, self.shown == place else { return self.endArranging(key) }
+            guard self.isLive(token, place, searching) else { return self.endArranging(token) }
             start = ContinuousClock.now
-            // The chosen row is read as the table lands, where the held table shows it now.
+            // The chosen row is read as the table lands, where the held table shows it now. The held table's rows are
+            // read only for that row, since reading them sorts them on the main actor where they were never asked for.
             let pinned = sameChoices && self.selection.count == 1 ? self.selection.first : nil
-            let shownRows = self.heldTables[place]?.content.rows ?? earlier.content.rows
-            content.land(ordered, rows: Browser.holding(pinned, in: ordered.rows, as: pinned == nil ? nil : shownRows))
+            let shownRows = pinned == nil ? nil : ((searching ? self.heldSearch : self.heldTables[place])?.content.rows ?? earlier.content.rows)
+            content.land(ordered, rows: Browser.holding(pinned, in: ordered.rows, as: shownRows))
             Cost.record(.tableArrange, since: start)
             self.arranging = nil
             self.tableMemo = (key, content)
-            self.hold((key, content), for: place)
+            if searching { self.heldSearch = (key, content) } else { self.hold((key, content), for: place) }
             self.tableArrangements += 1
         }
-        arranging = (key, task)
+        arranging = (key, token, task)
     }
 
-    /// Ends the arrangement for `key` that did not land, so the next ask for that table arranges it again.
-    private func endArranging(_ key: TableKey) {
-        if arranging?.key == key { arranging = nil }
+    /// Whether the arrangement of `token` is still the one under way, for the place and the search it began for.
+    private func isLive(_ token: UUID, _ place: PlaceView, _ searching: Bool) -> Bool {
+        !Task.isCancelled && arranging?.token == token && shown == place && isSearching == searching
+    }
+
+    /// Ends the arrangement of `token` that did not land, so the next ask for that table arranges it again. A task that
+    /// was replaced finds another's record and leaves it.
+    private func endArranging(_ token: UUID) {
+        if arranging?.token == token { arranging = nil }
     }
 
     /// `rows` with the row of `id` where it stood in `earlier`, where both hold it.

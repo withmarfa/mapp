@@ -64,12 +64,14 @@ final class ItemTableContent {
         let start = ContinuousClock.now
         defer { Cost.record(.tableContent, since: start) }
         let wants = Wants(items: items, browser: browser, library: library)
-        self.init(browser: browser, library: library, made: Made(Self.reading(browser: browser, library: library, items: items, wants: wants)))
+        self.init(
+            browser: browser, library: library, made: Made(Self.reading(browser: browser, library: library, items: items, wants: wants)),
+            options: browser.tableOptions[browser.shown] ?? ItemTableOptions(), hidesEmptyGroups: browser.hidesEmptyGroups)
     }
 
-    /// Works the table out from its rows and columns, which may have been made off the main actor.
-    init(browser: Browser, library: any ItemLibrary, made: Made) {
-        let options = browser.tableOptions[browser.shown] ?? ItemTableOptions()
+    /// Works the table out from its rows and columns, which may have been made off the main actor, by the `options` and
+    /// Hide Empty Groups they were made under, which a table that lands later must not read again from the window.
+    init(browser: Browser, library: any ItemLibrary, made: Made, options: ItemTableOptions, hidesEmptyGroups: Bool) {
         allRows = made.allRows
         columns = made.columns
         heldTypes = made.types
@@ -83,7 +85,7 @@ final class ItemTableContent {
         grouping = ItemTableLayout.grouping(options, columns: columns)
         // A place's own grouping is by the status's groups, as a board of mixed types is.
         groupMode = options.grouping == .automatic ? .statusGroups : options.grouping.mode
-        hidesEmptyGroups = browser.hidesEmptyGroups
+        self.hidesEmptyGroups = hidesEmptyGroups
         calendar = browser.isViewPlace ? DateGroups.viewCalendar() : WeekStart.calendar(.current, in: browser.defaults)
     }
 
@@ -162,37 +164,66 @@ final class ItemTableContent {
         let catalogue: Catalogue
         let now: Date
         let sort: [ItemTableComparator]
+        let grouping: ItemTableColumn?
+        let groupMode: GroupMode
+        let declaresGroups: Bool
+        let groupOrder: [String]?
+        let calendar: Calendar
 
+        /// Everything the table reads of its rows that costs a pass over them, so none is made on the main actor.
         struct Ordered: Sendable {
-            let offer: FilterOffer?
+            let offer: FilterOffer
             let kept: [ItemTableRow]
             let rows: [ItemTableRow]
+            let sortChoices: [ItemTableColumn]
+            /// Every group of `rows` in order, for a table that is grouped.
+            let groups: [ItemTableGroup]
+
+            fileprivate init(ordering: Ordering, offer: FilterOffer, kept: [ItemTableRow]) {
+                let rows = ItemTableLayout.sorted(kept, by: ordering.sort)
+                self.offer = offer
+                self.kept = kept
+                self.rows = rows
+                sortChoices = ItemTableLayout.sortChoices(from: ordering.columns, types: Set(kept.map(\.item.type)), catalogue: ordering.catalogue)
+                groups = ordering.grouping.map {
+                    ItemTableLayout.ordered(
+                        ItemTableLayout.groups(
+                            of: rows, by: $0, mode: ordering.groupMode, catalogue: ordering.catalogue, declared: ordering.declaresGroups,
+                            calendar: ordering.calendar),
+                        by: ordering.groupOrder)
+                } ?? []
+            }
         }
 
         func ordered() -> Ordered {
-            guard let filter else { return Ordered(offer: nil, kept: allRows, rows: ItemTableLayout.sorted(allRows, by: sort)) }
             let offer = FilterOffer.make(columns: columns, types: types, catalogue: catalogue)
+            guard let filter else { return Ordered(ordering: self, offer: offer, kept: allRows) }
             let kept = FilterMatching.filter(
                 allRows, by: filter, targets: offer.targets, catalogue: catalogue, clock: .init(now: now, calendar: .current))
-            return Ordered(offer: offer, kept: kept, rows: ItemTableLayout.sorted(kept, by: sort))
+            return Ordered(ordering: self, offer: offer, kept: kept)
         }
     }
 
     var ordering: Ordering {
         Ordering(
             allRows: allRows, filter: options.isFiltering ? options.filter : nil, columns: columns,
-            types: listedTypes.union(heldTypes), catalogue: catalogue, now: now, sort: sort)
+            types: listedTypes.union(heldTypes), catalogue: catalogue, now: now, sort: sort,
+            grouping: grouping, groupMode: groupMode, declaresGroups: options.grouping != .automatic,
+            groupOrder: options.groupOrder, calendar: calendar)
     }
 
-    /// Takes the rows `ordering` kept and sorted, with `rows` in the order to show.
+    /// Takes what `ordering` made, with `rows` in the order to show. The groups were made of the rows as sorted, so they
+    /// stand only where the rows are shown as sorted; where the chosen row was kept in its place the groups are made
+    /// when first read, as ever.
     func land(_ ordered: Ordering.Ordered, rows: [ItemTableRow]) {
-        if let offer = ordered.offer { filterOffer = offer }
+        filterOffer = ordered.offer
         kept = ordered.kept
+        sortChoices = ordered.sortChoices
+        if rows.elementsEqual(ordered.rows, by: { $0.id == $1.id }) { allGroups = ordered.groups }
         self.rows = rows
     }
 
     /// The columns Add Sort offers: those of the types the view shows after its filters, in a sensible order.
-    var sortChoices: [ItemTableColumn] {
-        ItemTableLayout.sortChoices(from: columns, types: Set(kept.map(\.item.type)), catalogue: catalogue)
-    }
+    lazy var sortChoices: [ItemTableColumn] = ItemTableLayout.sortChoices(
+        from: columns, types: Set(kept.map(\.item.type)), catalogue: catalogue)
 }
