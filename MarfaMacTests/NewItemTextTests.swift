@@ -85,7 +85,7 @@ struct NewItemTextTests {
     }
 
     static func removingDay(_ text: String, _ locale: String = "en_GB") -> String? {
-        Self.day(text, locale).map { NewItemText.removing($0, from: text) }
+        Self.day(text, locale).map { NewItemText.removing([$0.range], from: text) }
     }
 
     @Test func theDaysWordsLeaveTheTitle() {
@@ -114,29 +114,41 @@ struct NewItemTextTests {
 
     // MARK: Tags
 
-    @Test func aFinishedTagBecomesATagAndLeavesTheText() {
-        let typing = NewItemText.takeTags(from: "Call #work about it", finishing: false)
+    /// The tags read in `text`, and the text with their words taken out, as Add does.
+    static func taking(_ text: String, finishing: Bool, refuses: (String) -> Bool = { _ in false }) -> (tags: [String], text: String) {
+        let found = NewItemText.tags(in: text, finishing: finishing, refuses: refuses)
+        return (found.map(\.tag), NewItemText.removing(found.map(\.range), from: text))
+    }
+
+    @Test func aFinishedTagIsReadWhereItStands() {
+        let typing = Self.taking("Call #work about it", finishing: false)
         #expect(typing.tags == ["work"])
         #expect(typing.text == "Call about it")
+        #expect(NewItemText.tags(in: "Call #work about it", finishing: false).map(\.range) == [5..<10])
 
-        let unfinished = NewItemText.takeTags(from: "Call #wor", finishing: false)
-        #expect(unfinished.tags.isEmpty, "a tag still being typed stays text")
-        #expect(NewItemText.takeTags(from: "Call #work", finishing: true).tags == ["work"])
+        #expect(Self.taking("Call #wor", finishing: false).tags.isEmpty, "a tag still being typed is not read")
+        #expect(Self.taking("Call #work", finishing: true).tags == ["work"])
     }
 
     @Test func aFullStopAfterATagIsTheSentences() {
-        let taken = NewItemText.takeTags(from: "Buy milk #home. Then call", finishing: true)
+        let taken = Self.taking("Buy milk #home. Then call", finishing: true)
         #expect(taken.tags == ["home"])
         #expect(taken.text == "Buy milk. Then call")
     }
 
+    @Test func eachTagIsReadWhereItStandsAndOnlyItsWordsLeave() {
+        let taken = Self.taking("#home first. Then #home. And #work", finishing: true)
+        #expect(taken.tags == ["home", "home", "work"])
+        #expect(taken.text == "first. Then. And ")
+    }
+
     @Test func numbersAndCodeStayText() {
         for text in ["Issue #12 ", "Learn C# today", "Win #1st prize "] {
-            let taken = NewItemText.takeTags(from: text, finishing: true)
+            let taken = Self.taking(text, finishing: true)
             #expect(taken.tags.isEmpty, "\(text)")
             #expect(taken.text == text)
         }
-        let refused = NewItemText.takeTags(from: "Pin #favorite ", finishing: true) { $0 == "favorite" }
+        let refused = Self.taking("Pin #favorite ", finishing: true) { $0 == "favorite" }
         #expect(refused.tags.isEmpty && refused.text == "Pin #favorite ")
     }
 

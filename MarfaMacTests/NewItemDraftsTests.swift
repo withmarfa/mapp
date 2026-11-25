@@ -117,7 +117,7 @@ struct NewItemDraftsTests {
         draft.properties = ["priority": .string("high")]
         draft.chips = [.parent, .field("priority"), .tag("work")]
         draft.files = [attached]
-        draft.sources = [.tag("work"): QuickAdd.Source(words: "#work", offset: 7), .field("priority"): QuickAdd.Source(words: "p1", offset: 0)]
+        draft.marks = [QuickAdd.Mark(range: 7..<13, words: "a quit", chip: .tag("work"))]
         draft.declined = ["Fri 27 Nov", "#q3"]
         do {
             let drafts = NewItemDrafts(file: file)
@@ -223,18 +223,18 @@ struct NewItemDraftsTests {
         #expect(back.draft.files == [attached])
     }
 
-    @Test func aCreateFromAnEarlierRunIsSettledByTheCopyOnLaunch() throws {
+    @Test func aCreateFromAnEarlierRunComesBackOnlyOnMarfasRefusal() throws {
         let disk = TestFiles()
         let file = disk.directory.appending(path: "Drafts.json")
         let queued = ItemID.mint()
-        let lost = ItemID.mint()
+        let absent = ItemID.mint()
         do {
             let drafts = NewItemDrafts(file: file)
             _ = Self.sent("Queued", as: queued, in: drafts)
-            // The app stopped after writing the draft and before the create was queued.
+            // The app stopped after writing the sent ID; the copy may not show the create yet.
             let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.task"), in: "a")
-            drafts.update(id, Self.typed("Never queued"))
-            #expect(drafts.sending(id, as: lost))
+            drafts.update(id, Self.typed("Not in the copy"))
+            #expect(drafts.sending(id, as: absent))
         }
         let library = FakeItemLibrary()
         library.serverKey = "a"
@@ -243,9 +243,42 @@ struct NewItemDraftsTests {
             created: .now, modified: .now, sync: .waiting(writes: 1))]
         let reopened = NewItemDrafts(file: file)
         reopened.settle(in: library)
-        let back = try #require(reopened.takeReturned(.line, in: "a"))
-        #expect(back.draft.title == "Never queued")
-        #expect(reopened.takeReturned(.line, in: "a") == nil, "the queued create stays hidden, so it is never made twice")
+        #expect(reopened.takeReturned(.line, in: "a") == nil, "a create not in the copy waits, so it is never made twice")
+
+        library.syncReport.problems = [Self.problem(.blocked(.failingAlone), creating: absent)]
+        reopened.settle(in: library)
+        #expect(reopened.takeReturned(.line, in: "a") == nil, "a blocked create may still be made")
+
+        library.syncReport.problems = [Self.problem(.refused, creating: absent)]
+        reopened.settle(in: library)
+        #expect(reopened.takeReturned(.line, in: "a")?.draft.title == "Not in the copy")
+        #expect(reopened.takeReturned(.line, in: "a") == nil, "the queued create stays hidden")
+    }
+
+    @Test func aSentIDThatCannotBeWrittenIsNotSent() throws {
+        let disk = TestFiles()
+        let blocker = disk.url("Blocker")
+        let file = blocker.appending(path: "Drafts.json")
+        let drafts = NewItemDrafts(file: file)
+        drafts.notices = Notices()
+        let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.task"), in: "a")
+        drafts.update(id, Self.typed("Typed"))
+        #expect(!drafts.sending(id, as: .mint()))
+
+        try FileManager.default.removeItem(at: blocker)
+        drafts.release(id)
+        let kept = try #require(NewItemDrafts(file: file).take(.line, in: "a"), "still a draft to type into, not one on its way")
+        #expect(kept.sent == nil)
+    }
+
+    @Test func aDraftIsNeverWrittenUnderAnUnknownLibrary() throws {
+        let disk = TestFiles()
+        let file = disk.directory.appending(path: "Drafts.json")
+        let drafts = NewItemDrafts(file: file)
+        let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.task"), in: "")
+        drafts.update(id, Self.typed("Before the instance"))
+        #expect(!FileManager.default.fileExists(atPath: file.path(percentEncoded: false)))
+        #expect(!drafts.sending(id, as: .mint()), "a create no later run could follow is not made")
     }
 
     @Test func aDraftThatCantBeWrittenIsToldOnceAndWrittenOnceItCanBe() throws {
