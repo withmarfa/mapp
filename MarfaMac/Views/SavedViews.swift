@@ -149,6 +149,21 @@ enum SavedViews {
         return Arrangement(sort: [sort], hasDateSections: order.groupsByDate && order.sort != .title, isDated: true)
     }
 
+    /// What a view will not keep, as a few words for a line that lists them.
+    static func shortName(_ unkept: ViewDraft.Unkept) -> String {
+        switch unkept {
+        case .search(let text): String(localized: "“\(text)”")
+        case .searchToken(let sentence), .relativeFilter(let sentence): String(localized: "“\(sentence)”")
+        case .filter(let column): String(localized: "the filter on \(column)")
+        case .mixedFilters: String(localized: "filters joined by both “and” and “or”")
+        case .tooManyFilters: String(localized: "more than \(ViewDraft.maxConditions) conditions")
+        case .refused: String(localized: "a filter Marfa refuses")
+        case .sort(let column): String(localized: "sorting by \(column)")
+        case .group(let column): String(localized: "grouping by \(column)")
+        case .groupMode(let column, let mode): String(localized: "grouping by \(column): \(mode)")
+        }
+    }
+
     static func describe(_ unkept: ViewDraft.Unkept) -> String {
         switch unkept {
         case .search(let text): String(localized: "The search for “\(text)”")

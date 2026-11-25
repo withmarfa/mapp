@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// A new view's page of the View panel, in the View panel's place: the starting points that fit the place, three to a
-/// row; the view as one sentence of values, each a menu; the name, Add to Sidebar and Quick Actions; then Cancel and
-/// Create View. The window behind lists what the view will list, and its pill stands in the row until it is made.
+/// A new view's page of the View panel, in the View panel's place: the view's name as its head, ready to type; the
+/// starting points that fit the place, three to a row; the view as one sentence of values, each a menu, and one line
+/// that says what Marfa keeps; Quick Actions where the view lists the Feed, and Add to Sidebar; then Cancel and Create
+/// View. The window behind lists what the view will list, and its pill stands in the row until it is made.
 struct NewViewPage: View {
     @CurrentLibrary private var library
     @StoredOrder private var order
@@ -13,11 +14,21 @@ struct NewViewPage: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 3)
     /// The view a tile would open, while the person is asked whether to discard the new view for it.
     @State private var discardingFor: PlaceView?
+    @FocusState private var nameFocused: Bool
 
     var body: some View {
         let starts = browser.newViewStarts(in: library)
         let suggestion = browser.suggestedViewName(in: library)
-        ViewPanelHead(title: String(localized: "New View"))
+        TextField("View Name", text: $panel.shownName, prompt: Text(verbatim: suggestion))
+            .textFieldStyle(.plain)
+            .interfaceFont(.title3.weight(.semibold))
+            .focused($nameFocused)
+            .onSubmit { create() }
+            .frame(minHeight: ViewPanelMetrics.rowHeight)
+            .padding(.horizontal, ViewPanelMetrics.inset)
+            .padding(.top, 6)
+            .task { nameFocused = true }
+            .accessibilityIdentifier("ViewPanelName")
         if !starts.isEmpty {
             LazyVGrid(columns: columns, spacing: 4) {
                 ForEach(starts) { tile($0) }
@@ -30,24 +41,22 @@ struct NewViewPage: View {
             NewViewSentence(browser: browser, panel: panel)
                 .padding(.horizontal, ViewPanelMetrics.inset)
                 .padding(.vertical, 4)
-            ViewPanelUnkept(browser: browser)
+            NewViewKeeping(browser: browser)
+                .padding(.horizontal, ViewPanelMetrics.inset)
+                .padding(.bottom, 6)
         }
         ViewPanelSection {
-            TextField("View Name", text: $panel.shownName, prompt: Text(verbatim: suggestion))
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { create() }
-                .padding(.horizontal, ViewPanelMetrics.inset)
-                .frame(minHeight: ViewPanelMetrics.rowHeight)
-                .accessibilityIdentifier("ViewPanelName")
+            if browser.offersNewViewQuickActions {
+                ViewPanelSwitchRow(
+                    symbol: "bolt", label: String(localized: "Quick Actions"), isOn: browser.showsQuickActions,
+                    set: { browser.setShowsQuickActions($0) })
+                    .help("Buttons on the row under the pointer, such as Archive and Delete")
+                    .accessibilityIdentifier("ViewPanelQuickActions")
+            }
             ViewPanelSwitchRow(
-                symbol: "sidebar.left", label: String(localized: "Add to Sidebar"), isOn: panel.addsToSidebar,
+                symbol: "pin", label: String(localized: "Add to Sidebar"), isOn: panel.addsToSidebar,
                 set: { panel.addsToSidebar = $0 })
                 .accessibilityIdentifier("NewViewAddToSidebar")
-            ViewPanelSwitchRow(
-                symbol: "bolt", label: String(localized: "Quick Actions"), isOn: browser.showsQuickActions,
-                set: { browser.setShowsQuickActions($0) })
-                .help("Buttons on the row under the pointer, such as Archive and Delete")
-                .accessibilityIdentifier("ViewPanelQuickActions")
         }
         if let problem = shownProblem {
             Label(problem, systemImage: "exclamationmark.triangle")
@@ -60,10 +69,6 @@ struct NewViewPage: View {
         }
         VStack(alignment: .leading, spacing: 6) {
             Divider()
-            Text(verbatim: ViewPanelKeeping.savedViewOverview)
-                .interfaceFont(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
                 Button("Cancel") { browser.escapeViewPanel(in: library) }
@@ -119,16 +124,23 @@ struct NewViewPage: View {
             discardingFor = browser.pickStart(start, in: library, order: order)
         } label: {
             VStack(spacing: 4) {
-                Image(systemName: theirs == nil ? start.symbol : "checkmark.circle.fill")
+                Image(systemName: start.symbol)
                     .font(.body)
                     .frame(height: 18)
-                Text(verbatim: start.title)
-                    .font(.system(size: 11))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
+                Group {
+                    if theirs == nil {
+                        Text(verbatim: start.title)
+                    } else {
+                        Text("\(Image(systemName: "checkmark")) \(start.title)")
+                    }
+                }
+                .font(.system(size: 11))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
             }
+            .foregroundStyle(chosen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
             .frame(maxWidth: .infinity, minHeight: 58)
-            .background(chosen ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.quinary), in: .rect(cornerRadius: 10))
+            .background(chosen ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 10))
             .contentShape(.rect(cornerRadius: 10))
         }
         .buttonStyle(.plain)
@@ -306,5 +318,26 @@ private struct NewViewSentence: View {
                 Button("Edit Group…") { panel.page = .group }
             }
         }
+    }
+}
+
+/// One quiet line under the sentence: Marfa keeps the view for every app, and what of the window it will not keep.
+private struct NewViewKeeping: View {
+    @CurrentLibrary private var library
+    @StoredOrder private var order
+    let browser: Browser
+
+    var body: some View {
+        let window = SavedViews.window(browser, in: library, order: order)
+        let unkept = ViewDraft.draft(window, catalogue: library.catalogue, views: library.views)?.unkept ?? []
+        let line = unkept.isEmpty ? String(localized: "Saved in Marfa for every app.")
+            : String(localized: "Saved in Marfa for every app, except \(unkept.map(SavedViews.shortName).formatted(.list(type: .and, width: .standard))).")
+        Text(verbatim: line)
+            .interfaceFont(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .help(unkept.map(SavedViews.describe).joined(separator: "\n"))
+            .accessibilityIdentifier("NewViewKeeping")
     }
 }
