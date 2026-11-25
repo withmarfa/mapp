@@ -48,7 +48,9 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         XCTAssertFalse(connect.isEnabled)
         XCTAssertFalse(connectWithCode.isEnabled)
         address.click()
-        address.typeText("https://marfa.example.com")
+        let server = "https://marfa.example"
+        address.typeText(server)
+        XCTAssertEqual(address.value as? String, server)
         XCTAssertTrue(connect.isEnabled)
         XCTAssertTrue(connectWithCode.isEnabled)
     }
