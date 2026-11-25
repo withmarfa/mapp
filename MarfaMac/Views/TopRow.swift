@@ -18,6 +18,8 @@ struct TopRowTitleLine: View {
     let opensPlaces: Bool
     /// Whether the window is at its smallest, where the views are the one pill beside the title.
     let isSmall: Bool
+    /// Whether the open search field spans the line, as it does in a list column, so nothing of the title shows through it.
+    var isCovered = false
 
     var body: some View {
         let pieces = TopRowPieces(browser: browser, content: content, library: library, order: order)
@@ -31,6 +33,8 @@ struct TopRowTitleLine: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(isCovered ? 0 : 1)
+        .accessibilityHidden(isCovered)
     }
 
     /// Beside the title every step of the fold is in play. Alone, the title has only the control to give up, and only
