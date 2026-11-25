@@ -149,7 +149,7 @@ import Testing
         #expect(source.writes == [.restore(F.n1), .transition(F.n1, .trashed)])
     }
 
-    @Test func anUndoOfAnItemAlreadyWhereItWouldPutItIsMadeQuietly() async throws {
+    @Test func anUndoOfAnItemAlreadyWhereItWouldPutItIsMadeQuietlyAndItsRedoLeavesItAlone() async throws {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         library.delete([F.n1], undoManager: undo)
@@ -162,7 +162,7 @@ import Testing
         #expect(source.writes.isEmpty)
         #expect(library.notices.waiting.isEmpty)
         undo.redo()
-        #expect(source.writes == [.transition(F.n1, .trashed)])
+        #expect(source.writes.isEmpty, "the redo leaves the item where the other device put it")
     }
 
     @Test func anArchiveGivenBackAfterTheRestoreIsToldAndNotPutBack() async throws {

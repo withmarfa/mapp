@@ -26,25 +26,24 @@ extension MarfaLibrary {
 
     /// An Undo or Redo moves only an item still in the state this Mac left it in (`stateLeft`). A state moves no
     /// version, so the server would not catch a change another device made since; that item is left alone and the
-    /// person told. An item already where the step would put it needs nothing sent, and the step counts as made for
-    /// it. The step registered in return reverses only what the server took or may still take.
+    /// person told. An item already where the step would put it was put there elsewhere, so nothing is sent and the
+    /// step registered in return leaves it alone too. That step reverses only what the server took or may still take.
     func setStates(_ changes: [ItemID: StateChange], name: String, undoManager: UndoManager?) {
         var changes = changes.filter { item($0.key) != nil }
         var changedSince = BatchSkips()
-        var already: [ItemID: StateChange] = [:]
+        var already = false
         if undoRun != nil {
             for (id, change) in changes {
                 let left = stateLeft(id)
                 guard left != change.from else { continue }
                 changes[id] = nil
-                if left == change.to { already[id] = change } else { changedSince.skip(.changedSince) }
+                if left == change.to { already = true } else { changedSince.skip(.changedSince) }
             }
             tellSkipped(changedSince, didChange: !changes.isEmpty, failing: name)
-            if changes.isEmpty, already.isEmpty, !changedSince.isEmpty { undoRun?.outcome.wasMade = false }
+            if changes.isEmpty, !already, !changedSince.isEmpty { undoRun?.outcome.wasMade = false }
         }
-        guard !changes.isEmpty || !already.isEmpty || !changedSince.isEmpty else { return }
+        guard !changes.isEmpty || already || !changedSince.isEmpty else { return }
         let made = StateMoves()
-        made.moves = already
         for (id, change) in changes { move(id, change, recordingIn: made, name: name) }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             guard !made.moves.isEmpty else { return library.notices.tell(name, library.notMade) }

@@ -34,24 +34,25 @@ extension MarfaLibrary {
         return CommandOutcome(plan.changing, skips: plan.skips)
     }
 
-    /// `tierLeft` includes writes the source has yet to show, so an undo can follow a pending move.
+    /// `tierLeft` includes writes the source has yet to show, so an undo can follow a pending move. An item already
+    /// where an Undo or Redo would put it was put there elsewhere, so nothing is sent and the step registered in return
+    /// leaves it alone too.
     func setTiers(_ changes: [ItemID: TierChange], name: String, undoManager: UndoManager?) {
         var changes = changes.filter { item($0.key) != nil }
         var changedSince = BatchSkips()
-        var already: [ItemID: TierChange] = [:]
+        var already = false
         if undoRun != nil {
             for (id, change) in changes {
                 let left = tierLeft(id)
                 guard left != change.from else { continue }
                 changes[id] = nil
-                if left == change.to { already[id] = change } else { changedSince.skip(.changedSince) }
+                if left == change.to { already = true } else { changedSince.skip(.changedSince) }
             }
             tellSkipped(changedSince, didChange: !changes.isEmpty, failing: name)
-            if changes.isEmpty, already.isEmpty, !changedSince.isEmpty { undoRun?.outcome.wasMade = false }
+            if changes.isEmpty, !already, !changedSince.isEmpty { undoRun?.outcome.wasMade = false }
         }
-        guard !changes.isEmpty || !already.isEmpty || !changedSince.isEmpty else { return }
+        guard !changes.isEmpty || already || !changedSince.isEmpty else { return }
         let made = TierMoves()
-        made.moves = already
         for (id, change) in changes {
             guard let item = item(id) else { continue }
             let write = submit(.retier(id, change.to, base: item.version), failing: name)
