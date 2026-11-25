@@ -1129,3 +1129,28 @@ test("a right-click on a row opens the row's menu, and anywhere else is left to 
   expect(header.openRowMenuAt(title())).toBe(false)
   expect(header.rowAt(name)).toEqual({ item: 'ticket', row: 'status' })
 })
+
+test('the toolbar names the item only once its head has scrolled away, or in Focus', () => {
+  // No head sent yet: nothing is shown to have scrolled, however far the page is.
+  expect(header.isAway(0)).toBe(false)
+  expect(header.isAway(500)).toBe(false)
+  header.set(ticket)
+  expect(header.isAway(0)).toBe(false)
+  // A head with no height yet, as before layout, is not away at the start.
+  Object.defineProperty(root, 'offsetHeight', { configurable: true, value: 0 })
+  Object.defineProperty(root, 'offsetTop', { configurable: true, value: 0 })
+  expect(header.isAway(0)).toBe(false)
+  Object.defineProperty(root, 'offsetHeight', { configurable: true, value: 200 })
+  Object.defineProperty(root, 'offsetTop', { configurable: true, value: 20 })
+  expect(header.isAway(0)).toBe(false)
+  expect(header.isAway(219)).toBe(false)
+  expect(header.isAway(220)).toBe(true)
+  // Focus draws no head, and the toolbar names the item from the start.
+  header.set({ ...ticket, focused: true })
+  expect(header.isAway(0)).toBe(true)
+  header.set(ticket)
+  expect(header.isAway(0)).toBe(false)
+  // The head goes away with the item, so nothing is away.
+  header.set(null)
+  expect(header.isAway(500)).toBe(false)
+})

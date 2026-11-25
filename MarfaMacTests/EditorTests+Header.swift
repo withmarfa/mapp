@@ -444,4 +444,42 @@ extension EditorTests {
         try await host.page.wait { host.page.editor.isEditable }
         try await host.waitFor("the title to unlock") { try await host.value(titleEditable) as? String == "plaintext-only" }
     }
+
+    /// The toolbar names the item only once its head is off the screen, so a page that is opened, or moved to another
+    /// item, never says the head is away while it sits at the top, not even for the moment before the head is laid out.
+    @Test @MainActor func aPageAtItsStartNeverSaysItsHeadIsAway() async throws {
+        let library = FakeItemLibrary()
+        let first = library.add("First\n")
+        let second = library.add("Second\n")
+        let page = try await Page(library: library)
+        let recorder = AwayRecorder(page.editor)
+        page.editor.showHeader(ItemPageHeader.heldHeader(of: page.editor, in: library, drafts: DetailsPresentation()))
+        for item in [first, second] {
+            try await page.show(item.id)
+            try await page.wait { page.editor.header?.item == item.id.rawValue }
+            try await Task.sleep(for: .milliseconds(300))
+            #expect(page.editor.isHeaderScrolledAway == false)
+        }
+        #expect(!recorder.told.contains(true), "the page said its head was away while it showed")
+    }
+}
+
+/// Every value the editor's report of its head being away takes, in order.
+@MainActor private final class AwayRecorder {
+    private let editor: EditorController
+    private(set) var told: [Bool] = []
+
+    init(_ editor: EditorController) {
+        self.editor = editor
+        watch()
+    }
+
+    private func watch() {
+        withObservationTracking { _ = editor.isHeaderScrolledAway } onChange: {
+            Task { @MainActor [self] in
+                told.append(editor.isHeaderScrolledAway)
+                watch()
+            }
+        }
+    }
 }

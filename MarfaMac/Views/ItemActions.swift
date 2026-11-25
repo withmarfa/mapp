@@ -63,7 +63,7 @@ struct ItemOrganizeActions: View {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
             VersionHistoryButton(ids: ids, details: details, shortcuts: shortcuts)
         } else {
-            FavoriteButton(ids: ids, undoManager: undoManager, shortcuts: shortcuts)
+            FavoriteButton(ids: ids, undoManager: undoManager, shortcuts: shortcuts, inMenu: true)
             AddTagButton(ids: ids, details: details, undoManager: undoManager, shortcuts: shortcuts)
             TypeChangeButton(ids: ids, details: details, undoManager: undoManager, shortcuts: shortcuts)
             // A right click on a card with no page open has nothing to arrange; the menus keep the item in place.
@@ -75,22 +75,30 @@ struct ItemOrganizeActions: View {
     }
 }
 
-/// Adds the selection to Favorites, or removes it once every item is there.
+/// Adds the selection to Favorites, or removes it once every item is there. A toolbar's button is the star itself:
+/// outlined while the items are not favorites, filled once they are, never struck through. A menu names the action and
+/// draws it, so Remove from Favorites keeps the slash there.
 struct FavoriteButton: View {
     @CurrentLibrary private var library
     let ids: Set<ItemID>
     let undoManager: UndoManager?
     var shortcuts: ShortcutBindings?
+    var inMenu = false
 
     var body: some View {
         // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change. An archived one takes it.
         let active = ItemActionContext(library: library, ids: ids, keepsPlace: true).items.filter { $0.state != .trashed }
         let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
-        Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
+        Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: symbol(allFavorites)) {
             library.setFavorite(ids, !allFavorites, undoManager: undoManager)
         }
         .shortcut(.favorite, shortcuts)
         .disabled(active.isEmpty)
+    }
+
+    private func symbol(_ allFavorites: Bool) -> String {
+        if inMenu { return allFavorites ? "star.slash" : "star" }
+        return allFavorites ? "star.fill" : "star"
     }
 }
 

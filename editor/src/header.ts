@@ -547,6 +547,16 @@ export class ItemHeader {
     return this.isHidden ? 0 : this.root.offsetTop + this.root.offsetHeight
   }
 
+  /** Whether the toolbar should name the item: the page is in Focus, which draws no head, or the head has gone
+   *  under the toolbar. A head the app has not sent yet, or one with no height yet, is not away: its title is not
+   *  shown anywhere else, and a page at its start has scrolled nowhere. */
+  isAway(scrolled: number): boolean {
+    if (!this.model) return false
+    if (this.model.focused) return true
+    const bottom = this.bottom
+    return bottom > 0 && scrolled >= bottom
+  }
+
   set(model: HeaderModel | null) {
     const previous = this.model
     this.model = model ?? undefined
