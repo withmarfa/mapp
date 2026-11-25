@@ -172,6 +172,8 @@ final class Browser {
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
+    /// The search's offers for the last key they were worked out for (`searchOffers`).
+    @ObservationIgnored var offerMemo: (key: OfferKey, offers: [SearchOffer])?
     @ObservationIgnored var tableMemo: (key: TableKey, content: ItemTableContent)?
     /// The last table of each large place, shown while its next is arranged off the main actor (`Browser+PlaceContent`).
     @ObservationIgnored var heldTables: PlaceMemory<(key: TableKey, content: ItemTableContent)> = [:]
@@ -460,6 +462,7 @@ final class Browser {
         arranging?.task.cancel()
         arranging = nil
         indexRowsMemo = nil
+        offerMemo = nil
         sectionsMemo = nil
         viewModesMemo = nil
         fieldsMemo = nil

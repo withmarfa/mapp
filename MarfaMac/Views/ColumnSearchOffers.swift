@@ -120,11 +120,17 @@ final class SearchOffersController {
     }
 
     /// Moves the choice one offer, from none to the first (or last, going up) and from the first back to none. Whether
-    /// there were offers to move through, so a key with none to move is left to the field.
+    /// the key was used, so one with no offer to move to, or down from the last, is left to the field.
     func move(by step: Int) -> Bool {
         guard isFocused, !offers.isEmpty else { return false }
         if step > 0 {
-            highlighted = highlighted.map { min($0 + 1, offers.count - 1) } ?? 0
+            // Past the last offer the keyboard goes on to the list.
+            if highlighted == offers.count - 1 {
+                highlighted = nil
+                refresh()
+                return false
+            }
+            highlighted = highlighted.map { $0 + 1 } ?? 0
         } else {
             switch highlighted {
             case nil: highlighted = offers.count - 1

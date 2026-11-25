@@ -248,6 +248,8 @@ struct PaletteLeftOutLine: View {
 /// copy is still filling it says it is looking, since what matches may not have arrived.
 struct PaletteNoResults: View {
     let isLooking: Bool
+    /// Whether Return makes the item, which it does until the person arrows to a token offer.
+    var returnMakes = true
     let onNew: () -> Void
 
     var body: some View {
@@ -259,12 +261,14 @@ struct PaletteNoResults: View {
             Button(action: onNew) {
                 HStack(spacing: 6) {
                     Text("New Item")
-                    ShortcutKeys("↩")
-                        .accessibilityHidden(true)
+                    if returnMakes {
+                        ShortcutKeys("↩")
+                            .accessibilityHidden(true)
+                    }
                 }
             }
             .appButton(.secondary, size: .small)
-            .accessibilityIdentifier("CommandPaletteOpen")
+            .accessibilityIdentifier("CommandPaletteNewItem")
         }
         .accessibilityElement(children: .contain)
     }

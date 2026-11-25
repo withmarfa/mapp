@@ -176,10 +176,14 @@ struct ColumnSearchField: View {
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             if !chips.isEmpty {
-                SearchChipRow(chips: chips, width: width * ColumnSearchMetrics.chipShare, onRemove: onRemove)
+                SearchChipRow(chips: chips, width: width * ColumnSearchMetrics.chipShare) { chip in
+                    onRemove(chip)
+                    // With the last token gone, no text and no keyboard in the field, nothing is left to stay open for.
+                    if !isFocused, text.isEmpty, chips.allSatisfy({ $0 == chip }) { onEnd() }
+                }
             }
             ToolbarSearchText(
-                text: $text, prompt: chips.isEmpty ? prompt : "", focusRequests: focusRequests + clears, keepsOpen: !chips.isEmpty,
+                text: $text, prompt: chips.isEmpty ? prompt : "", label: prompt, focusRequests: focusRequests + clears, keepsOpen: !chips.isEmpty,
                 controller: controller, offers: offers, onSubmit: onSubmit, onDown: onDown, onPick: onPick,
                 onDeleteAtStart: onDeleteAtStart, onFocus: { isFocused = $0 }, onEnd: onEnd
             )
@@ -256,6 +260,8 @@ private struct SearchChipView: View {
                 .truncationMode(.tail)
             Button(action: remove) {
                 Image(systemName: "xmark").font(.system(size: 8 * scale, weight: .bold)).foregroundStyle(.secondary)
+                    .frame(minWidth: 16, minHeight: 16)
+                    .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Remove Filter")
@@ -279,6 +285,8 @@ private struct ToolbarSearchText: NSViewRepresentable {
     @Environment(\.interfaceTextSize) private var textSize
     @Binding var text: String
     let prompt: String
+    /// What VoiceOver calls the field, the search prompt even where the field shows no placeholder.
+    let label: String
     let focusRequests: Int
     /// Whether the search holds tokens, which keep the field open while it is empty and loses the keyboard.
     let keepsOpen: Bool
@@ -320,6 +328,7 @@ private struct ToolbarSearchText: NSViewRepresentable {
     private func update(_ field: ToolbarSearchTextField) {
         if field.stringValue != text { field.stringValue = text }
         field.placeholderString = prompt
+        field.setAccessibilityLabel(label)
         field.keepsOpen = keepsOpen
         field.font = InterfaceStyle.font(.body, textSize: textSize)
     }
@@ -352,7 +361,14 @@ private struct ToolbarSearchText: NSViewRepresentable {
                 if !controller.move(by: 1) { parent.onDown() }
             case #selector(NSResponder.moveUp(_:)):
                 return controller.move(by: -1)
-            case #selector(NSResponder.cancelOperation(_:)): parent.onEnd()
+            case #selector(NSResponder.cancelOperation(_:)):
+                // With tokens, the first Escape takes the words away and the next the tokens, with the field.
+                if parent.keepsOpen, !parent.text.isEmpty {
+                    textView.string = ""
+                    parent.text = ""
+                } else {
+                    parent.onEnd()
+                }
             case #selector(NSResponder.insertNewline(_:)):
                 if let offer = controller.chosen { parent.onPick(offer) } else { parent.onSubmit() }
             case #selector(NSResponder.deleteBackward(_:)):

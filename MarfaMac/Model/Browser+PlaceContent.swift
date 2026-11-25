@@ -13,9 +13,11 @@ extension Browser {
         }
         if hasSearchTokens {
             // Each token Marfa can say narrows the search itself, so the most it lists is counted after them; the rest are
-            // applied to what it lists (`ItemTableContent.kept`), which is the only place every token is applied.
+            // applied to what it lists (`ItemTableContent.kept`), which is the only place every token is applied. A Type
+            // token only narrows within the place's types, never lists others.
             query = ViewDraft.adding(
-                FilterState(clauses: searchTokens), to: query, targets: tokenTargets(in: library), catalogue: library.catalogue).query
+                FilterState(clauses: searchTokens), to: query, targets: tokenTargets(in: library), catalogue: library.catalogue,
+                replacingTypes: false).query
         }
         return .query(query)
     }

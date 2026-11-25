@@ -60,13 +60,33 @@ extension Browser {
         return FilterWording.tokenParts(of: clause, target: target, calendar: .current, titles: { library.title(ofValue: $0) })
     }
 
-    /// What the field offers for the words typed in it, worked out from the place's own fields.
+    /// What the search's offers are held under between runs of the body: the words, the tokens, the place and what the
+    /// library holds, which are all they are worked out from.
+    struct OfferKey: Equatable {
+        let text: String
+        let tokens: [FilterClause]
+        let shown: PlaceView
+        let listing: PlaceListing
+        let content: Int
+        let membership: Int
+    }
+
+    /// What the field offers for the words typed in it. The fields are those of the types the place lists, or of the whole
+    /// catalogue where it lists no fixed types, so what the words found never decides them. Worked out once for a key.
     func searchOffers(in library: any ItemLibrary) -> [SearchOffer] {
         guard SearchScope.narrows(shown), isSearching else { return [] }
-        let offer = tableContent(in: library).filterOffer
-        let targets = offer.placeFields + offer.everyItem.filter { $0.kind != .parent } + [.tier]
+        let key = OfferKey(
+            text: searchText, tokens: searchTokens, shown: shown, listing: listing, content: library.contentRevision,
+            membership: library.membershipRevision)
+        if let held = offerMemo, held.key == key { return held.offers }
+        let catalogue = library.catalogue
+        let types = listedTypes(in: library)
+        let several = (types.isEmpty ? catalogue.itemTypes.count : types.count) > 1
         let context = SearchOffers.Context(
-            targets: targets, values: library.searchOfferValues, hasSeveralTypes: offer.hasSeveralTypes, calendar: .current, now: library.now())
-        return SearchOffers.make(text: searchText, in: context, existing: searchTokens)
+            targets: FilterTarget.fields(among: types, catalogue: catalogue) + FilterTarget.everyItem.filter { $0.kind != .parent } + [.tier],
+            values: library.searchOfferValues, hasSeveralTypes: several, calendar: .current, now: library.now())
+        let offers = SearchOffers.make(text: searchText, in: context, existing: searchTokens)
+        offerMemo = (key, offers)
+        return offers
     }
 }

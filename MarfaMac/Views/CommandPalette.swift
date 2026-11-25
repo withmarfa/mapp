@@ -34,9 +34,14 @@ struct CommandPalette: View {
     @State private var actionsFor: String?
     /// Search Items' tokens, which last until the palette is put away. Nothing here is saved.
     @State private(set) var tokens = PaletteTokens()
-    /// Whether an arrow key has moved the choice since the words last changed, so Return on a list of nothing but offers
-    /// makes the item and not a token.
+    /// Whether an arrow key has moved the choice since the words last changed. A list of nothing but offers has no choice
+    /// until it has, so Return makes the item and not a token.
     @State private var arrowed = false
+
+    /// Whether a row is chosen: always where there are results, and among offers alone only once an arrow has moved to one.
+    private func hasChoice(_ rows: [Entry]) -> Bool {
+        arrowed || rows.contains { !$0.isOffer }
+    }
 
     /// Makes `clause` a token and puts the words that offered it away.
     func addToken(_ clause: FilterClause) {
@@ -177,7 +182,8 @@ struct CommandPalette: View {
             if isTyped {
                 if results.isEmpty {
                     PaletteNoResults(
-                        isLooking: Self.emptyAnswer(searching: mode == .search, results: searched) == .stillLooking, onNew: newItem)
+                        isLooking: Self.emptyAnswer(searching: mode == .search, results: searched) == .stillLooking,
+                        returnMakes: !arrowed, onNew: newItem)
                 } else {
                     let count = PaletteSections.resultCount(sections) { $0.id != Self.searchItemsID && !$0.isOffer }
                     Text(count == 1 ? String(localized: "1 result") : String(localized: "\(count) results"))
@@ -201,8 +207,10 @@ struct CommandPalette: View {
             actionsHighlighted = min(actionsHighlighted + 1, max(PaletteAction.filtered(actions(for: target), by: actionsQuery).count - 1, 0))
             return .handled
         }
+        guard !rows.isEmpty else { return .handled }
+        // Among offers alone nothing is chosen yet, so the first arrow chooses the first.
+        highlighted = hasChoice(rows) ? min(chosen + 1, max(rows.count - 1, 0)) : 0
         arrowed = true
-        highlighted = min(chosen + 1, max(rows.count - 1, 0))
         scrollTarget = rows.indices.contains(highlighted) ? rows[highlighted].id : nil
         return .handled
     }
@@ -212,7 +220,7 @@ struct CommandPalette: View {
             actionsHighlighted = max(actionsHighlighted - 1, 0)
             return .handled
         }
-        arrowed = true
+        guard hasChoice(rows) else { return .handled }
         highlighted = max(chosen - 1, 0)
         scrollTarget = rows.indices.contains(highlighted) ? rows[highlighted].id : nil
         return .handled
@@ -254,7 +262,7 @@ struct CommandPalette: View {
             }
             .safeAreaBar(edge: .bottom, spacing: 0) {
                 // Kept in place while Actions is out, so the rows above do not move.
-                if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
+                if hasChoice(rows), let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
                     HStack(alignment: .bottom, spacing: PaletteBar.spacing) {
                         Spacer(minLength: 0)
                         PaletteFooter(
@@ -301,7 +309,7 @@ struct CommandPalette: View {
                         ForEach(Array(group.section.rows.enumerated()), id: \.element.id) { position, entry in
                             let index = group.start + position
                             PaletteRow(
-                                entry: entry, query: query, isHighlighted: index == chosen,
+                                entry: entry, query: query, isHighlighted: index == chosen && hasChoice(sections.flatMap(\.rows)),
                                 isSearch: mode == .search, showsSnippets: showsSnippets
                             ) {
                                 if highlighted != index { highlighted = index }
