@@ -10611,9 +10611,6 @@
     "This needs the server. Try again when you’re back online." : {
       "extractionState" : "manual"
     },
-    "This place can’t be saved as a view" : {
-      "extractionState" : "manual"
-    },
     "This plugin needs Marfa %@ or later. This server runs %@." : {
       "localizations" : {
         "en" : {
