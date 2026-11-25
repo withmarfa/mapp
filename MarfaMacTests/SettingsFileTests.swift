@@ -47,7 +47,7 @@ import Testing
         defaults.set(Data(looks.utf8), forKey: TypeLooks.defaultsKey)
         defaults.set(#"{"core.note":{"pins":["due_at"]}}"#, forKey: PagePlacements.key)
         defaults.set(#"{"core.note":{"part":"links"}}"#, forKey: PanelParts.key)
-        ViewOrders.update(in: defaults) { $0.set([.favorites, .own], in: .library) }
+        ViewOrders.update(in: defaults) { $0.set([.favorites, .own], in: .library); $0.setHidden(.favorites, true, in: .library) }
         ViewLayouts.update(in: defaults) { $0.set(ViewMacSettings(layout: .board, widths: Data("widths".utf8)), for: view) }
         PlaceDefaults.update(in: defaults) {
             var choice = PlaceDefault()
