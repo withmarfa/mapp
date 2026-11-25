@@ -133,26 +133,30 @@ nonisolated extension ItemTableColumn {
 nonisolated extension ViewProperties {
     /// The properties a layout lists: all of them in a table, which draws every column, and in any other layout those
     /// a chip can say, less what the layout already says another way (`leaving`, the identifiers of the property a
-    /// board's lanes or a timeline's days are made of) and a field every one of the place's `types` that declares it
-    /// already has as its date or on its Secondary line, which stay the type's.
+    /// board's lanes or a timeline's days are made of). Every field the place's `types` declare is offered. One that
+    /// every type declaring it already says as its date or on its Secondary line shows by default, and stays in that
+    /// place on the row; its switch only hides it.
     static func offered(
         _ columns: [ItemTableColumn], in layout: ItemViewMode, leaving: Set<String> = [], looks: [TypeID: TypeLook] = [:],
         types: [TypeID] = [], catalogue: Catalogue? = nil
     ) -> [ItemTableColumn] {
         guard layout != .table else { return columns }
-        return columns.filter { column in
-            guard column.isChip, !leaving.contains(column.id) else { return false }
-            guard let key = column.field?.key, let catalogue else { return true }
+        return columns.compactMap { column in
+            guard column.isChip, !leaving.contains(column.id) else { return nil }
+            guard let key = column.field?.key, let catalogue else { return column }
             let declaring = types.filter { catalogue.itemTypes[$0]?.fields.contains { $0.key == key } == true }
-            guard !declaring.isEmpty else { return true }
-            return declaring.contains { !(looks[$0] ?? .empty).says(key) }
+            guard !declaring.isEmpty, declaring.allSatisfy({ (looks[$0] ?? .empty).says(key) }) else { return column }
+            var said = column
+            said.isShownByDefault = true
+            return said
         }
     }
 
     /// The looks of every type with this list drawn into them, which a layout of chips reads in place of the types' own.
     /// Until the list is changed they are the types' looks, untouched. Once it is, each type's facts are the shown
     /// properties in the list's order, less those the type does not declare, which are skipped for its items, and the
-    /// status and the type show or hide as their properties do. The date and the Secondary line stay the type's.
+    /// status and the type show or hide as their properties do. The date and the Secondary line stay the type's, less a
+    /// field in them the person hid.
     func looks(_ base: [TypeID: TypeLook], columns: [ItemTableColumn], catalogue: Catalogue) -> [TypeID: TypeLook] {
         guard isChanged else { return base }
         let listed = arranged(columns).filter { $0.content != .title }
@@ -166,6 +170,7 @@ nonisolated extension ViewProperties {
                 own.showsStatus = isShown(status)
             }
             if let typeColumn { own.showsType = isShown(typeColumn) }
+            own.hide { shown[Browser.fieldColumnPrefix + $0] == false }
             looks[type] = own
         }
         return looks
@@ -177,6 +182,17 @@ nonisolated extension TypeLook {
     func says(_ key: String) -> Bool {
         if date == .field(key) { return true }
         return secondary.contains { $0 == .field(key) || $0 == .time(key) }
+    }
+
+    /// Takes out of the date and the Secondary line each field `hidden` names.
+    mutating func hide(_ hidden: (String) -> Bool) {
+        if case .field(let key) = date, hidden(key) { date = .off }
+        secondary.removeAll { part in
+            switch part {
+            case .field(let key), .time(let key): hidden(key)
+            default: false
+            }
+        }
     }
 }
 

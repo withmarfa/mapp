@@ -96,7 +96,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 - **One list serves every layout** (`ViewProperties`): columns in a table, chips elsewhere.
 - **Until the person changes it, each item shows its type's look**, and Use Layouts goes back to that. The first change makes the list the view's.
-- **The date and the second line stay the type's.** A field one of them already says is not listed again.
+- **The date and the second line stay the type's.** Switching off a field they say takes it out.
 - **A stored property that a place lacks is kept**, because another place may have it.
 
 ## Indexes
