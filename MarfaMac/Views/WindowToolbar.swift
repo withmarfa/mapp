@@ -156,7 +156,7 @@ struct InspectorToolbar: ToolbarContent {
                 ViewPanelToolbar(browser: browser, panel: panel, editor: editor)
             } else {
                 ToolbarItem {
-                    DetailsToggle(details: details, editor: editor)
+                    DetailsToggle(details: details)
                 }
             }
         }
@@ -166,38 +166,13 @@ struct InspectorToolbar: ToolbarContent {
 /// The Details button of a toolbar above the inspector: on, because the inspector is open.
 struct DetailsToggle: View {
     let details: DetailsPresentation
-    let editor: EditorController?
 
     var body: some View {
-        if details.isCustomizingLayout {
-            LayoutDoneButton(details: details, editor: editor)
-        } else {
-            Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
-                // Gray while on, as every on button is, rather than the accent color.
-                .tint(.secondary)
-                .help("Hide Details")
-                .accessibilityIdentifier("DetailsToggle")
-        }
-    }
-}
-
-/// Stands in for the Details button while Customize Layout has the right sidebar: the system's prominent button, which
-/// finishes the mode, as Escape does and Return does unless the page has the keyboard: the page can still be typed in.
-struct LayoutDoneButton: View {
-    let details: DetailsPresentation
-    let editor: EditorController?
-
-    var body: some View {
-        Button("Done") { details.endLayout() }
-            .buttonStyle(.borderedProminent)
-            .keyboardShortcut(editor?.isFocused == true ? nil : .defaultAction)
-            .background {
-                Button("Finish Customizing") { details.endLayout() }
-                    .keyboardShortcut(.cancelAction)
-                    .hidden()
-            }
-            .help("Finish Customizing")
-            .accessibilityIdentifier("LayoutDone")
+        Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
+            // Gray while on, as every on button is, rather than the accent color.
+            .tint(.secondary)
+            .help("Hide Details")
+            .accessibilityIdentifier("DetailsToggle")
     }
 }
 
@@ -306,14 +281,10 @@ struct ItemToolbarActions {
     }
 
     @ViewBuilder var detailsButton: some View {
-        if details.isCustomizingLayout {
-            LayoutDoneButton(details: details, editor: editor)
-        } else {
-            Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
-                .help(details.isPresented ? "Hide Details" : "Show Details")
-                .disabled((browser?.selection.count ?? items.count) != 1)
-                .accessibilityIdentifier("DetailsToggle")
-        }
+        Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
+            .help(details.isPresented ? "Hide Details" : "Show Details")
+            .disabled((browser?.selection.count ?? items.count) != 1)
+            .accessibilityIdentifier("DetailsToggle")
     }
 
     var ids: Set<ItemID> { browser.map(\.selection) ?? Set(items.map(\.id)) }

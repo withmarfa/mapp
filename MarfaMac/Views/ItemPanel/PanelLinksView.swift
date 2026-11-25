@@ -51,24 +51,17 @@ private struct PanelLinkHeading: View {
     let add: (String, NSView) -> Void
     @State private var hovering = false
     @State private var anchor = ValueEditAnchorBox()
-    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             PanelHeading(title: group.title, count: group.links.count, isFirst: isFirst)
             Spacer(minLength: 6)
             if let field = group.editableField {
-                Button {
+                InspectorPlusButton(
+                    accessibilityLabel: "Add to \(group.title)", identifier: "PanelLinkAdd.\(group.kind.rawValue)", isRowHovered: hovering
+                ) {
                     if let view = anchor.view { add(field, view) }
-                } label: {
-                    Image(systemName: "plus").foregroundStyle(.secondary).frame(width: 20, height: 20).contentShape(.rect)
                 }
-                .buttonStyle(.plain)
-                .focused($isFocused)
-                .opacity(hovering || isFocused ? 1 : 0)
-                .help("Add to \(group.title)")
-                .accessibilityLabel("Add to \(group.title)")
-                .accessibilityIdentifier("PanelLinkAdd.\(group.kind.rawValue)")
             }
         }
         .background(ValueEditAnchor(box: anchor))

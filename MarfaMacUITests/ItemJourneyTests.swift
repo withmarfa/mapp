@@ -12,39 +12,9 @@ nonisolated final class ItemJourneyTests: XCTestCase {
 
     @MainActor override func tearDown() async throws { app.terminate() }
 
-    @MainActor func testCreateRelateEditAndReopen() {
+    @MainActor func testCreateEditAndReopen() {
         create(type: "Project", title: "Interface Test Project")
-        let details = app.descendants(matching: .any)["DetailsToggle"]
-        XCTAssertTrue(details.waitForExistence(timeout: 3))
-        details.click()
-        // Description is a field of the sample's Project type; the inspector offers only what the type declares.
-        let addProperty = app.descendants(matching: .any)["ItemInspectorAddProperty"]
-        XCTAssertTrue(addProperty.waitForExistence(timeout: 3))
-        addProperty.click()
-        let descriptionOption = app.menuItems.matching(NSPredicate(format: "identifier == %@ OR title == %@", "ItemInspectorAdd.description", "Description")).firstMatch
-        XCTAssertTrue(descriptionOption.waitForExistence(timeout: 3), app.debugDescription)
-        descriptionOption.click()
-        let description = app.descendants(matching: .any)["ItemProperty.description"]
-        XCTAssertTrue(description.waitForExistence(timeout: 3))
-        description.typeText("Saved through the native inspector")
-        app.typeKey(.tab, modifierFlags: [])
-        details.click()
-
         create(type: "Task", title: "Interface Test Task")
-        details.click()
-        let addRelationship = app.descendants(matching: .any)["RelationshipAddMenu"]
-        XCTAssertTrue(addRelationship.waitForExistence(timeout: 3))
-        addRelationship.click()
-        let parentEdit = app.menuItems.matching(NSPredicate(format: "identifier == %@ OR title == %@", "RelationshipAdd.child-of", "Parent")).firstMatch
-        XCTAssertTrue(parentEdit.waitForExistence(timeout: 3))
-        parentEdit.click()
-        let search = app.textFields["RelationshipSearch"]
-        XCTAssertTrue(search.waitForExistence(timeout: 3))
-        search.click()
-        search.typeText("Interface Test Project")
-        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipCandidate.'")).firstMatch.click()
-        app.buttons["RelationshipSave"].click()
-        details.click()
         let editor = app.itemPageBody
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         editor.click()
@@ -57,12 +27,6 @@ nonisolated final class ItemJourneyTests: XCTestCase {
         XCTAssertTrue(reopened.waitForExistence(timeout: 3))
         let savedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "A document written through the existing editor."), evaluatedWith: reopened)
         wait(for: [savedBody], timeout: 5)
-        details.click()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipTarget.' AND label CONTAINS %@", "Interface Test Project")).firstMatch.waitForExistence(timeout: 3))
-        reopen("Interface Test Project")
-        let savedDescription = app.descendants(matching: .any)["ItemProperty.description"]
-        XCTAssertTrue(savedDescription.waitForExistence(timeout: 3))
-        XCTAssertEqual(savedDescription.value as? String, "Saved through the native inspector")
     }
 
     @MainActor func testANewItemOpensInThePageAndHeaderEditsSurviveReopening() {
@@ -84,21 +48,17 @@ nonisolated final class ItemJourneyTests: XCTestCase {
         title.typeKey(.return, modifierFlags: [])
         let row = app.outlines["ItemList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Body Focus Saved Task")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
-        // A new task has no status, so its pin is an empty chip; the inspector sets the status in the same panel.
-        app.descendants(matching: .any)["DetailsToggle"].click()
-        let inspectorStatus = app.descendants(matching: .any)["ItemProperty.status"]
-        XCTAssertTrue(inspectorStatus.waitForExistence(timeout: 3))
-        inspectorStatus.click()
+        // A new task has no status, so its pin is an empty chip, which opens the panel that sets it.
+        let status = app.itemStatusPin
+        XCTAssertTrue(status.waitForExistence(timeout: 3))
+        status.click()
         let completed = app.descendants(matching: .any)["ValueEditRow.option:completed"]
         XCTAssertTrue(completed.waitForExistence(timeout: 3))
         completed.click()
-        // The status is then pinned under the title, where it opens the same panel.
-        let status = app.itemStatusPin
         XCTAssertTrue(status.waitForExistence(timeout: 3))
         XCTAssertTrue(status.label.contains("Completed") || status.value as? String == "Completed")
-        XCTAssertTrue(inspectorStatus.label.contains("Completed") || inspectorStatus.value as? String == "Completed")
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-        attachment.name = "Item page with pins and details"
+        attachment.name = "Item page with pins"
         attachment.lifetime = .keepAlways
         add(attachment)
         reopen("Body Focus Saved Task")
@@ -106,9 +66,9 @@ nonisolated final class ItemJourneyTests: XCTestCase {
         XCTAssertTrue(reopened.waitForExistence(timeout: 3))
         let savedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "Created by starting the document body."), evaluatedWith: reopened)
         wait(for: [savedBody], timeout: 5)
-        if !inspectorStatus.exists { app.descendants(matching: .any)["DetailsToggle"].click() }
-        XCTAssertTrue(inspectorStatus.waitForExistence(timeout: 3))
-        XCTAssertTrue(inspectorStatus.label.contains("Completed") || inspectorStatus.value as? String == "Completed")
+        let reopenedStatus = app.itemStatusPin
+        XCTAssertTrue(reopenedStatus.waitForExistence(timeout: 3))
+        XCTAssertTrue(reopenedStatus.label.contains("Completed") || reopenedStatus.value as? String == "Completed")
     }
 
     /// Leaves the item for another and comes back, so the page reads it again from the library. The sample

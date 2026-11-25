@@ -42,9 +42,7 @@ struct ItemWindow: View {
     ) -> EditorController {
         let editor = EditorController(library: library)
         editor.titleDrafts = details
-        editor.onEscape = { [details] in
-            if details.isCustomizingLayout { details.endLayout() } else { details.escapeFromPage() }
-        }
+        editor.onEscape = { [details] in details.escapeFromPage() }
         editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
         // The keyboard follows the link to the item it opened, as it does in a main window.
         editor.onOpenItem = { [weak editor, library] linked in
@@ -108,8 +106,6 @@ struct ItemWindow: View {
         .modifier(FieldEditSheets(details: details))
         .sheet(item: Binding { details.typeValues } set: { details.typeValues = $0 }) { TypeValuesSheet(request: $0) }
         .onChange(of: details.isPresentedByPerson) { storedDetailsPresented = details.isPresentedByPerson }
-        // Closing the sidebar by hand finishes Customize Layout, which has nowhere else to show.
-        .onChange(of: details.isPresented) { if !details.isPresented { details.endLayout() } }
         .onAppear {
             details.isPresented = storedDetailsPresented
         }
@@ -122,9 +118,7 @@ struct ItemWindow: View {
         .onChange(of: id) { details.leaveHistory() }
         // The page goes when its library does, as when the window waits while the server's copy opens again, and
         // the window's undo would act on the library left.
-        .onDisappear { [library] in
-            // What was typed in the inspector goes to the library it was typed for, or back to the person.
-            details.handOffProperties(in: library, undoManager: nil)
+        .onDisappear {
             // A window that never showed an item made no editor.
             editorSlot.made?.flush()
             editorSlot.made?.windowWent()

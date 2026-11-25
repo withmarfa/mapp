@@ -41,7 +41,7 @@ private struct ItemActionContext {
     var isEmpty: Bool { items.isEmpty && !keepsPlace }
 }
 
-/// Favorites, Add Tag, Change Type, Customize Layout and Version History for the selection, or Recover for deleted items. The
+/// Favorites, Add Tag, Change Type and Version History for the selection, or Recover for deleted items. The
 /// collection actions sit beside these (`CollectionActions`).
 struct ItemOrganizeActions: View {
     @CurrentLibrary private var library
@@ -66,10 +66,6 @@ struct ItemOrganizeActions: View {
             FavoriteButton(ids: ids, undoManager: undoManager, shortcuts: shortcuts, inMenu: true)
             AddTagButton(ids: ids, details: details, undoManager: undoManager, shortcuts: shortcuts)
             TypeChangeButton(ids: ids, details: details, undoManager: undoManager, shortcuts: shortcuts)
-            // A right click on a card with no page open has nothing to arrange; the menus keep the item in place.
-            if details?.showsPage != false || inMenuBar || keepsPlace {
-                CustomizeLayoutButton(ids: ids, details: details, shortcuts: shortcuts)
-            }
             VersionHistoryButton(ids: ids, details: details, shortcuts: shortcuts)
         }
     }

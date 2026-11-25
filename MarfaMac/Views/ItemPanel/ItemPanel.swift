@@ -4,7 +4,7 @@ import SwiftUI
 /// Info). One part has no pills. A type remembers the part last chosen (`PanelParts`), so a person can stay on Links.
 /// Where the type remembers none, the part shown is chosen once when the item opens and does not change as headings
 /// arrive or vanish, so a property being edited in Info is never taken from under the person.
-struct ItemPanel<Legacy: View>: View {
+struct ItemPanel: View {
     @AppStorage(PanelParts.key) private var remembered = PanelParts()
     @State private var opened = OpenedPart()
     let item: Item
@@ -15,8 +15,6 @@ struct ItemPanel<Legacy: View>: View {
     let onHeading: (Int) -> Void
     let onPage: (Int) -> Void
     let onShowHistory: () -> Void
-    /// What Info still carries until the page's rows can edit it (Properties, Relationships and Tags).
-    @ViewBuilder let legacy: Legacy
 
     private var parts: [PanelPart] {
         var parts: [PanelPart] = []
@@ -51,7 +49,7 @@ struct ItemPanel<Legacy: View>: View {
                     switch shown {
                     case .outline: PanelOutlineView(model: outline, onHeading: onHeading, onPage: onPage)
                     case .links: PanelLinksView(item: item.id, groups: links, onOpen: onOpen)
-                    case .info: PanelInfoView(model: info, onShowHistory: onShowHistory) { legacy }
+                    case .info: PanelInfoView(model: info, onShowHistory: onShowHistory)
                     }
                 }
                 .padding(.horizontal, PanelMetrics.inset)

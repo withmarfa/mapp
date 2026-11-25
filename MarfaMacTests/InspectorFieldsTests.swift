@@ -134,8 +134,6 @@ struct InspectorFieldsTests {
         library.catalogue = Catalogue(itemTypes: [Self.task])
         let hidden = library.hiddenPropertyKeys(of: item)
         #expect(hidden == ["title", "body"])
-        #expect(InspectorFields.properties(of: item, type: Self.task, hidden: hidden).map(\.key) == ["description"])
-        #expect(InspectorFields.addable(of: item, type: Self.task, hidden: hidden).map(\.key) == ["status", "priority"])
     }
 
     @Test func aUrlOrEmailValueIsALinkOnlyToAWebOrMailAddress() {
@@ -156,32 +154,7 @@ struct InspectorFieldsTests {
         #expect(InspectorFields.link(of: ItemTypeInfo.Field(key: "k", label: "K", kind: .text, declaredBy: TypeID("aic.x"), format: .url), value: nil) == nil)
     }
 
-    // MARK: Only what has a value
-
-    @Test func propertiesListOnlyWhatHasAValueInTheCataloguesOrder() {
-        let item = Self.item("aic.ticket.task", properties: [
-            Property(key: "priority", value: .string("high")), Property(key: "description", value: .string("About")),
-            Property(key: "status", value: .string(""))
-        ])
-        #expect(InspectorFields.properties(of: item, type: Self.task, hidden: ["title", "body"]).map(\.key) == ["description", "priority"])
-        #expect(InspectorFields.addable(of: item, type: Self.task, hidden: ["title", "body"]).map(\.key) == ["status"])
-    }
-
-    @Test func aPropertyTheItemCannotTakeIsNeverOffered() {
-        var item = Self.item("aic.ticket.task")
-        item.state = .trashed
-        #expect(InspectorFields.addable(of: item, type: Self.task, hidden: []).isEmpty)
-        let list = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("tags", "array"), Self.field("note")]))
-        #expect(InspectorFields.addable(of: Self.item("aic.x"), type: list, hidden: []).map(\.key) == ["note"])
-    }
-
-    @Test func anAddedOrClearedPropertyStaysListedAndLeavesTheMenu() {
-        let item = Self.item("aic.ticket.task")
-        let hidden: Set<String> = ["title", "body"]
-        let revealed: Set<String> = ["priority"]
-        #expect(InspectorFields.properties(of: item, type: Self.task, hidden: hidden, revealed: revealed).map(\.key) == ["priority"])
-        #expect(InspectorFields.addable(of: item, type: Self.task, hidden: hidden, revealed: revealed).map(\.key) == ["description", "status"])
-    }
+    // MARK: What a value says
 
     @Test func emptyValuesAreNotValues() {
         #expect(!InspectorFields.hasValue(nil))
@@ -216,7 +189,6 @@ struct InspectorFieldsTests {
         let library = try await Self.marfa([item], types: [Self.file])
         let hidden = library.hiddenPropertyKeys(of: item)
         #expect(hidden == MarfaMapping.fileFacts.union(["title"]))
-        #expect(InspectorFields.properties(of: item, type: Self.file, hidden: hidden).map(\.key) == ["description"])
         // None of them turns up under the other properties either.
         #expect(InspectorFields.accountedFor(type: Self.file, hidden: hidden).isSuperset(of: ["blob_ref", "mime_type", "size_bytes"]))
     }

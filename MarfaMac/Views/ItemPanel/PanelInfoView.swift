@@ -16,12 +16,11 @@ struct PanelInfoModel {
     var leavesTheFeed: Date?
 }
 
-struct PanelInfoView<Legacy: View>: View {
+struct PanelInfoView: View {
     @CurrentLibrary private var library
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     let model: PanelInfoModel
     let onShowHistory: () -> Void
-    @ViewBuilder let legacy: Legacy
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -30,7 +29,6 @@ struct PanelInfoView<Legacy: View>: View {
                 facts: PanelInfo.facts(of: model.item, source: model.source, version: model.version, pages: model.pages, format: dateFormat),
                 trailing: [(name: String(localized: "In"), content: AnyView(placeControl))] + leavesTheFeed)
             historySection
-            legacy
         }
         .task { await library.readConnectors() }
         .task(id: model.version) { PanelHistory.shared.ask(model.item.id, version: model.version, in: library) }

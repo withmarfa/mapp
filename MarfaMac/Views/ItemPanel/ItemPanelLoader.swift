@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Makes the panel for one item: reads what its parts show and works out, away from the main thread, what the text and the
 /// file need (Reading Time, Words, a PDF's pages and contents). The host remakes it for another item.
-struct ItemPanelLoader<Legacy: View>: View {
+struct ItemPanelLoader: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
@@ -12,7 +12,6 @@ struct ItemPanelLoader<Legacy: View>: View {
     let editor: EditorController?
     let details: DetailsPresentation
     let onOpen: (ItemID) -> Void
-    @ViewBuilder let legacy: Legacy
     @State private var textFacts: PanelTextFacts?
     @State private var pdf: PanelPDFFacts?
 
@@ -41,7 +40,7 @@ struct ItemPanelLoader<Legacy: View>: View {
             onHeading: { editor?.revealHeading(at: $0) },
             onPage: goToPage,
             onShowHistory: { details.showHistory(of: id, in: library) }
-        ) { legacy }
+        )
         .task(id: CountKey(item: id, revision: library.contentRevision, hasHeadings: !headings.isEmpty)) {
             await count(hasHeadings: !headings.isEmpty)
         }
