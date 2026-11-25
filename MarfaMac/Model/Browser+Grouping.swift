@@ -7,21 +7,20 @@ extension Browser {
     /// What Group by offers in the open place and layout.
     func groupOffer(in library: any ItemLibrary) -> GroupOffer {
         let content = tableContent(in: library)
-        if let held = groupOfferMemo, held.content === content, held.layout == viewMode, held.isView == isViewPlace { return held.offer }
+        if let held = groupOfferMemo, held.content === content, held.layout == viewMode { return held.offer }
         let offer = Cost.measure(.groupOffer) {
             GroupOffer.make(
                 columns: content.columns, types: listedTypes(in: library).union(content.allRows.map(\.item.type)), rows: content.allRows,
                 catalogue: library.catalogue,
-                layout: viewMode, isView: isViewPlace)
+                layout: viewMode)
         }
-        groupOfferMemo = GroupOfferMemo(content: content, layout: viewMode, isView: isViewPlace, offer: offer)
+        groupOfferMemo = GroupOfferMemo(content: content, layout: viewMode, offer: offer)
         return offer
     }
 
     struct GroupOfferMemo {
         let content: ItemTableContent
         let layout: ItemViewMode
-        let isView: Bool
         let offer: GroupOffer
     }
 
@@ -47,7 +46,7 @@ extension Browser {
     /// first field offered (`GroupOffer.fallback`), which leaves the place's choice as it is for the layouts that can.
     func boardGrouping(in library: any ItemLibrary) -> ItemTableOptions.Grouping? {
         let offer = groupOffer(in: library)
-        if let stored = tableOptions[shown]?.grouping, case .column = stored, let found = offer.entry(for: stored), found.choice.isKept {
+        if let stored = tableOptions[shown]?.grouping, case .column = stored, offer.entry(for: stored) != nil {
             return stored
         }
         return offer.fallback

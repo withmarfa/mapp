@@ -17,15 +17,6 @@ nonisolated enum GroupMode: Hashable, Sendable {
         if case .bucket(let bucket) = self { bucket } else { nil }
     }
 
-    /// Whether a saved view can hold the grouping. Marfa's group has no presence span and no status groups yet, so
-    /// those stay in a place's default view and are named as not kept on Save as View (`ViewDraft.Unkept.groupMode`).
-    var isKeptByView: Bool {
-        switch self {
-        case .value, .bucket: true
-        case .presence, .statusGroups: false
-        }
-    }
-
     /// The choice's name under its field: Words, Groups, Day and the rest, Set or Not Set.
     var title: String {
         switch self {

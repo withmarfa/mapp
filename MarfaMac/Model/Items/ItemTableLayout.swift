@@ -491,6 +491,9 @@ nonisolated enum ItemTableLayout {
                 return x == y ? a < b : x < y
             case .boolean:
                 return a == "true"
+            // Marfa orders a view's sources by their codes (`device/view-group-source`).
+            case _ where column.content == .source:
+                return a < b
             default:
                 if byLabel { return column.label(ofCategory: a, in: rows).localizedStandardCompare(column.label(ofCategory: b, in: rows)) == .orderedAscending }
                 let (x, y) = (buckets[a]!.count, buckets[b]!.count)
