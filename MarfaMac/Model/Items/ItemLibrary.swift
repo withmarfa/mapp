@@ -131,6 +131,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// The items filed directly under `id` (`parent-of`), in no order, held or not. Observed, so a view that works
     /// something out from them is told when one comes or goes.
     func childIDs(of id: ItemID) -> [ItemID]
+    /// The active and archived items `field` may link `id` to; an item in the bin is never one.
     func relationshipCandidates(for id: ItemID, field: String) -> [Item]
     /// What the core says of linking `id` through `field` to `other`, judged on what is held, with nothing queued and
     /// no server: taken, refused in its words, or unknown where it could not be asked.

@@ -37,7 +37,7 @@ extension MarfaLibrary {
     @discardableResult
     func addToCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
         let title = String(localized: "Can’t Add to Collection")
-        guard let target = item(collection), target.state == .active, catalogue.isCollection(target.type) else {
+        guard let target = item(collection), target.state != .trashed, catalogue.isCollection(target.type) else {
             notices.tell(title, String(localized: "This collection isn’t in the library."))
             return false
         }

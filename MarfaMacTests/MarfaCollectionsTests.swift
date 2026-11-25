@@ -163,6 +163,17 @@ import Testing
         #expect(library.notices.waiting.last?.message == String(localized: "This collection isn’t in the library."))
     }
 
+    /// An archived collection takes members and is offered for one, since Marfa links an archived item as any other.
+    /// One in the bin is neither.
+    @Test func anArchivedCollectionTakesMembersAndIsOffered() async throws {
+        let (library, source) = try await loaded()
+        source.send(.upserted([F.item(Self.holiday, F.album, "Holiday", age: 0, state: .archived)]))
+        try #require(await eventually { library.item(Self.holiday)?.state == .archived })
+        #expect(Set(library.relationshipCandidates(for: F.e1, field: "in-collection").map(\.id)) == [Self.holiday, Self.archive])
+        #expect(library.addToCollection([F.e1], Self.holiday, undoManager: nil))
+        #expect(source.writes == [.link(EdgeDraft(type: "in-collection", from: F.e1, to: Self.holiday, position: 3))])
+    }
+
     /// The collection commands take the whole selection, files too, never only its notes, and leave out what
     /// can't be a member.
     @Test func theCollectionCommandsTakeFilesAndLeaveOutCollections() async throws {

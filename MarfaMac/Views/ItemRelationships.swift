@@ -380,8 +380,11 @@ private struct RelationshipCandidateRow: View {
                     Text(candidate.displayTitle)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(LocalizedStringKey(library.catalogue.itemTypes[candidate.type]?.label ?? candidate.type.rawValue))
-                        .interfaceFont(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text(LocalizedStringKey(library.catalogue.itemTypes[candidate.type]?.label ?? candidate.type.rawValue))
+                        if candidate.state == .archived { Text("Archived") }
+                    }
+                    .interfaceFont(.caption).foregroundStyle(.secondary)
                     if let refusal {
                         Text(verbatim: refusal).interfaceFont(.caption).foregroundStyle(.red)
                             .fixedSize(horizontal: false, vertical: true)

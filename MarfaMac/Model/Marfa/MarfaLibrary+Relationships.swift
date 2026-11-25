@@ -237,12 +237,16 @@ extension MarfaLibrary {
         }
     }
 
-    /// Active items of a type the field's far end allows. Which of them the core would refuse, such as one that
-    /// would close a cycle, is asked of each (`relationshipVerdict`).
+    /// The items a link may reach: active and archived, never in the bin, since Marfa links an archived item as any
+    /// other ("What an item allows").
+    private var linkable: Set<ItemID> { index.ids(in: .active).union(index.ids(in: .archived)) }
+
+    /// Active and archived items of a type the field's far end allows. Which of them the core would refuse, such as one
+    /// that would close a cycle, is asked of each (`relationshipVerdict`).
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
         guard let item = item(id), let end = fieldEnd(field) else { return [] }
         guard admits(item.type, end.info, atTo: end.atTo) else { return [] }
-        return heldItems(index.ids(in: .active))
+        return heldItems(linkable)
             .filter { $0.id != id && admits($0.type, end.info, atTo: !end.atTo) }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
@@ -268,7 +272,7 @@ extension MarfaLibrary {
             admits(TypeID(typeID), constraint(of: info, atTo: true))
         else { return [] }
         let parents = constraint(of: info, atTo: false)
-        return heldItems(index.ids(in: .active))
+        return heldItems(linkable)
             .filter { admits($0.type, parents) }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
@@ -278,7 +282,7 @@ extension MarfaLibrary {
             admits(TypeID(typeID), constraint(of: info, atTo: true))
         else { return false }
         let parents = constraint(of: info, atTo: false)
-        return index.ids(in: .active).contains { id in heldItems(CollectionOfOne(id)).first.map { admits($0.type, parents) } ?? false }
+        return linkable.contains { id in heldItems(CollectionOfOne(id)).first.map { admits($0.type, parents) } ?? false }
     }
 
     // MARK: Writing
@@ -291,8 +295,10 @@ extension MarfaLibrary {
             let end: EdgeTypeInfo.End
             let to: ItemID
             let from: ItemID
+            /// The edge's other end, which the move leaves where it is.
+            let stays: ItemID
 
-            var reversed: Move { Move(edge: edge, end: end, to: from, from: to) }
+            var reversed: Move { Move(edge: edge, end: end, to: from, from: to, stays: stays) }
         }
 
         var adding: [EdgeDraft] = []
