@@ -6,13 +6,13 @@ import SwiftUI
 enum SavedViews {
     /// Whether the window shows a list that can be saved as a view.
     static func canSave(_ browser: Browser, in library: any ItemLibrary) -> Bool {
-        library.isLoaded && library.reachesServer && !browser.showsSidebarIndex
+        library.isLoaded && library.reachesServer && !browser.showsPlaceIndex
             && ViewDraft.query(for: browser.shown, catalogue: library.catalogue, views: library.views) != nil
     }
 
     /// Whether Edit View has a panel for the window's place: a saved view, or a place that could become one.
     static func canEdit(_ browser: Browser, in library: any ItemLibrary) -> Bool {
-        library.isLoaded && !browser.showsSidebarIndex
+        library.isLoaded && !browser.showsPlaceIndex
             && (shown(browser, in: library) != nil
                 || ViewDraft.query(for: browser.shown, catalogue: library.catalogue, views: library.views) != nil)
     }

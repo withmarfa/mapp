@@ -17,7 +17,7 @@ extension CommandPalette {
 
         if library.isLoaded {
             add(String(localized: "Search List"), "magnifyingglass", keys(.searchList), in: .edit) { browser.focusRequest = .search }
-            let modes = browser.showsSidebarIndex ? [] : browser.availableViewModes(in: library)
+            let modes = browser.showsPlaceIndex ? [] : browser.availableViewModes(in: library)
             func addLayout(_ mode: ItemViewMode, _ title: String, _ systemImage: String, _ command: ShortcutCommand) {
                 if modes.contains(mode) { add(title, systemImage, keys(command), in: .view) { browser.viewMode = mode } }
             }
@@ -216,17 +216,6 @@ extension CommandPalette {
                 add(String(localized: "Finish Customizing Sidebar"), "checkmark", in: .view) { browser.customizesSidebar = false }
             } else {
                 add(String(localized: "Customize Sidebar…"), "sidebar.squares.leading", in: .view) { browser.customizesSidebar = true }
-            }
-            if let indexActions {
-                if let rename = indexActions.rename {
-                    add(String(localized: "Rename Source…"), "pencil", in: .file, action: rename)
-                }
-                if let chooseMark = indexActions.chooseMark {
-                    add(String(localized: "Choose Source Mark…"), "face.smiling", in: .file, action: chooseMark)
-                }
-                if let delete = indexActions.delete {
-                    add(String(localized: "Delete Collection…"), "trash", in: .file, action: delete)
-                }
             }
         }
         if fullWidth {

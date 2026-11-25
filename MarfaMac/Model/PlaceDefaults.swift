@@ -166,6 +166,18 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         includesKinds = options.includesKinds
     }
 
+    /// Takes back from `stored` the sort and the grouping that opening could not apply, because no type of the place
+    /// declares their field now, while the window still holds what opening made of them. So a change of something else
+    /// does not write the shortened sort or the place's own grouping over what the person kept.
+    mutating func keepUnapplied(from stored: PlaceDefault, in place: PlaceView, catalogue: Catalogue) {
+        var opened = PlaceDefault()
+        opened.keep(stored.options(replacing: nil, in: place, catalogue: catalogue))
+        if sort != stored.sort, sort == opened.sort { sort = stored.sort }
+        if grouping != stored.grouping, grouping == opened.grouping, groupOrder == opened.groupOrder, hiddenGroups == opened.hiddenGroups {
+            (grouping, groupOrder, hiddenGroups) = (stored.grouping, stored.groupOrder, stored.hiddenGroups)
+        }
+    }
+
     /// The options a place opens with: those the window holds, with the filters, sort and grouping this keeps. A column
     /// of a field no type of the place declares any more is dropped, with its condition, and the rest stays.
     func options(replacing held: ItemTableOptions?, in place: PlaceView, catalogue: Catalogue) -> ItemTableOptions {

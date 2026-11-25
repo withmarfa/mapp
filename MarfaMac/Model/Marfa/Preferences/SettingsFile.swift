@@ -53,7 +53,7 @@ nonisolated extension SyncedSetting {
     var section: SettingsFile.Section {
         switch place {
         case .member(let field), .serverMember(let field, _): SettingsFile.Section(field)
-        case .rows(let table, _, _, _, _, _), .serverRows(let table, _, _), .set(let table, _), .placeRows(let table, _, _):
+        case .rows(let table, _, _, _, _, _), .serverRows(let table, _, _), .set(let table, _):
             SettingsFile.Section(table)
         case .sidebar: .sidebar
         }

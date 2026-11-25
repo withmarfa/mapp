@@ -4,8 +4,7 @@ import UniformTypeIdentifiers
 /// The buttons of a window's toolbar, and nothing else: the top row draws the title and the views in the content
 /// (`TopRow`), under the window's hidden title. A list has Search, View and Panel; an item's page has Favorite, Share
 /// and More as one group, then Panel. A person cannot rearrange them. Every action is a menu command too.
-///
-/// The index pages keep their own tabs and buttons until they go (`IndexToolbarItems`). Format and the Reader and
+/// Library › Types, Collections and Sources have Search alone, as they have no view to set up. Format and the Reader and
 /// Original switch are in the page's corner (`ItemCorner`), not here.
 struct WindowToolbar: ToolbarContent {
     @CurrentLibrary private var library
@@ -25,7 +24,7 @@ struct WindowToolbar: ToolbarContent {
 
     var body: some ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
-        let isIndex = browser?.showsSidebarIndex == true
+        let isIndex = browser?.showsPlaceIndex == true
         let opensFromCollection = browser?.isCollectionItemPresented == true && !hasListColumn
         let editsView = browser?.showsViewPanel == true
         // A list beside its page has the page's buttons here; a list that spans the window has Search and View.
@@ -52,12 +51,9 @@ struct WindowToolbar: ToolbarContent {
             }
             .sharedBackgroundVisibility(.hidden)
         }
-        if let browser, isIndex {
-            IndexTabsToolbarItem(browser: browser)
-        }
         ToolbarSpacer(.flexible)
         if let browser, isIndex {
-            IndexToolbarItems(browser: browser)
+            ViewToolbarItems(browser: browser, layout: .item, offersView: false)
         } else if let browser, listsHere {
             ViewToolbarItems(browser: browser, layout: .item)
         }
@@ -159,19 +155,6 @@ struct InspectorToolbar: ToolbarContent {
             if let browser, details.isEditingView, let panel = browser.viewPanel {
                 ViewPanelToolbar(browser: browser, panel: panel, editor: editor)
             } else {
-                // The Items index shows the chosen item in this sidebar, so what acts on it sits above it, as Open comes first.
-                if let browser, browser.showsItemsIndex {
-                    let items = browser.selectedHeaderItems(in: library)
-                    let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: nil, details: details)
-                    ToolbarItem {
-                        Button("Open") { browser.openSelection() }
-                            .disabled(browser.selection.count != 1)
-                            .help("Open")
-                            .accessibilityIdentifier("OpenItemToolbar")
-                    }
-                    ToolbarItem { tools.shareLink.disabled(items.isEmpty) }
-                    ToolbarItem { tools.moreMenu.disabled(items.isEmpty) }
-                }
                 ToolbarItem {
                     DetailsToggle(details: details, editor: editor)
                 }
@@ -328,8 +311,7 @@ struct ItemToolbarActions {
         } else {
             Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
                 .help(details.isPresented ? "Hide Details" : "Show Details")
-                // An index page shows the container chosen in its table, so it has details whatever items are selected.
-                .disabled(browser?.showsSidebarIndex != true && (browser?.selection.count ?? items.count) != 1)
+                .disabled((browser?.selection.count ?? items.count) != 1)
                 .accessibilityIdentifier("DetailsToggle")
         }
     }

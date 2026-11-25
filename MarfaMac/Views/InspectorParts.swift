@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// The measures the right sidebar's parts share at the default text size, which scale with the interface text: the
-/// item's Properties and Relationships, the view panel, the index pages and Version History.
+/// item's Properties and Relationships, the view panel and Version History.
 enum InspectorMetrics {
     /// The name column of a row. It never takes more than `maxNameShare` of the width, so a large text size leaves
     /// the value room.

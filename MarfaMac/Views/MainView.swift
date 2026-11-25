@@ -64,8 +64,7 @@ struct MainView: View {
 
     private var workspacePresentation: WorkspacePresentation {
         if details.history != nil { return .history }
-        if browser.showsItemsIndex { return .items }
-        if browser.showsSidebarIndex { return .index }
+        if browser.showsPlaceIndex { return .index }
         return usesCollectionLayout ? .collection : .list
     }
 
@@ -100,7 +99,7 @@ struct MainView: View {
         }
         // Another place, or the index of one, is somewhere else to go: Version History is of the item it was opened for.
         .onChange(of: browser.showing?.memoryKey) { details.leaveHistory() }
-        .onChange(of: browser.showsSidebarIndex) { details.leaveHistory() }
+        .onChange(of: browser.showsPlaceIndex) { details.leaveHistory() }
     }
 
     private var isSidebarVisible: Bool {
@@ -204,21 +203,12 @@ struct MainView: View {
             if let history = details.history, shownPresentation == .history {
                 VersionHistoryWorkspace(mode: history, details: details)
                     .toastOverlay()
-            } else if shownPresentation == .items {
-                NavigationSplitView(columnVisibility: galleryColumnVisibility) {
-                    sidebarColumn
-                } detail: {
-                    ItemsIndex(browser: browser, pane: $pane)
-                        .besidePage(browser, editor: editor, details: details)
-                        .toastOverlay()
-                        .modifier(itemInspector)
-                        .toolbar { windowToolbar() }
-                }
             } else if shownPresentation == .index {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
                 } detail: {
-                    SidebarIndex(browser: browser, details: details, order: order, pane: $pane)
+                    PlaceIndex(browser: browser, details: details, order: order, pane: $pane)
+                        .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, signal: topRowSignal)
                         .toastOverlay()
                         .toolbar { windowToolbar() }
                 }
@@ -436,6 +426,8 @@ struct MainView: View {
             // can miss the selection and stay on No Item Selected.
             Task {
                 if restoresWindow { browser.restore(from: storedBrowser ?? earlierBrowser, in: library, order: order, start: StartWith.stored().start()) }
+                // A window opened for one of the Library's places shows it.
+                if let place = PlaceWindows.take() { browser.show(place, in: library, order: order) }
                 #if DEBUG
                 if SampleLibrary.isRequested, SampleLibrary.withCollections {
                     browser.showing = .type(TypeID("core.task"))
@@ -529,7 +521,7 @@ struct MainView: View {
 }
 
 private enum WorkspacePresentation: Hashable {
-    case list, collection, index, items, history
+    case list, collection, index, history
 }
 
 /// What changes the toolbar's items beside the top row, which the row measures again when any of it changes.

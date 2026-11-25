@@ -1631,9 +1631,6 @@
     "%llu waiting to download" : {
       "extractionState" : "manual"
     },
-    "+%lld" : {
-
-    },
     "+%lld more" : {
 
     },
@@ -1782,16 +1779,7 @@
     "A" : {
 
     },
-    "A Collection" : {
-
-    },
     "A Folder" : {
-
-    },
-    "A Source" : {
-
-    },
-    "A Type" : {
 
     },
     "A View" : {
@@ -2147,12 +2135,6 @@
     "Add Row Below" : {
 
     },
-    "Add Section" : {
-
-    },
-    "Add Shortcut" : {
-
-    },
     "Add Sort" : {
 
     },
@@ -2242,6 +2224,9 @@
       "generatesSymbol" : false
     },
     "Add to Favorites" : {
+
+    },
+    "Add to Sidebar" : {
 
     },
     "Add “%@”" : {
@@ -2553,9 +2538,6 @@
 
     },
     "Apps and keys using this rule will see items from every source for the types you limited, including subtypes." : {
-
-    },
-    "Apps you sign in show here." : {
 
     },
     "Archive" : {
@@ -3335,9 +3317,6 @@
     "Choose Parent…" : {
       "extractionState" : "manual"
     },
-    "Choose Source Mark…" : {
-
-    },
     "Choose Undo again to try it as things are now." : {
       "extractionState" : "manual"
     },
@@ -3346,9 +3325,6 @@
     },
     "Choose a Version" : {
       "extractionState" : "manual"
-    },
-    "Choose a collection to see what’s in it." : {
-
     },
     "Choose a date before the app’s sign-in ends." : {
 
@@ -3371,17 +3347,11 @@
     "Choose a plugin bundle." : {
 
     },
-    "Choose a source to see what it sends." : {
-
-    },
     "Choose a value" : {
 
     },
     "Choose an Icon" : {
       "extractionState" : "manual"
-    },
-    "Choose an item to see its details." : {
-
     },
     "Choose how often to back up." : {
 
@@ -3522,9 +3492,6 @@
 
     },
     "Collections" : {
-
-    },
-    "Collections that apps make show here." : {
 
     },
     "Collections you make show here." : {
@@ -4041,9 +4008,6 @@
     "Delete %@?" : {
 
     },
-    "Delete Collection…" : {
-
-    },
     "Delete Column" : {
 
     },
@@ -4336,9 +4300,6 @@
     "Edit Meaning…" : {
 
     },
-    "Edit New Row…" : {
-
-    },
     "Edit Pages As" : {
 
     },
@@ -4351,13 +4312,13 @@
     "Edit Time" : {
 
     },
+    "Edit Type…" : {
+
+    },
     "Edit Value" : {
 
     },
     "Edit View" : {
-
-    },
-    "Edit the New row" : {
 
     },
     "Edited" : {
@@ -4965,9 +4926,6 @@
     "Go" : {
 
     },
-    "Go To" : {
-
-    },
     "Go back to settings saved before a change." : {
 
     },
@@ -5112,13 +5070,7 @@
     "Hide Sidebar" : {
 
     },
-    "Hide Views from Sidebar" : {
-
-    },
     "Hide from Page" : {
-
-    },
-    "Hide from Sidebar" : {
 
     },
     "Hide on %@ Pages" : {
@@ -5577,9 +5529,6 @@
     "Items About This" : {
       "extractionState" : "manual"
     },
-    "Items Page" : {
-
-    },
     "Items deleted more than %@ ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered." : {
       "extractionState" : "manual"
     },
@@ -5605,9 +5554,6 @@
     "Items that already hold a choice you take out keep it." : {
 
     },
-    "Items that apps send show here." : {
-
-    },
     "Items this sign-in can’t see are still of this type, so %@ was kept." : {
 
     },
@@ -5621,9 +5567,6 @@
 
     },
     "Items you favorite show here." : {
-
-    },
-    "Items you make or apps send show here." : {
 
     },
     "Items you make show here." : {
@@ -5901,17 +5844,11 @@
     "Keys keep working" : {
 
     },
-    "Keys you make show here." : {
-
-    },
     "Kind" : {
       "extractionState" : "manual"
     },
     "Kind of Item" : {
       "extractionState" : "manual"
-    },
-    "Kinds" : {
-
     },
     "Large" : {
       "extractionState" : "manual"
@@ -6605,9 +6542,6 @@
     "New Child Type…" : {
 
     },
-    "New Collection" : {
-
-    },
     "New Field Choices Not Kept" : {
 
     },
@@ -6652,9 +6586,6 @@
 
     },
     "New Tab" : {
-
-    },
-    "New Tab…" : {
 
     },
     "New Type" : {
@@ -6751,12 +6682,6 @@
     "No Collections" : {
       "extractionState" : "manual"
     },
-    "No Collections in the Feed" : {
-
-    },
-    "No Collections in the Library" : {
-
-    },
     "No Connectors" : {
 
     },
@@ -6787,16 +6712,7 @@
     "No Items" : {
       "extractionState" : "manual"
     },
-    "No Items in the Feed" : {
-
-    },
-    "No Items in the Library" : {
-
-    },
     "No Jobs Yet" : {
-
-    },
-    "No Keys" : {
 
     },
     "No Library Open" : {
@@ -6863,6 +6779,9 @@
 
     },
     "No Tags" : {
+
+    },
+    "No Types" : {
 
     },
     "No Types of Your Own" : {
@@ -8025,9 +7944,6 @@
     "Remove %@" : {
 
     },
-    "Remove %@ From New" : {
-
-    },
     "Remove %@?" : {
 
     },
@@ -8056,9 +7972,6 @@
       "extractionState" : "manual"
     },
     "Remove Old Activity" : {
-
-    },
-    "Remove Shortcut" : {
 
     },
     "Remove Sort" : {
@@ -8170,6 +8083,9 @@
     "Rename" : {
       "extractionState" : "manual"
     },
+    "Rename Collection" : {
+
+    },
     "Rename Field" : {
 
     },
@@ -8190,12 +8106,6 @@
     },
     "Rename Source" : {
       "extractionState" : "manual"
-    },
-    "Rename Source…" : {
-
-    },
-    "Rename Tab" : {
-
     },
     "Rename View" : {
       "extractionState" : "manual",
@@ -8460,9 +8370,6 @@
       "extractionState" : "manual"
     },
     "Saved" : {
-
-    },
-    "Saved Views" : {
 
     },
     "Saved as “%@”." : {
@@ -8833,9 +8740,6 @@
     "Show Month" : {
       "extractionState" : "manual"
     },
-    "Show More" : {
-
-    },
     "Show Original" : {
 
     },
@@ -8846,9 +8750,6 @@
 
     },
     "Show Property" : {
-
-    },
-    "Show Quick Add Options" : {
 
     },
     "Show Reader" : {
@@ -10820,9 +10721,6 @@
     "This needs the server. Try again when you’re back online." : {
       "extractionState" : "manual"
     },
-    "This place can’t be saved as a view" : {
-
-    },
     "This plugin needs Marfa %@ or later. This server runs %@." : {
       "localizations" : {
         "en" : {
@@ -10903,9 +10801,6 @@
 
     },
     "Tight" : {
-
-    },
-    "Tiles above the table for making a new item of a type." : {
 
     },
     "Time" : {
@@ -11115,6 +11010,9 @@
 
     },
     "Types that Marfa or a plugin provides can’t be changed. Add the field to a type of your own instead." : {
+
+    },
+    "Types that hold items show here." : {
 
     },
     "Types, Collections, or Sources" : {
@@ -11935,6 +11833,9 @@
 
     },
     "^[%lld version](inflect: true)" : {
+
+    },
+    "^[%lld view](inflect: true)" : {
 
     },
     "^[Archived %lld item](inflect: true)" : {

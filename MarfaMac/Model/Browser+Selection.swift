@@ -17,8 +17,14 @@ extension Browser {
     }
 
     func selectFirstItem(in library: any ItemLibrary, order: ItemOrder) {
-        // An index chooses nothing until the person does, and ordering every item for a first one would hold the window.
-        guard !showsSidebarIndex else { return selectAutomatically([]) }
+        // An index of places chooses nothing until the person does.
+        guard !showsPlaceIndex else { return selectAutomatically([]) }
+        // A table's first row is its content's, which the table shares, so a large place is not ordered twice.
+        if viewMode == .table, usesCollection {
+            let content = tableContent(in: library)
+            let first = content.grouping == nil ? content.rows.first : content.groups.first { !$0.rows.isEmpty }?.rows.first
+            return selectAutomatically(first.map { [$0.id] } ?? [])
+        }
         let first = sections(in: library, order: order, now: library.now()).first?.items.first
         selectAutomatically(first.map { [$0.id] } ?? [])
     }
@@ -43,12 +49,10 @@ extension Browser {
     /// The items the layout that spans the window holds, which its selection follows as they change (`keepSelection`):
     /// the table's in the order it shows them, then those its filters hide, and the gallery's, the board's and the
     /// timeline's in the list's order, which is also the order of a full page opened from the list. The table's come from
-    /// its own content, so a move between its places sorts no list. Items' are its table's (`itemIndexIDs`).
+    /// its own content, so a move between its places sorts no list.
     func collectionItemIDs(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
         guard followsCollection else { return [] }
-        // Items has no layout: a full page opened from it follows the rows of its table.
-        if shown == .library { return itemIndexIDs(in: library) }
-        guard !showsSidebarIndex else { return [] }
+        guard !showsPlaceIndex else { return [] }
         guard viewMode == .table else {
             let shown = sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
             // The items the filters and the hidden groups leave out stay in the selection's reach, as the table's do.
