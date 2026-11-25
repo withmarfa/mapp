@@ -71,8 +71,6 @@ struct CalendarWeekView: View {
         let shown = scrolled.shown()
         let showsAllDay = CalendarWeek.showsAllDay(
             run.days.enumerated().filter { shown.contains(range.lowerBound + $0.offset) }.map(\.element))
-        let first = strip.day(at: scrolled.nearest, calendar: calendar)
-        let end = strip.day(at: scrolled.nearest + 7, calendar: calendar)
 
         ScrollView([.horizontal, .vertical]) {
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
