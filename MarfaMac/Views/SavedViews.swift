@@ -25,15 +25,27 @@ enum SavedViews {
 
     /// What the window shows, as the table works it out. Every layout applies the place's filters.
     static func window(_ browser: Browser, in library: any ItemLibrary) -> ViewDraft.Window {
+        window(browser, in: library, mode: browser.viewMode, order: nil)
+    }
+
+    /// What Create View will save, using the draft's layout while the window previews its items.
+    static func window(_ browser: Browser, in library: any ItemLibrary, order: ItemOrder) -> ViewDraft.Window {
+        window(browser, in: library, mode: browser.viewPanelLayout, order: order)
+    }
+
+    private static func window(
+        _ browser: Browser, in library: any ItemLibrary, mode: ItemViewMode, order: ItemOrder?
+    ) -> ViewDraft.Window {
         let content = browser.tableContent(in: library)
         let options = browser.tableOptions[browser.shown] ?? ItemTableOptions()
         let search = browser.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         // The order and grouping come from what the layout shows (`arrangement`), which is what the panel shows too.
-        let layoutShows = arrangement(browser, content: content, order: browser.storedOrder)
+        let layoutShows = arrangement(browser, content: content, order: browser.storedOrder, layout: mode)
         // The grouping the layout shows: a board's lanes, the place's grouping, or the starting order's dates by day.
         var grouping: ItemTableColumn?
         var groupMode = GroupMode.value
-        if case .column(let id, let mode) = browser.shownGrouping(in: library), let column = content.columns.first(where: { $0.id == id }) {
+        if case .column(let id, let mode) = browser.shownGrouping(in: library, layout: mode),
+           let column = content.columns.first(where: { $0.id == id }) {
             grouping = column
             groupMode = mode
         }
@@ -43,7 +55,7 @@ enum SavedViews {
             place: browser.shown, columns: content.columns, sort: layoutShows.sort, grouping: grouping, groupMode: groupMode,
             groupOrder: options.groupOrder, hiddenGroups: options.hiddenGroups,
             filter: options.filter, targets: content.filterOffer.targets, search: search.isEmpty ? nil : search,
-            layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.shown],
+            layout: layout(mode, of: browser, in: library, order: order), timelineDate: browser.timelineFields[browser.shown],
             seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.hasDateSections) : nil,
             listing: browser.listing,
             // A token This Search says with its From is kept as the view's tier, while the From still says it.
@@ -55,18 +67,11 @@ enum SavedViews {
             })
     }
 
-    /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new
-    /// view keeps what the person sees.
-    static func window(_ browser: Browser, in library: any ItemLibrary, order: ItemOrder) -> ViewDraft.Window {
-        var window = window(browser, in: library)
-        window.layout = layout(of: browser, in: library, order: order)
-        return window
-    }
-
-    /// The layout the window shows. Without the list's order, which only a new view takes, a list or a gallery is
-    /// read as the table is.
-    private static func layout(of browser: Browser, in library: any ItemLibrary, order: ItemOrder?) -> ViewDraft.Layout {
-        switch browser.viewMode {
+    /// Without the list's order, which only a new view takes, a list or a gallery is read as the table is.
+    private static func layout(
+        _ mode: ItemViewMode, of browser: Browser, in library: any ItemLibrary, order: ItemOrder?
+    ) -> ViewDraft.Layout {
+        switch mode {
         case .table:
             return .table
         case .list, .gallery:
@@ -93,10 +98,10 @@ enum SavedViews {
     static func newViewSettings(_ browser: Browser, in library: any ItemLibrary) -> ViewMacSettings {
         var settings = browser.shown.savedView.map { browser.macSettings(for: $0) } ?? ViewMacSettings()
         if browser.shown.savedView == nil { settings.map = browser.placeMaps[browser.shown] }
-        settings.layout = browser.viewMode
+        settings.layout = browser.viewPanelLayout
         settings.cards = browser.cards
         settings.density = browser.density
-        if browser.viewMode == .calendar { settings.calendarScale = browser.calendarScale }
+        if settings.layout == .calendar { settings.calendarScale = browser.calendarScale }
         settings.hidesEmptyGroups = browser.hidesEmptyGroups
         settings.properties = browser.properties
         settings.opening = browser.chosenOpening
@@ -126,15 +131,18 @@ enum SavedViews {
 
     /// Whether the table's sort and grouping order the layout: always, except in a list or gallery that is neither
     /// sorted nor grouped by a column.
-    static func isArranged(_ browser: Browser) -> Bool {
-        guard browser.viewMode == .list || browser.viewMode == .gallery else { return true }
+    static func isArranged(_ browser: Browser, layout: ItemViewMode) -> Bool {
+        guard layout == .list || layout == .gallery else { return true }
         return browser.listShape?.arranged == true
     }
 
-    static func arrangement(_ browser: Browser, content: ItemTableContent, order: ItemOrder) -> Arrangement {
-        guard !isArranged(browser) else {
+    static func arrangement(
+        _ browser: Browser, content: ItemTableContent, order: ItemOrder, layout: ItemViewMode? = nil
+    ) -> Arrangement {
+        let mode = layout ?? browser.viewMode
+        guard !isArranged(browser, layout: mode) else {
             // The board sorts its cards by title where nothing sorts them, which is what it then shows and keeps.
-            if browser.viewMode == .board, browser.tableOptions[browser.shown]?.sort?.isEmpty != false {
+            if mode == .board, browser.tableOptions[browser.shown]?.sort?.isEmpty != false {
                 return Arrangement(sort: [ItemTableComparator(column: .title)], isDated: false)
             }
             return Arrangement(sort: content.sort, isDated: false)

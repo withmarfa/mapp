@@ -105,7 +105,7 @@ extension Browser {
     /// the place declares any more is dropped and the rest kept; a layout the place no longer offers is not taken. A place
     /// with nothing kept opens as it is, which is how a window that has held another's change forgets it.
     func followPlaceDefault(in library: any ItemLibrary) {
-        guard hasDefaultView, library.isLoaded else { return }
+        guard hasDefaultView, library.isLoaded, viewPanel?.isNew != true else { return }
         prunePlaceDefaults(in: library)
         let place = shown
         let stored = PlaceDefaults.stored(in: defaults).default(for: place) ?? PlaceDefault()

@@ -343,7 +343,7 @@ struct ViewPanelSort: View {
 
     var body: some View {
         let content = browser.tableContent(in: library)
-        let sort = SavedViews.arrangement(browser, content: content, order: order).sort
+        let sort = SavedViews.arrangement(browser, content: content, order: order, layout: browser.viewPanelLayout).sort
         let unused = content.sortChoices.filter { column in !sort.contains { $0.column.id == column.id } }
         ViewPanelHead(title: String(localized: "Sort"), back: { panel.page = .main })
         if browser.isSearching {
@@ -458,12 +458,13 @@ struct ViewPanelGroup: View {
     @Bindable var panel: ViewPanel
 
     var body: some View {
-        let offer = browser.groupOffer(in: library)
-        let shown = browser.shownGrouping(in: library)
+        let layout = browser.viewPanelLayout
+        let offer = browser.groupOffer(in: library, layout: layout)
+        let shown = browser.shownGrouping(in: library, layout: layout)
         let found = offer.entry(for: shown)
         ViewPanelHead(title: String(localized: "Group"), back: { panel.page = .main })
         Menu {
-            GroupByChoices(browser: browser, offer: offer, shown: shown)
+            GroupByChoices(browser: browser, offer: offer, shown: shown, layout: layout)
         } label: {
             ViewPanelRowLabel(
                 symbol: "rectangle.grid.1x2", label: String(localized: "Group By"),
@@ -478,7 +479,7 @@ struct ViewPanelGroup: View {
                 ForEach(Array(found.entry.runs.enumerated()), id: \.offset) { index, run in
                     if index > 0 { Divider() }
                     ForEach(run) { choice in
-                        Toggle(isOn: Binding { shown == choice.grouping } set: { _ in browser.chooseGrouping(choice.grouping) }) {
+                        Toggle(isOn: Binding { shown == choice.grouping } set: { _ in browser.chooseGrouping(choice.grouping, layout: layout) }) {
                             Text(verbatim: choice.label)
                         }
                     }
@@ -491,8 +492,8 @@ struct ViewPanelGroup: View {
             .menuIndicator(.hidden)
             .accessibilityIdentifier("ViewPanelGroupMode")
         }
-        if shown != .none, browser.datedList == nil {
-            let hidden = browser.viewMode == .board && browser.boardLanes(in: library)?.isOwn == false
+        if shown != .none, browser.datedList(for: layout) == nil {
+            let hidden = layout == .board && browser.boardLanes(in: library)?.isOwn == false
                 ? Set<String>() : browser.tableOptions[browser.shown]?.hiddenGroups ?? []
             let rows = browser.groupRows(in: library).filter { $0.key != GroupKey.notApplicable }
             if !rows.isEmpty {
@@ -519,6 +520,7 @@ struct GroupByChoices: View {
     let browser: Browser
     let offer: GroupOffer
     let shown: ItemTableOptions.Grouping
+    var layout: ItemViewMode?
 
     var body: some View {
         if offer.offersNone {
@@ -551,7 +553,7 @@ struct GroupByChoices: View {
     }
 
     private func choice(_ label: String, _ grouping: ItemTableOptions.Grouping) -> some View {
-        Toggle(isOn: Binding { shown == grouping } set: { _ in browser.chooseGrouping(grouping) }) {
+        Toggle(isOn: Binding { shown == grouping } set: { _ in browser.chooseGrouping(grouping, layout: layout) }) {
             Text(verbatim: label)
         }
     }

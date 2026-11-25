@@ -43,6 +43,28 @@ import Testing
         #expect(await eventually { library.body(of: id)?.text == typed }, "\(String(describing: library.body(of: id)))")
     }
 
+    /// The sample answers as an instance, as a real server does, so New is offered there, and the studio is an
+    /// instance of its own, so neither finds a draft the other kept.
+    @Test func newIsOfferedInTheSampleAndTheStudio() async throws {
+        let (library, _) = try await Self.loaded()
+        try #require(await eventually { !library.serverKey.isEmpty })
+        #expect(library.serverKey == "instance:" + SampleLibrary.instanceID)
+        #expect(QuickAdd.isAvailable(in: library))
+        #expect(QuickAdd.waitReason(in: library) == nil)
+        let browser = Browser()
+        browser.adopt(library)
+        browser.openNewItem(in: library)
+        #expect(browser.quickAdd.draft != nil)
+
+        let studioSource = SampleLibrary.open(SampleLibrary.connection, castell: .studio)
+        let studio = MarfaLibrary(source: studioSource, notices: Notices())
+        studioSource.refresh()
+        try #require(await eventually { studio.isLoaded && !studio.serverKey.isEmpty })
+        #expect(studio.serverKey == "instance:" + SampleCastell.instanceID)
+        #expect(studio.serverKey != library.serverKey)
+        #expect(QuickAdd.isAvailable(in: studio))
+    }
+
     /// The same holds for an item the sample started with.
     @Test func textTypedOnAnItemItHeldIsKeptSaveAfterSave() async throws {
         let (library, source) = try await Self.loaded()

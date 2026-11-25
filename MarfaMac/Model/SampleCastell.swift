@@ -16,6 +16,9 @@ nonisolated enum SampleCastell {
     static let flag = "-MarfaMacCastellStudio"
     static let heavyFlag = "-MarfaMacHeavySample"
 
+    /// The instance the studio answers as (`SampleLibrary.instanceID`).
+    static let instanceID = "0193f0a1-5a3e-7c00-8000-ca5e11000001"
+
     /// The size of library the launch asked for with the sample flag, if any.
     static var requested: Size? {
         guard SampleLibrary.isRequested else { return nil }

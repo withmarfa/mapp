@@ -65,13 +65,18 @@ final class NewItemDrafts {
     }
 
     /// The app's own drafts. A unit test's host gets a store in memory for each holder, so no test reads another's
-    /// draft or the person's.
+    /// draft or the person's. The sample library's are kept in memory too, as all it holds is, for the run.
     static func standard() -> NewItemDrafts {
         #if DEBUG
         if TestHost.isRequested { return NewItemDrafts(file: nil) }
+        if SampleLibrary.isRequested { return sample }
         #endif
         return shared
     }
+
+    #if DEBUG
+    private static let sample = NewItemDrafts(file: nil)
+    #endif
 
     private static let shared = NewItemDrafts(file: AppPaths.applicationSupport.appending(path: "New Item Drafts.json"))
 

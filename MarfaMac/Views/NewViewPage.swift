@@ -177,7 +177,7 @@ private struct NewViewSentence: View {
     var body: some View {
         let content = browser.tableContent(in: library)
         let place = browser.shown.place
-        let mode = browser.viewMode
+        let mode = browser.viewPanelLayout
         TagFlowLayout(spacing: 4) {
             types(content)
             switch place {
@@ -198,7 +198,7 @@ private struct NewViewSentence: View {
             words(String(localized: "as a"))
             value(mode.title, id: "Layout") {
                 ForEach(browser.availableViewModes(in: library), id: \.self) { layout in
-                    Toggle(layout.title, isOn: Binding { browser.viewMode == layout } set: { _ in browser.viewMode = layout })
+                    Toggle(layout.title, isOn: Binding { browser.viewPanelLayout == layout } set: { _ in browser.chooseLayout(layout) })
                 }
             }
             if mode != .timeline, mode != .calendar, !browser.keepsPlaceOrder {
@@ -295,7 +295,7 @@ private struct NewViewSentence: View {
     }
 
     private func sort(_ content: ItemTableContent) -> some View {
-        let sort = SavedViews.arrangement(browser, content: content, order: order).sort
+        let sort = SavedViews.arrangement(browser, content: content, order: order, layout: browser.viewPanelLayout).sort
         return value(sort.first?.column.label ?? String(localized: "None"), id: "Sort") {
             ForEach(content.sortChoices) { column in
                 Toggle(column.label, isOn: Binding { sort.first?.column.id == column.id } set: { _ in
@@ -308,12 +308,13 @@ private struct NewViewSentence: View {
     }
 
     @ViewBuilder private var group: some View {
-        let shown = browser.shownGrouping(in: library)
-        let offer = browser.groupOffer(in: library)
+        let layout = browser.viewPanelLayout
+        let shown = browser.shownGrouping(in: library, layout: layout)
+        let offer = browser.groupOffer(in: library, layout: layout)
         if shown != .none, let found = offer.entry(for: shown) {
             words(String(localized: "grouped by"))
             value(found.entry.label, id: "Group") {
-                GroupByChoices(browser: browser, offer: offer, shown: shown)
+                GroupByChoices(browser: browser, offer: offer, shown: shown, layout: layout)
                 Divider()
                 Button("Edit Group…") { panel.page = .group }
             }

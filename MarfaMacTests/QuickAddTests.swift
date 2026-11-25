@@ -1094,4 +1094,19 @@ struct QuickAddTests {
         browser.adopt(FakeItemLibrary(now: start))
         #expect(browser.newItems.isEmpty)
     }
+
+    /// A library read before its copy has learned which Marfa it holds, as on a first launch offline, offers no New
+    /// and says why; once the instance is known, New is offered and says nothing.
+    @MainActor @Test func newWaitsForTheInstanceAndSaysWhy() {
+        let library = FakeItemLibrary(now: start)
+        library.serverKey = ""
+        #expect(!QuickAdd.isAvailable(in: library))
+        #expect(QuickAdd.waitReason(in: library) != nil)
+        library.isLoaded = false
+        #expect(QuickAdd.waitReason(in: library) == nil)
+        library.isLoaded = true
+        library.serverKey = "instance:a"
+        #expect(QuickAdd.isAvailable(in: library))
+        #expect(QuickAdd.waitReason(in: library) == nil)
+    }
 }

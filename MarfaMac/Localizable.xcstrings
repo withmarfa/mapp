@@ -2876,6 +2876,9 @@
     "Available" : {
 
     },
+    "Available once the app first reaches your Marfa server." : {
+
+    },
     "Back" : {
 
     },
@@ -3561,6 +3564,9 @@
 
     },
     "Choose it in Runs next time, or remove it in Terminal with %@." : {
+
+    },
+    "Choose one item to read or edit it." : {
 
     },
     "Choose the machine that runs %@ to see one." : {

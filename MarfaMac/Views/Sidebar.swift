@@ -31,6 +31,8 @@ struct SidebarContent {
     let tab: SidebarTab
     let customizing: Bool
     let canCreate: Bool
+    /// Why New is off, for its help tag (`QuickAdd.waitReason`).
+    let createWaitReason: String?
     /// The sections of the open tab that show: all of them while customizing, otherwise those with something in them.
     let sections: [SidebarSectionData]
 
@@ -53,6 +55,7 @@ struct SidebarContent {
         tabs = plan.tabs
         self.tab = layout.tab(tab)
         canCreate = QuickAdd.isAvailable(in: library)
+        createWaitReason = QuickAdd.waitReason(in: library)
         typeRows = plan.typeRows
         creatable = Set(QuickAdd.types(in: library).map(\.id.rawValue))
         let creatable = creatable
@@ -288,7 +291,8 @@ private struct SidebarList: View {
         switch section.plan.group.kind {
         case .shortcuts:
             SidebarShortcutsSection(
-                section: section, tab: content.tab.id, canCreate: content.canCreate, customizing: content.customizing,
+                section: section, tab: content.tab.id, canCreate: content.canCreate,
+                createWaitReason: content.createWaitReason, customizing: content.customizing,
                 addsShortcuts: content.sections.first { $0.plan.group.kind == .shortcuts }?.id == section.id, offers: content.offers,
                 actions: actions, browser: browser, order: order)
         case .types:

@@ -147,6 +147,7 @@ struct SidebarShortcutsSection: View, Equatable {
     let section: SidebarSectionData
     let tab: String
     let canCreate: Bool
+    let createWaitReason: String?
     let customizing: Bool
     let addsShortcuts: Bool
     let offers: SidebarOffers
@@ -156,16 +157,18 @@ struct SidebarShortcutsSection: View, Equatable {
 
     /// The section's data and nothing else, so a change of selection does not run its body.
     static func == (a: Self, b: Self) -> Bool {
-        a.section == b.section && a.tab == b.tab && a.canCreate == b.canCreate && a.customizing == b.customizing
+        a.section == b.section && a.tab == b.tab && a.canCreate == b.canCreate
+            && a.createWaitReason == b.createWaitReason && a.customizing == b.customizing
             && a.addsShortcuts == b.addsShortcuts && a.offers == b.offers && a.order == b.order
     }
 
     var body: some View {
         Section {
             ForEach(section.shortcuts) { data in
+                let makes = data.shortcut == .new || isCreate(data.shortcut)
                 SidebarShortcutRow(
                     data: data, keys: keys(for: data.shortcut), customizing: customizing,
-                    isEnabled: !((data.shortcut == .new || isCreate(data.shortcut)) && !canCreate)
+                    isEnabled: !(makes && !canCreate), waitReason: makes && !canCreate ? createWaitReason : nil
                 ) {
                     // While customizing a command draws as it does, and acts on nothing.
                     if !customizing { perform(data) }
@@ -219,6 +222,7 @@ private struct SidebarShortcutRow: View {
     let keys: String?
     let customizing: Bool
     let isEnabled: Bool
+    let waitReason: String?
     let perform: () -> Void
 
     var body: some View {
@@ -238,6 +242,7 @@ private struct SidebarShortcutRow: View {
         .buttonStyle(.plain)
         .selectionDisabled()
         .disabled(!isEnabled)
+        .help(waitReason ?? "")
         .onHover { isHovering = $0 }
         .sidebarRowGround(isHovering && !customizing)
         .accessibilityIdentifier(identifier)
