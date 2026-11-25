@@ -57,7 +57,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **The Feed opens in Digest, newest created first.** Every item list offers it. Cards show type, source, title, text and pictures.
 - **Digest stacks messages by `in-thread` and excerpts by `excerpt-of`** (`DigestLayout`). A pile spans sources, sits at its newest visible member and opens in place.
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
-- **⌘⌫ deletes chosen items shown on a board, timeline or map** (`ChosenItemDeletion`). Changing the calendar span drops old events.
+- **⌘⌫ deletes chosen items shown in a board, timeline, Digest, or map** (`ChosenItemDeletion`). Changing the calendar span drops old events.
 - **Calendar and Timeline use each type's date** (`ItemPlacement`) or a field chosen for the view.
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
 - **Map places items with two valid coordinates** (`MapLayout`). Fit All Items shows every marker. No Location lists the rest. A listed type must declare both fields.
@@ -69,7 +69,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 ## The View panel
 
 - **Digest choices** are Stack Related Items and Pictures (both on), and Lines of Text (three).
-- **Quick Actions** defaults on in the Feed, Archive and saved views whose From is Feed. Table, list, Digest and gallery offer Keep, Archive or Unarchive, and Delete where applicable, on hover and through VoiceOver.
+- **Quick Actions** are on by default in the Feed, Archive, and saved views whose From is Feed. Table, List, Digest, and Gallery offer Keep, Archive or Unarchive, and Delete where applicable, on hover and through VoiceOver.
 
 ## Grouping
 

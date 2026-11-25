@@ -16,9 +16,7 @@ extension Browser {
     /// Whether the open place has a default view the window can change.
     var hasDefaultView: Bool { Self.hasDefaultView(shown) }
 
-    /// The layout a place opens in until the person chooses one: a table for the Archive, which lists items by what they
-    /// are and where they came from, and for the Library once it holds more than `libraryListLimit` items, which a new
-    /// Marfa's few read better as a list; a list for any other.
+    /// The Feed opens in Digest. The Archive and a Library above `libraryListLimit` open as a table.
     func naturalLayout(of place: PlaceView) -> ItemViewMode {
         if place == .feed { return .digest }
         if place == .archive { return .table }

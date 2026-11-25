@@ -32,7 +32,7 @@ paths:
 - **A set is written sorted**, so saving it again is not a change.
 - **A hidden view is its own row, kept when shown again:** a row this Mac lacks of a `PreferencesMap.keptWhereAbsent` setting is taken, not deleted.
 - **What is kept for a place is keyed by its word** (`PlaceView.storageKey`), and for a saved view by its id, as its place can change; an earlier copy's keys are never removed (`EarlierPlace`).
-- **An earlier copy drops members it does not know** from a row it rewrites, which is accepted: `quickActions` and `opening` in `viewLayout`; `scope`, `archived`, `includesKinds`, `quickActions` and `opening` in `placeDefaults`.
+- **An earlier copy drops unknown members** from a row it rewrites. For example, it may drop `digest` from `viewLayout` or `placeDefaults`. It reads an unknown layout as List.
 - **A sign-in asks for `app.*:write`, never the app's own vendor scope**, because discovery lists no vendor scope before its first type exists (withmarfa/marfa#3522).
 
 ## The first launch against a Marfa
