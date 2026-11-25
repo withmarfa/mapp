@@ -117,7 +117,7 @@
     "setReadingWidth",
     "setHeader",
     "setHeaderIcons",
-    "setNotice",
+    "setNotices",
     "setLinkStyle",
     "setOptions",
     "setLineSpacing",

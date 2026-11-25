@@ -83,6 +83,7 @@ struct ItemPage: View {
     @Environment(\.topRowSpace) private var topRow
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.settingsLauncher) private var settingsLauncher
 
     var body: some View {
         GeometryReader { proxy in
@@ -135,7 +136,7 @@ struct ItemPage: View {
             editor.select(item)
             feedHeaderScroll()
         }
-        .onChange(of: PageNotice.of(item), initial: true) { _, notice in editor.setNotice(notice) }
+        .onChange(of: PageNotice.all(for: item), initial: true) { _, notices in editor.setNotices(notices) }
         .onChange(of: editor.isHeaderScrolledAway) { feedHeaderScroll() }
         .onChange(of: editor.pageItemID) { feedHeaderScroll() }
         .onChange(of: item.title) { feedHeaderScroll() }
@@ -159,11 +160,11 @@ struct ItemPage: View {
 
     /// What the page's notice asks for the item it names, if the item still gives that notice.
     private var noticeAction: (ItemID, String) -> Void {
-        let library = library, undoManager = undoManager, openWindow = openWindow
+        let library = library, undoManager = undoManager, openWindow = openWindow, settingsLauncher = settingsLauncher
         return { [weak editor] id, kind in
             guard let editor, editor.isShowing(id), let item = library.item(id),
-                  let notice = PageNotice.of(item), notice.kind.rawValue == kind, let action = notice.action else { return }
-            action.run(for: id, in: library, undoManager: undoManager, openWindow: openWindow)
+                  let notice = PageNotice.all(for: item).first(where: { $0.kind.rawValue == kind }) else { return }
+            notice.run(in: library, undoManager: undoManager, openWindow: openWindow, openSettings: { [settingsLauncher] in settingsLauncher?.show($0) })
         }
     }
 

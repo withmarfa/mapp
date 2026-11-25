@@ -50,6 +50,7 @@ struct ItemFileView: View {
     @StoredPageStyle private var style
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.settingsLauncher) private var settingsLauncher
     @State private var width: CGFloat = 0
     let id: ItemID
     /// The window the file's size and page are offered to once it is ready (`FileItemContent`).
@@ -61,10 +62,10 @@ struct ItemFileView: View {
 
     private var item: Item? { library.item(id) }
 
-    private var notice: PageNotice? {
-        guard let item else { return nil }
-        if case .unavailable? = loader.resolution(of: id) { return PageNotice.of(item, fileIsMissing: true) }
-        return PageNotice.of(item)
+    private var notices: [PageNotice] {
+        guard let item else { return [] }
+        if case .unavailable? = loader.resolution(of: id) { return PageNotice.all(for: item, fileIsMissing: true) }
+        return PageNotice.all(for: item)
     }
 
     var body: some View {
@@ -96,9 +97,9 @@ struct ItemFileView: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if let notice {
-                PageNoticeView(notice: notice) { action in
-                    action.run(for: id, in: library, undoManager: undoManager, openWindow: openWindow)
+            if !notices.isEmpty {
+                PageNoticeView(notices: notices) { notice in
+                    notice.run(in: library, undoManager: undoManager, openWindow: openWindow, openSettings: { [settingsLauncher] in settingsLauncher?.show($0) })
                 }
                 .padding(.horizontal, style.horizontalInset(for: width))
                 .padding(.vertical, 12)

@@ -1,34 +1,35 @@
 import SwiftUI
 
-/// A page's notice (`PageNotice`) as the file page and the saved web page draw it: one quiet line in the page's column,
-/// 13 points at the default text size, with its one action as plain words and, for the pictures' notice, a close button.
-/// The web head draws the same line in `editor/src/notice.ts`. A screen reader hears it once, when it appears.
+/// A page's notices (`PageNotice`) as the file page and the saved web page draw them: quiet lines in the page's column,
+/// 13 points at the default text size, each with its one action as plain words and, for the pictures' notice, a close
+/// button. The wash reaches 12 points beyond the text, so its symbol stands where the text does. The web head draws the
+/// same lines in `editor/src/notice.ts`. A screen reader hears them once, when they appear or say something else.
 struct PageNoticeView: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
-    let notice: PageNotice
-    let run: (PageNotice.Action) -> Void
+    let notices: [PageNotice]
+    let run: (PageNotice) -> Void
     var close: (() -> Void)?
 
     var body: some View {
         let size = CGFloat(textSize)
-        VStack(alignment: .leading, spacing: size * 18 / 13) {
-            line(size)
+        VStack(alignment: .leading, spacing: size * 4 / 13) {
+            ForEach(notices, id: \.kind) { line($0, size) }
             // Where the text is withheld, what it would have said.
-            if let reason = notice.reason {
+            if let reason = notices.lazy.compactMap(\.reason).first {
                 Text(verbatim: reason)
                     .foregroundStyle(.secondary)
                     .font(.system(size: size))
                     .textSelection(.enabled)
-                    .padding(.horizontal, size * 12 / 13)
+                    .padding(.top, size * 14 / 13)
             }
         }
-        // Said once, as the notice appears or says something else, and not again for a redraw.
-        .onChange(of: notice.words, initial: true) { _, words in
-            AccessibilityNotification.Announcement(words).post()
+        // Said once, as a notice appears or says something else, and not again for a redraw.
+        .onChange(of: notices.map(\.words), initial: true) { _, words in
+            AccessibilityNotification.Announcement(words.joined(separator: " ")).post()
         }
     }
 
-    private func line(_ size: CGFloat) -> some View {
+    private func line(_ notice: PageNotice, _ size: CGFloat) -> some View {
         HStack(alignment: .top, spacing: size * 7 / 13) {
             Image(systemName: notice.symbol)
                 .foregroundStyle(.secondary)
@@ -38,8 +39,8 @@ struct PageNoticeView: View {
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
-            if let label = notice.actionLabel, let action = notice.action {
-                Button { run(action) } label: {
+            if let label = notice.actionLabel, notice.action != nil {
+                Button { run(notice) } label: {
                     Text(label).font(.system(size: size, weight: .medium)).fixedSize()
                 }
                 .buttonStyle(.plain)
@@ -62,22 +63,32 @@ struct PageNoticeView: View {
         .lineSpacing(size * 2 / 13)
         .padding(EdgeInsets(top: size * 9 / 13, leading: size * 12 / 13, bottom: size * 9 / 13, trailing: size * 12 / 13))
         .background(.quinary, in: RoundedRectangle(cornerRadius: size * 10 / 13, style: .continuous))
+        // The wash starts outside the text, so its symbol lines up with the text.
+        .padding(.horizontal, -size * 12 / 13)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("PageNotice")
     }
 }
 
-extension PageNotice.Action {
-    /// Carries out the action for the item the page shows. None writes or drops text: Recover changes the item's state,
-    /// Open Copy opens another item, and Load Pictures is the page's own (`loadPictures`).
+extension PageNotice {
+    /// Carries out the notice's action for its own item. None writes or drops text: Recover changes the item's state, Open
+    /// Copy opens another item, Show Changes opens Settings where the copy's changes are listed, and Load Pictures is the
+    /// page's own (`loadPictures`).
     @MainActor func run(
-        for item: ItemID, in library: any ItemLibrary, undoManager: UndoManager?, openWindow: OpenWindowAction,
-        loadPictures: () -> Void = {}
+        in library: any ItemLibrary, undoManager: UndoManager?, openWindow: OpenWindowAction,
+        openSettings: (SettingsPage) -> Void, loadPictures: () -> Void = {}
     ) {
-        switch self {
+        switch action {
         case .recover: library.recover([item], undoManager: undoManager)
         case .openCopy(let copy): openWindow(value: copy)
+        case .showChanges: openSettings(.connection)
         case .loadPictures: loadPictures()
+        case nil: break
         }
     }
+}
+
+extension EnvironmentValues {
+    /// Opens Settings, from whichever window shows the page.
+    @Entry var settingsLauncher: SettingsLauncher?
 }

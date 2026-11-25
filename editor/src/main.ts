@@ -71,7 +71,7 @@ declare global {
       setReadingWidth(ems: number): void
       setHeader(model: HeaderModel | null): void
       setHeaderIcons(icons: HeaderIcons): void
-      setNotice(model: NoticeModel | null): void
+      setNotices(models: NoticeModel[]): void
       setLinkStyle(variables: Record<string, string>): void
       setOptions(options: { textInput: TextInputPreferences; display: DisplayPreferences }): void
       setLineSpacing(multiple: number): void
@@ -135,17 +135,16 @@ const notice = new PageNoticeLine(
   reasonRoot,
   {
     // Loading pictures is the page's own: it asks the app for each, as its own Load buttons do.
-    action: (kind) => {
+    // Any other action is for the item the app made the notice for, so it needs no item on the page.
+    action: (kind, item) => {
       if (kind === 'picturesWaiting') editor.loadPictures()
-      else if (shownItem) postToHost({ type: 'noticeAction', item: shownItem, kind })
+      else if (item) postToHost({ type: 'noticeAction', item, kind })
     },
     // Closing hides the notice for this page: it loads nothing and changes no setting.
     close: () => editor.dismissPictures(),
   },
   () => labels.words.closePictures ?? 'Close',
 )
-/** The item the app last said the page shows, which a notice's action is for. */
-let shownItem = ''
 
 // Escape hands the keyboard back to the list. Heard on the window, since a read-only page's editor hears
 // no keys of its own.
@@ -310,10 +309,7 @@ window.editor = {
   setEditingMode: (mode, expected) => guardedCommand(() => editor.setEditingMode(mode, expected)),
   undo: (expected) => guardedCommand(() => editor.undo(expected)),
   redo: (expected) => guardedCommand(() => editor.redo(expected)),
-  setItem: (id) => {
-    shownItem = id
-    editor.setItem(id)
-  },
+  setItem: (id) => editor.setItem(id),
   linksChanged: () => editor.linksChanged(),
   embedsChanged: (texts) => editor.embedsChanged(texts),
   picturesChanged: () => editor.picturesChanged(),
@@ -385,7 +381,7 @@ window.editor = {
     header.setIcons(icons)
     notice.setIcons(icons)
   },
-  setNotice: (model) => notice.setApp(model),
+  setNotices: (models) => notice.setApp(models),
 }
 
 postToHost({ type: 'ready' })

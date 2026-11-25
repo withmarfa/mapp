@@ -69,20 +69,20 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 
 ## Page notices
 
-One quiet line at the top of the page's column says what is not ordinary (`PageNotice.of`). The web head draws it, and so do a file's page and a saved web page, which keep it above their viewer. It has one action at most, with no fill, and VoiceOver hears it once.
+Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`). The web head, a file's page and a saved web page draw them the same way, with one action at most and no fill. VoiceOver hears them once. The wash reaches 12 points beyond the text, with 22 points under it.
 
 | The item has | The action |
 | --- | --- |
 | Been deleted | Recover |
 | A copy saved beside it | Open Copy |
 | Text that could not be read | None; the reason stands where the text would |
-| A write held on the Mac | None; a note over the size says how big it is |
+| A write held in the copy | None; for one too large, Show Changes opens the Settings page that lists it and its text |
 | Values that could not be read | None |
 | No file in Marfa | None |
 | Pictures not loaded | Load Pictures, and a close for the page |
 
-- **A page says the first row that holds,** and a write that only waits says nothing.
-- **No action writes or drops text.** Recover changes the state, and Load Pictures asks as each Load button does.
+- **The first row that holds leads,** and a write that only waits says nothing. Unreadable text, a held write and a missing file are never hidden: each has its line under the first.
+- **An action carries its item from the app,** and none writes or drops text. A write refused as too large never tells the person to shorten the older text: the latest is kept in the copy.
 
 ## Customize Layout
 

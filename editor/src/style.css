@@ -210,7 +210,8 @@ body:has(> #item-header:not([hidden])) {
    page. 13 points at the default text size, radius 10, a wash, and one action that has no fill. The app draws the same
    line over a file page and a saved web page. */
 #page-notice {
-  padding: 0 var(--inkkit-column-inset);
+  /* The wash starts 12 points outside the text, so its symbol lines up with the text. */
+  padding: 0 calc(var(--inkkit-column-inset) - var(--interface-text-size) * 12 / 13);
   font-family: -apple-system, system-ui, sans-serif;
   font-size: var(--interface-text-size);
   line-height: calc(var(--interface-text-size) * 18 / 13);
@@ -220,6 +221,11 @@ body:has(> #item-header:not([hidden])) {
 
 #page-notice:not(:empty) {
   padding-top: calc(var(--step) * 3);
+  padding-bottom: calc(var(--interface-text-size) * 12 / 13);
+}
+
+.page-notice + .page-notice {
+  margin-top: calc(var(--interface-text-size) * 4 / 13);
 }
 
 .page-notice {

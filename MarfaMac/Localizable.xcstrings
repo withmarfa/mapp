@@ -8744,6 +8744,9 @@
     "Show Backups" : {
 
     },
+    "Show Changes" : {
+
+    },
     "Show Command Palette" : {
 
     },
@@ -10698,16 +10701,6 @@
     "This item hasn’t been changed since it was made, or the server has kept no earlier version of it." : {
       "extractionState" : "manual"
     },
-    "This item is %@, more than the %@ the server takes at once, so your changes haven’t reached it. Make it smaller to send them." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "This item is %1$@, more than the %2$@ the server takes at once, so your changes haven’t reached it. Make it smaller to send them."
-          }
-        }
-      }
-    },
     "This item is in Recently Deleted, where its history can’t be read. Recover it to see its versions." : {
       "extractionState" : "manual"
     },
@@ -11797,6 +11790,9 @@
 
     },
     "Your items are still loading." : {
+
+    },
+    "Your latest changes to this item weren’t saved to Marfa. They’re kept on this Mac, in Settings, where you can copy them." : {
 
     },
     "Your settings are back as they were before Import, %@." : {

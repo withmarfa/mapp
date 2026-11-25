@@ -64,6 +64,7 @@ struct WebPageItemPage: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.settingsLauncher) private var settingsLauncher
     @StoredPageStyle private var style
     @AppStorage(RemotePictureSetting.key) private var remotePictures = RemotePictureSetting.standard
     @AppStorage(SourceViewMode.key) private var mode = SourceViewMode.standard
@@ -106,13 +107,13 @@ struct WebPageItemPage: View {
     private var noticeGap: CGFloat { CGFloat(interfaceTextSize) * 4 / 13 * 4 }
 
     /// What the page says, if anything: the item's own notice, then the pictures that wait unless the person put that away.
-    private var notice: PageNotice? {
+    private var notices: [PageNotice] {
         let waiting = pictures.map { noticeDismissal.isClosed(for: item.id) ? 0 : $0.waitingCount } ?? 0
-        return PageNotice.of(item, fileIsMissing: content == .unavailable, waitingPictures: waiting)
+        return PageNotice.all(for: item, fileIsMissing: content == .unavailable, waitingPictures: waiting)
     }
 
-    private func run(_ action: PageNotice.Action) {
-        action.run(for: item.id, in: library, undoManager: undoManager, openWindow: openWindow) { pictures?.loadWaiting() }
+    private func run(_ notice: PageNotice) {
+        notice.run(in: library, undoManager: undoManager, openWindow: openWindow, openSettings: { [settingsLauncher] in settingsLauncher?.show($0) }) { pictures?.loadWaiting() }
     }
 
     /// The look the page is in, once it is known.
@@ -146,10 +147,10 @@ struct WebPageItemPage: View {
                 ScrollingHeader(scroll: headerScroll) {
                     VStack(spacing: 0) {
                         // Above the title, so the page says it first. It stays in Focus, which leaves only the page.
-                        if let notice {
+                        if !notices.isEmpty {
                             PageNoticeView(
-                                notice: notice, run: run,
-                                close: notice.isClosable ? { noticeDismissal.close(for: item.id) } : nil)
+                                notices: notices, run: run,
+                                close: notices.contains(where: \.isClosable) ? { noticeDismissal.close(for: item.id) } : nil)
                                 .padding(.horizontal, inset)
                                 .padding(.top, noticeGap * 3)
                                 // The header's own space is under it, unless Focus has taken the header out.

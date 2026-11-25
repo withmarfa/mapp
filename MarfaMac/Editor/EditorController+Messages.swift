@@ -41,7 +41,7 @@ extension EditorController {
             headerIconSize = nil
             headerTypeIcons = []
             sendHeader()
-            sendNotice()
+            sendNotices()
             if let pageItemID {
                 embeds.version += 1
                 call("setItem", json(pageItemID.rawValue))
