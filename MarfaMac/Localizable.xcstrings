@@ -510,6 +510,16 @@
         }
       }
     },
+    "%@ was added. Its parent link may not have been made, so check that it’s under %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ was added. Its parent link may not have been made, so check that it’s under %2$@."
+          }
+        }
+      }
+    },
     "%@ was changed elsewhere. The app read the new value; yours wasn’t saved." : {
 
     },
@@ -5722,6 +5732,9 @@
     "Item Deleted" : {
 
     },
+    "Item May Not Be Under Its Parent" : {
+
+    },
     "Item Not Added" : {
       "extractionState" : "manual"
     },
@@ -10023,12 +10036,6 @@
     "The app needs a window to show the server’s sign-in page over. Open one of its windows, then try again, or use a code instead." : {
 
     },
-    "The app quit while this file was being added. Check that it isn’t in the library before you add it again." : {
-
-    },
-    "The app quit while this item was being added. Check that it isn’t in the library before you add it again." : {
-
-    },
     "The app ran into a problem it can’t resolve itself. Choose Refresh to try again." : {
 
     },
@@ -11054,6 +11061,9 @@
     },
     "This link isn’t in the library." : {
       "extractionState" : "manual"
+    },
+    "This may already be in Marfa. The app quit while it was being added, so check the library before you add it again." : {
+
     },
     "This may remove %@ sooner than the server’s current setting." : {
 
