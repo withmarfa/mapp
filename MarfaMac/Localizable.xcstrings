@@ -946,6 +946,9 @@
     "%lld completed" : {
       "extractionState" : "manual"
     },
+    "%lld conditions" : {
+
+    },
     "%lld copies" : {
 
     },
@@ -2074,6 +2077,9 @@
     "A view keeps up to %lld conditions; this one has %lld." : {
 
     },
+    "A view named “%@” already exists. Choose another name." : {
+
+    },
     "A view or a place can set its own." : {
 
     },
@@ -2413,6 +2419,9 @@
     },
     "All day" : {
       "extractionState" : "manual"
+    },
+    "All items" : {
+
     },
     "All versions kept for" : {
       "extractionState" : "manual"
@@ -2907,6 +2916,9 @@
     "Beta Versions" : {
 
     },
+    "Blank" : {
+
+    },
     "Block Quote" : {
 
     },
@@ -2984,6 +2996,15 @@
 
     },
     "By Group" : {
+
+    },
+    "By Source" : {
+
+    },
+    "By Status" : {
+
+    },
+    "By Type" : {
 
     },
     "Calendar" : {
@@ -3138,6 +3159,12 @@
     },
     "Can’t Save View" : {
       "extractionState" : "manual"
+    },
+    "Can’t Save View. Change what Marfa refused, or choose Cancel." : {
+
+    },
+    "Can’t Save View. Your Marfa server can’t be reached. Everything here stays until you choose Create View again." : {
+
     },
     "Can’t Search" : {
       "extractionState" : "manual"
@@ -4385,6 +4412,12 @@
     "Edit Choices…" : {
 
     },
+    "Edit Filter…" : {
+
+    },
+    "Edit Group…" : {
+
+    },
     "Edit Layout of %@…" : {
 
     },
@@ -4409,10 +4442,16 @@
     "Edit Property" : {
       "extractionState" : "manual"
     },
+    "Edit Sort…" : {
+
+    },
     "Edit Statuses…" : {
 
     },
     "Edit Time" : {
+
+    },
+    "Edit Types…" : {
 
     },
     "Edit Type…" : {
@@ -5357,6 +5396,9 @@
     "In saved pages and emails." : {
 
     },
+    "In the Feed" : {
+
+    },
     "In the Panel" : {
 
     },
@@ -5364,6 +5406,9 @@
 
     },
     "In the sidebar." : {
+
+    },
+    "Inbox" : {
 
     },
     "Include" : {
@@ -6335,9 +6380,6 @@
     "Make this version the item’s text and title" : {
 
     },
-    "Making a view needs your Marfa server, which can’t be reached now. Your changes are still in the window." : {
-
-    },
     "Manage Apps" : {
 
     },
@@ -7287,6 +7329,9 @@
     "Offline, updated just now" : {
 
     },
+    "Offline. Your change is saved once your Marfa server is back." : {
+
+    },
     "Oiling an oak worktop" : {
 
     },
@@ -7318,6 +7363,9 @@
 
     },
     "On every Mac that connects to this Marfa. Your items stay." : {
+
+    },
+    "On the Calendar" : {
 
     },
     "On the Page" : {
@@ -8035,6 +8083,9 @@
     "Recent" : {
 
     },
+    "Recently Added" : {
+
+    },
     "Recently Deleted" : {
 
     },
@@ -8120,6 +8171,9 @@
 
     },
     "Remove Field…" : {
+
+    },
+    "Remove Filters" : {
 
     },
     "Remove Link" : {
@@ -8952,6 +9006,9 @@
       "extractionState" : "manual"
     },
     "Show in Finder" : {
+
+    },
+    "Show in Row" : {
 
     },
     "Show in Types" : {
@@ -10284,6 +10341,9 @@
     "The search for “%@”" : {
       "extractionState" : "manual"
     },
+    "The search token “%@”" : {
+
+    },
     "The server accepts this address." : {
 
     },
@@ -10469,6 +10529,9 @@
     },
     "The view is deleted for every app connected to your Marfa server. You can’t undo this action." : {
       "extractionState" : "manual"
+    },
+    "The view keeps its name." : {
+
     },
     "The view was deleted before it was renamed." : {
       "extractionState" : "manual"
@@ -10687,6 +10750,9 @@
 
     },
     "This Plugin Isn’t Here" : {
+
+    },
+    "This Search" : {
 
     },
     "This Type Is Gone" : {
@@ -11508,9 +11574,6 @@
     "View Not Fully Saved" : {
 
     },
-    "View Not Made" : {
-
-    },
     "View Not Renamed" : {
       "extractionState" : "manual"
     },
@@ -11925,10 +11988,16 @@
     "Your Marfa library can’t be opened right now. Check the connection in Settings, then open the link again." : {
 
     },
+    "Your Marfa server can’t be reached, so the view keeps its name." : {
+
+    },
     "Your Marfa server can’t be reached, so the view keeps its name. Rename it again once it is back." : {
 
     },
     "Your Marfa server can’t be reached. Marfa for Mac keeps your change and saves it once the server is back." : {
+
+    },
+    "Your Marfa server is back. Choose Create View to save the view." : {
 
     },
     "Your Marfa server no longer has this view." : {
@@ -12155,6 +12224,12 @@
     "another plugins release" : {
 
     },
+    "any source" : {
+
+    },
+    "as a" : {
+
+    },
     "before" : {
       "comment" : "Typed in the list's search: a date field is before a day"
     },
@@ -12200,6 +12275,18 @@
     "folders" : {
 
     },
+    "from" : {
+
+    },
+    "from the Feed" : {
+
+    },
+    "from the Library" : {
+
+    },
+    "grouped by" : {
+
+    },
     "has any" : {
 
     },
@@ -12210,6 +12297,9 @@
 
     },
     "heartbeat address" : {
+
+    },
+    "in %@" : {
 
     },
     "in the last %lld days" : {
@@ -12344,6 +12434,9 @@
     "manage webhooks" : {
       "extractionState" : "manual"
     },
+    "no filter" : {
+
+    },
     "no limit" : {
       "extractionState" : "manual"
     },
@@ -12382,6 +12475,9 @@
     },
     "see and change this Marfa’s settings" : {
       "extractionState" : "manual"
+    },
+    "sorted by" : {
+
     },
     "starts with" : {
 
@@ -12459,6 +12555,15 @@
 
     },
     "webhooks" : {
+
+    },
+    "where" : {
+
+    },
+    "whose source is" : {
+
+    },
+    "with" : {
 
     },
     "yesterday" : {

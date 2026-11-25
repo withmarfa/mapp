@@ -48,6 +48,33 @@ struct NewViewTests {
         return try #require(await browser.finishViewPanel(in: library, order: order))
     }
 
+    // MARK: This Search
+
+    @Test func thisSearchComesFirstAndSavesOnlyTheTokensMarfaCanSay() async throws {
+        let (browser, library) = Self.window()
+        let tag = FilterClause(field: FilterTarget.tags.id, op: .includes, values: ["zine"])
+        let lately = FilterClause(field: FilterTarget.created.id, op: .inLast, values: ["7"])
+        browser.addSearchToken(tag)
+        browser.addSearchToken(lately)
+        #expect(browser.searchTokenFilters(in: library) == [tag])
+        browser.openNewViewPanel(in: library)
+        #expect(browser.newViewStarts(in: library).first == .search)
+        #expect(browser.viewPanel?.start == .search)
+        #expect(browser.tableOptions[browser.shown]?.filter.clauses == [tag])
+        let draft = try #require(ViewDraft.draft(SavedViews.window(browser, in: library, order: Self.order), catalogue: library.catalogue, views: []))
+        #expect(draft.unkept.contains { if case .searchToken = $0 { true } else { false } })
+        let made = try #require(await browser.finishViewPanel(in: library, order: Self.order))
+        let terms = try ViewDraft.terms(of: made.query.filter).terms
+        #expect(terms.contains { $0.field == .tags && $0.operator == .contains && $0.value == .text("zine") })
+        #expect(terms.count == 1)
+    }
+
+    @Test func withoutTokensThereIsNoThisSearch() {
+        let (browser, library) = Self.window()
+        browser.openNewViewPanel(in: library)
+        #expect(!browser.newViewStarts(in: library).contains(.search))
+    }
+
     // MARK: What Create View writes
 
     @Test func recentlyAddedIsSortedByCreatedNewestFirstOverTheWire() async throws {
