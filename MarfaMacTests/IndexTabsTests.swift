@@ -39,7 +39,7 @@ import Testing
 
         source.clearWrites()
         toasts.undo()
-        #expect(source.writes == [.transition(holiday, .active)], "Undo brings back the collection alone")
+        #expect(source.writes == [.restore(holiday)], "Undo brings back the collection alone")
     }
 
     @Test func deletingACollectionThatIsAlreadyGoneShowsNoToast() async throws {

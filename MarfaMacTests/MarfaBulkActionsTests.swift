@@ -157,7 +157,7 @@ final class StepCountingUndoManager: UndoManager {
         #expect(undo.steps == 1)
         source.clearWrites()
         undo.undo()
-        #expect(Set(source.writes) == [.transition(a, .active), .transition(b, .active)])
+        #expect(Set(source.writes) == [.restore(a), .restore(b)])
     }
 
     @Test func favoritingLeavesItemsInTheBinAndTellsHowMany() async throws {
