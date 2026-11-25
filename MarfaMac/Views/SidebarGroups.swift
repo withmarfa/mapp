@@ -79,7 +79,7 @@ struct SidebarGroupHeader: View, Equatable {
     private var add: some View {
         let group = section.plan.group
         return Menu {
-            SidebarOfferMenu(group: group.id, kind: group.kind, tab: tab, offers: offers, actions: actions)
+            SidebarOfferMenu(group: group.id, kind: group.kind, tab: tab, offers: offers, actions: actions, name: group.name)
         } label: {
             Image(systemName: "plus")
         }
@@ -271,8 +271,9 @@ struct SidebarPlacesSection: View, Equatable {
 
     var body: some View {
         if let header {
-            // The sections never fold: the system's outline would take a press on the heading's menu as a fold.
-            Section(isExpanded: .constant(true)) { rows } header: { header }
+            // A section never folds, so a press on the heading's menu cannot fold it.
+            Section { rows } header: { header }
+                .collapsible(false)
         } else {
             Section { rows }
         }

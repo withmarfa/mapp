@@ -31,8 +31,8 @@ struct SidebarTypesSection: View, Equatable {
 
     var body: some View {
         let _ = Cost.record(.sidebarBody, since: .now)
-        // The section never folds: the system's outline would take a press on the heading's menu as a fold.
-        Section(isExpanded: .constant(true)) {
+        // A section never folds, so a press on the heading's menu cannot fold it.
+        Section {
             if customizing {
                 customizingRows
                 place
@@ -42,6 +42,7 @@ struct SidebarTypesSection: View, Equatable {
         } header: {
             header
         }
+        .collapsible(false)
     }
 
     @ViewBuilder private var typeRows: some View {

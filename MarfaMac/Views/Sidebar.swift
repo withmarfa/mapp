@@ -285,7 +285,8 @@ private struct SidebarList: View {
                 section: section, groups: groupChoices(excluding: section.id), customizing: content.customizing, browser: browser,
                 order: order, header: section.plan.group.hasHeading ? header : nil,
                 place: SidebarAddPlace(
-                    group: section.id, kind: section.plan.group.kind, tab: content.tab.id, offers: content.offers, actions: actions))
+                    group: section.id, kind: section.plan.group.kind, tab: content.tab.id, offers: content.offers, actions: actions,
+                    name: section.plan.group.name))
         }
     }
 

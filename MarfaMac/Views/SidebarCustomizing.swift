@@ -69,17 +69,21 @@ struct SidebarAddPlace: View {
     /// The section it adds to; nil for the Section place, and for the Command place in a tab with no commands.
     let group: String?
     let kind: SidebarGroup.Kind
+    /// The section's name, where it has one.
+    var name: String?
     let tab: String
     let offers: SidebarOffers
     let actions: SidebarActions
 
     var body: some View {
         Menu {
-            SidebarOfferMenu(group: group, kind: kind, tab: tab, offers: offers, actions: actions)
+            SidebarOfferMenu(group: group, kind: kind, tab: tab, offers: offers, actions: actions, name: name)
         } label: {
             SidebarDashedLabel(title: title, height: 28)
         }
-        .menuStyle(.borderlessButton)
+        // A button style draws the label as it is; the borderless menu style drops its outline.
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .selectionDisabled()
         .padding(.top, group == nil && kind == .custom ? 8 : 0)
@@ -107,14 +111,28 @@ struct SidebarOfferMenu: View {
     let offers: SidebarOffers
     let actions: SidebarActions
 
+    /// The section's name, for the menu's heading: "Add to Pinned".
+    var name: String?
+
     var body: some View {
+        Section(heading) {
+            switch kind {
+            case .shortcuts: commands
+            case .places: places
+            case .pinned: pins(in: group ?? SidebarGroup.pinnedID)
+            case .types: types
+            case .custom:
+                if let group { pins(in: group) } else { sections }
+            }
+        }
+    }
+
+    private var heading: String {
         switch kind {
-        case .shortcuts: commands
-        case .places: places
-        case .pinned: pins(in: group ?? SidebarGroup.pinnedID)
-        case .types: types
-        case .custom:
-            if let group { pins(in: group) } else { sections }
+        case .shortcuts: String(localized: "Add a Command")
+        case .places: String(localized: "Add Under the Library")
+        case .custom where group == nil: String(localized: "Add a Section")
+        default: String(localized: "Add to \(name ?? SidebarGroup(id: "", kind: kind, tab: "").name)")
         }
     }
 
@@ -225,7 +243,7 @@ struct SidebarDashedLabel: View {
             Image(systemName: "plus").font(.system(size: 10, weight: .medium))
             Text(title).lineLimit(1)
         }
-        .interfaceFont(.callout)
+        .interfaceFont(.subheadline)
         .foregroundStyle(.tertiary)
         .padding(.horizontal, 10)
         .frame(maxWidth: capsule ? nil : .infinity, minHeight: height, alignment: .leading)
