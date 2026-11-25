@@ -7,7 +7,7 @@ import SwiftUI
 /// shown as it was written, with no Reader to switch to, and a mail sits centered on the surface behind pages. The
 /// document is the item's own file, for a Web Page or an HTML file, or the HTML file attached to it, for a document a
 /// connector keeps that way (`ItemLibrary.pageLayout(of:)`). The body is read only, and the title and properties are
-/// not edited on the page, except a pinned status, which keeps its menu; the inspector shows them all.
+/// not edited on the page, except a pinned status, which keeps its menu.
 ///
 /// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, the page's notice
 /// (`PageNotice`) at the top, above the title, says how many and loads them, as on an item's page. Its close button hides

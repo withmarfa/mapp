@@ -116,7 +116,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// bound to one item, ambiguous with its candidates, or unresolved. Nil where the library cannot ask, such as
     /// for an item it does not hold; the answer is never guessed from the titles held.
     func linkAnswers(of targets: [String], in itemID: ItemID?) async -> [LinkAnswer]?
-    /// The property keys of the item that the inspector never lists: what the page shows as the title and the text,
+    /// The property keys of the item that the page never lists as properties: what the page shows as the title and the text,
     /// and any a library keeps for its own use.
     func hiddenPropertyKeys(of item: Item) -> Set<String>
     /// The counts of what an item holds, worked out when read and never stored (`CountFact`): its children, a collection's

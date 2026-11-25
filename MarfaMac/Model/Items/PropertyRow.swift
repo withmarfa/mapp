@@ -270,7 +270,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 let names = entries.compactMap { ListEntries.object($0).flatMap(shape.personName(of:)) }
                 return names.isEmpty ? nil : .people(names)
             }
-            // Only the main entry shows on the page; the inspector lists them all.
+            // Only the main entry shows on the page; Show More lists them all.
             guard let main = entries.first.flatMap(ListEntries.object) else { return nil }
             return shape.rowValue(of: main)
         case (.boolean, .bool(let flag)): return .boolean(flag)

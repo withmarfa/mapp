@@ -115,7 +115,7 @@ struct InspectorFieldsTests {
         #expect(PageHead.statusValue(of: Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string(""))]), in: status) == nil)
     }
 
-    // MARK: The inspector's fields
+    // MARK: A property's value
 
     @MainActor private static func marfa(_ items: [MarfaMac.Item], types: [ItemTypeInfo]) async throws -> MarfaLibrary {
         let source = FakeItemSource()
