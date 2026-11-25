@@ -57,6 +57,8 @@ nonisolated enum ViewDraft {
         case timeline(key: String?, label: String)
         /// Items placed by their own dates, in no order and no groups of a view's.
         case calendar
+        /// Items placed by their coordinates, in no order and no groups of a view's.
+        case map
     }
 
     /// A choice of the window's that the view will not keep.
@@ -184,7 +186,7 @@ nonisolated enum ViewDraft {
             return arrangement(of: Window(
                 place: window.place, columns: window.columns, sort: window.sort, grouping: window.grouping, groupMode: window.groupMode,
                 groupOrder: window.groupOrder, hiddenGroups: window.hiddenGroups, layout: .table, listing: window.listing))
-        case .calendar:
+        case .calendar, .map:
             return ([], nil, [])
         case .timeline(let key, let label):
             guard let key else { return ([], nil, []) }

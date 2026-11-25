@@ -134,7 +134,7 @@ struct MapGroupArt: View {
     }
 }
 
-private struct Triangle: Shape {
+private nonisolated struct Triangle: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The corner each layout of a collection has: the calendar's, the timeline's Today and the gallery's card size. Any
-/// other layout has nothing to set, so draws nothing.
+/// other layout has nothing to set, so draws nothing; the map draws its own zoom controls.
 struct ViewCorner: View {
     @Bindable var browser: Browser
     let width: CGFloat
@@ -25,7 +25,7 @@ struct ViewCorner: View {
                 .help("Card Size")
                 .accessibilityIdentifier("GalleryCardSize")
             }
-        case .list, .table, .board:
+        case .list, .table, .board, .map:
             EmptyView()
         }
     }

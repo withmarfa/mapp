@@ -77,6 +77,8 @@ enum SavedViews {
             return .board
         case .calendar:
             return .calendar
+        case .map:
+            return .map
         case .timeline:
             let fields = browser.timelineFieldChoices(in: library)
             let key = ItemTimelineLayout.selectedField(browser.timelineFields[browser.shown], fields: fields)
