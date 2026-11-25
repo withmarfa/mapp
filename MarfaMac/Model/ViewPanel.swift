@@ -89,8 +89,8 @@ final class ViewPanel {
 
     /// The starting point the person chose, which the window shows.
     var start: NewViewStart?
-    /// Whether the view is kept in the sidebar's Pinned, where a saved view goes unless taken out.
-    var addsToSidebar = true
+    /// Whether the new view is kept in the sidebar. Off until the person turns it on.
+    var addsToSidebar = false
     /// The new view's Quick Actions on this Mac; nil follows the place.
     var quickActions: Bool?
     var problem: Problem?

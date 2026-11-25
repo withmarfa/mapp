@@ -395,8 +395,8 @@ struct NewViewTests {
         #expect(text.contains(", newest first"))
         #expect(text.contains(ItemViewMode.list.title))
         #expect(text.contains("Add to Sidebar: "))
-        // A task's place lists All Items, the Feed's tier among them, so Quick Actions is said too.
-        #expect(text.contains("Quick Actions: "))
+        // A task's place lists All Items, not the Feed, so Quick Actions is not offered or said.
+        #expect(!text.contains("Quick Actions: "))
     }
 
     @Test func anUntouchedDraftEndsWithNothingGivenBack() {

@@ -298,7 +298,7 @@ extension Browser {
     }
 
     /// Whether the new view offers Quick Actions: only where it lists the Feed, whose rows they are for.
-    var offersNewViewQuickActions: Bool { listing.scope.includes(.feed) }
+    var offersNewViewQuickActions: Bool { listing.scope == .feed }
 
     /// The Feed's sources an inbox can list, by name with their counts.
     func inboxSources(in library: any ItemLibrary) -> [(code: String, name: String, count: Int)] {
