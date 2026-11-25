@@ -37,7 +37,7 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | `unarchive(_:undoManager:moved:)` | Each archived item (`unarchivePlan`) | An active item |
 
 - **`ItemLibrary.perform(_:on:undoManager:details:)` is the one way a menu runs a move.** It asks first where it must, then calls `Browser.move`.
-- **An item menu lists what `ItemMove.inMenu` gives of `selectionCommands`:** each tier move that would change an item, then Archive if any item can be archived, else Unarchive. They end the menu before Delete, with ⌃⌘K and ⌃⌘A beside them and ⌘⌫ beside Delete. The menu bar and More keep all three, dimmed where nothing would change.
+- **An item menu lists what `ItemMove.inMenu` gives of `selectionCommands`:** each tier move that would change an item, then Archive if any item can be archived, else Unarchive. They end the menu before Delete, with ⌃⌘K and ⌃⌘A beside them and ⌘⌫ beside Delete. The menu bar and More keep all three, dimmed where nothing would change. More draws ⌘⌫ beside Delete as a row's menu does; the menu bar binds no key to Delete, because ⌘⌫ would then leave the editor, where it deletes a line, so it shows none until the person assigns one.
 - **Archive and Unarchive are one command, ⌃⌘A,** which toggles by state and archives a mixed selection.
 - **A toast follows each move** (`Browser.move`): "Kept “x” in the Library", "Moved “x” to the Feed", "Archived “x”" or "Unarchived “x”", or the count. It shows only what the copy queued. Its Undo is the step the move registered, and the library says so if it puts the step back.
 - **Archive asks when items are under the selection:** Archive All, Archive Only This Item or Cancel, with the count `archivePlan` puts beneath (`ArchiveRequest`).

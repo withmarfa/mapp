@@ -26,10 +26,14 @@ struct RowQuickActions: View {
             ForEach(actions, id: \.self) { action in
                 switch action {
                 case .move(let move):
-                    Button(move.name, systemImage: move.symbol) {
+                    Button {
                         library.perform(move, on: [id], undoManager: undoManager, details: details)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: move.symbol)
+                            Text(move.name)
+                        }
                     }
-                    .labelStyle(.titleAndIcon)
                     .appButton(.secondary, size: .small)
                     .accessibilityIdentifier("RowAction.\(move.name)")
                 case .delete:
