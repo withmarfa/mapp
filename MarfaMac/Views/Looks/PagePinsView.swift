@@ -147,7 +147,7 @@ private struct StatusPin: View {
         let current = PagePins.statusValue(of: item, in: field)
         let label = current.map { ItemTypeInfo.Field.label(ofOption: $0) } ?? String(localized: "Status")
         let mark = StatusSymbol(group: current.flatMap(field.statusGroup(of:)))
-        let editable = item.isEditable && field.isPicked
+        let editable = item.allows(.fields) && field.isPicked
         if editable {
             Menu {
                 Picker("Status", selection: Binding { current ?? "" } set: { choice in

@@ -133,7 +133,7 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
     var problem: ItemProblem?
     /// Whether the server advises that a person's connector keeps this item, so a change made here would be put back
     /// on the connector's next run. Advice only: the server refuses no write, and the value can be older than 15
-    /// minutes. The app offers no change to such an item (`allowsChanges`).
+    /// minutes. What the app still offers on such an item is `obstacle(to:)`'s.
     var readOnly = false
     /// Each embed in this item's text, in order, with the file item the library bound it to or why it has none.
     var boundEmbeds: [BoundEmbed] = []
@@ -207,22 +207,6 @@ nonisolated extension Item {
             return id
         }
     }
-
-    /// Whether its properties and relationships can be changed. A file, a deleted item, one with a problem or one a
-    /// connector keeps is read only.
-    var isEditable: Bool { allowsChanges && !isFile }
-
-    /// Whether its text can be written in: text the library could not read is not shown, so nothing typed over the
-    /// empty page is written.
-    var isWritable: Bool { state == .active && !isFile && !readOnly && problem?.withholdsText != true }
-
-    /// Whether its tags can be changed: a file can be tagged, a deleted item, one with a problem or one a connector
-    /// keeps cannot.
-    var canEditTags: Bool { allowsChanges }
-
-    /// The one place that decides an item takes changes to its values and tags, which every editor on the page and in
-    /// the inspector asks through `isEditable` and `canEditTags`.
-    private var allowsChanges: Bool { state == .active && problem == nil && !readOnly }
 
     var isFile: Bool {
         if case .file = content { true } else { false }

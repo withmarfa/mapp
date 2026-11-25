@@ -104,7 +104,7 @@ extension CommandPalette {
         add("Show Tuning Panel", "slider.horizontal.3", in: .debug) { openWindow(id: TuningPanel.windowID) }
         #endif
 
-        if let one, one.isWritable {
+        if let one, one.allows(.text) {
             if hasVisibleEditor {
                 for format in [Format.title, .heading, .subheading, .heading4, .heading5, .heading6, .body, .bold, .italic,
                                .strikethrough, .highlight, .code, .link, .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]

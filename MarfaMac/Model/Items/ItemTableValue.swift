@@ -199,7 +199,7 @@ nonisolated extension ItemTableColumn {
     /// field, the row's type does not declare it, the item cannot be edited, the cell holds a value, or its value is
     /// picked from a menu or switched (a status, priority, choice or yes or no), which the cell edits in place.
     func addKind(for row: ItemTableRow, catalogue: Catalogue) -> ValueEditKind? {
-        guard let field = field(for: row, catalogue: catalogue), row.item.isEditable, !picksFrom(field),
+        guard let field = field(for: row, catalogue: catalogue), row.item.allows(.fields), !picksFrom(field),
               let kind = ValueEditKind(field: field) else { return nil }
         guard !InspectorFields.hasValue(row.item.value(of: field.key)) else { return nil }
         return kind

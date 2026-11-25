@@ -27,7 +27,7 @@ struct AddTagButton: View {
 extension ItemLibrary {
     /// Whether any of the items can take a tag.
     func canTag(_ ids: Set<ItemID>) -> Bool {
-        ids.contains { item($0)?.canEditTags == true }
+        ids.contains { item($0)?.allows(.tags) == true }
     }
 }
 

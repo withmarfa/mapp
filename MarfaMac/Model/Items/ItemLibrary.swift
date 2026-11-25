@@ -353,7 +353,7 @@ extension ItemLibrary {
     /// Whether the person can give the item a title. A title is kept only as a property, so an item titled by its
     /// first line takes its title from its text.
     func canSetTitle(of item: Item) -> Bool {
-        guard item.isEditable else { return false }
+        guard item.allows(.title) else { return false }
         if case .firstLine = item.titleRule { return false }
         return true
     }
@@ -393,7 +393,7 @@ extension ItemLibrary {
                 skips.skip(.gone)
                 continue
             }
-            if let reason = item.writeObstacle {
+            if let reason = item.obstacle(to: .tags) {
                 skips.skip(reason)
             } else if item.tags.contains(tag) {
                 holding += 1
@@ -410,10 +410,10 @@ extension ItemLibrary {
         return .success((tag, lacking, skips))
     }
 
-    /// Whether the item can be filed in a collection: an active item the library can write, of a type the catalogue
-    /// lets join one. A collection can't.
+    /// Whether the item can be filed in a collection: one not in the bin, of a type the catalogue lets join one. A
+    /// collection can't.
     func canJoinCollection(_ item: Item) -> Bool {
-        item.writeObstacle == nil && catalogue.canJoinCollection(item.type)
+        item.allows(.collections) && catalogue.canJoinCollection(item.type)
     }
 
     /// The items of the selection that can be filed in a collection, files too: Add to Collection and Remove from

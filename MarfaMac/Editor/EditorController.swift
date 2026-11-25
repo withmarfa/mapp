@@ -422,7 +422,7 @@ final class EditorController: NSObject {
         guard item.id == requestedItemID else { return }
         guard item.id == pageItemID, isPresented else { return loading == item.id ? () : load(item) }
         guard let body = library?.body(of: item.id) else { return }
-        guard body.text != markdown || item.isWritable != isEditable else {
+        guard body.text != markdown || item.allows(.text) != isEditable else {
             // The page already holds this text, so what is typed next is typed on this version of it.
             read = body.version
             shown[generation]?.read = body.version
@@ -443,7 +443,7 @@ final class EditorController: NSObject {
         pageItemID = item.id
         markdown = body.text
         read = body.version
-        isEditable = item.isWritable
+        isEditable = item.allows(.text)
         watchEmbeds()
         guard isReady else { return }
         embeds.version += 1

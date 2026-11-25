@@ -154,7 +154,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
         if let typeLabel {
-            rows.append(PropertyRow(id: PagePlacement.type, label: String(localized: "Type"), value: .type(typeLabel, icon: typeIcon), editable: changesType ?? item.isEditable))
+            rows.append(PropertyRow(id: PagePlacement.type, label: String(localized: "Type"), value: .type(typeLabel, icon: typeIcon), editable: changesType ?? item.allows(.type)))
         }
         if let source = (sourceName ?? item.source)?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
             rows.append(PropertyRow(id: PagePlacement.source, label: String(localized: "Source"), value: .source(source)))
@@ -184,14 +184,14 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             } else if let value = value(of: field, in: item, format: format) {
                 fields.append(PropertyRow(
                     id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item),
-                    editable: item.isEditable && isEdited(field),
+                    editable: item.allows(.fields) && isEdited(field),
                     optionTones: optionTones(of: field, in: item, isPriority: isPriority(field))))
-            } else if offersEmpty, item.isEditable, isEdited(field), !InspectorFields.hasValue(item.value(of: field.key)) {
+            } else if offersEmpty, item.allows(.fields), isEdited(field), !InspectorFields.hasValue(item.value(of: field.key)) {
                 empty.append(PropertyRow(id: field.key, label: field.label, value: .empty(symbol: symbol(of: field)), editable: true))
             }
         }
         if parent, !fields.contains(where: { $0.value == .parent }) { fields.insert(parentRow(relationships, parentField), at: 0) }
-        if offersEmpty, !parent, item.isEditable, let none = relationships.first(where: { $0.field == parentField && $0.isEditable }) {
+        if offersEmpty, !parent, item.allows(.links), let none = relationships.first(where: { $0.field == parentField && $0.isEditable }) {
             empty.append(PropertyRow(id: parentField, label: none.label, value: .empty(symbol: "square.stack"), editable: true))
         }
         rows += fields + empty
@@ -199,8 +199,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             if let row = linkRow(relationship, icon: icon, isPerson: isPerson) { rows.append(row) }
         }
         if !tags.isEmpty {
-            rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags), editable: item.canEditTags))
-        } else if offersEmpty, item.canEditTags {
+            rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags), editable: item.allows(.tags)))
+        } else if offersEmpty, item.allows(.tags) {
             rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .empty(symbol: "tag"), editable: true))
         }
         return rows

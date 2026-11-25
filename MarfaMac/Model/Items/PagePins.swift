@@ -42,7 +42,7 @@ nonisolated struct PagePins: Equatable, Sendable {
             if row.value == .status {
                 // The pill shows a status the item has; one it has not reads Empty and opens the status editor.
                 guard let status, statusValue(of: item, in: status) == nil else { return row }
-                return offersEmpty && item.isEditable && status.isPicked
+                return offersEmpty && item.allows(.fields) && status.isPicked
                     ? PropertyRow(id: row.id, label: row.label, value: .empty(symbol: PropertyRow.Value.status.symbol), editable: true) : nil
             }
             return row

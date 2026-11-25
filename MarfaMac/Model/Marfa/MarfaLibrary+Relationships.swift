@@ -156,7 +156,7 @@ extension MarfaLibrary {
         var results = fields.map { name, end in
             ItemRelationship(
                 field: name, label: label(end), targets: Self.ordered(others(of: id, end).map(target)),
-                isEditable: item.isEditable, allowsMultiple: end.info.cardinality == .many)
+                isEditable: item.allows(.links), allowsMultiple: end.info.cardinality == .many)
         }
         let pointing = index.links(touching: id).filter { $0.holder != id }
         for type in Set(pointing.map(\.type)) {
@@ -177,7 +177,7 @@ extension MarfaLibrary {
             // The text that links an item is the linking item's to change, not a relationship of this one.
             results.append(ItemRelationship(
                 field: Self.inversePrefix + type, label: label(end), targets: targets,
-                isEditable: item.isEditable && type != MarfaMapping.bodyLinkEdge,
+                isEditable: item.allows(.links) && type != MarfaMapping.bodyLinkEdge,
                 allowsMultiple: end.info.reverseCardinality == .many))
         }
         return results.sorted { lhs, rhs in
@@ -370,7 +370,7 @@ extension MarfaLibrary {
     /// replaced by a move, and a link another item holds as its own is never taken. How many links an end may hold is
     /// the core's to judge, of the links this makes.
     private func plan(_ id: ItemID, field: String, adding wanted: [ItemID], removing unwanted: [ItemID]) -> Planning {
-        guard let item = item(id), item.isEditable, let end = fieldEnd(field) else { return .unavailable }
+        guard let item = item(id), item.allows(.links), let end = fieldEnd(field) else { return .unavailable }
         guard end.info.id != MarfaMapping.bodyLinkEdge else {
             return .refused(String(localized: "A link is changed in the text that holds it."))
         }

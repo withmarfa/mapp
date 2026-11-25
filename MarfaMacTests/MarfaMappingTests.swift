@@ -79,8 +79,8 @@ struct MarfaMappingTests {
 
         #expect(shown.problem == ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true))
         #expect(shown.preview == MarfaProblems.unreadableMessage, "the list says why, rather than showing a blank row")
-        #expect(!shown.isEditable, "nothing is written from a row that shows none of what it holds")
-        #expect(!shown.isWritable, "and nothing typed over its empty page is written")
+        #expect(!shown.allows(.fields), "nothing is written from a row that shows none of what it holds")
+        #expect(!shown.allows(.text), "and nothing typed over its empty page is written")
         #expect(shown.version == ItemVersion(7) && shown.tags == ["favorite"] && shown.state == .active)
         #expect(shown.properties.isEmpty)
     }
@@ -89,7 +89,7 @@ struct MarfaMappingTests {
         let shown = Self.item(Self.row("r"))
         #expect(shown.problem == nil)
         #expect(shown.preview == "Body")
-        #expect(shown.isEditable && shown.isWritable)
+        #expect(shown.allows(.fields) && shown.allows(.text))
     }
 
     // MARK: Read only
@@ -99,7 +99,7 @@ struct MarfaMappingTests {
         kept.readOnly = true
         let shown = Self.item(kept)
         #expect(shown.readOnly)
-        #expect(!shown.isEditable && !shown.isWritable && !shown.canEditTags)
+        #expect(shown.obstacle(to: .fields) == .readOnly && shown.obstacle(to: .text) == .readOnly && shown.allows(.tags))
         #expect(shown.problem == nil, "it is advice, not a fault, so nothing is flagged as wrong")
         #expect(shown.state == .active && shown.preview == "Body", "and it is read as any other row")
         #expect(!Self.item(Self.row("w")).readOnly)

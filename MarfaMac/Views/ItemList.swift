@@ -58,7 +58,7 @@ struct ItemList: View, Equatable {
         // Return opens the item for writing; a deleted item or a file cannot be written in, so it stays in the list.
         .onKeyPress(.return, phases: .down) { press in
             guard press.modifiers.isEmpty, browser.selection.count == 1,
-                  browser.selectedItems(in: library).first?.isWritable == true
+                  browser.selectedItems(in: library).first?.allows(.text) == true
             else { return .ignored }
             browser.focusRequest = .page
             return .handled

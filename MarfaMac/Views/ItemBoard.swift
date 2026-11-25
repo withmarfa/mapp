@@ -337,7 +337,7 @@ private struct BoardCard: View, Equatable {
                     .foregroundStyle(.primary)
                     .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if !item.isEditable { Image(systemName: "lock").interfaceFont(.caption).foregroundStyle(.secondary).accessibilityLabel("Read Only") }
+                if !item.allows(.fields) { Image(systemName: "lock").interfaceFont(.caption).foregroundStyle(.secondary).accessibilityLabel("Read Only") }
             }
             if !compact {
                 if let secondary = content.secondary {

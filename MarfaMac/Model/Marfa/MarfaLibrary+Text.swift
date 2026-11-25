@@ -58,7 +58,7 @@ extension MarfaLibrary {
     private func sendWaitingText(of id: ItemID) {
         guard let waiting = waitingText.removeValue(forKey: id) else { return }
         waiting.timer?.cancel()
-        guard let item = item(id), item.isWritable else {
+        guard let item = item(id), item.allows(.text) else {
             if unsettledText[id] == nil, let copy = sourceText.removeValue(forKey: id) { records[id]?.body = copy }
             return notices.notKept(waiting.title, text: waiting.text, reason: Self.cantChange)
         }

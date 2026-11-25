@@ -54,7 +54,7 @@ struct ItemBoardTests {
         var binned = Self.item("binned", value: .string("todo"))
         binned.state = .trashed
         var problem = Self.item("problem", value: .string("todo"))
-        problem.state = .archived
+        problem.problem = ItemProblem(message: "Unreadable properties")
         let file = Item(
             id: ItemID("file"), type: .file, title: "file", titleRule: .property("title"), content: .file(.data, byteCount: 1),
             version: ItemVersion(1), created: Date(timeIntervalSince1970: 0), modified: Date(timeIntervalSince1970: 0))
@@ -92,9 +92,10 @@ struct ItemBoardTests {
 
     @Test func readOnlyItemsAndDiagnosticLanesCannotBeMoved() {
         var archived = Self.item("Archived"); archived.state = .archived
+        #expect(ItemBoardLayout.move(archived, key: "status", to: .option("done"), catalogue: Self.catalogue) == .set(.string("done")))
         var trashed = Self.item("Trashed"); trashed.state = .trashed
         var broken = Self.item("Broken"); broken.problem = ItemProblem(message: "Unreadable properties")
-        for item in [archived, trashed, broken] {
+        for item in [trashed, broken] {
             #expect(ItemBoardLayout.move(item, key: "status", to: .option("done"), catalogue: Self.catalogue) == .refused)
         }
         for lane in [ItemBoardLane.ID.invalid, .notApplicable, .option("")] {

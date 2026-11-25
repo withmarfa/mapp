@@ -22,7 +22,7 @@ struct ItemCorner: View {
         let layout = library.pageLayout(of: item)
         let fileView = details.fileViewing(of: item.id)
         let hasReader = details.pageLook?.item == item.id
-        let canWrite = item.isWritable && editor != nil
+        let canWrite = item.allows(.text) && editor != nil
         let choice = PageCornerChoice(formats: showsFormats, textSize: showsTextSize, focus: showsFocus)
         let buttons = PageCorner.buttons(
             layout: layout, hasReader: hasReader, canWrite: canWrite, file: fileView?.kind, shows: choice)

@@ -207,11 +207,11 @@ final class ValueEditModel {
     var isEditable: Bool {
         if kind == .type { return library.offersTypeChange(for: request.targets) }
         if kind == .collections { return !library.collectionMembers(request.targets).isEmpty }
-        if kind == .tags, !request.items.isEmpty { return request.items.contains { library.item($0)?.canEditTags == true } }
+        if kind == .tags, !request.items.isEmpty { return request.items.contains { library.item($0)?.allows(.tags) == true } }
         guard let id = request.item else { return true }
         guard let item = library.item(id) else { return false }
-        if case .location(let spec) = kind { return item.isEditable || spec.hasPoint(item) }
-        return kind == .tags ? item.canEditTags : item.isEditable
+        if case .location(let spec) = kind { return item.allows(.fields) || spec.hasPoint(item) }
+        return item.allows(kind.change)
     }
 
     /// The tags or the words the panel holds, which its search field shows as chips.
@@ -220,7 +220,7 @@ final class ValueEditModel {
         case .tags:
             // With several items, only the tags every one that can take tags holds: a tag that some lack is not held by
             // the selection.
-            let held = request.targets.compactMap(library.item).filter(\.canEditTags).map { Set(library.tags(of: $0)) }
+            let held = request.targets.compactMap(library.item).filter { $0.allows(.tags) }.map { Set(library.tags(of: $0)) }
             guard let first = held.first else { return [] }
             return held.dropFirst().reduce(first) { $0.intersection($1) }.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         case .words: return heldWords
@@ -564,7 +564,7 @@ final class ValueEditModel {
     func refusalReason(_ fallback: String) -> String {
         guard let id = request.item else { return fallback }
         guard let item = library.item(id) else { return String(localized: "This item is no longer available.") }
-        return (kind == .tags ? item.canEditTags : item.isEditable) ? fallback : PropertyLoss.notEditable.reason
+        return item.allows(kind.change) ? fallback : PropertyLoss.notEditable.reason
     }
 
     /// The editor is ending. A text or number the person typed is written or handed back unless they cancelled it

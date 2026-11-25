@@ -217,7 +217,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(note.first { $0.field == "about" }?.allowsMultiple == true)
         #expect(!note.contains { $0.field == "supersedes" })
         #expect(library.bodyMentions(for: F.n1).map(\.itemID) == [F.t1])
-        #expect(library.relationships(for: F.f1).allSatisfy { !$0.isEditable })
     }
 
     @Test func candidatesFollowTheCatalogueAndLeaveCyclesToTheCoresCheck() async throws {
@@ -827,7 +826,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func aFieldOrItemThatCantChangeSendsNothing() async throws {
         let (library, source) = try await loaded()
-        #expect(await library.changeItemRelationship(F.f1, field: "about", adding: [F.p1], removing: [], undoManager: nil) == false)
+        #expect(await library.changeItemRelationship(F.n3, field: "about", adding: [F.p1], removing: [], undoManager: nil) == false)
         #expect(await library.changeItemRelationship(F.n1, field: "nothing", adding: [F.p1], removing: [], undoManager: nil) == false)
         #expect(source.writes.isEmpty)
     }

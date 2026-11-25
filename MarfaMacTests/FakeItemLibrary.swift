@@ -431,7 +431,7 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func setItemProperties(_ id: ItemID, changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) -> Bool {
-        guard acceptsProperties, let index = items.firstIndex(where: { $0.id == id }), items[index].isEditable else { return false }
+        guard acceptsProperties, let index = items.firstIndex(where: { $0.id == id }), items[index].allows(.fields) else { return false }
         let old = Dictionary(uniqueKeysWithValues: changes.keys.map { ($0, items[index].value(of: $0)) })
         guard !changes.isEmpty, isWritingProperties(of: id) || changes.contains(where: { old[$0.key] != $0.value }) else { return true }
         write(id, changes, from: old, at: index, actionName: actionName, undoManager: undoManager)
@@ -542,7 +542,7 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func removeTag(_ tag: String, from ids: Set<ItemID>, undoManager: UndoManager?) {
-        let changing = Set(ids.filter { item($0).map { $0.canEditTags && $0.tags.contains(tag) } ?? false })
+        let changing = Set(ids.filter { item($0).map { $0.allows(.tags) && $0.tags.contains(tag) } ?? false })
         guard !reservedTags.contains(tag), !changing.isEmpty else { return }
         tagWrites.append((tag, false, changing))
         change(changing) { $0.tags.remove(tag) }
@@ -744,7 +744,7 @@ final class FakeItemLibrary: ItemLibrary {
         var skips = BatchSkips()
         for index in items.indices where ids.contains(items[index].id) {
             guard items[index].collectionIDs.contains(collection) else { continue }
-            if let reason = items[index].writeObstacle {
+            if let reason = items[index].obstacle(to: .collections) {
                 skips.skip(reason)
                 continue
             }

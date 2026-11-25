@@ -90,13 +90,12 @@ struct ItemLocationTests {
 
     // MARK: Rows and listing
 
-    @Test func aFileHasAMapToLookAtAndNothingToEdit() throws {
+    @Test func aFilesLocationIsAFieldAPersonMayChange() throws {
         let spec = try Self.spec("core.file.image")
         let image = Self.item("core.file.image", Self.london, content: .file(.png, byteCount: 4))
-        #expect(!image.isEditable)
-        #expect(spec.hasPoint(image))
+        #expect(image.allows(.fields))
         #expect(spec.row(of: image, offersEmpty: true)?.editable == true)
-        #expect(spec.row(of: Self.item("core.file.image", content: .file(.png, byteCount: 4)), offersEmpty: true) == nil)
+        #expect(spec.row(of: Self.item("core.file.image", content: .file(.png, byteCount: 4)), offersEmpty: true)?.editable == true)
     }
 
     // MARK: Points and frames

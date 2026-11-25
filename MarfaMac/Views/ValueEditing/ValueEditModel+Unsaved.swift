@@ -52,7 +52,7 @@ extension ValueEditModel {
             // An item that became read-only still holds a tag that reached it first.
             let tag = ItemTag.normalized(text)
             let items = request.targets.compactMap(library.item)
-            let taking = items.filter(\.canEditTags)
+            let taking = items.filter { $0.allows(.tags) }
             let judged = taking.isEmpty ? items : taking
             return !judged.isEmpty && judged.allSatisfy { library.tags(of: $0).contains(tag) }
         case .words:
