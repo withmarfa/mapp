@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MarfaMac
 
-/// The filter row's clauses: what each kind and operator becomes in a saved view's filter and comes back as, the "is not"
+/// A place's filter clauses: what each kind and operator becomes in a saved view's filter and comes back as, the "is not"
 /// rewrite, All and Any, dates relative to the day (which a view never keeps), the count of conditions, and what a clause
 /// keeps in the window.
 @MainActor

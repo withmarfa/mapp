@@ -1,6 +1,6 @@
 import Foundation
 
-/// The open place's filters, as the View panel's Filter and the Items page's filter row change them. Each change goes
+/// The open place's filters, as the View panel's Filter and the search field's tokens change them. Each change goes
 /// through the window's choices (`choicesChanged`), so it is one step of Undo and, in a saved view, written as made.
 extension Browser {
     /// How many filters the open place holds.

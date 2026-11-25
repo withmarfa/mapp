@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// A condition's editor, read from the window as it is now, so a pick shows in it at once: the operators of the field,
-/// and the control its value needs. The View panel's Filter and the Items page's filter row open it. The View panel
-/// offers no operator relative to today (`offersRelative`), which a saved view cannot keep.
+/// and the control its value needs. The View panel's Filter opens it, and offers no operator relative to today
+/// (`offersRelative`), which a saved view cannot keep.
 struct FilterConditionEditor: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
