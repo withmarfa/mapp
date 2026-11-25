@@ -170,6 +170,8 @@ import Testing
         source.send(.upserted([F.item(Self.holiday, F.album, "Holiday", age: 0, state: .archived)]))
         try #require(await eventually { library.item(Self.holiday)?.state == .archived })
         #expect(Set(library.relationshipCandidates(for: F.e1, field: "in-collection").map(\.id)) == [Self.holiday, Self.archive])
+        #expect(library.joinableCollections.map(\.id).contains(Self.holiday))
+        #expect(!library.collections.map(\.id).contains(Self.holiday))
         #expect(library.addToCollection([F.e1], Self.holiday, undoManager: nil))
         #expect(source.writes == [.link(EdgeDraft(type: "in-collection", from: F.e1, to: Self.holiday, position: 3))])
     }

@@ -156,6 +156,9 @@ protocol ItemLibrary: AnyObject, Observable {
 
     /// The active collections, by title: items whose type plays Marfa's `container` role (`Catalogue.isCollection`).
     var collections: [Item] { get }
+    /// The collections an item may join, by title: the active ones and the archived ones, since Marfa links an archived
+    /// item as any other.
+    var joinableCollections: [Item] { get }
     /// Files each item in the collection with one `in-collection` edge, in one undoable change, leaving out those
     /// already in it. An item that can't be a member, as a collection can't, or can't be changed, is skipped and the
     /// library tells the person how many and why. False where nothing was filed because every item was skipped.
@@ -459,7 +462,7 @@ extension ItemLibrary {
     /// The collections any of the items is in, by title.
     func collections(holding ids: Set<ItemID>) -> [Item] {
         let held = Set(ids.compactMap { item($0) }.flatMap(\.collectionIDs))
-        return collections.filter { held.contains($0.id) }
+        return joinableCollections.filter { held.contains($0.id) }
     }
 
     /// The active items `place` lists in both tiers, a type's kinds included.

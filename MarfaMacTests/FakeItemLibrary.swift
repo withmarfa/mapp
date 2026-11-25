@@ -784,8 +784,13 @@ final class FakeItemLibrary: ItemLibrary {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
+    var joinableCollections: [Item] {
+        items.filter { $0.state != .trashed && catalogue.isCollection($0.type) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
     func addToCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
-        guard collections.contains(where: { $0.id == collection }) else {
+        guard joinableCollections.contains(where: { $0.id == collection }) else {
             notices.tell("Can’t Add to Collection", "Refused")
             return false
         }
