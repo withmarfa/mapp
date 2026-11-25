@@ -1,4 +1,5 @@
 import AppKit
+import Marfa
 
 /// How wide each column of the table starts, from what its cells say: the widest of the first rows' words, with a cell's
 /// room and the chip or mark it draws, and not less than its heading with the sort mark. The name is the table's flexible
@@ -68,7 +69,7 @@ enum ItemTableFit {
         case .count(let fact):
             let hasStatus = library.catalogue.itemTypes[row.item.type]?.statusField != nil
             return CountWording.text(of: fact, answer: row.counts[fact], hasStatus: hasStatus).map { Entry(words: $0, chrome: 0) }
-        case .field(let field):
+        case .field:
             guard let own = column.field(for: row, catalogue: library.catalogue), let current = ItemTableValue.string(row, key: own.key) else { return nil }
             switch column.style(for: own) {
             case .status, .priority, .choice: return Entry(words: ItemTypeInfo.Field.label(ofOption: current), chrome: chipRoom)
