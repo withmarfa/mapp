@@ -179,10 +179,10 @@ private struct TopRowTable: ViewModifier {
 }
 
 /// Reaches the `NSScrollView` behind a table or a list. SwiftUI's `contentMargins` leaves their scroll views alone, so the
-/// room for the row of views is the scroll view's own top inset, to which AppKit adds the headings' height. The headings'
-/// container is then set at the title line's lower edge, or lower while the row of views still shows, and set again
-/// whenever the scroll view or AppKit moves it. The line's height is the top row's (`TopRowSpace`), not the scroll view's
-/// safe area, which is empty while full screen hides the toolbar and changes as it comes and goes.
+/// room for the row of views is added to the scroll view's own safe area, from which AppKit sets its insets with the
+/// toolbar's height, the sidebar over the column and the headings' height. The headings' container is then set at the
+/// title line's lower edge, or lower while the row of views still shows, and set again whenever the scroll view or AppKit
+/// moves it. The line's height is the top row's (`TopRowSpace`), which stands also while full screen hides the toolbar.
 private struct TopRowTableProbe: NSViewRepresentable {
     let space: TopRowSpace
 
@@ -219,20 +219,17 @@ private struct TopRowTableProbe: NSViewRepresentable {
         func refresh() {
             guard window != nil, let table = nearestTable(), let scroll = table.enclosingScrollView else { return }
             if self.table !== table { follow(table, in: scroll) }
-            if scroll.automaticallyAdjustsContentInsets { scroll.automaticallyAdjustsContentInsets = false }
-            // With the adjustment off the sides are the safe area's, set here: a sidebar that floats over this column, shown
-            // or hidden, moves where the rows begin. Set outright, never by what changed, which would keep an error forever.
-            let safe = scroll.safeAreaInsets
-            let wanted = NSEdgeInsets(top: space.lineHeight + space.restHeight, left: safe.left, bottom: safe.bottom, right: safe.right)
-            let current = scroll.contentInsets
-            if current.top != wanted.top || current.left != wanted.left || current.bottom != wanted.bottom || current.right != wanted.right {
-                let clip = scroll.contentView
-                let scrolled = clip.bounds.origin.y + clip.contentInsets.top
-                let moved = wanted.left - current.left
-                scroll.contentInsets = wanted
-                // Keeps the rows where they were: the same distance from the first, and the same sideways place or the new edge.
-                clip.scroll(to: NSPoint(x: clip.bounds.origin.x - moved, y: scrolled - clip.contentInsets.top))
-                scroll.reflectScrolledClipView(clip)
+            // AppKit keeps the insets from the safe area, so they follow a sidebar shown or hidden over the column at once.
+            // What the title bar and toolbar already cover, none while full screen hides them: measured from the window,
+            // never from the safe area, which holds what was added here until AppKit next lays out.
+            guard let window else { return }
+            let top = scroll.convert(scroll.bounds, to: nil).maxY
+            let covered = max(0, top - window.contentLayoutRect.maxY)
+            let extra = max(0, space.lineHeight + space.restHeight - covered)
+            if scroll.additionalSafeAreaInsets.top != extra {
+                var added = scroll.additionalSafeAreaInsets
+                added.top = extra
+                scroll.additionalSafeAreaInsets = added
             }
             place()
         }
@@ -240,14 +237,6 @@ private struct TopRowTableProbe: NSViewRepresentable {
         private func follow(_ table: NSTableView, in scroll: NSScrollView) {
             stop()
             self.table = table
-            // The split view moves its columns, and a sidebar over this one changes its safe area, with no layout of this view.
-            var ancestor: NSView? = scroll.superview
-            while let view = ancestor, !(view is NSSplitView) { ancestor = view.superview }
-            if let split = ancestor {
-                observers.append(NotificationCenter.default.addObserver(
-                    forName: NSSplitView.didResizeSubviewsNotification, object: split, queue: .main
-                ) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } })
-            }
             scroll.contentView.postsBoundsChangedNotifications = true
             observers.append(NotificationCenter.default.addObserver(
                 forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main
