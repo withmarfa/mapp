@@ -738,6 +738,15 @@ final class FakeItemLibrary: ItemLibrary {
     /// The tags each file was added with, in step with `addedFiles`.
     private(set) var addedFileTags: [[String]] = []
     var refusesFiles = false
+    /// Names of files that are added but whose items the library does not hold until `showWithheld()`, as a library
+    /// fed by a server holds an item only once its source says so.
+    var withheldFiles: Set<String> = []
+    private(set) var withheld: [Item] = []
+
+    func showWithheld() {
+        items.append(contentsOf: withheld)
+        withheld = []
+    }
     /// Awaited before a file is added, so a test can act while it is being sent.
     var sendingFile: (() async -> Void)?
 
@@ -757,9 +766,10 @@ final class FakeItemLibrary: ItemLibrary {
         addedFileTags.append(tags)
         let id = ItemID.mint()
         let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", from: id, to: .item($0), origin: .property("child-of")) }
-        items.append(Item(
+        let made = Item(
             id: id, type: .file, title: title ?? name, titleRule: .property("title"), content: .file(.data, byteCount: Int64(data.count)),
-            version: ItemVersion(1), created: now(), modified: now(), edgesOut: parent.map { [$0] } ?? []))
+            version: ItemVersion(1), created: now(), modified: now(), edgesOut: parent.map { [$0] } ?? [])
+        if withheldFiles.contains(name) { withheld.append(made) } else { items.append(made) }
         return id
     }
 

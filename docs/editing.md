@@ -63,10 +63,10 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 ## Dropping on a place
 
 - **Files dropped on a list join the place in view** (`Browser.fileDropTarget`). A collection's place makes them members, the Feed keeps them in the Feed, and any other place adds them to the Library. A type of files names itself; a place that cannot take files says "the Library" in the pill.
-- **While files are held over a list, a gray ring runs round it** (`takesDroppedFiles`), with one pill, "Add 3 Files to Glaze tests", counting the files the drag holds. The sidebar takes none.
+- **While files are held over a list, a gray ring runs round it** (`takesDroppedFiles`), with one pill, "Add 3 Files to Glaze tests", counting the files the drag holds. A drag of folders alone shows no pill. The sidebar takes none, and an item dragged from the app is never imported again as a file.
 - **Where files go is fixed at the drop,** so a place that changes meanwhile does not move them.
 - **A folder is refused and told,** never opened for its files. A file named twice in one drop is added once, and a file the server refuses is told while the others are still added.
-- **A drop is one undo step and one toast** ("Added 3 Files", or "Added 2 of 3 Files"). Undo moves the new items to Recently Deleted.
+- **A drop is one undo step and one toast** ("Added 3 Files", or "Added 2 of 3 Files"), made once the library holds what was added. Undo removes the new items from the collection, if the drop joined one, and moves them to Recently Deleted; Redo restores them and joins them again. Where the library does not hold them all in time, the toast has no Undo and the person is told. An item that did not join says so in the toast ("Added 3 Files, 1 not in Glaze tests").
 - **A collection's row, card or sidebar row takes items and files** (`dropsInto`). Items already in it get no second edge, and the toast counts them. Nothing else in the sidebar takes a drop, nothing springs open, and sub-items do not drag. Add to Collection… is the way to do the same without a drag.
 
 ## Changing type

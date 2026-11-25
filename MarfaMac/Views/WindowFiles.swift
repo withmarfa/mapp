@@ -86,37 +86,54 @@ private struct DroppedFiles: ViewModifier {
     }
 }
 
+/// Takes files from outside the app and refuses the app's own items, which a drag of a file item also offers as a
+/// file, so that only they are imported.
 private struct FileDropHandler: DropDelegate {
-    @Binding var held: Int?
+    /// How many files the drag holds while it is over, 0 where that is not known; nil while none is over, or the
+    /// drag holds only folders.
+    var held: Binding<Int?>?
+    /// Whether a drag is over, for a view that draws its own target.
+    var isOver: Binding<Bool>?
     let take: ([NSItemProvider]) -> Void
 
-    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: [.fileURL]) }
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [.fileURL]) && !info.hasItemsConforming(to: [.marfaItem])
+    }
 
     func dropEntered(info: DropInfo) {
-        held = FileDropHandler.count(info)
+        held?.wrappedValue = FileDropHandler.count(info)
+        isOver?.wrappedValue = true
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .copy) }
 
-    func dropExited(info: DropInfo) { held = nil }
+    func dropExited(info: DropInfo) { leave() }
 
     func performDrop(info: DropInfo) -> Bool {
-        held = nil
+        leave()
         let providers = info.itemProviders(for: [.fileURL])
         guard !providers.isEmpty else { return false }
         take(providers)
         return true
     }
 
-    /// How many files the drag holds, read from the drag's own pasteboard, which the system fills as the drag starts:
-    /// a folder is not one, and a file named twice counts once. Falls back to the providers where it names none.
-    private static func count(_ info: DropInfo) -> Int {
+    private func leave() {
+        held?.wrappedValue = nil
+        isOver?.wrappedValue = false
+    }
+
+    /// How many files the drag holds: its providers, one for each item dragged. The drag's own pasteboard is read
+    /// only to leave out folders and a file named twice, and only where it lists as many items as the providers, so
+    /// it is this drag's. Folders alone give nil, and the pasteboard alone stands in where the drag names no provider.
+    private static func count(_ info: DropInfo) -> Int? {
+        let providers = info.itemProviders(for: [.fileURL]).count
         let urls = NSPasteboard(name: .drag).readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
-        guard !urls.isEmpty else { return info.itemProviders(for: [.fileURL]).count }
+        guard providers == 0 || urls.count == providers else { return providers }
+        guard !urls.isEmpty else { return 0 }
         let files = Set(
             urls.map { $0.resolvingSymlinksInPath() }
                 .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true })
-        return files.count
+        return files.isEmpty ? nil : files.count
     }
 }
 
@@ -177,13 +194,11 @@ private struct CollectionDrop: ViewModifier {
                 browser.addDropped(
                     Set(references.map(\.id)), to: collection, in: library, undoManager: undoManager, toasts: details?.toasts)
             } isTargeted: { isOverItems = $0 }
-            .onDrop(of: [.fileURL], isTargeted: $isOverFiles) { providers in
-                guard !providers.isEmpty else { return false }
+            .onDrop(of: [.fileURL], delegate: FileDropHandler(isOver: $isOverFiles) { providers in
                 browser.importProviders(
                     providers, to: browser.fileDropTarget(onCollection: collection, in: library), in: library, order: order,
                     undoManager: undoManager, toasts: details?.toasts)
-                return true
-            }
+            })
             .onChange(of: isTargeted) { reports?.wrappedValue = isTargeted }
             .background {
                 if reports == nil, isTargeted {

@@ -116,6 +116,69 @@ struct FileDropTests {
         #expect(toasts.current == nil)
     }
 
+    @Test func filesTheLibraryHasNotShownAreToldNotJoinedAndGiveNoUndo() async throws {
+        let collection = FakeItemLibrary.collection("Glaze tests")
+        let library = FakeItemLibrary(items: [collection])
+        let browser = Browser()
+        browser.adopt(library)
+        browser.show(.collection(collection.id), in: library, order: ItemOrder())
+        library.withheldFiles = ["b.txt"]
+        let toasts = ToastPresenter()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let ids = await browser.importFiles(
+            [disk.url("a.txt"), disk.url("b.txt")], in: library, order: ItemOrder(), undoManager: undo, toasts: toasts,
+            waiting: .milliseconds(50))
+        #expect(ids.count == 2)
+        #expect(toasts.current?.message == "Added 2 Files, 1 not in Glaze tests")
+        #expect(toasts.current?.undo == nil)
+        #expect(!undo.canUndo)
+        #expect(library.notices.waiting.count == 1)
+        #expect(library.item(ids[0])?.collectionIDs.contains(collection.id) == true)
+        #expect(browser.selection == [ids[0]])
+    }
+
+    @Test func aDropWhoseFilesAreAllUnshownJoinsNothingAndSelectsNothing() async throws {
+        let collection = FakeItemLibrary.collection("Glaze tests")
+        let library = FakeItemLibrary(items: [collection])
+        let browser = Browser()
+        browser.adopt(library)
+        browser.show(.collection(collection.id), in: library, order: ItemOrder())
+        library.withheldFiles = ["a.txt"]
+        let toasts = ToastPresenter()
+        let ids = await browser.importFiles(
+            [disk.url("a.txt")], in: library, order: ItemOrder(), undoManager: nil, toasts: toasts, waiting: .milliseconds(50))
+        #expect(ids.count == 1)
+        #expect(toasts.current?.message == "Added 1 File, 1 not in Glaze tests")
+        #expect(toasts.current?.undo == nil)
+        #expect(library.notices.waiting.count == 1)
+        #expect(browser.selection.isEmpty)
+    }
+
+    @MainActor @Test func theToastAndUndoWaitForTheLibraryToHoldWhatWasAdded() async throws {
+        let library = FakeItemLibrary()
+        let browser = Browser()
+        browser.adopt(library)
+        library.withheldFiles = ["a.txt"]
+        let toasts = ToastPresenter()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let url = disk.url("a.txt")
+        let drop = Task { @MainActor in
+            await browser.importFiles([url], in: library, order: ItemOrder(), undoManager: undo, toasts: toasts)
+        }
+        try #require(await eventually { !library.withheld.isEmpty })
+        #expect(toasts.current == nil)
+        #expect(!undo.canUndo)
+        library.showWithheld()
+        let ids = await drop.value
+        #expect(toasts.current?.message == "Added 1 File")
+        #expect(toasts.current?.undo != nil)
+        #expect(undo.canUndo)
+        undo.undo()
+        #expect(library.item(ids[0])?.state == .trashed)
+    }
+
     @Test func aFileThatCannotBeReadIsToldAndTheRestAreStillAdded() async throws {
         let library = FakeItemLibrary()
         let browser = Browser()
