@@ -10,7 +10,7 @@ paths:
 
 # How things look
 
-Each kind of thing has one drawing, used on the page and in a panel, row, card or table cell. Measures, colors and fills are tokens in the code; this page has the rules that they serve. Search `docs/rejected.md` before you propose a look.
+Each kind of thing has one drawing, used on the page and in a panel, row, card or table cell. Measures, colors and fills are tokens in the code; this page has the rules they serve. Search `docs/rejected.md` before proposing a look.
 
 ## Where things go
 
