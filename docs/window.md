@@ -56,7 +56,7 @@ paths:
 
 ## Sidebar closed
 
-- **The title opens the sidebar's rows as a menu** (`PlacesMenu`); place, views and buttons share one row.
+- **The title opens the sidebar's rows as a menu** (`PlacesMenu`); over a column that spans the window, place, views and buttons share one row.
 - **Beside a page the first line holds the controls only.** The title, the scope and the views have the row below, which scrolls away.
 
 ## Smallest window

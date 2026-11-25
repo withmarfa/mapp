@@ -34,8 +34,8 @@ private struct TopRowOverList: ViewModifier {
     func body(content: Content) -> some View {
         let row = TopRowContent.make(browser: browser, library: library)
         // With the sidebar closed the place, its views and the buttons share one row, and so they do at the smallest window.
-        // Closed, the traffic lights, the sidebar's button and Back and Forward leave the first line of a list column no room
-        // for the title: it, the scope and the views have the row below, which scrolls away.
+        // Except in a list column beside a page: there the traffic lights, the sidebar's button and Back and Forward leave
+        // the first line no room for the title, so it, the scope and the views have the row below, which scrolls away.
         let isCompact = opensPlaces && isBesidePage
         let beside = !isCompact && (isAlwaysBeside || browser.isSearchExpanded || browser.isSearching || opensPlaces || isSmall)
         let restHeight = (row.hasViews || isCompact) && !beside
