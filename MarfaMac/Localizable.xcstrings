@@ -328,6 +328,36 @@
     "%@ kept the mapping as it was." : {
 
     },
+    "%@ leave the Feed after ^[%lld day](inflect: true), and %lld of these are older. They would go to Recently Deleted within the hour." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ leave the Feed after ^[%2$lld day](inflect: true), and %3$lld of these are older. They would go to Recently Deleted within the hour."
+          }
+        }
+      }
+    },
+    "%@ leave the Feed after ^[%lld day](inflect: true), and 1 of these is older. It would go to Recently Deleted within the hour." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ leave the Feed after ^[%2$lld day](inflect: true), and 1 of these is older. It would go to Recently Deleted within the hour."
+          }
+        }
+      }
+    },
+    "%@ leave the Feed after ^[%lld day](inflect: true), and this one is older. It would go to Recently Deleted within the hour." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ leave the Feed after ^[%2$lld day](inflect: true), and this one is older. It would go to Recently Deleted within the hour."
+          }
+        }
+      }
+    },
     "%@ lists its jobs once it has started them." : {
 
     },
@@ -5982,6 +6012,9 @@
 
     },
     "Leave a field empty to use %@’s own default." : {
+
+    },
+    "Leaves the Feed" : {
 
     },
     "Left Out of Search" : {
