@@ -56,6 +56,7 @@ nonisolated enum MarfaProblems {
                 for: write, body: merged(write, with: folded), type: type, catalogue: catalogue,
                 afterRefusal: waitsOnStopped(write, among: { byID[$0] }))
             entry?.dependents = folded.map(\.id)
+            entry?.dependentCreates = folded.filter { $0.kind == .createItem }.compactMap { $0.itemId.map { ItemID($0) } }
             return entry
         }
         problems += conflictedCopies.map { entry(for: $0, catalogue: catalogue) }

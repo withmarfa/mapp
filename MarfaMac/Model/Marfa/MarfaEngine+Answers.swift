@@ -62,11 +62,15 @@ extension MarfaEngine {
                 verdict, afterRefusal: MarfaProblems.waitsOnStopped(answer, among: { answeredNow[$0] ?? refusals[$0] }))
             ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
             // A blocked or dead link may be released and sent again, so it is followed until it is answered for good.
-            if !outcome.mayBeSentAgain, let link = parentLinks.removeValue(forKey: answer.id) {
+            // A refusal is kept with the link first, so a quit before it is told still tells it at the next launch.
+            if !outcome.mayBeSentAgain, let link = parentLinks.link(for: answer) {
                 ids.formUnion([link.child.rawValue, link.parent.rawValue])
                 if case .refused(let problem) = outcome {
                     let reason = problem.message ?? String(localized: "The Marfa server refused this change.")
-                    refusedParentLinks.append(ParentRefusal(link: link, reason: reason, listed: true))
+                    parentLinks.refuse(answer.id, reason: reason)
+                    refusedParentLinks.append(ParentRefusal(link: link, reason: reason, listed: true, write: answer.id))
+                } else {
+                    parentLinks.remove(answer.id)
                 }
             }
             if let itemID = answer.itemId {
@@ -144,46 +148,68 @@ nonisolated struct ParentLink: Hashable, Codable, Sendable {
     let parent: ItemID
 }
 
-/// The new items' parent links waiting for the server, by queued write, written whole to `file` at each change.
+/// The new items' parent links waiting for the server, by queued write, written whole to `file` at each change. A
+/// link the server refused keeps its reason until the person is told.
 nonisolated struct ParentLinkStore {
+    private struct Entry: Codable {
+        let link: ParentLink
+        var refusal: String?
+    }
+
     private let file: URL?
-    private var links: [String: ParentLink]
+    private var entries: [String: Entry]
 
     init(file: URL?) {
         self.file = file
-        links = file.flatMap { try? Data(contentsOf: $0) }.flatMap { try? JSONDecoder().decode([String: ParentLink].self, from: $0) } ?? [:]
+        entries = file.flatMap { try? Data(contentsOf: $0) }.flatMap { try? JSONDecoder().decode([String: Entry].self, from: $0) } ?? [:]
     }
+
+    var isEmpty: Bool { entries.isEmpty }
 
     mutating func keep(_ link: ParentLink, for write: String) {
-        links[write] = link
+        entries[write] = Entry(link: link)
         save()
     }
 
-    mutating func removeValue(forKey write: String) -> ParentLink? {
-        guard let link = links.removeValue(forKey: write) else { return nil }
-        save()
-        return link
+    /// The link `write` makes, not yet refused: only a link from its parent to its child, so a queue id used again
+    /// never matches.
+    func link(for write: Marfa.QueuedWrite) -> ParentLink? {
+        guard write.kind == .createEdge, let entry = entries[write.id], entry.refusal == nil,
+            write.itemId == entry.link.parent.rawValue, write.toId == entry.link.child.rawValue
+        else { return nil }
+        return entry.link
     }
 
-    var isEmpty: Bool { links.isEmpty }
-    func link(for write: Marfa.QueuedWrite) -> ParentLink? { links[write.id] }
-    mutating func refuse(_ write: String, reason: String) {}
-
-    mutating func keepOnly(_ writes: Set<String>) {
-        let kept = links.filter { writes.contains($0.key) }
-        guard kept.count != links.count else { return }
-        links = kept
+    mutating func refuse(_ write: String, reason: String) {
+        entries[write]?.refusal = reason
         save()
+    }
+
+    mutating func remove(_ write: String) {
+        guard entries.removeValue(forKey: write) != nil else { return }
+        save()
+    }
+
+    /// What is still to be told once the queue is first read: each refusal not told before a quit, and each link
+    /// whose write left the queue, `queued`, with no answer taken, which may not have been made.
+    func untold(queued: Set<String>) -> [ParentRefusal] {
+        entries.sorted { $0.key < $1.key }.compactMap { write, entry in
+            if let refusal = entry.refusal {
+                return ParentRefusal(link: entry.link, reason: refusal, listed: queued.contains(write), write: write)
+            }
+            guard !queued.contains(write) else { return nil }
+            return ParentRefusal(link: entry.link, reason: nil, listed: false, write: write)
+        }
     }
 
     /// A link not written is still told while the app runs; only a relaunch loses it.
     private func save() {
         guard let file else { return }
         do {
-            if links.isEmpty {
+            if entries.isEmpty {
                 if FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) { try FileManager.default.removeItem(at: file) }
             } else {
-                try JSONEncoder().encode(links).write(to: file, options: .atomic)
+                try JSONEncoder().encode(entries).write(to: file, options: .atomic)
             }
         } catch {
             Telemetry.logger(.engine).error("New item parent links not written: \(error.localizedDescription)")
@@ -192,10 +218,12 @@ nonisolated struct ParentLinkStore {
 }
 
 /// A parent link refused as it was queued, or by the server later, when the refused write is also `listed` in Settings.
+/// With no `reason`, its write left the queue with no answer known. `write` is its entry in `ParentLinkStore`.
 nonisolated struct ParentRefusal: Hashable, Sendable {
     let link: ParentLink
-    let reason: String
+    let reason: String?
     let listed: Bool
+    var write: String?
 }
 
 nonisolated extension WriteOutcome {

@@ -349,13 +349,14 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     var namesRevision: Int { membershipRevision }
-    /// Every create Marfa refused for good: those refused as they were sent, and those the copy lists as refused.
+    /// Every create Marfa refused for good: those refused as they were sent, and those the copy lists as refused, on
+    /// their own or with a write they went with, such as a file's upload.
     var refusedCreates: Set<ItemID> {
-        refusedCreations.union(syncReport.problems.compactMap { $0.change == .create && $0.kind == .refused ? $0.itemID : nil })
+        refusedCreations.union(syncReport.problems.filter { $0.kind == .refused }.flatMap(\.refusedCreates))
     }
-    /// The server's reason for refusing the create of `item`, where the queue still lists it.
+    /// The reason the copy gives for refusing the create of `item`, where the queue still lists it.
     func refusalReason(creating item: ItemID) -> String? {
-        syncReport.problems.first { $0.itemID == item && $0.change == .create && $0.kind == .refused }?.reason?.message
+        syncReport.problems.first { $0.kind == .refused && $0.refusedCreates.contains(item) }?.reason?.message
     }
     var serverKey: String { "" }
     func headerItem(_ id: ItemID) -> Item? { item(id) }

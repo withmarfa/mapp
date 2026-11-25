@@ -289,16 +289,18 @@ final class QuickAdd {
     var mayBeInMarfa = false
     /// Whether the window asks the person to add again a draft that may be in Marfa already.
     var asksAgain = false
-    static var mayBeInMarfaNotice: String { "stub" }
+    /// What the line and the text form say of a draft that may be in Marfa already.
+    static var mayBeInMarfaNotice: String {
+        String(localized: "This may already be in Marfa. The app quit while it was being added, so check the library before you add it again.")
+    }
 
     /// Writes the draft as it now is, or drops it where it is empty.
     private func keep() {
         guard let entry, let draft else { return }
         let kept = drafts.update(entry, draft)
         guard kept != entry else { return }
-        // The draft emptied was on its way, so it waits in the store as sent and the window goes on afresh.
+        // The draft was on its way, so it waits in the store as sent and the window goes on in a new one.
         self.entry = kept
-        mayBeInMarfa = false
     }
 
     /// Starts this window's draft in `library`: the one a closed window or an earlier run left there, else a new one
@@ -330,9 +332,7 @@ final class QuickAdd {
     private func cameBack(_ kept: NewItemDrafts.Entry, in library: any ItemLibrary) {
         mayBeInMarfa = kept.interrupted
         if kept.interrupted {
-            lastAdded = QuickAdd.isFile(kept.draft.typeID, in: library.catalogue)
-                ? String(localized: "The app quit while this file was being added. Check that it isn’t in the library before you add it again.")
-                : String(localized: "The app quit while this item was being added. Check that it isn’t in the library before you add it again.")
+            lastAdded = Self.mayBeInMarfaNotice
         } else if kept.returned {
             lastAdded = String(localized: "The item wasn’t added. What you typed is back.")
         }
@@ -413,6 +413,8 @@ final class QuickAdd {
     private var sending: Draft?
     /// The kept draft whose file is on its way, which the window may let go before the library answers.
     private var sendingEntry: UUID?
+    /// The window let go of what it held while the file was on its way.
+    private var leftWhileSending = false
     /// While the core is asked about the parent, before anything is sent. The draft is still the window's to hand
     /// off, since nothing is on its way, so this only stops a second Add.
     private var checkingParent = false
@@ -438,22 +440,24 @@ final class QuickAdd {
 
     /// Lets the draft go as it leaves the window. The draft stays kept on this Mac (`NewItemDrafts`), and the next
     /// window to open a new item in its library takes it back. A draft whose file is on its way stays kept as it was
-    /// sent until the library answers (`fileSent`), and only what was typed besides is offered meanwhile. An entry
+    /// sent until the library answers (`fileSent`), and only what was typed after it, less what was sent, is offered
+    /// meanwhile. An entry
     /// still being typed into a list field is in no draft, so that alone goes to the clipboard through `notices`,
     /// which tells the person.
     func leave(because departure: Departure, telling notices: Notices) {
         let lists = unfinishedListText
-        if let entry, var rest = draft, let sending, entry == sendingEntry {
+        if let entry, var rest = draft, let sending, sendingEntry != nil, !leftWhileSending {
             rest.files.removeAll { sending.files.contains($0) }
             if NameText.trimmed(rest.title) == NameText.trimmed(sending.title) { rest.title = "" }
             if rest.parentID == sending.parentID { rest.parentID = nil }
             rest.properties = rest.properties.filter { sending.properties[$0.key] != $0.value }
             rest.chips.removeAll { sending.chips.contains($0) }
             rest.tags.removeAll { sending.tags.contains($0) }
-            drafts.release(entry, sending: sending, rest: rest)
+            drafts.release(drafts.update(entry, rest))
         } else if let entry {
             drafts.release(entry)
         }
+        if sendingEntry != nil { leftWhileSending = true }
         entry = nil
         draft = nil
         mayBeInMarfa = false
@@ -468,17 +472,23 @@ final class QuickAdd {
         notices.notKept(String(localized: "Entry Not Added"), text: lists.joined(separator: "\n"), reason: reason)
     }
 
-    fileprivate func saving(_ draft: Draft) {
+    /// The file is about to be sent, marked so first (`NewItemDrafts.sendingFile`). False where the mark is kept
+    /// nowhere, so nothing is sent.
+    fileprivate func saving(_ draft: Draft) -> Bool {
+        guard let entry, drafts.sendingFile(entry) else { return false }
         sending = draft
         sendingEntry = entry
-        if let entry { _ = drafts.sendingFile(entry) }
+        return true
     }
 
-    /// Returns whether the window still holds the draft. If the window closed, keep the draft until Marfa answers
-    /// the queued create. If queuing failed, return the draft and tell the person where to find it.
+    /// Returns whether the window still holds the draft. Where the window closed, or went on in a new draft, the
+    /// draft as sent is kept until Marfa answers the queued create, or, if queuing failed, given back and the person
+    /// told where to find it.
     fileprivate func fileSent(_ item: ItemID?, telling notices: Notices) -> Bool {
         let files = Array(sending?.files.prefix(1) ?? [])
         sending = nil
+        let held = !leftWhileSending
+        leftWhileSending = false
         guard let sent = sendingEntry else { return true }
         sendingEntry = nil
         guard sent != entry else { return true }
@@ -490,7 +500,7 @@ final class QuickAdd {
                 String(localized: "File Not Added"),
                 String(localized: "\(QuickAdd.File.names(files)) wasn’t added, so what you typed for it is kept. It comes back the next time you make a new item."))
         }
-        return false
+        return held
     }
     /// The create about to be made from the draft, kept first (`NewItemDrafts.sending`). False where the draft is kept
     /// nowhere, so nothing would follow the create.
@@ -925,7 +935,12 @@ extension Browser {
         var startsGroup = undoManager?.groupingLevel == 0
         let id: ItemID?
         if isFile, let file = draft.files.first {
-            quickAdd.saving(typed)
+            guard quickAdd.saving(typed) else {
+                library.notices.tell(
+                    String(localized: "Item Not Added"),
+                    String(localized: "The app couldn’t save the new item on this Mac before sending it, so nothing was added. What you typed is still there. Try again."))
+                return nil
+            }
             let title = NameText.trimmed(draft.title)
             id = await library.addFile(
                 file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, tier: draft.tier, tags: draft.tags)

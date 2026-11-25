@@ -294,9 +294,15 @@ extension MarfaEngine {
         let told = hub.told([refusal.link.child, refusal.link.parent])
         let item = told[refusal.link.child].map { "“\($0.item.displayTitle)”" } ?? String(localized: "The new item")
         let parent = told[refusal.link.parent].map { "“\($0.item.displayTitle)”" } ?? String(localized: "its parent")
+        guard let reason = refusal.reason else {
+            return SourceFailure(
+                kind: .failed,
+                message: String(localized: "\(item) was added. Its parent link may not have been made, so check that it’s under \(parent)."),
+                title: String(localized: "Item May Not Be Under Its Parent"))
+        }
         let message = refusal.listed
-            ? String(localized: "\(item) was added, but Marfa refused to put it under \(parent): \(refusal.reason) The link is also listed in Settings.")
-            : String(localized: "\(item) was added, but it couldn’t be put under \(parent): \(refusal.reason)")
+            ? String(localized: "\(item) was added, but Marfa refused to put it under \(parent): \(reason) The link is also listed in Settings.")
+            : String(localized: "\(item) was added, but it couldn’t be put under \(parent): \(reason)")
         return SourceFailure(kind: .failed, message: message, title: String(localized: "Can’t Put Item Under Its Parent"))
     }
 

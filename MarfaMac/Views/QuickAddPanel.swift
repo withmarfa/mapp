@@ -66,6 +66,12 @@ struct QuickAddPanel: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("QuickAddListUnfinished")
                 }
+                if quickAdd.mayBeInMarfa {
+                    Text(verbatim: QuickAdd.mayBeInMarfaNotice)
+                        .interfaceFont(.callout)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("QuickAddMayBeInMarfa")
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)

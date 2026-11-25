@@ -79,10 +79,17 @@ nonisolated struct SyncProblemEntry: Identifiable, Hashable, Sendable {
     var date: Date?
     /// Writes refused only because this one was, which go when it is discarded.
     var dependents: [String] = []
+    /// The items whose creates are among `dependents`, as a file's create goes with its upload.
+    var dependentCreates: [ItemID] = []
     /// The core's names for the fields of the item's type, for the parts of a refusal that name a field.
     var fieldLabels: [String: String] = [:]
 
     var copyText: String { content.plainText }
+
+    /// The creates this problem stands for: its own, and those refused with it.
+    var refusedCreates: [ItemID] {
+        (change == .create ? itemID.map { [$0] } ?? [] : []) + dependentCreates
+    }
 }
 
 /// A write's content as plain text values, in the catalogue's order.
