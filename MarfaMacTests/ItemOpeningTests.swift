@@ -44,6 +44,7 @@ struct ItemOpeningTests {
 
     @Test @MainActor func theWindowHoldsAPageOnlyWhileTheColumnBesideALayoutShowsIt() {
         let browser = Browser()
+        browser.showing = .sources
         let table = UUID(), items = UUID()
         #expect(!browser.showsBesideColumn && !browser.showsPage, "an index with no column shows no page")
         browser.columnBeside(table, isShown: true)
