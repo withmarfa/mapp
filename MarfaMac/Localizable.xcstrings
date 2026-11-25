@@ -572,6 +572,16 @@
         }
       }
     },
+    "%@, %lld already in it" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$lld already in it"
+          }
+        }
+      }
+    },
     "%@, %lld completed" : {
       "localizations" : {
         "en" : {
@@ -2137,6 +2147,12 @@
     "Add File or Property" : {
       "extractionState" : "manual"
     },
+    "Add Files" : {
+
+    },
+    "Add Files to %@" : {
+
+    },
     "Add Filter" : {
 
     },
@@ -2265,11 +2281,31 @@
     "Added %@." : {
 
     },
+    "Added %lld of %lld Files" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Added %1$lld of %2$lld Files"
+          }
+        }
+      }
+    },
     "Added a file" : {
 
     },
     "Added “%@”" : {
 
+    },
+    "Added “%@” to %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Added “%1$@” to %2$@"
+          }
+        }
+      }
     },
     "Adding will be refused: this kind of item needs %@, which the app can’t fill in. Choose another kind." : {
 
@@ -11972,6 +12008,16 @@
     "^[%lld change](inflect: true)" : {
 
     },
+    "^[%lld item](inflect: true) already in %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "^[%1$lld item](inflect: true) already in %2$@"
+          }
+        }
+      }
+    },
     "^[%lld item](inflect: true) can’t be added as a file." : {
       "extractionState" : "manual"
     },
@@ -12008,6 +12054,29 @@
     },
     "^[%lld view](inflect: true)" : {
 
+    },
+    "^[Add %lld File](inflect: true) to %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "^[Add %1$lld File](inflect: true) to %2$@"
+          }
+        }
+      }
+    },
+    "^[Added %lld File](inflect: true)" : {
+
+    },
+    "^[Added %lld item](inflect: true) to %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "^[Added %1$lld item](inflect: true) to %2$@"
+          }
+        }
+      }
     },
     "^[Archived %lld item](inflect: true)" : {
 
@@ -12313,6 +12382,12 @@
 
     },
     "the %@" : {
+
+    },
+    "the Feed" : {
+
+    },
+    "the Library" : {
 
     },
     "the key %@" : {
