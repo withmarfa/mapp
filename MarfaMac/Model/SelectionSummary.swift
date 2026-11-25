@@ -37,7 +37,7 @@ struct SelectionFacts: Equatable {
         facts.ids = selection
         guard !held.isEmpty else { return facts }
         facts.moves = library.selectionCommands(facts.ids)
-        facts.isAllInBin = held.allSatisfy { $0.state == .trashed }
+        facts.isAllInBin = held.count == selection.count && held.allSatisfy { $0.state == .trashed }
         facts.canTag = held.contains { $0.allows(.tags) }
         facts.canCollect = !library.joinableCollections.isEmpty && held.contains(where: library.canJoinCollection)
         facts.canChangeType = library.offersTypeChange(for: facts.ids)

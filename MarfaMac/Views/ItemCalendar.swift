@@ -66,7 +66,11 @@ struct ItemCalendar: View {
             keyboard.day = nil
             return .handled
         }
-        .deletesChosen(browser) { CalendarLayout.ids(in: placed.entries, within: drawn) }
+        // The menu and the capsule act on the whole choice, so a choice never holds an event the calendar has left behind.
+        .onChange(of: drawn) {
+            let kept = browser.selection.intersection(CalendarLayout.ids(in: placed.entries, within: drawn))
+            if kept != browser.selection { browser.selection = kept }
+        }
         .searchStatus(browser)
         .overlay {
             if items.isEmpty {

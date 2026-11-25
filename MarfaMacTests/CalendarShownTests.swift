@@ -10,11 +10,11 @@ struct CalendarShownTests {
         return CalendarEntry(id: ItemID(id), title: id, start: start, end: start.addingTimeInterval(3_600), isAllDay: false)
     }
 
-    @Test func aKeyCommandReachesOnlyTheEventsOfTheWeekOrMonthDrawn() {
+    @Test func aChoiceNarrowsToTheEventsOfTheWeekOrMonthDrawn() {
         let entries = [entry("this", day: 25), entry("next", day: 30), entry("last month", month: 10, day: 10)]
         let firstShown = calendar.date(from: DateComponents(year: 2026, month: 11, day: 23))!
         let week = CalendarLayout.drawn(.week, firstShown: firstShown, anchor: firstShown, calendar: calendar)
-        #expect(CalendarLayout.ids(in: entries, within: week) == [ItemID("this")], "the next week's event is not shown, so a delete leaves it")
+        #expect(CalendarLayout.ids(in: entries, within: week) == [ItemID("this")], "the next week's event is not drawn, so a change of week drops it from the choice")
         let month = CalendarLayout.drawn(.month, firstShown: firstShown, anchor: firstShown, calendar: calendar)
         #expect(CalendarLayout.ids(in: entries, within: month) == [ItemID("this"), ItemID("next")])
     }

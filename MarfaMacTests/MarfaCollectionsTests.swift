@@ -199,6 +199,23 @@ import Testing
         #expect(toasts.current?.undo == nil)
     }
 
+    @Test func recoverAndRemoveFromACollectionCountAnItemTheLibraryNoLongerHoldsAsSkipped() async throws {
+        let (library, source) = try await loaded()
+        let gone = ItemID("gone")
+        let skipped = BatchSkips.sentence(.gone, count: 1)
+        library.recover([F.n3, gone], undoManager: nil)
+        #expect(source.writes == [.restore(F.n3)])
+        // The notice waits for the engine's first answer to the restore.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        #expect(await eventually { library.notices.waiting.last?.message == skipped })
+        #expect(library.notices.waiting.last?.title == String(localized: "Some Items Were Skipped"))
+        source.clearWrites()
+        #expect(library.removeFromCollection([F.n1, gone], Self.holiday, undoManager: nil))
+        #expect(source.writes.count == 1, "only the item the library holds is taken out")
+        #expect(library.notices.waiting.last?.title == String(localized: "Some Items Were Skipped"))
+        #expect(library.notices.waiting.last?.message == skipped)
+    }
+
     @Test func removingFromACollectionIsOneUndoStepThatPutsBackOnlyWhatLeft() async throws {
         let (library, source) = try await loaded()
         let undo = StepCountingUndoManager()

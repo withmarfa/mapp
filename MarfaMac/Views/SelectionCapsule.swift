@@ -183,11 +183,7 @@ struct SelectionCapsule: View {
 
     private func deleteButton(_ facts: SelectionFacts) -> some View {
         Button {
-            if facts.isAllInBin {
-                library.itemsToPurge = facts.ids
-            } else {
-                library.deleteAfterSaving(facts.ids, undoManager: undoManager, asking: details)
-            }
+            library.deleteAfterSaving(facts.ids, undoManager: undoManager, asking: details)
         } label: {
             Image(systemName: "trash")
         }

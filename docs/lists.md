@@ -52,8 +52,8 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Unarchive and Delete stand on an Archive row under the pointer** (`RowQuickActions`).
 - **Layouts draw the supplied items** (`ItemViewMode`).
 - **One row menu, one density and one drag serve every layout.**
-- **Several chosen items show a capsule of item commands** (`SelectionCapsule`), under a pile beside a list (`SelectionPile`).
-- **The count and Escape clear the choice;** ⌘⌫ deletes only the chosen items the layout shows (`deletesChosen`).
+- **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
+- **⌘⌫ deletes what a board or timeline shows** (`deletesChosen`). A calendar's new span drops events it leaves.
 - **An item's date is its own type's** (`ItemPlacement`), so a place of several types puts each where it belongs. The view can point at one field.
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
