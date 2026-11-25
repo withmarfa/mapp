@@ -839,15 +839,22 @@ test('a header with no pins draws none', () => {
 })
 
 /** Draws three rows of 30 points with a fourth folded away, and returns a drag of the first by its name. */
-function draggable(): { key: HTMLElement; drag: (y: number) => void; drop: () => void } {
-  const rows = ['a', 'b', 'c', 'd'].map((id) => ({
+function draggable(
+  ids = ['a', 'b', 'c', 'd'],
+  folded = ['d'],
+): {
+  key: HTMLElement
+  drag: (y: number) => void
+  drop: () => void
+} {
+  const rows = ids.map((id) => ({
     id,
     label: id,
     symbol: 'text.alignleft',
     kind: 'text' as const,
     text: id,
     editable: true,
-    folded: id === 'd',
+    folded: folded.includes(id),
   }))
   header.set({ ...ticket, rows })
   const list = root.querySelector<HTMLElement>('.item-props')!
@@ -879,6 +886,15 @@ test('a row dropped last among those shown stays above the rows folded away', ()
   drop()
   expect(posted).toEqual([
     { type: 'moveRow', item: 'ticket', row: 'a', order: ['b', 'c', 'a', 'd'] },
+  ])
+})
+
+test('a row folded away keeps its place in the order a drag sends', () => {
+  const { drag, drop } = draggable(['a', 'x', 'b', 'c'], ['x'])
+  drag(80)
+  drop()
+  expect(posted).toEqual([
+    { type: 'moveRow', item: 'ticket', row: 'a', order: ['b', 'x', 'c', 'a'] },
   ])
 })
 

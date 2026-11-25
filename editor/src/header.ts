@@ -1028,13 +1028,17 @@ export class ItemHeader {
     return true
   }
 
-  /** Asks the app to list the rows in the order the page now shows: those on screen as dragged, then any folded away
-   *  as the page drew them, so the app stores what the person saw and not an order of its own. */
+  /** Asks the app to list every row in the order the page now shows: the rows on screen take the places they held, in
+   *  their dragged order, and a row folded away keeps its own place, so the type's one order changes only where the
+   *  person moved something. */
   private moveRow(row: string, shown: string[]) {
     if (!this.model) return
-    const kept = new Set(shown)
-    const folded = this.model.rows.map((property) => property.id).filter((id) => !kept.has(id))
-    postToHost({ type: 'moveRow', item: this.model.item, row, order: [...shown, ...folded] })
+    const onScreen = new Set(shown)
+    let next = 0
+    const order = this.model.rows.map((property) =>
+      onScreen.has(property.id) ? shown[next++]! : property.id,
+    )
+    postToHost({ type: 'moveRow', item: this.model.item, row, order })
   }
 
   /** Asks the app for Change Type, under the kicker's type name. */
