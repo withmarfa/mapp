@@ -5,7 +5,7 @@ import SwiftUI
 enum ViewPanelMetrics {
     static let width: CGFloat = 356
     static let rowHeight: CGFloat = 32
-    static let inset: CGFloat = 12
+    static let inset: CGFloat = 16
     static let symbolWidth: CGFloat = 18
     /// The most the panel grows to before its body scrolls.
     static let maxHeight: CGFloat = 640
@@ -27,7 +27,8 @@ struct ViewPanelHead<Trailing: View>: View {
                     .accessibilityIdentifier("ViewPanelBack")
             }
             Text(verbatim: title)
-                .interfaceFont(.body.weight(.semibold))
+                .interfaceFont(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .accessibilityAddTraits(.isHeader)
@@ -35,8 +36,9 @@ struct ViewPanelHead<Trailing: View>: View {
             trailing
         }
         .frame(minHeight: ViewPanelMetrics.rowHeight)
-        .padding(.horizontal, ViewPanelMetrics.inset)
-        .padding(.top, 8)
+        .padding(.leading, ViewPanelMetrics.inset)
+        .padding(.trailing, 14)
+        .padding(.top, 6)
     }
 }
 
@@ -212,8 +214,8 @@ struct ViewPanelFoot: View {
                 .padding(.horizontal, ViewPanelMetrics.inset)
                 .padding(.vertical, 4)
             Text(verbatim: text)
-                .interfaceFont(.callout)
-                .foregroundStyle(.secondary)
+                .interfaceFont(.subheadline)
+                .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, ViewPanelMetrics.inset)
                 .padding(.bottom, 10)
@@ -222,13 +224,13 @@ struct ViewPanelFoot: View {
     }
 }
 
-/// The grabber that leads each row of an ordered list.
+/// The six-dot grip that leads each row of an ordered list.
 struct ViewPanelGrabber: View {
     var isHidden = false
 
     var body: some View {
-        Image(systemName: "line.3.horizontal")
-            .font(.caption)
+        Image(systemName: "circle.grid.2x3.fill")
+            .font(.system(size: 8))
             .foregroundStyle(.tertiary)
             .opacity(isHidden ? 0 : 1)
             .frame(width: 12)

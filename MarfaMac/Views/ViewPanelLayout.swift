@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The layout's own section of the View panel: what only that layout has. A list has its density, a table how many rows
-/// it shows at a time, a board and a gallery their cards, a calendar its span and a timeline its date.
+/// The layout's own section of the View panel: what only that layout has. A list has its properties and density, a
+/// table its columns and how many rows it shows at a time, a board its properties and cards, a gallery its cards and
+/// properties, a calendar its span and a timeline its date and properties.
 struct ViewPanelLayoutRows: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
@@ -11,12 +12,23 @@ struct ViewPanelLayoutRows: View {
 
     var body: some View {
         switch browser.viewMode {
-        case .list: density
-        case .table: tableRows
-        case .board: boardCards
-        case .gallery: ViewPanelGalleryRows(browser: browser)
-        case .calendar: calendarSpan
-        case .timeline: timelineDate
+        case .list:
+            ViewPanelPropertiesRow(browser: browser, panel: panel)
+            density
+        case .table:
+            ViewPanelPropertiesRow(browser: browser, panel: panel)
+            tableRows
+        case .board:
+            ViewPanelPropertiesRow(browser: browser, panel: panel)
+            boardCards
+        case .gallery:
+            ViewPanelGalleryRows(browser: browser)
+            ViewPanelPropertiesRow(browser: browser, panel: panel)
+        case .calendar:
+            calendarSpan
+        case .timeline:
+            timelineDate
+            ViewPanelPropertiesRow(browser: browser, panel: panel)
         }
     }
 
@@ -65,6 +77,28 @@ struct ViewPanelLayoutRows: View {
             choose: { browser.setTimelineField($0, in: library) })
             .disabled(fields.isEmpty)
             .accessibilityIdentifier("TimelineDateField")
+    }
+}
+
+/// The row that opens Properties, or a table's Columns, with what they show.
+private struct ViewPanelPropertiesRow: View {
+    @CurrentLibrary private var library
+    @Bindable var browser: Browser
+    let panel: ViewPanel
+
+    var body: some View {
+        let isTable = browser.viewMode == .table
+        ViewPanelOpenRow(
+            symbol: "list.bullet.rectangle", label: isTable ? String(localized: "Columns") : String(localized: "Properties"), value: value
+        ) { panel.page = .properties }
+        .accessibilityIdentifier("ViewPanelPropertiesRow")
+    }
+
+    private var value: String {
+        let properties = browser.properties
+        guard properties.isChanged else { return String(localized: "As in Layouts") }
+        let shown = browser.offeredProperties(in: library).filter { $0.content != .title && properties.isShown($0) }
+        return shown.isEmpty ? String(localized: "None") : shown.map(\.label).formatted(.list(type: .and, width: .narrow))
     }
 }
 

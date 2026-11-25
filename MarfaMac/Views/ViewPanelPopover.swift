@@ -1,12 +1,14 @@
+import AppKit
 import SwiftUI
 
-/// The View button at the end of a view's toolbar, which opens the View panel under it. It is tinted and counts the
-/// filters where the place has any, and carries a dot while the person has changed the saved view since the window
-/// opened it, which Revert View takes back.
+/// The View button at the end of a view's toolbar, which opens the View panel under it and stays pressed while it is
+/// open. It is tinted and counts the filters where the place has any, and carries a dot while the person has changed the
+/// saved view since the window opened it, which Revert View takes back.
 struct ViewPanelButton: View {
     @CurrentLibrary private var library
     @Environment(\.controlActiveState) private var activeState
     @Bindable var browser: Browser
+    @State private var room = TrailingRoom()
 
     var body: some View {
         let count = browser.filterCount
@@ -14,9 +16,9 @@ struct ViewPanelButton: View {
         // neighbours do.
         let tinted = count > 0 && activeState != .inactive
         let changed = browser.isViewChanged
-        Button {
-            if browser.showsViewPanel { browser.escapeViewPanel(in: library) } else { browser.openViewPanel(in: library) }
-        } label: {
+        Toggle(isOn: Binding { browser.showsViewPanel } set: { open in
+            if open { browser.openViewPanel(in: library) } else { browser.escapeViewPanel(in: library) }
+        }) {
             HStack(spacing: 3) {
                 Image(systemName: "slider.horizontal.3")
                 if count > 0 { Text("\(count)").font(.caption.monospacedDigit()) }
@@ -32,11 +34,13 @@ struct ViewPanelButton: View {
                 }
             }
         }
+        .toggleStyle(.button)
+        .background(TrailingRoomProbe(room: room))
         .disabled(!browser.offersViewOptions || !library.isLoaded || browser.showsSidebarIndex)
         .help("View")
         .accessibilityLabel(Self.label(count: count, changed: changed))
         .accessibilityIdentifier("ViewOptionsToolbar")
-        .popover(isPresented: presented, arrowEdge: .bottom) {
+        .popover(isPresented: presented, attachmentAnchor: .rect(.rect(room.anchor(width: ViewPanelMetrics.width))), arrowEdge: .bottom) {
             if let panel = browser.viewPanel {
                 ViewPanelPopover(browser: browser, panel: panel)
                     .environment(\.library, library)
@@ -61,6 +65,40 @@ struct ViewPanelButton: View {
     }
 }
 
+/// How far the window's trailing margin is from the View button, so the panel opens inside the window with its trailing
+/// edge at that margin, as the toolbar's other panels stand, rather than centred under the button and past the window's
+/// edge. Read when the button draws, which it does as the panel opens.
+@MainActor
+private final class TrailingRoom {
+    weak var view: NSView?
+
+    /// The window's margin, the inset of the toolbar's last button.
+    private static let margin: CGFloat = 14
+
+    /// The rect, in the button's space, under which a panel `width` wide stands with its trailing edge at the window's
+    /// margin. With no window yet it is the button's own bounds.
+    func anchor(width: CGFloat) -> CGRect {
+        guard let view, let window = view.window else { return CGRect(origin: .zero, size: view?.bounds.size ?? .zero) }
+        let frame = view.convert(view.bounds, to: nil)
+        let room = max(0, window.frame.width - Self.margin - frame.maxX)
+        return CGRect(x: view.bounds.width + room - width, y: 0, width: width, height: view.bounds.height)
+    }
+}
+
+private struct TrailingRoomProbe: NSViewRepresentable {
+    let room: TrailingRoom
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        room.view = view
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        room.view = view
+    }
+}
+
 /// The View panel (`ViewPanel`): one page at a time, the view's settings first, and each of Types, Filter, Sort, Group
 /// and Properties opened in place with a way back. Every change is kept as it is made, so it has no Save and no Done;
 /// a new view, which does not exist until it is made, ends with Create View.
@@ -69,14 +107,15 @@ struct ViewPanelPopover: View {
     @Bindable var browser: Browser
     @Bindable var panel: ViewPanel
 
+    /// The open page's own height, so each page is as tall as it needs, up to the most the panel grows to.
+    @State private var height: CGFloat?
+
     var body: some View {
-        ViewThatFits(in: .vertical) {
-            page
-            ScrollView { page }
-                .scrollBounceBehavior(.basedOnSize)
+        ScrollView {
+            page.onGeometryChange(for: CGFloat.self, of: \.size.height) { height = $0 }
         }
-        .frame(width: ViewPanelMetrics.width)
-        .frame(maxHeight: ViewPanelMetrics.maxHeight)
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(width: ViewPanelMetrics.width, height: height.map { min($0, ViewPanelMetrics.maxHeight) }, alignment: .top)
         .onExitCommand {
             if panel.page != .main { panel.page = .main } else { browser.escapeViewPanel(in: library) }
         }
@@ -99,8 +138,8 @@ struct ViewPanelPopover: View {
     }
 }
 
-/// The panel's first page: the name with More, the layouts, the layout's own section, Items, Properties, Open Items and
-/// Quick Actions, then the foot line.
+/// The panel's first page: the name with More, the layouts, the layout's own section, Items, Open Items and Quick
+/// Actions, then the foot line.
 private struct ViewPanelMain: View {
     @CurrentLibrary private var library
     @StoredOrder private var order
@@ -119,22 +158,16 @@ private struct ViewPanelMain: View {
         ViewPanelSection(title: String(localized: "Items")) {
             ViewPanelItemsRows(browser: browser, panel: panel)
         }
-        if mode != .calendar {
-            ViewPanelSection {
-                ViewPanelOpenRow(
-                    symbol: "list.bullet.rectangle", label: mode == .table ? String(localized: "Columns") : String(localized: "Properties"),
-                    value: propertiesValue
-                ) { panel.page = .properties }
-                .accessibilityIdentifier("ViewPanelPropertiesRow")
-            }
-        }
         ViewPanelSection {
             ViewPanelOpeningRow(browser: browser)
-            ViewPanelSwitchRow(
-                symbol: "bolt", label: String(localized: "Quick Actions"), isOn: browser.showsQuickActions,
-                set: { browser.setShowsQuickActions($0) })
-                .help("Buttons on the row under the pointer, such as Archive and Delete")
-                .accessibilityIdentifier("ViewPanelQuickActions")
+            // Quick Actions belong where the view lists the Feed; one turned on elsewhere stays, to be turned off.
+            if browser.showsQuickActions || ViewMacSettings.showsQuickActions(nil, in: browser.shown, scope: browser.listing.scope) {
+                ViewPanelSwitchRow(
+                    symbol: "bolt", label: String(localized: "Quick Actions"), isOn: browser.showsQuickActions,
+                    set: { browser.setShowsQuickActions($0) })
+                    .help("Buttons on the row under the pointer, such as Archive and Delete")
+                    .accessibilityIdentifier("ViewPanelQuickActions")
+            }
         }
         if panel.isNew {
             ViewPanelUnkept(browser: browser)
@@ -142,13 +175,6 @@ private struct ViewPanelMain: View {
         } else {
             ViewPanelFoot(text: panel.purpose == .place ? ViewPanelKeeping.mac : ViewPanelKeeping.savedViewOverview)
         }
-    }
-
-    private var propertiesValue: String {
-        let properties = browser.properties
-        guard properties.isChanged else { return String(localized: "As in Layouts") }
-        let shown = browser.offeredProperties(in: library).filter { $0.content != .title && properties.isShown($0) }
-        return shown.isEmpty ? String(localized: "None") : shown.map(\.label).formatted(.list(type: .and, width: .narrow))
     }
 }
 

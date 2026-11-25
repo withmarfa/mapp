@@ -83,7 +83,7 @@ nonisolated final class ItemLayoutTests: XCTestCase {
         let before = header.frame.minY
         let otherColumnControls = [
             app.toolbars.buttons["Search"],
-            app.toolbars.buttons["ViewOptionsToolbar"],
+            app.toolbars.descendants(matching: .any)["ViewOptionsToolbar"],
             app.toolbars.buttons["Hide Sidebar"],
         ]
         let controlFrames = otherColumnControls.map(\.frame)
