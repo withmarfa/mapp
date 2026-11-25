@@ -224,7 +224,7 @@ struct GroupByTests {
     @Test func aViewKeepsGroupsBySetOrNotSetWithTheirOrderAndHiddenGroups() throws {
         let column = ItemTableColumn(id: "field.due_at", label: "Due", content: .field(Self.due), style: .date)
         let result = try Self.roundTrip(column, mode: .presence, order: [GroupKey.notSet], hidden: [GroupKey.set])
-        #expect(result.written == LibraryViewGroup(field: "properties.due_at", byPresence: true, order: [.bool(false)], hidden: [.bool(true)]))
+        #expect(result.written == LibraryViewGroup(field: "properties.due_at", order: [.bool(false)], hidden: [.bool(true)], byPresence: true))
         #expect(result.reread.grouping == .column("field.due_at", by: .presence))
         #expect(result.reread.groupOrder == [GroupKey.notSet])
         #expect(result.reread.hiddenGroups == [GroupKey.set])
