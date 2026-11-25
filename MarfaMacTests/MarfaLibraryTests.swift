@@ -455,6 +455,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         try #require(await eventually { library.stateJudging.isEmpty })
         undo.undo()
         #expect(source.writes.last == .restore(F.n1))
+        source.send(.taken(try #require(source.submitted.last?.id)))
         source.clearWrites()
         library.recover([F.n3, F.n1], undoManager: undo)
         #expect(source.writes == [.restore(F.n3)])
