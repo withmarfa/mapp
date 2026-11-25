@@ -4,7 +4,7 @@ import Observation
 /// What the capsule and the pile say about the items chosen: which commands apply and how to name the choice. It is
 /// worked out once for each change of the choice or of the items, never for each frame or for each button.
 struct SelectionFacts: Equatable {
-    /// The whole choice, as a menu's command gets it: an item a sync has removed is counted by the command as gone.
+    /// Includes items removed by sync so command planners can count them.
     var ids: Set<ItemID> = []
     /// The moves that would change at least one chosen item (`ItemLibrary.selectionCommands`).
     var moves: Set<ItemMove> = []
@@ -78,8 +78,7 @@ final class SelectionSummary {
         if new != facts { facts = new }
     }
 
-    /// Takes the pile's top card from the item edited last, after an item changed. Only a title or text edit moves it,
-    /// and no command depends on that, so the rest of the facts stand. One pass over the choice for each change.
+    /// Rechecks edit order after a content change, without rebuilding command availability.
     func refreshTop(_ selection: Set<ItemID>, in library: any ItemLibrary) {
         guard facts.count > 1, selection == facts.ids else { return }
         let top = SelectionFacts.topID(of: selection, in: library)
