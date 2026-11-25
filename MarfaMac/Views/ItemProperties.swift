@@ -1,7 +1,7 @@
 import Marfa
 import SwiftUI
 
-/// One property as a row of a form that holds a value no item has yet (quick add's, a change of type's). The value
+/// One property as a row of a form that holds a value no item has yet (a new item's, a change of type's). The value
 /// opens in a panel under it (`ValueEditPresenter`), as it does on the page: a choice, a status, a date, a list of words
 /// and a list of people. A yes/no is a checkbox. A text or a number is typed into a borderless field that looks like
 /// plain text until it is used; the row keeps unfinished input until it is committed, and a change made elsewhere
