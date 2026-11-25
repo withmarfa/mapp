@@ -54,7 +54,7 @@ The server one person owns, and the source of every item the app shows.
 - **The app names no type.** It asks what a type declares, so a type that a plugin brings is first class.
 - **A type shown as a fact about an item is its mark and its name**, never a chip.
 - **A type has one count**, of all its items, in the sidebar and in Library › Types.
-- **A type opens on All Items**, quietly. A setting says what types open on: All Items, Library or Feed. No rule of the app's picks one.
+- **A type opens on All Items**, quietly. A setting says what types open on: All Items or Library. No rule of the app's picks one.
 - **Changing type edits one value.** It is not a move, and the item keeps its id, its links and its history.
 
 ## Property

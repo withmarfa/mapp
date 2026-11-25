@@ -25,7 +25,7 @@ Every change a person makes to an item is an `ItemWrite` through `ItemLibrary`. 
 ## Value panels
 
 - **A value is edited in a panel under itself** (`ValueEditPresenter`, `ValueEditModel`), the same one from a row, a cell, the right sidebar and a chip.
-- **A single choice closes the panel when picked; several choices keep it open.** Only a date's panel has a row for Not Set; picking a choice again clears it.
+- **A single choice closes the panel when picked; several choices keep it open.** Only a date's panel has a row for Not Set.
 - **A status panel lists the type's words under their four groups.** Edit Statuses… opens the type in Settings.
 - **Unsaved text is kept when a panel loses its place**, and the person is told where it is.
 - **A panel writes the one property it shows**, on the version it read, so it never writes over another app's change to another property.
