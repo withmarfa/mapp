@@ -51,6 +51,7 @@ struct AppCommands: Commands {
                 }
                     .shortcut(.newItem, shortcuts)
                     .disabled(browser == nil || library.map(QuickAdd.isAvailable) != true)
+                    .help(library.flatMap(QuickAdd.waitReason) ?? "")
                 Button("New Window", systemImage: "macwindow.badge.plus") {
                     openWindow(id: MarfaMacApp.mainWindowID)
                 }

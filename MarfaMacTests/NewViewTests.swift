@@ -408,6 +408,35 @@ struct NewViewTests {
         #expect(!library.notices.waiting.contains { $0.isNotKept })
     }
 
+    /// A starting point that changes the layout, as Recently Added's list does, makes the window's toolbar again, and
+    /// the popover under the View button it replaced closes. That is not the person's click outside: in every place,
+    /// each starting point it offers keeps the panel, its draft and the tile chosen. The button in view still ends it.
+    @Test func everyStartingPointKeepsThePanelThroughTheLayoutItSets() throws {
+        for place in [PlaceView.library, .feed, PlaceView(.type(Self.task))] {
+            let (browser, library) = Self.window(place)
+            browser.openNewViewPanel(in: library)
+            let panel = try #require(browser.viewPanel)
+            let starts = browser.newViewStarts(in: library)
+            #expect(starts.contains(.recentlyAdded))
+            // A tile for a view the person has, as the Library's Favorites, opens theirs instead.
+            for start in starts where browser.existingView(for: start, in: library) == nil {
+                let anchor = browser.viewMode
+                #expect(browser.pickStart(start, in: library, order: Self.order) == nil)
+                browser.viewPanelPopoverClosed(anchoredIn: anchor, in: library)
+                #expect(browser.viewPanel === panel, "\(place) \(start)")
+                #expect(panel.start == start, "\(place) \(start)")
+                #expect(panel.form?.isBusy == false, "\(place) \(start)")
+                #expect(!library.notices.waiting.contains { $0.isNotKept }, "\(place) \(start)")
+            }
+            browser.chooseStart(.recentlyAdded, in: library)
+            #expect(browser.viewMode == .list)
+            browser.viewPanelPopoverClosed(anchoredIn: browser.viewMode, in: library)
+            #expect(browser.viewPanel == nil)
+            #expect(!library.notices.waiting.contains { $0.isNotKept })
+            #expect(browser.viewMode == .table)
+        }
+    }
+
     @Test func aRefusedDraftIsStillGivenBackWhenTheWindowCloses() async throws {
         let (browser, library) = Self.window()
         library.viewFailure = ViewWriteFailure(kind: .refused, message: "filter")

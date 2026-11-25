@@ -86,6 +86,14 @@ extension Browser {
         dismissViewPanel(in: library)
     }
 
+    /// The popover closed under the View button made for `layout`. The window makes its toolbar again with each layout
+    /// (`MainView`), so a button made for another layout was just taken away, as a starting point or a layout chosen in
+    /// the panel takes it: the panel stays, and the new button shows it. Only the button in view takes a click outside.
+    func viewPanelPopoverClosed(anchoredIn layout: ItemViewMode, in library: any ItemLibrary) {
+        guard layout == viewMode else { return }
+        dismissViewPanel(in: library)
+    }
+
     /// Handles dismissal by the popover. A rename is submitted and handed back if the write fails.
     func dismissViewPanel(in library: any ItemLibrary) {
         guard let panel = viewPanel else { return }

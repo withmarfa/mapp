@@ -50,6 +50,10 @@ nonisolated enum SampleLibrary {
         }
     }()
 
+    /// The instance the sample answers as, fixed as a real server's is, so what this Mac keeps by instance, such as a
+    /// new item's draft, has a key. The studio is another instance, so neither finds what the other kept.
+    static let instanceID = "0193f0a1-5a3e-7c00-8000-5a3e1e000001"
+
     /// The studio the design boards draw, when the launch asked for it.
     static var name: String { SampleCastell.requested == nil ? "Sample Library" : "Castell Studio" }
 
@@ -68,7 +72,7 @@ nonisolated enum SampleLibrary {
             itemTypes: castell == nil ? itemTypes + (gallery ? SampleGallery.types : []) : SampleCastell.itemTypes,
             edgeTypes: edgeTypes, views: views, displays: display)
         if gallery { SampleGallery.writeFiles(galleryFiles) }
-        let server = SampleServer(copy: fake.copy)
+        let server = SampleServer(copy: fake.copy, instance: castell == nil ? instanceID : SampleCastell.instanceID)
         let source = MarfaSource(
             copy: fake.copy, connection: connection, reading: server, refreshing: server)
         source.events.yield(.paint)
@@ -417,9 +421,12 @@ nonisolated enum SampleLibrary {
 /// at once. The fake copy answers the drain.
 private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
     let copy: WorkingCopy
+    let instance: String
 
     private var whole: Status {
-        Status(sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes, hydration: .complete)
+        Status(
+            sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes, hydration: .complete,
+            instanceId: instance)
     }
 
     func status() async throws -> Status { whole }

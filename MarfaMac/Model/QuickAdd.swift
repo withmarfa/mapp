@@ -554,6 +554,13 @@ final class QuickAdd {
         return catalogue.itemTypes[.file] != nil || catalogue.itemTypes.keys.contains(where: catalogue.isCreatable)
     }
 
+    /// Why New Item is off in a library that is read: the copy has not yet learned which Marfa it holds, as on a
+    /// first launch before the server is reached. Nil where New is on, or the window says why it is off.
+    static func waitReason(in library: any ItemLibrary) -> String? {
+        guard library.isLoaded, library.serverKey.isEmpty else { return nil }
+        return String(localized: "Available once the app first reaches your Marfa server.")
+    }
+
     /// The kinds of item the panel offers, by label, with File after them where the catalogue has files.
     static func types(in library: any ItemLibrary) -> [ItemTypeOption] {
         let catalogue = library.catalogue

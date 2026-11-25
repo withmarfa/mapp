@@ -7,6 +7,13 @@ struct ViewPanelButton: View {
     @CurrentLibrary private var library
     @Environment(\.controlActiveState) private var activeState
     @Bindable var browser: Browser
+    /// The layout whose toolbar this button stands in (`Browser.viewPanelPopoverClosed`).
+    @State private var anchorLayout: ItemViewMode
+
+    init(browser: Browser) {
+        self.browser = browser
+        _anchorLayout = State(initialValue: browser.viewMode)
+    }
 
     var body: some View {
         let count = browser.filterCount
@@ -56,8 +63,8 @@ struct ViewPanelButton: View {
 
     /// The popover shows while the window holds a panel. A click outside it ends the panel as `dismissViewPanel` says.
     private var presented: Binding<Bool> {
-        Binding { browser.showsViewPanel } set: { shown in
-            if !shown { browser.dismissViewPanel(in: library) }
+        Binding { browser.showsViewPanel } set: { [anchorLayout] shown in
+            if !shown { browser.viewPanelPopoverClosed(anchoredIn: anchorLayout, in: library) }
         }
     }
 }
