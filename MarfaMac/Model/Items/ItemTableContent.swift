@@ -69,14 +69,14 @@ final class ItemTableContent {
         let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
         columns = ItemTableLayout.columns(
             for: allRows, types: browser.listedTypes(in: library), catalogue: library.catalogue, hidden: hidden, looks: looks,
-            listsArchive: browser.listsArchive)
+            listsByOrigin: browser.listsByOrigin)
         catalogue = library.catalogue
         listedTypes = browser.listedTypes(in: library)
         now = library.now()
         self.options = options
         // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
         sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(
-            options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder, listsArchive: browser.listsArchive)
+            options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder, listsByOrigin: browser.listsByOrigin)
         grouping = ItemTableLayout.grouping(options, columns: columns)
         // A place's own grouping is by the status's groups, as a board of mixed types is.
         groupMode = options.grouping == .automatic ? .statusGroups : options.grouping.mode

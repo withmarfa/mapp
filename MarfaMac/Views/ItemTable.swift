@@ -68,7 +68,7 @@ struct ItemTable: View {
             }
             .onChange(of: allRows.count) { browser.revealSelectionInTable(content) }
             // The Archive names each item's source, which the server names after the items are read.
-            .task(id: library.membershipRevision) { if browser.listsArchive { await library.refreshSources() } }
+            .task(id: library.membershipRevision) { if browser.listsByOrigin { await library.refreshSources() } }
             .task {
                 for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
             }
@@ -202,7 +202,7 @@ struct ItemTable: View {
         Binding {
             browser.ordersByRelevance ? [] : ItemTableLayout.sort(
                 browser.tableOptions[browser.shown] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder,
-                listsArchive: browser.listsArchive)
+                listsByOrigin: browser.listsByOrigin)
         } set: { sort in
             if !sort.isEmpty { browser.orderSearch(byRelevance: false) }
             browser.tableOptions[browser.shown, default: .init()].sort = Array(sort.prefix(ViewDraft.maxSortKeys))

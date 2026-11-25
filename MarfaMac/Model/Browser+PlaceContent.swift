@@ -37,6 +37,10 @@ extension Browser {
     /// Whether the window shows the Archive's own list, as against a view or a place's list of archived items.
     var listsArchive: Bool { shown.place == .archive && shown.view == .own }
 
+    /// Whether the window shows a list of items by what they are and where they came from: the Archive's own list, and the
+    /// Library's, whose default view is the name, type, source and edit date, latest first.
+    var listsByOrigin: Bool { (shown.place == .archive || shown.place == .library) && shown.view == .own }
+
     /// The title a layout gives the window: the Archive is a page of the Library and keeps its title through a search.
     func pageTitle(in library: any ItemLibrary) -> String {
         if listsArchive { return String(localized: "Library") }

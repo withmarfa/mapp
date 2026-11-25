@@ -41,7 +41,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 ## Layouts
 
 - **The Library opens as a table, and as a list while it holds ten items or fewer** (`Browser.naturalLayout`).
-- **The Archive, reached from the Library's row and Go, opens as a table of Name, Type, Source and Edited.**
+- **The Library and the Archive open as a table of Name, Type, Source and Edited, latest edit first, with no grouping; the Archive is reached from the Library's row and Go.** A person's own columns, sort and grouping are kept as for any place (`listsByOrigin`).
 - **Unarchive and Delete stand on an Archive row under the pointer** (`RowQuickActions`).
 - **A layout draws the list it is given** (`ItemViewMode`) and never changes which items show.
 - **One row menu, one density and one drag serve every layout.**
