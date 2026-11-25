@@ -60,7 +60,7 @@ Two defaults name types: the sidebar's and toolbar's starting set for New, and t
 
 - **A window shows a place and one of its views** (`PlaceView`, `Place`, `ViewChoice`), each stored as a word. An unknown word is kept as written, and an unknown view reads as the place's own.
 - **A window left in a place this copy cannot read** opens where a new window would, and keeps that place until the person moves (`Browser.LaterPlace`).
-- **A saved view belongs to one place** (`Place.home(of:catalogue:)`): its one type; else the one collection, or the one source, that its filter alone requires, through the item's own edge; else the Feed, for the feed tier alone; else the Library.
+- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, else the sole collection or source its filter requires. Collection membership uses the item's outbound edge. For the feed tier alone, use the Feed. Otherwise use the Library.
 - **A window follows its view to a new place,** with what it keeps for the view (`PlaceMemory`). Views sort by the app's order (`ViewOrders`), then title.
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
 - **Favorites has an ordinary From,** starting on Library; a person may choose All Items.

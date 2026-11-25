@@ -149,8 +149,7 @@ extension MarfaLibrary {
         return counts
     }
 
-    /// The index's counts less the files attached to a held item, worked out once for each change of membership: one
-    /// pass over the types and sources and one over those files, so every count after is a lookup.
+    /// Counts by tier and state, with attached files removed once per membership revision.
     private var standaloneCounts: StandaloneCounts {
         let revision = membershipRevision
         if let held = countedAlone, held.revision == revision { return held.counts }
@@ -190,11 +189,8 @@ extension MarfaLibrary {
         items.sorted { $0.created != $1.created ? $0.created > $1.created : $0.id.rawValue < $1.id.rawValue }
     }
 
-    /// The Library is the library tier and the Feed the feed tier. Each, a type's place and a source's leave out a
-    /// file attached to another item the library holds, which shows on that item's page instead; a file with no
-    /// parent, or whose parent is not held, still shows, whoever added it (Marfa holds no other mark of one the person
-    /// added), and search lists every file. Favorites stay unfiltered. A type lists its kinds unless the window
-    /// leaves them out.
+    /// A file attached to an item the library holds appears on that item's page. A file whose parent is missing still
+    /// appears in places so it can be found. Search includes both.
     private func members(of key: ListingKey) -> Set<ItemID> {
         if key.favorites {
             return index.standalone(index.favorites.filter { index.listed.contains($0, in: key.scope, key.archived) })

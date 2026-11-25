@@ -160,7 +160,7 @@ nonisolated struct PlaceView: Hashable, Codable, Sendable {
     static func collection(_ id: ItemID) -> PlaceView { PlaceView(.collection(id)) }
     static func source(_ code: String) -> PlaceView { PlaceView(.source(code)) }
 
-    /// The saved view `id` as a key of what the window keeps for it, which is equal to the view at any home.
+    /// The saved view `id` at its canonical home for window settings (`memoryKey`).
     static func saved(_ id: ItemID) -> PlaceView { PlaceView(.library, .saved(id)) }
 
     /// The saved view `id`, at its home in `library`, or in the Library where the copy does not hold the view.
