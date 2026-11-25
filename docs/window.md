@@ -58,12 +58,12 @@ paths:
 
 ## Sidebar closed
 
-- **The title opens the sidebar's rows as a menu** (`PlacesMenu`); place, views and buttons share one row.
+- **The title opens the sidebar's rows as a menu** (`PlacesMenu`); over a column that spans the window, place, views and buttons share one row, and beside a page the views have the row below.
 
 ## Smallest window
 
 - **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900, and under 800 the views are one pill beside the title.
-- **Only what the window folded opens again,** also after a quit. It folds only as its width crosses a limit, never on opening.
+- **Only what the window folded opens again,** also after a quit.
 - **The panel is 300 wide** in every window (`PanelWidth`).
 
 ## Corner
@@ -74,7 +74,7 @@ paths:
 ## Menus and palettes
 
 - **Every menu of items is one menu** (`ItemRowMenu`), in every layout.
-- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`). Search Items is the same panel searching titles and text.
+- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`).
 - **Trap:** Actions grows out of the palette's bar with an ordinary transition: a Liquid Glass morph hung the app.
 - **A command that takes the keyboard says so** (`takesFocus`), so the palette does not take it back.
 

@@ -1631,9 +1631,6 @@
     "%llu waiting to download" : {
       "extractionState" : "manual"
     },
-    "+%lld" : {
-
-    },
     "+%lld more" : {
 
     },
@@ -2540,9 +2537,6 @@
     "Apps and keys using this rule will see items from every source for the types you limited, including subtypes." : {
 
     },
-    "Apps you sign in show here." : {
-
-    },
     "Archive" : {
 
     },
@@ -3323,9 +3317,6 @@
     "Choose Parent…" : {
       "extractionState" : "manual"
     },
-    "Choose Source Mark…" : {
-
-    },
     "Choose Undo again to try it as things are now." : {
       "extractionState" : "manual"
     },
@@ -3334,9 +3325,6 @@
     },
     "Choose a Version" : {
       "extractionState" : "manual"
-    },
-    "Choose a collection to see what’s in it." : {
-
     },
     "Choose a date before the app’s sign-in ends." : {
 
@@ -3359,17 +3347,11 @@
     "Choose a plugin bundle." : {
 
     },
-    "Choose a source to see what it sends." : {
-
-    },
     "Choose a value" : {
 
     },
     "Choose an Icon" : {
       "extractionState" : "manual"
-    },
-    "Choose an item to see its details." : {
-
     },
     "Choose how often to back up." : {
 
@@ -3510,9 +3492,6 @@
 
     },
     "Collections" : {
-
-    },
-    "Collections that apps make show here." : {
 
     },
     "Collections you make show here." : {
@@ -4026,9 +4005,6 @@
     "Delete %@?" : {
 
     },
-    "Delete Collection…" : {
-
-    },
     "Delete Column" : {
 
     },
@@ -4321,9 +4297,6 @@
     "Edit Meaning…" : {
 
     },
-    "Edit New Row…" : {
-
-    },
     "Edit Pages As" : {
 
     },
@@ -4343,9 +4316,6 @@
 
     },
     "Edit View" : {
-
-    },
-    "Edit the New row" : {
 
     },
     "Edited" : {
@@ -5559,9 +5529,6 @@
     "Items About This" : {
       "extractionState" : "manual"
     },
-    "Items Page" : {
-
-    },
     "Items deleted more than %@ ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered." : {
       "extractionState" : "manual"
     },
@@ -5587,9 +5554,6 @@
     "Items that already hold a choice you take out keep it." : {
 
     },
-    "Items that apps send show here." : {
-
-    },
     "Items this sign-in can’t see are still of this type, so %@ was kept." : {
 
     },
@@ -5603,9 +5567,6 @@
 
     },
     "Items you favorite show here." : {
-
-    },
-    "Items you make or apps send show here." : {
 
     },
     "Items you make show here." : {
@@ -5883,17 +5844,11 @@
     "Keys keep working" : {
 
     },
-    "Keys you make show here." : {
-
-    },
     "Kind" : {
       "extractionState" : "manual"
     },
     "Kind of Item" : {
       "extractionState" : "manual"
-    },
-    "Kinds" : {
-
     },
     "Large" : {
       "extractionState" : "manual"
@@ -6596,9 +6551,6 @@
     "New Child Type…" : {
 
     },
-    "New Collection" : {
-
-    },
     "New Field Choices Not Kept" : {
 
     },
@@ -6739,12 +6691,6 @@
     "No Collections" : {
       "extractionState" : "manual"
     },
-    "No Collections in the Feed" : {
-
-    },
-    "No Collections in the Library" : {
-
-    },
     "No Connectors" : {
 
     },
@@ -6775,16 +6721,7 @@
     "No Items" : {
       "extractionState" : "manual"
     },
-    "No Items in the Feed" : {
-
-    },
-    "No Items in the Library" : {
-
-    },
     "No Jobs Yet" : {
-
-    },
-    "No Keys" : {
 
     },
     "No Library Open" : {
@@ -8007,9 +7944,6 @@
     "Remove %@" : {
 
     },
-    "Remove %@ From New" : {
-
-    },
     "Remove %@?" : {
 
     },
@@ -8166,9 +8100,6 @@
     },
     "Rename Source" : {
       "extractionState" : "manual"
-    },
-    "Rename Source…" : {
-
     },
     "Rename View" : {
       "extractionState" : "manual",
@@ -8815,9 +8746,6 @@
     "Show Property" : {
 
     },
-    "Show Quick Add Options" : {
-
-    },
     "Show Reader" : {
 
     },
@@ -9419,15 +9347,6 @@
     "The Feed lets items go after a while" : {
 
     },
-    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
-
-    },
     "The Folder Is Missing Where This Copy Is Kept" : {
 
     },
@@ -9907,9 +9826,6 @@
     },
     "The file couldn’t be attached." : {
       "extractionState" : "manual"
-    },
-    "The file for this page isn’t in Marfa." : {
-
     },
     "The file may be damaged or unavailable. Try opening it in another app." : {
 
@@ -10878,9 +10794,6 @@
     "Tight" : {
 
     },
-    "Tiles above the table for making a new item of a type." : {
-
-    },
     "Time" : {
 
     },
@@ -11711,9 +11624,6 @@
       "extractionState" : "manual"
     },
     "Written By" : {
-
-    },
-    "Written by" : {
 
     },
     "Wrote items in bulk" : {

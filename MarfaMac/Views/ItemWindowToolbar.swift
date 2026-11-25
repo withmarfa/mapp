@@ -46,5 +46,6 @@ struct ItemWindowToolbar: ToolbarContent {
         }
         ToolbarSpacer(.fixed)
         ToolbarItem { tools.detailsButton }
+            .sharedBackgroundVisibility(.hidden)
     }
 }

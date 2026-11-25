@@ -187,15 +187,17 @@ private struct TopRowTitle: View {
 
     private var cluster: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title)
-                .font(.system(size: 22 * scale, weight: .bold)).lineLimit(1).truncationMode(.tail)
-                .frame(maxWidth: Self.widest, alignment: .leading)
-            Text(countText).font(.system(size: 15 * scale)).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
+            CappedWidth(limit: Self.widest) {
+                Text(title).font(.system(size: 22 * scale, weight: .bold)).lineLimit(1).truncationMode(.tail)
+            }
+            Text(countText)
+                .font(.system(size: 15 * scale)).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
+                .fixedSize().layoutPriority(1)
             if menu != nil {
                 Image(systemName: "chevron.down").font(.system(size: 10 * scale, weight: .semibold)).foregroundStyle(.secondary)
+                    .layoutPriority(1)
             }
         }
-        .fixedSize(horizontal: true, vertical: false)
     }
 
     var body: some View {
@@ -203,7 +205,7 @@ private struct TopRowTitle: View {
             if let menu {
                 // The menu's own button, labeled with the title and its count.
                 Menu { PlacesMenuView(menu: menu, browser: browser, order: order) } label: { cluster }
-                    .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                    .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel(label)
                     .accessibilityHint("Opens the sidebar's places")
             } else {
@@ -214,6 +216,25 @@ private struct TopRowTitle: View {
         }
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("TopRowTitle")
+    }
+}
+
+/// Lays out its one child at the width it needs up to `limit`, and narrower when the row has less. A flexible frame
+/// would take the whole room offered and leave the count beside the title at the edge of it.
+private struct CappedWidth: Layout {
+    let limit: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let child = subviews.first else { return .zero }
+        return child.sizeThatFits(ProposedViewSize(width: min(proposal.width ?? limit, limit), height: proposal.height))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(bounds.size))
+    }
+
+    func explicitAlignment(of guide: VerticalAlignment, in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGFloat? {
+        subviews.first.map { bounds.minY + $0.dimensions(in: ProposedViewSize(bounds.size))[guide] }
     }
 }
 
@@ -376,6 +397,8 @@ private struct TopRowPills: View {
 enum TopRowMetrics {
     /// How far the title stands from its column's edge, as the list's first column does.
     static let lead: CGFloat = 40
+    /// The same in a list column beside a page, where the title's text stands where the rows' text does.
+    static let listLead: CGFloat = 16
     /// The pills start a little before the title so their words line up under it.
     static let pillsLead: CGFloat = 29
     static let pillHeight: CGFloat = 28
@@ -391,4 +414,7 @@ enum TopRowMetrics {
     static func restHeight(scale: CGFloat) -> CGFloat { pillHeight * max(1, scale) + restMargin }
     /// What the row keeps clear of the toolbar's buttons and of the traffic lights.
     static let clearance: CGFloat = 12
+    /// How far the title stands from the last of the traffic lights, the sidebar's button and Back and Forward, as the
+    /// sidebar-closed board has it.
+    static let leadingClearance: CGFloat = 20
 }

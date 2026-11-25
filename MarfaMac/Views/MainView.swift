@@ -123,7 +123,7 @@ struct MainView: View {
         } content: {
             ItemList(browser: browser, order: order, pane: $pane).equatable()
                 .filterChips(browser)
-                .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, signal: topRowSignal)
+                .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, isBesidePage: true, signal: topRowSignal)
                 // The split view reads the ideal only as it is built, so it comes from the tracker as it stands then.
                 .navigationSplitViewColumnWidth(
                     min: ColumnWidth.list.range.lowerBound, ideal: measuredWidths.width(of: .list),
@@ -544,6 +544,7 @@ private struct ItemInspectorColumn: ViewModifier {
         // While the modal is open its own sidebar shows the details, so this one is out and only one is mounted.
         content.inspector(isPresented: Binding { details.isPresented && !browser.isModalPresented } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details, editor: editor)
+                .panelEdgeThroughToolbar()
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newWidth in
                     guard details.isPresented, Self.isDraggingEdge(ofSidebarWidth: newWidth) else { return }
                     UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)

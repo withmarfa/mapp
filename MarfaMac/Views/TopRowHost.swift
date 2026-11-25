@@ -130,9 +130,9 @@ private struct TopRowStack<Line: View, Rest: View>: View {
 }
 
 extension TopRowRoom {
-    /// The title's inset at the column's start: the usual one, or further where the traffic lights, the sidebar's button
-    /// and Back and Forward stand over it.
-    var titleLead: CGFloat { max(TopRowMetrics.lead, leading > 0 ? leading + TopRowMetrics.clearance : 0) }
+    /// The title's inset at the column's start: `base`, or further where the traffic lights, the sidebar's button and Back
+    /// and Forward stand over it.
+    func titleLead(base: CGFloat = TopRowMetrics.lead) -> CGFloat { max(base, leading > 0 ? leading + TopRowMetrics.leadingClearance : 0) }
     /// What the line keeps for the buttons at the column's end.
     var titleTrail: CGFloat { max(14, trailing > 0 ? trailing + TopRowMetrics.clearance : 14) }
 }
@@ -202,6 +202,8 @@ private struct TopRowTableProbe: NSViewRepresentable {
         private weak var table: NSTableView?
         private var observers: [any NSObjectProtocol] = []
         private var isPlacing = false
+        /// The scroll view's safe area as the insets last took it, so the sides move by what changes.
+        private var safeSides: NSEdgeInsets?
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -221,14 +223,25 @@ private struct TopRowTableProbe: NSViewRepresentable {
             if self.table !== table { follow(table, in: scroll) }
             let room = space.lineHeight + space.restHeight
             if scroll.automaticallyAdjustsContentInsets { scroll.automaticallyAdjustsContentInsets = false }
-            if scroll.contentInsets.top != room {
+            // Switching the adjustment off freezes the sides at what they were, so a change of the safe area moves them
+            // here: a sidebar that floats over this column, shown or hidden, moves where the rows begin.
+            let safe = scroll.safeAreaInsets
+            var wanted = scroll.contentInsets
+            wanted.top = room
+            if let last = safeSides {
+                wanted.left += safe.left - last.left
+                wanted.right += safe.right - last.right
+                wanted.bottom += safe.bottom - last.bottom
+            }
+            safeSides = safe
+            let current = scroll.contentInsets
+            if current.top != wanted.top || current.left != wanted.left || current.bottom != wanted.bottom || current.right != wanted.right {
                 let clip = scroll.contentView
                 let scrolled = clip.bounds.origin.y + clip.contentInsets.top
-                var insets = scroll.contentInsets
-                insets.top = room
-                scroll.contentInsets = insets
-                // Keeps the rows where they were: the same distance from the first, and the same sideways place.
-                clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: scrolled - clip.contentInsets.top))
+                let moved = wanted.left - current.left
+                scroll.contentInsets = wanted
+                // Keeps the rows where they were: the same distance from the first, and the same sideways place or the new edge.
+                clip.scroll(to: NSPoint(x: clip.bounds.origin.x - moved, y: scrolled - clip.contentInsets.top))
                 scroll.reflectScrolledClipView(clip)
             }
             place()
@@ -237,6 +250,15 @@ private struct TopRowTableProbe: NSViewRepresentable {
         private func follow(_ table: NSTableView, in scroll: NSScrollView) {
             stop()
             self.table = table
+            safeSides = nil
+            // The split view moves its columns, and a sidebar over this one changes its safe area, with no layout of this view.
+            var ancestor: NSView? = scroll.superview
+            while let view = ancestor, !(view is NSSplitView) { ancestor = view.superview }
+            if let split = ancestor {
+                observers.append(NotificationCenter.default.addObserver(
+                    forName: NSSplitView.didResizeSubviewsNotification, object: split, queue: .main
+                ) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } })
+            }
             scroll.contentView.postsBoundsChangedNotifications = true
             observers.append(NotificationCenter.default.addObserver(
                 forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main
@@ -470,9 +492,11 @@ private struct ToolbarRoomProbe: NSViewRepresentable {
         }
 
         /// The items that stand in a row from each end of the column: each begins within a gap of the one before it, as the
-        /// toolbar's groups do, and the first begins near the column's edge. Items in the middle are another group's.
+        /// toolbar's groups do, and the first begins near the column's edge. Items in the middle are another group's. The
+        /// gap is wider than the space between the items of one group and narrower than the one between the leading group
+        /// and the list's own buttons.
         static func room(of rects: [NSRect], in column: NSRect) -> (leading: CGFloat, trailing: CGFloat) {
-            let gap: CGFloat = 48
+            let gap: CGFloat = 24
             let inside = rects.filter { $0.maxX > column.minX && $0.minX < column.maxX }
             var leading: CGFloat = 0
             var edge = column.minX
