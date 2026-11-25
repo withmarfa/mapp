@@ -1,8 +1,6 @@
 import Foundation
 
-/// The map's placing of a place's items (`MapLayout.placing`), held for the key it was made for. A place of more than
-/// `inPlaceLimit` items is worked out off the main actor and the last answer stands until the next lands, so a place of
-/// tens of thousands never stops the window to place its items again.
+/// Keeps the last placement for the current place visible while a new placement runs off the main actor.
 @MainActor @Observable
 final class MapPlacingWork {
     nonisolated static let inPlaceLimit = 2_000
@@ -42,7 +40,7 @@ final class MapPlacingWork {
         return held.placing
     }
 
-    /// Ends the run under way, as when the map leaves the window.
+    /// Discards the result when the map leaves the window.
     func cancel() {
         running?.task.cancel()
         running = nil

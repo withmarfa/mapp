@@ -57,7 +57,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **⌘⌫ deletes what a board or timeline shows** (`deletesChosen`). A calendar's new span drops events it leaves.
 - **An item's date is its own type's** (`ItemPlacement`), so a place of several types puts each where it belongs. The view can point at one field.
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
-- **The map places an item only where its type has coordinates** (`MapLayout`). The pill "No Location" counts and lists the rest; a place without coordinates never offers Map.
+- **The map places items with two valid coordinates** (`MapLayout`). No Location counts and lists the rest. Map is available when a listed type declares both coordinate fields.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse a drop: no single value is meant.
 - **Only divider drags save widths** (`keepWidths`).

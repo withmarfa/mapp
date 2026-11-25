@@ -7034,7 +7034,26 @@
 
     },
     "No Location, %lld items" : {
-
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "No Location, %lld item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "No Location, %lld items"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "No Machine" : {
 

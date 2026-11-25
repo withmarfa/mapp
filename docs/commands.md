@@ -12,7 +12,7 @@ paths:
 
 # Commands and shortcuts
 
-The menu bar is the full list of commands. Every toolbar, corner and row command is also in the menu bar and the palette, so a window with its sidebar or toolbar hidden loses none. `docs/window.md` says how menus and palettes look.
+The menu bar and palette include every toolbar, corner and row command. See `docs/window.md` for their appearance.
 
 ## Adding a command
 
@@ -93,7 +93,8 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | View | Make Text Bigger, Smaller | ⌘+, ⌘- | Yes |
 | View | Actual Size | ⌘0 | Yes |
 | View | Show Markdown Source or Formatted Text, Show Reader or Original, Show or Hide Formats, Clear Filters, View…, New View…, Revert View, Reset View, Save View, Duplicate View, Delete View…, Collapse All Groups, Expand All Groups, Standard Width, Full Width, Customize Sidebar…, Close Modal, Zoom to Fit, Next Page, Previous Page | – | Yes |
-| View | View as Digest, View as Map, Show All Items, Show Library, Show Feed | – | Agreed |
+| View | Fit All Items | – | Yes |
+| View | View as Digest, Show All Items, Show Library, Show Feed | – | Agreed |
 | Format | Heading 1, 2, 3 | ⇧⌘T, ⇧⌘H, ⇧⌘J | Yes |
 | Format | Body | ⇧⌘B | Yes |
 | Format | Bold, Italic, Strikethrough | ⌘B, ⌘I, ⇧⌘X | Yes |
