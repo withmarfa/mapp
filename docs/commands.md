@@ -26,7 +26,7 @@ The menu bar is the full list of commands. Every toolbar, corner and row command
 
 ## Tier and state
 
-The `ItemLibrary` calls take the whole selection and return a `CommandOutcome`. Pass it to `movedMessage` to format the result.
+The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` with the planned changes and planner skips. The engine can skip additional items when it queues the writes.
 
 | Call | Moves | Leaves alone |
 | --- | --- | --- |

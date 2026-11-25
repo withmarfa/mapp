@@ -61,8 +61,7 @@ import Testing
         // Another device moves Epic task to Recently Deleted.
         try await show([F.e1], in: library, source) { $0.state = .trashed }
         undo.undo()
-        #expect(Set(source.writes) == [.transition(F.p1, .active, from: .archived), .transition(F.e1, .active, from: .archived)],
-                "Bug one stays archived")
+        #expect(Set(source.writes) == [.transition(F.p1, .active, from: .archived), .transition(F.e1, .active, from: .archived)])
         // The engine queues the one the copy shows archived and skips the one in the bin.
         let epic = try #require(source.submitted.first { $0.write == .transition(F.e1, .active, from: .archived) })
         let alpha = try #require(source.submitted.first { $0.write == .transition(F.p1, .active, from: .archived) })

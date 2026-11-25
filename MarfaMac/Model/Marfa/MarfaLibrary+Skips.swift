@@ -33,7 +33,7 @@ extension MarfaLibrary {
         gathering?.skips.skip(reason)
     }
 
-    /// The source took `write` for the command being gathered.
+    /// Includes a submitted write while the engine decides whether to queue it.
     func gather(_ write: WriteID) {
         guard let notice = gathering else { return }
         notice.waiting.insert(write)

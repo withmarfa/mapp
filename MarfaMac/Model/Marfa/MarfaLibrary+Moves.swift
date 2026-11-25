@@ -56,9 +56,8 @@ extension MarfaLibrary {
         }
     }
 
-    /// Only the server's answer to a tier write says whether this Mac's move was made or merged over another
-    /// device's (`tierWriteAnswered`), so a step whose writes have no answer yet is not made: an Undo goes back on its
-    /// stack, and a Redo is told.
+    /// The server's answer says whether the tier move is safe to reverse (`tierWriteAnswered`). While it is pending,
+    /// the library puts Undo back on its stack or tells the person why Redo could not run.
     private func reverse(_ made: TierMoves, name: String, undoManager: UndoManager?) {
         guard !made.moves.isEmpty else { return notices.tell(name, notMade) }
         if made.moves.values.contains(where: { tierWrites[$0.write] != nil }) {

@@ -9,8 +9,7 @@ nonisolated enum ItemMove: Hashable, Sendable, CaseIterable {
     case unarchive
 }
 
-/// What a tier or state command did, for the toast that says so: how many items changed, the one item where only one
-/// did, and what it left alone, which the library has already told (`ItemLibrary.tellSkipped`).
+/// The command's planned changes and planner skips. The engine can skip additional items when it queues the writes.
 nonisolated struct CommandOutcome: Equatable, Sendable {
     var changed: Int
     var onlyItem: ItemID?
@@ -77,7 +76,7 @@ extension ItemMove {
 }
 
 extension ItemLibrary {
-    /// What the toast says for `outcome` of `move`, naming the one item it changed where there was one.
+    /// Formats the planned move, using the item's name if the plan includes one item.
     func movedMessage(_ move: ItemMove, _ outcome: CommandOutcome) -> String {
         move.movedMessage(count: outcome.changed, title: outcome.onlyItem.flatMap(item)?.name)
     }
