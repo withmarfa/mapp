@@ -153,15 +153,14 @@ struct GroupByTests {
         #expect(second.sections(in: library, order: second.storedOrder, now: library.now()).map { $0.group?.title() } == ["Not Set"])
     }
 
-    @Test func saveAsViewNamesTheGroupingAViewCannotKeep() throws {
+    @Test func aNewViewKeepsABoardBySetOrNotSet() throws {
         let library = Self.library(Self.events)
         let browser = Self.window(library, place: .type(Self.event), layout: .board)
         browser.chooseGrouping(.column("field.starts_at", by: .presence))
         let window = SavedViews.window(browser, in: library, order: browser.storedOrder)
         let draft = try #require(ViewDraft.draft(window, catalogue: library.catalogue, views: []))
-        #expect(draft.group == nil)
-        #expect(draft.unkept == [.groupMode(column: "Starts", mode: "Set or Not Set")])
-        #expect(SavedViews.describe(draft.unkept[0]) == "Group by Starts: Set or Not Set")
+        #expect(draft.group == LibraryViewGroup(field: "properties.starts_at", byPresence: true))
+        #expect(draft.unkept.isEmpty)
     }
 
     @Test func aViewWritesTheGroupsItPutsFirstAndHides() {
