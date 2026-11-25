@@ -53,13 +53,10 @@ struct ViewPanelButton: View {
         }
     }
 
-    /// The popover shows while the window holds a panel. A click outside it closes a view's or a place's panel with a
-    /// name still being typed written, and drops a new view with the name typed given back, as any close that is not
-    /// the person's Escape does.
+    /// The popover shows while the window holds a panel. A click outside it ends the panel as `dismissViewPanel` says.
     private var presented: Binding<Bool> {
         Binding { browser.showsViewPanel } set: { shown in
-            guard !shown, let panel = browser.viewPanel else { return }
-            if panel.isNew { browser.closeViewPanel(in: library) } else { browser.escapeViewPanel(in: library) }
+            if !shown { browser.dismissViewPanel(in: library) }
         }
     }
 }

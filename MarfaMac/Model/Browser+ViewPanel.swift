@@ -49,7 +49,10 @@ extension Browser {
     func finishViewPanel(in library: any ItemLibrary, order: ItemOrder) async {
         guard let panel = viewPanel else { return }
         if panel.isNew { return await makeNewView(from: panel, in: library, order: order) }
-        if panel.typedRename != nil { await commitViewName(of: panel, in: library) }
+        if panel.typedRename != nil {
+            panel.leave(because: .left)
+            await commitViewName(of: panel, in: library)
+        }
         if viewPanel === panel { viewPanel = nil }
     }
 
@@ -63,15 +66,27 @@ extension Browser {
     }
 
     /// Escape, the person's own: a view's or a place's panel closes, and a new view makes nothing: the place goes back
-    /// as it was, and what they typed is theirs to drop.
+    /// as it was, and what they typed is theirs to drop. A view's name still being typed is written, and given back
+    /// where it cannot be (`dismissViewPanel`).
     func escapeViewPanel(in library: any ItemLibrary) {
         guard let panel = viewPanel else { return }
         if panel.isNew {
             panel.form?.discard()
             return dropNewViewPanel(panel)
         }
-        if panel.typedRename != nil { Task { await commitViewName(of: panel, in: library) } }
+        dismissViewPanel(in: library)
+    }
+
+    /// A click outside the panel: a new view is dropped with its name given back, and a view's or a place's panel closes.
+    /// A view's name still being typed is written, and given back if the write fails, is refused or finds the view gone,
+    /// since nothing else holds it once the panel has closed.
+    func dismissViewPanel(in library: any ItemLibrary) {
+        guard let panel = viewPanel else { return }
+        if panel.isNew { return closeViewPanel(in: library) }
         viewPanel = nil
+        guard panel.typedRename != nil else { return }
+        panel.leave(because: .left)
+        Task { await commitViewName(of: panel, in: library) }
     }
 
     private func dropNewViewPanel(_ panel: ViewPanel) {

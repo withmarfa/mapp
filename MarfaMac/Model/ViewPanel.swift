@@ -130,6 +130,16 @@ final class ViewPanel {
         }
     }
 
+    /// The panel ends with the name typed still to be written (`Browser.commitViewName`): a write that fails or is
+    /// refused, or a view gone meanwhile, gives the name back, as a panel that ended mid-rename does.
+    func leave(because departure: ViewTitleForm.Departure) {
+        guard case .edit = purpose, typedRename != nil else { return }
+        leftWhileRenaming = leaveReason(departure)
+    }
+
+    /// Whether the panel has ended with a name the view does not yet hold.
+    var hasLeftWithRename: Bool { leftWhileRenaming != nil }
+
     private func leaveReason(_ departure: ViewTitleForm.Departure) -> String {
         switch departure {
         case .closed: String(localized: "The window closed before the view was renamed.")
@@ -151,6 +161,7 @@ final class ViewPanel {
     /// The view is gone, so the name typed for it has nowhere to go. Whether there was one to give back.
     @discardableResult
     func handOffBecauseGone() -> Bool {
+        leftWhileRenaming = nil
         guard typedRename != nil else { return false }
         giveBackRename(reason: String(localized: "The view was deleted before it was renamed."))
         return true
