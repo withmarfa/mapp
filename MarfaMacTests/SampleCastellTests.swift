@@ -106,8 +106,8 @@ import Testing
         for collection in collections {
             let members = Set(world.edges.filter { $0.edgeType == "in-collection" && $0.toId == collection.id }.map(\.fromId))
             let expected = Set(active.filter { members.contains($0.id) }.map { ItemID($0.id) })
-            #expect(ids(.collection(ItemID(collection.id)), .all) == expected, collection.id)
-            #expect(!expected.isEmpty, collection.id)
+            #expect(ids(.collection(ItemID(collection.id)), .all) == expected, Comment(rawValue: collection.id))
+            #expect(!expected.isEmpty, Comment(rawValue: collection.id))
         }
     }
 }
