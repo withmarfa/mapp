@@ -12,7 +12,7 @@ struct TextZoomTests {
     @Test func applyWritesOnlyTheSettingItActsOn() throws {
         let defaults = ThrowawayDefaults.make("TextZoomTests")
         TextZoom.page.apply(.bigger, in: defaults)
-        #expect(defaults.integer(forKey: PageKey.textSize) == 16)
+        #expect(defaults.integer(forKey: PageKey.textSize) == 14)
         #expect(defaults.object(forKey: InterfaceKey.textSize) == nil)
         defaults.set(24, forKey: InterfaceKey.textSize)
         TextZoom.interface.apply(.bigger, in: defaults)
@@ -21,11 +21,25 @@ struct TextZoomTests {
         #expect(defaults.integer(forKey: InterfaceKey.textSize) == 13)
     }
 
-    @Test func theDefaultPageTextIs15AndASizeStoredBeforeTheStepsReadsAsTheNearest() {
-        #expect(PageStyle().textSize == 15)
+    @Test func pageRolesAndReadingWidthScaleFromActualSize() {
+        let actual = PageStyle()
+        #expect(abs(actual.titleSize - 24.7) < 0.001)
+        #expect(Typography.headingSize(2) == 17.5)
+        #expect(Typography.headingSize(3) == 15)
+        #expect(abs(actual.readingEms * Double(actual.textSize) - 680) < 0.001)
+        #expect(abs(actual.horizontalInset(for: 900) - 110) < 0.001)
+        let larger = PageStyle(textSize: 18)
+        #expect(larger.titleSize > actual.titleSize)
+        #expect(larger.horizontalInset(for: 1_000) < actual.horizontalInset(for: 1_000))
+    }
+
+    @Test func theDefaultPageTextIs13AndASizeStoredBeforeTheStepsReadsAsTheNearest() {
+        #expect(PageStyle().textSize == 13)
         #expect(PageStyle.textSizes == [13, 14, 15, 16, 18, 20, 24])
         #expect(PageStyle.nearestTextSize(11) == 13)
         #expect(PageStyle.nearestTextSize(12) == 13)
+        #expect(PageStyle.nearestTextSize(15) == 15)
+        #expect(TextZoom.page.size(after: .actual, from: 15) == 13)
         #expect(PageStyle.nearestTextSize(17) == 16, "the smaller of two equally near")
         #expect(PageStyle.nearestTextSize(22) == 20)
         #expect(PageStyle.nearestTextSize(24) == 24)

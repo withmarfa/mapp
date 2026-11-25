@@ -57,7 +57,7 @@ extension EditorController {
                 guard let result = value as? [String: Any], let html = result["html"] as? String,
                       let revision = result["revision"] as? Int else { throw unprepared }
                 guard pageItemID == id, self.generation == generation else { return }
-                try await renderer.load(html, textSize: CGFloat(style.textSize))
+                try await renderer.load(html, style: style)
                 guard pageItemID == id, self.generation == generation, webView.window === window,
                       let current = try await webView.evaluateJavaScript("window.editor.snapshot(\(generation))") as? [String: Any],
                       current["revision"] as? Int == revision else { return }

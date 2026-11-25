@@ -18,7 +18,7 @@ struct PageHeadView<Title: View>: View {
     @State private var expanded = false
 
     var body: some View {
-        let size = CGFloat(textSize)
+        let size = CGFloat(InterfaceStyle.defaultTextSize) * InterfaceStyle.scale(for: textSize)
         let step = size * 4 / 13
         let shown = expanded ? head.rows : head.rows.filter { !$0.folded }
         VStack(alignment: .leading, spacing: 0) {
@@ -33,7 +33,7 @@ struct PageHeadView<Title: View>: View {
                         VStack(alignment: .leading, spacing: step * 1.25) {
                             HStack(spacing: step) {
                                 Image(systemName: pin.symbolName)
-                                    .font(.system(size: size * 11 / 13))
+                                    .font(.system(size: Typography.caption * InterfaceStyle.scale(for: textSize)))
                                     .accessibilityHidden(true)
                                 Text(verbatim: pin.label)
                                     .font(.system(size: size * 12 / 13))
@@ -267,7 +267,7 @@ struct PageKicker: View {
     let changeType: () -> Void
 
     var body: some View {
-        let size = CGFloat(textSize)
+        let size = CGFloat(InterfaceStyle.defaultTextSize) * InterfaceStyle.scale(for: textSize)
         HStack(spacing: size * 8 / 13) {
             if kicker.changesType {
                 Button(action: changeType) { typeName(size) }
@@ -285,7 +285,7 @@ struct PageKicker: View {
                 .foregroundStyle(.tertiary)
             }
         }
-        .font(.system(size: size * 12 / 13, weight: .medium))
+        .font(.system(size: Typography.chip * InterfaceStyle.scale(for: textSize), weight: .medium))
         .frame(minHeight: size * 20 / 13)
         // Where the type name is a button, the heading holds it and the flags, so the button stays reachable.
         .accessibilityElement(children: kicker.changesType ? .contain : .ignore)

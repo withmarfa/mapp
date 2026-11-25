@@ -86,7 +86,8 @@ nonisolated struct SourceLook: Equatable, Sendable {
 
     /// The board's prose: New York at 14.6 for every 13 of the page's text, a 1.65 line, headings in the same serif.
     private var readerRules: String {
-        let size = String(format: "%.1f", Double(textSize) * 14.6 / 13)
+        let size = String(format: "%.1f", Double(textSize) * Typography.readerBody / Double(Typography.body))
+        let captionSize = Typography.pageSize(Typography.caption, at: CGFloat(textSize))
         return """
             :root { color-scheme: light dark; }
             html { box-sizing: border-box; margin: 0; padding: 16px \(inset) 48px; }
@@ -101,7 +102,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
             li > ul, li > ol { margin-bottom: 0; }
             img, video, svg { display: block; max-width: 100%; height: auto; margin: 0.8em 0; border-radius: 6px; }
             figure { margin: 0 0 0.75em; }
-            figcaption { margin-top: 8px; color: GrayText; font: 0.79em/1.4 -apple-system, system-ui, sans-serif; }
+            figcaption { margin-top: 8px; color: GrayText; font: \(captionSize)px/1.4 -apple-system, system-ui, sans-serif; }
             .marfa-lead { display: block; margin: 0 0 1.5em; }
             figure.marfa-lead img, img.marfa-lead { width: 100%; margin: 0; border-radius: 12px; }
             blockquote { margin-inline: 0; padding-inline-start: 1em; border-inline-start: 3px solid color-mix(in srgb, CanvasText 20%, transparent); color: GrayText; }

@@ -60,19 +60,19 @@ struct VersionPageColumn: View {
         let content = entry.content
         let rows = content.rows(
             placement: placements.placement(of: content.type, in: library.catalogue), in: library.catalogue, format: dateFormat)
-        let size = CGFloat(interfaceTextSize)
-        let titleSize = CGFloat(style.textSize) * 28 / 15
+        let size = CGFloat(InterfaceStyle.defaultTextSize) * InterfaceStyle.scale(for: interfaceTextSize)
+        let titleSize = style.titleSize
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 PageKicker(kicker: kicker(of: content.type)) {}
                     .padding(.bottom, size * 6 / 13)
                 if let title = content.title, !title.isEmpty {
                     Text(verbatim: title)
-                        .font(.system(size: titleSize, weight: .bold)).tracking(-titleSize * 0.022)
+                        .font(.system(size: titleSize, weight: .semibold)).tracking(titleSize * Typography.titleTracking)
                         .textSelection(.enabled)
                         .accessibilityAddTraits(.isHeader)
                 } else if content.title != nil {
-                    Text("Untitled").font(.system(size: titleSize, weight: .bold)).tracking(-titleSize * 0.022)
+                    Text("Untitled").font(.system(size: titleSize, weight: .semibold)).tracking(titleSize * Typography.titleTracking)
                         .foregroundStyle(.tertiary)
                 }
                 if !rows.isEmpty { propertyRows(rows, size: size) }
@@ -80,7 +80,7 @@ struct VersionPageColumn: View {
                     if let text = content.text {
                         VersionTextView(old: older?.content.text, new: text, size: CGFloat(style.textSize))
                     } else {
-                        Text("No text").foregroundStyle(.secondary)
+                        Text("No text").font(.system(size: CGFloat(style.textSize))).foregroundStyle(.secondary)
                     }
                 }
                 .padding(.top, rows.isEmpty ? 24 : 20)
@@ -180,7 +180,9 @@ private struct VersionLineView: View {
         case .rule:
             Divider()
         case .heading(let level):
-            Text(attributed).font(Self.font(forHeading: level, size: size)).padding(.top, 6)
+            Text(attributed)
+                .font(.system(size: Typography.pageSize(Typography.headingSize(level), at: size), weight: level <= 3 ? .bold : .semibold))
+                .padding(.top, 6)
         case .bullet(let depth, let number):
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(number.map { "\($0)." } ?? "•").foregroundStyle(.secondary)
@@ -192,22 +194,11 @@ private struct VersionLineView: View {
                 .padding(.leading, 14)
                 .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 3) }
         case .code:
-            Text(attributed).font(.system(size: size, design: .monospaced))
+            Text(attributed).font(.system(size: size * Typography.codeBlockRatio, design: .monospaced))
         case .paragraph:
             Text(attributed)
         case .table(let table):
             VersionTableView(table: table)
-        }
-    }
-
-    /// The board's headings as multiples of the text size: 19 and 16 where the text is 15, the next level down at the
-    /// text's own size, and the top level a step above the second.
-    private static func font(forHeading level: Int, size: CGFloat) -> Font {
-        switch level {
-        case 1: .system(size: size * 22 / 15, weight: .bold)
-        case 2: .system(size: size * 19 / 15, weight: .semibold)
-        case 3: .system(size: size * 16 / 15, weight: .semibold)
-        default: .system(size: size, weight: .semibold)
         }
     }
 

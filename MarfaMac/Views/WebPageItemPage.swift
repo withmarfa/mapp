@@ -403,13 +403,13 @@ private struct WebPageHeader: View {
         let head = PageHead(
             of: item, in: library, placements: placements, pinsProperties: pinsProperties, dateFormat: dateFormat,
             showsCoordinates: showsCoordinates)
-        let textSize = CGFloat(style.textSize)
+        let titleSize = style.titleSize
         let statusField = library.catalogue.itemTypes[item.type]?.statusField
         VStack(alignment: .leading, spacing: 0) {
             PageHeadView(item: item, head: head, statusField: statusField, drafts: drafts, open: open) {
                 Text(verbatim: item.displayTitle)
-                    .font(.system(size: textSize * 28 / 15, weight: .bold))
-                    .tracking(-textSize * 28 / 15 * 0.022)
+                    .font(.system(size: titleSize, weight: .semibold))
+                    .tracking(titleSize * Typography.titleTracking)
                     .lineLimit(TitleLines.resolved(titleLines))
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
@@ -419,7 +419,7 @@ private struct WebPageHeader: View {
             }
             if let statusField, drafts.draft(for: item.id, key: statusField.key).rejected {
                 Text("The value could not be saved.")
-                    .font(.system(size: CGFloat(interfaceTextSize) * 10 / 13))
+                    .font(InterfaceStyle.captionFont.scaled(by: InterfaceStyle.scale(for: interfaceTextSize)))
                     .foregroundStyle(.red)
                     .accessibilityAddTraits(.updatesFrequently)
             }

@@ -59,8 +59,8 @@ extension EditorController {
     func applyFonts() {
         let text = FontChoice.resolved(style.textFont, among: FontChoice.installedFamilies())
         let code = FontChoice.resolved(style.codeFont, among: FontChoice.installedMonospacedFamilies())
-        setProperty("--inkkit-font-family", text.map { FontChoice.css(family: $0, generic: "-apple-system, system-ui, sans-serif") }, onBody: true)
-        setProperty("--inkkit-monospace-font", code.map { FontChoice.css(family: $0, generic: "ui-monospace, monospace") }, onBody: true)
+        setProperty("--inkkit-font-family", text.map { FontChoice.css(family: $0, generic: Typography.systemCSS) }, onBody: true)
+        setProperty("--inkkit-monospace-font", code.map { FontChoice.css(family: $0, generic: Typography.monoCSS) }, onBody: true)
     }
 
     /// Sets a custom property on the page's root, or on its body where the page sets the same property there, and takes

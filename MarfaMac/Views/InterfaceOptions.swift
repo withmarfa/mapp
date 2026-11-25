@@ -51,7 +51,7 @@ enum PanelWidth {
 }
 
 enum InterfaceStyle {
-    static let defaultTextSize = 13
+    static let defaultTextSize = Typography.primary
     static let textSizes = [11, 12, 13, 14, 15, 16, 18, 20, 24]
 
     static func scale(for textSize: Int) -> CGFloat {
@@ -59,9 +59,13 @@ enum InterfaceStyle {
     }
 
     static func font(_ style: NSFont.TextStyle, textSize: Int) -> NSFont {
+        if style == .body { return .systemFont(ofSize: CGFloat(defaultTextSize) * scale(for: textSize)) }
         let font = NSFont.preferredFont(forTextStyle: style)
         return NSFontManager.shared.convert(font, toSize: font.pointSize * scale(for: textSize))
     }
+
+    static let primaryFont = Font.system(size: CGFloat(Typography.primary))
+    static let captionFont = Font.system(size: Typography.caption)
 }
 
 extension EnvironmentValues {
@@ -74,7 +78,7 @@ private struct InterfaceTextStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .environment(\.interfaceTextSize, textSize)
-            .font(Font.body.scaled(by: InterfaceStyle.scale(for: textSize)))
+            .font(InterfaceStyle.primaryFont.scaled(by: InterfaceStyle.scale(for: textSize)))
     }
 }
 

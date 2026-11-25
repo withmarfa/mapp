@@ -15,14 +15,14 @@ struct ChipLooks: Equatable, Sendable {
     var cornerRadius = 7.0
     /// A chip's text: 12 points at `pageWeight` on the page, and in a row `rowTextSize` at `rowWeight`. Weights are the
     /// CSS numbers (400 regular, 500 medium, 600 semibold) so the page and the app read the same value.
-    let textSize = 12.0
+    let textSize = Typography.chip
     let pageWeight = 500
     let rowWeight = 400
     /// A chip's text is the ink at this opacity (in dark, white at the same opacity), a step under a label's.
     var chipTextOpacity = 0.72
     /// A type, a linked item or a person shown as a fact: its name at `factSize` on the page and `rowFactSize` in a row,
     /// at `factWeight`.
-    let factSize = 13.0
+    let factSize = Double(Typography.primary)
     let rowFactSize = 12.0
     let factWeight = 400
     let initialsWeight = 600

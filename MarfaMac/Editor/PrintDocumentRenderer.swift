@@ -15,7 +15,7 @@ final class PrintDocumentRenderer: NSObject, WKNavigationDelegate {
     private var timeout: Task<Void, Never>?
     private var continuation: CheckedContinuation<Void, any Error>?
 
-    func load(_ html: String, textSize: CGFloat = 15) async throws {
+    func load(_ html: String, style: PageStyle) async throws {
         guard html.utf8.count <= 64 << 20 else { throw PrintError.limit }
         window.isReleasedWhenClosed = false
         window.contentView = view
@@ -30,13 +30,31 @@ final class PrintDocumentRenderer: NSObject, WKNavigationDelegate {
                 self.complete(PrintError.unavailable)
             }
         }
+        let headings = (1...6).map { level in
+            ".inkkit-print-document h\(level) { font-size: \(Typography.headingSize(level) / Double(Typography.body))rem; font-weight: \(level <= 3 ? 700 : 600); }"
+        }.joined(separator: "\n")
+        let textFamily = FontChoice.resolved(style.textFont, among: FontChoice.installedFamilies())
+        let codeFamily = FontChoice.resolved(style.codeFont, among: FontChoice.installedMonospacedFamilies())
         _ = try await view.callAsyncJavaScript("""
         document.documentElement.style.fontSize = `${textSize}px`;
+        document.documentElement.style.fontFamily = textFamily;
+        document.documentElement.style.setProperty('--marfa-print-code', codeFamily);
+        const typography = document.createElement('style');
+        typography.textContent = headings +
+          '.inkkit-print-document :is(code, pre) { font-family: var(--marfa-print-code); }' +
+          '.inkkit-print-document pre:not(.inkkit-print-literal) { font-size: ' + codeRatio + 'rem; }';
+        document.head.append(typography);
         await Promise.race([
           (async () => { await document.fonts.ready; await Promise.all(Array.from(document.images, image => image.decode())); })(),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Print content could not finish loading.')), 15000))
         ]);
-        """, arguments: ["textSize": textSize], in: nil, contentWorld: .page)
+        """, arguments: [
+            "textSize": style.textSize,
+            "headings": headings,
+            "textFamily": textFamily.map { FontChoice.css(family: $0, generic: Typography.systemCSS) } ?? Typography.systemCSS,
+            "codeFamily": codeFamily.map { FontChoice.css(family: $0, generic: Typography.monoCSS) } ?? Typography.monoCSS,
+            "codeRatio": Typography.codeBlockRatio,
+        ], in: nil, contentWorld: .page)
     }
 
     func close() {

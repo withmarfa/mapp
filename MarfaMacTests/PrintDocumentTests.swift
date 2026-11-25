@@ -21,7 +21,7 @@ struct PrintDocumentTests {
     @Test func longDocumentExportsCompleteBoundedPages() async throws {
         let renderer = PrintDocumentRenderer()
         defer { renderer.close() }
-        try await renderer.load(html())
+        try await renderer.load(html(), style: PageStyle())
         let folder = try TemporaryFolder()
         let url = folder.url.appending(path: "long.pdf")
         try await renderer.exportPDF(to: url)
@@ -59,7 +59,7 @@ struct PrintDocumentTests {
     @Test func limitsRejectWithoutCreatingOrReplacingADestination() async throws {
         let renderer = PrintDocumentRenderer()
         defer { renderer.close() }
-        try await renderer.load(html())
+        try await renderer.load(html(), style: PageStyle())
         let folder = try TemporaryFolder()
         let absent = folder.url.appending(path: "absent.pdf")
         await #expect(throws: (any Error).self) { try await renderer.exportPDF(to: absent, limits: .init(pages: 1)) }
@@ -69,5 +69,24 @@ struct PrintDocumentTests {
         try original.write(to: existing)
         await #expect(throws: (any Error).self) { try await renderer.exportPDF(to: existing, limits: .init(bytes: 512)) }
         #expect(try Data(contentsOf: existing) == original)
+    }
+
+    @Test func theExportUsesTheChosenPageSize() async throws {
+        let folder = try TemporaryFolder()
+        let phrase = "The same words on both pages"
+        let html = "<html><body class='inkkit-print-document'><p>\(phrase)</p></body></html>"
+        var widths: [CGFloat] = []
+        for size in [13, 20] {
+            let renderer = PrintDocumentRenderer()
+            defer { renderer.close() }
+            try await renderer.load(html, style: PageStyle(textSize: size))
+            let url = folder.url.appending(path: "\(size).pdf")
+            try await renderer.exportPDF(to: url)
+            let document = try #require(PDFDocument(url: url))
+            let page = try #require(document.page(at: 0))
+            let selection = try #require(document.findString(phrase).first)
+            widths.append(selection.bounds(for: page).width)
+        }
+        #expect(widths[1] > widths[0] * 1.4)
     }
 }
