@@ -11,7 +11,7 @@ import Testing
     /// Hosts the window on the Library of `BigLibrary` (650 items), in `mode`.
     private func hosted(
         _ mode: ItemViewMode, options: ItemTableOptions? = nil,
-        _ script: @MainActor (Browser, MarfaLibrary, FakeItemSource) async throws -> Void
+        _ script: @MainActor (Browser, MarfaLibrary, FakeItemSource, NSWindow) async throws -> Void
     ) async throws {
         let (library, source) = try await BigLibrary.loaded()
         #expect(library.items(in: .library).count > 2 * Browser.listPage)
@@ -37,40 +37,40 @@ import Testing
             browser.tableOptions[.library] = options
             browser.choicesChanged()
         }
-        try await script(browser, library, source)
+        try await script(browser, library, source, window)
     }
 
-    private static func longestTable() -> NSTableView? {
+    /// The window's longest table: its own, since other suites' windows may be open beside it.
+    private static func longestTable(in window: NSWindow) -> NSTableView? {
         func tables(in view: NSView) -> [NSTableView] {
             (view as? NSTableView).map { [$0] } ?? view.subviews.flatMap { tables(in: $0) }
         }
-        guard let content = NSApp.windows.first(where: { $0 is TestWindow })?.contentView else { return nil }
+        guard let content = window.contentView else { return nil }
         return tables(in: content).max(by: { $0.numberOfRows < $1.numberOfRows })
     }
 
     @Test func selectAllInTheTimelineChoosesEveryItem() async throws {
-        try await hosted(.timeline) { browser, _, _ in
-            try #require(await eventually { Self.longestTable()?.numberOfRows ?? 0 > 100 })
+        try await hosted(.timeline) { browser, _, _, window in
+            try #require(await eventually { Self.longestTable(in: window)?.numberOfRows ?? 0 > 100 })
             let all = try #require(browser.timelineWork.held?.value.positions.keys).map { $0 }
             #expect(all.count > Browser.listPage, "more items than are drawn")
             // As the Edit menu sends it.
-            #expect(NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: Self.longestTable(), from: nil))
+            #expect(NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: Self.longestTable(in: window), from: nil))
             #expect(browser.selection == Set(all))
         }
     }
 
     @Test func commandAInTheGalleryChoosesEveryItem() async throws {
-        try await hosted(.gallery) { browser, _, _ in
+        try await hosted(.gallery) { browser, _, _, window in
             let all = try #require(browser.sectionsWork.held?.value.ids)
             #expect(all.count > Browser.listPage, "more items than are drawn")
             browser.focusRequest = .list
-            let window = try #require(NSApp.windows.first { $0 is TestWindow && $0.isVisible })
             let press = try #require(NSEvent.keyEvent(
                 with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0, windowNumber: window.windowNumber, context: nil,
                 characters: "a", charactersIgnoringModifiers: "a", isARepeat: false, keyCode: 0))
             // Sent again until the gallery has the keyboard, which it takes once the window has drawn it.
             let chose = await eventually {
-                if browser.selection.isEmpty { NSApp.sendEvent(press) }
+                if browser.selection.isEmpty { window.sendEvent(press) }
                 return !browser.selection.isEmpty
             }
             try #require(chose)
@@ -81,7 +81,7 @@ import Testing
     /// The chosen item, renamed to the end of a sort by name, is drawn there.
     @Test(arguments: [ItemViewMode.list, .gallery])
     func aChosenItemAChangeMovesPastThePageIsDrawn(mode: ItemViewMode) async throws {
-        try await hosted(mode, options: ItemTableOptions(sort: [ItemTableComparator(column: .title)])) { browser, library, source in
+        try await hosted(mode, options: ItemTableOptions(sort: [ItemTableComparator(column: .title)])) { browser, library, source, _ in
             // Sorted by name, as asked.
             @MainActor func sortedByName() -> Bool {
                 guard let held = browser.sectionsWork.held, held.value.ids.count > 2 * Browser.listPage else { return false }
