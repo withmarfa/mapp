@@ -18,6 +18,7 @@ struct ViewOptionCommand {
         case .timeline: return timeline(browser, library) + properties(browser, library)
         case .calendar: return calendar(browser, library)
         case .map: return map(browser)
+        case .digest: return []
         case .gallery: return gallery(browser) + sorting(browser, library) + grouping(browser, library) + properties(browser, library)
         case .list: return sorting(browser, library) + grouping(browser, library) + properties(browser, library)
         }

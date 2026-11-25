@@ -20,6 +20,7 @@ extension Browser {
     /// are and where they came from, and for the Library once it holds more than `libraryListLimit` items, which a new
     /// Marfa's few read better as a list; a list for any other.
     func naturalLayout(of place: PlaceView) -> ItemViewMode {
+        if place == .feed { return .digest }
         if place == .archive { return .table }
         if place == .library, let library, library.count(in: .library) > Self.libraryListLimit { return .table }
         return .list
@@ -122,6 +123,7 @@ extension Browser {
         let properties: ViewProperties? = stored.properties.isChanged ? stored.properties : nil
         if placeProperties[place] != properties { placeProperties[place] = properties }
         if placeQuickActions[place] != stored.quickActions { placeQuickActions[place] = stored.quickActions }
+        if placeDigests[place] != stored.digest { placeDigests[place] = stored.digest }
         if placeOpenings[place] != stored.opening { placeOpenings[place] = stored.opening }
         if placeMaps[place] != stored.map { placeMaps[place] = stored.map }
         observedChoices[place] = ViewChoices(options: options, timelineDate: stored.timelineField)
@@ -173,6 +175,7 @@ extension Browser {
         placeQuickActions[place] = nil
         placeOpenings[place] = nil
         placeMaps[place] = nil
+        placeDigests[place] = nil
         observedChoices[place] = ViewChoices(options: ItemTableOptions(), timelineDate: nil)
         let natural = naturalLayout(of: place)
         if viewMode != natural, availableViewModes(in: library).contains(natural) { set(layout: natural) }
@@ -196,6 +199,7 @@ extension Browser {
         placeHidesEmptyGroups[place] = stored.hidesEmptyGroups ? true : nil
         placeProperties[place] = stored.properties.isChanged ? stored.properties : nil
         placeQuickActions[place] = stored.quickActions
+        placeDigests[place] = stored.digest
         placeOpenings[place] = stored.opening
         placeMaps[place] = stored.map
     }

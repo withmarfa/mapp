@@ -19,10 +19,15 @@ nonisolated enum SampleLibrary {
     /// Also asks for the tasks and events a board and a timeline show.
     static var withCollections: Bool { ProcessInfo.processInfo.arguments.contains("-MarfaMacCollectionSample") }
 
-    /// With the sample flag, `-MarfaMacOpenPlace <type id>` opens that type's place (`items` opens Items) and
-    /// `-MarfaMacLayout list|gallery|table|board|timeline|calendar|map` the layout, for a screenshot of one view.
+    /// With the sample flag, `-MarfaMacOpenPlace` takes a type ID, `items` or `feed`, and `-MarfaMacLayout` a layout.
     static var launchPlace: PlaceView? {
-        argument(after: "-MarfaMacOpenPlace").map { $0 == "items" ? .library : .type(TypeID($0)) }
+        argument(after: "-MarfaMacOpenPlace").map {
+            switch $0 {
+            case "items": .library
+            case "feed": .feed
+            default: .type(TypeID($0))
+            }
+        }
     }
 
     static var launchLayout: ItemViewMode? { argument(after: "-MarfaMacLayout").flatMap(ItemViewMode.init(rawValue:)) }
@@ -33,6 +38,12 @@ nonisolated enum SampleLibrary {
     /// `-MarfaMacLayout` or the place's look says.
     @MainActor static func forgetStoredChoices(in defaults: UserDefaults) {
         MacSettings.reset(in: defaults)
+        if SampleCastell.requested != nil {
+            ViewLayouts.update(in: defaults) {
+                $0.set(ViewMacSettings(layout: .digest), for: ItemID(readingViewID))
+                $0.set(ViewMacSettings(layout: .table), for: ItemID(gitHubViewID))
+            }
+        }
     }
 
     private static func argument(after flag: String) -> String? {
@@ -70,7 +81,7 @@ nonisolated enum SampleLibrary {
                 ? castell?.edges ?? (memberships(now: now) + (withCollections ? taskLinks(now: now) : []) + SampleGallery.edges(now: now, files: galleryFiles))
                 : []),
             itemTypes: castell == nil ? itemTypes + (gallery ? SampleGallery.types : []) : SampleCastell.itemTypes,
-            edgeTypes: edgeTypes, views: views, displays: display)
+            edgeTypes: edgeTypes, views: castell == nil ? views : views + feedViews, displays: display)
         if gallery { SampleGallery.writeFiles(galleryFiles) }
         let server = SampleServer(copy: fake.copy, instance: castell == nil ? instanceID : SampleCastell.instanceID)
         let source = MarfaSource(
@@ -203,6 +214,8 @@ nonisolated enum SampleLibrary {
             shipped: true, acyclic: true),
         EdgeType(id: "about", label: "About", reverseLabel: "Subject of", cardinality: "many-to-many", shipped: true),
         EdgeType(id: "references", label: "References", reverseLabel: "Referenced by", cardinality: "many-to-many", shipped: true),
+        EdgeType(id: MarfaMapping.threadEdge, label: "In Thread", reverseLabel: "Messages", cardinality: "many-to-one", shipped: true),
+        EdgeType(id: MarfaMapping.excerptEdge, label: "Excerpt From", reverseLabel: "Excerpts", cardinality: "many-to-one", shipped: true),
         EdgeType(
             id: "supersedes", label: "Supersedes", reverseLabel: "Superseded by", cardinality: "one-to-one", shipped: true),
         EdgeType(
@@ -220,6 +233,24 @@ nonisolated enum SampleLibrary {
     static var catalogue: Catalogue { MarfaMapping.catalogue(itemTypes: itemTypes, edgeTypes: edgeTypes) }
 
     // MARK: Views
+
+    private static let readingViewID = "view-feed-reading"
+    private static let gitHubViewID = "view-feed-github"
+
+    private static let feedViews: [SavedView] = [
+        SavedView(
+            id: readingViewID, version: 1,
+            settings: ViewSettings(
+                title: "Reading",
+                query: ViewQuery(types: [SampleCastell.Kind.bookmark, SampleCastell.Kind.highlight, SampleCastell.Kind.article], tier: .feed, states: [.active]),
+                sort: [ViewSort(by: "created_at", direction: .descending)])),
+        SavedView(
+            id: gitHubViewID, version: 1,
+            settings: ViewSettings(
+                title: "GitHub",
+                query: ViewQuery(types: [SampleCastell.Kind.issue, SampleCastell.Kind.pullRequest], tier: .feed, states: [.active]),
+                sort: [ViewSort(by: "updated_at", direction: .descending)])),
+    ]
 
     /// Views as another app might have saved them, held by the fake copy and read through it like a real copy's.
     /// The fake cannot judge a query's `filter`, so each asks only for types, state, order and grouping.

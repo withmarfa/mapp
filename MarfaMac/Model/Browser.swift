@@ -514,6 +514,8 @@ final class Browser {
         placeQuickActions = [:]
         placeOpenings = [:]
         placeMaps = [:]
+        placeDigests = [:]
+        digestDisplay = nil
         openedView = nil
         placeProperties = [:]
         placeCalendarScales = [:]
@@ -699,6 +701,8 @@ final class Browser {
     var placeOpenings: PlaceMemory<ItemOpening> = [:]
     /// The map's choices of each place that is not a saved view, as its default view keeps them (`mapChoices`).
     var placeMaps: PlaceMemory<MapChoices> = [:]
+    var placeDigests: PlaceMemory<DigestChoices> = [:]
+    var digestDisplay: DigestLayout.Display?
     /// The Properties list of each place that is not a saved view, as its default view keeps it (`properties`).
     var placeProperties: PlaceMemory<ViewProperties> = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.

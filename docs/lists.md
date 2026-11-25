@@ -12,10 +12,13 @@ paths:
   - MarfaMac/Views/Filter*.swift
   - MarfaMac/Views/ItemTable*.swift
   - MarfaMac/Views/ItemBoard*.swift
+  - MarfaMac/Views/ItemDigest.swift
+  - MarfaMac/Views/ItemRowQuickActions.swift
   - MarfaMac/Views/ItemTimeline*.swift
   - MarfaMac/Views/ItemCalendar*.swift
   - MarfaMac/Views/ItemMap*.swift
   - MarfaMac/Model/Items/MapLayout.swift
+  - MarfaMac/Model/Items/DigestLayout.swift
   - MarfaMac/Views/PlaceIndex.swift
   - MarfaMac/Model/Items/IndexRow.swift
   - MarfaMac/Views/ColumnSearch*.swift
@@ -32,30 +35,30 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 - **The app saves changes to a place's default view immediately** (`PlaceDefaults`). Reset View restores it. Types, Collections and Sources have none.
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest, such as layout and properties (`ViewMacSettings` in `ViewLayouts`).
-- **Saved view changes are written as they happen** (`Browser+ViewWrites`). Writes name the changed settings and use the current row for Mac settings.
+- **Saved view writes name the changed settings and use the current row** (`Browser+ViewWrites`).
 - **A write that Marfa has not taken stays in the window.** Save View resends it (`hasViewChanges`). Offline, it waits by setting (`PendingViewChanges`), through closing and quitting. A refused one goes to the clipboard in words.
 - **Revert View writes back each setting the window changed as it was at opening** (`openedView`), Marfa's whole. One changed elsewhere since stays, and the person is told.
-- **While a change waits, the window lists the view's query with its own filters, From and Archived Items** (`viewPreview`).
-- **Undo takes back only the settings of its own step**, so another app's change stays.
+- **While a change waits, the window lists its preview** (`viewPreview`).
+- **Undo takes back only its own step.**
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
 - **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`).
 - **A draft from a saved view owns the window,** settings and widths (`ViewPanel.mac`). Revert View is off and a returning write leaves it. Cancel writes nothing and shows the original as it is now.
 - **Making, renaming and deleting a view needs the server and is never queued.** A changed or submitted draft stays open; leaving it, or a late refusal, gives it back in words. A rename never replaces another app's; deleting asks.
-- **Starting points preview items in the window's layout** (`NewViewStart`). Create View applies the draft's layout. This Search comes first, saving supported tokens and unchanged From. An existing view asks before discarding changes.
+- **Starting points preview in the window's layout** (`NewViewStart`). Create View applies the draft's layout. This Search comes first, saving supported tokens and unchanged From. An existing view asks before discarding changes.
 - **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
-- **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
+- **The Library and the Feed list their own tier.** The Feed's first view is All. A type, a collection and a source choose From (`ListScope`).
 - **Favorites starts on Library,** with the usual From choices.
-- **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
+- **Include Kinds defaults on.** A saved view with no state shows archived items (`ArchivedItems`).
 - **Earlier place settings fill unset keys once per Mac** (`EarlierPlace.readIn`).
 
 ## Layouts
 
 - **The Library opens as a table, and as a list while it holds ten items or fewer** (`Browser.naturalLayout`). It and the Archive, reached from the Library's row and Go, list Name, Type, Source and Edited, latest first (`listsByOrigin`).
-- **Layouts draw the supplied items** (`ItemViewMode`).
-- **One row menu, one density and one drag serve every layout.**
+- **The Feed opens in Digest, newest created first.** Every item list offers it. Cards show type, source, title, text and pictures.
+- **Digest stacks messages by `in-thread` and excerpts by `excerpt-of`** (`DigestLayout`). A pile spans sources, sits at its newest visible member and opens in place.
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
 - **⌘⌫ deletes chosen items shown on a board, timeline or map** (`ChosenItemDeletion`). Changing the calendar span drops old events.
-- **An item's date is its own type's** (`ItemPlacement`), so a place of several types puts each where it belongs. The view can point at one field.
+- **Calendar and Timeline use each type's date** (`ItemPlacement`) or a field chosen for the view.
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
 - **Map places items with two valid coordinates** (`MapLayout`). Fit All Items shows every marker. No Location lists the rest. A listed type must declare both fields.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
@@ -65,11 +68,12 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 ## The View panel
 
-- **The View panel** (`ViewPanelPopover`) says where settings are saved. Add to Sidebar defaults off. Quick Actions appears only for the Feed.
+- **Digest choices** are Stack Related Items and Pictures (both on), and Lines of Text (three).
+- **Quick Actions** defaults on in the Feed, Archive and saved views whose From is Feed. Table, list, Digest and gallery offer Keep, Archive or Unarchive, and Delete where applicable, on hover and through VoiceOver.
 
 ## Grouping
 
-- **The offer comes from the types a place lists, never from the items on screen** (`GroupOffer`), so a field no item fills can be chosen.
+- **Group offers come from the listed types** (`GroupOffer`), including fields that no item fills.
 - **A grouping has a mode** (`GroupMode`): each value, a date's span, set or not set, or the four status groups.
 - **A saved view keeps every grouping offered,** order and hidden groups too. Hide Empty Groups stays on the Mac.
 - **A saved view's weeks start on Monday,** as in every app. A place's own follow Settings.
@@ -118,7 +122,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 ## Search
 
-- **A search is narrowed in the query, never after it** (`SearchNarrowing`), except a token Marfa cannot say (`ItemTableContent`). More conditions than a query takes are refused and named.
+- **Tokens narrow the query** (`SearchNarrowing`), with unsupported tokens applied locally (`ItemTableContent`). Excess conditions are named and refused.
 - **What a search leaves out is said** (`SearchLeaveOuts`), with a way to include it.
 - **The list's search is tokens and words** (`ColumnSearch`). Return on an offer (`SearchOffers`) makes a token; a change of place clears it. A Type token narrows within the place's types; in Archive it searches archived items.
 - **A search in the list is sorted by relevance until the person sorts it.** The gallery and the table keep their own sorts until relevance is picked (`Browser.ordersByRelevance`).

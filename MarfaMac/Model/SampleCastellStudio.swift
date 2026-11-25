@@ -124,7 +124,14 @@ nonisolated extension SampleCastell.Maker {
              body: "Saw to the waste side of the line and stop paring so early. Most gaps in a dovetail come from the chisel, and the saw is blamed for them.")
         make("feed-van", Kind.message, "Re: van hire for the print fair", studio, 1, "15:27", tier: .feed,
              body: "The long wheelbase is free that weekend and takes both tables flat. They want it back by nine on Monday, and the deposit comes off the card when the keys go back.\n\nCollection is from the yard on Davey's Lane, any time after eight on the Friday.")
+        make("feed-van-first", Kind.message, "Van hire for the print fair", studio, 2, "14:00", tier: .feed,
+             body: "Can we fit both tables flat in the long wheelbase?")
+        link("feed-van", "note-fair-layout", MarfaMapping.threadEdge)
+        link("feed-van-first", "note-fair-layout", MarfaMapping.threadEdge)
         make("feed-fold", Kind.highlight, nil, readwise, 1, "11:00", tier: .feed, body: "Paper remembers every fold, so make the first one the one you meant.")
+        make("feed-fold-first", Kind.highlight, nil, readwise, 5, "11:00", tier: .feed, body: "The grain always tells you which way the page wants to turn.")
+        make("feed-fold-second", Kind.highlight, nil, readwise, 3, "11:00", tier: .feed, body: "A good binding is quiet in the hand.")
+        for id in ["feed-fold", "feed-fold-first", "feed-fold-second"] { link(id, "book-cliff", MarfaMapping.excerptEdge) }
         make("feed-corner", Kind.article, "The corner printer comes back", readwise, 1, "10:00", tier: .feed,
              body: "Short runs made the small press shop worth opening again. A hundred copies used to be a favour, and it is now most of the work.")
         for (index, entry) in [

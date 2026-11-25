@@ -53,6 +53,7 @@ nonisolated extension ShortcutCommand {
     static let viewAsBoard = ShortcutCommand("viewAsBoard", in: .view, String(localized: "View as Board"), "4")
     static let viewAsTimeline = ShortcutCommand("viewAsTimeline", in: .view, String(localized: "View as Timeline"), "5")
     static let viewAsCalendar = ShortcutCommand("viewAsCalendar", in: .view, String(localized: "View as Calendar"), "6")
+    static let viewAsDigest = ShortcutCommand("viewAsDigest", in: .view, String(localized: "View as Digest"), "7")
     static let viewAsMap = ShortcutCommand("viewAsMap", in: .view, String(localized: "View as Map"), "8")
     static let toggleFilters = ShortcutCommand("toggleFilters", in: .view, String(localized: "Show or Hide Filters"))
     static let clearFilters = ShortcutCommand("clearFilters", in: .view, String(localized: "Clear Filters"))
@@ -96,7 +97,7 @@ nonisolated extension ShortcutCommand {
             settings, newItem, newWindow, refresh, open, openBesideList, openAsModal, openAsFullPage, openInNewWindow, quickLook, openOutside,
             favorite, addTag, changeType, versionHistory, keepInLibrary, moveToFeed, archive, delete, exportPDF, print,
             copyLink, addAttachment, searchItems, commandPalette, paletteActions, searchList, find, findNext, findPrevious, useSelectionForFind,
-            toggleSource, toggleReader, toggleFormats, focus, viewAsList, viewAsGallery, viewAsTable, viewAsBoard, viewAsTimeline, viewAsCalendar, viewAsMap,
+            toggleSource, toggleReader, toggleFormats, focus, viewAsList, viewAsGallery, viewAsTable, viewAsBoard, viewAsTimeline, viewAsCalendar, viewAsDigest, viewAsMap,
             toggleFilters, clearFilters, today, previousPeriod, nextPeriod, showWeek, showMonthScale, toggleMonth,
             editView, newView, revertView, resetView, duplicateView, toggleDetails, toggleSidebar, customizeSidebar, back, forward, previousItem, nextItem,
             makeTextBigger, makeTextSmaller, actualSize, zoomToFit, nextPage, previousPage,

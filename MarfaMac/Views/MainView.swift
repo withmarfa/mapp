@@ -237,6 +237,8 @@ struct MainView: View {
                                     ItemCalendar(browser: browser, pane: $pane)
                                 case .map:
                                     ItemMap(browser: browser, pane: $pane)
+                                case .digest:
+                                    ItemDigest(browser: browser, pane: $pane)
                                 case .list, .gallery:
                                     ItemGallery(browser: browser, order: order, pane: $pane)
                                 }

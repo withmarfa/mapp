@@ -92,6 +92,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     var opening: ItemOpening?
     /// The map's Style and whether it groups markers that crowd; nil follows the defaults.
     var map: MapChoices?
+    var digest: DigestChoices?
 
     init() {}
 
@@ -121,6 +122,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         // A way this version does not know follows Settings.
         opening = try container.decodeIfPresent(String.self, forKey: .opening).flatMap(ItemOpening.init(rawValue:))
         map = try container.decodeIfPresent(MapChoices.self, forKey: .map)
+        digest = try container.decodeIfPresent(DigestChoices.self, forKey: .digest)
     }
 
     var isEmpty: Bool { self == PlaceDefault() }
@@ -147,6 +149,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         filled.quickActions = quickActions ?? other.quickActions
         filled.opening = opening ?? other.opening
         filled.map = map ?? other.map
+        filled.digest = digest ?? other.digest
         return filled
     }
 

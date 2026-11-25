@@ -84,6 +84,9 @@ extension Browser {
     /// The items in the order of what is behind the modal: the table's rows, and for every other
     /// layout the list's sections, which follow the filters and the sort.
     func orderBehind(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
+        if viewMode == .digest {
+            return currentDigest?.itemOrder ?? []
+        }
         if viewMode == .table {
             let content = tableContent(in: library)
             let rows = content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)

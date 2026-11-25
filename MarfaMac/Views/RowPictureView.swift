@@ -11,13 +11,15 @@ enum RowPictureMetrics {
 /// The small picture at a Standard row's trailing edge, under the date: a rounded square with a hairline edge, the same
 /// size whatever it holds. What fills it is whatever its content draws.
 struct RowPictureFrame<Content: View>: View {
+    var size = CGSize(width: RowPictureMetrics.side, height: RowPictureMetrics.side)
+    var radius = RowPictureMetrics.radius
     @ViewBuilder let content: Content
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: RowPictureMetrics.radius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         Color(nsColor: .textBackgroundColor)
             .overlay { content }
-            .frame(width: RowPictureMetrics.side, height: RowPictureMetrics.side)
+            .frame(width: size.width, height: size.height)
             .clipShape(shape)
             .overlay { shape.strokeBorder(.separator, lineWidth: 0.5) }
             .accessibilityHidden(true)
@@ -34,14 +36,16 @@ struct RowPictureView: View {
     let picture: RowPicture
     /// The item's type's icon, for the frame of an item whose picture cannot be made.
     let icon: String?
+    var size = CGSize(width: RowPictureMetrics.side, height: RowPictureMetrics.side)
+    var radius = RowPictureMetrics.radius
     @State private var artwork: GalleryArtwork?
     /// Whether making the picture has ended, with or without one, so the frame does not show its mark while it waits.
     @State private var resolved = false
 
     var body: some View {
         let basis = GalleryArtworkCache.basis(of: picture.item, attachments: picture.attachments, in: library)
-        let shown = artwork ?? GalleryArtworkCache.peek(basis, width: RowPictureMetrics.side)
-        RowPictureFrame {
+        let shown = artwork ?? GalleryArtworkCache.peek(basis, width: size.width)
+        RowPictureFrame(size: size, radius: radius) {
             if let shown {
                 Color.clear.overlay(alignment: shown.isDocument ? .top : .center) {
                     Image(decorative: shown.image, scale: displayScale).resizable().scaledToFill()
@@ -55,9 +59,9 @@ struct RowPictureView: View {
         }
         .task(id: basis) {
             artwork = nil
-            resolved = GalleryArtworkCache.peek(basis, width: RowPictureMetrics.side) != nil
+            resolved = GalleryArtworkCache.peek(basis, width: size.width) != nil
             let made = await GalleryArtworkCache.artwork(
-                for: picture.item, attachments: picture.attachments, width: RowPictureMetrics.side, scale: displayScale, in: library)
+                for: picture.item, attachments: picture.attachments, width: size.width, scale: displayScale, in: library)
             if !Task.isCancelled {
                 artwork = made
                 resolved = true

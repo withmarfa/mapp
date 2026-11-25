@@ -81,7 +81,7 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | Edit | Use Selection for Find | ⌘E | Yes |
 | View | Focus | ⇧⌘F | Yes |
 | View | View as List, Gallery, Table | ⌘1, ⌘2, ⌘3 | Yes |
-| View | View as Board, Timeline, Calendar, Map | ⌘4, ⌘5, ⌘6, ⌘8 | Yes |
+| View | View as Board, Timeline, Calendar, Digest, Map | ⌘4, ⌘5, ⌘6, ⌘7, ⌘8 | Yes |
 | View | Today | ⌘T | Yes |
 | View | Previous, Next Week or Month | ⌥⌘←, ⌥⌘→ | Yes |
 | View | Show a Week, Show a Month | ⌥⌘1, ⌥⌘2 | Yes |
@@ -94,7 +94,7 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | View | Actual Size | ⌘0 | Yes |
 | View | Show Markdown Source or Formatted Text, Show Reader or Original, Show or Hide Formats, Clear Filters, View…, New View…, Revert View, Reset View, Save View, Duplicate View, Delete View…, Collapse All Groups, Expand All Groups, Standard Width, Full Width, Customize Sidebar…, Close Modal, Zoom to Fit, Next Page, Previous Page | – | Yes |
 | View | Fit All Items | – | Yes |
-| View | View as Digest, Show All Items, Show Library, Show Feed | – | Agreed |
+| View | Show All Items, Show Library, Show Feed | – | Agreed |
 | Format | Heading 1, 2, 3 | ⇧⌘T, ⇧⌘H, ⇧⌘J | Yes |
 | Format | Body | ⇧⌘B | Yes |
 | Format | Bold, Italic, Strikethrough | ⌘B, ⌘I, ⇧⌘X | Yes |

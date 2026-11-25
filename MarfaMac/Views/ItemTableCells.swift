@@ -37,13 +37,16 @@ struct ItemTableCell: View {
     /// cell's control is pulled back out, so the content keeps the column's text edge.
     @State private var bleed = CellBleed.zero
     /// The row's quick actions, shown in place of what the row's last cell holds while the pointer is on the row.
-    private var showsQuickActions: Bool { endsRow && hover.row == row.id && !browser.quickActions.isEmpty }
+    private var showsQuickActions: Bool { endsRow && hover.row == row.id && !browser.quickActions(for: row.item).isEmpty }
 
     var body: some View {
         content
             .opacity(showsQuickActions ? 0 : 1)
             .overlay(alignment: .trailing) {
-                if showsQuickActions { RowQuickActions(id: row.id, actions: browser.quickActions) }
+                if showsQuickActions {
+                    RowQuickActions(id: row.id, actions: browser.quickActions(for: row.item))
+                        .accessibilityHidden(true)
+                }
             }
             .lineLimit(1)
             // The same room for every cell, whether or not it offers an edit, so the probe measures the same frame throughout.
@@ -101,7 +104,7 @@ struct ItemTableCell: View {
 
     @ViewBuilder private var content: some View {
         switch column.content {
-        case .title: title
+        case .title: title.rowAccessibilityActions(for: row.id, actions: browser.quickActions(for: row.item))
         case .type: MarkedName(text: row.typeLabel, icon: row.typeIcon, size: .row)
         case .parent: links(row.parent.map { [$0] } ?? [])
         case .children: links(row.children)

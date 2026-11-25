@@ -25,7 +25,7 @@ struct ViewCorner: View {
                 .help("Card Size")
                 .accessibilityIdentifier("GalleryCardSize")
             }
-        case .list, .table, .board, .map:
+        case .list, .table, .board, .digest, .map:
             EmptyView()
         }
     }

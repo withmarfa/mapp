@@ -18,6 +18,8 @@ extension Browser {
     func selectFirstItem(in library: any ItemLibrary, order: ItemOrder) {
         // An index of places chooses nothing until the person does.
         guard !showsPlaceIndex else { return selectAutomatically([]) }
+        // A Digest opens for reading. Choosing a card opens its page beside it if the view uses that opening.
+        guard viewMode != .digest else { return selectAutomatically([]) }
         // A table's first row is its content's, which the table shares, so a large place is not ordered twice.
         if viewMode == .table, usesCollection {
             let content = tableContent(in: library)
@@ -52,6 +54,8 @@ extension Browser {
     func collectionItemIDs(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
         guard followsCollection else { return [] }
         guard !showsPlaceIndex else { return [] }
+        // The Digest follows its own order as each arrangement lands, including while its full page is open.
+        guard viewMode != .digest else { return [] }
         guard viewMode == .table else {
             let shown = arrangement(in: library, order: order, now: library.now()).ids
             // The items the filters and the hidden groups leave out stay in the selection's reach, as the table's do.

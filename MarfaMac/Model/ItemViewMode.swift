@@ -2,7 +2,7 @@ import Foundation
 
 /// The list keeps the page beside it; collection layouts span the window and open an item in their place.
 nonisolated enum ItemViewMode: String, Codable, CaseIterable {
-    case list, gallery, table, board, timeline, calendar, map
+    case list, gallery, table, board, timeline, calendar, digest, map
 
     /// A stored layout this version does not have, such as one a window or a view kept under an earlier name, reads
     /// as the list, so the window opens instead of losing the rest of what it kept.
@@ -19,6 +19,7 @@ nonisolated enum ItemViewMode: String, Codable, CaseIterable {
         case .board: "rectangle.split.3x1"
         case .timeline: "calendar.day.timeline.left"
         case .calendar: "calendar"
+        case .digest: "rectangle.split.1x2"
         case .map: "map"
         }
     }
@@ -29,6 +30,7 @@ nonisolated enum ItemViewMode: String, Codable, CaseIterable {
         var modes: [ItemViewMode] = [.list, .gallery, .table]
         if types.contains(where: { !ItemBoardLayout.eligibleFields(of: $0, catalogue: catalogue).isEmpty }) { modes.append(.board) }
         if !ItemTimelineLayout.fields(forTypes: types, catalogue: catalogue).isEmpty { modes += [.timeline, .calendar] }
+        modes.append(.digest)
         if MapLayout.canPlace(types: types, catalogue: catalogue) { modes.append(.map) }
         return modes
     }
@@ -45,6 +47,7 @@ nonisolated enum ItemViewMode: String, Codable, CaseIterable {
         case .board: "Back to Board"
         case .timeline: "Back to Timeline"
         case .calendar: "Back to Calendar"
+        case .digest: "Back to Digest"
         case .map: "Back to Map"
         }
     }

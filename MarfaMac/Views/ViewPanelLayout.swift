@@ -38,6 +38,21 @@ struct ViewPanelLayoutRows: View {
                 symbol: "circle.grid.2x2", label: String(localized: "Group Nearby Items"), isOn: browser.groupsNearbyItems,
                 set: { browser.setGroupsNearbyItems($0) })
                 .accessibilityIdentifier("ViewPanelMapGroups")
+        case .digest:
+            let choices = browser.digestChoices
+            ViewPanelSwitchRow(
+                symbol: "rectangle.on.rectangle", label: String(localized: "Stack Related Items"), isOn: choices.stacks,
+                set: { value in browser.changeDigest { $0.stack = value ? nil : false } })
+                .accessibilityIdentifier("ViewPanelDigestStack")
+            ViewPanelChoiceRow(
+                symbol: "text.alignleft", label: String(localized: "Lines of Text"), choices: Array(DigestChoices.lineCounts),
+                title: { $0.formatted() }, selection: choices.lines,
+                choose: { value in browser.changeDigest { $0.lineCount = value == 3 ? nil : value } })
+                .accessibilityIdentifier("ViewPanelDigestLines")
+            ViewPanelSwitchRow(
+                symbol: "photo", label: String(localized: "Pictures"), isOn: choices.showsPictures,
+                set: { value in browser.changeDigest { $0.pictures = value ? nil : false } })
+                .accessibilityIdentifier("ViewPanelDigestPictures")
         }
     }
 
@@ -157,6 +172,7 @@ struct ViewLayoutCommands: View {
             choice("View as Board", .board, command: .viewAsBoard)
             choice("View as Timeline", .timeline, command: .viewAsTimeline)
             choice("View as Calendar", .calendar, command: .viewAsCalendar)
+            choice("View as Digest", .digest, command: .viewAsDigest)
             choice("View as Map", .map, command: .viewAsMap)
         }
         .disabled(browser == nil)
@@ -194,7 +210,7 @@ struct CurrentLayoutCommands: View {
                 .disabled(!grouped)
         case .map:
             Button("Fit All Items", systemImage: "scope") { browser.requestMapFit() }
-        case .board, .gallery:
+        case .board, .gallery, .digest:
             EmptyView()
         }
         Button("Clear Filters", systemImage: "line.3.horizontal.decrease") { browser.clearFilters() }
