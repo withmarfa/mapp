@@ -25,7 +25,7 @@ paths:
 - **A window shows a place and one of its views** (`PlaceView`, `Place`, `ViewChoice`), each stored as a word. An unknown word is kept as written; an unknown view reads as the place's own.
 - **A window left in a place this copy cannot read** opens where a new window would, and keeps that place until the person moves (`Browser.laterPlace`).
 - **A window follows its view to a new place** with what it keeps for the view (`PlaceMemory`). Views sort by the synced `viewOrder` row (`ViewOrders`), then title.
-- **A window's snapshot and Start With have slots of their own** (`window`, `opening`, `openingLastPlace`), with its open item and scroll position. Files is no place: the person is told once.
+- **A window's snapshot and Start With have slots of their own** (`window`, `opening`, `openingLastPlace`). Files is no place: the person is told once.
 
 ## Sidebar
 
@@ -74,8 +74,8 @@ paths:
 ## Menus and palettes
 
 - **Every menu of items is one menu** (`ItemRowMenu`), in every layout.
-- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`). Search Items is the same panel searching titles and text. Marks are plain gray, a Feed or archived item says so at the row's end, and with nothing typed Settings… is the one Settings row.
-- **Search Items' filters are tokens** of the same model as the list's search (`PaletteTokens`): offers for what is typed come after the results, and Return on one makes the token. Where nothing matches, the field's line says so and offers New Item, which Return runs through quick add.
+- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`). Search Items is the same panel searching titles and text. A Feed or archived item says so at the row's end.
+- **Search Items' filters are tokens** of the list search's model (`PaletteTokens`). With no match, Return makes the item through quick add.
 - **Trap:** Actions grows out of the palette's bar with an ordinary transition: a Liquid Glass morph hung the app.
 - **A command that takes the keyboard says so** (`takesFocus`), so the palette does not take it back.
 
@@ -84,7 +84,7 @@ paths:
 - **Open, Return, a double click and a link follow Open Items** (`ItemOpening`).
 - **Beside the List is the standard:** a layout that spans the window shows the chosen item's page in a column of 372 (`BesideColumn`), and a new row replaces it once the selection rests (`BesideSettler`).
 - **A column, a modal and a full page show one item** with the window's one editor, one at a time. New Window takes several and asks first above a limit (`ItemWindows`).
-- **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`), Keep moves on once queued, and a followed link stays in it.
+- **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`).
 - **An item's window has the modal's controls and the panel** (`ItemWindowToolbar`); Back and Forward walk its links (`ItemWindow.go`).
 - **A full page's Back returns to the layout**, and the list's view options are not offered.
 
