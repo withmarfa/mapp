@@ -242,7 +242,7 @@ extension Browser {
         let derived = derivedKey(in: library)
         let key = TableKey(
             derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, counts: library.counts.revision,
-            hidesEmpty: hidesEmptyGroups,
+            hidesEmpty: hidesEmptyGroups, sources: library.sources.infos,
             relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()))
         if let held = tableMemo, held.key == key { return held.content }
         let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
@@ -293,6 +293,8 @@ extension Browser {
         /// A changed or evicted answer invalidates the cached table rows.
         let counts: Int
         let hidesEmpty: Bool
+        /// The names the server gave sources, which a row holds from when it was made, so the Source column sorts by them.
+        let sources: [String: SourceInfo]
         /// The day a filter relative to the day is worked out for, so the table is made again when it changes.
         let relativeDay: Date?
     }

@@ -215,7 +215,8 @@ struct ItemTable: View {
     private func sortBinding(_ columns: [ItemTableColumn]) -> Binding<[ItemTableComparator]> {
         Binding {
             browser.ordersByRelevance ? [] : ItemTableLayout.sort(
-                browser.tableOptions[browser.shown] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
+                browser.tableOptions[browser.shown] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder,
+                listsArchive: browser.listsArchive)
         } set: { sort in
             if !sort.isEmpty { browser.orderSearch(byRelevance: false) }
             browser.tableOptions[browser.shown, default: .init()].sort = Array(sort.prefix(ViewDraft.maxSortKeys))

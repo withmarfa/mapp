@@ -75,7 +75,8 @@ final class ItemTableContent {
         now = library.now()
         self.options = options
         // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
-        sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
+        sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(
+            options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder, listsArchive: browser.listsArchive)
         grouping = ItemTableLayout.grouping(options, columns: columns)
         // A place's own grouping is by the status's groups, as a board of mixed types is.
         groupMode = options.grouping == .automatic ? .statusGroups : options.grouping.mode

@@ -328,9 +328,12 @@ nonisolated enum ItemTableLayout {
         }
     }
 
-    /// The order a place starts with: the most pressing first where items have a priority, else the latest edit. A
-    /// place that keeps its own order, as a collection does, starts unsorted, so its rows stay in the order given.
-    static func sort(_ options: ItemTableOptions, columns: [ItemTableColumn], keepsGivenOrder: Bool = false) -> [ItemTableComparator] {
+    /// The order a place starts with: the most pressing first where items have a priority, else the latest edit, which
+    /// is all the Archive uses. A place that keeps its own order, as a collection does, starts unsorted, so its rows stay
+    /// in the order given.
+    static func sort(
+        _ options: ItemTableOptions, columns: [ItemTableColumn], keepsGivenOrder: Bool = false, listsArchive: Bool = false
+    ) -> [ItemTableComparator] {
         if let sort = options.sort {
             // Resolve stored sort keys against the columns the place offers now.
             let fresh = sort.compactMap { comparator in
@@ -340,7 +343,7 @@ nonisolated enum ItemTableLayout {
         }
         if keepsGivenOrder { return [] }
         var sort: [ItemTableComparator] = []
-        if let priority = columns.first(where: { $0.style == .priority && $0.isShownByDefault }) {
+        if !listsArchive, let priority = columns.first(where: { $0.style == .priority }) {
             sort.append(ItemTableComparator(column: priority, order: .reverse))
         }
         sort.append(ItemTableComparator(column: .edited, order: .reverse))

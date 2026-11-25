@@ -107,9 +107,8 @@ extension Browser {
         let properties: ViewProperties? = stored.properties.isChanged ? stored.properties : nil
         if placeProperties[place] != properties { placeProperties[place] = properties }
         observedChoices[place] = ViewChoices(options: options, timelineDate: stored.timelineField)
-        // A place with no layout kept opens as the window has it, but for one whose own layout is not the list's.
-        let natural = Self.naturalLayout(of: place)
-        apply(layout: stored.layout ?? (natural == .list ? nil : natural), in: library)
+        // A place with no layout kept opens in its own, so one place's table is not carried to the next.
+        apply(layout: stored.layout ?? Self.naturalLayout(of: place), in: library)
     }
 
     // MARK: Resetting

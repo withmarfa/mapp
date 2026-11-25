@@ -550,7 +550,7 @@ private struct MoreMenu: View {
                 command(.exportPDF)
                 Divider()
                 ItemMoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
-                ItemRemoveActions(ids: ids, undoManager: undoManager, keepsPlace: true, showsDeleteKey: true)
+                ItemRemoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
             }
             // On macOS a menu item draws its symbol only when the menu asks for it. The menu's own label stays a symbol.
             .labelStyle(.titleAndIcon)
