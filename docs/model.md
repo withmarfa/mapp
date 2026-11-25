@@ -58,12 +58,15 @@ Two defaults name types: the sidebar's and toolbar's starting set for New, and t
 
 ## Places and views
 
-- **A window shows a place and one of its views** (`PlaceView`). `Place` and `ViewChoice` list them. Each is stored as a word; an unknown place word is skipped and kept, and an unknown view word reads as the place's own and is kept as written. A window left in a place this copy cannot read opens where a new window would, and keeps the place as written until the person moves (`Browser.LaterPlace`).
-- **A saved view belongs to one place** (`Place.home(of:catalogue:)`): its one type; else the one collection its filter requires through the item's own `in-collection` edge; else the one source it requires; else the Feed, for the feed tier with no collection or source named; else the Library. A collection or source named inside an `OR`, or beside another, places it in the Library. When a change moves the view, a window showing it moves with it, and what the window keeps for the view goes along (`PlaceMemory`). Its order among the place's views is the app's (`ViewOrders`), then by title.
-- **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on the one Settings gives (`lists.defaultScope`).
-- **The Library's Favorites view has an ordinary From,** kept by the app like a place's own view. It starts on Library whatever `lists.defaultScope` says, and a person may set it to All Items, since a Feed item can be a favorite. Its Feed items carry the Feed's mark, as in any list.
+- **A window shows a place and one of its views** (`PlaceView`, `Place`, `ViewChoice`), each stored as a word. An unknown word is kept as written, and an unknown view reads as the place's own.
+- **A window left in a place this copy cannot read** opens where a new window would, and keeps that place until the person moves (`Browser.LaterPlace`).
+- **A saved view belongs to one place** (`Place.home(of:catalogue:)`): its one type; else the one collection, or the one source, that its filter alone requires, through the item's own edge; else the Feed, for the feed tier alone; else the Library.
+- **A window follows its view to a new place,** with what it keeps for the view (`PlaceMemory`). Views sort by the app's order (`ViewOrders`), then title.
+- **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
+- **Favorites has an ordinary From,** starting on Library; a person may choose All Items.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
-- **What earlier copies kept is read in once on each Mac** (`EarlierPlace.readIn`): it is copied to the new keys, and the earlier entries stay for those copies. The Library takes All Items' settings, and Recents fills what All Items left unset, since Recents was the Library sorted by Edited. A window's snapshot and Start With have slots of their own (`window`, `opening`, `openingLastPlace`), so an earlier copy keeps reading its own; a window of a type, collection, source, view, All Items, Inbox or Favorites keeps its open item and scroll position. Files is no place: the person is told once, and its settings stay for older copies. Include Subtypes is not read in, because it started off and Include Kinds starts on.
+- **What earlier copies kept is read in once on each Mac** (`EarlierPlace.readIn`), to new keys; the earlier entries stay for those copies. The Library takes All Items' settings, filled from Recents'. Include Subtypes is not read in.
+- **A window's snapshot and Start With have slots of their own** (`window`, `opening`, `openingLastPlace`). An earlier window of a place that still exists keeps its open item and scroll position. Files is no place: the person is told once.
 
 ## Vocabulary
 
