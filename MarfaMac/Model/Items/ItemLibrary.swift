@@ -313,7 +313,7 @@ protocol ItemLibrary: AnyObject, Observable {
     func refreshSources() async
     /// What the server's connectors say of the types they write, once read; nil before, and while it cannot be reached.
     var connectors: ConnectorKeepers? { get }
-    /// Reads `connectors` once for the library. A later call reads nothing, and a failed read is made again by the next.
+    /// Reads `connectors` once for the library. A later call reads nothing once it has read; a failed read is made again only after a minute.
     func readConnectors() async
     /// Renames the source `code` or changes its mark, for every app; a field left nil stays. Nil on success; otherwise
     /// why not, in words for the person.
