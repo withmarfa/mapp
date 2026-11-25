@@ -7,7 +7,10 @@ nonisolated struct DigestChoices: Codable, Hashable, Sendable {
     var pictures: Bool?
 
     var stacks: Bool { stack ?? true }
-    var lines: Int { Self.lineCounts.contains(lineCount ?? 3) ? lineCount ?? 3 : 3 }
+    var lines: Int {
+        guard let lineCount, Self.lineCounts.contains(lineCount) else { return 3 }
+        return lineCount
+    }
     var showsPictures: Bool { pictures ?? true }
 }
 

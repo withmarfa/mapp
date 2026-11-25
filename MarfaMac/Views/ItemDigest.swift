@@ -7,6 +7,7 @@ struct ItemDigest: View {
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var expanded: Set<DigestLayout.Pile.ID> = []
     @State private var cursor: ItemID?
+    @State private var anchor: ItemID?
 
     var body: some View {
         let choices = browser.digestChoices
@@ -25,8 +26,12 @@ struct ItemDigest: View {
                                 DigestPileView(
                                     pile: pile, choices: choices, browser: browser,
                                     isExpanded: expanded.contains(pile.id),
-                                    toggle: { if expanded.remove(pile.id) == nil { expanded.insert(pile.id) } },
-                                    choose: { select($0, extending: false, toggling: false, in: current) })
+                                    toggle: { toggle(pile) },
+                                    choose: { id in
+                                        let modifiers = NSApp.currentEvent?.modifierFlags ?? []
+                                        select(id, extending: modifiers.contains(.shift), toggling: modifiers.contains(.command), in: current)
+                                    })
+                                .id(pile.newest.id)
                             }
                         }
                     }
@@ -66,6 +71,7 @@ struct ItemDigest: View {
         .onChange(of: browser.shown) {
             expanded.removeAll()
             cursor = nil
+            anchor = nil
         }
         .onChange(of: cursor.map { current?.itemIDs.contains($0) == true }) { _, stillListed in
             if stillListed == false { cursor = nil }
@@ -80,6 +86,20 @@ struct ItemDigest: View {
         .filteredEmptyState(browser)
     }
 
+    private func toggle(_ pile: DigestLayout.Pile) {
+        if expanded.remove(pile.id) == nil {
+            expanded.insert(pile.id)
+        } else {
+            let hidden = Set(pile.earlier.map(\.id))
+            let selected = browser.selection
+            if !selected.isDisjoint(with: hidden) {
+                browser.selection = selected.subtracting(hidden).union([pile.newest.id])
+            }
+            if let cursor, hidden.contains(cursor) { self.cursor = pile.newest.id }
+            if let anchor, hidden.contains(anchor) { self.anchor = pile.newest.id }
+        }
+    }
+
     private func visibleIDs(in layout: DigestLayout.Display) -> [ItemID] {
         guard !expanded.isEmpty else { return layout.topItems }
         return layout.sections.flatMap { section in
@@ -88,12 +108,10 @@ struct ItemDigest: View {
     }
 
     private func select(_ id: ItemID, extending: Bool, toggling: Bool, in layout: DigestLayout.Display) {
-        let modifiers = NSApp.currentEvent?.modifierFlags ?? []
-        let shift = extending || modifiers.contains(.shift)
-        let command = toggling || modifiers.contains(.command)
-        browser.selection = shift || command
-            ? GallerySelection.selecting(id, among: visibleIDs(in: layout), current: browser.selection, anchor: cursor, extending: shift, toggling: command)
+        browser.selection = extending || toggling
+            ? GallerySelection.selecting(id, among: visibleIDs(in: layout), current: browser.selection, anchor: anchor, extending: extending, toggling: toggling)
             : [id]
+        if !extending || anchor == nil { anchor = id }
         cursor = id
         pane.wrappedValue = .list
     }
@@ -143,14 +161,16 @@ private struct DigestPileView: View {
     let choose: (ItemID) -> Void
 
     var body: some View {
-        let more = moreLabel
-        DigestCard(item: pile.newest, choices: choices, browser: browser, choose: choose, more: more, isExpanded: isExpanded, toggle: toggle)
-            .id(pile.newest.id)
-        if isExpanded {
-            ForEach(pile.earlier) { item in
-                DigestCard(item: item, choices: choices, browser: browser, choose: choose)
-                    .id(item.id)
-                    .padding(.leading, 18)
+        VStack(alignment: .leading, spacing: 12) {
+            DigestCard(
+                item: pile.newest, choices: choices, browser: browser, choose: choose,
+                more: moreLabel, isExpanded: isExpanded, toggle: toggle)
+            if isExpanded {
+                ForEach(pile.earlier) { item in
+                    DigestCard(item: item, choices: choices, browser: browser, choose: choose)
+                        .id(item.id)
+                        .padding(.leading, 18)
+                }
             }
         }
     }
@@ -254,7 +274,7 @@ private struct DigestCard: View {
         .onHover { isHovering = $0 }
         .padding(.bottom, isStacked ? 10 : 0)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(marked ? Text("\(item.displayTitle), Feed") : Text(item.displayTitle))
+        .accessibilityLabel(spoken(type: type, source: source, marked: marked))
         .accessibilityValue(more.map { Text($0) } ?? Text(verbatim: ""))
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -276,10 +296,23 @@ private struct DigestCard: View {
         return RowPicture.of(item, attachments: attachments)
     }
 
+    private var preview: String {
+        let text = item.preview.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text == item.displayTitle ? "" : text
+    }
+
+    private func spoken(type: String, source: String?, marked: Bool) -> Text {
+        var parts = [item.displayTitle, type]
+        if let source { parts.append(source) }
+        if marked { parts.append(String(localized: "Feed")) }
+        if !preview.isEmpty { parts.append(preview) }
+        return Text(verbatim: parts.joined(separator: ", "))
+    }
+
     private func metadata(icon: String?, type: String, source: String?, showsDate: Bool) -> some View {
         HStack(spacing: 7) {
             TonedGlyph(id: icon, size: 14)
-            Text(type).foregroundStyle(.secondary)
+            Text(type).foregroundStyle(.secondary).lineLimit(1)
             if let source { Text(source).foregroundStyle(.tertiary).lineLimit(1) }
             Spacer()
             if showsDate {
@@ -294,18 +327,15 @@ private struct DigestCard: View {
 
     private func text(marked: Bool) -> some View {
         let title = item.displayTitle
-        let preview = item.preview.trimmingCharacters(in: .whitespacesAndNewlines)
-        let leadsWithExcerpt = DigestLayout.Relationship(item)?.kind == .excerpt && !preview.isEmpty
+        let isExcerpt = DigestLayout.Relationship(item)?.kind == .excerpt
         return VStack(alignment: .leading, spacing: 3) {
-            if !leadsWithExcerpt {
-                (marked ? FeedMark.titled(title) : Text(title))
-                    .interfaceFont(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(item.isUntitled ? .secondary : .primary)
-            }
-            if !preview.isEmpty, leadsWithExcerpt || preview != title {
-                (leadsWithExcerpt && marked ? FeedMark.titled(preview) : Text(preview))
-                    .interfaceFont(.system(size: leadsWithExcerpt ? 16 : 14, weight: leadsWithExcerpt ? .medium : .regular))
-                    .foregroundStyle(leadsWithExcerpt ? .primary : .secondary)
+            (marked ? FeedMark.titled(title) : Text(title))
+                .interfaceFont(.system(size: isExcerpt ? 16 : 15, weight: isExcerpt ? .medium : .semibold))
+                .foregroundStyle(item.isUntitled ? .secondary : .primary)
+            if !preview.isEmpty {
+                Text(preview)
+                    .interfaceFont(.system(size: 14))
+                    .foregroundStyle(.secondary)
                     .lineSpacing(4)
                     .lineLimit(choices.lines)
             }
