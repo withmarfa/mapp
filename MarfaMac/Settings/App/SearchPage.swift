@@ -7,7 +7,7 @@ struct SearchPage: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
     @AppStorage(SearchOptions.includesArchivedKey) private var includesArchived = SearchOptions.includesArchivedStandard
-    @AppStorage(SearchOptions.includesInboxKey) private var includesInbox = SearchOptions.includesInboxStandard
+    @AppStorage(SearchOptions.includesFeedKey) private var includesFeed = SearchOptions.includesFeedStandard
     @AppStorage(SearchOptions.orderKey) private var order = SearchOptions.Order.standard
     @AppStorage(SearchOptions.showsSnippetsKey) private var showsSnippets = SearchOptions.showsSnippetsStandard
 
@@ -134,7 +134,7 @@ struct SearchPage: View {
                 SettingsToggle(title: "Archived Items", isOn: $includesArchived).accessibilityIdentifier("SearchArchived")
             }
             SettingsRow("Feed Items", line: "What your apps send.") {
-                SettingsToggle(title: "Feed Items", isOn: $includesInbox).accessibilityIdentifier("SearchInbox")
+                SettingsToggle(title: "Feed Items", isOn: $includesFeed).accessibilityIdentifier("SearchFeed")
             }
         }
     }

@@ -10,6 +10,8 @@ nonisolated enum PaletteSections {
         case group(CommandGroup)
         /// Search Items: items whose title has what was typed, then items whose text does.
         case titles, inTheText
+        /// Search Items: the tokens the typed words can make.
+        case filters
 
         var title: String {
             switch self {
@@ -20,6 +22,7 @@ nonisolated enum PaletteSections {
             case .group(let group): group.title
             case .titles: String(localized: "Titles")
             case .inTheText: String(localized: "In the Text")
+            case .filters: String(localized: "Filters")
             }
         }
     }

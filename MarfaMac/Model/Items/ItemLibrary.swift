@@ -499,10 +499,4 @@ extension ItemLibrary {
 
     /// Every active item, the Library's and then the Feed's.
     var activeItems: [Item] { items(in: .library) + items(in: .feed) }
-
-    /// What a flat list of items, such as the palette or the link picker, says beside a title: Feed for an item
-    /// in the feed tier, otherwise its type.
-    func placeLabel(of item: Item) -> String {
-        item.tier == .feed ? String(localized: "Feed") : catalogue.label(for: item.type)
-    }
 }

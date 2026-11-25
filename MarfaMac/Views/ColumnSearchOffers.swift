@@ -50,6 +50,13 @@ struct SearchOffersList: View {
         .accessibilityIdentifier("ColumnSearchOffers")
     }
 
+    /// The field in the secondary color, then the rest.
+    private static func styled(field: String, rest: String) -> AttributedString {
+        var head = AttributedString(field)
+        head.foregroundColor = .secondary
+        return head + AttributedString(" " + rest)
+    }
+
     private func row(_ offer: SearchOffer, isChosen: Bool) -> some View {
         HStack(spacing: 8) {
             Image(systemName: offer.symbol)
@@ -58,7 +65,7 @@ struct SearchOffersList: View {
                 .accessibilityHidden(true)
             switch offer.kind {
             case .token:
-                (Text(verbatim: offer.field).foregroundStyle(.secondary) + Text(verbatim: " ") + Text(verbatim: offer.value))
+                Text(Self.styled(field: offer.field, rest: offer.value))
                     .lineLimit(1)
                     .truncationMode(.tail)
             case .text:

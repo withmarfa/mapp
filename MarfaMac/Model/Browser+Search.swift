@@ -57,29 +57,16 @@ extension Browser {
     /// values. Nil where the field is not one the place's types have.
     func tokenParts(of clause: FilterClause, in library: any ItemLibrary) -> FilterWording.Parts? {
         guard let target = tokenTargets(in: library)[clause.field] else { return nil }
-        var parts = FilterWording.parts(of: clause, target: target, calendar: .current, titles: { Self.title(ofValue: $0, in: library) })
-        if clause.op == target.kind.startingOperator || (clause.op == .includes && target.kind == .tags) { parts.relation = "" }
-        return parts
-    }
-
-    private static func title(ofValue id: String, in library: any ItemLibrary) -> String? {
-        if let type = library.itemTypeCounts.first(where: { $0.id.rawValue == id }) { return type.label }
-        return library.item(ItemID(rawValue: id))?.displayTitle
+        return FilterWording.tokenParts(of: clause, target: target, calendar: .current, titles: { library.title(ofValue: $0) })
     }
 
     /// What the field offers for the words typed in it, worked out from the place's own fields.
     func searchOffers(in library: any ItemLibrary) -> [SearchOffer] {
         guard SearchScope.narrows(shown), isSearching else { return [] }
         let offer = tableContent(in: library).filterOffer
-        var values = SearchOffers.Values()
-        values.types = library.itemTypeCounts.map { SearchOffers.Option(id: $0.id.rawValue, title: $0.label) }
-        values.sources = library.sources.infos.values.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-            .map { SearchOffers.Option(id: $0.code, title: $0.name) }
-        values.tags = library.knownTags
-        values.collections = library.collections.map { SearchOffers.Option(id: $0.id.rawValue, title: $0.displayTitle) }
         let targets = offer.placeFields + offer.everyItem.filter { $0.kind != .parent } + [.tier]
         let context = SearchOffers.Context(
-            targets: targets, values: values, hasSeveralTypes: offer.hasSeveralTypes, calendar: .current, now: library.now())
+            targets: targets, values: library.searchOfferValues, hasSeveralTypes: offer.hasSeveralTypes, calendar: .current, now: library.now())
         return SearchOffers.make(text: searchText, in: context, existing: searchTokens)
     }
 }

@@ -82,7 +82,7 @@ struct ItemLinkPicker: View {
             TonedGlyph(id: library.catalogue.icon(for: item.type))
             Text(item.displayTitle).lineLimit(1)
             Spacer(minLength: 8)
-            Text(library.placeLabel(of: item))
+            Text(library.catalogue.label(for: item.type))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }

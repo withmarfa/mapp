@@ -9,7 +9,7 @@ extension CommandPalette {
         let mode: Browser.Palette
         let returnFocus: Browser.Pane
         let selection: Set<ItemID>
-        let filters: PaletteFilters
+        let tokens: PaletteTokens
         /// What a typed search keeps and leaves out, which the items it lists follow.
         let narrowing: SearchNarrowing
         let typed: Bool
@@ -22,6 +22,7 @@ extension CommandPalette {
         var items: (basis: Basis, items: [Item], titles: [String], leftOut: [Item], leftOutTitles: [String])?
         var leftOutMatches: (key: Ranking, items: [Item])?
         var ranking: (key: Ranking, picks: [PaletteMatch.Pick], scores: [Int])?
+        var offers: (key: OfferKey, offers: [SearchOffer])?
     }
 
     struct Ranking: Equatable {
@@ -32,20 +33,19 @@ extension CommandPalette {
 
     private var basis: Basis {
         Basis(library: ObjectIdentifier(library), content: library.contentRevision, membership: library.membershipRevision,
-              mode: mode, returnFocus: returnFocus, selection: browser.selection, filters: filterState.filters,
+              mode: mode, returnFocus: returnFocus, selection: browser.selection, tokens: tokens,
               narrowing: askedNarrowing, typed: isTyped)
     }
 
     var isTyped: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    /// What the search keeps and leaves out: the Type filter, each type with its kinds, and what this library leaves
+    /// What the search keeps and leaves out: the type token, each type with its kinds, and what this library leaves
     /// out of search.
     private var narrowing: SearchNarrowing {
-        let filters = filterState.filters
         return SearchNarrowing(
-            types: filters.types, typesWithSubtypes: filters.types,
-            excludesTypes: filters.negated.contains(.type), leaveOut: libraries?.searchLeaveOut ?? SearchLeaveOut(),
-            includesArchived: includesArchived, includesInbox: includesInbox)
+            types: tokens.types, typesWithSubtypes: tokens.types,
+            excludesTypes: tokens.excludesTypes, leaveOut: libraries?.searchLeaveOut ?? SearchLeaveOut(),
+            includesArchived: includesArchived, includesFeed: includesFeed)
     }
 
     /// The search a query and its narrowing stand for, so a change of either starts the answer again.
@@ -92,8 +92,8 @@ extension CommandPalette {
         } else {
             kept = recent.filter { typed.admitsType($0.type, in: catalogue) }
         }
-        let items = basis.filters.afterSearch.apply(to: kept, now: library.now())
-        let leftOutItems = basis.filters.afterSearch.apply(to: out, now: library.now())
+        let items = basis.tokens.afterSearch.apply(to: kept, catalogue: catalogue, now: library.now())
+        let leftOutItems = basis.tokens.afterSearch.apply(to: out, catalogue: catalogue, now: library.now())
         let titles = items.map(\.title)
         let leftOutTitles = leftOutItems.map(\.title)
         listing.items = (basis, items, titles, leftOutItems, leftOutTitles)
@@ -166,9 +166,10 @@ extension CommandPalette {
     }
 
     func applyFilters(to results: SearchResults, leftOut found: SearchResults) {
-        let rest = filterState.filters.afterSearch
-        searchedItems = searchOrder.ordered(rest.apply(to: results.items, now: library.now()))
-        leftOutItems = rest.apply(to: found.items, now: library.now())
+        let rest = tokens.afterSearch
+        let catalogue = library.catalogue
+        searchedItems = searchOrder.ordered(rest.apply(to: results.items, catalogue: catalogue, now: library.now()))
+        leftOutItems = rest.apply(to: found.items, catalogue: catalogue, now: library.now())
     }
 
     /// Keeps `searched` current for the query: the library's answer arrives later through its observed state, so each
@@ -219,7 +220,7 @@ extension CommandPalette {
             // An excerpt that is the title says nothing the title does not, so the preview stands.
             let excerpt = results?.excerpts[item.id].flatMap { $0.plainText == item.name ? nil : $0 }
             return Entry(
-                id: "note:\(item.id)", title: item.displayTitle, detail: library.placeLabel(of: item),
+                id: "note:\(item.id)", title: item.displayTitle, detail: Self.tierWord(of: item),
                 snippet: item.preview.isEmpty ? about(item) : item.preview, excerpt: excerpt,
                 date: DateDisplay.text(of: item.modified, place: .list, format: dateFormat, now: now),
                 icon: .type(library.catalogue.icon(for: item.type)), item: item.id, takesFocus: true
@@ -227,21 +228,64 @@ extension CommandPalette {
                 reveal(item)
             }
         }
-        return PaletteSections.forSearch(rows: entries, typed: isTyped) { entry in
+        let sections = PaletteSections.forSearch(rows: entries, typed: isTyped) { entry in
             PaletteMatch.matchRange(in: entry.title, query) != nil
         }
+        let offered = offerEntries
+        return offered.isEmpty ? sections : sections + [.init(kind: .filters, rows: offered)]
+    }
+
+    /// The word at a row's end where the item is not an ordinary active one of the library: Feed, or Archived.
+    static func tierWord(of item: Item) -> String? {
+        if item.state == .archived { return String(localized: "Archived") }
+        return item.tier == .feed ? String(localized: "Feed") : nil
     }
 
     /// A search row's second line for an item with no text of its own: its type or tier, and the collections it is
     /// in, so every row in Search Items has two lines.
     private func about(_ item: Item) -> String {
-        let place = library.placeLabel(of: item)
+        let place = library.catalogue.label(for: item.type)
         let collections = item.collectionIDs.compactMap { library.item($0)?.displayTitle }
         guard !collections.isEmpty else { return place }
         return String(localized: "\(place) in \(collections.formatted(.list(type: .and)))", comment: "A search row's second line: an item's type, then the collections it is in.")
     }
 
     static let searchItemsID = "command:searchItemsFor"
+    static let offerPrefix = "offer:"
+
+    /// What an offered token is held under between runs of the body: the words, the tokens and what the library holds.
+    struct OfferKey: Equatable {
+        let query: String
+        let tokens: PaletteTokens
+        let content: Int
+        let membership: Int
+    }
+
+    /// The tokens the typed words can make, as rows after the items: Return on one makes it and clears the words. Worked
+    /// out once for a key, never for each hover.
+    private var offerEntries: [Entry] {
+        guard mode == .search, isTyped else { return [] }
+        let key = OfferKey(query: query, tokens: tokens, content: library.contentRevision, membership: library.membershipRevision)
+        let offers: [SearchOffer]
+        if let held = listing.offers, held.key == key {
+            offers = held.offers
+        } else {
+            let context = SearchOffers.Context(
+                targets: PaletteTokens.targets, values: library.searchOfferValues, hasSeveralTypes: true, calendar: .current,
+                now: library.now())
+            offers = SearchOffers.make(text: query, in: context, existing: tokens.clauses).filter { $0.kind != .text }
+            listing.offers = (key, offers)
+        }
+        return offers.compactMap { offer in
+            guard let clause = offer.clause else { return nil }
+            return Entry(
+                id: Self.offerPrefix + offer.id, title: offer.title, icon: .symbol(offer.symbol), takesFocus: true, group: nil, staysOpen: true
+            ) {
+                tokens.clauses.append(clause)
+                query = ""
+            }
+        }
+    }
 
     /// The last row under Items: the same words, searched in the text of every item.
     private var searchItemsEntry: Entry {
@@ -255,7 +299,7 @@ extension CommandPalette {
 
     /// An item by title, with its type.
     private func itemEntry(_ item: Item) -> Entry {
-        Entry(id: "note:\(item.id)", title: item.displayTitle, detail: library.placeLabel(of: item),
+        Entry(id: "note:\(item.id)", title: item.displayTitle, detail: Self.tierWord(of: item),
               icon: .type(library.catalogue.icon(for: item.type)), item: item.id, takesFocus: true) {
             reveal(item)
         }

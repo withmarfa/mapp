@@ -298,3 +298,32 @@ nonisolated enum SearchDates {
         return calendar.startOfDay(for: result)
     }
 }
+
+extension FilterWording {
+    /// A token as its chip says it: the field, the relation unless it is the field's usual one (a tag is simply there, a type
+    /// simply is), and the values.
+    static func tokenParts(of clause: FilterClause, target: FilterTarget, calendar: Calendar, titles: (String) -> String?) -> Parts {
+        var parts = parts(of: clause, target: target, calendar: calendar, titles: titles)
+        if clause.op == target.kind.startingOperator || (clause.op == .includes && target.kind == .tags) { parts.relation = "" }
+        return parts
+    }
+}
+
+extension ItemLibrary {
+    /// The values a token can name here: the types, the sources, the tags and the collections.
+    var searchOfferValues: SearchOffers.Values {
+        var values = SearchOffers.Values()
+        values.types = itemTypeCounts.map { SearchOffers.Option(id: $0.id.rawValue, title: $0.label) }
+        values.sources = sources.infos.values.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            .map { SearchOffers.Option(id: $0.code, title: $0.name) }
+        values.tags = knownTags
+        values.collections = collections.map { SearchOffers.Option(id: $0.id.rawValue, title: $0.displayTitle) }
+        return values
+    }
+
+    /// The name a token's value goes by where it is an identifier: a type's, or a collection's title.
+    func title(ofValue id: String) -> String? {
+        if let type = itemTypeCounts.first(where: { $0.id.rawValue == id }) { return type.label }
+        return item(ItemID(rawValue: id))?.displayTitle
+    }
+}

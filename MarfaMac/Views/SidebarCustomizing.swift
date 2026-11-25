@@ -328,7 +328,7 @@ struct SidebarItemChooser: View {
             TonedGlyph(id: library.catalogue.icon(for: item.type))
             Text(item.displayTitle).lineLimit(1)
             Spacer(minLength: 8)
-            Text(library.placeLabel(of: item)).foregroundStyle(.secondary).lineLimit(1)
+            Text(library.catalogue.label(for: item.type)).foregroundStyle(.secondary).lineLimit(1)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)

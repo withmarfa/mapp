@@ -207,7 +207,7 @@ struct ColumnSearchField: View {
 }
 
 /// The tokens in a row that scrolls once it is wider than the room it is given, and follows the newest.
-private struct SearchChipRow: View {
+struct SearchChipRow: View {
     let chips: [SearchChip]
     let width: CGFloat
     let onRemove: (SearchChip) -> Void
@@ -239,13 +239,19 @@ private struct SearchChipView: View {
     let remove: () -> Void
     @Environment(\.interfaceTextSize) private var textSize
 
+    /// The field in the secondary color, then the relation and the values.
+    private var styled: AttributedString {
+        var head = AttributedString(chip.parts.field)
+        head.foregroundColor = .secondary
+        let rest = [chip.parts.relation, chip.parts.values].filter { !$0.isEmpty }.joined(separator: " ")
+        return head + AttributedString(" " + rest)
+    }
+
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
         let looks = ChipLooks.defaults
         HStack(spacing: looks.gap * scale / 1.25) {
-            (Text(verbatim: chip.parts.field).foregroundStyle(.secondary)
-                + Text(verbatim: chip.parts.relation.isEmpty ? " " : " \(chip.parts.relation) ")
-                + Text(verbatim: chip.parts.values))
+            Text(styled)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Button(action: remove) {
