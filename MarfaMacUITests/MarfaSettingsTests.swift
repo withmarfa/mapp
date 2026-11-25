@@ -57,8 +57,9 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         openLibraryPage()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         address.click()
-        address.typeText("ftp://marfa.example")
-        XCTAssertEqual(address.value as? String, "ftp://marfa.example")
+        let invalidAddress = "marfa example"
+        address.typeText(invalidAddress)
+        XCTAssertEqual(address.value as? String, invalidAddress)
         XCTAssertTrue(connect.isEnabled)
         connect.click()
         let detail = app.descendants(matching: .any)["SettingsDetail"]
