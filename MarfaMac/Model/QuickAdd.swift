@@ -426,16 +426,18 @@ final class QuickAdd {
         return types
     }
 
-    /// The kinds as the kind menu lists them: first the sidebar's own in its order, then File, which Tab and
-    /// Shift-Tab move through; then, after a divider, the rest. The chosen kind is always among the first.
+    /// The kinds as the kind menu lists them: first the sidebar's own in its order, then File wherever the sidebar
+    /// shows it, which Tab and Shift-Tab move through; then, after a divider, the rest by name. The chosen kind is
+    /// always among the first.
     static func kindMenu(_ types: [ItemTypeOption], shown: [TypeID], chosen: String?) -> (first: [ItemTypeOption], rest: [ItemTypeOption]) {
-        var first = shown.compactMap { id in types.first { $0.id == id } }
+        var first = shown.filter { $0 != .file }.compactMap { id in types.first { $0.id == id } }
         if first.isEmpty, let note = types.first(where: { $0.id == TypeID("core.note") }) { first.append(note) }
-        if let file = types.first(where: { $0.id == .file }), !first.contains(file) { first.append(file) }
+        if let file = types.first(where: { $0.id == .file }) { first.append(file) }
         if let chosen, let option = types.first(where: { $0.id.rawValue == chosen }), !first.contains(option) {
             first.append(option)
         }
-        return (first, types.filter { !first.contains($0) })
+        let rest = types.filter { !first.contains($0) }.sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
+        return (first, rest)
     }
 
     /// The fields the panel offers for a kind: those the person can set, not its title or text. A file has none,
