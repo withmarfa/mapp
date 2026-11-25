@@ -92,6 +92,41 @@ import Testing
         #expect(!undo.canUndo)
     }
 
+    @Test func aDropOnACollectionAddsOnlyMissingMembershipsInOneUndoStep() async throws {
+        let (library, source) = try await loaded()
+        let browser = Browser()
+        browser.adopt(library)
+        let toasts = ToastPresenter()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        // Plain note is in Holiday already, so only the other two join.
+        #expect(browser.addDropped([F.e1, F.n2, F.n1], to: Self.holiday, in: library, undoManager: undo, toasts: toasts))
+        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft) = write { draft.from } else { nil } }
+        #expect(Set(joined) == [F.e1, F.n2])
+        #expect(joined.count == 2)
+        #expect(toasts.current?.message == "Added 2 items to Holiday, 1 already in it")
+        #expect(toasts.current?.undo != nil)
+        try await takeAll(library, source)
+        source.clearWrites()
+        toasts.undo()
+        #expect(source.writes.count == 2)
+        #expect(!undo.canUndo)
+    }
+
+    @Test func aDropOfItemsAlreadyInTheCollectionWritesNothingAndSaysSo() async throws {
+        let (library, source) = try await loaded()
+        let browser = Browser()
+        browser.adopt(library)
+        let toasts = ToastPresenter()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        #expect(browser.addDropped([F.n1, F.p1], to: Self.holiday, in: library, undoManager: undo, toasts: toasts))
+        #expect(source.writes.isEmpty)
+        #expect(!undo.canUndo)
+        #expect(toasts.current?.message == "2 items already in Holiday")
+        #expect(toasts.current?.undo == nil)
+    }
+
     @Test func removingFromACollectionIsOneUndoStepThatPutsBackOnlyWhatLeft() async throws {
         let (library, source) = try await loaded()
         let undo = StepCountingUndoManager()

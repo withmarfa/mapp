@@ -123,6 +123,7 @@ struct MainView: View {
         } content: {
             ItemList(browser: browser, order: order, pane: $pane).equatable()
                 .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, isBesidePage: true, signal: topRowSignal)
+                .takesDroppedFiles(in: browser, order: order)
                 // The split view reads the ideal only as it is built, so it comes from the tracker as it stands then.
                 .navigationSplitViewColumnWidth(
                     min: ColumnWidth.list.range.lowerBound, ideal: measuredWidths.width(of: .list),
@@ -208,6 +209,7 @@ struct MainView: View {
                 } detail: {
                     PlaceIndex(browser: browser, details: details, order: order, pane: $pane)
                         .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, signal: topRowSignal)
+                        .takesDroppedFiles(in: browser, order: order)
                         .toastOverlay()
                         .toolbar { windowToolbar() }
                 }
@@ -233,6 +235,7 @@ struct MainView: View {
                             }
                             .viewCorner(browser)
                             .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, signal: topRowSignal)
+                            .takesDroppedFiles(in: browser, order: order)
                         } else {
                             fullPage.topRowOverPage(tools: pageTools, signal: topRowSignal)
                         }

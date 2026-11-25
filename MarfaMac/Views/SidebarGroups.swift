@@ -310,6 +310,7 @@ struct SidebarPlaceRow: View, Equatable {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     @State private var isHovering = false
+    @State private var isDropTarget = false
     let data: SidebarPlaceRowData
     let groups: [SidebarGroupChoice]
     let customizing: Bool
@@ -336,7 +337,9 @@ struct SidebarPlaceRow: View, Equatable {
             guard data.opens == .library, !customizing, !PlaceView.library.isSame(browser.showing) else { return }
             browser.show(.library, in: library, order: order)
         }, isEnabled: data.opens == .library && !customizing)
-        .sidebarRowGround(isHovering && !customizing)
+        // A collection's row is the one place in the sidebar that takes a drop, and nothing under it opens.
+        .dropsInto(collection: droppableCollection, browser: browser, order: order, isTargeted: $isDropTarget)
+        .sidebarRowGround(isHovering && !customizing, isDropTarget: isDropTarget)
         .contextMenu {
             SidebarPlaceMenu(data: data, groups: groups, customizing: customizing, browser: browser, order: order)
         }
@@ -368,6 +371,10 @@ struct SidebarPlaceRow: View, Equatable {
                 }
             }
         }
+    }
+
+    private var droppableCollection: ItemID? {
+        if case .collection(let id) = data.place, !customizing { id } else { nil }
     }
 
     private var addName: String {
@@ -444,10 +451,17 @@ struct SidebarPlus: View {
 extension View {
     /// The rounded ground behind a row under the pointer, as `Sidebar-Pointer` draws it: the row's whole height and the
     /// selection's width. The row keeps its own hover state, so the sidebar's body does not run on hover.
-    func sidebarRowGround(_ isShown: Bool) -> some View {
+    /// A row a drop is over has a gray ring as well.
+    func sidebarRowGround(_ isShown: Bool, isDropTarget: Bool = false) -> some View {
         listRowBackground(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(nsColor: .labelColor).opacity(isShown ? 0.045 : 0))
+                .fill(Color(nsColor: .labelColor).opacity(isShown || isDropTarget ? 0.045 : 0))
+                .overlay {
+                    if isDropTarget {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color(nsColor: .labelColor).opacity(0.34), lineWidth: 1.5)
+                    }
+                }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 0.5))
     }
