@@ -154,23 +154,23 @@ import Testing
         let tasks = FeedLimitQuestion.Window(typePlural: "Tasks", days: 30)
         let gone = "within the hour."
         // One item: the board's form.
-        #expect(MoveWords.feedMessage(.moveToFeed, selected: 1, question: .init(pastWindow: 1, window: tasks))
+        #expect(MoveWords.feedMessage(.moveToFeed, selected: 1, question: FeedLimitQuestion(pastWindow: 1, window: tasks))
             == "Tasks leave the Feed after 30 days, and this one is older. It would go to Recently Deleted \(gone)")
-        #expect(MoveWords.feedMessage(.unarchive, selected: 1, question: .init(pastWindow: 1, window: tasks))
+        #expect(MoveWords.feedMessage(.unarchive, selected: 1, question: FeedLimitQuestion(pastWindow: 1, window: tasks))
             == "Tasks leave the Feed after 30 days, and this one is older. Unarchived, it would go to Recently Deleted \(gone)")
         // Some of a selection.
-        #expect(MoveWords.feedMessage(.moveToFeed, selected: 5, question: .init(pastWindow: 1, window: tasks))
+        #expect(MoveWords.feedMessage(.moveToFeed, selected: 5, question: FeedLimitQuestion(pastWindow: 1, window: tasks))
             == "Tasks leave the Feed after 30 days, and 1 of the 5 items is older. It would go to Recently Deleted \(gone)")
-        #expect(MoveWords.feedMessage(.moveToFeed, selected: 5, question: .init(pastWindow: 3, window: tasks))
+        #expect(MoveWords.feedMessage(.moveToFeed, selected: 5, question: FeedLimitQuestion(pastWindow: 3, window: tasks))
             == "Tasks leave the Feed after 30 days, and 3 of the 5 items are older. They would go to Recently Deleted \(gone)")
-        #expect(MoveWords.feedMessage(.unarchive, selected: 5, question: .init(pastWindow: 5, window: tasks))
+        #expect(MoveWords.feedMessage(.unarchive, selected: 5, question: FeedLimitQuestion(pastWindow: 5, window: tasks))
             == "Tasks leave the Feed after 30 days, and all 5 are older. Unarchived, they would go to Recently Deleted \(gone)")
-        #expect(MoveWords.feedMessage(.moveToFeed, selected: 2, question: .init(pastWindow: 2, window: tasks))
+        #expect(MoveWords.feedMessage(.moveToFeed, selected: 2, question: FeedLimitQuestion(pastWindow: 2, window: tasks))
             == "Tasks leave the Feed after 30 days, and both are older. They would go to Recently Deleted \(gone)")
         // Types with no one window.
-        #expect(MoveWords.feedMessage(.moveToFeed, selected: 4, question: .init(pastWindow: 2, window: nil))
+        #expect(MoveWords.feedMessage(.moveToFeed, selected: 4, question: FeedLimitQuestion(pastWindow: 2, window: nil))
             == "The Feed lets items go after a while, and 2 of the 4 items are older. They would go to Recently Deleted \(gone)")
-        #expect(MoveWords.feedMessage(.moveToFeed, selected: 1, question: .init(pastWindow: 1, window: nil))
+        #expect(MoveWords.feedMessage(.moveToFeed, selected: 1, question: FeedLimitQuestion(pastWindow: 1, window: nil))
             == "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted \(gone)")
     }
 
