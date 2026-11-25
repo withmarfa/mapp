@@ -29,13 +29,13 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A place's default view is the app's** (`PlaceDefaults`). Every change is kept as it is made, and Reset View puts the place back. Types, Collections and Sources have none.
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest (`ViewMacSettings` in `ViewLayouts`): layout, properties, cards, density, week or month and column widths.
 - **A change to a saved view is written as it is made** (`Browser+ViewWrites`), naming only the settings that changed.
-- **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits (`PendingViewChanges`) through closing and quitting; a refusal goes to the clipboard.
-- **Revert View puts back what the window changed since opening the view** (`openedView`), not another app's.
+- **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits (`PendingViewChanges`) by setting, so two windows keep theirs, through closing and quitting. A refused one goes to the clipboard in words.
+- **Revert View writes back each setting the window changed as Marfa held it at opening** (`openedView`), whole. One another app changed since, as Marfa holds it, stays, and the person is told.
 - **The window lists what it shows while a change waits:** while its filters, From or Archived Items differ from the view's, it reads the view's query with its own choices (`viewPreview`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
 - **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds, and an exact-type condition only with Include Kinds off; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and the reverse (`ViewDraft`).
-- **Making, renaming and deleting a view needs the server.** A view has no bin, so deleting one asks.
+- **Making, renaming and deleting a view needs the server.** A rename never replaces another app's; a view has no bin, so deleting one asks.
 - **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, else the sole collection or source its filter requires. Collection membership uses the item's outbound edge. For the feed tier alone, use the Feed. Otherwise use the Library.
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
 - **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
