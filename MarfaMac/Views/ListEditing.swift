@@ -309,13 +309,15 @@ final class ListEditing {
 
     // MARK: Writing
 
-    /// Writes the text typed into `member` of entry `id` (`pendingID` for the entry being added). Returns whether the
-    /// text is settled; false keeps it as typed, with `notice` saying why, or the conflict for the person to answer.
+    /// Writes the text typed into `member` of entry `id`; for `pendingID`, the entry being added, that is `addEntry`,
+    /// which writes the entry whole. Returns whether the text is settled; false keeps it as typed, with `notice`
+    /// saying why, or the conflict for the person to answer.
     @discardableResult
     func commit(
         _ member: ListShape.Member, of id: UUID, in shape: ListShape, value: PropertyValue?, overwriting: Bool = false,
         write: (PropertyValue?) -> Bool
     ) -> Bool {
+        if id == pendingID { return addEntry(in: shape, value: value, write: write) }
         let slot = Slot(entry: id, member: member.key)
         guard let draft = drafts[slot], draft.isDirty else { return true }
         let typed = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -325,16 +327,10 @@ final class ListEditing {
         }
         if !overwriting, conflicts(slot, in: value) { return false }
         let new: PropertyValue?
-        if typed.isEmpty {
-            new = nil
-        } else if case .number(let rule) = member.kind {
-            guard let number = PropertyNumber.parse(typed, integer: rule.integer) else {
-                return refuse(draft, PropertyLoss.notANumber.reason)
-            }
-            guard rule.allows(number) else { return refuse(draft, rule.requirement ?? PropertyLoss.outOfRange.reason) }
-            new = .number(number)
-        } else {
-            new = .string(typed)
+        do {
+            new = try Self.parsed(typed, as: member)
+        } catch {
+            return refuse(draft, error.reason)
         }
         let given = Given.text(slot, base: draft.base, text: draft.text)
         guard apply(member.key, to: new, of: id, in: shape, value: value, giving: given, write: write) else {
@@ -344,6 +340,17 @@ final class ListEditing {
         draft.discard(toMatch: ListShape.editing(new))
         entryBases[slot] = nil
         return true
+    }
+
+    private struct Refusal: Error { let reason: String }
+
+    /// What the typed text of a member holds, or why the member does not take it.
+    private static func parsed(_ typed: String, as member: ListShape.Member) throws(Refusal) -> PropertyValue? {
+        if typed.isEmpty { return nil }
+        guard case .number(let rule) = member.kind else { return .string(typed) }
+        guard let number = PropertyNumber.parse(typed, integer: rule.integer) else { throw Refusal(reason: PropertyLoss.notANumber.reason) }
+        guard rule.allows(number) else { throw Refusal(reason: rule.requirement ?? PropertyLoss.outOfRange.reason) }
+        return .number(number)
     }
 
     private func refuse(_ draft: ItemPropertyDraft, _ reason: String) -> Bool {
@@ -376,14 +383,7 @@ final class ListEditing {
                 return false
             }
             pending = entry
-            guard shape.refusal(of: entry) == nil else { return true }
-            let base = base(value)
-            // The entry keeps the identity it was typed under, so text still being typed into it stays with it.
-            if send(ListEntries.appending(entry, to: base), over: base, ids: ids + [pendingID], giving: .entry(pendingID, entry), in: shape, write: write) {
-                pending = nil
-                pendingID = UUID()
-            }
-            return true
+            return add(shape, value: value, write: write) != .refused
         }
         guard let current = entry(id, in: value), var fields = current.fields else {
             notice = String(localized: "The entry was removed while you were editing it.")
@@ -449,19 +449,60 @@ final class ListEditing {
         }
     }
 
-    /// Adds the entry being added with all that was typed into it: the members the list does not require first, then the
-    /// required ones, the last of which writes it. False where the entry stays as typed, with `notice` saying why.
+    private enum Adding { case written, held, refused }
+
+    /// Adds the entry being added with all that was typed into it, in one write once it holds what the list requires.
+    /// False where the entry stays as typed, with `notice` saying why.
     @discardableResult
     func addEntry(in shape: ListShape, value: PropertyValue?, write: (PropertyValue?) -> Bool) -> Bool {
         guard pending != nil else { return true }
-        for member in shape.members.filter({ !$0.required }) + shape.members.filter(\.required) {
-            guard commit(member, of: pendingID, in: shape, value: value, write: write) else { return false }
-        }
-        guard pending != nil else { return true }
-        if notice == nil, let missing = shape.members.first(where: { $0.required && pending?[$0.key] == nil }) {
+        let adding = add(shape, value: value, write: write)
+        if adding == .held, notice == nil, let missing = shape.members.first(where: { $0.required && pending?[$0.key] == nil }) {
             notice = String(localized: "\(missing.label) is required.")
         }
-        return false
+        return adding == .written
+    }
+
+    /// Takes the text typed into the entry being added into it and writes the entry once it is whole.
+    /// A text is marked written only once the entry holds it or the library has taken the entry, so a refused write
+    /// leaves everything to be written again, and nothing is written in parts.
+    private func add(_ shape: ListShape, value: PropertyValue?, write: (PropertyValue?) -> Bool) -> Adding {
+        var entry = pending ?? [:]
+        var taken: [(draft: ItemPropertyDraft, member: ListShape.Member)] = []
+        for member in shape.members {
+            guard let draft = drafts[Slot(entry: pendingID, member: member.key)], draft.isDirty else { continue }
+            do {
+                entry[member.key] = try Self.parsed(draft.text.trimmingCharacters(in: .whitespacesAndNewlines), as: member)
+            } catch {
+                _ = refuse(draft, error.reason)
+                return .refused
+            }
+            taken.append((draft, member))
+        }
+        notice = nil
+        if let refusal = shape.refusal(of: entry, ignoringMissingRequired: true) {
+            notice = refusal
+            taken.forEach { $0.draft.rejected = true }
+            return .refused
+        }
+        pending = entry
+        func settle() {
+            for (draft, member) in taken { draft.discard(toMatch: ListShape.editing(entry[member.key])) }
+        }
+        guard shape.refusal(of: entry) == nil else {
+            settle()
+            return .held
+        }
+        let base = base(value)
+        // The entry keeps the identity it was typed under, so text still being typed into it stays with it.
+        guard send(ListEntries.appending(entry, to: base), over: base, ids: ids + [pendingID], giving: .entry(pendingID, entry), in: shape, write: write) else {
+            taken.forEach { $0.draft.rejected = true }
+            return .refused
+        }
+        settle()
+        pending = nil
+        pendingID = UUID()
+        return .written
     }
 
     /// Drops the entry being added and what was typed into it, at the person's word.
@@ -548,12 +589,14 @@ final class ListEditing {
         }
         var conflicted = false
         if isEditable {
-            for id in ids + [pendingID] {
+            for id in ids {
                 for member in shape.members where drafts[Slot(entry: id, member: member.key)]?.isDirty == true {
                     conflicted = conflicts(Slot(entry: id, member: member.key), in: current) || conflicted
                     commit(member, of: id, in: shape, value: current, write: writing)
                 }
             }
+            // The entry being added is written whole or not at all, never one member of it.
+            addEntry(in: shape, value: current, write: writing)
         }
         if let text = unsavedText(in: shape) {
             let reason = if !isEditable { PropertyLoss.notEditable.reason }

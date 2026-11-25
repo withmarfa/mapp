@@ -647,6 +647,18 @@ struct ValueEditingTests {
         #expect(library.notices.waiting.first?.text == "Due: sometime soon")
     }
 
+    @Test func aDayTypedForADateAndTimeKeepsTheWholeClockTheValueHolds() {
+        let written = Written()
+        let model = datePanel(Self.due, holding: "2026-11-07T09:30:42.123Z", written: written)
+        model.beginDay()
+        model.dayDraft = "25 Nov 2026"
+        model.commitDay()
+        #expect(written.all == [PropertyValue.string("2026-11-25T09:30:42.123Z")])
+        let quick = Written()
+        datePanel(Self.due, holding: "2026-11-07T09:30:42.123Z", written: quick).chooseDay(Self.moment(9, 0, 0))
+        #expect(quick.all == [PropertyValue.string("2026-11-09T09:30:42.123Z")])
+    }
+
     @Test func aTypedDayIsTheDayItNamesAndNothingElse() {
         #expect(TypedDay.parse("25 Nov 2026", calendar: Self.utc) == Self.moment(25, 0, 0))
         #expect(TypedDay.parse("2026-11-25", calendar: Self.utc) == Self.moment(25, 0, 0))

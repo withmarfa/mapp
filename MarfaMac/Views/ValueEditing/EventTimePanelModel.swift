@@ -118,23 +118,27 @@ final class EventTimePanelModel {
         return true
     }
 
-    private func attempt(_ change: () throws(EventTime.Refusal) -> EventTime.Reading) {
+    /// Whether the change was taken; where it is not, what was typed stays, with the reason in `notice`.
+    @discardableResult
+    private func attempt(_ change: () throws(EventTime.Refusal) -> EventTime.Reading) -> Bool {
         do throws(EventTime.Refusal) {
-            apply(try change())
+            return apply(try change())
         } catch {
             notice = error.message
+            return false
         }
     }
 
+    /// A day picked replaces the day typed, once the write is taken: a refused pick leaves the typed text and says why.
     func choose(day: Date) {
-        dayInput = nil
         let (part, reading, mac) = (part, reading, mac)
-        attempt { () throws(EventTime.Refusal) -> EventTime.Reading in try EventTime.choosing(day, for: part, in: reading, mac: mac) }
+        guard attempt({ () throws(EventTime.Refusal) -> EventTime.Reading in try EventTime.choosing(day, for: part, in: reading, mac: mac) }) else { return }
+        dayInput = nil
+        notice = nil
     }
 
     func setAllDay(_ on: Bool) {
-        discardTyping()
-        apply(EventTime.setting(allDay: on, in: reading, mac: mac, now: now))
+        if apply(EventTime.setting(allDay: on, in: reading, mac: mac, now: now)) { discardTyping() }
     }
 
     func setZone(_ zone: TimeZone?) {
@@ -146,10 +150,9 @@ final class EventTimePanelModel {
     /// Takes the start and the end away.
     func clear() {
         guard canEdit, let item else { return }
-        discardTyping()
         let changes = spec.clearing(in: item)
-        guard !changes.isEmpty else { return }
-        _ = write(changes, becoming: EventTime.Reading(start: nil, end: nil, allDay: reading.allDay, zone: reading.zone))
+        guard !changes.isEmpty else { return discardTyping() }
+        if write(changes, becoming: EventTime.Reading(start: nil, end: nil, allDay: reading.allDay, zone: reading.zone)) { discardTyping() }
     }
 
     // MARK: Typing

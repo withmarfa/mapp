@@ -218,6 +218,17 @@ nonisolated enum TimeOfDay {
         return hour < 24 ? (hour, minute) : nil
     }
 
+    /// `day` with the whole clock time of `basis` in `calendar`, seconds and fractions included, so a time the person did
+    /// not touch is never rounded. A clock time that the day does not have goes to the next one that it does, as a
+    /// calendar moves an event onto such a day.
+    static func keeping(clockOf basis: Date, on day: Date, calendar: Calendar) -> Date {
+        let start = calendar.startOfDay(for: day)
+        var parts = calendar.dateComponents([.year, .month, .day], from: start)
+        let time = calendar.dateComponents([.hour, .minute, .second, .nanosecond], from: basis)
+        (parts.hour, parts.minute, parts.second, parts.nanosecond) = (time.hour, time.minute, time.second, time.nanosecond)
+        return calendar.date(from: parts) ?? start
+    }
+
     /// `hour` and `minute` on the day of `day` in `calendar`, or nil where that day's clock has no such time (a clock put
     /// forward). The next time that does exist is never taken for it.
     static func moment(hour: Int, minute: Int, on day: Date, calendar: Calendar) -> Date? {
@@ -293,12 +304,11 @@ nonisolated enum QuickDates {
         return formatter.string(from: entry.date)
     }
 
-    /// The date to store for choosing `day`: with a time, the day at the time the item already holds, else at the
+    /// The date to store for choosing `day`: with a time, the day at the whole time the item already holds, else at the
     /// start of the day.
     static func moment(on day: Date, keepingTimeOf current: Date?, calendar: Calendar) -> Date {
         guard let current else { return calendar.startOfDay(for: day) }
-        let time = calendar.dateComponents([.hour, .minute], from: current)
-        return calendar.date(bySettingHour: time.hour ?? 0, minute: time.minute ?? 0, second: 0, of: day) ?? day
+        return TimeOfDay.keeping(clockOf: current, on: day, calendar: calendar)
     }
 }
 

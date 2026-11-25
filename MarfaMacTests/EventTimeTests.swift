@@ -187,4 +187,39 @@ struct EventTimeTests {
         model.finish(cancelled: false)
         #expect(library.notices.waiting.first?.text == "Date: whenever")
     }
+
+    @Test func aDayClickWhoseWriteIsRefusedLeavesTheTypedDayAndSaysWhy() {
+        let (model, library) = Self.panel(Self.timed)
+        model.part = .start
+        model.beginDay()
+        model.typeDay("whenever")
+        model.commitDay()
+        #expect(model.shownDay == "whenever" && model.notice != nil)
+
+        library.acceptsProperties = false
+        model.choose(day: Self.day(2026, 11, 28))
+        #expect(model.shownDay == "whenever")
+        #expect(model.notice != nil)
+
+        library.acceptsProperties = true
+        model.choose(day: Self.day(2026, 11, 28))
+        #expect(model.dayInput == nil && model.notice == nil)
+        #expect(library.items[0].value(of: "starts_at") == .string("2026-11-28T10:00:00.000Z"))
+    }
+
+    @Test func aRefusedAllDayKeepsATypedTime() {
+        let (model, library) = Self.panel(Self.timed)
+        model.beginTyping(in: .end)
+        model.type("11:00", into: .end)
+        library.acceptsProperties = false
+        model.setAllDay(true)
+        #expect(model.shownTime(of: .end) == "11:00")
+    }
+
+    @Test func movingTheDayKeepsFractionsOfASecond() {
+        let (model, library) = Self.panel(["starts_at": .string("2026-11-26T16:00:37.123Z"), "ends_at": .string("2026-11-26T16:30:37.123Z"), "timezone": .string("UTC")])
+        model.part = .start
+        model.choose(day: Self.day(2026, 11, 28))
+        #expect(library.items[0].value(of: "starts_at") == .string("2026-11-28T16:00:37.123Z"))
+    }
 }

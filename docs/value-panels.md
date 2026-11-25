@@ -23,9 +23,9 @@ paths:
 - **A status panel lists the type's words under their four groups.** Edit Statuses… opens the type in Settings.
 - **A people panel offers the people the lists already name and the people the library holds as items,** each added with their first address.
 - **An event's time is one panel** (`EventTime`, `EventTimePanelModel`): a calendar, the start and the end each with a day and a time, All Day, and the zone. A change writes only the fields the action changes, so a stored value the person did not touch stays byte for byte.
-- **A day change keeps the whole clock time,** seconds included. Moving the start keeps the length, and an end before the start is refused.
+- **A day chosen or typed keeps the whole clock time,** seconds and fractions included. Moving the start keeps the length, and an end before the start is refused.
 - **A time the zone does not have on that day is refused,** never moved to one it has. What was typed stays in the field with the reason, and is given back where the panel ends or the start or end changed meanwhile.
-- **A list of entries is edited in one panel** (`EntriesEditor`): a block for each entry, its members in rows named by the core's labels. The first is the main one. Add, or Return, writes the new entry with all that was typed; Done ends the panel.
+- **A list of entries is edited in one panel** (`EntriesEditor`): a block for each entry, its members in rows named by the core's labels. The first is the main one. Add, Return and leaving write the new entry whole, or hand back all of it; a refused Add keeps it to try again.
 - **A conflict is a question, not an error,** so it has no red: "This value changed while you were editing." and "Your edit hasn’t been saved.", with Keep My Edit, the main button, and Use Current Value. Any other refusal is one red line at the foot, and what was typed stays.
 - **A web address is a link, and a click opens it.** Its row's menu has Open, Copy, Edit, then Clear.
 - **Unsaved text is kept when a panel loses its place**, and the person is told where it is.

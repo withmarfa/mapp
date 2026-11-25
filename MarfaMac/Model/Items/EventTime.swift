@@ -160,15 +160,9 @@ nonisolated struct EventTime: Hashable, Sendable {
         calendar.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? day
     }
 
-    /// `day` with the whole clock time of `basis`, seconds included, or its midnight for whole days. A clock time that the
-    /// day does not have goes to the next one that it does, as a calendar moves an event onto such a day.
+    /// `day` with the whole clock time of `basis`, or its midnight for whole days.
     private static func moving(_ day: Date, to calendar: Calendar, keepingTimeOf basis: Date, whole: Bool) -> Date {
-        let start = calendar.startOfDay(for: day)
-        guard !whole else { return start }
-        var parts = calendar.dateComponents([.year, .month, .day], from: start)
-        let time = calendar.dateComponents([.hour, .minute, .second, .nanosecond], from: basis)
-        (parts.hour, parts.minute, parts.second, parts.nanosecond) = (time.hour, time.minute, time.second, time.nanosecond)
-        return calendar.date(from: parts) ?? start
+        whole ? calendar.startOfDay(for: day) : TimeOfDay.keeping(clockOf: basis, on: day, calendar: calendar)
     }
 
     /// The properties to write for the person's change from `old` to `new`: only a part that changed, so a time the person
