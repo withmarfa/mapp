@@ -19,12 +19,14 @@ nonisolated final class FakeEmbeds: EmbedResolver {
     }
 
     let added = Mutex<[(file: String, data: Data, title: String?, tier: Tier?, tags: [String], parent: ItemID?)]>([])
+    /// The ids the next files added are given, in order, before any that is minted.
+    let made = Mutex<[ItemID]>([])
 
     func addFile(_ file: URL, title: String?, tier: Tier?, tags: [String], parent: ItemID?) async throws -> ItemID {
         if let failure = failure.withLock({ $0 }) { throw failure }
         let data = try Data(contentsOf: file)
         added.withLock { $0.append((file.lastPathComponent, data, title, tier, tags, parent)) }
-        return ItemID.mint()
+        return made.withLock { $0.isEmpty ? nil : $0.removeFirst() } ?? ItemID.mint()
     }
 }
 

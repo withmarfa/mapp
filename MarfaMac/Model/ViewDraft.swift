@@ -34,6 +34,8 @@ nonisolated enum ViewDraft {
         var dated: Dated?
         /// The window's From, Archived Items and Include Kinds (`Browser.listing`).
         var listing = PlaceListing()
+        /// The search's tokens that are not among the filters, as the field words them, which a view does not keep.
+        var searchTokens: [String] = []
     }
 
     /// The list's own order, which stands for a view with no sort or grouping of its own.
@@ -60,6 +62,8 @@ nonisolated enum ViewDraft {
     /// A choice of the window's that the view will not keep.
     enum Unkept: Hashable, Sendable {
         case search(String)
+        /// A search token, as the field words it.
+        case searchToken(String)
         /// A column whose filter a view cannot express.
         case filter(column: String)
         /// Filters that need both AND and OR, which a Marfa filter never mixes.
@@ -74,6 +78,14 @@ nonisolated enum ViewDraft {
         case group(column: String)
         /// A way of grouping a view's group cannot hold yet, such as Set or Not Set, named by its field and its way.
         case groupMode(column: String, mode: String)
+
+        /// Said where it is made, in the row or the panel, so never told again once a view is written.
+        var isSaidWhereMade: Bool {
+            switch self {
+            case .search, .searchToken, .relativeFilter: true
+            default: false
+            }
+        }
     }
 
     /// The settings a view saves, apart from its title, and what of the window it leaves out.
@@ -129,6 +141,7 @@ nonisolated enum ViewDraft {
         }
         var unkept: [Unkept] = []
         if let search = window.search { unkept.append(.search(search)) }
+        unkept += window.searchTokens.map(Unkept.searchToken)
         let filtered: (query: LibraryViewQuery, unkept: [Unkept])
         if window.place.savedView != nil {
             // A view's place shows the view's own filter as the window's filters, so they stand in for it.
@@ -488,6 +501,7 @@ nonisolated enum ViewDraft {
         var change = LibraryViewChange()
         var unkept: [Unkept] = []
         if let search = window.search { unkept.append(.search(search)) }
+        unkept += window.searchTokens.map(Unkept.searchToken)
         if sortKeys(options.sort) != sortKeys(seed.sort) {
             let sort = sort(window.sort)
             change.sort = sort.sort

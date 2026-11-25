@@ -116,7 +116,8 @@ struct TopRowPieces {
     func views(_ fold: TopRowFold) -> some View {
         HStack(spacing: 0) {
             TopRowPills(
-                choices: content.views, chosen: content.chosenChoice?.id ?? "", isChanged: content.isChanged, fold: fold,
+                browser: browser, place: content.place, choices: content.views, hiddenViews: content.hidden,
+                chosen: content.chosenChoice?.id ?? "", isChanged: content.isChanged, fold: fold,
                 choose: choose, newView: newView)
             Spacer(minLength: 16)
             switch fold.places {
@@ -128,6 +129,8 @@ struct TopRowPieces {
     }
 
     private func choose(_ choice: TopRowContent.Choice) {
+        // The view being made is already what the window shows.
+        guard !choice.isNew else { return }
         browser.show(choice.target, in: library, order: order)
     }
 
@@ -309,20 +312,31 @@ private struct TopRowMenuLabel: View {
     }
 }
 
-/// The views of a place as a radio group: each a pill, the chosen one selected, and what does not fit in a menu that ends
-/// with New View…. VoiceOver reads a radio group of every view, whatever has folded.
+/// The views of a place as a radio group: each a pill, the chosen one selected, and what does not fit or is hidden in
+/// More, which ends with New View…. A pill is dragged to move it, right-clicked for its menu (`TopRowPillMenu`), and
+/// renamed in place. VoiceOver reads a radio group of every view, whatever has folded.
 private struct TopRowPills: View {
+    @CurrentLibrary private var library
+    @StoredOrder private var order
+    let browser: Browser
+    let place: Place
     let choices: [TopRowContent.Choice]
+    let hiddenViews: [TopRowContent.Choice]
     let chosen: String
     let isChanged: Bool
     let fold: TopRowFold
     let choose: (TopRowContent.Choice) -> Void
     let newView: () -> Void
+    @State private var renaming: String?
+    @State private var typed = ""
+    /// The name the view had when Rename… began, which the rename is written against.
+    @State private var renamingFrom = ""
+    @FocusState private var nameFocused: Bool
 
     /// None while the window shows one of the Library's places.
     private var current: TopRowContent.Choice? { choices.first { $0.id == chosen } ?? (chosen.isEmpty ? nil : choices.first) }
 
-    private var split: (shown: [TopRowContent.Choice], hidden: [TopRowContent.Choice]) {
+    private var split: (shown: [TopRowContent.Choice], folded: [TopRowContent.Choice]) {
         guard let count = fold.shown, count < choices.count else { return (choices, []) }
         var shown = Array(choices.prefix(count))
         if let current, !shown.contains(current) { shown[shown.count - 1] = current }
@@ -334,10 +348,10 @@ private struct TopRowPills: View {
             if fold.onePill {
                 onePill
             } else {
-                let (shown, hidden) = split
+                let (shown, folded) = split
                 HStack(spacing: 2) {
                     ForEach(shown) { pill($0) }
-                    if hidden.isEmpty { plus } else { more(hidden) }
+                    if folded.isEmpty, hiddenViews.isEmpty { plus } else { more(folded) }
                 }
             }
         }
@@ -361,15 +375,66 @@ private struct TopRowPills: View {
         .accessibilityIdentifier("TopRowViews")
     }
 
-    private func pill(_ choice: TopRowContent.Choice) -> some View {
-        let isChosen = choice.id == current?.id
-        return Button { choose(choice) } label: {
-            HStack(spacing: 5) {
-                Text(choice.title)
-                if isChosen, isChanged { Circle().fill(.secondary).frame(width: 5, height: 5).accessibilityHidden(true) }
+    @ViewBuilder private func pill(_ choice: TopRowContent.Choice) -> some View {
+        if renaming == choice.id {
+            nameField(choice)
+        } else {
+            let isChosen = choice.id == current?.id
+            let button = Button { choose(choice) } label: {
+                HStack(spacing: 5) {
+                    Text(choice.title)
+                    if isChosen, isChanged { Circle().fill(.secondary).frame(width: 5, height: 5).accessibilityHidden(true) }
+                }
+            }
+            .buttonStyle(TopRowPillStyle(isChosen: isChosen))
+            .help(choice.isWaiting ? Text("Offline. Your change is saved once your Marfa server is back.") : Text(choice.title))
+            if choice.isNew {
+                button
+            } else {
+                button
+                    .contextMenu {
+                        TopRowPillMenu(browser: browser, choice: choice, place: place) { startRename(choice) }
+                    }
+                    .draggable(choice.id)
+                    .dropDestination(for: String.self) { words, _ in drop(words, onto: choice) }
             }
         }
-        .buttonStyle(TopRowPillStyle(isChosen: isChosen))
+    }
+
+    private func nameField(_ choice: TopRowContent.Choice) -> some View {
+        TextField("View Name", text: $typed)
+            .textFieldStyle(.plain)
+            .fixedSize()
+            .focused($nameFocused)
+            .font(.system(size: 13, weight: .medium))
+            .padding(.horizontal, 11)
+            .frame(height: TopRowMetrics.pillHeight)
+            .background(Capsule().fill(Color.primary.opacity(0.07)))
+            .onSubmit { commitRename(choice) }
+            .onExitCommand { renaming = nil }
+            .onChange(of: nameFocused) { if !nameFocused, renaming == choice.id { commitRename(choice) } }
+            // The pill can go while the name is typed, as when another app deletes the view: the name is handed on.
+            .onDisappear { if renaming == choice.id { commitRename(choice) } }
+            .task { nameFocused = true }
+            .accessibilityIdentifier("TopRowRename")
+    }
+
+    private func startRename(_ choice: TopRowContent.Choice) {
+        typed = choice.title
+        renamingFrom = choice.title
+        renaming = choice.id
+    }
+
+    private func commitRename(_ choice: TopRowContent.Choice) {
+        renaming = nil
+        guard case .saved(let id) = choice.target.view else { return }
+        let (name, from) = (typed, renamingFrom)
+        Task { await browser.renameView(id, to: name, from: from, in: library) }
+    }
+
+    private func drop(_ words: [String], onto target: TopRowContent.Choice) {
+        guard let word = words.first, let moved = ViewChoice(knownWord: word) else { return }
+        browser.moveView(moved, onto: target.target.view, in: place, library: library)
     }
 
     private var plus: some View {
@@ -379,21 +444,41 @@ private struct TopRowPills: View {
             .help("New View")
     }
 
-    private func more(_ hidden: [TopRowContent.Choice]) -> some View {
+    private func more(_ folded: [TopRowContent.Choice]) -> some View {
         Menu {
-            ForEach(hidden) { choice in Button(choice.title) { choose(choice) } }
+            ForEach(folded) { choice in Button(choice.title) { choose(choice) } }
+            if !hiddenViews.isEmpty {
+                hiddenSection
+            }
             Divider()
             Button("New View…", action: newView)
         } label: {
-            TopRowMenuLabel(title: Text("\(hidden.count) More"))
+            TopRowMenuLabel(title: Text("\(folded.count + hiddenViews.count) More"))
         }
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+    }
+
+    /// The views hidden from the row, each opened or shown in the row again from its own menu.
+    private var hiddenSection: some View {
+        Section("Hidden") {
+            ForEach(hiddenViews) { choice in
+                Menu(choice.title) {
+                    Button("Open View") { choose(choice) }
+                    Button("Show in Row") {
+                        browser.setHidden(choice.target.view, false, in: place, library: library, order: order)
+                    }
+                }
+            }
+        }
     }
 
     private var onePill: some View {
         Menu {
             ForEach(choices) { choice in
                 Toggle(choice.title, isOn: Binding { choice.id == current?.id } set: { _ in choose(choice) })
+            }
+            if !hiddenViews.isEmpty {
+                hiddenSection
             }
             Divider()
             Button("New View…", action: newView)

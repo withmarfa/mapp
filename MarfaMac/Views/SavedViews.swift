@@ -45,7 +45,14 @@ enum SavedViews {
             filter: options.filter, targets: content.filterOffer.targets, search: search.isEmpty ? nil : search,
             layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.shown],
             seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.hasDateSections) : nil,
-            listing: browser.listing)
+            listing: browser.listing,
+            // A token This Search says with its From is kept as the view's tier, while the From still says it.
+            searchTokens: browser.searchTokens.filter { token in
+                let inFrom = browser.viewPanel?.tokensInFrom.contains(token) == true && !browser.fromTokensSetAside.contains(token)
+                return !options.filter.clauses.contains(token) && !inFrom
+            }.map { token in
+                browser.tokenParts(of: token, in: library)?.sentence ?? token.values.joined(separator: ", ")
+            })
     }
 
     /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new
@@ -142,9 +149,25 @@ enum SavedViews {
         return Arrangement(sort: [sort], hasDateSections: order.groupsByDate && order.sort != .title, isDated: true)
     }
 
+    /// What a view will not keep, as a few words for a line that lists them.
+    static func shortName(_ unkept: ViewDraft.Unkept) -> String {
+        switch unkept {
+        case .search(let text): String(localized: "“\(text)”")
+        case .searchToken(let sentence), .relativeFilter(let sentence): String(localized: "“\(sentence)”")
+        case .filter(let column): String(localized: "the filter on \(column)")
+        case .mixedFilters: String(localized: "filters joined by both “and” and “or”")
+        case .tooManyFilters: String(localized: "more than \(ViewDraft.maxConditions) conditions")
+        case .refused: String(localized: "a filter Marfa refuses")
+        case .sort(let column): String(localized: "sorting by \(column)")
+        case .group(let column): String(localized: "grouping by \(column)")
+        case .groupMode(let column, let mode): String(localized: "grouping by \(column): \(mode)")
+        }
+    }
+
     static func describe(_ unkept: ViewDraft.Unkept) -> String {
         switch unkept {
         case .search(let text): String(localized: "The search for “\(text)”")
+        case .searchToken(let sentence): String(localized: "The search token “\(sentence)”")
         case .filter(let column): String(localized: "The filter on \(column)")
         case .mixedFilters: String(localized: "Filters that would join conditions with both “and” and “or”")
         case .tooManyFilters: String(localized: "More than \(ViewDraft.maxConditions) filter conditions")

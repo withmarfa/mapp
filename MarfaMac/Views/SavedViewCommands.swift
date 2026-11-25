@@ -43,7 +43,7 @@ struct SavedViewCommand {
                     Task { await browser.duplicateView(view.id, in: library, order: order) }
                 })
                 commands.append(SavedViewCommand(title: String(localized: "Delete View…"), systemImage: "trash") {
-                    browser.deletingView = view.id
+                    browser.askToDeleteView(view.id, in: library)
                 })
             }
         }
@@ -99,7 +99,7 @@ struct SavedViewMenu: View {
         .shortcut(.duplicateView, shortcuts)
         .disabled(!reachesServer || shown == nil)
         Button("Delete View…", systemImage: "trash") {
-            if let shown { browser?.deletingView = shown.id }
+            if let browser, let library, let shown { browser.askToDeleteView(shown.id, in: library) }
         }
         .disabled(!reachesServer || shown == nil)
     }

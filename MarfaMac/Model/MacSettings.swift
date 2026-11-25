@@ -12,7 +12,7 @@ enum MacSettings {
                 DateFormat.key, WeekStart.key, StartWith.key, StartWith.lastPlaceKey, ReopenWindows.key, NewItemType.key,
                 NewOpens.key, NewItemRecents.key, RemotePictureSetting.key, Reporting.switchKey, UpdateSettings.betaKey, SidebarTypeRow.subtypeIconsKey,
                 SourceViewMode.key, PlaceDensities.key, PlaceDefaults.key, ItemTableColumnLayouts.key, ViewLayouts.key,
-                PagePlacements.key, PanelParts.key, ViewOrders.key, ListScope.defaultScopeKey, SidebarLayouts.defaultsKey, TypeLooks.defaultsKey, SearchLeaveOuts.defaultsKey,
+                PagePlacements.key, PanelParts.key, ViewOrders.key, ViewOrders.hiddenKey, ListScope.defaultScopeKey, SidebarLayouts.defaultsKey, TypeLooks.defaultsKey, SearchLeaveOuts.defaultsKey,
                 ShortcutBindings.defaultsKey, AnyAppShortcuts.defaultsKey, CalendarHourHeight.key,
                 AutomaticExport.plansKey,
             ] + SearchOptions.keys

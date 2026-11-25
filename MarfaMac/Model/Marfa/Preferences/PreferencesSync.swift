@@ -509,6 +509,17 @@ final class PreferencesSync {
         for unit in Set(remote.keys).union(base.keys) where !PreferencesMap.synced.contains(where: { $0.owns(unit) }) {
             mine[unit] = base[unit]
         }
+        // Nor is a row this Mac never stored of a setting kept where absent, unless this Mac's value wins on purpose.
+        let keptAbsent = PreferencesMap.synced.filter { PreferencesMap.keptWhereAbsent.contains($0.key) }
+        let isKeptAbsent = { (unit: PreferenceUnit) in keptAbsent.contains { $0.owns(unit) } }
+        let winsHere = { (unit: PreferenceUnit) in
+            PreferencesMap.synced.contains { setting in
+                setting.owns(unit) && winning[setting.key].map { !$0.contains(unit) } == true
+            }
+        }
+        for unit in Set(remote.keys).union(base.keys) where mine[unit] == nil && isKeptAbsent(unit) && !winsHere(unit) {
+            mine[unit] = base[unit]
+        }
         mine.merge(setAsideUnreadable(remote, base: base)) { _, unreadable in unreadable }
         var seen = remote
         for unit in holding { seen[unit] = base[unit] }
@@ -523,6 +534,10 @@ final class PreferencesSync {
         var outcome = PreferencesMerge.reconcile(
             local: mine, remote: seen, base: before, frozen: { unit in unreadable.contains { $0.owns(unit) } })
         outcome.toLocal.formUnion(retrying)
+        // What this Mac lacks of such a setting comes here.
+        outcome.toLocal.formUnion(outcome.merged.keys.filter { unit in
+            local.units[unit] == nil && isKeptAbsent(unit) && !unreadable.contains { $0.owns(unit) }
+        })
         if switched { outcome.toLocal.formUnion(Set(local.units.keys).union(outcome.merged.keys)) }
         try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: retrying, in: copy) {
             [defaults, before] partial, unsent in

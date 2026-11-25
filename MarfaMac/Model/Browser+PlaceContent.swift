@@ -16,7 +16,7 @@ extension Browser {
             // applied to what it lists (`ItemTableContent.kept`), which is the only place every token is applied. A Type
             // token only narrows within the place's types, never lists others.
             query = ViewDraft.adding(
-                FilterState(clauses: searchTokens), to: query, targets: tokenTargets(in: library), catalogue: library.catalogue,
+                FilterState(clauses: narrowingSearchTokens), to: query, targets: tokenTargets(in: library), catalogue: library.catalogue,
                 replacingTypes: false).query
         }
         return .query(query)
@@ -29,13 +29,18 @@ extension Browser {
 
     /// The items the list shows: the search results while searching, the place's items otherwise.
     func items(in library: any ItemLibrary) -> [Item] {
-        Cost.measure(.items) { searchResults(in: library)?.items ?? placeItems(in: library) }
+        if previewsNothing { return [] }
+        return Cost.measure(.items) { searchResults(in: library)?.items ?? placeItems(in: library) }
     }
+
+    /// Whether the window previews a new view that lists nothing: an inbox whose every source the person unticked.
+    var previewsNothing: Bool { viewPanel?.choosesNoSource == true }
 
     /// Whether the open place lists anything, without copying its items.
     /// A search, a saved view's list or the Favorites view is the copy's answer, filters included. No index count
     /// matches it. Chip filters narrow a layout after the list is made. They are not part of what `items(in:)` answered.
     func listsAnything(in library: any ItemLibrary) -> Bool {
+        if previewsNothing { return false }
         if isSearching || shown.view != .own || listing.archived != .hidden || !listing.includesKinds {
             return !items(in: library).isEmpty
         }
@@ -185,7 +190,7 @@ extension Browser {
             shape.sort = nil
             shape.grouping = .automatic
         }
-        return ListShape(options: shape, arranged: arranged, tokens: searchTokens)
+        return ListShape(options: shape, arranged: arranged, tokens: narrowingSearchTokens)
     }
 
     /// The sections of a place that is filtered or arranged, worked out from the table's content, which the table
@@ -254,12 +259,14 @@ extension Browser {
     func tableContent(in library: any ItemLibrary) -> ItemTableContent {
         // Read, so whoever asks is told when an arrangement lands.
         _ = tableArrangements
+        // Not held: the options are those of every source, whose table comes back as it was once one is ticked.
+        if previewsNothing { return ItemTableContent(browser: self, library: library, items: []) }
         let keyed = (tableOptions[shown] ?? ItemTableOptions()).settled
         let derived = derivedKey(in: library)
         let key = TableKey(
             derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, counts: library.counts.revision,
             hidesEmpty: hidesEmptyGroups, sources: library.sources.infos,
-            relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()), tokens: searchTokens)
+            relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()), tokens: narrowingSearchTokens)
         if let held = tableMemo, held.key == key { return held.content }
         // A search's table is held apart, so its results never show the Library's table nor drop it.
         let searching = isSearching

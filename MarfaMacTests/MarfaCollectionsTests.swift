@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import MarfaMac
 
@@ -90,6 +91,112 @@ import Testing
         undo.undo()
         #expect(Set(source.writes) == Set(minted.map { .unlink(EdgeDraft(type: "in-collection", from: $0.from, to: Self.holiday, id: $0.id)) }))
         #expect(!undo.canUndo)
+    }
+
+    @Test func aDropOnACollectionAddsOnlyMissingMembershipsInOneUndoStep() async throws {
+        let (library, source) = try await loaded()
+        let browser = Browser()
+        browser.adopt(library)
+        let toasts = ToastPresenter()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        // Plain note is in Holiday already, so only the other two join.
+        #expect(browser.addDropped([F.e1, F.n2, F.n1], to: Self.holiday, in: library, undoManager: undo, toasts: toasts))
+        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft) = write { draft.from } else { nil } }
+        #expect(Set(joined) == [F.e1, F.n2])
+        #expect(joined.count == 2)
+        #expect(toasts.current?.message == "Added 2 items to Holiday, 1 already in it")
+        #expect(toasts.current?.undo != nil)
+        try await takeAll(library, source)
+        source.clearWrites()
+        toasts.undo()
+        #expect(source.writes.count == 2)
+        #expect(!undo.canUndo)
+    }
+
+    /// What a source that refuses an edge write on an item in the bin would refuse among `writes`, given the items
+    /// already there. The test source applies nothing, so this follows the writes in the order they were sent.
+    private static func refusedForBinned(_ writes: [ItemWrite], binned: Set<ItemID> = []) -> [ItemWrite] {
+        var binned = binned
+        var refused: [ItemWrite] = []
+        for write in writes {
+            switch write {
+            case .transition(let id, .trashed, _): binned.insert(id)
+            case .restore(let id): binned.remove(id)
+            case .link(let draft), .unlink(let draft): if binned.contains(draft.from) { refused.append(write) }
+            default: break
+            }
+        }
+        return refused
+    }
+
+    @Test func undoingAFileDropOnACollectionUnlinksBeforeItBinsAndRedoRestoresBeforeItLinks() async throws {
+        let (library, source) = try await loaded()
+        let disk = TestFiles()
+        let dropped = ItemID("dropped")
+        source.attaching.made.withLock { $0 = [dropped] }
+        source.send(.upserted([F.item(dropped, F.note, "a.txt", age: 0)]))
+        try #require(await eventually { library.item(dropped) != nil })
+        let browser = Browser()
+        browser.adopt(library)
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let target = browser.fileDropTarget(onCollection: Self.holiday, in: library)
+        await browser.importFiles(
+            [disk.url("a.txt")], to: target, in: library, order: ItemOrder(), undoManager: undo)
+        try #require(source.writes.count == 1)
+        guard case .link = source.writes[0] else {
+            Issue.record("The drop wrote no link.")
+            return
+        }
+        let minted = try #require(source.lastMintedEdge)
+        try await takeAll(library, source)
+        var item = try #require(library.item(dropped))
+        item.edgesOut.append(Self.member(minted.rawValue, dropped, of: Self.holiday))
+        source.send(.upserted([item]))
+        try #require(await eventually { library.item(dropped)?.collectionIDs.contains(Self.holiday) == true })
+        source.clearWrites()
+
+        undo.undo()
+        let undone = source.writes
+        guard undone.count == 2, case .unlink = undone[0], case .transition(dropped, .trashed, _) = undone[1] else {
+            Issue.record("Undo wrote \(undone), not an unlink then a move to Recently Deleted.")
+            return
+        }
+        #expect(Self.refusedForBinned(undone).isEmpty)
+
+        try await takeAll(library, source)
+        let binWrite = try #require(source.submitted.last?.id)
+        var binned = try #require(library.item(dropped))
+        binned.state = .trashed
+        binned.edgesOut = []
+        source.send(.upserted([binned]))
+        try #require(await eventually { library.item(dropped)?.state == .trashed })
+        source.send(.answered(binWrite, .accepted))
+        try #require(await eventually { library.stateJudging[binWrite] == nil })
+        source.clearWrites()
+
+        undo.redo()
+        let redone = source.writes
+        guard redone.count == 2, case .restore(dropped) = redone[0], case .link = redone[1] else {
+            Issue.record("Redo wrote \(redone), not a restore then a link.")
+            return
+        }
+        #expect(Self.refusedForBinned(redone, binned: [dropped]).isEmpty)
+    }
+
+    @Test func aDropOfItemsAlreadyInTheCollectionWritesNothingAndSaysSo() async throws {
+        let (library, source) = try await loaded()
+        let browser = Browser()
+        browser.adopt(library)
+        let toasts = ToastPresenter()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        #expect(browser.addDropped([F.n1, F.p1], to: Self.holiday, in: library, undoManager: undo, toasts: toasts))
+        #expect(source.writes.isEmpty)
+        #expect(undo.canUndo == false)
+        #expect(toasts.current?.message == "2 items already in Holiday")
+        #expect(toasts.current?.undo == nil)
     }
 
     @Test func removingFromACollectionIsOneUndoStepThatPutsBackOnlyWhatLeft() async throws {

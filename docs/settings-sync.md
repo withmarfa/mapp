@@ -21,8 +21,8 @@ paths:
 - **A setting has the narrowest home a person would expect**, and one home only. `PreferencesMap` names it, and a test fails for a key it does not place.
 - **To add a setting:** add its key to `MacSettings.keys` and to `PreferencesMap` in the same change. Reset, export, restore points and the sample library then include it.
 - **The defaults are the store the app reads**, so a launch needs no network. Where settings sync, they are this Mac's copy.
-- **Store only what a person chose.** A value that equals the default is left out, so a better default reaches them.
-- **A new member of a stored value is optional**, because values saved before it must still decode.
+- **Store only what a person chose.** A value equal to the default is left out, so a better default reaches them.
+- **A new member of a stored value is optional**, so older values decode.
 
 ## In the Marfa
 
@@ -30,6 +30,7 @@ paths:
 - **The type can never change shape.** Only the client that registered it may replace it, and every Mac is another client (withmarfa/marfa#3462). A new setting is a new member of a field or a new `setting` word in a table.
 - **Two Macs that change different settings both keep their change.** A field is written by member and a table by row, so split a value into rows where its parts change apart. A list whose order matters is one row, and the later arrangement wins whole.
 - **A set is written sorted**, so saving it again is not a change.
+- **A hidden view is its own row, kept when shown again:** a row this Mac lacks of a `PreferencesMap.keptWhereAbsent` setting is taken, not deleted.
 - **What is kept for a place is keyed by its word** (`PlaceView.storageKey`), and for a saved view by its id, as its place can change; an earlier copy's keys are never removed (`EarlierPlace`).
 - **An earlier copy drops members it does not know** from a row it rewrites, which is accepted: `quickActions` and `opening` in `viewLayout`; `scope`, `archived`, `includesKinds`, `quickActions` and `opening` in `placeDefaults`.
 - **A sign-in asks for `app.*:write`, never the app's own vendor scope**, because discovery lists no vendor scope before its first type exists (withmarfa/marfa#3522).
@@ -40,12 +41,12 @@ paths:
 - **No item, and this Mac never adopted a Marfa:** the item is made from this Mac's settings.
 - **No item, and this Mac adopted another Marfa:** the shared settings start from the app's defaults, so a new Marfa does not take another's arrangement.
 - **An item exists:** it wins, and what it lacks is filled from this Mac once.
-- **Two items,** made by two Macs at once: the older is used, and what it lacks is filled from the other.
+- **Two items,** made by two Macs at once: the older is used, filled from the other.
 - **Switching Marfa** loads the other Marfa's settings whole.
 
 ## Changes between Macs
 
-- **Each step compares three things:** this Mac, the item, and what both held after the last step (`PreferencesMerge`). A change on this Mac waits a moment, so a drag is one write. What was just applied is not written back.
+- **Each step compares this Mac, the item, and what both held after the last step** (`PreferencesMerge`). A drag is one write. What was just applied is not written back.
 - **The record of what both hold is saved before the item is written**, so a refused write never sends another Mac's change back as this Mac's.
 - **The later write wins**, row by row and member by member. A table's change log can undo a batch from the command line.
 - **A conflicted copy of a field is answered by member:** what this Mac sent is written again, the rest is taken; the copy goes to the bin.
@@ -68,7 +69,7 @@ paths:
 
 - **Before anything replaces many settings at once, a restore point is saved** (`RestorePoints`): the first sync, adoption, switching Marfa, Reset, Import and Restore. If the point cannot be saved, nothing changes and the person is told.
 - **A point is the defaults themselves** (`SettingsSnapshot`): every key, every Marfa's entry, the settings that stay, and text its store cannot read. It reads only the app's own domain, so a restore never makes a system setting the app's.
-- **An identical point is not saved again**, so a step that retries does not push a real one out.
+- **An identical point is not saved again**, so a retry pushes no real one out.
 
 ## Import, restore and reset
 

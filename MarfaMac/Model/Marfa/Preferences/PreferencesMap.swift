@@ -93,8 +93,15 @@ enum PreferencesMap {
             .places, setting: "placeDensity", .data, wrapper: nil, local: [], .data(PlaceDensities.setAsideKey))),
         SyncedSetting(key: ViewOrders.key, place: .rows(
             .places, setting: "viewOrder", .data, wrapper: nil, local: [], .data(ViewOrders.setAsideKey))),
+        SyncedSetting(key: ViewOrders.hiddenKey, place: .rows(
+            .places, setting: "viewHidden", .data, wrapper: nil, local: [], .data(ViewOrders.hiddenSetAsideKey))),
         SyncedSetting(key: SidebarLayouts.defaultsKey, place: .sidebar(.data(SidebarLayouts.setAsideKey))),
     ]
+
+    /// Settings whose rows this Mac may lack only because it has not read them: an earlier copy kept another Mac's rows in
+    /// the sync's record without storing them. A row of one that this Mac does not hold is never deleted from the Marfa;
+    /// it is taken from there. Such a setting keeps a value for "not chosen" rather than removing its row.
+    static let keptWhereAbsent: Set<String> = [ViewOrders.hiddenKey]
 
     /// Settings that stay on this Mac but that a settings file and a restore point carry, placed as they would be synced:
     /// the shortcuts that work in any app, since a system-wide shortcut can clash with an app one Mac alone has. Rows

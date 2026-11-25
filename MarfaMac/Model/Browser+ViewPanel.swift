@@ -32,32 +32,41 @@ extension Browser {
         openViewPanel(in: library)
     }
 
-    /// New View, from what the window shows: the name starts empty, and the place goes back as it was on Escape.
+    /// New View, from what the window shows: the name starts as the one suggested, and the place goes back as it was on
+    /// Escape. While searching, it starts from the search.
     func openNewViewPanel(in library: any ItemLibrary) {
         if let panel = viewPanel {
+            if panel.isNew { return }
             // A place's panel turns into the new view's; an edit of a view closes, its changes being written already.
-            if panel.purpose == .place { panel.becomeNew(from: viewSnapshot(), library: library) }
-            if panel.isNew || panel.purpose == .place { return }
-            panel.handOff(because: .left)
-            viewPanel = nil
+            if panel.purpose == .place {
+                panel.becomeNew(from: viewSnapshot(), library: library)
+            } else {
+                panel.handOff(because: .left)
+                viewPanel = nil
+            }
         }
-        viewPanel = ViewPanel(newFrom: viewSnapshot(), library: library)
+        if viewPanel == nil { viewPanel = ViewPanel(newFrom: viewSnapshot(), library: library) }
+        viewPanel?.handOffText = { [weak self] in self?.newViewHandOff(in: library) }
+        if newViewStarts(in: library).first == .search { chooseStart(.search, in: library) }
+        viewPanel?.suggest(suggestedViewName(in: library))
+        viewPanel?.startingValues = newViewValues()
     }
 
     /// Create View on a new view makes it, with the name typed or the default one. On a view or a place it closes the
     /// panel, with a name still being typed written first.
-    func finishViewPanel(in library: any ItemLibrary, order: ItemOrder) async {
-        guard let panel = viewPanel else { return }
+    @discardableResult
+    func finishViewPanel(in library: any ItemLibrary, order: ItemOrder) async -> LibraryView? {
+        guard let panel = viewPanel else { return nil }
         if panel.isNew { return await makeNewView(from: panel, in: library, order: order) }
         if panel.typedRename != nil {
             panel.leave(because: .left)
             await commitViewName(of: panel, in: library)
         }
         if viewPanel === panel { viewPanel = nil }
+        return nil
     }
 
-    /// Closes the panel for a reason that is not the person's own choice: a view's changes were already written, and a
-    /// new view is dropped, with the name the person typed given back, since the panel is where it lived.
+    /// Closes the panel and hands back any unsaved draft or rename.
     func closeViewPanel(in library: any ItemLibrary) {
         guard let panel = viewPanel else { return }
         panel.handOff(because: .left)
@@ -77,9 +86,7 @@ extension Browser {
         dismissViewPanel(in: library)
     }
 
-    /// A click outside the panel: a new view is dropped with its name given back, and a view's or a place's panel closes.
-    /// A view's name still being typed is written, and given back if the write fails, is refused or finds the view gone,
-    /// since nothing else holds it once the panel has closed.
+    /// Handles dismissal by the popover. A rename is submitted and handed back if the write fails.
     func dismissViewPanel(in library: any ItemLibrary) {
         guard let panel = viewPanel else { return }
         if panel.isNew { return closeViewPanel(in: library) }
@@ -92,11 +99,13 @@ extension Browser {
     private func dropNewViewPanel(_ panel: ViewPanel) {
         viewPanel = nil
         dropUndoSteps(of: panel)
-        if let snapshot = panel.snapshot { restore(snapshot) }
+        guard let snapshot = panel.snapshot else { return }
+        restore(snapshot)
+        // A search set aside for a starting point's list comes back, unless the window has moved on.
+        if shown.isSame(snapshot.place) { restoreSetAsideSearch(of: panel) }
     }
 
-    /// The place changed under the panel: a new view is cancelled, and a view's changes stay held where they were made.
-    /// A name typed is given back, since the change is not the person's Cancel.
+    /// Hands back an unsaved draft or rename when the window changes place.
     func viewPanelPlaceChanged() {
         guard let panel = viewPanel else { return }
         panel.handOff(because: .left)
@@ -157,29 +166,68 @@ extension Browser {
 
     // MARK: Making a new view
 
-    /// Makes the view of what the window shows, under the name typed or the default one, and shows it. What the view
-    /// cannot keep of the window is said once it exists. A refusal leaves the panel and the name as they are.
-    func makeNewView(from panel: ViewPanel, in library: any ItemLibrary, order: ItemOrder) async {
-        guard let form = panel.form, !form.isBusy else { return }
-        if form.trimmedTitle.isEmpty { form.title = String(localized: "New View") }
-        let window = SavedViews.window(self, in: library, order: order)
-        let settings = SavedViews.newViewSettings(self, in: library)
-        guard library.reachesServer else {
-            library.notices.tell(String(localized: "View Not Made"), String(localized: "Making a view needs your Marfa server, which can’t be reached now. Your changes are still in the window."))
-            return
+    /// Makes the view of what the window shows, under the name typed or the one suggested, and shows it. What the view
+    /// cannot keep of the window is said once it exists. A name another view has, a server that can't be reached and a
+    /// refusal each leave the panel, the name and the window as they are, with the reason in the panel.
+    @discardableResult
+    func makeNewView(from panel: ViewPanel, in library: any ItemLibrary, order: ItemOrder) async -> LibraryView? {
+        guard let form = panel.form, !form.isBusy, !panel.choosesNoSource else { return nil }
+        if form.trimmedTitle.isEmpty { form.title = suggestedViewName(in: library) }
+        if viewNamed(form.trimmedTitle, in: library) != nil {
+            panel.problem = .clash(form.trimmedTitle)
+            return nil
         }
-        guard form.canSubmit else { return }
-        guard let draft = ViewDraft.draft(window, catalogue: library.catalogue, views: library.views) else { return }
-        guard case .done(let view) = await form.submit(draft) else { return }
+        // A view is never queued: offline, it waits in the panel for Create View once the server is back.
+        guard library.reachesServer else {
+            panel.problem = .offline
+            return nil
+        }
+        let window = SavedViews.window(self, in: library, order: order)
+        var settings = SavedViews.newViewSettings(self, in: library)
+        let held: Bool? = if let id = shown.savedView { macSettings(for: id).quickActions } else { placeQuickActions[shown] }
+        settings.quickActions = panel.quickActions ?? held
+        guard form.canSubmit else { return nil }
+        guard var draft = ViewDraft.draft(window, catalogue: library.catalogue, views: library.views) else { return nil }
+        // A starting point's own order is written as it is, never left to the order a layout or a search gives, while
+        // the person has changed neither the sort nor the layout since choosing it. Otherwise the draft's own order stands.
+        if let start = panel.start, let own = start.sort, let chosen = panel.startingValues,
+           tableOptions[shown]?.sort == own.window, viewMode == chosen.layout {
+            draft.sort = own.saved
+        }
+        panel.problem = nil
+        guard case .done(let view) = await form.submit(draft) else {
+            panel.problem = .refused
+            return nil
+        }
         // The view exists now, so the Mac keeps its settings whatever became of the panel meanwhile.
         ViewLayouts.update(in: defaults) { $0.set(settings, for: view.id) }
         // New View's panel named what the view would not keep (`ViewPanelUnkept`), so it is not told again.
-        toldUnkept[view.id] = Set(draft.unkept.filter { if case .search = $0 { false } else if case .relativeFilter = $0 { false } else { true } })
-        guard viewPanel === panel else { return }
+        toldUnkept[view.id] = Set(draft.unkept.filter { !$0.isSaidWhereMade })
+        guard viewPanel === panel else { return view }
         viewPanel = nil
         dropUndoSteps(of: panel)
         if let snapshot = panel.snapshot { restore(snapshot, keepingLayout: true) }
         show(.saved(view.id), in: library, order: order)
+        followView(in: library)
+        return view
+    }
+
+    /// A starting point's tile: one the person already has opens theirs, at once while the new view holds nothing of
+    /// theirs. Otherwise the view it would open is returned, for the person to confirm discarding the new view first.
+    func pickStart(_ start: NewViewStart, in library: any ItemLibrary, order: ItemOrder) -> PlaceView? {
+        guard let theirs = existingView(for: start, in: library) else {
+            chooseStart(start, in: library)
+            return nil
+        }
+        if let panel = viewPanel, isNewViewTouched(panel) { return theirs }
+        openExistingView(theirs, in: library, order: order)
+        return nil
+    }
+
+    /// A starting point the person already has opens theirs, and the new view is dropped as Cancel drops it.
+    func openExistingView(_ place: PlaceView, in library: any ItemLibrary, order: ItemOrder) {
+        escapeViewPanel(in: library)
+        show(place, in: library, order: order)
         followView(in: library)
     }
 
@@ -189,7 +237,11 @@ extension Browser {
     /// shows the copy.
     @discardableResult
     func duplicateView(_ id: ItemID, in library: any ItemLibrary, order: ItemOrder) async -> LibraryView? {
-        guard library.reachesServer, let view = library.views.first(where: { $0.id == id }) else { return nil }
+        guard let view = library.views.first(where: { $0.id == id }) else {
+            library.notices.tell(String(localized: "Can’t Duplicate View"), Self.deletedElsewhere)
+            return nil
+        }
+        guard library.reachesServer else { return nil }
         let settings = LibraryViewSettings(title: String(localized: "\(view.title) Copy"), query: view.query, sort: view.sort, group: view.group)
         guard let copy = await library.createView(settings) else { return nil }
         if let kept = ViewLayouts.stored(in: defaults).settings(for: id) {
@@ -207,14 +259,18 @@ extension Browser {
     /// Whether the open place's rows offer their quick actions: a saved view's choice on this Mac, else the place's
     /// default view's, else the place's own (`ViewMacSettings.showsQuickActions`).
     var showsQuickActions: Bool {
-        let chosen: Bool? = if let id = shown.savedView { macSettings(for: id).quickActions } else { placeQuickActions[shown] }
+        let chosen: Bool? = if let panel = viewPanel, panel.isNew, let new = panel.quickActions { new }
+            else if let id = shown.savedView { macSettings(for: id).quickActions } else { placeQuickActions[shown] }
         return ViewMacSettings.showsQuickActions(chosen, in: shown, scope: listing.scope)
     }
 
     /// Turns the open place's quick actions on or off. A saved view's choice is kept in the app's settings, and a place's
     /// in its default view. Undo takes either back.
     func setShowsQuickActions(_ shows: Bool) {
-        if let id = shown.savedView {
+        // A new view's choice is the panel's until the view exists.
+        if let panel = viewPanel, panel.isNew {
+            panel.quickActions = shows
+        } else if let id = shown.savedView {
             changeViewSettings(id) { $0.quickActions = shows }
         } else if shows != showsQuickActions {
             setPlaceQuickActions(shows, in: shown)
