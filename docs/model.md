@@ -5,8 +5,6 @@ paths:
   - MarfaMac/Model/Items/Item.swift
   - MarfaMac/Model/Items/ItemAllows.swift
   - MarfaMac/Model/Items/ItemMoves.swift
-  - MarfaMac/Model/Place.swift
-  - MarfaMac/Model/EarlierPlaces.swift
   - MarfaMac/Model/Marfa/MarfaMapping*.swift
 ---
 
@@ -30,6 +28,7 @@ Read this before you name, store or show a thing. `docs/concepts.md` says what e
 - **Everything drawn**: marks' colors, chips, symbols, spacing, layouts, and which properties a page or row shows. All of it syncs as this app's settings and touches no item. `docs/settings-sync.md` says where each setting is kept.
 - **Its own choices are defaults until a person changes one**, and only the change is stored, so a better default reaches everyone else.
 - **An option's color comes from its words, and a mark's from its icon** (`OptionTone`, `TypeTone`), because Marfa holds neither and two Macs must agree without a setting.
+- **Trap:** "the app keeps it" does not mean "this Mac keeps it": most of what a person sets follows them (`PreferencesMap.staysOnMac`).
 
 ## Where the app looks at what a type descends from
 
@@ -55,18 +54,6 @@ Two defaults name types: the sidebar's and toolbar's starting set for New, and t
 - **Known gaps:** a queued write can overwrite a change the copy has not yet learned of (withmarfa/marfa#3523, withmarfa/marfa#3528), including one the copy applies between `judge` and the queue, two package calls.
 - **Also open:** two notices when planner and queue skips coincide; one notice per failed rearchive in a bulk Undo of Delete; Delete's toast counts what it planned; Undo of New Item before the item shows.
 - **Archive with what is beneath takes every active item under the selection through `parent-of`** (`archivePlan`). Marfa's own archive reaches no child.
-
-## Places and views
-
-- **A window shows a place and one of its views** (`PlaceView`, `Place`, `ViewChoice`), each stored as a word. An unknown word is kept as written, and an unknown view reads as the place's own.
-- **A window left in a place this copy cannot read** opens where a new window would, and keeps that place until the person moves (`Browser.laterPlace`).
-- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, else the sole collection or source its filter requires. Collection membership uses the item's outbound edge. For the feed tier alone, use the Feed. Otherwise use the Library.
-- **A window follows its view to a new place,** with what it keeps for the view (`PlaceMemory`). Views sort by the app's order (`ViewOrders`), then title.
-- **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
-- **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
-- **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
-- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`), at launch and after each settings sync, where the new keys leave it unset. Each earlier entry is read in once on each Mac, and stays for those copies. The Library takes All Items' settings, filled from Recents'. Include Subtypes is not read in.
-- **A window's snapshot and Start With have slots of their own** (`window`, `opening`, `openingLastPlace`). An earlier window of a place that still exists keeps its open item and scroll position, and one favorite opens where that item is listed. Files is no place: the person is told once.
 
 ## Vocabulary
 
@@ -105,8 +92,3 @@ Use these words in names, strings and comments. A word with "Marfa" is the serve
 | Toast | App | The short message with Undo (`ToastView`) |
 | Keycap | App | A key drawn by the app (`KeyCap`) |
 | Settings window | App | The window that holds the app's settings and the Marfa's (`SettingsWindowView`) |
-
-## Storage
-
-- **On this Mac** means a value that never leaves it. `PreferencesMap.staysOnMac` is the whole list, and a test fails if a key is in neither list.
-- **Trap:** "the app keeps it" does not mean "this Mac keeps it". Widths of columns, the last place open and per-Marfa export plans stay; nearly everything else a person sets follows them.

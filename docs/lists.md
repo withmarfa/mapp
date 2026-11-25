@@ -2,6 +2,7 @@
 summary: The rules of views, layouts, grouping, filters, properties, indexes and search, and what Marfa can save of them.
 paths:
   - MarfaMac/Model/Browser+*.swift
+  - MarfaMac/Model/EarlierPlaces.swift
   - MarfaMac/Model/View*.swift
   - MarfaMac/Model/ItemViewMode.swift
   - MarfaMac/Model/Items/Filter*.swift
@@ -30,6 +31,11 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current**, because a copy that is filling also lacks things.
 - **Save as View saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type, which Marfa takes with its kinds, and an exact-type condition only with Include Kinds off; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and a view's become the window's (`ViewDraft`).
 - **Making, renaming and deleting a view needs the server.** A view has no bin, so deleting one asks.
+- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, else the sole collection or source its filter requires. Collection membership uses the item's outbound edge. For the feed tier alone, use the Feed. Otherwise use the Library.
+- **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
+- **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
+- **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
+- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`), at launch and after each settings sync, where the new keys leave it unset. Each earlier entry is read in once on each Mac, and stays for those copies. The Library takes All Items' settings, filled from Recents'. Include Subtypes is not read in.
 
 ## Layouts
 

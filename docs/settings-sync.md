@@ -30,8 +30,8 @@ paths:
 - **The type can never change shape.** Only the client that registered it may replace it, and every Mac is another client (withmarfa/marfa#3462). A new setting is a new member of a field or a new `setting` word in a table.
 - **Two Macs that change different settings both keep their change.** A field is written by member and a table by row, so split a value into rows where its parts change apart. A list whose order matters is one row, and the later arrangement wins whole.
 - **A set is written sorted**, so saving it again is not a change.
-- **What is kept for a place is keyed by its word** (`PlaceView.storageKey`), and for a saved view by its id, since its place can change. Each place's order of views is a `viewOrder` row (`ViewOrders`).
-- **An earlier copy's keys for a place are never removed** (`EarlierPlace`). An earlier copy that rewrites a `viewLayout` row drops `quickActions`, and one that rewrites a `placeDefaults` row drops `scope`, `archived` and `includesKinds`; that is accepted.
+- **What is kept for a place is keyed by its word** (`PlaceView.storageKey`), and for a saved view by its id, as its place can change; an earlier copy's keys are never removed (`EarlierPlace`).
+- **An earlier copy drops members it does not know** from a row it rewrites, which is accepted: `quickActions` in `viewLayout`; `scope`, `archived` and `includesKinds` in `placeDefaults`.
 - **A sign-in asks for `app.*:write`, never the app's own vendor scope**, because discovery lists no vendor scope before its first type exists (withmarfa/marfa#3522).
 
 ## The first launch against a Marfa

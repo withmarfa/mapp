@@ -1,6 +1,7 @@
 ---
 summary: The rules of the sidebar, toolbar, corner, menus, palettes, opening an item, the modal and item links.
 paths:
+  - MarfaMac/Model/Place.swift
   - MarfaMac/Model/Sidebar*.swift
   - MarfaMac/Model/ItemOpening.swift
   - MarfaMac/Model/ItemLink*.swift
@@ -15,6 +16,13 @@ paths:
 
 `docs/look.md` has the window's areas. `docs/commands.md` has every command and shortcut.
 
+## Places
+
+- **A window shows a place and one of its views** (`PlaceView`, `Place`, `ViewChoice`), each stored as a word. An unknown word is kept as written, and an unknown view reads as the place's own.
+- **A window left in a place this copy cannot read** opens where a new window would, and keeps that place until the person moves (`Browser.laterPlace`).
+- **A window follows its view to a new place,** with what it keeps for the view (`PlaceMemory`). Views sort by the app's order, a synced `viewOrder` row (`ViewOrders`), then title.
+- **A window's snapshot and Start With have slots of their own** (`window`, `opening`, `openingLastPlace`). An earlier window of a place that still exists keeps its open item and scroll position, and one favorite opens where that item is listed. Files is no place: the person is told once.
+
 ## Sidebar
 
 - **A person arranges the sidebar in place** (`SidebarLayout`): tabs, sections, order, colors and what is hidden. A place the layout does not name, such as a new type, shows after the rest.
@@ -22,8 +30,8 @@ paths:
 - **A shortcut acts, or goes somewhere, and is not a place** (`SidebarShortcut`). Search and New are shortcuts.
 - **A row's menu is AppKit's** (`SidebarPlaceMenu`), because SwiftUI menus cannot hold the color swatches.
 - **Go lists the same places, views and types** (`GoMenu`), hidden types too, so a window without its sidebar reaches them.
-- **A sidebar row opens a place or one of its views.** A saved view opens at its home. See [Places and views](model.md#places-and-views).
-- **The Library and the Feed keep the keys earlier copies gave All Items and Inbox** (`all`, `inbox`), so an arranged sidebar reads unchanged. A Recents row reads as nothing and stays stored. A section of a kind this copy does not know is left out of the sidebar alone, and written back where it was; a sidebar of only those shows no sections.
+- **A sidebar row opens a place or one of its views.** A saved view opens at its home ([Two kinds of view](lists.md#two-kinds-of-view)).
+- **The Library and the Feed keep the keys earlier copies gave All Items and Inbox** (`all`, `inbox`), so an arranged sidebar reads unchanged. A Recents row reads as nothing and stays stored. A section of a kind this copy does not know is left out alone and written back where it was; with only those, the sidebar shows no sections.
 - **Recently Deleted is a page of Settings**, never a row.
 
 ## Toolbar
