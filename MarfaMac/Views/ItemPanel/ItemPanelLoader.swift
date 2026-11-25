@@ -15,7 +15,6 @@ struct ItemPanelLoader<Legacy: View>: View {
     @ViewBuilder let legacy: Legacy
     @State private var textFacts: PanelTextFacts?
     @State private var pdf: PanelPDFFacts?
-    @State private var history = PanelHistory()
 
     private var isPDF: Bool { item.fileType.flatMap(FileViewKind.of) == .pdf }
 
@@ -35,7 +34,7 @@ struct ItemPanelLoader<Legacy: View>: View {
             links: PanelLinks.groups(of: item, in: library, relationships: relationships, mentions: mentions, format: dateFormat),
             info: PanelInfoModel(
                 item: item, source: item.source.map { library.sources.info($0).name },
-                version: library.itemVersion(id) ?? item.version, pages: pdf?.pages, moves: moves, history: history,
+                version: library.itemVersion(id) ?? item.version, pages: pdf?.pages, moves: moves,
                 move: { library.perform($0 == .library ? .keep : .moveToFeed, on: [id], undoManager: undoManager, details: details) }),
             onOpen: onOpen,
             onHeading: { editor?.revealHeading(at: $0) },

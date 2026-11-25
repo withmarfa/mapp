@@ -28,7 +28,7 @@ struct ItemPanel<Legacy: View>: View {
         let shown = remembered.shown(of: item.type, among: parts) ?? .info
         VStack(alignment: .leading, spacing: 0) {
             if parts.count > 1 {
-                PanelPills(parts: parts, shown: shown) { remembered.choose($0, for: item.type) }
+                PanelPills(parts: parts, shown: shown) { PanelParts.choose($0, for: item.type) }
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {

@@ -35,6 +35,8 @@ nonisolated final class FakeSourceNames: SourceNameSource {
         return counts
     }
 
+    func connectors() async throws(SourceEditFailure) -> ConnectorKeepers { ConnectorKeepers() }
+
     func update(_ code: String, name: SourceFieldChange?, mark: SourceFieldChange?) async throws(SourceEditFailure) -> SourceInfo {
         if let failure = state.withLock({ $0.failure }) { throw failure }
         return state.withLock { state in

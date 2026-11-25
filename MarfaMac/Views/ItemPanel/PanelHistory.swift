@@ -1,38 +1,46 @@
 import Foundation
 import Observation
 
-/// The versions the panel's History lists. They are asked for only while Info shows, once for each version of an item,
-/// so another selection or an edit starts a new read and a return to Info reads nothing again. An item at version 1 has
-/// no earlier version to ask for.
+/// The versions the panel's History lists, kept beyond the life of the view that asked, so leaving Info or choosing another
+/// item and coming back reads nothing again. One read for each version of an item; an edit is a new version and starts a
+/// new read. The newest few are kept. A read that failed is made again when Info shows. An item at version 1 has no earlier
+/// version to ask for.
 @MainActor @Observable
 final class PanelHistory {
     /// Most earlier versions drawn before Show All.
     static let shown = 10
+    /// How many items' reads are kept.
+    static let capacity = 8
 
-    private struct Key: Equatable {
+    static let shared = PanelHistory()
+
+    private struct Key: Hashable {
+        let library: ObjectIdentifier
         let item: ItemID
         let version: ItemVersion
     }
 
-    private(set) var model: ItemHistoryModel?
-    @ObservationIgnored private var key: Key?
+    private var reads: [Key: ItemHistoryModel] = [:]
+    @ObservationIgnored private var order: [Key] = []
 
-    /// Reads the versions of `item` at `version` unless they are already read or on their way.
-    func ask(_ item: ItemID, version: ItemVersion, in library: any ItemLibrary) {
-        let wanted = Key(item: item, version: version)
-        guard key != wanted else { return }
-        stop()
-        key = wanted
-        guard version.rawValue > 1 else { return }
-        let model = ItemHistoryModel(id: item, source: library.history)
-        self.model = model
-        model.load()
+    /// The read for `item` at `version` in the library, once asked for.
+    func model(of item: ItemID, version: ItemVersion, in library: any ItemLibrary) -> ItemHistoryModel? {
+        reads[Key(library: ObjectIdentifier(library), item: item, version: version)]
     }
 
-    func stop() {
-        model?.cancel()
-        model = nil
-        key = nil
+    /// Reads the versions of `item` at `version` unless they are already read, or on their way.
+    func ask(_ item: ItemID, version: ItemVersion, in library: any ItemLibrary) {
+        guard version.rawValue > 1 else { return }
+        let key = Key(library: ObjectIdentifier(library), item: item, version: version)
+        if let held = reads[key] {
+            if case .failed = held.phase { held.load() }
+            return
+        }
+        let model = ItemHistoryModel(id: item, source: library.history)
+        reads[key] = model
+        order.append(key)
+        while order.count > Self.capacity { reads.removeValue(forKey: order.removeFirst())?.cancel() }
+        model.load()
     }
 
     /// The symbol that stands for who wrote a version, by the kind of sign-in. The name beside it says which.

@@ -311,6 +311,10 @@ protocol ItemLibrary: AnyObject, Observable {
     var sources: SourceDirectory { get }
     /// Asks the server for the sources' names, marks and counts again; a failed ask keeps what was read before.
     func refreshSources() async
+    /// What the server's connectors say of the types they write, once read; nil before, and while it cannot be reached.
+    var connectors: ConnectorKeepers? { get }
+    /// Reads `connectors` once for the library. A later call reads nothing, and a failed read is made again by the next.
+    func readConnectors() async
     /// Renames the source `code` or changes its mark, for every app; a field left nil stays. Nil on success; otherwise
     /// why not, in words for the person.
     func updateSource(_ code: String, name: SourceFieldChange?, mark: SourceFieldChange?) async -> SourceEditFailure?
@@ -329,6 +333,8 @@ extension ItemLibrary {
     func textIsEmpty(_ id: ItemID) -> Bool { body(of: id)?.text.isEmpty ?? true }
     func bodyText(_ id: ItemID) -> String? { body(of: id)?.text }
     func boundEmbeds(of id: ItemID) -> [BoundEmbed] { item(id)?.boundEmbeds ?? [] }
+    var connectors: ConnectorKeepers? { nil }
+    func readConnectors() async {}
     var downloadedFiles: (any DownloadedFiles)? { nil }
     func downloadEverythingAgain() {}
     func instanceID() async -> String? { nil }

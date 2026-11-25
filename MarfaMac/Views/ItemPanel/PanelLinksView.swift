@@ -40,7 +40,7 @@ private struct PanelLinkRow: View {
         Button { onOpen(link.item) } label: {
             HStack(spacing: 8) {
                 Group {
-                    if let status = link.status { StatusMark(group: status, size: 14) } else { TonedGlyph(id: link.icon) }
+                    if let status = link.status { StatusMark(group: status, scale: scale) } else { TonedGlyph(id: link.icon) }
                 }
                 .frame(width: 16)
                 Text(verbatim: link.title)

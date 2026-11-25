@@ -14,30 +14,49 @@ nonisolated enum PanelPart: String, CaseIterable, Sendable {
 }
 
 /// The part of the panel each type last showed, so a person who stays on Links stays there for every item of the type.
-/// Kept in the app's settings as one value (`PreferencesMap`), one row for each type.
+/// Kept in the app's settings as one value (`PreferencesMap`), one row for each type. Each row is held as it was stored,
+/// so a row this version cannot read and a member or a word a later copy wrote are still there when a choice is saved.
 nonisolated struct PanelParts: Equatable, Sendable {
     static let key = "panelParts"
     /// Each entry is stored text that could not be read, in the order it was found.
     static let setAsideKey = "panelPartsSetAside"
 
-    /// What one type keeps. A member is optional so a copy saved before it existed still reads.
-    struct Choice: Codable, Equatable, Sendable {
-        var part: String?
+    private static let partMember = "part"
+
+    private(set) var rows: [String: StoredJSON]
+
+    init(_ rows: [String: StoredJSON] = [:]) {
+        self.rows = rows
     }
 
-    private(set) var choices: [String: Choice]
-
-    init(_ choices: [String: Choice] = [:]) {
-        self.choices = choices.filter { $0.value.part != nil }
-    }
-
-    /// The part `type` last showed. A word this version does not know is no choice.
+    /// The part `type` last showed. A word this version does not know, or a row it cannot read, is no choice.
     func part(of type: TypeID) -> PanelPart? {
-        choices[type.rawValue]?.part.flatMap(PanelPart.init(rawValue:))
+        guard case .object(let members)? = rows[type.rawValue], case .string(let word)? = members[Self.partMember] else { return nil }
+        return PanelPart(rawValue: word)
     }
 
-    mutating func choose(_ part: PanelPart, for type: TypeID) {
-        choices[type.rawValue] = Choice(part: part.rawValue)
+    /// Whether the row of `type` is one this version can read: an object whose part, if it has one, is a word.
+    private func isReadable(_ row: StoredJSON) -> Bool {
+        guard case .object(let members) = row else { return false }
+        switch members[Self.partMember] {
+        case nil, .string?: return true
+        default: return false
+        }
+    }
+
+    /// Chooses `part` for `type`, keeping every other member of its row. Returns the text of a row this version could not
+    /// read that the choice replaced, for the caller to set aside.
+    @discardableResult
+    mutating func choose(_ part: PanelPart, for type: TypeID) -> String? {
+        let name = type.rawValue
+        var members: [String: StoredJSON] = [:]
+        var displaced: String?
+        if let row = rows[name] {
+            if isReadable(row), case .object(let kept) = row { members = kept } else { displaced = row.text }
+        }
+        members[Self.partMember] = .string(part.rawValue)
+        rows[name] = .object(members)
+        return displaced
     }
 
     /// The part to show among those the item has: the one the type last showed, else the first.
@@ -49,15 +68,28 @@ nonisolated struct PanelParts: Equatable, Sendable {
 
 /// The settings as `@AppStorage` keeps them: JSON with sorted keys, so the same choice is the same text.
 nonisolated extension PanelParts: RawRepresentable {
-    var rawValue: String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        return (try? encoder.encode(choices)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-    }
+    var rawValue: String { StoredJSON.object(rows).text }
 
     init?(rawValue: String) {
-        guard let choices = try? JSONDecoder().decode([String: Choice].self, from: Data(rawValue.utf8)) else { return nil }
-        self.init(choices)
+        guard let rows = try? JSONDecoder().decode([String: StoredJSON].self, from: Data(rawValue.utf8)) else { return nil }
+        self.init(rows)
+    }
+}
+
+nonisolated extension PanelParts {
+    static func stored(in defaults: UserDefaults = .standard) -> PanelParts {
+        defaults.string(forKey: key).flatMap(PanelParts.init(rawValue:)) ?? PanelParts()
+    }
+
+    /// Remembers `part` for `type`. Stored text that is not a map of rows, and a row the choice replaces that this version
+    /// cannot read, are set aside before they are written over.
+    static func choose(_ part: PanelPart, for type: TypeID, in defaults: UserDefaults = .standard) {
+        var aside: [String] = []
+        if let text = defaults.string(forKey: key), PanelParts(rawValue: text) == nil { aside.append(text) }
+        var value = stored(in: defaults)
+        if let displaced = value.choose(part, for: type) { aside.append(displaced) }
+        if !aside.isEmpty { defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + aside, forKey: setAsideKey) }
+        defaults.set(value.rawValue, forKey: key)
     }
 }
 

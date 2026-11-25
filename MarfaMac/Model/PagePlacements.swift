@@ -26,8 +26,38 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         /// own order after those named. Nil follows the default order. Optional so a choice saved before ordering
         /// existed still decodes.
         var rowOrder: [String]?
+        /// Every member this version does not name, as it was stored: an older or a later copy wrote it, and rewriting the
+        /// row keeps it.
+        var others: [String: StoredJSON] = [:]
 
-        var isEmpty: Bool { rows.isEmpty && linkedFrom == nil && pins == nil && rowOrder == nil }
+        var isEmpty: Bool { rows.isEmpty && linkedFrom == nil && pins == nil && rowOrder == nil && others.isEmpty }
+
+        init(rows: [String: Bool] = [:], linkedFrom: LinkedFromPlace? = nil, pins: [String]? = nil, rowOrder: [String]? = nil) {
+            self.rows = rows
+            self.linkedFrom = linkedFrom
+            self.pins = pins
+            self.rowOrder = rowOrder
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: DynamicKey.self)
+            rows = try container.decodeIfPresent([String: Bool].self, forKey: DynamicKey("rows")) ?? [:]
+            linkedFrom = try container.decodeIfPresent(LinkedFromPlace.self, forKey: DynamicKey("linkedFrom"))
+            pins = try container.decodeIfPresent([String].self, forKey: DynamicKey("pins"))
+            rowOrder = try container.decodeIfPresent([String].self, forKey: DynamicKey("rowOrder"))
+            others = try container.members(except: Self.known)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: DynamicKey.self)
+            try container.encode(rows, forKey: DynamicKey("rows"))
+            try container.encodeIfPresent(linkedFrom, forKey: DynamicKey("linkedFrom"))
+            try container.encodeIfPresent(pins, forKey: DynamicKey("pins"))
+            try container.encodeIfPresent(rowOrder, forKey: DynamicKey("rowOrder"))
+            for (name, value) in others { try container.encode(value, forKey: DynamicKey(name)) }
+        }
+
+        private static let known: Set<String> = ["rows", "linkedFrom", "pins", "rowOrder"]
     }
 
     /// By type identifier.

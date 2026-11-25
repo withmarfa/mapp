@@ -11,7 +11,6 @@ struct PanelInfoModel {
     var pages: Int?
     /// Which of Library and Feed the item may move to, or nil where it may not move at all.
     var moves: Set<Tier>?
-    let history: PanelHistory
     let move: (Tier) -> Void
 }
 
@@ -24,25 +23,31 @@ struct PanelInfoView<Legacy: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let line = PanelKeptBy.line(of: model.item, source: model.source) { keptBy(line) }
+            if let line = PanelKeptBy.line(of: model.item, source: model.source, direction: direction) { keptBy(line) }
             PanelFacts(
                 facts: PanelInfo.facts(of: model.item, source: model.source, version: model.version, pages: model.pages, format: dateFormat),
                 trailing: (String(localized: "In"), AnyView(placeControl)))
             historySection
             legacy
         }
-        .task(id: model.version) { model.history.ask(model.item.id, version: model.version, in: library) }
-        .onDisappear { model.history.stop() }
+        .task { await library.readConnectors() }
+        .task(id: model.version) { PanelHistory.shared.ask(model.item.id, version: model.version, in: library) }
     }
 
     // MARK: Who keeps it
 
+    /// How the connector that wrote the item moves items of its type, once the server has said.
+    private var direction: ConnectorDirection? {
+        guard let source = model.item.source else { return nil }
+        return library.connectors?.direction(source: source, type: model.item.type)
+    }
+
     /// Said once at the top, with the reason the item's allowances give.
-    private func keptBy(_ line: String) -> some View {
+    private func keptBy(_ line: PanelKeptLine) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "lock").foregroundStyle(.tertiary).accessibilityHidden(true)
-                Text(verbatim: line)
+                Image(systemName: line.symbol).foregroundStyle(.tertiary).accessibilityHidden(true)
+                Text(verbatim: line.text)
             }
             .interfaceFont(.callout)
             .foregroundStyle(.secondary)
@@ -92,7 +97,7 @@ struct PanelInfoView<Legacy: View>: View {
 
     @ViewBuilder private var historySection: some View {
         let version = Int(model.version.rawValue)
-        if let history = model.history.model, version > 1 {
+        if let history = PanelHistory.shared.model(of: model.item.id, version: model.version, in: library), version > 1 {
             let entries = VersionThread.entries(
                 snapshots: history.snapshots, current: model.item, currentText: nil, in: library.catalogue)
             let earlier = Array(entries.dropFirst())

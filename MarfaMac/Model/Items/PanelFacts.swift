@@ -92,14 +92,29 @@ nonisolated enum PanelInfo {
     }
 }
 
-/// The line Info says once at the top of an item a connector keeps and would put changes back on. It reads the reason the
-/// item's allowances give (`Item.obstacle(to:)`), so the page, the commands and this line never disagree about what is
-/// locked. Whether a connector that carries changes back keeps the item too is not told without an owner's call, so only
-/// the read-only case has a line.
+/// The line Info says once at the top of an item a connector keeps: its symbol and its words.
+nonisolated struct PanelKeptLine: Equatable, Sendable {
+    let symbol: String
+    let text: String
+}
+
+/// Who keeps an item, said once at the top of Info. A connector that only reads in makes the item Read Only, and one that
+/// carries changes both ways says the item is Synced With it. Where the server's connectors are not known (not read yet, or
+/// offline), the line is the item's own allowances alone (`Item.obstacle(to:)`), so the page, the commands and this line
+/// never disagree about what is locked; only the read-only case has one then.
 nonisolated enum PanelKeptBy {
-    static func line(of item: Item, source: String?) -> String? {
-        guard item.obstacle(to: .fields) == .readOnly else { return nil }
-        guard let source else { return String(localized: "Read only. A connector keeps this item, so a change made here would be overwritten.") }
-        return String(localized: "Read only. \(source) keeps this item, so a change made here would be overwritten.")
+    /// `direction` is how the connector that wrote the item moves items of its type, where the server has said.
+    static func line(of item: Item, source: String?, direction: ConnectorDirection?) -> PanelKeptLine? {
+        switch direction {
+        case .into?: readOnly(source)
+        case .both?: source.map { PanelKeptLine(symbol: "arrow.triangle.2.circlepath", text: String(localized: "Synced With \($0).")) }
+        case .out?, nil: item.obstacle(to: .fields) == .readOnly ? readOnly(source) : nil
+        }
+    }
+
+    private static func readOnly(_ source: String?) -> PanelKeptLine {
+        let text = source.map { String(localized: "Read only. \($0) keeps this item, so a change made here would be overwritten.") }
+            ?? String(localized: "Read only. A connector keeps this item, so a change made here would be overwritten.")
+        return PanelKeptLine(symbol: "lock", text: text)
     }
 }

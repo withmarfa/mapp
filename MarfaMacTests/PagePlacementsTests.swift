@@ -105,6 +105,16 @@ struct PagePlacementsTests {
         #expect(PagePlacements(rawValue: #"{"aic.ticket":{"linkedFrom":"somewhere"}}"#) == nil)
     }
 
+    @Test func aMemberThisVersionDoesNotReadSurvivesARewrite() throws {
+        let stored = #"{"aic.ticket":{"linkedFrom":"inspector","rows":{"repo":false},"sidebar":["details","tags"]}}"#
+        var placements = try #require(PagePlacements(rawValue: stored))
+        placements.setShown(true, row: "repo", of: Self.ticket)
+        placements.setShown(false, row: "github_id", of: Self.comment)
+        #expect(
+            placements.rawValue
+                == #"{"aic.comment":{"rows":{"github_id":false}},"aic.ticket":{"linkedFrom":"inspector","rows":{"repo":true},"sidebar":["details","tags"]}}"#)
+    }
+
     @Test func theDefaultsHoldTheChoicesUnderOneKey() throws {
         let defaults = ThrowawayDefaults.make("MarfaMac.PagePlacementsTests")
         #expect(PagePlacements.stored(in: defaults) == PagePlacements())

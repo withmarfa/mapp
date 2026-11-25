@@ -21,6 +21,13 @@ extension MarfaLibrary {
         }
     }
 
+    func readConnectors() async {
+        guard connectors == nil, !isReadingConnectors, let sourceNames else { return }
+        isReadingConnectors = true
+        defer { isReadingConnectors = false }
+        connectors = try? await sourceNames.connectors()
+    }
+
     func updateSource(_ code: String, name: SourceFieldChange?, mark: SourceFieldChange?) async -> SourceEditFailure? {
         guard let sourceNames else { return .unsupported }
         do {
