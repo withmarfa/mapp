@@ -6,6 +6,10 @@ import Observation
 @Observable
 final class Browser {
     var showing: PlaceView? = .library {
+        // A new view's words are worked out while the window still shows the place it began on.
+        willSet {
+            if !(newValue.map { $0.isSame(showing) } ?? (showing == nil)) { viewPanel?.settleHandOffText() }
+        }
         // A scroll position belongs to the place and layout it was made in.
         didSet {
             // A saved view that moves to another home is still what the window shows.
@@ -456,6 +460,7 @@ final class Browser {
         Browser.open.add(self)
         if let undoManager { self.undoManager = undoManager }
         guard libraryID != id else { return }
+        viewPanel?.settleHandOffText()
         self.library = library
         let isFirst = libraryID == nil
         libraryID = id
@@ -645,7 +650,8 @@ final class Browser {
     @ObservationIgnored var pendingViewWrites: Set<ItemID> = []
     /// What names this window's own changes among those kept offline (`PendingViewChanges`).
     @ObservationIgnored let pendingOwner = UUID().uuidString
-    @ObservationIgnored var toldOffline: Set<ItemID> = []
+    /// Views with a change waiting for the server, which their pills say on hover.
+    var toldOffline: Set<ItemID> = []
     @ObservationIgnored var toldUnkept: [ItemID: Set<ViewDraft.Unkept>] = [:]
     /// Each view's groups this window replaced, by field, so grouping by that field again (an Undo, or a choice made
     /// back) gives back the groups another app ordered and hid there.

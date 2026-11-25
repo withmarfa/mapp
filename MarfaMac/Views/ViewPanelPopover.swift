@@ -82,6 +82,8 @@ struct ViewPanelPopover: View {
         .onExitCommand {
             if panel.page != .main { panel.page = .main } else { browser.escapeViewPanel(in: library) }
         }
+        // A new view holding the person's work stays until they make it or cancel it.
+        .interactiveDismissDisabled(browser.keepsNewViewOpen)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ViewPanel")
     }
@@ -89,7 +91,8 @@ struct ViewPanelPopover: View {
     @ViewBuilder private var page: some View {
         VStack(alignment: .leading, spacing: 0) {
             switch panel.page {
-            case .main: ViewPanelMain(browser: browser, panel: panel)
+            case .main:
+                if panel.isNew { NewViewPage(browser: browser, panel: panel) } else { ViewPanelMain(browser: browser, panel: panel) }
             case .types: ViewPanelTypes(browser: browser, panel: panel)
             case .filter: ViewPanelFilter(browser: browser, panel: panel)
             case .sort: ViewPanelSort(browser: browser, panel: panel)
@@ -105,7 +108,6 @@ struct ViewPanelPopover: View {
 /// Actions, then the foot line.
 private struct ViewPanelMain: View {
     @CurrentLibrary private var library
-    @StoredOrder private var order
     @Bindable var browser: Browser
     @Bindable var panel: ViewPanel
 
@@ -132,31 +134,25 @@ private struct ViewPanelMain: View {
                     .accessibilityIdentifier("ViewPanelQuickActions")
             }
         }
-        if panel.isNew {
-            ViewPanelUnkept(browser: browser)
-            ViewPanelNewFoot(browser: browser, panel: panel)
-        } else {
-            ViewPanelFoot(text: panel.purpose == .place ? ViewPanelKeeping.mac : ViewPanelKeeping.savedViewOverview)
-        }
+        ViewPanelFoot(text: panel.purpose == .place ? ViewPanelKeeping.mac : ViewPanelKeeping.savedViewOverview)
     }
 }
 
-/// The head of the first page: the view's name, a field while it is renamed or made, and More.
+/// The head of the first page: the view's name, a field while it is renamed, and More.
 private struct ViewPanelNameHead: View {
     @CurrentLibrary private var library
-    @StoredOrder private var order
     @Environment(Libraries.self) private var libraries
     @Bindable var browser: Browser
     @Bindable var panel: ViewPanel
     @FocusState private var nameFocused: Bool
 
     var body: some View {
-        if panel.isNew || panel.isRenaming {
+        if panel.isRenaming {
             HStack {
                 TextField("View Name", text: $panel.shownName)
                     .textFieldStyle(.roundedBorder)
                     .focused($nameFocused)
-                    .onSubmit { submit() }
+                    .onSubmit { commitRename() }
                     .accessibilityIdentifier("ViewPanelName")
             }
             .frame(minHeight: ViewPanelMetrics.rowHeight)
@@ -212,14 +208,6 @@ private struct ViewPanelNameHead: View {
         .foregroundStyle(.secondary)
         .help("More")
         .accessibilityIdentifier("ViewPanelMore")
-    }
-
-    private func submit() {
-        if panel.isNew {
-            Task { await browser.finishViewPanel(in: library, order: order) }
-        } else {
-            commitRename()
-        }
     }
 
     private func commitRename() {
@@ -379,7 +367,7 @@ private struct ViewPanelOpeningRow: View {
 }
 
 /// What a new view will not keep of the window, so nothing is a surprise once it is made.
-private struct ViewPanelUnkept: View {
+struct ViewPanelUnkept: View {
     @CurrentLibrary private var library
     @StoredOrder private var order
     let browser: Browser
@@ -399,35 +387,6 @@ private struct ViewPanelUnkept: View {
             }
             .accessibilityIdentifier("ViewPanelUnkept")
         }
-    }
-}
-
-/// The foot of a new view's panel: Cancel, which puts the place back as it was, and Create View.
-private struct ViewPanelNewFoot: View {
-    @CurrentLibrary private var library
-    @StoredOrder private var order
-    let browser: Browser
-    @Bindable var panel: ViewPanel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Divider()
-            Text(verbatim: ViewPanelKeeping.savedViewOverview)
-                .interfaceFont(.callout)
-                .foregroundStyle(.secondary)
-            HStack {
-                Spacer()
-                Button("Cancel") { browser.escapeViewPanel(in: library) }
-                    .accessibilityIdentifier("ViewPanelCancel")
-                Button("Create View") { Task { await browser.finishViewPanel(in: library, order: order) } }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(panel.form?.isBusy == true || !library.reachesServer)
-                    .accessibilityIdentifier("ViewPanelCreate")
-            }
-        }
-        .padding(.horizontal, ViewPanelMetrics.inset)
-        .padding(.top, 4)
-        .padding(.bottom, 10)
     }
 }
 

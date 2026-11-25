@@ -63,24 +63,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The row of views | Pills in an order the app keeps for each place; a pill is dragged, and its menu has Hide. Past the room, N More, whose menu ends with New View…. A place with one view has no row. | `ListToolbar.swift`, `ViewMacSettings` | `Rethink-Top-Row-Lists`, `Rethink-View-Menu` |
-| A changed view | A change is written as it is made. The pill's dot shows while the view differs from how it was when last opened on the Mac. Revert View puts that back; Save as New View… makes another. | `Browser+ViewWrites.swift`, `Browser+SavedViews.swift` | `Rethink-View-Changed` |
-| Offline | A change to a view waits, and the pill says so on hover. A new view waits too. | `Browser+ViewWrites.swift` | `Rethink-Offline` |
 | Groupings to come | By collection and by tag, with the order of a date's groups following the sort. | `GroupOffer`, `GroupMode` | `Rethink-View-Group` |
-
-## Making a view
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-| The plus | Opens one panel where the View panel stands; the view is its pill at once, and the list shows what it will list. Starting points that fit the place, then one sentence of values, a suggested name, Add to Sidebar and Quick Actions, and Create View. | `ViewDraft`, `SavedViews.swift` | `Rethink-New-View`, `Rethink-New-View-First`, `Rethink-New-View-Chosen`, `Rethink-New-View-Types`, `Rethink-New-View-Value`, `Rethink-New-View-Inbox` |
-| Starting points | Recently Added, Favorites, a layout that fits the fields, In the Feed, Blank. One a person already has opens theirs. | `ViewDraft` | `Rethink-New-View-First` |
-| While searching | The new view starts from the search: its tokens are the filter, and its first starting point is This Search. | `SearchNarrowing`, `ViewDraft` | `Rethink-Search-Items` |
-| Naming | A pill is renamed in place, and its menu has Rename…, Duplicate, Hide and Delete View…. | `SavedViewCommands.swift` | `Rethink-View-Menu` |
-
-## Search
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
 
 ## Making an item
 

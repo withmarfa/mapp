@@ -27,20 +27,21 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 ## Two kinds of view
 
 - **A place's default view is the app's** (`PlaceDefaults`). Every change is kept as it is made, and Reset View puts the place back. Types, Collections and Sources have none.
-- **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest (`ViewMacSettings` in `ViewLayouts`): layout, properties, cards, density, week or month and column widths.
+- **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest, such as layout and properties (`ViewMacSettings` in `ViewLayouts`).
 - **A change to a saved view is written as it is made** (`Browser+ViewWrites`), naming only the settings that changed.
-- **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits (`PendingViewChanges`) by setting, so two windows keep theirs, through closing and quitting. A refused one goes to the clipboard in words.
-- **Revert View writes back each setting the window changed as Marfa held it at opening** (`openedView`), whole. One another app changed since, as Marfa holds it, stays, and the person is told.
-- **The window lists what it shows while a change waits:** while its filters, From or Archived Items differ from the view's, it reads the view's query with its own choices (`viewPreview`).
+- **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits by setting (`PendingViewChanges`), through closing and quitting. A refused one goes to the clipboard in words.
+- **Revert View writes back each setting the window changed as Marfa held it at opening** (`openedView`), whole. One another app changed since stays, and the person is told.
+- **While a change waits, the window lists the view's query with its own filters, From and Archived Items** (`viewPreview`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
-- **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds, and an exact-type condition only with Include Kinds off; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and the reverse (`ViewDraft`).
-- **Making, renaming and deleting a view needs the server.** A rename never replaces another app's; a view has no bin, so deleting one asks.
-- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, else the sole collection or source its filter requires. Collection membership uses the item's outbound edge. For the feed tier alone, use the Feed. Otherwise use the Library.
+- **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`).
+- **Making, renaming and deleting a view needs the server and is never queued.** An unmade view stays in its panel. A changed or submitted draft stays open; leaving it, or a late refusal, gives it back in words. A rename never replaces another app's; deleting asks.
+- **Starting points are what Marfa saves exactly** (`NewViewStart`), and list their own items while chosen. This Search, first while searching, takes the sayable tokens, From as the tier, unless the From changed. One the person has opens theirs, asking first if the draft changed.
+- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
-- **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
+- **Favorites has an ordinary From,** starting on Library; a person may choose All Items.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
-- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`), at launch and after each settings sync, once on each Mac, where the new keys leave it unset. The earlier entry stays for those copies.
+- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`) once on each Mac, where they are unset, and stays for those copies.
 
 ## Layouts
 
@@ -52,11 +53,11 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse a drop: no single value is meant.
-- **A table's widths are stored only from a drag of a divider** (`keepWidths`), never from AppKit's own layout, which changes without the person.
+- **A table's widths are stored only from a drag of a divider** (`keepWidths`), never from AppKit's layout, which changes by itself.
 
 ## The View panel
 
-- **The View button opens the panel** (`ViewPanelPopover`). Filter, Sort, Group, Properties, and Types each have a page. The footer shows where settings are saved.
+- **The View button opens the panel** (`ViewPanelPopover`). The footer, or a new view's one line, says where settings are saved. Add to Sidebar starts off; Quick Actions shows only for the Feed.
 
 ## Grouping
 
@@ -108,7 +109,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 ## Search
 
-- **A search is narrowed in the query, never after it** (`SearchNarrowing`), except a token Marfa cannot say (`ItemTableContent`). Marfa limits its answers; counting the limit first would hide matches. More conditions than a query takes are refused and named.
+- **A search is narrowed in the query, never after it** (`SearchNarrowing`), except a token Marfa cannot say (`ItemTableContent`). Counting Marfa's limit first would hide matches. More conditions than a query takes are refused and named.
 - **What a search leaves out is said** (`SearchLeaveOuts`), with a way to include it.
-- **The list's search is tokens and words** (`ColumnSearch`). Return on an offer (`SearchOffers`) makes a token; a change of place clears it. A Type token narrows within the place's types; in Archive the search is of archived items.
+- **The list's search is tokens and words** (`ColumnSearch`). Return on an offer (`SearchOffers`) makes a token; a change of place clears it. A Type token narrows within the place's types; in Archive it searches archived items.
 - **A search in the list is sorted by relevance until the person sorts it.** The gallery and the table keep their own sorts until relevance is picked (`Browser.ordersByRelevance`).

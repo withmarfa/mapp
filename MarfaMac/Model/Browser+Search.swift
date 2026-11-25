@@ -9,6 +9,22 @@ extension Browser {
     /// Whether the list is narrowed by its search in any way.
     var narrowsBySearch: Bool { isSearching || hasSearchTokens }
 
+    /// The From tokens This Search took as a new view's From that its From no longer says, as after the person chose
+    /// another From: they no longer narrow the list, and the panel names them as not saved.
+    var fromTokensSetAside: [FilterClause] {
+        guard let panel = viewPanel, panel.isNew, !panel.tokensInFrom.isEmpty else { return [] }
+        let scope = listing.scope
+        return panel.tokensInFrom.filter { token in
+            token.values.count != 1 || token.values.first.flatMap(Tier.init(word:)).map { ListScope(tier: $0) != scope } ?? true
+        }
+    }
+
+    /// The tokens that narrow the list: every one but those set aside (`fromTokensSetAside`).
+    var narrowingSearchTokens: [FilterClause] {
+        let aside = fromTokensSetAside
+        return aside.isEmpty ? searchTokens : searchTokens.filter { !aside.contains($0) }
+    }
+
     /// Puts the search away: its text, its tokens and the field.
     func clearSearch() {
         searchText = ""
@@ -36,12 +52,13 @@ extension Browser {
 
     /// The fields the tokens ask about, found from the catalogue alone: the table's columns come from the items, which
     /// the tokens decide, so the fields cannot wait for them.
-    func tokenTargets(in library: any ItemLibrary) -> [String: FilterTarget] {
-        guard hasSearchTokens else { return [:] }
+    func tokenTargets(in library: any ItemLibrary, of tokens: [FilterClause]? = nil) -> [String: FilterTarget] {
+        let tokens = tokens ?? searchTokens
+        guard !tokens.isEmpty else { return [:] }
         let known = Dictionary((FilterTarget.everyItem + [.tier]).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let types = listedTypes(in: library)
         var targets: [String: FilterTarget] = [:]
-        for clause in searchTokens where targets[clause.field] == nil {
+        for clause in tokens where targets[clause.field] == nil {
             if let target = known[clause.field] {
                 targets[clause.field] = target
             } else if clause.field.hasPrefix(Self.fieldColumnPrefix),

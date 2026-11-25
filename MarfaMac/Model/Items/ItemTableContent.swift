@@ -90,7 +90,7 @@ final class ItemTableContent {
         listedTypes = browser.listedTypes(in: library)
         now = library.now()
         self.options = options
-        tokens = FilterState(clauses: browser.searchTokens)
+        tokens = FilterState(clauses: browser.narrowingSearchTokens)
         tokenTargets = browser.tokenTargets(in: library)
         // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
         sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(

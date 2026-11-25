@@ -23,8 +23,8 @@ paths:
 ## Places
 
 - **A window shows a place and one of its views** (`PlaceView`, `Place`, `ViewChoice`), each stored as a word. An unknown word is kept as written; an unknown view reads as the place's own.
-- **A window left in a place this copy cannot read** opens where a new window would, and keeps that place until the person moves (`Browser.laterPlace`).
-- **A window follows its view to a new place** with what it keeps for the view (`PlaceMemory`). Views sort by the synced `viewOrder` row (`ViewOrders`), then title.
+- **A window left in a place this copy cannot read** opens where a new window would, and keeps it until the person moves (`Browser.laterPlace`).
+- **A window follows its view to a new place** with what it keeps (`PlaceMemory`).
 - **A window's snapshot and Start With have slots of their own** (`window`, `opening`, `openingLastPlace`), with its open item and scroll position. Files is no place: the person is told once.
 
 ## Sidebar
@@ -51,8 +51,8 @@ paths:
 ## Toolbar
 
 - **The top row is drawn in the content under a title the window hides** (`TopRowFrame`); a plain `toolbar` holds only the buttons.
-- **The views are a radio group;** VoiceOver reads every view, whatever has folded.
-- **The row folds by the room it has** (`ToolbarRoomProbe`) and holds no width.
+- **The views are a radio group;** VoiceOver reads every view, folded or not.
+- **The row folds by the room it has** (`ToolbarRoomProbe`) into N More, with hidden pills and New View…, and holds no width. One view makes no row.
 - **An on button is gray, never the accent.** An item that cannot act dims.
 - **Trap:** hide the title on the window (`hidesWindowTitle`), or it returns in full screen. Read the row's line from `TopRowSpace`, never a safe area: full screen hides the toolbar.
 

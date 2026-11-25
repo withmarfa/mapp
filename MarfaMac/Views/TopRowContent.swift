@@ -8,6 +8,13 @@ struct TopRowContent {
         let id: String
         let title: String
         let target: PlaceView
+        /// Whether a change to the view waits for the server.
+        var isWaiting = false
+        /// Whether this is the view being made, which is a pill until Create View makes it or Cancel drops it.
+        var isNew = false
+        var isHidden = false
+
+        static let newID = "new"
     }
 
     /// One of the Library's places that fold into Browse.
@@ -31,7 +38,10 @@ struct TopRowContent {
     let count: Int
     /// What a search found, or a filter leaves of the Archive, out of everything the place holds.
     let narrowed: Int?
+    /// The row's views, with the one being made last; a hidden view only while the window shows it.
     let views: [Choice]
+    /// The views hidden from the row, which More lists.
+    let hidden: [Choice]
     let chosen: String
     let places: [Browsed]
     /// Whether the chosen view differs from how it was when last opened.
@@ -41,7 +51,7 @@ struct TopRowContent {
     let scope: ListScope
     let defaultScope: ListScope
 
-    var hasViews: Bool { views.count > 1 }
+    var hasViews: Bool { views.count + hidden.count > 1 }
     var showsScope: Bool { !scopes.isEmpty }
     /// Whether the control says what Settings does, which is when it is quiet and the first thing to give way.
     var isDefaultScope: Bool { scope == defaultScope }
@@ -68,9 +78,16 @@ struct TopRowContent {
         // Types, Collections, Sources and the Archive are pages of the Library: its title, its views with none chosen,
         // and its places with theirs.
         let ofLibrary = Self.libraryPages.contains(place)
-        let views = choices(in: ofLibrary ? .library : place, library: library)
+        let all = choices(in: ofLibrary ? .library : place, browser: browser, library: library)
         let chosenWord = shown.view.word
-        let chosen = ofLibrary && place != .library ? "" : views.first { $0.target.view.word == chosenWord }?.id ?? views.first?.id ?? ""
+        let making = browser.viewPanel?.isNew == true
+        var views = all.filter { !$0.isHidden || (!making && (!ofLibrary || place == .library) && $0.id == chosenWord) }
+        if let panel = browser.viewPanel, panel.isNew {
+            let title = panel.trimmedName.isEmpty ? String(localized: "New View") : panel.trimmedName
+            views.append(Choice(id: Choice.newID, title: title, target: shown, isNew: true))
+        }
+        let chosen = making ? Choice.newID
+            : ofLibrary && place != .library ? "" : views.first { $0.id == chosenWord }?.id ?? views.first?.id ?? ""
 
         let base: Int
         if shown.view != .own { base = library.count(in: shown, favoritesScope: listing.scope) }
@@ -102,32 +119,31 @@ struct TopRowContent {
         let scopes = offers ? ListScope.allCases.map { ScopeChoice(scope: $0, title: $0.title, count: counts.count(in: $0)) } : []
         return TopRowContent(
             place: place, title: ofLibrary ? library.name(of: .library) : library.name(of: place), count: count,
-            narrowed: narrowed, views: views, chosen: chosen,
-            places: ofLibrary ? browsed(in: library) : [], isChanged: ofLibrary && place != .library ? false : browser.hasViewChanges,
+            narrowed: narrowed, views: views, hidden: all.filter { $0.isHidden && !views.contains($0) }, chosen: chosen,
+            places: ofLibrary ? browsed(in: library) : [], isChanged: ofLibrary && place != .library ? false : browser.isViewChanged,
             scopes: scopes, scope: listing.scope, defaultScope: ListScope.defaultScope(in: browser.defaults))
     }
 
     /// The Library and the places that are pages of it.
     private static let libraryPages: [Place] = [.library, .types, .collections, .sources, .archive]
 
-    /// The place's views in the order the person arranged them, the ones they did not place after it.
+    /// The place's views in the order the person arranged them (`Browser.viewChoices`).
     @MainActor
-    private static func choices(in place: Place, library: any ItemLibrary) -> [Choice] {
-        let orders = ViewOrders.stored()
-        var all = [Choice(id: ViewChoice.own.word, title: ownTitle(of: place, library: library), target: PlaceView(place, .own))]
-        if place == .library { all.append(Choice(id: ViewChoice.favorites.word, title: String(localized: "Favorites"), target: .favorites)) }
-        for view in library.views(in: place, order: orders.savedOrder(in: place)) {
-            all.append(Choice(id: ViewChoice.saved(view.id).word, title: view.title, target: PlaceView(place, .saved(view.id))))
-        }
-        let rank = Dictionary(orders.order(in: place).enumerated().map { ($1.word, $0) }, uniquingKeysWith: { first, _ in first })
-        return all.enumerated().sorted { a, b in
-            switch (rank[a.element.id], rank[b.element.id]) {
-            case let (x?, y?): x < y
-            case (.some, nil): true
-            case (nil, .some): false
-            case (nil, nil): a.offset < b.offset
+    private static func choices(in place: Place, browser: Browser, library: any ItemLibrary) -> [Choice] {
+        let hidden = browser.hiddenViews(in: place)
+        return browser.viewChoices(in: place, library: library).compactMap { choice in
+            let title: String
+            switch choice {
+            case .own: title = ownTitle(of: place, library: library)
+            case .favorites: title = String(localized: "Favorites")
+            case .saved(let id):
+                guard let view = library.views.first(where: { $0.id == id }) else { return nil }
+                title = view.title
             }
-        }.map(\.element)
+            return Choice(
+                id: choice.word, title: title, target: PlaceView(place, choice),
+                isWaiting: choice.savedView.map(browser.toldOffline.contains) ?? false, isHidden: hidden.contains(choice))
+        }
     }
 
     /// A type's own view says what it lists, "All Highlights"; any other place's says All.

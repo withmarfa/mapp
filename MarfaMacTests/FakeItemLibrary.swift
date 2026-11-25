@@ -678,11 +678,11 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func createView(_ settings: LibraryViewSettings) async -> LibraryView? {
+        await inViewWrite?()
         if let viewFailure {
             notices.tell("Can’t Save View", viewFailure.message)
             return nil
         }
-        await inViewWrite?()
         let view = LibraryView(id: ItemID.mint(), title: settings.title, version: 1, query: settings.query, sort: settings.sort, group: settings.group)
         views = LibraryView.ordered(views + [view])
         return view

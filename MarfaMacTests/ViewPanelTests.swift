@@ -532,7 +532,7 @@ struct ViewPanelTests {
         await browser.finishViewPanel(in: library, order: Self.order)
         #expect(library.notices.told == before)
         release?.resume()
-        await first.value
+        _ = await first.value
         #expect(library.views.count == 2)
     }
 
