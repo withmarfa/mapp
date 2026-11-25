@@ -259,7 +259,7 @@ private struct TypeRowsPreview: View {
         let widest = rows.filter(\.isExpandable).map(\.node.count).max() ?? 0
         List {
             Section {
-                SidebarLabel(title: "All Items", icon: .symbol("note.text"))
+                SidebarLabel(title: "Library", icon: .symbol("square.grid.2x2"))
                     .badge(Text(412, format: .number).monospacedDigit())
             }
             Section("Types") {
