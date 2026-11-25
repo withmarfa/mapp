@@ -20,7 +20,7 @@ extension Browser {
 
     /// The one way files from outside become items: dropped from Finder on the list, the sidebar or the window, dropped
     /// on a collection, or taken from a nearby device. Each file is added as an item of its own, of the type its kind
-    /// calls for (as quick add's file is), in the place the window showed when they were dropped (`destination`,
+    /// calls for (as the new item's file is), in the place the window showed when they were dropped (`destination`,
     /// which is that place when none is given). Where that was a collection, or the drop was on one, the items join
     /// it. A file that cannot be read, and one the library refuses, are told, and the rest are still added. The files
     /// are written to `library` whatever the window does meanwhile, since a write there is safe and a drop cut short
@@ -41,7 +41,7 @@ extension Browser {
         QuickAdd.File.tellUnreadable(notRead, unreadable: unreadable, to: library.notices)
         var added: [ItemID] = []
         for file in files {
-            if let id = await library.addFile(file.url, title: nil, parentID: nil, in: destination.place.place) { added.append(id) }
+            if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: destination.place.place), tags: []) { added.append(id) }
         }
         guard !added.isEmpty else { return [] }
         var joined = false

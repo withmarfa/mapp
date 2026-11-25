@@ -47,6 +47,10 @@ protocol ItemLibrary: AnyObject, Observable {
     /// this and `membershipRevision` rather than `contentRevision`, which a published keystroke moves. A library that
     /// bumps `membershipRevision` for every item change may leave this as that.
     var namesRevision: Int { get }
+    /// Names the Marfa the library reads by its instance id, never its address, so what this Mac keeps for it, such
+    /// as an item typed and not yet added, waits for it and goes to no other, even a server that later takes its
+    /// address. Empty until the copy has read its instance, and where there is no server.
+    var serverKey: String { get }
     func item(_ id: ItemID) -> Item?
     /// The instance id of the Marfa the library's copy holds, as its `GET /` names it, which an item's `marfa://` link
     /// is checked against; nil until the copy has read it. Reads only the copy.
@@ -145,6 +149,12 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Whether `creationParentCandidates` would list anything: a cheap check that sorts and builds nothing, for a
     /// view that is evaluated at every keystroke.
     func canHaveParent(typeID: String) -> Bool
+    /// The best `limit` of `creationParentCandidates` whose name holds `query`: those in `first` in its order, then
+    /// the rest by name, or with `newest` the most recently changed first. Filters before it sorts, for the line's
+    /// `@` row at every keystroke.
+    func creationParentMatches(typeID: String, matching query: String, first: [ItemID], limit: Int, newest: Bool) -> [Item]
+    /// Whether a new item of `typeID` can be put under `parent`, as `creationParentCandidates` would list it.
+    func admitsCreationParent(_ parent: ItemID, typeID: String) -> Bool
 
     // MARK: History
 
@@ -181,16 +191,27 @@ protocol ItemLibrary: AnyObject, Observable {
 
     // MARK: Writing
 
-    /// Nil when the item cannot be made, and the library tells the person why. The properties go in the create
-    /// itself, so a type whose fields are required is made whole in one write.
+    /// Nil when the item cannot be made, and the library tells the person why. The properties, tags and tier go in
+    /// the create itself, so a type whose fields are required is made whole in one write; the parent is linked after
+    /// it, and a parent that cannot be linked is told apart. The title may be empty only for a type whose title is
+    /// not required, where the item holds something else.
     func createItem(
-        typeID: String, title: String, body: String, properties: [String: PropertyValue], parentID: ItemID?,
-        in place: Place, undoManager: UndoManager?
+        typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String], parentID: ItemID?,
+        tier: Tier, undoManager: UndoManager?
     ) -> ItemID?
-    /// Adds the file at `file` as an item of its own, of the file type its media type calls for, titled `title` or by its name, under `parentID`
+    /// Made as `id`, which the caller may keep first, so a create it follows is never made twice. Registers the step
+    /// that undoes it (`registerNewItemUndo`) on `undoManager`.
+    func createItem(
+        as id: ItemID, typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String],
+        parentID: ItemID?, tier: Tier, undoManager: UndoManager?
+    ) -> ItemID?
+    /// Adds the file at `file` as an item of its own, of the file type its media type calls for, titled `title` or by its name, with `tags`, under `parentID`
     /// where one is given. The file is read where it is while this runs. Nil when it could not be added, and the
     /// library tells the person why.
-    func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: Place) async -> ItemID?
+    func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier, tags: [String]) async -> ItemID?
+    /// Registers the step that undoes adding the item `id`, named and run as a created item's is, for a file added
+    /// where a person would undo it.
+    func registerNewItemUndo(_ id: ItemID, undoManager: UndoManager?)
     /// Text typed on the page, over the text `body(of:)` gave at `readAt`. An edit typed on text older than the
     /// library now holds was made without seeing what replaced it, so it never silently overwrites that. Typing is
     /// undone by the page that holds it, so this registers nothing.
@@ -201,9 +222,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Sends at once any typed text the library holds back to send fewer writes, as every hand-over of the pages
     /// ends with, so nothing typed before a hand-over still waits after it.
     func sendWaitingText()
-    /// Whether the create of `id` was refused before the library held the item, so the window has no item to open and the
-    /// library has told the person. A library that refuses a create at once answers nil from `createItem` instead.
-    func wasRefused(creating id: ItemID) -> Bool
+    /// The creates Marfa refused after `createItem` answered, before or after the library showed the item, which the
+    /// library has told the person of. A library that refuses a create at once answers nil from `createItem` instead.
+    var refusedCreations: Set<ItemID> { get }
     @discardableResult
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool
     /// Several properties of one item in one edit and one undo step named `actionName`, each given its value or, where
@@ -328,6 +349,11 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     var namesRevision: Int { membershipRevision }
+    /// Every create Marfa refused for good: those refused as they were sent, and those the copy lists as refused.
+    var refusedCreates: Set<ItemID> {
+        refusedCreations.union(syncReport.problems.compactMap { $0.change == .create && $0.kind == .refused ? $0.itemID : nil })
+    }
+    var serverKey: String { "" }
     func headerItem(_ id: ItemID) -> Item? { item(id) }
     func itemVersion(_ id: ItemID) -> ItemVersion? { item(id)?.version }
     func textIsEmpty(_ id: ItemID) -> Bool { body(of: id)?.text.isEmpty ?? true }
@@ -350,11 +376,28 @@ extension ItemLibrary {
     func tookPropertyWrite(_ mark: Int) -> Bool { false }
     var history: (any ItemHistorySource)? { nil }
     func newChildVerdict(under parent: ItemID) async -> EdgeVerdict { .taken }
+    func creationParentMatches(typeID: String, matching query: String, first: [ItemID], limit: Int, newest: Bool) -> [Item] {
+        QuickAdd.bestParents(creationParentCandidates(typeID: typeID), matching: query, first: first, limit: limit, newest: newest)
+    }
+    func admitsCreationParent(_ parent: ItemID, typeID: String) -> Bool {
+        creationParentCandidates(typeID: typeID).contains { $0.id == parent }
+    }
 
     func createItem(
-        typeID: String, title: String, body: String, parentID: ItemID?, in place: Place, undoManager: UndoManager?
+        typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String], parentID: ItemID?,
+        tier: Tier, undoManager: UndoManager?
     ) -> ItemID? {
-        createItem(typeID: typeID, title: title, body: body, properties: [:], parentID: parentID, in: place, undoManager: undoManager)
+        createItem(
+            as: .mint(), typeID: typeID, title: title, body: body, properties: properties, tags: tags, parentID: parentID,
+            tier: tier, undoManager: undoManager)
+    }
+    func createItem(
+        typeID: String, title: String, body: String, properties: [String: PropertyValue] = [:], parentID: ItemID?, tier: Tier,
+        undoManager: UndoManager?
+    ) -> ItemID? {
+        createItem(
+            typeID: typeID, title: title, body: body, properties: properties, tags: [], parentID: parentID, tier: tier,
+            undoManager: undoManager)
     }
     func hiddenPropertyKeys(of item: Item) -> Set<String> { catalogue.pageKeys(of: item) }
 

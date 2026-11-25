@@ -214,10 +214,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task { [libraries] in
             let kept = await libraries.flushEditors(within: .seconds(5))
-            // A draft in quick add, or a view's title not yet saved, has no other home once its window goes, so it
-            // is told with the rest.
+            // A new item's draft is kept on this Mac already; an entry typed into one of its list fields, or a view's
+            // title not yet saved, has no other home once its window goes, so it is told with the rest.
             if kept {
-                QuickAdd.handOffAll(to: libraries.host.notices, in: libraries.current)
+                QuickAdd.leaveAll(telling: libraries.host.notices)
                 ViewPanel.handOffAll()
                 libraries.handOffDraftsAtQuit()
             }

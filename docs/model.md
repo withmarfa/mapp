@@ -40,7 +40,7 @@ Each is a case where a declared field is not enough. Add to this list only where
 - `PageHeaderKind`: the nearest ancestor the app treats apart.
 - `LookPreset.suggested`: the highlight type, found by walking up.
 
-Two defaults name types: the sidebar's and toolbar's starting set for New, and the type quick add begins with. Both use only types the library offers.
+One default names a type: the kind a new item begins with (`QuickAdd.startingType`), only where the library offers it.
 
 ## Tier, state and what an item allows
 

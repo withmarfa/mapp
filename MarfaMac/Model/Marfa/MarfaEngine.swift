@@ -37,7 +37,7 @@ actor MarfaEngine {
         /// Attaches a file, which the package queues as an upload, a file item and an edge.
         case attach(URL, ItemID, CheckedContinuation<Result<Embed, SourceFailure>, Never>)
         /// Adds a file as an item of its own, which the package queues as an upload and a file item.
-        case addFile(URL, title: String?, tier: Tier?, parent: ItemID?, CheckedContinuation<Result<ItemID, SourceFailure>, Never>)
+        case addFile(URL, title: String?, tier: Tier?, tags: [String], parent: ItemID?, CheckedContinuation<Result<ItemID, SourceFailure>, Never>)
         /// What the copy answered an attach it made beside the lane (`token`), with the title the lane chose.
         case attached(
             Result<Marfa.Attached, SourceFailure>, ItemID, title: String, token: UUID,
@@ -266,7 +266,7 @@ actor MarfaEngine {
             if case .attach(_, _, let done) = event {
                 done.resume(returning: .failure(SourceFailure(kind: .missing, message: Self.closedLibrary)))
             }
-            if case .addFile(_, _, _, _, let done) = event {
+            if case .addFile(_, _, _, _, _, let done) = event {
                 done.resume(returning: .failure(SourceFailure(kind: .missing, message: Self.closedLibrary)))
             }
             // The copy took the file before it closed, so the answer says so, and nothing is read again.
@@ -297,8 +297,8 @@ actor MarfaEngine {
         case .withdrawn(let ids):
             for id in ids { answered(id, .refused(SyncProblem(code: Self.withdrawnCode))) }
         case .attach(let file, let item, let done): attach(file, to: item, answering: done)
-        case .addFile(let file, let title, let tier, let parent, let done):
-            addFile(file, title: title, tier: tier, under: parent, answering: done)
+        case .addFile(let file, let title, let tier, let tags, let parent, let done):
+            addFile(file, title: title, tier: tier, tags: tags, under: parent, answering: done)
         case .attached(let result, let item, let title, let token, let done):
             done.resume(returning: await take(attached: result, to: item, title: title, token: token))
         case .addedFile(let result, let parent, let token, let done):

@@ -346,6 +346,12 @@ nonisolated struct Catalogue: Hashable, Sendable {
         field.key == MarfaMapping.startField && [MarfaMapping.eventType, MarfaMapping.taskType].contains { type == $0 || isSubtype(type, ofAnyOf: [$0]) }
     }
 
+    /// The field a bookmark keeps its web address in: the `url` field of a type that is `core.bookmark` or below it.
+    func bookmarkAddress(of type: TypeID) -> ItemTypeInfo.Field? {
+        guard type == MarfaMapping.bookmarkType || isSubtype(type, ofAnyOf: [MarfaMapping.bookmarkType]) else { return nil }
+        return itemTypes[type]?.fields.first { $0.key == MarfaMapping.urlField }
+    }
+
     /// The group of the word `item` holds in its type's status field; nil where the type has none, the item holds
     /// none, or the type does not declare it.
     func statusGroup(of item: Item) -> StatusGroup? {

@@ -6,7 +6,7 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 
 - **Name no type, field or label in code.** They come from `Catalogue`. A type identifier is named only for these:
   - **Roots:** `TypeID.isShipped` guards Marfa's `core`, `system` and `marfa` roots and the plugins' `common`; `TypeID.isHidden` hides `system` and `app`. `MarfaSync` names `system.view`, and `PreferencesType` the app's own hidden settings.
-  - **Families:** tasks (`Catalogue.isTask`, `Catalogue.isStartDate`), files (`Catalogue.isFileType`), the header (`PageHeaderKind`) and the suggested look (`LookPreset.suggested`); a preset's fields are named in `MarfaMapping`. Collections go by their role (`Catalogue.isCollection`), never an identifier.
+  - **Families:** tasks (`Catalogue.isTask`, `Catalogue.isStartDate`), files (`Catalogue.isFileType`), bookmarks (`Catalogue.bookmarkAddress`), the header (`PageHeaderKind`) and the suggested look (`LookPreset.suggested`); a preset's fields are named in `MarfaMapping`. Collections go by their role (`Catalogue.isCollection`), never an identifier.
   - **Starting points:** the Note fallback of `QuickAdd` and `TypesModel.beginChild`, each only where the catalogue offers it.
 - **Edit only a type the owner made.** `TypeDefinitionEdit` reads `provenance.origin` from `GET /types`, because a plugin's type can have its own root.
 - **A field is a status only by its kind, and a list only by its shape** (`Field.Kind.list`), whatever it is called.
@@ -28,8 +28,7 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 - **Moving several items to the bin asks first.** One does not, because Undo restores it. Delete erases only items already in the bin, after its own dialog.
 - **Change Type, Restore, Undo and Redo judge the item as it stands,** after open pages hand over their last edit where they touch its text. A change made elsewhere is refused or worked on, never written over.
 - **What needs the server is never queued:** `purge`, a view's making, renaming and deletion, a type's icon, the owner's settings. An offline view change waits in `PendingViewChanges`. `ItemLibrary.reachesServer` offers them; a refusal is told. Every other write goes to the copy's queue.
-- **What a person typed into a sheet or panel stays there until the library takes it.** A window that closes or changes library, and a panel that ends any way but Cancel, hands it over through `Notices.notKept`. Only Cancel drops it.
-- **Quick add makes an item in one create** (`Browser.saveQuickAdd`), so no required field is set after. It never writes an empty item or drops what the kind cannot keep.
+- **What a person typed into a sheet or panel stays there until the library takes it.** A window that closes or changes library, and a panel that ends any way but Cancel, hands it over through `Notices.notKept`. Only Cancel drops it. A new item's draft is kept by `NewItemDrafts` instead (`docs/editing.md`).
 - **Files from outside become items only through `Browser.importFiles`,** in the library they were dropped on, even after the window moves on. What leaves in a drag is an `ItemReference`: an identity inside the app, a file outside it.
 
 ## Places, views and search

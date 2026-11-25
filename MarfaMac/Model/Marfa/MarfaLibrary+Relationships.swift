@@ -272,6 +272,24 @@ extension MarfaLibrary {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
+    func creationParentMatches(typeID: String, matching query: String, first: [ItemID], limit: Int, newest: Bool) -> [Item] {
+        guard let info = catalogue.edgeTypes[MarfaMapping.parentEdge],
+            admits(TypeID(typeID), constraint(of: info, atTo: true))
+        else { return [] }
+        let parents = constraint(of: info, atTo: false)
+        _ = contentRevision
+        let held = linkable.lazy.compactMap { self.records[$0]?.item }.filter { self.admits($0.type, parents) }
+        return QuickAdd.bestParents(held, matching: query, first: first, limit: limit, newest: newest)
+    }
+
+    func admitsCreationParent(_ parent: ItemID, typeID: String) -> Bool {
+        guard let info = catalogue.edgeTypes[MarfaMapping.parentEdge],
+            admits(TypeID(typeID), constraint(of: info, atTo: true)),
+            linkable.contains(parent), let item = records[parent]?.item
+        else { return false }
+        return admits(item.type, constraint(of: info, atTo: false))
+    }
+
     func canHaveParent(typeID: String) -> Bool {
         guard let info = catalogue.edgeTypes[MarfaMapping.parentEdge],
             admits(TypeID(typeID), constraint(of: info, atTo: true))

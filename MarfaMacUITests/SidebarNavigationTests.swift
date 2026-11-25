@@ -71,9 +71,9 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
 
     @MainActor func testTheNewRowOpensQuickAddAndTakesNoSelection() {
         element("SidebarNew").click()
-        XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3))
+        XCTAssertTrue(element("NewItemLineTitle").waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(element("QuickAddTitle").waitForNonExistence(timeout: 2))
+        XCTAssertTrue(element("NewItemLineTitle").waitForNonExistence(timeout: 2))
         XCTAssertTrue(element("TopRowTitle").exists, "the window stays where it was")
     }
 
@@ -86,9 +86,9 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
 
     @MainActor func testTheNewAndSearchRowsTakeAClickAnywhereAlongTheirWidth() {
         clickBeyondTheWords(of: element("SidebarNew"))
-        XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3), "New opens from the end of its row")
+        XCTAssertTrue(element("NewItemLineTitle").waitForExistence(timeout: 3), "New opens from the end of its row")
         app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(element("QuickAddTitle").waitForNonExistence(timeout: 2))
+        XCTAssertTrue(element("NewItemLineTitle").waitForNonExistence(timeout: 2))
         clickBeyondTheWords(of: element("SidebarSearch"))
         XCTAssertTrue(element("CommandPaletteField").waitForExistence(timeout: 3), "Search opens from the end of its row")
         app.typeKey(.escape, modifierFlags: [])
@@ -113,7 +113,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
 
     @MainActor func testTheNewRowOpensQuickAdd() {
         element("SidebarNew").click()
-        XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3))
+        XCTAssertTrue(element("NewItemLineTitle").waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
     }
 

@@ -5,7 +5,7 @@ import Testing
 import WebKit
 @testable import MarfaMac
 
-/// An item with no text yet, as quick add makes from a title alone, holds no text property at all. The page shows it
+/// An item with no text yet, as a new item made from a title alone is, holds no text property at all. The page shows it
 /// empty, and what is typed there is saved to it and to no other item.
 extension EditorTests {
     private static let stamp = "2026-10-26T00:00:00Z"

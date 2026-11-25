@@ -117,10 +117,12 @@ private func loaded(
     _ items: [Item] = LibraryFixture.items, catalogue: Catalogue = LibraryFixture.catalogue
 ) async throws -> (MarfaLibrary, FakeItemSource) {
     let source = FakeItemSource()
+    source.heldInstanceID.withLock { $0 = "library-tests" }
     for (id, text) in LibraryFixture.texts { source.setBody(text, of: id) }
     let library = MarfaLibrary(source: source, notices: Notices())
     source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
-    try #require(await eventually { library.isLoaded })
+    // A new item waits for the copy to name its instance (`QuickAdd.isAvailable`).
+    try #require(await eventually { library.isLoaded && !library.serverKey.isEmpty })
     return (library, source)
 }
 
@@ -266,14 +268,14 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         let id = try #require(library.createItem(
-            typeID: "aic.ticket.task", title: "  New task ", body: "Text", parentID: F.p1, in: .library, undoManager: undo))
+            typeID: "aic.ticket.task", title: "  New task ", body: "Text", parentID: F.p1, tier: .library, undoManager: undo))
         #expect(id.rawValue == id.rawValue.lowercased())
         #expect(id.rawValue.dropFirst(14).first == "7")
-        #expect(source.writes == [.create(id: id, ItemDraft(type: F.task, title: "New task", body: "Text", parent: F.p1))])
+        #expect(source.writes == [.create(id: id, ItemDraft(type: F.task, title: "New task", body: "Text", tier: .library, parent: F.p1))])
 
         // The Inbox is the feed tier, and a blank body is no text.
         let inbox = try #require(library.createItem(
-            typeID: "core.note", title: "Captured", body: "\n", parentID: nil, in: .feed, undoManager: nil))
+            typeID: "core.note", title: "Captured", body: "\n", parentID: nil, tier: .feed, undoManager: nil))
         #expect(source.writes.last == .create(id: inbox, ItemDraft(type: F.note, title: "Captured", tier: .feed)))
 
         // Undoing a create puts the item in the bin; redoing it brings it back.
@@ -291,10 +293,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func aCreateTheCatalogueRefusesIsToldAndNotSent() async throws {
         let (library, source) = try await loaded()
-        #expect(library.createItem(typeID: "no.such", title: "X", body: "", parentID: nil, in: .library, undoManager: nil) == nil)
+        #expect(library.createItem(typeID: "no.such", title: "X", body: "", parentID: nil, tier: .library, undoManager: nil) == nil)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Create Item"))
         library.notices.answerAll()
-        #expect(library.createItem(typeID: "core.note", title: " ", body: "", parentID: nil, in: .library, undoManager: nil) == nil)
+        #expect(library.createItem(typeID: "core.note", title: " ", body: "", parentID: nil, tier: .library, undoManager: nil) == nil)
         #expect(library.notices.waiting.last != nil)
         #expect(source.writes.isEmpty)
     }
@@ -1049,16 +1051,16 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.attaching.attached.withLock { $0.map(\.file) } == ["plan.pdf"])
 
         let id = await library.addFile(
-            disk.url("photo.png", "png"), title: "Holiday", parentID: F.p1, in: .feed)
+            disk.url("photo.png", "png"), title: "Holiday", parentID: F.p1, tier: .feed, tags: ["trip"])
         #expect(id != nil)
         let added = try #require(source.attaching.added.withLock { $0.first })
         #expect(added.file == "photo.png" && added.data == Data("png".utf8))
-        #expect(added.title == "Holiday" && added.tier == .feed && added.parent == F.p1)
+        #expect(added.title == "Holiday" && added.tier == .feed && added.tags == ["trip"] && added.parent == F.p1)
 
         source.attaching.failure.withLock { $0 = SourceFailure(kind: .failed, message: "No room.") }
         source.attaching.failures.withLock { $0["b.pdf"] = SourceFailure(kind: .failed, message: "No room.") }
         await #expect(throws: SourceFailure.self) { try await library.attach(file: disk.url("b.pdf"), to: F.n1) }
-        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, in: .library) == nil)
+        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, tier: .library, tags: []) == nil)
         #expect(library.notices.waiting.last?.message == "No room.")
     }
 
@@ -1294,15 +1296,15 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let browser = Browser()
         browser.adopt(library)
         let id = try #require(await browser.quickAdded("Trip", in: library))
-        #expect(browser.newItem?.id == id)
+        #expect(browser.newItems.map(\.id) == [id])
 
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: "hydration_incomplete", message: MarfaEngine.notCurrent))))
-        #expect(await eventually { library.wasRefused(creating: id) })
+        #expect(await eventually { library.refusedCreations.contains(id) })
         #expect(browser.isNewItemSettled(in: library))
-        browser.finishNewItem(in: library)
+        browser.finishNewItems(in: library)
 
-        #expect(browser.newItem == nil)
+        #expect(browser.newItems.isEmpty)
         #expect(browser.selection.isEmpty)
         #expect(library.notices.waiting.last?.title == "Can’t Create Item")
         #expect(library.notices.waiting.last?.message == MarfaEngine.notCurrent)
@@ -1317,10 +1319,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let browser = Browser()
         browser.adopt(library)
         _ = try #require(await browser.quickAdded("Trip", in: library))
-        #expect(browser.newItem != nil)
+        #expect(!browser.newItems.isEmpty)
 
         browser.adopt(FakeItemLibrary())
-        #expect(browser.newItem == nil)
+        #expect(browser.newItems.isEmpty)
     }
 
     /// A write made after the source closed is kept nowhere, so the person is told rather than left to find it gone.
@@ -1360,13 +1362,13 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.notices.waiting.map(\.text) == ["Typed as it closed"])
     }
 
-    /// A create refused as the source closes gives back everything typed into it in quick add, its properties' text
+    /// A create refused as the source closes gives back everything typed into the new item, its properties' text
     /// among it, since nothing else holds that.
     @Test func aCreateRefusedAsTheSourceClosesGivesBackItsPropertiesText() async throws {
         let (library, source) = try await loaded()
         _ = try #require(library.createItem(
             typeID: LibraryFixture.task.rawValue, title: "Kept", body: "Only copy", properties: ["status": .string("open")],
-            parentID: nil, in: .library, undoManager: nil))
+            parentID: nil, tier: .library, undoManager: nil))
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: MarfaEngine.closedCode, message: MarfaEngine.notKept))))
         #expect(await eventually { !library.notices.waiting.isEmpty })
@@ -1419,7 +1421,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func aCreateRefusedBeforeItWasQueuedGivesItsTextBack() async throws {
         let (library, source) = try await loaded()
         _ = try #require(library.createItem(
-            typeID: "core.note", title: "Kept", body: "Only copy", parentID: nil, in: .library, undoManager: nil
+            typeID: "core.note", title: "Kept", body: "Only copy", parentID: nil, tier: .library, undoManager: nil
         ))
         let write = try #require(source.submitted.last?.id)
         let problem = SyncProblem(code: "type_not_permitted", message: "Not this type.", notQueued: true)

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where the page puts the caret in a new item's text: after the source the person typed before it in quick add, or
+/// Where the page puts the caret in a new item's text: after the source the person typed before it in the new-item form, or
 /// at the end, where that text is too long to send the page.
 enum PageCaret: Equatable {
     case after(String)
@@ -16,8 +16,9 @@ enum PageCaret: Equatable {
     }
 }
 
-/// An item quick add made, which the window opens, the way Settings says, once its library holds it. A Marfa library
-/// holds an item only when its source says so, which may take a moment, so the window waits for it.
+/// An item the line or the text form made, which the window opens, the way Settings says, once its library holds it,
+/// or only files in the collection shown where the line's Add made it. A Marfa library holds an item only when its
+/// source says so, which may take a moment, so the window waits for it.
 struct NewItem {
     let id: ItemID
     let typeID: String
@@ -33,47 +34,54 @@ struct NewItem {
     var embedsInText = false
     /// The collection whose place the item was added in, which it joins once the library holds it.
     var collection: ItemID?
-    /// How the item opens, as Settings said when it was added.
-    var opening = ItemOpening.standard
-    /// The window's, so the item's joining the collection is undone there.
-    weak var undoManager: UndoManager?
+    /// How the item opens, as Settings said when it was added; nil where it was added without opening.
+    var opening: ItemOpening? = ItemOpening.standard
 }
 
-/// What the page writes at the end of a new item's text for the files quick add attached to it.
+/// What the page writes at the end of a new item's text for the files its form attached to it.
 struct NewEmbeds: Equatable {
     let id: ItemID
     let embeds: [Embed]
 }
 
 extension Browser {
-    /// Whether an item quick add made is now held by the library, or was refused, and so is to be shown, or given
+    /// Whether an item the window made is now held by the library, or was refused, and so is to be shown, or given
     /// up.
     func isNewItemSettled(in library: any ItemLibrary) -> Bool {
-        guard let newItem else { return false }
-        return library.item(newItem.id) != nil || isRefused(newItem, in: library)
+        newItems.contains { library.item($0.id) != nil || isRefused($0, in: library) }
     }
 
-    /// Refused once queued, so the refusal is in the problems the library shows, or refused before it was queued.
-    /// A create sent to another library counts as refused once this one has loaded without it, since it will not
-    /// come.
+    /// Refused for good, once queued or before it was, never only held up (`NewItemDrafts.answer`). A create sent
+    /// to another library counts as refused once this one has loaded without it, since it will not come.
     private func isRefused(_ entry: NewItem, in library: any ItemLibrary) -> Bool {
         if entry.library !== library { return library.isLoaded }
-        return library.wasRefused(creating: entry.id) || library.syncReport.problems.contains { $0.itemID == entry.id }
+        return NewItemDrafts.answer(creating: entry.id, in: library) == .refused
     }
 
-    /// Opens the item quick add made once the library holds it. A create the library refused is given up; the
-    /// library tells the person why, with the text they typed.
-    func finishNewItem(in library: any ItemLibrary) {
-        guard let entry = newItem else { return }
-        guard library.item(entry.id) != nil else {
-            if isRefused(entry, in: library) { giveUpNewItem(because: .refused) }
-            return
+    /// Finishes each item the window made that the library now holds or refused. A create the library refused is
+    /// given up, the library tells the person why, and its draft comes back to a line with nothing typed
+    /// (`QuickAdd.takeBackRefused`).
+    func finishNewItems(in library: any ItemLibrary) {
+        for entry in newItems {
+            if library.item(entry.id) != nil {
+                newItems.removeAll { $0.id == entry.id }
+                finish(entry, in: library)
+            } else if isRefused(entry, in: library) {
+                newItems.removeAll { $0.id == entry.id }
+                giveUp(entry, because: .refused)
+            }
         }
-        newItem = nil
+        quickAdd.drafts.settle(in: library)
+        if quickAdd.isPresented { quickAdd.takeBackRefused(in: library) }
+    }
+
+    /// Files the item in the collection shown, attaches its files, and opens it where it was added to be opened.
+    private func finish(_ entry: NewItem, in library: any ItemLibrary) {
         let joined = join(entry, in: library)
         if !entry.attachments.isEmpty {
             Task { await attachFiles(of: entry, in: library) }
         }
+        guard let opening = entry.opening else { return }
         clearSearch()
         // The edge is queued, so the collection's list may not hold the item yet; it soon will.
         let joinedShown = joined && entry.collection.map { shown == .collection($0) } == true
@@ -81,8 +89,8 @@ extension Browser {
             showing = .type(TypeID(entry.typeID))
         }
         selection = [entry.id]
-        open([entry.id], as: entry.opening)
-        if entry.opening == .newWindow {
+        open([entry.id], as: opening)
+        if opening == .newWindow {
             // The window of its own takes no caret from here, so the list keeps the keyboard.
             focusRequest = .list
         } else if entry.isFile {
@@ -97,14 +105,17 @@ extension Browser {
 
     /// Files the new item in the collection whose place it was added in, through the edge queue as any link is
     /// added, and says whether it did. An item whose type can't be in a collection, such as another collection, is
-    /// left out of it; one the library refuses stays where it is, and the library tells the person why.
+    /// left out of it; one the library refuses stays where it is, and the library tells the person why. Joining is
+    /// part of the add, so it registers no step of its own: undoing the add moves the item, with its place in the
+    /// collection, to Recently Deleted. An item already moved there is left out.
     private func join(_ entry: NewItem, in library: any ItemLibrary) -> Bool {
-        guard let collection = entry.collection, let held = library.item(entry.id), library.canJoinCollection(held)
+        guard let collection = entry.collection, let held = library.item(entry.id), held.state == .active,
+              library.canJoinCollection(held)
         else { return false }
-        return library.addToCollection([entry.id], collection, undoManager: entry.undoManager)
+        return library.addToCollection([entry.id], collection, undoManager: nil)
     }
 
-    /// Why the window stops waiting for the item quick add made.
+    /// Why the window stops waiting for the item it made.
     enum NewItemDeparture {
         /// The library refused the create.
         case refused
@@ -112,11 +123,15 @@ extension Browser {
         case windowLeft
     }
 
-    /// Stops waiting for the item quick add made. Files that were to be attached to it are named, since nothing
-    /// else keeps them.
-    func giveUpNewItem(because departure: NewItemDeparture) {
-        guard let entry = newItem else { return }
-        newItem = nil
+    /// Stops waiting for every item the window made, as it leaves. Files that were to be attached are named, since
+    /// nothing else keeps them; the drafts stay kept until their library settles them (`NewItemDrafts.settle`).
+    func giveUpNewItems(because departure: NewItemDeparture) {
+        let entries = newItems
+        newItems = []
+        for entry in entries { giveUp(entry, because: departure) }
+    }
+
+    private func giveUp(_ entry: NewItem, because departure: NewItemDeparture) {
         guard !entry.attachments.isEmpty else { return }
         let reason = switch departure {
         case .refused: String(localized: "The item wasn’t added, so its files weren’t attached.")
@@ -125,7 +140,7 @@ extension Browser {
         entry.library.notices.tell(String(localized: "Files Not Attached"), "\(reason) \(QuickAdd.File.notAdded(entry.attachments))")
     }
 
-    /// Attaches the files quick add held to the item it made, one at a time, so one that fails leaves the others
+    /// Attaches the files the new-item form held to the item it made, one at a time, so one that fails leaves the others
     /// and the item as they are. The person is told which failed, once; what the page writes for the rest goes to
     /// the page for the end of the item's text.
     private func attachFiles(of entry: NewItem, in library: any ItemLibrary) async {

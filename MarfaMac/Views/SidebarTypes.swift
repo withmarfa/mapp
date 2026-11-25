@@ -7,7 +7,6 @@ struct SidebarTypesSection: View, Equatable {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = true
-    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     /// Every shown row, folded open as the person left them.
     let rows: [SidebarPlan.TypeRow]
     let plan: SidebarPlan
@@ -149,10 +148,10 @@ struct SidebarTypesSection: View, Equatable {
         SidebarCustomizeButton(browser: browser)
     }
 
-    /// Makes an item of the row's type, where quick add can make one.
+    /// Makes an item of the row's type, where the new item can make one.
     private func add(_ node: TypeNode) -> (() -> Void)? {
         guard let type = node.type, creatable.contains(type.rawValue) else { return nil }
-        return { browser.openQuickAdd(typeID: type.rawValue, in: library) }
+        return { browser.openNewItem(kind: type.rawValue, in: library) }
     }
 
     private func addName(_ node: TypeNode) -> String {

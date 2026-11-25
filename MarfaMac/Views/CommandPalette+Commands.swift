@@ -77,12 +77,12 @@ extension CommandPalette {
             }
             entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: keys(.newItem),
                                  takesFocus: true) {
-                browser.openQuickAdd(remembered: lastType, in: library)
+                browser.openNewItem(in: library)
             })
             for type in QuickAdd.types(in: library) {
                 entries.append(Entry(id: "command:new:" + type.id.rawValue, title: String(localized: "New \(type.label)"),
                                      icon: .type(library.catalogue.icon(for: type.id)), takesFocus: true, group: nil) {
-                    browser.openQuickAdd(typeID: type.id.rawValue, in: library)
+                    browser.openNewItem(kind: type.id.rawValue, in: library)
                 })
             }
             // After New Item and the typed ones, so the commands "new" finds lead with New Item.

@@ -17,7 +17,6 @@ struct CommandPalette: View {
     @Environment(Libraries.self) var libraries: Libraries?
     @StoredOrder var order
     @AppStorage(PageKey.fullWidth) var fullWidth = PageStyle().fullWidth
-    @AppStorage(QuickAdd.lastTypeKey) var lastType = ""
     @AppStorage(DateFormat.key) var dateFormat = DateFormat.standard
     @AppStorage(SearchOptions.includesArchivedKey) var includesArchived = SearchOptions.includesArchivedStandard
     @AppStorage(SearchOptions.includesFeedKey) var includesFeed = SearchOptions.includesFeedStandard
@@ -389,10 +388,10 @@ struct CommandPalette: View {
         }
     }
 
-    /// What was typed found nothing: quick add opens with the words as its title.
+    /// What was typed found nothing: a new item opens with the words as its title.
     private func newItem() {
         close(returningFocus: false)
-        browser.openQuickAdd(titled: query, remembered: lastType, in: library)
+        browser.openNewItem(title: query, in: library)
     }
 
     private func close(returningFocus: Bool = true) {
