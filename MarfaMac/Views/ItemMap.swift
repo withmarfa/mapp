@@ -26,7 +26,7 @@ struct ItemMap: View {
                 browser: browser, catalogue: library.catalogue, placing: placing, style: browser.mapStyle, groups: browser.groupsNearbyItems,
                 placeToken: AnyHashable(MapPlaceToken(library: key.library, place: key.place)), scheme: scheme, textSize: textSize,
                 reduceMotion: reduceMotion))
-            .ignoresSafeArea()
+            .ignoresSafeArea(.container, edges: .top)
             .overlay(alignment: .top) {
                 // The row's own band shows only once rows scroll under it, and the map is under it from the start.
                 ToolbarBand(toolbarHeight: space.lineHeight, isShown: true, strength: 0.78)

@@ -20,6 +20,8 @@ final class ItemMKMapView: MKMapView {
 final class PinAnnotation: NSObject, MKAnnotation {
     let pin: MapLayout.Pin
     let coordinate: CLLocationCoordinate2D
+    /// Whether the window has chosen the item, which then never joins a group, so its card always shows.
+    var isChosen = false
 
     init(_ pin: MapLayout.Pin) {
         self.pin = pin
@@ -39,7 +41,19 @@ final class MapController: NSObject, MKMapViewDelegate {
     private static let groupIdentifier = "group"
     private static let clustering = "items"
 
-    let mapView = ItemMKMapView()
+    /// Made when first asked for, since a view that holds a controller makes one each time it is built and keeps only the first.
+    lazy var mapView: ItemMKMapView = {
+        let mapView = ItemMKMapView()
+        mapView.delegate = self
+        mapView.showsCompass = false
+        mapView.showsZoomControls = false
+        mapView.isRotateEnabled = false
+        mapView.isPitchEnabled = false
+        mapView.setRegion(LocationFrame.world.region, animated: false)
+        mapView.onReturn = { [weak self] in _ = self?.browser?.openSelection() }
+        mapView.onEscape = { [weak self] in self?.browser?.selection = [] }
+        return mapView
+    }()
     private let artist = MapArtist()
     private var annotations: [ItemID: PinAnnotation] = [:]
     private var servedSerial: UUID?
@@ -53,18 +67,6 @@ final class MapController: NSObject, MKMapViewDelegate {
     /// Marks a selection the map itself made, which needs no moving of the map to show.
     private var choosing = false
     private weak var browser: Browser?
-
-    override init() {
-        super.init()
-        mapView.delegate = self
-        mapView.showsCompass = false
-        mapView.showsZoomControls = false
-        mapView.isRotateEnabled = false
-        mapView.isPitchEnabled = false
-        mapView.setRegion(LocationFrame.world.region, animated: false)
-        mapView.onReturn = { [weak self] in _ = self?.browser?.openSelection() }
-        mapView.onEscape = { [weak self] in self?.browser?.selection = [] }
-    }
 
     // MARK: Updating
 
@@ -178,7 +180,10 @@ final class MapController: NSObject, MKMapViewDelegate {
         let wanted: PinAnnotation? = selection.count == 1 ? selection.first.flatMap { annotations[$0] } : nil
         let current = mapView.selectedAnnotations.compactMap { $0 as? PinAnnotation }
         if current.count == 1, current.first === wanted { return }
+        // A marker that was chosen and no longer is may join a group again.
+        for annotation in annotations.values where annotation.isChosen && annotation !== wanted { setChosen(annotation, false) }
         if let wanted {
+            setChosen(wanted, true)
             if !choosing, !mapView.visibleMapRect.contains(MKMapPoint(wanted.coordinate)) {
                 mapView.setCenter(wanted.coordinate, animated: !reduceMotion)
             }
@@ -188,7 +193,20 @@ final class MapController: NSObject, MKMapViewDelegate {
         }
     }
 
+    /// Marks a marker chosen or not. One inside a group is taken off the map and put back, so it stands alone.
+    private func setChosen(_ annotation: PinAnnotation, _ chosen: Bool) {
+        guard annotation.isChosen != chosen else { return }
+        annotation.isChosen = chosen
+        if let view = mapView.view(for: annotation) {
+            configure(view, for: annotation)
+        } else {
+            mapView.removeAnnotation(annotation)
+            mapView.addAnnotation(annotation)
+        }
+    }
+
     func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+        if let pin = view.annotation as? PinAnnotation { pin.isChosen = true }
         configure(view, for: view.annotation)
         if let pin = view.annotation as? PinAnnotation {
             choosing = true
@@ -201,6 +219,7 @@ final class MapController: NSObject, MKMapViewDelegate {
     }
 
     func mapView(_ mapView: MKMapView, didDeselect view: MKAnnotationView) {
+        (view.annotation as? PinAnnotation)?.isChosen = false
         configure(view, for: view.annotation)
         guard let pin = view.annotation as? PinAnnotation else { return }
         // Moving from one marker to the next deselects the first before it selects the second.
@@ -255,11 +274,11 @@ final class MapController: NSObject, MKMapViewDelegate {
         let icon = catalogue.icon(for: pin.type)
         let drawn = artist.marker(
             glyph: icon, tone: TypeTone(icon: icon), title: pin.title, typeName: catalogue.label(for: pin.type), subtitle: pin.subtitle,
-            isChosen: view.isSelected)
+            isChosen: annotation.isChosen)
         place(drawn, in: view)
-        view.clusteringIdentifier = groups ? Self.clustering : nil
-        view.displayPriority = view.isSelected ? .required : .defaultLow
-        view.zPriority = view.isSelected ? .max : .defaultUnselected
+        view.clusteringIdentifier = groups && !annotation.isChosen ? Self.clustering : nil
+        view.displayPriority = annotation.isChosen ? .required : .defaultLow
+        view.zPriority = annotation.isChosen ? .max : .defaultUnselected
         view.canShowCallout = false
         view.setAccessibilityElement(true)
         view.setAccessibilityRole(.button)
