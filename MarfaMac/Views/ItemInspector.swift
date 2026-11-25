@@ -338,3 +338,11 @@ private struct PanelSection<Content: View, Add: View>: View {
         }
     }
 }
+
+extension PanelSection where Add == EmptyView {
+    /// A section with no plus.
+    fileprivate init(title: LocalizedStringKey, count: Int? = nil, placeholder: LocalizedStringKey? = nil, boxed: Bool = true,
+                     @ViewBuilder content: () -> Content) {
+        self.init(title: title, count: count, placeholder: placeholder, boxed: boxed, add: { _ in EmptyView() }, content: content)
+    }
+}
