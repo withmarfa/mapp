@@ -13,7 +13,7 @@ paths:
 
 # Making and editing
 
-Every change a person makes to an item is an `ItemWrite` through `ItemLibrary`. `docs/value-panels.md` says how a value is edited in its panel. `MarfaMac/Model/AGENTS.md` says how a write is kept.
+Item changes go through `ItemLibrary` as `ItemWrite` values. See `docs/value-panels.md` for value editing and `MarfaMac/Model/AGENTS.md` for write storage.
 
 ## What an item allows
 
@@ -42,6 +42,7 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 - **Add (↩) keeps the line open with the same kind,** with an Undo. ⌘↩ adds and opens; ⇧↩ opens the text form.
 - **Words stay in the title until Add or ⇧↩ take out what was read** (`QuickAdd.finishLine`); chips show it (`QuickAdd.lineChips`).
 - **Delete on a chip stops it being read** (`QuickAdd.Draft.decline`).
+- An offer chosen for a typed word keeps the word (`QuickAdd.Mark`).
 - **A tag is `#` and a letter at a word's start** (`NewItemText.tags`); reserved tags are never read.
 - **A day becomes the due day, else the start day** (`QuickAdd.dayField`), in the person's locale.
 - **A web address pasted into an empty line makes a bookmark** (`QuickAdd.bookmarkKind`).
