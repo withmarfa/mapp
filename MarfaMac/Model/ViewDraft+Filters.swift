@@ -1,8 +1,8 @@
 import Foundation
 import Marfa
 
-/// How the filter row's clauses become the conditions of a saved view's `query.filter`, and a view's conditions the
-/// row's clauses. The core writes and reads the grammar (`FilterExpression`), so nothing here quotes or escapes a value.
+/// How the window's filter clauses become the conditions of a saved view's `query.filter`, and a view's conditions the
+/// window's clauses. The core writes and reads the grammar (`FilterExpression`), so nothing here quotes or escapes a value.
 ///
 /// A clause becomes a piece: the conditions it takes and how they join among themselves (a chip of several "is" values is
 /// OR, one of several "is not" values is AND, a date's bounds are AND). The pieces join by AND, or all by OR where the row

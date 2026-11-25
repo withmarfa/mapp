@@ -47,7 +47,7 @@ final class ItemTableContent {
     lazy var rows: [ItemTableRow] = Cost.measure(.tableRows) {
         ItemTableLayout.sorted(kept, by: sort)
     }
-    /// Every group in order, the hidden and the empty ones too: what Edit View lists to order and hide. A grouping the
+    /// Every group in order, the hidden and the empty ones too: what the View panel's Group lists to order and hide. A grouping the
     /// person or the view chose lists its empty groups (`declared`), which a place's own grouping by status does not.
     lazy var allGroups: [ItemTableGroup] = Cost.measure(.tableGroups) {
         guard let grouping else { return [] }

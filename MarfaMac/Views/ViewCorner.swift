@@ -31,7 +31,7 @@ struct ViewCorner: View {
     }
 }
 
-/// The gallery's card size as a choice of three, ticked for the one showing. It is the value Edit View's Cards section
+/// The gallery's card size as a choice of three, ticked for the one showing. It is the value the View panel's Card Size
 /// reads and writes.
 struct GalleryCardSizeOptions: View {
     @Bindable var browser: Browser

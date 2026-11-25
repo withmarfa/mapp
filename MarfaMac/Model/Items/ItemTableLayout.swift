@@ -57,7 +57,7 @@ nonisolated struct ItemTableOptions: Hashable, Sendable {
     /// The groups left out, whose items still count in the place. A saved view's `group.hidden`, or a place's own.
     var hiddenGroups: Set<String>?
     var sort: [ItemTableComparator]?
-    /// The filter row's clauses and whether any one of them will do (`FilterClause`).
+    /// The filter's clauses and whether any one of them will do (`FilterClause`).
     var filter = FilterState()
     var collapsed: Set<String>?
     /// How many rows show at first and each time Load More is chosen. Kept with the place's other choices, not in
@@ -210,7 +210,7 @@ nonisolated enum ItemTableLayout {
             }
         }
 
-        // What the looks do not show waits behind View Options. Where each item is filed is one of those.
+        // What the looks do not show waits in the View panel's Properties. Where each item is filed is one of those.
         for relation in Relation.allCases where !used.contains(ItemTableColumn.relation(relation, in: catalogue).id) {
             add(.relation(relation, in: catalogue), shown: false)
         }

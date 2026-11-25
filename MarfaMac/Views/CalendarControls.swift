@@ -67,7 +67,7 @@ struct CalendarCornerView: View {
 struct ItemCalendarOptions: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
-    /// The keys the menu binds; the toolbar's copy in View Options has none and leaves them to the menu.
+    /// The keys the menu binds.
     var shortcuts: ShortcutBindings?
 
     var body: some View {

@@ -1,7 +1,7 @@
 import Foundation
 
-/// One Group by for every layout and place (`GroupOffer`): what it offers, what the layout shows, and the changes View
-/// Options and Edit View make. A choice is the place's grouping (`ItemTableOptions.grouping`), kept in a place's default
+/// One Group by for every layout and place (`GroupOffer`): what it offers, what the layout shows, and the changes the View
+/// panel and the View menu make. A choice is the place's grouping (`ItemTableOptions.grouping`), kept in a place's default
 /// view or written to a saved view by the window's funnel (`choicesChanged`).
 extension Browser {
     /// What Group by offers in the open place and layout.
@@ -109,7 +109,7 @@ extension Browser {
         tableOptions[shown, default: .init()].collapsed = []
     }
 
-    /// The groups of the open layout in order, hidden ones too, as Edit View lists them: a board's lanes, else the
+    /// The groups of the open layout in order, hidden ones too, as the View panel's Group lists them: a board's lanes, else the
     /// groups of the list or table.
     func groupRows(in library: any ItemLibrary) -> [(key: String, title: String)] {
         if viewMode == .board { return boardLanes(in: library)?.all.map { ($0.groupKey, $0.title) } ?? [] }

@@ -10,7 +10,7 @@ enum SavedViews {
             && ViewDraft.query(for: browser.shown, catalogue: library.catalogue, views: library.views) != nil
     }
 
-    /// Whether Edit View has a panel for the window's place: a saved view, or a place that could become one.
+    /// Whether the View panel can save the window's place: a saved view, or a place that could become one.
     static func canEdit(_ browser: Browser, in library: any ItemLibrary) -> Bool {
         library.isLoaded && !browser.showsPlaceIndex
             && (shown(browser, in: library) != nil

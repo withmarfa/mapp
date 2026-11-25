@@ -243,7 +243,7 @@ final class Browser {
     var panelIsOut: Bool { palette != nil || (quickAdd.isPresented && quickAdd.draft != nil) || isModalPresented }
     /// The window's quick-add panel and what is typed in it.
     let quickAdd = QuickAdd()
-    /// Whether the list's search is out as a field, rather than a button beside View Options.
+    /// Whether the list's search is out as a field, rather than a button beside the View button.
     var isSearchExpanded = false
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0

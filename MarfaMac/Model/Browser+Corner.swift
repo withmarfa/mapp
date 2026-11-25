@@ -28,7 +28,7 @@ extension Browser {
         timelineTodayRequests += 1
     }
 
-    /// Sets the gallery's card size, the value Edit View's Cards section reads and writes.
+    /// Sets the gallery's card size, the value the View panel's Card Size reads and writes.
     func setCardSize(_ size: ViewCards.Size) {
         changeCards { $0.size = size }
     }

@@ -245,7 +245,7 @@ extension AppCommands {
     }
 }
 
-/// The list's own search, beside View Options, from ⌥⌘F under Find, as Notes has it.
+/// The list's own search, beside the View button, from ⌥⌘F under Find, as Notes has it.
 struct SearchListButton: View {
     @FocusedValue(\.browser) private var browser
 

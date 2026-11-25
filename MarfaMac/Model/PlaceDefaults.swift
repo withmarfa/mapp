@@ -70,7 +70,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     var hiddenGroups: [String] = []
     /// Whether a group with no items is left out.
     var hidesEmptyGroups = false
-    /// The filter row's clauses, which may be relative to the day (a view keeps none of those), and whether any one will do.
+    /// The filter's clauses, which may be relative to the day (a view keeps none of those), and whether any one will do.
     var filter: [FilterClause] = []
     var matchesAny = false
     /// The date field the timeline places its items on.

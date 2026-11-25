@@ -64,12 +64,8 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | The row of views | Pills in an order the app keeps for each place; a pill is dragged, and its menu has Hide. Past the room, N More, whose menu ends with New View…. A place with one view has no row. | `ListToolbar.swift`, `ViewMacSettings` | `Rethink-Top-Row-Lists`, `Rethink-View-Menu` |
-| The View panel | One panel replaces View Options, View As, Edit View and the filter row. Each part is one level in: Layout, Properties, Filter, Sort, Group, Types, From, Archived Items, Open Items, then the layout's own. | `ViewEditPanel.swift`, `ItemViewOptions.swift`, `FilterRow.swift` | `Rethink-View-Panels`, `Rethink-View-Filter`, `Rethink-View-Filter-Add`, `Rethink-View-Sort`, `Rethink-View-Group`, `Rethink-View-Properties`, `Rethink-View-Types`, `Rethink-View-From` |
-| Where it is kept | The foot of the View panel says "Kept for Marfa for Mac." for a place's first view, and "Saved in Marfa for every app." for a saved view alone. | `PlaceDefaults`, `ViewEditPanel.swift` | `Rethink-View-Panels` |
 | A changed view | A change is written as it is made. The pill's dot shows while the view differs from how it was when last opened on the Mac. Revert View puts that back; Save as New View… makes another. | `Browser+ViewWrites.swift`, `Browser+SavedViews.swift` | `Rethink-View-Changed` |
 | Offline | A change to a view waits, and the pill says so on hover. A new view waits too. | `Browser+ViewWrites.swift` | `Rethink-Offline` |
-| Plain filters first | Filter groups, and dates relative to the day, are offered only when Marfa can save them. | `ViewDraft`, `FilterOp` | `Rethink-View-Filter-Group` |
-| Set, Not Set and status groups | A saved view keeps them; Marfa and the package take them. | `ViewDraft`, `GroupMode` | `Rethink-View-Group` |
 | Groupings to come | By collection and by tag, with the order of a date's groups following the sort. | `GroupOffer`, `GroupMode` | `Rethink-View-Group` |
 
 ## Making a view

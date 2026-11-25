@@ -72,7 +72,7 @@ struct ColumnSearch: ToolbarContent {
 
 enum ColumnSearchMetrics {
     /// What a column's toolbar keeps beside an open field: the toolbar's margin on each side, so the glass sits as
-    /// far from what precedes it as from the column's end, and Filter and View Options in the same glass.
+    /// far from what precedes it as from the column's end, and the View button in the same glass.
     static let columnChrome: CGFloat = 89
     /// The room the sidebar button takes at the start of the list column's toolbar while the sidebar is hidden.
     static let sidebarButtonRoom: CGFloat = 46

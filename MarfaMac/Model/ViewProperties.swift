@@ -112,7 +112,7 @@ nonisolated extension ItemTableColumn {
     /// Whether the column is a status, which a row says first, as a chip of its own.
     var isStatus: Bool { style == .status && field != nil }
 
-    /// The symbol that stands for what the property holds, beside its name in Edit View.
+    /// The symbol that stands for what the property holds, beside its name in the View panel's Properties.
     var symbol: String {
         switch content {
         case .title: "textformat"

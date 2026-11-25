@@ -35,10 +35,10 @@ extension EmptyState where Actions == EmptyView {
     }
 }
 
-/// What a grouped layout says when every group holding items is hidden: the items are there, and Edit View shows them.
+/// What a grouped layout says when every group holding items is hidden: the items are there, and the View panel shows them.
 struct HiddenGroupsEmptyState: View {
     var body: some View {
-        EmptyState("Groups Hidden", detail: "Every group with items is hidden. Show a group in Edit View to see its items.")
+        EmptyState("Groups Hidden", detail: "Every group with items is hidden. Show a group in the View panel to see its items.")
     }
 }
 
