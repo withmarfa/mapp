@@ -191,6 +191,8 @@ extension MarfaLibrary {
         Cost.measure(.relationships) { readRelationFields(of: id) }
     }
 
+    /// Every field Marfa lets the item hold, or that it already holds, own or inverse. A two-way type's links read the
+    /// same from both ends, so its inverse joins its own field, unless only the inverse end admits the item.
     /// Filled fields come first. Within each group, sort own fields before inverses, then by label and field name.
     private func readRelationFields(of id: ItemID) -> [RelationField] {
         guard let item = headerItem(id) else { return [] }
@@ -198,16 +200,19 @@ extension MarfaLibrary {
         var ends: [String: FieldEnd] = [:]
         for info in catalogue.edgeTypes.values {
             let written = info.writtenFrom == .to
-            if admits(item.type, info, atTo: written) {
+            let own = admits(item.type, info, atTo: written)
+            if own {
                 ends[written ? info.reverseName ?? info.id : info.id] = FieldEnd(info: info, atTo: written, isInverse: false)
             }
-            if !info.isTwoWay, admits(item.type, info, atTo: !written) {
+            if !(info.isTwoWay && own), admits(item.type, info, atTo: !written) {
                 ends[Self.inversePrefix + info.id] = FieldEnd(info: info, atTo: !written, isInverse: true)
             }
         }
         for link in index.links(touching: id) {
             guard let held = fieldEnd(link.holder == id ? link.type : Self.inversePrefix + link.type) else { continue }
-            if held.isInverse, held.info.isTwoWay { continue }
+            if held.isInverse, held.info.isTwoWay, ends.values.contains(where: { $0.info.id == held.info.id && !$0.isInverse }) {
+                continue
+            }
             if ends.values.contains(where: { $0.info.id == held.info.id && $0.atTo == held.atTo }) { continue }
             let name = held.isInverse ? Self.inversePrefix + held.info.id : held.atTo ? held.info.reverseName ?? held.info.id : held.info.id
             ends[name] = held
