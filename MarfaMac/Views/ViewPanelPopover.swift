@@ -36,7 +36,7 @@ struct ViewPanelButton: View {
         }
         .toggleStyle(.button)
         .background(TrailingRoomProbe(room: room))
-        .disabled(!browser.offersViewOptions || !library.isLoaded || browser.showsSidebarIndex)
+        .disabled(!browser.offersViewOptions || !library.isLoaded || browser.showsPlaceIndex)
         .help("View")
         .accessibilityLabel(Self.label(count: count, changed: changed))
         .accessibilityIdentifier("ViewOptionsToolbar")

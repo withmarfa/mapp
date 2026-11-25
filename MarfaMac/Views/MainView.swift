@@ -274,8 +274,7 @@ struct MainView: View {
             return nil
         }
         if let folds = crossed(Self.panelFoldsBelow) {
-            // A panel opened for the moment, as by the view panel, is not the person's, so it is not opened again.
-            if folds, details.isPresented { foldedPanel = details.isPresentedByPerson; details.isPresented = false }
+            if folds, details.isPresented { foldedPanel = true; details.isPresented = false }
             else if !folds, foldedPanel { foldedPanel = false; details.isPresented = true }
         }
         if let folds = crossed(Self.sidebarFoldsBelow) {
@@ -311,10 +310,10 @@ struct MainView: View {
         .modifier(CommandValuePanels(details: details))
         .modifier(FieldEditSheets(details: details))
         .sheet(item: Binding { details.typeValues } set: { details.typeValues = $0 }) { TypeValuesSheet(request: $0) }
-        .onChange(of: details.isPresentedByPerson) {
+        .onChange(of: details.isPresented) {
             // What the window folded is not the person's choice: the panel the person opens is theirs again.
-            if details.isPresentedByPerson { foldedPanel = false }
-            if restoresWindow { storedDetailsPresented = details.isPresentedByPerson }
+            if details.isPresented { foldedPanel = false }
+            if restoresWindow { storedDetailsPresented = details.isPresented }
         }
         .onChange(of: isSidebarVisible) { if isSidebarVisible { foldedSidebar = false } }
         .overlay(alignment: .top) {

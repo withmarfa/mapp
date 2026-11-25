@@ -2,9 +2,8 @@ import AppKit
 import MarfaIcons
 import SwiftUI
 
-// The row of filters above a list, and the two panels it opens. Nothing here knows `Browser`: the row takes chips and
-// actions, the panels take rows and actions, so the command palette's filter row can use them as they are. `FilterRow`
-// is the adaptor that maps a window's filters onto them.
+// A row of filter chips, and the two panels it opens. Nothing here knows `Browser`: the row takes chips and actions,
+// the panels take rows and actions, so the command palette's filter row uses them as they are.
 
 /// One filter as the row draws it: "Status is not Completed, Canceled".
 struct FilterChipItem: Identifiable, Hashable {

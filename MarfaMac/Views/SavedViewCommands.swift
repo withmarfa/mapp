@@ -9,7 +9,7 @@ struct SavedViewCommand {
     static func commands(for browser: Browser, in library: any ItemLibrary, order: ItemOrder) -> [SavedViewCommand] {
         var commands: [SavedViewCommand] = []
         let shown = SavedViews.shown(browser, in: library)
-        if browser.offersViewOptions, library.isLoaded, !browser.showsSidebarIndex {
+        if browser.offersViewOptions, library.isLoaded, !browser.showsPlaceIndex {
             commands.append(SavedViewCommand(title: String(localized: "View…"), systemImage: "slider.horizontal.3") {
                 browser.openViewPanel(in: library)
             })
@@ -68,7 +68,7 @@ struct SavedViewMenu: View {
         let shown = browser.flatMap { browser in library.flatMap { SavedViews.shown(browser, in: $0) } }
         let reachesServer = library?.reachesServer == true
         let canSave = browser.flatMap { browser in library.map { SavedViews.canSave(browser, in: $0) } } ?? false
-        let opens = browser.flatMap { browser in library.map { browser.offersViewOptions && $0.isLoaded && !browser.showsSidebarIndex } } ?? false
+        let opens = browser.flatMap { browser in library.map { browser.offersViewOptions && $0.isLoaded && !browser.showsPlaceIndex } } ?? false
         Button("View…", systemImage: "slider.horizontal.3") {
             if let browser, let library { browser.openViewPanel(in: library) }
         }

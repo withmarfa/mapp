@@ -80,3 +80,26 @@ struct ListEmptyState: View {
         }
     }
 }
+
+/// The answer to filters that hide every item, in the layouts that have no empty state of their own for it.
+struct FilteredEmptyState: View {
+    @CurrentLibrary private var library
+    let browser: Browser
+
+    var body: some View {
+        if browser.filtersHideEverything(in: library) {
+            EmptyState(title: Text("No Matching Items"), detail: Text("No items match the filters.")) {
+                Button("Clear Filters") { browser.clearFilters() }
+            }
+            .background(.background)
+            .accessibilityIdentifier("FilteredEmptyState")
+        }
+    }
+}
+
+extension View {
+    /// Says so, with Clear Filters, where the place's filters hide every item.
+    func filteredEmptyState(_ browser: Browser) -> some View {
+        overlay { FilteredEmptyState(browser: browser) }
+    }
+}

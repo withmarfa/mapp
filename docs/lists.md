@@ -77,7 +77,6 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 | Which fields a place offers | `FilterOffer`, `FilterTarget` |
 | The operators of a kind of field, in order | `FilterOp.offered(for:)` |
 | The View panel's Filter page and a condition's panel | `ViewPanelFilter`, `FilterConditionEditor`, `FilterClausePanel` |
-| An index page's row and its chips | `FilterRow`, `FilterChips` |
 | What a chip says | `FilterWording` |
 | Which rows a filter keeps in the window | `FilterMatching` |
 | To and from a saved view's query | `ViewDraft` in `ViewDraft+Filters.swift` |
@@ -101,7 +100,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 ## Indexes
 
-- **Library › Types, Collections and Sources list places** (`PlaceIndex`), under the Library's title, count and views, with the place chosen. Search narrows the rows by name. With no view to set up, they draw no View Options button, unlike the boards.
+- **Library › Types, Collections and Sources list places** (`PlaceIndex`), under the Library's title, count and views, with the place chosen. Search narrows the rows by name. With no view to set up, they draw no View button, unlike the boards.
 - **Types nest kinds under their type.** Made By waits for the package's provenance; a type has no link to copy.
 - **A source's Kind** is Connector where `GET /plugins` names it, App for an `oauth:` code, else empty (`SourceKind`).
 - **A table of more than 2,000 items is made off the main actor** (`Browser.arrange`), its last table showing meanwhile. A search's table is held apart.

@@ -233,11 +233,6 @@ final class DetailsPresentation {
         history = nil
     }
 
-    /// Whether the person has the sidebar open, for the next launch.
-    var isPresentedByPerson: Bool {
-        isPresented
-    }
-
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
         if let draft = drafts[itemID]?[key] { return draft }
         let draft = ItemPropertyDraft()

@@ -481,7 +481,6 @@ final class Browser {
         viewPanel?.handOff(because: .libraryChanged)
         viewPanel = nil
         observedChoices = [:]
-        indexFilterChoice = [:]
         toldUnkept = [:]
         replacedGroups = [:]
         writingViews = []
@@ -579,10 +578,6 @@ final class Browser {
     /// Each view's groups this window replaced, by field, so grouping by that field again (an Undo, or a choice made
     /// back) gives back the groups another app ordered and hid there.
     @ObservationIgnored var replacedGroups: [ItemID: [String: LibraryViewGroup]] = [:]
-
-    /// Whether an index page's row of filters shows, where the person chose, which is window state and never saved
-    /// (`Browser+IndexPage`). A page the person did not choose for shows it by what it holds.
-    var indexFilterChoice: PlaceMemory<Bool> = [:]
 
     /// What the gallery draws on each card in a place that is not a saved view, as its default view keeps it
     /// (`Browser+PlaceDefaults`).
