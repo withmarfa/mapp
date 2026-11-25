@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Observation
 
 /// A row the sidebar can show, named by a key that stays the same across launches, so what the person chose to hide
@@ -150,8 +151,15 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     var homes: [String: String]?
     /// The color the person chose for a view's mark, by the place's key and the tone's name.
     var colors: [String: String]?
+    /// The sections this copy cannot read, such as a kind a later copy added, by their position among all the sections,
+    /// written back there so that copy keeps them.
+    private var laterGroups: [Int: JSONValue] = [:]
 
     init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case hidden, order, collapsed, tabs, groups, homes, colors
+    }
 
     init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -159,9 +167,34 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         order = try values.decodeIfPresent([String].self, forKey: .order) ?? []
         collapsed = try values.decodeIfPresent(Set<String>.self, forKey: .collapsed) ?? []
         tabs = try values.decodeIfPresent([SidebarTab].self, forKey: .tabs)
-        groups = try values.decodeIfPresent([SidebarGroup].self, forKey: .groups)
+        if let stored = try values.decodeIfPresent([JSONValue].self, forKey: .groups) {
+            var known: [SidebarGroup] = []
+            for (index, raw) in stored.enumerated() {
+                if let group = try? JSONDecoder().decode(SidebarGroup.self, from: JSONEncoder().encode(raw)) {
+                    known.append(group)
+                } else {
+                    laterGroups[index] = raw
+                }
+            }
+            groups = known.isEmpty && !laterGroups.isEmpty ? nil : known
+        }
         homes = try values.decodeIfPresent([String: String].self, forKey: .homes)
         colors = try values.decodeIfPresent([String: String].self, forKey: .colors)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(hidden, forKey: .hidden)
+        try values.encode(order, forKey: .order)
+        try values.encode(collapsed, forKey: .collapsed)
+        try values.encodeIfPresent(tabs, forKey: .tabs)
+        if groups != nil || !laterGroups.isEmpty {
+            var all = try (groups ?? []).map { try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode($0)) }
+            for (index, raw) in laterGroups.sorted(by: { $0.key < $1.key }) { all.insert(raw, at: min(index, all.count)) }
+            try values.encode(all, forKey: .groups)
+        }
+        try values.encodeIfPresent(homes, forKey: .homes)
+        try values.encodeIfPresent(colors, forKey: .colors)
     }
 
     func isHidden(_ place: SidebarPlace) -> Bool { hidden.contains(place.key) }

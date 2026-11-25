@@ -47,6 +47,22 @@ struct SidebarTabsTests {
         #expect(try JSONDecoder().decode(SidebarLayout.self, from: JSONEncoder().encode(layout)) == layout)
     }
 
+    @Test func aSectionOfAKindThisCopyDoesNotKnowIsSkippedAloneAndKept() throws {
+        let saved = Data(#"""
+        {"groups":[{"id":"library","kind":"library","tab":"home","isHidden":false,"shortcuts":[]},
+        {"id":"later","kind":"pinboard","tab":"home","extra":1},
+        {"id":"types","kind":"types","tab":"home","isHidden":false,"shortcuts":[]}],"order":["library"]}
+        """#.utf8)
+        var layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
+        #expect(layout.allGroups.map(\.id) == ["library", "types"])
+        #expect(layout.order == ["library"])
+        layout.setHidden(.library, true)
+        let back = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(layout)) as? [String: Any])
+        let groups = try #require(back["groups"] as? [[String: Any]])
+        #expect(groups.map { $0["id"] as? String } == ["library", "later", "types"])
+        #expect(groups[1]["kind"] as? String == "pinboard" && groups[1]["extra"] as? Int == 1)
+    }
+
     @Test func draggingARowAcrossTheBlocksOfADefaultSectionIsKept() {
         var layout = SidebarLayout()
         let members = SidebarPlan(library(), layout: layout).section(.views)?.members ?? []
