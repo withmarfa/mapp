@@ -1,4 +1,5 @@
 import Foundation
+import MapKit
 import Testing
 @testable import MarfaMac
 
@@ -39,6 +40,35 @@ struct MapLayoutTests {
         #expect(MapLayout.canPlace(types: [TypeID("core.note"), TypeID("core.event")], catalogue: Self.catalogue))
         let placing = MapLayout.placing(for: items, catalogue: Self.catalogue)
         #expect(placing.pins.isEmpty && placing.unplaced.count == 2)
-        #expect(placing.frame == .world)
+        #expect(placing.mapRect.contains(MKMapPoint(CLLocationCoordinate2D(latitude: 0, longitude: 0))))
+    }
+
+    @Test func fittingDistantItemsIncludesEveryPin() {
+        let items = [
+            Self.item(1, "core.event", ["latitude": Self.number("-77.85"), "longitude": Self.number("166.67")]),
+            Self.item(2, "core.event", ["latitude": Self.number("89"), "longitude": Self.number("-179")]),
+        ]
+        let placing = MapLayout.placing(for: items, catalogue: Self.catalogue)
+        #expect(placing.pins.count == 2)
+        #expect(placing.pins.allSatisfy { placing.mapRect.contains(MKMapPoint($0.point.coordinate)) })
+    }
+
+    @MainActor @Test func refreshingTheMiddleOfASavedViewReplacesItsPins() {
+        let items = (1...4).map { Self.item($0, "core.event", ["latitude": Self.number("51"), "longitude": Self.number("0")]) }
+        let library = FakeItemLibrary(items: items)
+        let view = LibraryView(id: ItemID("view-map"), title: "Places", query: LibraryViewQuery(types: [TypeID("core.event")]))
+        library.views = [view]
+        library.viewMembers[view.id] = [items[0].id, items[1].id, items[3].id]
+        let browser = Browser()
+        browser.adopt(library)
+        browser.showing = .saved(view.id)
+        let work = MapPlacingWork()
+
+        let first = browser.mapItems(in: library)
+        #expect(work.placing(for: first.key, items: first.items, catalogue: Self.catalogue)?.pins.map(\.id) == library.viewMembers[view.id])
+
+        library.viewMembers[view.id] = [items[0].id, items[2].id, items[3].id]
+        let refreshed = browser.mapItems(in: library)
+        #expect(work.placing(for: refreshed.key, items: refreshed.items, catalogue: Self.catalogue)?.pins.map(\.id) == library.viewMembers[view.id])
     }
 }

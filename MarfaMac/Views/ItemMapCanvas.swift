@@ -2,14 +2,17 @@ import AppKit
 import MapKit
 import SwiftUI
 
-/// An Apple map that reports Return and Escape, which a map view otherwise leaves to its responders.
+/// An Apple map that reports Return, Escape and Command-Delete while it has the keyboard.
 final class ItemMKMapView: MKMapView {
     var onReturn: (() -> Void)?
     var onEscape: (() -> Void)?
+    var onDelete: (() -> Void)?
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
         case 36, 76: onReturn?()
+        case 51 where ShortcutModifiers(event.modifierFlags) == .command:
+            if !event.isARepeat { onDelete?() }
         case 53: onEscape?()
         default: super.keyDown(with: event)
         }
@@ -49,7 +52,7 @@ final class MapController: NSObject, MKMapViewDelegate {
         mapView.showsZoomControls = false
         mapView.isRotateEnabled = false
         mapView.isPitchEnabled = false
-        mapView.setRegion(LocationFrame.world.region, animated: false)
+        mapView.setVisibleMapRect(.world, animated: false)
         mapView.onReturn = { [weak self] in _ = self?.browser?.openSelection() }
         mapView.onEscape = { [weak self] in self?.browser?.selection = [] }
         return mapView
@@ -98,12 +101,12 @@ final class MapController: NSObject, MKMapViewDelegate {
         shown = inputs.placing
         let regroups = groups != inputs.groups
         groups = inputs.groups
-        if let placing = inputs.placing {
-            if placing.serial != servedSerial || regroups { show(placing, rebuilding: regroups) }
-            if redrawn { redrawViews() }
-            if pendingFit { fit(placing, animated: false) }
-        }
-        syncSelection(inputs.browser.selection, placing: inputs.placing)
+        // A large place may have no placement yet. Take the last place's markers off the map at once.
+        let placing = inputs.placing ?? .empty
+        if placing.serial != servedSerial || regroups { show(placing, rebuilding: regroups) }
+        if redrawn { redrawViews() }
+        if pendingFit, let shown { fit(shown, animated: false) }
+        syncSelection(inputs.browser.selection)
     }
 
     private static func configuration(for style: ItemMapStyle) -> MKMapConfiguration {
@@ -160,23 +163,14 @@ final class MapController: NSObject, MKMapViewDelegate {
     /// Shows every marker, with room under the top row at the head and for Apple's mark and Legal at the foot.
     private func fit(_ placing: MapLayout.Placing, animated: Bool) {
         pendingFit = false
-        let rect = Self.rect(of: placing.frame.region)
-        mapView.setVisibleMapRect(rect, edgePadding: NSEdgeInsets(top: 84, left: 48, bottom: 64, right: 48), animated: animated && !reduceMotion)
-    }
-
-    private static func rect(of region: MKCoordinateRegion) -> MKMapRect {
-        let north = region.center.latitude + region.span.latitudeDelta / 2, south = region.center.latitude - region.span.latitudeDelta / 2
-        let west = region.center.longitude - region.span.longitudeDelta / 2, east = region.center.longitude + region.span.longitudeDelta / 2
-        let topLeft = MKMapPoint(CLLocationCoordinate2D(latitude: min(85, north), longitude: max(-180, west)))
-        let bottomRight = MKMapPoint(CLLocationCoordinate2D(latitude: max(-85, south), longitude: min(180, east)))
-        return MKMapRect(
-            x: topLeft.x, y: topLeft.y, width: max(1, bottomRight.x - topLeft.x), height: max(1, bottomRight.y - topLeft.y))
+        mapView.setVisibleMapRect(
+            placing.mapRect, edgePadding: NSEdgeInsets(top: 84, left: 48, bottom: 64, right: 48), animated: animated && !reduceMotion)
     }
 
     // MARK: Choosing
 
     /// Makes the chosen marker the window's single selection, and takes it off the map where the selection is anything else.
-    private func syncSelection(_ selection: Set<ItemID>, placing: MapLayout.Placing?) {
+    private func syncSelection(_ selection: Set<ItemID>) {
         let wanted: PinAnnotation? = selection.count == 1 ? selection.first.flatMap { annotations[$0] } : nil
         let current = mapView.selectedAnnotations.compactMap { $0 as? PinAnnotation }
         if current.count == 1, current.first === wanted { return }
@@ -209,6 +203,7 @@ final class MapController: NSObject, MKMapViewDelegate {
         if let pin = view.annotation as? PinAnnotation { pin.isChosen = true }
         configure(view, for: view.annotation)
         if let pin = view.annotation as? PinAnnotation {
+            guard annotations[pin.pin.id] === pin else { return }
             choosing = true
             if browser?.selection != [pin.pin.id] { browser?.selection = [pin.pin.id] }
             choosing = false
@@ -224,7 +219,8 @@ final class MapController: NSObject, MKMapViewDelegate {
         guard let pin = view.annotation as? PinAnnotation else { return }
         // Moving from one marker to the next deselects the first before it selects the second.
         Task { @MainActor [weak self] in
-            guard let self, self.mapView.selectedAnnotations.isEmpty, self.browser?.selection == [pin.pin.id] else { return }
+            guard let self, self.annotations[pin.pin.id] === pin, self.mapView.selectedAnnotations.isEmpty,
+                  self.browser?.selection == [pin.pin.id] else { return }
             self.browser?.selection = []
         }
     }
@@ -304,7 +300,7 @@ final class MapController: NSObject, MKMapViewDelegate {
     }
 
     private func open(_ id: ItemID) {
-        guard let browser else { return }
+        guard let browser, annotations[id] != nil else { return }
         browser.selection = [id]
         _ = browser.open([id])
     }
@@ -314,11 +310,24 @@ final class MapController: NSObject, MKMapViewDelegate {
 struct ItemMapCanvas: NSViewRepresentable {
     let controller: MapController
     let inputs: MapController.Inputs
+    private var delete = ChosenItemDeletion()
+
+    init(controller: MapController, inputs: MapController.Inputs) {
+        self.controller = controller
+        self.inputs = inputs
+    }
 
     func makeNSView(context: Context) -> ItemMKMapView { controller.mapView }
 
     func updateNSView(_ view: ItemMKMapView, context: Context) {
         controller.update(inputs)
+        let delete = delete
+        let place = inputs.browser.shown
+        let placing = inputs.placing
+        view.onDelete = { [weak browser = inputs.browser] in
+            guard let browser, browser.shown == place, let placing else { return }
+            delete(browser) { Set(placing.pinsByID.keys) }
+        }
     }
 }
 

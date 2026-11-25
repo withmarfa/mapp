@@ -65,19 +65,24 @@ extension Browser {
         let search: String?
         let options: ItemTableOptions
         let tokens: [FilterClause]
-        /// Where the items cannot be told by a revision, as a saved view's list arriving: the list's size and ends.
-        let count: Int
-        let first: ItemID?
-        let last: ItemID?
+        /// The ordered IDs when a result can change independently of the library's revisions.
+        let itemIDsHash: Int?
     }
 
     /// The items the map places: what the place lists, less those its filters hide, and the key their placing is held by.
     func mapItems(in library: any ItemLibrary) -> (items: [Item], key: MapKey) {
         let items = filteredItems(in: library)
+        let options = tableOptions[shown] ?? ItemTableOptions()
+        var itemIDsHash: Int?
+        if isSearching || shown.savedView != nil || options.isFiltering || hasSearchTokens {
+            var hasher = Hasher()
+            for item in items { hasher.combine(item.id) }
+            itemIDsHash = hasher.finalize()
+        }
         let key = MapKey(
             library: ObjectIdentifier(library), content: library.contentRevision, membership: library.membershipRevision, place: shown,
-            listing: listing, search: isSearching ? searchText : nil, options: tableOptions[shown] ?? ItemTableOptions(),
-            tokens: narrowingSearchTokens, count: items.count, first: items.first?.id, last: items.last?.id)
+            listing: listing, search: isSearching ? searchText : nil, options: options,
+            tokens: narrowingSearchTokens, itemIDsHash: itemIDsHash)
         return (items, key)
     }
 }

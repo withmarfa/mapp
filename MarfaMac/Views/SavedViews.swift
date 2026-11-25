@@ -92,6 +92,7 @@ enum SavedViews {
     /// place's.
     static func newViewSettings(_ browser: Browser, in library: any ItemLibrary) -> ViewMacSettings {
         var settings = browser.shown.savedView.map { browser.macSettings(for: $0) } ?? ViewMacSettings()
+        if browser.shown.savedView == nil { settings.map = browser.placeMaps[browser.shown] }
         settings.layout = browser.viewMode
         settings.cards = browser.cards
         settings.density = browser.density

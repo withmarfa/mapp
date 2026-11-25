@@ -54,10 +54,10 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Layouts draw the supplied items** (`ItemViewMode`).
 - **One row menu, one density and one drag serve every layout.**
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
-- **⌘⌫ deletes what a board or timeline shows** (`deletesChosen`). A calendar's new span drops events it leaves.
+- **⌘⌫ deletes chosen items shown on a board, timeline or map** (`ChosenItemDeletion`). Changing the calendar span drops old events.
 - **An item's date is its own type's** (`ItemPlacement`), so a place of several types puts each where it belongs. The view can point at one field.
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
-- **The map places items with two valid coordinates** (`MapLayout`). No Location counts and lists the rest. Map is available when a listed type declares both coordinate fields.
+- **Map places items with two valid coordinates** (`MapLayout`). Fit All Items shows every marker. No Location lists the rest. A listed type must declare both fields.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse a drop: no single value is meant.
 - **Only divider drags save widths** (`keepWidths`).

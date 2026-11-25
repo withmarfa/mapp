@@ -1,4 +1,5 @@
 import Foundation
+import MapKit
 import Marfa
 
 /// How an Apple map draws, as the View panel's Style chooses.
@@ -57,16 +58,27 @@ nonisolated enum MapLayout {
         /// Tells one answer from the next, so a view redraws the markers only for a new one.
         let serial = UUID()
         /// The stretch of the world that holds every marker: where the map opens and what Fit shows.
-        let frame: LocationFrame
+        let mapRect: MKMapRect
 
         init(pins: [Pin], unplaced: [ItemID]) {
             self.pins = pins
             self.unplaced = unplaced
             pinsByID = Dictionary(pins.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            frame = LocationFrame.covering(pins.map(\.point)) ?? .world
+            mapRect = LocationFrame.covering(pins.map(\.point)).map(MapLayout.rect(of:)) ?? .world
         }
 
         static let empty = Placing(pins: [], unplaced: [])
+    }
+
+    private static func rect(of frame: LocationFrame) -> MKMapRect {
+        let north = min(90, frame.latitude + frame.latitudeSpan / 2)
+        let south = max(-90, frame.latitude - frame.latitudeSpan / 2)
+        let west = max(-180, frame.longitude - frame.longitudeSpan / 2)
+        let east = min(180, frame.longitude + frame.longitudeSpan / 2)
+        let topLeft = MKMapPoint(CLLocationCoordinate2D(latitude: north, longitude: west))
+        let bottomRight = MKMapPoint(CLLocationCoordinate2D(latitude: south, longitude: east))
+        return MKMapRect(
+            x: topLeft.x, y: topLeft.y, width: max(1, bottomRight.x - topLeft.x), height: max(1, bottomRight.y - topLeft.y))
     }
 
     /// Whether a place of items of these types can show a map: one of them has the two coordinates.
