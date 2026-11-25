@@ -261,7 +261,7 @@ def blocks(text):
 
 def check_words(path, text, report):
     _, skip = frontmatter(text)
-    count = len(" ".join(text.splitlines()[skip:]).split())
+    count = sum(bool(re.search(r"\w", word)) for word in " ".join(text.splitlines()[skip:]).split())
     if path not in BUDGETS:
         report.fail(path, 1, "has no word budget; give it one in BUDGETS in Scripts/check-instructions.py.")
     elif count > BUDGETS[path]:
