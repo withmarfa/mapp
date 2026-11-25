@@ -36,12 +36,23 @@ paths:
 
 ## Toolbar
 
-- **The top row is drawn in the content under a hidden title;** a plain `toolbar` holds the buttons.
-  - It folds by the room it has. In the toolbar it needs a measured width, and an error, larger text or a closed sidebar sends everything to the overflow menu.
-  - It keeps one line with the sidebar closed or larger text, and VoiceOver reads it in order.
-- **An on button is gray, never the accent.**
-- **An item that cannot act dims**, so the row keeps its shape.
-- **Trap:** the row needs its own drag gesture and double click to move and zoom the window, and the window must hide its title, which returns in full screen.
+- **The top row is drawn in the content under a title the window hides** (`TopRowFrame`). A plain `toolbar` holds only the buttons: Search, View and Panel on a list; Favorite, Share and More as a group, then Panel, on a page.
+- **One row serves every place and layout** (`TopRowContent`): title, count on its baseline, the control, then the views as pills. The count is part of the title's label.
+- **The control** (All Items, Library, Feed) shows only where the place has Feed items, never on the Library's or the Feed's own page, and is quiet while it says Settings' default.
+- **The views** scroll away with the rows and then stand beside the title; a calendar and a board have them there from the start.
+- **The row folds by the room it has** (`TopRowFold`): the control, the Library's places into Browse, the views into N More, then one pill. It measures the toolbar (`ToolbarRoomProbe`) and holds no width.
+- **A page's row is empty until its head has scrolled away,** then the item's title (Appearance > Title When Scrolling).
+- **An on button is gray, never the accent.** An item that cannot act dims.
+- **Trap:** hide the title on the window (`hidesWindowTitle`), or it returns in full screen. The row has its own drag and double click, and leaves the accessibility tree once scrolled away.
+
+## Sidebar closed
+
+- **The place, its views and the buttons share one row** beside the traffic lights, with Back and Forward kept. The title opens the sidebar's rows as a menu (`PlacesMenu`).
+
+## Smallest window
+
+- **The main window goes down to 760 by 520.** The panel folds under 1000 wide, the sidebar under 900, then the control, the views and a table's columns. Only what the window folded opens again.
+- **The panel is 300 wide,** dragged within 260 to 440.
 
 ## Corner
 
