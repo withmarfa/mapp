@@ -135,20 +135,21 @@ struct MarkedName: View {
 }
 
 /// The type being given to an item, the one chip that takes a tint: its mark and name on the type's own pale color, or
-/// on the grey wash when Settings > Appearance says Grey (`TypeChipTint`). A chevron says it opens a menu.
+/// on the gray wash when Settings > Appearance says Gray (`TypeChipTint`). A chevron says it opens a menu.
 struct TintedChip: View {
     let text: String
     let icon: String?
     var chevron = true
 
     @Environment(\.colorScheme) private var scheme
-    @AppStorage(TypeChipTint.key) private var tint = TypeChipTint.standard.rawValue
+    @Environment(\.isFocused) private var isFocused
+    @AppStorage(AppearanceKey.typeChipTint) private var tint = TypeChipTint.standard
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
 
     var body: some View {
         let looks = ChipLooks.current
         let tone = TypeTone(icon: icon)
-        let tinted = TypeChipTint(rawValue: tint) != .grey
+        let tinted = tint != .gray
         let scale = CGFloat(textSize) / 13
         HStack(spacing: looks.gap * scale) {
             TonedGlyph(id: icon, size: looks.chipMarkSize * scale)
@@ -169,12 +170,15 @@ struct TintedChip: View {
             tinted ? tone.fill(scheme == .dark ? looks.typeTintOpacityDark : looks.typeTintOpacity, for: scheme) : looks.chipWash(for: scheme),
             in: RoundedRectangle(cornerRadius: looks.cornerRadius * scale)
         )
+        .overlay {
+            if isFocused { AppButtonStyle.focusRing(AnyShape(.rect(cornerRadius: looks.cornerRadius * scale))) }
+        }
     }
 }
 
-/// Whether the type being given to an item is tinted in its own color or grey, chosen in Settings > Appearance.
+/// Whether the type being given to an item is tinted in its own color or gray, chosen in Settings > Appearance.
 nonisolated enum TypeChipTint: String, CaseIterable, Identifiable, Sendable {
-    case tinted, grey
+    case tinted, gray
 
     static let key = "typeChipTint"
     static let standard = TypeChipTint.tinted
@@ -184,7 +188,7 @@ nonisolated enum TypeChipTint: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .tinted: String(localized: "Tinted")
-        case .grey: String(localized: "Grey")
+        case .gray: String(localized: "Gray")
         }
     }
 }

@@ -133,9 +133,17 @@ struct QuickAddPanel: View {
             .pickerStyle(.inline)
             .labelsHidden()
         } label: {
-            if let chosen { kindLabel(chosen) } else { Text("Kind") }
+            if let chosen {
+                TintedChip(text: chosen.label, icon: library.catalogue.icon(for: chosen.id))
+            } else {
+                Text("Kind")
+            }
         }
-        .appMenu(.value)
+        .menuStyle(.button)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .fixedSize()
         .help("Kind of Item")
         .accessibilityLabel("Kind of Item")
         .accessibilityIdentifier("QuickAddType")

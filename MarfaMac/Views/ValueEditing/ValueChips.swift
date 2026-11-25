@@ -45,8 +45,19 @@ struct ValueChipView: View {
     let chip: ValueChip
     let scale: CGFloat
     let remove: () -> Void
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        if chip.givesType, case .type(let icon) = chip.mark {
+            TintedChip(text: chip.title, icon: icon, chevron: false)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: chip.title))
+        } else {
+            wash
+        }
+    }
+
+    private var wash: some View {
         HStack(spacing: 4 * scale) {
             ValueMarkView(mark: chip.mark, scale: scale)
             Text(verbatim: chip.title).lineLimit(1).truncationMode(.tail)
@@ -63,7 +74,7 @@ struct ValueChipView: View {
         .padding(.leading, 6 * scale)
         .padding(.trailing, (chip.isRemovable ? 6 : 8) * scale)
         .frame(height: 20 * scale)
-        .background(.quaternary, in: .rect(cornerRadius: 5 * scale, style: .continuous))
+        .background(ChipLooks.current.chipWash(for: scheme), in: .rect(cornerRadius: ChipLooks.current.cornerRadius * scale, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(chip.isRemovable ? Text("\(chip.title), remove") : Text(verbatim: chip.title))
         .modifier(RemovableChip(isRemovable: chip.isRemovable, remove: remove))

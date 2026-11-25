@@ -8,6 +8,7 @@ struct AppearancePage: View {
     @AppStorage(AppearanceKey.highlights) private var highlight = HighlightChoice.standard
     @AppStorage(AppearanceKey.textFont) private var textFont = ""
     @AppStorage(AppearanceKey.codeFont) private var codeFont = ""
+    @AppStorage(AppearanceKey.typeChipTint) private var typeChipTint = TypeChipTint.standard
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     @AppStorage(InterfaceKey.valuePanelStyle) private var panelStyle = ValuePanelStyle.standard
     @AppStorage(InterfaceKey.paletteMaterial) private var paletteMaterial = PaletteMaterial.standard
@@ -116,6 +117,13 @@ struct AppearancePage: View {
                     Text("Accent").tag(HighlightChoice.accent)
                 }
                 .accessibilityIdentifier("Highlights")
+            }
+            SettingsRow("Type Chips", line: "The type you give an item.") {
+                SettingsPopUp(title: "Type Chips", selection: $typeChipTint) {
+                    Text("Tinted").tag(TypeChipTint.tinted)
+                    Text("Gray").tag(TypeChipTint.gray)
+                }
+                .accessibilityIdentifier("TypeChipTint")
             }
         }
     }

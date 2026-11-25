@@ -501,7 +501,7 @@ final class ValueEditModel {
         case .type:
             let types = Set(request.targets.compactMap { library.item($0)?.type })
             guard types.count == 1, let type = types.first else { return [] }
-            return [ValueChip(id: Self.typePrefix + type.rawValue, title: library.catalogue.label(for: type), mark: .type(icon: library.catalogue.icon(for: type)), isRemovable: false)]
+            return [ValueChip(id: Self.typePrefix + type.rawValue, title: library.catalogue.label(for: type), mark: .type(icon: library.catalogue.icon(for: type)), isRemovable: false, givesType: true)]
         case .date, .text, .number, .location:
             return []
         }
