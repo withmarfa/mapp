@@ -5,8 +5,8 @@ import Foundation
 /// (`PreferencesMap`). What a server leaves out of search is `SearchLeaveOuts`.
 nonisolated enum SearchOptions {
     static let includesArchivedKey = "searchIncludesArchived"
-    /// Whether the feed tier is searched.
-    static let includesFeedKey = "searchIncludesFeed"
+    /// Whether the feed tier is searched. The stored word keeps its first name, so no Mac loses the choice.
+    static let includesFeedKey = "searchIncludesInbox"
     static let orderKey = "searchOrder"
     static let showsSnippetsKey = "searchShowsSnippets"
 
