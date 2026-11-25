@@ -29,9 +29,7 @@ struct ItemTable: View {
 
     /// The inset style's own margin before the first column.
     static let inset: CGFloat = 16
-    /// The room the table leaves at each side of the pane, so a group's chevron, which hangs in the margin, sits inside
-    /// the window and a selected row's highlight stops short of its edge. With the inset it puts the first column's text
-    /// 40 points from the pane's edge, where the title and the boards' tables begin (`TopRowMetrics.lead`).
+    /// With the inset, the first column starts at the standard title inset and leaves room for group chevrons.
     static let margin: CGFloat = TopRowMetrics.lead - inset
 
     var body: some View {
