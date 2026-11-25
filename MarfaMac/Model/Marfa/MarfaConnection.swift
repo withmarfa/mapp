@@ -17,35 +17,21 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowercased = trimmed.lowercased()
         let explicit = lowercased.hasPrefix("http://") || lowercased.hasPrefix("https://")
-        guard explicit || (completing && !lowercased.hasPrefix("http:") && !lowercased.hasPrefix("https:")),
-            !trimmed.contains("\\"), trimmed.rangeOfCharacter(from: .controlCharacters) == nil
-        else { throw .notAServer }
+        guard explicit || completing else { throw .notAServer }
 
         let candidate = explicit ? trimmed : "https://" + trimmed
-        let authority = candidate.dropFirst(lowercased.hasPrefix("http://") ? 7 : 8)
-            .prefix { !"/?#".contains($0) }
-        guard let match = authority.wholeMatch(of: #/(?:\[[0-9A-Fa-f:.]+\]|[\p{L}\p{M}\p{N}._-]+)(?::([0-9]+))?/#),
-            var components = URLComponents(string: candidate),
-            let host = components.host?.lowercased(), let scheme = components.scheme?.lowercased()
+        guard var components = URLComponents(string: candidate),
+            let host = components.host?.lowercased(), !host.isEmpty,
+            let scheme = components.scheme?.lowercased(), components.user == nil, components.password == nil
         else { throw .notAServer }
-        if let port = match.output.1 {
-            guard let number = Int(port), (1...65535).contains(number), components.port == number else { throw .notAServer }
-        }
 
-        if host.hasPrefix("[") {
-            guard IPAddress(literal: host)?.bytes.count == 16 else { throw .notAServer }
+        if completing {
+            let authority = candidate.dropFirst(scheme == "http" ? 7 : 8).prefix { !"/?#".contains($0) }
+            guard !trimmed.contains("\\"), trimmed.rangeOfCharacter(from: .controlCharacters) == nil,
+                explicit || (host != "http" && host != "https"),
+                Self.isValidAuthority(authority, host: host, port: components.port, explicit: explicit)
+            else { throw .notAServer }
         } else {
-            let name = host.hasSuffix(".") ? host.dropLast() : host[...]
-            guard !name.split(separator: ".", omittingEmptySubsequences: false).contains(where: { $0.isEmpty }) else { throw .notAServer }
-            if !explicit, IPAddress(literal: host) != nil {
-                let octets = host.split(separator: ".", omittingEmptySubsequences: false)
-                guard octets.count == 4,
-                    octets.allSatisfy({ octet in UInt8(octet).map { String($0) == octet } == true })
-                else { throw .notAServer }
-            }
-        }
-
-        if !completing {
             guard ["", "/"].contains(components.percentEncodedPath), components.query == nil, components.fragment == nil
             else { throw .hasMore }
         }
@@ -56,6 +42,23 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         components.fragment = nil
         guard let address = components.url else { throw .notAServer }
         self.address = address
+    }
+
+    private static func isValidAuthority(_ authority: Substring, host: String, port: Int?, explicit: Bool) -> Bool {
+        guard let match = authority.wholeMatch(of: #/(?:\[[0-9A-Fa-f:.]+\]|[\p{L}\p{M}\p{N}._-]+)(?::([0-9]+))?/#)
+        else { return false }
+        if let digits = match.output.1 {
+            guard let number = Int(digits), (1...65535).contains(number), port == number else { return false }
+        }
+        if host.hasPrefix("[") { return IPAddress(literal: host)?.bytes.count == 16 }
+
+        let name = host.hasSuffix(".") ? host.dropLast() : host[...]
+        let labels = name.split(separator: ".", omittingEmptySubsequences: false)
+        guard !name.isEmpty, labels.allSatisfy({ !$0.isEmpty && $0.first != "-" && $0.last != "-" }) else { return false }
+        guard !explicit, IPAddress(literal: host) != nil else { return true }
+
+        // A resolver can read shortened, octal and hexadecimal IPv4 spellings as a different host.
+        return labels.count == 4 && labels.allSatisfy { label in UInt8(label).map { String($0) == label } == true }
     }
 
     /// Whether `other` names the same server: the same address once a port the scheme already means is left out. The

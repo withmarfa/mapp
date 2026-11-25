@@ -60,8 +60,8 @@ struct MarfaConnectionTests {
     }
 
     @Test(arguments: [
-        "ftp://marfa.example", "http://", "https:/marfa.example", "https:443", "//marfa.example",
-        "/marfa.example", "127.1", "2130706433", "0177.0.0.1", "marfa.example:", "marfa.example:65536", "marfa.example:99999999999999999999", "::1", "marfa example",
+        "ftp://marfa.example", "http://", "https:/marfa.example", "https//marfa.example", "http/marfa.example", "https:443", "//marfa.example",
+        "/marfa.example", ".", "-marfa.example", "127.1", "2130706433", "0177.0.0.1", "marfa.example:", "marfa.example:65536", "marfa.example:99999999999999999999", "::1", "marfa example",
         "user:secret@marfa.example", "https://user:secret@marfa.example", "https://marfa.example\\other", "",
     ])
     func anAddressThatNamesNoServerIsRefused(_ text: String) {
