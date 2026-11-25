@@ -69,11 +69,11 @@ struct SidebarAddPlace: View {
     /// The section it adds to; nil for the Section place, and for the Command place in a tab with no commands.
     let group: String?
     let kind: SidebarGroup.Kind
-    /// The section's name, where it has one.
-    var name: String?
     let tab: String
     let offers: SidebarOffers
     let actions: SidebarActions
+    /// The section's name, where it has one.
+    var name: String?
 
     var body: some View {
         Menu {
