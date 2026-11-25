@@ -42,7 +42,7 @@ A macOS app for a Marfa server's items. It works only through the `marfa-swift` 
 - Target macOS 27 and Xcode 27 only, with no `#available` checks.
 - Use SwiftUI's native containers and controls, and AppKit only where SwiftUI cannot.
 - Every user-facing string goes through the String Catalog. After an `xcodebuild` build, run `Scripts/sync-strings.sh <derived data>`.
-- The app is not sandboxed. Release keeps the hardened runtime with no exceptions. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting`, the plugins release reader (`PluginRelease`) and Sparkle may connect out. Neither the item page nor a sealed web page loads from the network itself.
+- The app is not sandboxed. Release keeps the hardened runtime with no exceptions. Only WebKit's page process, the Marfa server, `PictureFetcher`, `Reporting`, the plugins release reader (`PluginRelease`), MapKit and Sparkle may connect out. Neither the item page nor a sealed web page loads from the network itself.
 
 ## Data rules
 

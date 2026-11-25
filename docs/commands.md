@@ -81,7 +81,7 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | Edit | Use Selection for Find | ⌘E | Yes |
 | View | Focus | ⇧⌘F | Yes |
 | View | View as List, Gallery, Table | ⌘1, ⌘2, ⌘3 | Yes |
-| View | View as Board, Timeline, Calendar | ⌘4, ⌘5, ⌘6 | Yes |
+| View | View as Board, Timeline, Calendar, Map | ⌘4, ⌘5, ⌘6, ⌘8 | Yes |
 | View | Today | ⌘T | Yes |
 | View | Previous, Next Week or Month | ⌥⌘←, ⌥⌘→ | Yes |
 | View | Show a Week, Show a Month | ⌥⌘1, ⌥⌘2 | Yes |

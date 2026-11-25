@@ -14,6 +14,8 @@ paths:
   - MarfaMac/Views/ItemBoard*.swift
   - MarfaMac/Views/ItemTimeline*.swift
   - MarfaMac/Views/ItemCalendar*.swift
+  - MarfaMac/Views/ItemMap*.swift
+  - MarfaMac/Model/Items/MapLayout.swift
   - MarfaMac/Views/PlaceIndex.swift
   - MarfaMac/Model/Items/IndexRow.swift
   - MarfaMac/Views/ColumnSearch*.swift
@@ -49,18 +51,17 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 ## Layouts
 
 - **The Library opens as a table, and as a list while it holds ten items or fewer** (`Browser.naturalLayout`). It and the Archive, reached from the Library's row and Go, list Name, Type, Source and Edited, latest first (`listsByOrigin`).
-- **Unarchive and Delete stand on an Archive row under the pointer** (`RowQuickActions`).
 - **Layouts draw the supplied items** (`ItemViewMode`).
 - **One row menu, one density and one drag serve every layout.**
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
 - **⌘⌫ deletes what a board or timeline shows** (`deletesChosen`). A calendar's new span drops events it leaves.
 - **An item's date is its own type's** (`ItemPlacement`), so a place of several types puts each where it belongs. The view can point at one field.
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
+- **The map places an item only where its type has coordinates** (`MapLayout`). The pill "No Location" counts and lists the rest; a place without coordinates never offers Map.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse a drop: no single value is meant.
 - **Only divider drags save widths** (`keepWidths`).
 - **Item table text starts where the title does** (`TopRowMetrics.collectionLead`). Unset widths sample 120 rows (`ItemTableFit`). Name fills the remaining space until resized.
-- **Table timestamps show the time today with date words on** (`DateDisplay.Place.table`). Other dates use day labels.
 
 ## The View panel
 

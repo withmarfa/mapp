@@ -2906,6 +2906,9 @@
     "Back to Gallery" : {
 
     },
+    "Back to Map" : {
+
+    },
     "Back to Table" : {
 
     },
@@ -3307,6 +3310,9 @@
 
     },
     "Change Layout" : {
+
+    },
+    "Change Map" : {
 
     },
     "Change Mark" : {
@@ -4401,6 +4407,9 @@
     "Done" : {
 
     },
+    "Don’t Group Nearby Items" : {
+
+    },
     "Download Again" : {
 
     },
@@ -4996,6 +5005,9 @@
     "Fit" : {
 
     },
+    "Fit All Items" : {
+
+    },
     "Fit Picture" : {
       "extractionState" : "manual"
     },
@@ -5193,6 +5205,9 @@
     "Group By" : {
 
     },
+    "Group Nearby Items" : {
+
+    },
     "Group by %@" : {
 
     },
@@ -5374,6 +5389,9 @@
 
     },
     "How wide a line of text grows." : {
+
+    },
+    "Hybrid" : {
 
     },
     "Icon" : {
@@ -5780,6 +5798,9 @@
     },
     "Items About This" : {
       "extractionState" : "manual"
+    },
+    "Items With No Location" : {
+
     },
     "Items deleted more than %@ ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered." : {
       "extractionState" : "manual"
@@ -6505,6 +6526,9 @@
     "Map" : {
       "extractionState" : "manual"
     },
+    "Map Style: %@" : {
+
+    },
     "Marfa" : {
       "extractionState" : "manual"
     },
@@ -7006,6 +7030,12 @@
     "No Link Types of Your Own" : {
 
     },
+    "No Location" : {
+
+    },
+    "No Location, %lld items" : {
+
+    },
     "No Machine" : {
 
     },
@@ -7148,6 +7178,9 @@
 
     },
     "None are left to change." : {
+
+    },
+    "None of these items has a location." : {
 
     },
     "None saved yet." : {
@@ -7347,6 +7380,9 @@
     },
     "Nothing selected has a file or text to show." : {
       "extractionState" : "manual"
+    },
+    "Nothing to Show on the Map" : {
+
     },
     "Nothing was changed: the sign-in wasn’t confirmed." : {
 
@@ -8656,6 +8692,9 @@
     "Safety" : {
 
     },
+    "Satellite" : {
+
+    },
     "Save" : {
       "extractionState" : "manual"
     },
@@ -9512,6 +9551,9 @@
 
     },
     "Struck a damaged file copy" : {
+
+    },
+    "Style" : {
 
     },
     "Sub-Items" : {
@@ -11743,6 +11785,9 @@
     "View as List" : {
 
     },
+    "View as Map" : {
+
+    },
     "View as Table" : {
 
     },
@@ -12204,6 +12249,9 @@
 
     },
     "Zoom to Fit" : {
+
+    },
+    "Zooms in on these items." : {
 
     },
     "^[%lld Field](inflect: true)" : {
