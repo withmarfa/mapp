@@ -519,6 +519,13 @@ extension Browser {
         ViewLayouts.update(in: defaults) { $0.forget(id) }
     }
 
+    /// Delete View…, from the View menu, the palette or a pill: asks first, since a view has no bin. The View panel closes
+    /// so the question is not hidden behind it.
+    func askToDeleteView(_ id: ItemID, in library: any ItemLibrary) {
+        closeViewPanel(in: library)
+        deletingView = id
+    }
+
     /// Deletes the view for good, once the person confirmed. Nothing of it stays in the app's settings, and its panel closes
     /// with nothing said: the person did this.
     func deleteView(_ id: ItemID, in library: any ItemLibrary) async {

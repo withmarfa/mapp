@@ -65,17 +65,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | --- | --- | --- | --- |
 | Groupings to come | By collection and by tag, with the order of a date's groups following the sort. | `GroupOffer`, `GroupMode` | `Rethink-View-Group` |
 
-## Making a view
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-| While searching | The new view starts from the search: its tokens are the filter, and its first starting point is This Search. | `SearchNarrowing`, `ViewDraft` | `Rethink-Search-Items` |
-
-## Search
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-
 ## Making an item
 
 | Part | What it is | Lands in | Boards |

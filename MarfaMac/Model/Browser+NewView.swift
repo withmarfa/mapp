@@ -43,10 +43,13 @@ nonisolated enum NewViewStart: String, CaseIterable, Hashable, Identifiable, Sen
 /// has, the name the panel suggests, and Create View's checks. The window shows the view as it will list, and the
 /// panel's snapshot puts the place back on Cancel.
 extension Browser {
-    /// The search's tokens as filters, which This Search starts from. Search tokens plug in here: until the search
-    /// field makes them, a search has none, and This Search is not offered.
+    /// The search's tokens that Marfa can save as a view's filter, which This Search starts from. The panel names the
+    /// others (`ViewDraft.Unkept.searchToken`).
     func searchTokenFilters(in library: any ItemLibrary) -> [FilterClause] {
-        []
+        let targets = tokenTargets(in: library)
+        return searchTokens.filter { token in
+            targets[token.field].flatMap { ViewDraft.piece(of: token, target: $0, calendar: .current) } != nil
+        }
     }
 
     /// The starting points for the place the new view began on, three to a tile row: This Search first while searching,

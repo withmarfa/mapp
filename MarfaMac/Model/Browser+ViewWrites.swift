@@ -401,7 +401,7 @@ extension Browser {
     /// Says once what a write left out of the view, as it did in the dialog before a Save.
     func tellUnkept(_ unkept: [ViewDraft.Unkept], of id: ItemID, in library: any ItemLibrary) {
         // The search and a date relative to the day are said where they are made, in the row or the panel.
-        let left = unkept.filter { if case .search = $0 { false } else if case .relativeFilter = $0 { false } else { true } }
+        let left = unkept.filter { !$0.isSaidWhereMade }
         let told = toldUnkept[id] ?? []
         let fresh = left.filter { !told.contains($0) }
         toldUnkept[id] = Set(left)
@@ -450,23 +450,23 @@ extension Browser {
         if outcome == .renamedElsewhere, let now = library.views.first(where: { $0.id == id }) { panel.restartRename(from: now) }
     }
 
-    /// Renames a view from its pill, against the name and version it had when Rename… began. A name the view does not
-    /// take is given back on the clipboard, since nothing else holds it.
+    /// Renames a view from its pill, where it still has the name it had when Rename… began, on the latest version this
+    /// window holds with that name. A name the view does not take is given back on the clipboard, since nothing else
+    /// holds it.
     @discardableResult
-    func renameView(_ id: ItemID, to typed: String, from base: ViewPanel.RenameBase, in library: any ItemLibrary) async -> Bool {
+    func renameView(_ id: ItemID, to typed: String, from startingTitle: String, in library: any ItemLibrary) async -> Bool {
         let name = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard library.views.contains(where: { $0.id == id }), !name.isEmpty, name != base.title else { return false }
+        guard library.views.contains(where: { $0.id == id }), !name.isEmpty, name != startingTitle else { return false }
         guard library.reachesServer else {
             library.notices.notKept(
                 String(localized: "View Not Renamed"), text: name,
                 reason: String(localized: "Your Marfa server can’t be reached, so the view keeps its name."))
             return false
         }
-        let outcome = await writeName(
-            name, of: id, expecting: [base.title], baseVersion: base.version, in: library, tellsOffline: false, tellsRenamed: false)
+        let outcome = await writeName(name, of: id, expecting: [startingTitle], in: library, tellsOffline: false, tellsRenamed: false)
         switch outcome {
         case .kept:
-            registerNameUndo(of: id, restoring: base.title, from: name)
+            registerNameUndo(of: id, restoring: startingTitle, from: name)
         case .renamedElsewhere:
             library.notices.notKept(
                 String(localized: "View Not Renamed"), text: name,

@@ -197,7 +197,7 @@ struct NewViewTests {
         browser.chooseSort([ItemTableComparator(column: .created, order: .reverse)])
         let write = browser.choicesChanged()
         #expect(await eventually(within: .seconds(20)) { release != nil })
-        let rename = Task { await browser.renameView(id, to: "Newest", in: library) }
+        let rename = Task { await browser.renameView(id, to: "Newest", from: "Open", in: library) }
         release?.resume()
         await write?.value
         #expect(await rename.value)
@@ -210,9 +210,56 @@ struct NewViewTests {
         let id = ItemID("v-open")
         let view = LibraryView(id: id, title: "Open", version: 1, query: LibraryViewQuery(types: [Self.task]), sort: [], group: nil)
         let (browser, library) = Self.window(views: [view], reachesServer: false)
-        #expect(await browser.renameView(id, to: "Newest", in: library) == false)
+        #expect(await browser.renameView(id, to: "Newest", from: "Open", in: library) == false)
         #expect(library.notices.waiting.contains { $0.isNotKept && $0.text == "Newest" })
         #expect(library.views.first?.title == "Open")
+    }
+
+    @Test func aRenameOfAViewRenamedSinceRenameBeganGivesTheNameBack() async {
+        let id = ItemID("v-open")
+        let view = LibraryView(id: id, title: "Theirs", version: 2, query: LibraryViewQuery(types: [Self.task]), sort: [], group: nil)
+        let (browser, library) = Self.window(views: [view])
+        #expect(await browser.renameView(id, to: "Newest", from: "Open", in: library) == false)
+        #expect(library.notices.waiting.contains { $0.isNotKept && $0.text == "Newest" })
+        #expect(library.views.first?.title == "Theirs")
+    }
+
+    @Test func aRenameThatMeetsAnotherAppsRenameGivesTheNameBack() async {
+        let id = ItemID("v-open")
+        let view = LibraryView(id: id, title: "Open", version: 1, query: LibraryViewQuery(types: [Self.task]), sort: [], group: nil)
+        let (browser, library) = Self.window(PlaceView(.type(Self.task), .saved(id)), views: [view])
+        browser.followView(in: library)
+        library.changedElsewhere = { $0.title = "Theirs" }
+        #expect(await browser.renameView(id, to: "Newest", from: "Open", in: library) == false)
+        #expect(library.notices.waiting.contains { $0.isNotKept && $0.text == "Newest" })
+        #expect(library.views.first?.title == "Theirs")
+    }
+
+    @Test func deleteViewFromAnyMenuClosesThePanelAndAsks() {
+        let id = ItemID("v-open")
+        let view = LibraryView(id: id, title: "Open", version: 1, query: LibraryViewQuery(types: [Self.task]), sort: [], group: nil)
+        let (browser, library) = Self.window(PlaceView(.type(Self.task), .saved(id)), views: [view])
+        browser.followView(in: library)
+        browser.openViewPanel(in: library)
+        #expect(browser.viewPanel != nil)
+        browser.askToDeleteView(id, in: library)
+        #expect(browser.viewPanel == nil)
+        #expect(browser.deletingView == id)
+        #expect(library.views.count == 1)
+    }
+
+    @Test func theViewMenuAndThePaletteDuplicateAndDeleteTheShownView() {
+        let id = ItemID("v-open")
+        let view = LibraryView(id: id, title: "Open", version: 1, query: LibraryViewQuery(types: [Self.task]), sort: [], group: nil)
+        let (browser, library) = Self.window(PlaceView(.type(Self.task), .saved(id)), views: [view])
+        browser.followView(in: library)
+        let icons = SavedViewCommand.commands(for: browser, in: library, order: Self.order).map(\.systemImage)
+        #expect(icons.contains("plus.square.on.square"))
+        #expect(icons.contains("trash"))
+        library.reachesServer = false
+        let offline = SavedViewCommand.commands(for: browser, in: library, order: Self.order).map(\.systemImage)
+        #expect(!offline.contains("plus.square.on.square"))
+        #expect(!offline.contains("trash"))
     }
 
     @Test func aViewDeletedElsewhereWhileShownFallsToTheFirstView() {

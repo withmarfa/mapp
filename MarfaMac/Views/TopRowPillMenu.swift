@@ -36,8 +36,7 @@ struct TopRowPillMenu: View {
             }
             Divider()
             Button("Delete View…", systemImage: "trash", role: .destructive) {
-                browser.closeViewPanel(in: library)
-                browser.deletingView = id
+                browser.askToDeleteView(id, in: library)
             }
             .disabled(!library.reachesServer)
         }

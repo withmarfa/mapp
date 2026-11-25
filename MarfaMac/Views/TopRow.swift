@@ -322,6 +322,8 @@ private struct TopRowPills: View {
     let newView: () -> Void
     @State private var renaming: String?
     @State private var typed = ""
+    /// The name the view had when Rename… began, which the rename is written against.
+    @State private var renamingFrom = ""
     @FocusState private var nameFocused: Bool
 
     /// None while the window shows one of the Library's places.
@@ -410,14 +412,15 @@ private struct TopRowPills: View {
 
     private func startRename(_ choice: TopRowContent.Choice) {
         typed = choice.title
+        renamingFrom = choice.title
         renaming = choice.id
     }
 
     private func commitRename(_ choice: TopRowContent.Choice) {
         renaming = nil
         guard case .saved(let id) = choice.target.view else { return }
-        let name = typed
-        Task { await browser.renameView(id, to: name, in: library) }
+        let (name, from) = (typed, renamingFrom)
+        Task { await browser.renameView(id, to: name, from: from, in: library) }
     }
 
     private func drop(_ words: [String], onto target: TopRowContent.Choice) {

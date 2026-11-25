@@ -45,7 +45,10 @@ enum SavedViews {
             filter: options.filter, targets: content.filterOffer.targets, search: search.isEmpty ? nil : search,
             layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.shown],
             seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.hasDateSections) : nil,
-            listing: browser.listing)
+            listing: browser.listing,
+            searchTokens: browser.searchTokens.filter { !options.filter.clauses.contains($0) }.map { token in
+                browser.tokenParts(of: token, in: library)?.sentence ?? token.values.joined(separator: ", ")
+            })
     }
 
     /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new
@@ -145,6 +148,7 @@ enum SavedViews {
     static func describe(_ unkept: ViewDraft.Unkept) -> String {
         switch unkept {
         case .search(let text): String(localized: "The search for “\(text)”")
+        case .searchToken(let sentence): String(localized: "The search token “\(sentence)”")
         case .filter(let column): String(localized: "The filter on \(column)")
         case .mixedFilters: String(localized: "Filters that would join conditions with both “and” and “or”")
         case .tooManyFilters: String(localized: "More than \(ViewDraft.maxConditions) filter conditions")
