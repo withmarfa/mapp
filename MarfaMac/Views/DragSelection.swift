@@ -13,6 +13,7 @@ private struct DragSelection: ViewModifier {
     let browser: Browser
 
     func body(content: Content) -> some View {
-        content.dragContainerSelection(Array(browser.selection))
+        // Several items drag as one card with the count and the cards behind it, the pile a collection takes.
+        content.dragContainerSelection(Array(browser.selection)).dragPreviewsFormation(.pile)
     }
 }

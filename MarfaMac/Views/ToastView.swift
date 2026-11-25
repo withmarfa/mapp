@@ -46,9 +46,12 @@ struct ToastView: View {
     }
 }
 
-/// Where a window's toast rises: at the foot of the content it covers, centered on it. Only the toast takes clicks.
+/// Where a window's toast rises: at the foot of the content it covers, centered on it, above the capsule while several
+/// items are chosen. Only the toast takes clicks.
 private struct ToastHost: View {
     let presenter: ToastPresenter
+    @Environment(SelectionSummary.self) private var summary: SelectionSummary?
+    @Environment(\.interfaceTextSize) private var textSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -56,7 +59,7 @@ private struct ToastHost: View {
             if let toast = presenter.current {
                 ToastView(toast: toast, presenter: presenter)
                     .id(toast.id)
-                    .padding(.bottom, 22)
+                    .padding(.bottom, summary?.isCapsuleShown == true ? SelectionSummary.capsuleRoom(scale: InterfaceStyle.scale(for: textSize)) : 22)
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -81,4 +84,10 @@ private struct ToastOverlay: ViewModifier {
 extension View {
     /// Shows the window's toast over this view, which is the content column and never the sidebar.
     func toastOverlay() -> some View { modifier(ToastOverlay()) }
+
+    /// Shows the window's toast and the capsule for its chosen items over this content column, the toast above the
+    /// capsule. `spansLayout` says the content is a layout of rows (`selectionCapsule`).
+    func toastOverlay(capsuleFor browser: Browser, spansLayout: Bool) -> some View {
+        selectionCapsule(for: browser, spansLayout: spansLayout).toastOverlay()
+    }
 }

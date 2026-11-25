@@ -45,6 +45,7 @@ struct ItemList: View, Equatable {
         // the list's full width.
         listContent(lines: lines, ids: ids, contents: contents, density: density, excerpts: excerpts, title: title)
         .onDeleteCommand(perform: deleteSelection)
+        .clearsSeveralOnEscape(browser)
         .quickLooksOnSpace(browser)
         // Delete alone is the Edit menu's; Command-Delete deletes as it does in Mail.
         .onKeyPress(.delete, phases: .down) { press in

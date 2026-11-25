@@ -65,6 +65,7 @@ struct ItemCalendar: View {
             keyboard.day = nil
             return .handled
         }
+        .deletesChosen(browser)
         .searchStatus(browser)
         .overlay {
             if items.isEmpty {

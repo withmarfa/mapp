@@ -8,7 +8,8 @@ import SwiftUI
 /// kept clear of them, or above them when it is too wide to sit beside them (`FootBarLayout`); the bar draws its own
 /// glass. With no buttons the corner draws nothing.
 ///
-/// A toast rises from the foot of the same content, so the corner lifts above it while one shows.
+/// A toast rises from the foot of the same content, and the capsule for several chosen items stands there too, so the
+/// corner lifts above them while they show.
 struct WindowCorner<Buttons: View, Card: View>: View {
     /// Where an open card sits.
     enum CardPlacement {
@@ -26,6 +27,7 @@ struct WindowCorner<Buttons: View, Card: View>: View {
 
     @State private var buttonsWidth: CGFloat = 0
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
+    @Environment(SelectionSummary.self) private var summary: SelectionSummary?
     @Environment(\.interfaceTextSize) private var textSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -34,8 +36,10 @@ struct WindowCorner<Buttons: View, Card: View>: View {
 
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
-        // The toast's own height and the space under it (`ToastHost`), and a little between.
-        let lift = details?.toasts.current == nil ? 0 : 22 + 40 * scale + 10 - Self.inset
+        // The capsule's room, then the toast's own height and the space under it (`ToastHost`), and a little between.
+        let capsule = summary?.isCapsuleShown == true
+        let room = capsule ? SelectionSummary.capsuleRoom(scale: scale) : 22
+        let lift = details?.toasts.current != nil ? room + 40 * scale + 10 - Self.inset : capsule ? room - Self.inset : 0
         VStack(alignment: .trailing, spacing: 8) {
             if isCardOpen && cardPlacement == .aboveButtons {
                 card

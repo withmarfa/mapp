@@ -19,9 +19,7 @@ struct ItemDetail: View {
 
     var body: some View {
         if browser.selection.count > 1 {
-            EmptyState(title: Text("^[\(browser.selection.count) item](inflect: true) selected"),
-                       detail: Text("Choose one item to read or edit it."), actions: { EmptyView() })
-                .accessibilityIdentifier("MultipleSelectionPrompt")
+            SelectionPile()
                 .onAppear { editor.close() }
         } else if let id = shownID, let item = library.item(id) {
             if library.pageLayout(of: item) != .text {

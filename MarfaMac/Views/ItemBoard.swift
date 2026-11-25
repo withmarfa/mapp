@@ -103,6 +103,7 @@ struct ItemBoard: View {
                 browser.openSelection() ? .handled : .ignored
             }
             .onKeyPress(.escape) { browser.selection = []; return .handled }
+            .deletesChosen(browser)
             .onKeyPress("a", phases: .down) { press in
                 guard press.modifiers.contains(.command) else { return .ignored }
                 browser.selection = Set(ids)
