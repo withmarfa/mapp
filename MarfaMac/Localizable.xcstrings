@@ -886,6 +886,29 @@
     "%lld in the trash" : {
 
     },
+    "%lld files were skipped because Marfa sets this property." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file was skipped because Marfa sets this property."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files were skipped because Marfa sets this property."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld items" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -954,9 +977,6 @@
           }
         }
       }
-    },
-    "%lld items are files, and Marfa sets this property of a file itself." : {
-
     },
     "%lld items are files, which can’t be moved between lanes." : {
       "extractionState" : "manual",
