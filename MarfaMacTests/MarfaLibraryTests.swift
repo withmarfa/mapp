@@ -195,7 +195,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, _) = try await loaded()
         let bug = library.relationFields(of: F.t1)
         #expect(bug.prefix(2).map(\.field) == ["child-of", "inverse:references"])
-        #expect(bug.dropFirst(2).allSatisfy(\.targets.isEmpty))
+        #expect(bug.dropFirst(2).allSatisfy { $0.targets.isEmpty })
         let field = Dictionary(uniqueKeysWithValues: bug.map { ($0.field, $0) })
         #expect(field["child-of"]?.label == "Parent")
         #expect(field["child-of"]?.cardinality == .one)
@@ -563,7 +563,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         /// The copy takes the last write, as the engine does once it has judged and queued it.
         func take() async throws {
             source.send(.taken(try #require(source.submitted.last?.id)))
-            try #require(await eventually { library.linkSteps.values.allSatisfy(\.judging.isEmpty) })
+            try #require(await eventually { library.linkSteps.values.allSatisfy { $0.judging.isEmpty } })
         }
         // A new parent replaces the one link a child holds: one move of the edge's source, which keeps its id.
         undo.beginUndoGrouping()
@@ -883,7 +883,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         undo.endUndoGrouping()
         #expect(source.writes.last == .moveEdge(EdgeID("c2"), end: .from, to: F.p2, from: F.p1), "sent \(source.writes)")
         source.send(.taken(try #require(source.submitted.last?.id)))
-        try #require(await eventually { library.linkSteps.values.allSatisfy(\.judging.isEmpty) })
+        try #require(await eventually { library.linkSteps.values.allSatisfy { $0.judging.isEmpty } })
         source.clearWrites()
         undo.undo()
         // The second move is undone to the project the first put it under, then the first to the task it started under.
@@ -908,7 +908,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.holdingChecks.withLock { $0 = false }
         await finishing.value
         #expect(source.writes == [.link(EdgeDraft(type: "about", from: F.n1, to: F.p2))], "sent \(source.writes)")
-        #expect(await change.value)
+        #expect(await change.value == .taken)
         #expect(library.notices.waiting.isEmpty)
     }
 
