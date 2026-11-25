@@ -78,9 +78,9 @@ nonisolated struct MarfaItemIndex {
     /// The active items of `type` alone, in both tiers.
     func active(ofType type: TypeID) -> Set<ItemID> { byType[type]?.ids(in: .all, .hidden) ?? [] }
 
-    /// How many of `ids` stand alone (`standalone`), counted through the attached files rather than through `ids`.
-    func standaloneCount(_ count: Int, among contains: (ItemID) -> Bool) -> Int {
-        count - attachments.keys.filter { contains($0) && isAttachedToHeldItem($0) }.count
+    /// The files attached to an item the index holds, which the lists leave out (`standalone`).
+    func attachedToHeld() -> [ItemID] {
+        attachments.keys.filter(isAttachedToHeldItem)
     }
 
     /// `ids` without the files that are attached to an item the index holds, whatever state that item is in: a

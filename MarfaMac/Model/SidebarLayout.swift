@@ -115,11 +115,11 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         }
     }
 
-    /// Whether the row carries a count. The indexes and a saved view list what the copy holds on their own, and an
-    /// item is one.
+    /// Whether the row carries a count. The indexes and a saved view list what the copy holds on their own, an item is
+    /// one, and the Feed is a stream to read, not a store to size.
     var showsCount: Bool {
         switch self {
-        case .library, .feed, .favorites, .collection, .source: true
+        case .library, .favorites, .collection, .source: true
         default: false
         }
     }

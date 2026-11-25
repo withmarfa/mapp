@@ -82,6 +82,8 @@ nonisolated enum EarlierPlace {
         }
         ItemTableColumnLayouts.readIn(in: defaults)
         StartWith.readIn(in: defaults)
+        // The Items page listed both tiers; the Library lists only its own, so its Feed tab would open empty.
+        if IndexPreferences.tab(for: .items, in: defaults) == .feed { IndexPreferences.set(.all, for: .items, in: defaults) }
     }
 
     /// Whether the person has been told that Files is no longer a place, on this Mac.

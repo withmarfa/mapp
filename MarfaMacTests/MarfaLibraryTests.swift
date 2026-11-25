@@ -1071,6 +1071,36 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(attachedTo.targets.map(\.itemID) == [F.n1])
     }
 
+    @Test func anAttachedFileIsLeftOutOfEveryListAndCountButSearch() async throws {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        let album = ItemID("al1"), scan = ItemID("f2"), old = ItemID("old")
+        func attached(_ id: ItemID) -> Edge {
+            Edge(id: EdgeID("\(id.rawValue)#at"), type: "attached-to", from: id, to: .item(F.n1), origin: .property("attached-to"))
+        }
+        var items = F.items
+        let photo = try #require(items.firstIndex { $0.id == F.f1 })
+        items[photo].tags = [ItemTag.favorite]
+        items[photo].edgesOut = [
+            attached(F.f1), Edge(id: EdgeID("f1#in"), type: "in-collection", from: F.f1, to: .item(album), origin: .property("in-collection")),
+        ]
+        items += [
+            F.item(album, F.album, "Trips", age: 10),
+            F.item(scan, F.image, "Scan", age: 11, state: .archived, edges: [attached(scan)], titleRule: .firstLine, content: .file(.png, byteCount: 0)),
+            F.item(old, F.note, "Archived note", age: 12, state: .archived),
+        ]
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: Self.catalogue)))
+        try #require(await eventually { library.isLoaded })
+
+        #expect(!ids(library.favoriteItems(in: .all, archived: .hidden)).contains(F.f1))
+        #expect(library.items(in: .collection(album)).isEmpty)
+        #expect(library.count(in: .collection(album)) == 0)
+        #expect(ids(library.items(in: .archive, scope: .all, archived: .only, includingKinds: true)) == [old])
+        #expect(library.count(in: Place.archive) == 1)
+        #expect(library.count(in: .type(F.image)) == 0)
+        #expect(library.count(in: Place.library) == library.items(in: Place.library).count)
+    }
+
     @Test func theAttachmentsOfAnItemAreTheItemsWhoseAttachedToEdgePointsAtIt() async throws {
         let library = try await Self.loaded()
 

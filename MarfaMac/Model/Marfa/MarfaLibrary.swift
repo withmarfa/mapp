@@ -149,6 +149,7 @@ import Observation
     @ObservationIgnored var listed: [ListingKey: Listing] = [:]
     @ObservationIgnored var listedDeleted: Listing?
     @ObservationIgnored var counted: [Place: (revision: Int, counts: ScopeCounts)] = [:]
+    @ObservationIgnored var countedAlone: (revision: Int, counts: StandaloneCounts)?
     @ObservationIgnored var searches: [SearchKey: SearchRun] = [:]
     @ObservationIgnored var searchOrder: [SearchKey] = []
     /// What the latest search to be asked found, once it finishes, shown while the next one runs so the list does not

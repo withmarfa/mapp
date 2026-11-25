@@ -129,31 +129,50 @@ extension MarfaLibrary {
         }
     }
 
+    /// What `place` lists in each tier: its active items, or the Archive's archived ones, as its listing has them.
     func scopeCounts(in place: Place) -> ScopeCounts {
         let revision = membershipRevision
         if let held = counted[place], held.revision == revision { return held.counts }
-        let counts = ScopeCounts(library: activeCount(in: place, tier: .library), feed: activeCount(in: place, tier: .feed))
+        let alone = standaloneCounts
+        let counts: ScopeCounts = switch place {
+        case .library, .feed: alone.active
+        case .archive: alone.archived
+        case .types, .collections, .sources: ScopeCounts(library: 0, feed: 0)
+        case .type(let type): kinds(of: type).reduce(ScopeCounts(library: 0, feed: 0)) { $0 + (alone.byType[$1] ?? .zero) }
+        case .source(let code): alone.bySource[code] ?? .zero
+        case .collection:
+            ScopeCounts(
+                library: members(of: ListingKey(place: place, scope: .library, archived: .hidden, includingKinds: true)).count,
+                feed: members(of: ListingKey(place: place, scope: .feed, archived: .hidden, includingKinds: true)).count)
+        }
         counted[place] = (revision, counts)
         return counts
     }
 
-    /// The active items `place` lists in `tier`, from the index's split sets and the attached files alone.
-    private func activeCount(in place: Place, tier: Tier) -> Int {
-        let scope = ListScope(tier: tier)
-        func standalone(_ splits: [MarfaItemIndex.Split]) -> Int {
-            let count = splits.reduce(0) { $0 + $1.count(in: scope, .hidden) }
-            return index.standaloneCount(count) { id in splits.contains { $0.contains(id, in: scope, .hidden) } }
+    /// The index's counts less the files attached to a held item, worked out once for each change of membership: one
+    /// pass over the types and sources and one over those files, so every count after is a lookup.
+    private var standaloneCounts: StandaloneCounts {
+        let revision = membershipRevision
+        if let held = countedAlone, held.revision == revision { return held.counts }
+        func counts(_ split: MarfaItemIndex.Split, _ archived: ArchivedItems = .hidden) -> ScopeCounts {
+            ScopeCounts(library: split.count(in: .library, archived), feed: split.count(in: .feed, archived))
         }
-        switch place {
-        case .library, .feed, .archive, .types, .collections, .sources:
-            return place == .library || place == .feed ? standalone([index.listed]) : 0
-        case .type(let type):
-            return standalone(kinds(of: type).compactMap { index.byType[$0] })
-        case .source(let code):
-            return standalone(index.bySource[code].map { [$0] } ?? [])
-        case .collection:
-            return members(of: ListingKey(place: place, scope: scope, archived: .hidden, includingKinds: true)).count
+        var alone = StandaloneCounts(
+            active: counts(index.listed), archived: counts(index.listed, .only),
+            byType: index.byType.mapValues { counts($0) }, bySource: index.bySource.mapValues { counts($0) })
+        for id in index.attachedToHeld() {
+            guard let item = records[id]?.item else { continue }
+            switch item.state {
+            case .archived: alone.archived.take(item.tier)
+            case .active:
+                alone.active.take(item.tier)
+                alone.byType[item.type]?.take(item.tier)
+                if let source = item.source { alone.bySource[source]?.take(item.tier) }
+            case .trashed: break
+            }
         }
+        countedAlone = (revision, alone)
+        return alone
     }
 
     private func kinds(of type: TypeID, including: Bool = true) -> [TypeID] {
@@ -178,12 +197,12 @@ extension MarfaLibrary {
     /// leaves them out.
     private func members(of key: ListingKey) -> Set<ItemID> {
         if key.favorites {
-            return index.favorites.filter { index.listed.contains($0, in: key.scope, key.archived) }
+            return index.standalone(index.favorites.filter { index.listed.contains($0, in: key.scope, key.archived) })
         }
         switch key.place {
         case .library: return index.standalone(index.listed.ids(in: .library, key.archived))
         case .feed: return index.standalone(index.listed.ids(in: .feed, key.archived))
-        case .archive: return index.listed.ids(in: .all, .only)
+        case .archive: return index.standalone(index.listed.ids(in: .all, .only))
         case .types, .sources, .collections: return []
         case .source(let code): return index.standalone(index.bySource[code]?.ids(in: key.scope, key.archived) ?? [])
         case .type(let type):
@@ -192,9 +211,9 @@ extension MarfaLibrary {
             })
         // The items filed in the collection through `in-collection`.
         case .collection(let id):
-            return Set(index.links(to: id, type: MarfaMapping.collectionEdge).map(\.from)).filter {
+            return index.standalone(Set(index.links(to: id, type: MarfaMapping.collectionEdge).map(\.from)).filter {
                 index.listed.contains($0, in: key.scope, key.archived)
-            }
+            })
         }
     }
 
@@ -226,5 +245,28 @@ extension MarfaLibrary {
             return nil
         }
         return record.isHeld ? record.body : nil
+    }
+}
+
+/// Standalone items by tier: active ones for the library, each type and each source, and archived ones for the Archive.
+nonisolated struct StandaloneCounts {
+    var active: ScopeCounts
+    var archived: ScopeCounts
+    var byType: [TypeID: ScopeCounts]
+    var bySource: [String: ScopeCounts]
+}
+
+private nonisolated extension ScopeCounts {
+    static let zero = ScopeCounts(library: 0, feed: 0)
+
+    static func + (a: ScopeCounts, b: ScopeCounts) -> ScopeCounts {
+        ScopeCounts(library: a.library + b.library, feed: a.feed + b.feed)
+    }
+
+    mutating func take(_ tier: Tier) {
+        switch tier {
+        case .library: library -= 1
+        case .feed: feed -= 1
+        }
     }
 }

@@ -164,8 +164,10 @@ extension ItemLibrary {
         let counts = Dictionary(uniqueKeysWithValues: catalogue.itemTypes.keys.map { ($0, count(in: .type($0), scope: .all)) })
         let held = counts.filter { $0.value > 0 }
         let labels = catalogue.displayLabels(for: held.keys, as: .many)
+        var kindCounts: [TypeID: Int] = [:]
+        for info in catalogue.itemTypes.values { if let parent = info.parent { kindCounts[parent, default: 0] += counts[info.id] ?? 0 } }
         return held.map { type, count in
-            let kinds = catalogue.itemTypes.values.filter { $0.parent == type }.reduce(0) { $0 + (counts[$1.id] ?? 0) }
+            let kinds = kindCounts[type] ?? 0
             return ItemTypeCount(
                 id: type, label: labels[type] ?? type.rawValue, icon: catalogue.icon(for: type), count: count, own: max(count - kinds, 0))
         }
