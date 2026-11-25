@@ -61,6 +61,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Archive and Unarchive | ⌃⌘A, in the item menu after Keep or Move to Feed and before Delete. | `ItemActions.swift` | `Rethink-Archive-Toast`, `Rethink-Item-Menu` |
+| Undo of state and tier where the copy cannot be sure | **Waits for Marfa:** an expected state on a transition (marfa#3523) and an update that refuses a stale version (marfa#3528). Until then, Undo does nothing and says so when the copy shows a change, and a change the copy has not yet learned of can still be overwritten. | `MarfaEngine+Writing.swift`, `MarfaLibrary+Bin.swift`, `MarfaLibrary+Moves.swift` | `Rethink-Archive-Toast` |
 | With sub-items | It asks: Archive All, Archive Only This Item, Cancel. The count is what `archivePlan` puts beneath. | `LibraryDialogs.swift` | `Rethink-Archive-Sub-Items` |
 | Library's Archive | The one list of everything archived, from both the Library and the Feed, with its own count and its own layout choice. One type's archived items are this place narrowed by a token in Search. | `SidebarIndex.swift`, `MarfaItemIndex` | `Rethink-Archive`, `Rethink-Type-Archive` |
 | An archived item's page | Says Archived over its title, and edits as any other. | `ItemPageHeader.swift`, `BatchSkips` | `Rethink-Archived-Page` |
