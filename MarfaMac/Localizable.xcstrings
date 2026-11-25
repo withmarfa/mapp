@@ -531,6 +531,16 @@
         }
       }
     },
+    "%@, %@ of ^[%lld item](inflect: true)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ of ^[%3$lld item](inflect: true)"
+          }
+        }
+      }
+    },
     "%@, %@, and %lld more." : {
       "localizations" : {
         "en" : {
@@ -550,6 +560,19 @@
           }
         }
       }
+    },
+    "%@, ^[%lld item](inflect: true)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, ^[%2$lld item](inflect: true)"
+          }
+        }
+      }
+    },
+    "%@, changed" : {
+
     },
     "%@, edited" : {
       "extractionState" : "manual"
