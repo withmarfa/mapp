@@ -52,9 +52,7 @@ struct ItemBoard: View {
             if let cursor, !ids.contains(cursor) { self.cursor = nil }
             if let anchor, !ids.contains(anchor) { self.anchor = nil }
         }
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
-        }
+        .onClockChange { daysSeen += 1 }
     }
 
     /// Set in the View panel's Board section (`ViewPanelLayoutRows`).

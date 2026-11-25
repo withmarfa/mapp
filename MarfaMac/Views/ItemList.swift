@@ -73,11 +73,7 @@ struct ItemList: View, Equatable {
                 browser: browser, columnWidth: width - (isSidebarHidden ? ColumnSearchMetrics.sidebarButtonRoom : 0),
                 leadsWithHistory: isSidebarHidden && showsSidebarHistory)
         }
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
-                daysSeen += 1
-            }
-        }
+        .onClockChange { daysSeen += 1 }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
         .onChange(of: ids) { old, new in

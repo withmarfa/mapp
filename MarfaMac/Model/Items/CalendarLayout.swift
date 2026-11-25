@@ -23,6 +23,8 @@ nonisolated struct CalendarEntry: Identifiable, Hashable, Sendable {
     let end: Date
     /// Whether the item is a whole day or a run of days, rather than hours.
     let isAllDay: Bool
+    /// Whether the entry says the item is the Feed's, which a calendar of both tiers does (`RowContent.inFeed`).
+    var inFeed = false
 }
 
 /// Where items sit on a calendar, worked out from the same rule as the timeline (`ItemPlacement`), as pure values: the
@@ -36,7 +38,7 @@ nonisolated enum CalendarLayout {
 
     /// The items placed on the calendar, and how many had no date to place them by and were left out.
     static func entries(
-        for items: [Item], looks: [TypeID: TypeLook], catalogue: Catalogue, calendar: Calendar = .current
+        for items: [Item], looks: [TypeID: TypeLook], catalogue: Catalogue, calendar: Calendar = .current, marksFeed: Bool = false
     ) -> (entries: [CalendarEntry], leftOut: Int) {
         var entries: [CalendarEntry] = []
         var leftOut = 0
@@ -46,20 +48,21 @@ nonisolated enum CalendarLayout {
                 leftOut += 1
                 continue
             }
-            entries.append(entry(of: item, placement, calendar: calendar))
+            entries.append(entry(of: item, placement, calendar: calendar, marksFeed: marksFeed))
         }
         return (entries, leftOut)
     }
 
-    static func entry(of item: Item, _ placement: ItemPlacement, calendar: Calendar) -> CalendarEntry {
+    static func entry(of item: Item, _ placement: ItemPlacement, calendar: Calendar, marksFeed: Bool = false) -> CalendarEntry {
+        let inFeed = marksFeed && item.tier == .feed
         if !placement.hasTime {
             let first = calendar.startOfDay(for: placement.start)
             let next = calendar.date(byAdding: .day, value: 1, to: first) ?? first.addingTimeInterval(86_400)
             let end = placement.end.map { max($0, next) } ?? next
-            return CalendarEntry(id: item.id, title: item.displayTitle, start: first, end: end, isAllDay: true)
+            return CalendarEntry(id: item.id, title: item.displayTitle, start: first, end: end, isAllDay: true, inFeed: inFeed)
         }
         let end = placement.end.flatMap { $0 > placement.start ? $0 : nil } ?? placement.start.addingTimeInterval(defaultLength)
-        return CalendarEntry(id: item.id, title: item.displayTitle, start: placement.start, end: end, isAllDay: false)
+        return CalendarEntry(id: item.id, title: item.displayTitle, start: placement.start, end: end, isAllDay: false, inFeed: inFeed)
     }
 
     // MARK: Time

@@ -69,9 +69,7 @@ struct ItemGallery: View {
             }
         }
         .filteredEmptyState(browser)
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
-        }
+        .onClockChange { daysSeen += 1 }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
     }

@@ -22,6 +22,31 @@ enum StatusPanel {
     }
 }
 
+extension View {
+    /// Gives a row that VoiceOver reads as one element (and so cannot reach the status chip inside it) a Change Status
+    /// action that opens the chip's panel under the row. `id` is nil for a row whose status takes no change.
+    func changesStatus(of id: ItemID?) -> some View {
+        modifier(StatusRowAction(id: id))
+    }
+}
+
+private struct StatusRowAction: ViewModifier {
+    @CurrentLibrary private var library
+    @Environment(\.undoManager) private var undoManager
+    let id: ItemID?
+    @State private var anchor = ValueEditAnchorBox()
+
+    func body(content: Content) -> some View {
+        content
+            .background { if id != nil { ValueEditAnchor(box: anchor) } }
+            .accessibilityActions {
+                if let id {
+                    Button("Change Status") { StatusPanel.open(id, in: library, undoManager: undoManager, under: anchor.view) }
+                }
+            }
+    }
+}
+
 /// A status chip that opens its panel on a click, in the bottom line of a row or a card. It reads no library while it
 /// draws, so a change to another item draws no chip.
 struct StatusChipButton: View {

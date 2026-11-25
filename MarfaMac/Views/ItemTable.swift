@@ -13,6 +13,8 @@ struct ItemTable: View {
     let browser: Browser
     let order: ItemOrder
     var pane: FocusState<Browser.Pane?>.Binding
+    /// Where the title stands (`TopRowMetrics.collectionLead`), which the first column starts at.
+    var titleLead = TopRowMetrics.lead
     /// Each place's column widths, as the person dragged them. The columns shown and their order are the Properties list's.
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     /// What this Mac keeps for each saved view, whose column widths the table records (`Browser.keepWidths`).
@@ -29,8 +31,8 @@ struct ItemTable: View {
 
     /// The inset style's own margin before the first column.
     static let inset: CGFloat = 16
-    /// With the inset, the first column starts at the standard title inset and leaves room for group chevrons.
-    static let margin: CGFloat = TopRowMetrics.lead - inset
+    /// With the inset, the first column starts where the title does and leaves room for group chevrons.
+    private var margin: CGFloat { max(0, titleLead - Self.inset) }
 
     var body: some View {
         let _ = daysSeen
@@ -47,7 +49,7 @@ struct ItemTable: View {
         ItemTableSelection(browser: browser, content: content) { selection in
             table(selection: selection, columns: content.columns, fit: fit, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
         }
-            .padding(.horizontal, Self.margin)
+            .padding(.horizontal, margin)
             .searchStatus(browser)
             .overlay {
                 if allRows.isEmpty {
@@ -72,9 +74,7 @@ struct ItemTable: View {
             .onChange(of: allRows.count) { browser.revealSelectionInTable(content) }
             // The Archive names each item's source, which the server names after the items are read.
             .task(id: library.membershipRevision) { if browser.listsByOrigin { await library.refreshSources() } }
-            .task {
-                for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
-            }
+            .onClockChange { daysSeen += 1 }
     }
 
     /// The table's content, with its rows holding the links of the columns the person shows. A link column that was hidden

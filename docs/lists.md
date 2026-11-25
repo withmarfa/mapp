@@ -54,7 +54,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse a drop: no single value is meant.
 - **Only divider drags save widths** (`keepWidths`).
-- **Item table text starts 40 points from the pane edge.** Unset widths sample 120 rows (`ItemTableFit`). Name fills the remaining space until resized.
+- **Item table text starts where the title does,** 40 points from the pane edge, or 16 under the compact title (`TopRowMetrics.collectionLead`). Unset widths sample 120 rows (`ItemTableFit`). Name fills the remaining space until resized.
 - **Table timestamps show the time today with date words on** (`DateDisplay.Place.table`). Other dates use day labels.
 
 ## The View panel

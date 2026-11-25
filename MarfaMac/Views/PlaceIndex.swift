@@ -392,9 +392,7 @@ private struct PlaceIndexLatest: View {
         }
         .foregroundStyle(.secondary)
         .tableCellRoom()
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
-        }
+        .onClockChange { daysSeen += 1 }
     }
 }
 

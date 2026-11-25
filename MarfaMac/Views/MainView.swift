@@ -17,6 +17,7 @@ struct MainView: View {
     @SceneStorage("browser") private var earlierBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @AppStorage(InterfaceKey.showsSidebarHistory) private var showsSidebarHistory = true
+    @AppStorage(ListKey.openItemsIn) private var opening = ItemOpening.standard
     /// Kept with the window for the next launch, as the selection and the details are.
     @SceneStorage("sidebarHidden") private var isSidebarHidden = false
     @State private var snapshotSaver = DelayedAction()
@@ -222,7 +223,10 @@ struct MainView: View {
                             Group {
                                 switch browser.viewMode {
                                 case .table:
-                                    ItemTable(browser: browser, order: order, pane: $pane)
+                                    ItemTable(
+                                        browser: browser, order: order, pane: $pane,
+                                        titleLead: TopRowMetrics.collectionLead(
+                                            browser: browser, opening: opening, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow))
                                 case .board:
                                     ItemBoard(browser: browser, pane: $pane)
                                 case .timeline:

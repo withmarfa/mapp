@@ -39,6 +39,7 @@ struct ItemRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(content.spoken)
         .accessibilityAddTraits(.isStaticText)
+        .changesStatus(of: content.editsStatus ? itemID : nil)
     }
 
     private var compact: some View {

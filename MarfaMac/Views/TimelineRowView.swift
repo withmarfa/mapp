@@ -40,5 +40,6 @@ struct TimelineRowView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(content.spoken)
         .accessibilityAddTraits(.isStaticText)
+        .changesStatus(of: content.editsStatus ? itemID : nil)
     }
 }
