@@ -127,6 +127,10 @@ import MarfaTesting
         LaunchTrace.shared.mark(.librariesInit, note: isLaunching ? "server set" : "no server")
     }
 
+    isolated deinit {
+        refusalsHeard?.cancel()
+    }
+
     /// Puts every setting on this Mac back (`MacSettings`) and the shortcuts already held in memory with it, so the menus
     /// and the hot keys change at once and nothing writes the old choices back. Where the settings sync, the Marfa's are
     /// put back with them, for every Mac, even over another Mac's change not yet taken. A restore point is saved first,

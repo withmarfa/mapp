@@ -31,7 +31,7 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 - **`Browser.openNewItem` opens each New command.** In a window, New Opens (`NewOpens`) chooses the line or the text form. The any-app shortcut requests the line. A kind that the line cannot make opens in the text form (`QuickAdd.lineOffers`).
 - **The kind to start with:** a type's own place starts with that type; anywhere else, New Items Are, then the last kind used, then a note (`QuickAdd.startingType`).
-- **One create holds the properties, tags and tier** (`Browser.saveQuickAdd`). The parent is a second write; a refusal then or later names both (`MarfaEngine.place`). The In row sets the tier, starting from the place.
+- **One create holds the properties, tags and tier** (`Browser.saveQuickAdd`). The parent is a second write; a refusal, even after a relaunch, names both (`MarfaEngine.place`). The In row sets the tier, starting from the place.
 - **A type gives a new item only its first status that has not started** (`QuickAdd.prefill`).
 - **A required field the form cannot set is named at once** (`QuickAdd.unsettableRequired`). The line hands a draft missing a required value to the text form.
 - **The title may be left out** where the kind does not require it and the draft holds something else.
@@ -41,7 +41,7 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 - **Keys:** Tab moves the kind, `#` a tag, `@` a parent, `/` a property. Rows offer the most recent first.
 - **Add (↩) keeps the line open with the same kind,** with an Undo. ⌘↩ adds and opens; ⇧↩ opens the text form.
 - **Words stay in the title until Add or ⇧↩ take out what was read** (`QuickAdd.finishLine`); chips show it (`QuickAdd.lineChips`).
-- **Delete on a chip stops it being read** (`QuickAdd.Draft.decline`). An offer chosen for a typed word keeps the word (`QuickAdd.Mark`).
+- **Delete on a chip stops it being read** (`QuickAdd.Draft.decline`).
 - **A tag is `#` and a letter at a word's start** (`NewItemText.tags`); reserved tags are never read.
 - **A day becomes the due day, else the start day** (`QuickAdd.dayField`), in the person's locale.
 - **A web address pasted into an empty line makes a bookmark** (`QuickAdd.bookmarkKind`).
@@ -49,14 +49,14 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps each new item not added through a closed window, a quit and a refusal, by slot (`Slot.line`, `Slot.inPlace(_:)`) and instance (`serverKey`). A refusal is kept with its draft at once (`follow`).
+`NewItemDrafts` keeps each new item not added through a closed window, a quit and a refusal, by slot (`Slot.line`, `Slot.inPlace(_:)`) and instance (`serverKey`). Refusals are kept at once (`follow`). One cut off by a quit mid-add may be in Marfa, so its Add asks first (`QuickAdd.mayBeInMarfa`).
 
 | Call | Does |
 | --- | --- |
 | `make(_:_:in:)`, `take(_:in:)` | Start or claim a draft, never shared |
-| `update(_:_:)`, `escape(_:)` | Keep what was typed; drop an empty draft |
+| `update(_:_:)`, `escape(_:)` | Keep what was typed; drop an empty, unsent draft |
 | `sending(_:as:)`, `settle(in:)` | Write the item's ID first; hide the draft until Marfa answers (`ItemLibrary.refusedCreates`) |
-| `release(_:sending:rest:)`, `giveBack(_:)` | Hide the file draft after window close. If queuing fails, return it and tell the person. |
+| `release(_:sending:rest:)`, `giveBack(_:)` | Hide a file's draft as it goes; a failure or refusal returns it, told |
 | `release(_:)`, `drop(_:)` | The holder went, or the person cleared it |
 
 ### Dropping

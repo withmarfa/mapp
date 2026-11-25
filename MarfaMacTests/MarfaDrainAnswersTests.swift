@@ -236,7 +236,7 @@ struct MarfaDrainAnswersTests {
         await source.tellAnswers()
 
         #expect(await eventually { library.refusedCreates.contains(id) })
-        #expect(library.createRefusalReasons[id] != nil)
+        #expect(await eventually { library.refusalReason(creating: id) != nil })
         await source.close()
     }
 

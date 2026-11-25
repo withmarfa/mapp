@@ -281,7 +281,7 @@ extension MarfaEngine {
                 try await judge(edge: .link(draft))
                 return try await copy.edges.create(from: parent.rawValue, to: child.rawValue, type: draft.type)
             }
-            parentLinks[queued.id] = link
+            parentLinks.keep(link, for: queued.id)
         } catch {
             let reason = (error as? Refused)?.problem.message ?? Self.failure(error).message
             refusedParentLinks.append(ParentRefusal(link: link, reason: reason, listed: false))

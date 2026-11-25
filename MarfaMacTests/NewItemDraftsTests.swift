@@ -429,8 +429,9 @@ struct NewItemDraftsTests {
         drafts.sendingFile(id)
         drafts.release(id, sending: draft, rest: QuickAdd.Draft(typeID: "core.file"))
         drafts.added(id, as: item)
-        library.refusedCreations = [item]
-        library.createRefusalReasons = [item: "The file is too large."]
+        library.syncReport.problems = [SyncProblemEntry(
+            id: .write("w"), itemID: item, kind: .refused, change: .create,
+            reason: SyncProblem(code: "too_large", message: "The file is too large."), content: SyncContent(title: "Holiday"), actions: [])]
 
         drafts.settle(in: library)
         drafts.settle(in: library)

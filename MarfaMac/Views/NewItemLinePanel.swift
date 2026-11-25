@@ -46,6 +46,8 @@ struct NewItemLinePanel: View {
     @State private var editing: String?
     @State private var isChoosingFile = false
     @State private var isDropTargeted = false
+    /// Whether the Add that asked first would open the item, so adding again does the same.
+    @State private var addsOpening = false
 
     var body: some View {
         if let draft = quickAdd.draft {
@@ -86,6 +88,9 @@ struct NewItemLinePanel: View {
         .onKeyPress(.escape) {
             putAway()
             return .handled
+        }
+        .asksToAddAgain($quickAdd.asksAgain, isFile: QuickAdd.isFile(draft.typeID, in: library.catalogue)) {
+            add(opening: addsOpening, again: true)
         }
         .onWindowResignsKey { keyWindowIsOwn in
             if browser.putAwayQuickAddLeftEmpty(usesOwnSurface: isChoosingFile || editing != nil, keyWindowIsOwn: keyWindowIsOwn) { onClose() }
@@ -707,14 +712,16 @@ struct NewItemLinePanel: View {
         focus = .title
     }
 
-    private func add(opening: Bool) {
+    private func add(opening: Bool, again: Bool = false) {
         let typeID = quickAdd.draft?.typeID ?? ""
+        addsOpening = opening
         Task {
             if opening, let opensElsewhere {
-                guard let id = await browser.saveQuickAdd(in: library, undoManager: undo, opening: false, toasts: toasts) else { return }
+                guard let id = await browser.saveQuickAdd(in: library, undoManager: undo, opening: false, toasts: toasts, again: again)
+                else { return }
                 opensElsewhere(id, typeID)
             } else {
-                _ = await browser.saveQuickAdd(in: library, undoManager: undo, opening: opening, toasts: toasts)
+                _ = await browser.saveQuickAdd(in: library, undoManager: undo, opening: opening, toasts: toasts, again: again)
                 if opening, !quickAdd.isPresented { onClose() }
             }
         }

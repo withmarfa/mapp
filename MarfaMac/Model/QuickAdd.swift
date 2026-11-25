@@ -284,13 +284,20 @@ final class QuickAdd {
     var lastAdded: String?
     /// The Undo of the last Added line, while it is still the undo manager's latest step.
     var lastUndo: StepUndo?
+    /// The draft came back after the app quit while it was being added, so it may be in Marfa already and its Add
+    /// asks first (`asksAgain`).
     var mayBeInMarfa = false
+    /// Whether the window asks the person to add again a draft that may be in Marfa already.
     var asksAgain = false
 
     /// Writes the draft as it now is, or drops it where it is empty.
     private func keep() {
         guard let entry, let draft else { return }
-        drafts.update(entry, draft)
+        let kept = drafts.update(entry, draft)
+        guard kept != entry else { return }
+        // The draft emptied was on its way, so it waits in the store as sent and the window goes on afresh.
+        self.entry = kept
+        mayBeInMarfa = false
     }
 
     /// Starts this window's draft in `library`: the one a closed window or an earlier run left there, else a new one
@@ -303,11 +310,7 @@ final class QuickAdd {
         if let kept = drafts.take(.line, in: library.serverKey) {
             entry = kept.id
             draft = kept.draft
-            if kept.interrupted {
-                lastAdded = String(localized: "The app quit while this file was being added. Check that it isn’t in the library before you add it again.")
-            } else if kept.returned {
-                lastAdded = String(localized: "The item wasn’t added. What you typed is back.")
-            }
+            cameBack(kept, in: library)
             if !kept.missingFiles.isEmpty {
                 library.notices.tell(
                     String(localized: "File Not Found"),
@@ -318,7 +321,20 @@ final class QuickAdd {
         guard let made = make() else { return false }
         entry = drafts.make(.line, made, in: library.serverKey)
         draft = made
+        mayBeInMarfa = false
         return false
+    }
+
+    /// Says why a kept draft came back, and marks one that may be in Marfa already.
+    private func cameBack(_ kept: NewItemDrafts.Entry, in library: any ItemLibrary) {
+        mayBeInMarfa = kept.interrupted
+        if kept.interrupted {
+            lastAdded = QuickAdd.isFile(kept.draft.typeID, in: library.catalogue)
+                ? String(localized: "The app quit while this file was being added. Check that it isn’t in the library before you add it again.")
+                : String(localized: "The app quit while this item was being added. Check that it isn’t in the library before you add it again.")
+        } else if kept.returned {
+            lastAdded = String(localized: "The item wasn’t added. What you typed is back.")
+        }
     }
 
     /// Takes the draft `id` another holder let go, as the line over another app hands its draft to a window's text
@@ -329,6 +345,7 @@ final class QuickAdd {
         drafts.notices = library.notices
         entry = kept.id
         draft = kept.draft
+        mayBeInMarfa = kept.interrupted
         listDrafts = [:]
         return true
     }
@@ -340,7 +357,7 @@ final class QuickAdd {
         if let entry { drafts.drop(entry) }
         entry = kept.id
         draft = kept.draft
-        lastAdded = String(localized: "The item wasn’t added. What you typed is back.")
+        cameBack(kept, in: library)
     }
     /// The work on each list field's entries, by key: an entry being added, or a member's text not yet in the draft.
     /// Kept here, not by the popover that edits it, so closing the popover keeps it. Observed, so the panel's word on
@@ -375,6 +392,7 @@ final class QuickAdd {
         entry.map(drafts.release)
         entry = nil
         draft = nil
+        mayBeInMarfa = false
         listDrafts = [:]
     }
 
@@ -383,6 +401,7 @@ final class QuickAdd {
         if let entry { drafts.added(entry, as: item) }
         entry = nil
         draft = nil
+        mayBeInMarfa = false
         listDrafts = [:]
     }
 
@@ -423,7 +442,7 @@ final class QuickAdd {
     /// which tells the person.
     func leave(because departure: Departure, telling notices: Notices) {
         let lists = unfinishedListText
-        if let entry, var rest = draft, let sending {
+        if let entry, var rest = draft, let sending, entry == sendingEntry {
             rest.files.removeAll { sending.files.contains($0) }
             if NameText.trimmed(rest.title) == NameText.trimmed(sending.title) { rest.title = "" }
             if rest.parentID == sending.parentID { rest.parentID = nil }
@@ -436,6 +455,8 @@ final class QuickAdd {
         }
         entry = nil
         draft = nil
+        mayBeInMarfa = false
+        asksAgain = false
         listDrafts = [:]
         isPresented = false
         guard !lists.isEmpty else { return }
@@ -833,7 +854,7 @@ extension Browser {
     /// the whole draft, and a draft changed meanwhile stays as typed and is not added, and the person is told to add
     /// it again. A file no longer where it was is taken out of the draft and named, and nothing is added until the
     /// person has seen that. Nothing empty is ever written. `toasts` hears the line's Added, with an Undo that takes
-    /// back the add alone.
+    /// back the add alone. A draft that may be in Marfa already (`QuickAdd.mayBeInMarfa`) is added only `again`.
     @discardableResult
     func saveQuickAdd(
         in library: any ItemLibrary, undoManager: UndoManager?, opening: Bool = true, toasts: ToastPresenter? = nil,
@@ -851,6 +872,14 @@ extension Browser {
             }
         }
         guard !quickAdd.isSaving, QuickAdd.canSave(draft, in: library), quickAdd.unfinishedLists.isEmpty else { return nil }
+        // A draft back from a quit mid-add may be in Marfa already, so it is added again only once the person says so.
+        if quickAdd.mayBeInMarfa {
+            guard again else {
+                quickAdd.asksAgain = true
+                return nil
+            }
+            quickAdd.mayBeInMarfa = false
+        }
         let missing = draft.files.filter { !$0.isOnDisk }
         guard missing.isEmpty else {
             quickAdd.draft?.files.removeAll { missing.contains($0) }

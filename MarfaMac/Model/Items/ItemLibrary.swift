@@ -225,8 +225,6 @@ protocol ItemLibrary: AnyObject, Observable {
     /// The creates Marfa refused after `createItem` answered, before or after the library showed the item, which the
     /// library has told the person of. A library that refuses a create at once answers nil from `createItem` instead.
     var refusedCreations: Set<ItemID> { get }
-    /// The server's reason for each create in `refusedCreations` it gave one for.
-    var createRefusalReasons: [ItemID: String] { get }
     @discardableResult
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool
     /// Several properties of one item in one edit and one undo step named `actionName`, each given its value or, where
@@ -354,6 +352,10 @@ extension ItemLibrary {
     /// Every create Marfa refused for good: those refused as they were sent, and those the copy lists as refused.
     var refusedCreates: Set<ItemID> {
         refusedCreations.union(syncReport.problems.compactMap { $0.change == .create && $0.kind == .refused ? $0.itemID : nil })
+    }
+    /// The server's reason for refusing the create of `item`, where the queue still lists it.
+    func refusalReason(creating item: ItemID) -> String? {
+        syncReport.problems.first { $0.itemID == item && $0.change == .create && $0.kind == .refused }?.reason?.message
     }
     var serverKey: String { "" }
     func headerItem(_ id: ItemID) -> Item? { item(id) }

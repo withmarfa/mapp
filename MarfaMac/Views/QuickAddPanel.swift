@@ -105,6 +105,7 @@ struct QuickAddPanel: View {
             browser.putAwayQuickAddLeftEmpty(usesOwnSurface: isChoosingFile || editing != nil, keyWindowIsOwn: keyWindowIsOwn)
         }
         .onAppear { returnFocus = editor.isFocused ? .page : .list }
+        .asksToAddAgain($quickAdd.asksAgain, isFile: isFile) { save(again: true) }
         .defaultFocus($focus, .title)
         .task {
             let handed = quickAdd.draft?.title
@@ -629,12 +630,25 @@ struct QuickAddPanel: View {
         return candidates
     }
 
-    private func save() {
-        Task { await browser.saveQuickAdd(in: library, undoManager: undoManager) }
+    private func save(again: Bool = false) {
+        Task { await browser.saveQuickAdd(in: library, undoManager: undoManager, again: again) }
     }
 
     private func putAway() {
         browser.putAwayQuickAdd()
         if browser.focusRequest == nil { browser.focusRequest = returnFocus }
+    }
+}
+
+extension View {
+    /// Asks before a draft that may be in Marfa already is added again (`QuickAdd.mayBeInMarfa`).
+    func asksToAddAgain(_ isPresented: Binding<Bool>, isFile: Bool, add: @escaping () -> Void) -> some View {
+        alert(
+            isFile ? "This file may already have been added. Add it again?" : "This item may already have been added. Add it again?",
+            isPresented: isPresented
+        ) {
+            Button("Add Again", action: add)
+            Button("Cancel", role: .cancel) {}
+        }
     }
 }

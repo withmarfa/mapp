@@ -442,7 +442,6 @@ final class FakeItemLibrary: ItemLibrary {
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool { false }
     /// Creates refused after `createItem` answered, as a server's source refuses one it cannot queue.
     var refusedCreations: Set<ItemID> = []
-    var createRefusalReasons: [ItemID: String] = [:]
     func finish() {}
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
 

@@ -138,9 +138,52 @@ extension MarfaEngine {
 }
 
 /// A new item's parent link, as queued.
-nonisolated struct ParentLink: Hashable, Sendable {
+nonisolated struct ParentLink: Hashable, Codable, Sendable {
     let child: ItemID
     let parent: ItemID
+}
+
+/// The new items' parent links waiting for the server, by queued write, written whole to `file` at each change.
+nonisolated struct ParentLinkStore {
+    private let file: URL?
+    private var links: [String: ParentLink]
+
+    init(file: URL?) {
+        self.file = file
+        links = file.flatMap { try? Data(contentsOf: $0) }.flatMap { try? JSONDecoder().decode([String: ParentLink].self, from: $0) } ?? [:]
+    }
+
+    mutating func keep(_ link: ParentLink, for write: String) {
+        links[write] = link
+        save()
+    }
+
+    mutating func removeValue(forKey write: String) -> ParentLink? {
+        guard let link = links.removeValue(forKey: write) else { return nil }
+        save()
+        return link
+    }
+
+    mutating func keepOnly(_ writes: Set<String>) {
+        let kept = links.filter { writes.contains($0.key) }
+        guard kept.count != links.count else { return }
+        links = kept
+        save()
+    }
+
+    /// A link not written is still told while the app runs; only a relaunch loses it.
+    private func save() {
+        guard let file else { return }
+        do {
+            if links.isEmpty {
+                if FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) { try FileManager.default.removeItem(at: file) }
+            } else {
+                try JSONEncoder().encode(links).write(to: file, options: .atomic)
+            }
+        } catch {
+            Telemetry.logger(.engine).error("New item parent links not written: \(error.localizedDescription)")
+        }
+    }
 }
 
 /// A parent link refused as it was queued, or by the server later, when the refused write is also `listed` in Settings.

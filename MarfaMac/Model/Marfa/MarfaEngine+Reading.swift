@@ -304,6 +304,8 @@ extension MarfaEngine {
             readFailed(error)
             return
         }
+        // A link discarded from the queue in an earlier run is never answered.
+        if !readQueueOnce { parentLinks.keepOnly(Set(queue.map(\.id))) }
         queue = await libraryWrites(queue)
         let held = Set(queue.map(\.id)).union(answeredHeld.keys)
         counted.formIntersection(held)
