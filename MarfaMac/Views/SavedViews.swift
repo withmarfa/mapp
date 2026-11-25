@@ -84,11 +84,13 @@ enum SavedViews {
         }
     }
 
-    /// This Mac's settings for a view made of what the window shows: its layout, its Properties, its cards, its density,
-    /// its Open Items and its Quick Actions. Quick Actions is kept as the window shows it, since a view's default differs
-    /// from a place's.
+    /// This Mac's settings for a view made of what the window shows: a saved view's draft whole (`ViewPanel.mac`), so a
+    /// setting added later is carried with no list here, else its layout, its Properties, its cards, its density, its Open
+    /// Items and its Quick Actions. Quick Actions is kept as the window shows it, since a view's default differs from a
+    /// place's.
     static func newViewSettings(_ browser: Browser, in library: any ItemLibrary) -> ViewMacSettings {
-        var settings = ViewMacSettings(layout: browser.viewMode)
+        var settings = browser.shown.savedView.map { browser.macSettings(for: $0) } ?? ViewMacSettings()
+        settings.layout = browser.viewMode
         settings.cards = browser.cards
         settings.density = browser.density
         if browser.viewMode == .calendar { settings.calendarScale = browser.calendarScale }
@@ -96,7 +98,6 @@ enum SavedViews {
         settings.properties = browser.properties
         settings.opening = browser.chosenOpening
         settings.quickActions = browser.showsQuickActions
-        if let id = browser.shown.savedView { settings.calendarScale = browser.macSettings(for: id).calendarScale }
         return settings
     }
 

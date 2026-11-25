@@ -30,11 +30,11 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest, such as layout and properties (`ViewMacSettings` in `ViewLayouts`).
 - **Saved view changes are written as they happen** (`Browser+ViewWrites`). Writes name the changed settings and use the current row for Mac settings.
 - **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits by setting (`PendingViewChanges`), through closing and quitting. A refused one goes to the clipboard in words.
-- **Revert View writes back each setting the window changed as Marfa held it at opening** (`openedView`), whole. One another app changed since stays, and the person is told.
+- **Revert View writes back each setting the window changed as it was at opening** (`openedView`), Marfa's whole. One changed elsewhere since stays, and the person is told.
 - **While a change waits, the window lists the view's query with its own filters, From and Archived Items** (`viewPreview`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
-- **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`). Settings chosen meanwhile are the draft's (`ViewPanel.mac`); Cancel writes nothing to the original.
+- **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`). Settings and widths chosen meanwhile are the draft's (`ViewPanel.mac`); Cancel writes nothing to the original.
 - **Making, renaming and deleting a view needs the server and is never queued.** A changed or submitted draft stays open; leaving it, or a late refusal, gives it back in words. A rename never replaces another app's; deleting asks.
 - **Starting points are what Marfa saves exactly** (`NewViewStart`), and list their own items while chosen. This Search, first while searching, takes the sayable tokens, From as the tier, unless the From changed.
 - **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
@@ -66,7 +66,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **The offer comes from the types a place lists, never from the items on screen** (`GroupOffer`), so a field no item fills can be chosen.
 - **A grouping has a mode** (`GroupMode`): each value, a date's span, set or not set, or the four status groups.
 - **A saved view keeps every grouping offered,** order and hidden groups too. Hide Empty Groups stays on the Mac.
-- **A saved view's weeks start on Monday,** as Marfa fixes them for every app. A place's own follow Settings.
+- **A saved view's weeks start on Monday,** as in every app. A place's own follow Settings.
 - **Not Applicable is last.** In a saved view, presence grouping treats missing fields as Not Set, and status groups treat unknown words as No Status.
 - **A hidden group leaves the layout and not the count.**
 
@@ -85,7 +85,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 - **A new operator or kind changes every row of that table.** `FilterMatching` and the query must keep the same items; test both directions (`FilterClauseTests`, `ViewDraftTests`).
 - **Marfa's filter is one list, joined all by and or all by or.** A mix is refused before it is sent (`search-and-filters/filter-mixed-logic`), except that "is" several words of a closed field is written as "is not" the others.
-- **An untouched Type condition stays in the filter.**
+- **An untouched Type condition stays in the filter,** as does any in a filter matched by Any. One outside the view's types is not saved, and the person is told.
 - **A view takes ten conditions.** Each value and each bound of a date counts.
 - **Marfa has no relative date or filter group,** so the Filter page offers neither. A default view still reads relative dates it already holds (`FilterOp.isRelative`).
 - **Marfa has no "does not include"** for people and tags, and cannot ask about a list of words, so neither is offered.
@@ -103,7 +103,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 ## Indexes
 
-- **Library › Types, Collections, and Sources** (`PlaceIndex`) show places and search by name. They have no View button.
+- **Library › Types, Collections, and Sources** (`PlaceIndex`) show places, searched by name, with no View button.
 - **Types nest kinds under their type.** Made By waits for the package's provenance; a type has no link to copy.
 - **Source kind** shows App for `oauth:` codes and Connector for `GET /plugins` sources (`SourceKind`).
 - **A table of more than 2,000 items is made off the main actor** (`Browser.arrange`), its last table showing meanwhile. A search's table is held apart.

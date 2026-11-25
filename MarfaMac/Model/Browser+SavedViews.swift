@@ -50,6 +50,9 @@ extension Browser {
         if showing != home { showing = home }
         // A change the store is sending lands in the window by itself (`Browser.pendingChangeLanded`).
         if pendingViewWrites.remove(id) != nil, !PendingViewChanges.isSending(id) { scheduleWrite(of: id) }
+        // A new view's draft made from this view holds the window's choices and layout until it is made or dropped,
+        // and the window follows the view again then (`dropNewViewPanel`).
+        guard newViewPanel(from: id) == nil else { return }
         defer { noteOpened(view) }
         guard let seed = viewSeeds[id] else {
             apply(layout: ViewLayouts.stored(in: defaults).settings(for: id)?.layout, in: library)
@@ -201,7 +204,7 @@ extension Browser {
     }
 
     /// The panel of a new view made from the saved view `id`, which holds this Mac's settings until the view exists.
-    private func newViewPanel(from id: ItemID) -> ViewPanel? {
+    func newViewPanel(from id: ItemID) -> ViewPanel? {
         guard let panel = viewPanel, panel.isNew, panel.mac != nil, panel.snapshot?.place.savedView == id else { return nil }
         return panel
     }
@@ -335,31 +338,38 @@ extension Browser {
         }
     }
 
-    /// Changes this Mac's settings for a view, and keeps them at once. Undo puts back only the settings this step changed.
+    /// Changes this Mac's settings for a view, or for the new view's draft made from it while one is open, and keeps
+    /// them at once. Undo puts back only the settings this step changed, in the settings it changed: a step of the view
+    /// stays the view's when a draft opens later.
     func changeViewSettings(_ id: ItemID, _ change: (inout ViewMacSettings) -> Void) {
-        guard let step = writeViewSettings(id, change) else { return }
-        registerUndo(String(localized: "Change View")) { browser in
+        changeViewSettings(id, draft: newViewPanel(from: id), change)
+    }
+
+    private func changeViewSettings(_ id: ItemID, draft: ViewPanel?, _ change: (inout ViewMacSettings) -> Void) {
+        guard let step = writeViewSettings(id, draft: draft, change) else { return }
+        registerUndo(String(localized: "Change View"), owner: draft ?? self) { browser in
             guard browser.shown.isSame(.saved(id)) else { return }
-            browser.changeViewSettings(id) { $0.undo(step) }
+            browser.changeViewSettings(id, draft: draft) { $0.undo(step) }
         }
     }
 
     /// Makes the change to the view's settings as stored now, never to the window's copy, so a choice another Mac made
-    /// meanwhile stays. A new view's panel takes the change instead (`ViewPanel.mac`). Nil where nothing changed.
+    /// meanwhile stays, or to the `draft`'s (`ViewPanel.mac`). Nil where nothing changed; the window then still shows
+    /// the stored settings, which may already hold the choice.
     @discardableResult
     private func writeViewSettings(
-        _ id: ItemID, _ change: (inout ViewMacSettings) -> Void
+        _ id: ItemID, draft: ViewPanel?, _ change: (inout ViewMacSettings) -> Void
     ) -> (before: ViewMacSettings, after: ViewMacSettings)? {
-        let panel = newViewPanel(from: id)
-        let before = panel?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
+        let before = draft?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
         var after = before
         change(&after)
+        if draft == nil { viewSeeds[id]?.mac = after }
         guard !after.sameChoices(as: before) else { return nil }
-        if let panel {
-            panel.mac = after
+        if let draft {
+            draft.mac = after
         } else {
             ViewLayouts.update(in: defaults) { $0.set(after, for: id) }
-            viewSeeds[id]?.mac = after
+            if openedView?.id == id { openedView?.wrote(from: before, to: after) }
         }
         return (before, after)
     }
@@ -375,8 +385,9 @@ extension Browser {
             return
         }
         let layout = viewMode
-        guard let step = writeViewSettings(id, { $0.layout = layout }) else { return }
-        registerLayoutUndo(of: id, from: old, to: layout, stored: step)
+        let draft = newViewPanel(from: id)
+        guard let step = writeViewSettings(id, draft: draft, { $0.layout = layout }) else { return }
+        registerLayoutUndo(of: id, draft: draft, from: old, to: layout, stored: step)
     }
 
     /// A place that is not a view keeps its layout in its default view, and Undo puts the earlier one back.
@@ -389,25 +400,34 @@ extension Browser {
         }
     }
 
+    /// A step of the view's layout is undone in the view's settings; the window shows it unless a draft made from the
+    /// view is open, whose layout the window shows instead.
     private func registerLayoutUndo(
-        of id: ItemID, from old: ItemViewMode, to new: ItemViewMode, stored step: (before: ViewMacSettings, after: ViewMacSettings)
+        of id: ItemID, draft: ViewPanel?, from old: ItemViewMode, to new: ItemViewMode,
+        stored step: (before: ViewMacSettings, after: ViewMacSettings)
     ) {
-        registerUndo(String(localized: "Change Layout")) { browser in
+        registerUndo(String(localized: "Change Layout"), owner: draft ?? self) { browser in
             guard browser.shown.isSame(.saved(id)) else { return }
-            browser.set(layout: old)
-            guard let back = browser.writeViewSettings(id, { $0.undo(step) }) else { return }
-            browser.registerLayoutUndo(of: id, from: new, to: old, stored: back)
+            if draft != nil || browser.newViewPanel(from: id) == nil { browser.set(layout: old) }
+            guard let back = browser.writeViewSettings(id, draft: draft, { $0.undo(step) }) else { return }
+            browser.registerLayoutUndo(of: id, draft: draft, from: new, to: old, stored: back)
         }
     }
 
-    /// Keeps the table's column widths as the person drags them.
+    /// Keeps the table's column widths as the person drags them, in a new view's draft while one made from the view is
+    /// open.
     func keepWidths(_ widths: Data, of id: ItemID) {
+        if let draft = newViewPanel(from: id) {
+            draft.mac?.widths = widths
+            return
+        }
         ViewLayouts.update(in: defaults) {
             var settings = $0.settings(for: id) ?? ViewMacSettings()
             guard settings.widths != widths else { return }
             settings.widths = widths
             $0.set(settings, for: id)
         }
+        viewSeeds[id]?.mac.widths = widths
     }
 
     // MARK: Putting the window back to the view
@@ -420,14 +440,7 @@ extension Browser {
         // A change the window has not yet passed through the funnel is still its own.
         choicesChanged()
         guard let opened = openedView, let now = library.views.first(where: { $0.id == id }) else { return }
-        if let layout = opened.mac.layout, layout != viewMode, availableViewModes(in: library).contains(layout) {
-            viewMode = layout
-        }
-        changeViewSettings(id) { settings in
-            let layout = settings.layout
-            settings.take(choicesOf: opened.mac)
-            settings.layout = layout
-        }
+        let macKept = revertMacSettings(of: opened, in: library)
         let settings = OpenedView.settings(of: opened.changed)
         let kept = settings.filter { !opened.holdsWhatItLeft($0, in: now) }
         let reverted = settings.subtracting(kept)
@@ -449,18 +462,50 @@ extension Browser {
         choicesChanged()
         // The steps of one event are one step of Undo.
         undoManager?.setActionName(String(localized: "Revert View"))
-        tellKept(kept, in: library)
+        tellKept(kept, macKept: macKept, in: library)
     }
 
-    private func tellKept(_ kept: Set<PendingViewChanges.Setting>, in library: any ItemLibrary) {
-        guard !kept.isEmpty else { return }
-        let lines = PendingViewChanges.Setting.allCases.filter(kept.contains).map { setting in
+    /// Puts back each of this Mac's settings for the view that this window changed, as it was when the window opened
+    /// the view, where it is still stored as this window wrote it. One changed since on another Mac stays, the window
+    /// shows it, and it is no longer this window's to put back. Whether one stayed.
+    private func revertMacSettings(of opened: OpenedView, in library: any ItemLibrary) -> Bool {
+        let id = opened.id
+        let storedSettings = ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
+        let stored = storedSettings.leaves, opening = opened.mac.leaves
+        let reverted = Set(opened.macWritten.filter { (stored[$0.key] ?? .null) == $0.value }.keys)
+        let layoutPath: ViewMacSettings.Path = ["layout"]
+        let layout = reverted.contains(layoutPath) ? opened.mac.layout : opened.macWritten[layoutPath] != nil ? storedSettings.layout : nil
+        if let layout, layout != viewMode, availableViewModes(in: library).contains(layout) {
+            // This window's own is put back as a change of the person's, so Undo shows it again; another Mac's is only shown.
+            if reverted.contains(layoutPath) { viewMode = layout } else { set(layout: layout) }
+        }
+        let others = reverted.subtracting([layoutPath])
+        if !others.isEmpty {
+            changeViewSettings(id, draft: nil) { settings in
+                var leaves = settings.leaves
+                for path in others { leaves[path] = opening[path] }
+                if let back = ViewMacSettings(leaves: leaves) { settings = back }
+            }
+        }
+        // The window now opens on what is stored: what it put back, and what another Mac chose.
+        let now = ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
+        viewSeeds[id]?.mac = now
+        openedView?.mac = now
+        openedView?.mac.layout = viewMode
+        openedView?.macWritten = [:]
+        return reverted.count < opened.macWritten.count
+    }
+
+    private func tellKept(_ kept: Set<PendingViewChanges.Setting>, macKept: Bool, in library: any ItemLibrary) {
+        guard !kept.isEmpty || macKept else { return }
+        var lines = PendingViewChanges.Setting.allCases.filter(kept.contains).map { setting in
             switch setting {
             case .sort: String(localized: "Sort was changed in another app, so it was kept.")
             case .group: String(localized: "Grouping was changed in another app, so it was kept.")
             case .query: String(localized: "Filters or From were changed in another app, so they were kept.")
             }
         }
+        if macKept { lines.append(String(localized: "Some layout settings were changed on another Mac, so they were kept.")) }
         library.notices.tell(String(localized: "View Partly Reverted"), lines.joined(separator: " "))
     }
 

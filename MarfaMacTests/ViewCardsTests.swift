@@ -35,10 +35,6 @@ struct ViewCardsTests {
         var other = ViewMacSettings()
         other.cards.size = .small
         #expect(!ViewMacSettings().sameChoices(as: other))
-        var taken = ViewMacSettings(widths: Data([1]))
-        taken.take(choicesOf: other)
-        #expect(taken.cards.size == .small)
-        #expect(taken.widths == Data([1]))
     }
 
     @Test func settingsStoredBeforeCardsExistOpenWithTheDefaults() throws {

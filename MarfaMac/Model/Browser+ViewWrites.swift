@@ -82,10 +82,10 @@ extension Browser {
     }
 
     /// Registers a step of the window's Undo. While a new view's panel is open the step belongs to the panel, so that
-    /// dropping the panel removes these steps and no earlier one (`dropUndoSteps`).
-    func registerUndo(_ name: String, _ undo: @escaping @MainActor (Browser) -> Void) {
+    /// dropping the panel removes these steps and no earlier one (`dropUndoSteps`), unless `owner` names who it belongs to.
+    func registerUndo(_ name: String, owner: AnyObject? = nil, _ undo: @escaping @MainActor (Browser) -> Void) {
         guard let undoManager else { return }
-        let target: AnyObject = viewPanel.flatMap { $0.isNew ? $0 : nil } ?? self
+        let target: AnyObject = owner ?? viewPanel.flatMap { $0.isNew ? $0 : nil } ?? self
         undoManager.registerUndo(withTarget: target) { [weak self] _ in
             MainActor.assumeIsolated { if let self { undo(self) } }
         }

@@ -614,8 +614,8 @@ nonisolated extension ViewDraft {
     }
 
     /// The view's query with the window's filters in place of the conditions the window showed: the conditions
-    /// it could not show stay in order. An untouched Type condition stays in the filter. An edited Type condition may
-    /// replace the listed types (`narrowing`). A filter the view cannot hold leaves the query whole.
+    /// it could not show stay in order. An untouched Type condition, and any in a filter matched by Any, stays in the
+    /// filter. Another may replace the listed types (`narrowing`). A filter the view cannot hold leaves the query whole.
     static func replacing(
         _ query: LibraryViewQuery, with state: FilterState, targets: [String: FilterTarget], seededTypes: [String]?, catalogue: Catalogue,
         calendar: Calendar = .current
@@ -634,21 +634,24 @@ nonisolated extension ViewDraft {
         guard !window.isSame(as: seeded) else { return (query, []) }
 
         var result = query
+        var unsaid: [Unkept] = []
         if targets[typeFieldID] != nil, let index = window.clauses.firstIndex(where: { $0.field == typeFieldID && $0.op == .is }) {
             let chosen = Set(window.clauses[index].values).subtracting([""])
-            // A Type filter read from the view's filter stays a condition there when it is untouched, or when it is one of
-            // several matched by Any: moved to the view's types, it would narrow every other condition.
+            // A Type filter read from the view's filter stays a condition there when it is untouched. One of several matched
+            // by Any, read or added, is always a condition of that filter: moved to the view's types, it would narrow every
+            // other condition. A type outside the view's own cannot be one, so it is not saved, and the person is told.
             let read = seededTypes == nil
                 ? owned.first(where: { $0.clause.field == typeFieldID && $0.clause.op == .is }).map { Set($0.clause.values) } : nil
             let listed = scope(of: query, catalogue: catalogue)
-            let staysInFilter = read.map { read in
-                read == Set(window.clauses[index].values) || window.matchesAny && window.clauses.count > 1
-                    && (listed.isEmpty || chosen.allSatisfy { listed.contains(TypeID($0)) })
-            } ?? false
+            let ofAny = seededTypes == nil && window.matchesAny && window.clauses.count > 1
+            let withinListed = listed.isEmpty || chosen.allSatisfy { listed.contains(TypeID($0)) }
             if chosen.isEmpty {
                 window.clauses.remove(at: index)
-            } else if staysInFilter {
+            } else if read == Set(window.clauses[index].values) || ofAny && withinListed {
                 // The condition is written where it was, as the person changed it or not at all.
+            } else if ofAny {
+                window.clauses.remove(at: index)
+                unsaid.append(.filter(column: targets[typeFieldID]?.label ?? FilterTarget.type.label))
             } else if keepsListedTypes(chosen, listed: query.types, catalogue: catalogue) {
                 // The view's own types stay, and the filter is saved as an exact-type condition, a chip the view still shows
                 // when reopened.
@@ -662,14 +665,15 @@ nonisolated extension ViewDraft {
             result.types = []
         }
         window = normalized(window.clauses, matchesAny: window.matchesAny)
+        if !unsaid.isEmpty, window.isSame(as: seeded) { return (query, unsaid) }
         let ownedConditions = Set(owned.flatMap(\.conditions))
         let kept = parsed.terms.filter { !ownedConditions.contains($0) }
         let combination = combine(
             base: Parsed(terms: kept, join: parsed.join), adding: window, targets: targets, catalogue: catalogue, calendar: calendar,
             keeping: nil)
-        if combination.unkept.contains(where: refusesFilter) { return (query, combination.unkept) }
+        if combination.unkept.contains(where: refusesFilter) { return (query, unsaid + combination.unkept) }
         result.filter = combination.filter ?? (kept.isEmpty ? nil : try? FilterExpression(join: parsed.join, conditions: kept).encoded())
-        return (result, combination.unkept)
+        return (result, unsaid + combination.unkept)
     }
 }
 

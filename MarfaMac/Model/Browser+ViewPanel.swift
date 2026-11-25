@@ -102,7 +102,10 @@ extension Browser {
         guard let snapshot = panel.snapshot else { return }
         restore(snapshot)
         // A search set aside for a starting point's list comes back, unless the window has moved on.
-        if shown.isSame(snapshot.place) { restoreSetAsideSearch(of: panel) }
+        guard shown.isSame(snapshot.place) else { return }
+        restoreSetAsideSearch(of: panel)
+        // A saved view shows what it became while the draft held the window: a change elsewhere, or an Undo of its own.
+        if snapshot.place.savedView != nil, let library { followView(in: library) }
     }
 
     /// Hands back an unsaved draft or rename when the window changes place.

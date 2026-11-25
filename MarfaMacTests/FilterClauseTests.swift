@@ -484,7 +484,7 @@ struct FilterClauseTests {
             state.clauses.append(Self.clause("type", .is, [type]))
             return ViewDraft.replacing(query, with: state, targets: targets, seededTypes: nil, catalogue: Self.catalogue)
         }
-        let anyOf = LibraryViewQuery(filter: #"source eq "mail" OR source eq "calendar""#)
+        let anyOf = LibraryViewQuery(filter: #"source eq "mail" OR tags contains "x""#)
         let notes = written(anyOf, adding: "core.note")
         #expect(notes.query.types.isEmpty, "the view's types would narrow every other condition")
         let filter = try #require(notes.query.filter)
