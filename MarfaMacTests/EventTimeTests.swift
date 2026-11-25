@@ -109,4 +109,82 @@ struct EventTimeTests {
         #expect(library.propertiesSet.first?.1.keys.sorted() == ["ends_at", "starts_at"])
         #expect(library.items[0].value(of: "timezone") == .string("UTC"))
     }
+
+    @Test func movingTheDayKeepsTheSecondsAndTheLength() {
+        let (model, library) = Self.panel(["starts_at": .string("2026-11-26T16:00:37Z"), "ends_at": .string("2026-11-26T16:30:37Z"), "timezone": .string("UTC")])
+        model.part = .start
+        model.choose(day: Self.day(2026, 11, 28))
+        #expect(library.items[0].value(of: "starts_at") == .string("2026-11-28T16:00:37.000Z"))
+        #expect(library.items[0].value(of: "ends_at") == .string("2026-11-28T16:30:37.000Z"))
+    }
+
+    private static let gap: [String: PropertyValue] = [
+        "starts_at": .string("2026-03-08T15:00:00Z"), "ends_at": .string("2026-03-08T16:00:00Z"), "timezone": .string("America/New_York"),
+    ]
+
+    @Test func aTimeThatIsNotOnThatDaysClockIsRefusedAndKeptWithItsReason() {
+        let (model, library) = Self.panel(Self.gap)
+        model.beginTyping(in: .start)
+        model.type("02:30", into: .start)
+        model.commitTime(of: .start)
+        #expect(library.propertiesSet.isEmpty)
+        #expect(model.shownTime(of: .start) == "02:30")
+        #expect(model.notice == EventTime.Refusal.noSuchTime.message)
+        // The panel closing hands the input back with the same reason.
+        model.finish(cancelled: false)
+        #expect(library.propertiesSet.isEmpty)
+        #expect(library.notices.waiting.first?.text == "Time: 02:30")
+        #expect(library.notices.waiting.first?.message.contains(EventTime.Refusal.noSuchTime.message) == true)
+    }
+
+    @Test func aTimeTypedAgainstAnotherDateOrZoneIsGivenBackNotWritten() {
+        let (model, library) = Self.panel(Self.timed)
+        model.beginTyping(in: .end)
+        model.type("11:00", into: .end)
+        // Another device moves the end to the next day, at the same clock time.
+        library.items[0].properties.removeAll { $0.key == "ends_at" }
+        library.items[0].properties.append(Property(key: "ends_at", value: .string("2026-11-27T10:30:00Z")))
+        model.commitTime(of: .end)
+        #expect(library.propertiesSet.isEmpty)
+        #expect(library.notices.waiting.first?.text == "Time: 11:00")
+    }
+
+    @Test func anEndBeforeTheStartKeepsWhatWasTypedUntilTheWriteIsTaken() {
+        let (model, library) = Self.panel(Self.timed)
+        model.beginTyping(in: .end)
+        model.type("09:00", into: .end)
+        model.commitTime(of: .end)
+        #expect(library.propertiesSet.isEmpty)
+        #expect(model.shownTime(of: .end) == "09:00")
+        #expect(model.notice == EventTime.Refusal.endBeforeStart.message)
+        // Closing with it refused gives the text back.
+        model.finish(cancelled: false)
+        #expect(library.notices.waiting.first?.text == "Time: 09:00")
+        #expect(model.typed[.end] == nil)
+    }
+
+    @Test func aZoneChangeLeavesAStoredEndEarlierThanTheStartAsItIs() {
+        let held: [String: PropertyValue] = ["starts_at": .string("2026-11-26T10:00:00Z"), "ends_at": .string("2026-11-26T09:00:00Z"), "timezone": .string("UTC")]
+        let (model, library) = Self.panel(held)
+        model.setZone(TimeZone(identifier: "America/New_York"))
+        #expect(library.propertiesSet.first?.1.keys.sorted() == ["timezone"])
+        #expect(library.items[0].value(of: "ends_at") == .string("2026-11-26T09:00:00Z"))
+    }
+
+    @Test func aDayTypedAtTheTopMovesTheChosenPartAndAnUntidyOneStaysWithItsReason() {
+        let (model, library) = Self.panel(Self.timed)
+        model.part = .start
+        model.beginDay()
+        model.typeDay("28 Nov 2026")
+        model.commitDay()
+        #expect(library.items[0].value(of: "starts_at") == .string("2026-11-28T10:00:00.000Z"))
+        #expect(library.items[0].value(of: "ends_at") == .string("2026-11-28T10:30:00.000Z"))
+        #expect(model.dayInput == nil)
+
+        model.typeDay("whenever")
+        model.commitDay()
+        #expect(library.propertiesSet.count == 1 && model.shownDay == "whenever" && model.notice != nil)
+        model.finish(cancelled: false)
+        #expect(library.notices.waiting.first?.text == "Date: whenever")
+    }
 }

@@ -40,13 +40,13 @@ struct ValueEditContent: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: ValueEditMetrics.textSize * scale))
                     .focused($fieldFocused)
-                    .appFocusRing(isFocused: fieldFocused)
                     .accessibilityLabel(model.searchPrompt)
                     .accessibilityIdentifier("ValueEditSearch")
             }
             .padding(.horizontal, 7 * scale)
-            .padding(.vertical, 4 * scale)
-            Divider().padding(.top, 2 * scale)
+            .padding(.top, 4 * scale)
+            .padding(.bottom, 3 * scale)
+            Divider()
         }
         .padding(.bottom, 4 * scale)
     }
@@ -84,7 +84,7 @@ struct ValueEditContent: View {
     }
 
     private var rows: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: ValueEditMetrics.rowGap * scale) {
             ForEach(model.rows) { row in
                 switch row.role {
                 case .header:
@@ -92,10 +92,11 @@ struct ValueEditContent: View {
                         .font(.system(size: 11 * scale, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 8 * scale)
-                        .frame(maxWidth: .infinity, minHeight: ValueEditMetrics.headerHeight * scale, alignment: .leading)
+                        .padding(.bottom, 2 * scale)
+                        .frame(maxWidth: .infinity, minHeight: ValueEditMetrics.headerHeight * scale, alignment: .bottomLeading)
                         .accessibilityAddTraits(.isHeader)
                 case .separator:
-                    Divider().padding(.vertical, 5 * scale)
+                    Divider().padding(.vertical, 3 * scale)
                 case .option, .create:
                     ValueEditRow(row: row, model: model, scale: scale)
                 }
@@ -109,7 +110,7 @@ struct ValueEditContent: View {
     /// A status panel ends with the way to the words themselves: the type's page in Settings > Types.
     private func editStatuses(_ type: TypeID) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Divider().padding(.vertical, 5 * scale)
+            Divider().padding(.vertical, 4 * scale)
             Button { model.editStatuses(of: type) } label: {
                 Text("Edit Statuses…")
                     .font(.system(size: ValueEditMetrics.textSize * scale))
@@ -153,8 +154,11 @@ struct ValueEditContent: View {
         let calendar = model.request.calendar
         let now = model.request.library.now()
         return VStack(alignment: .leading, spacing: 0) {
-            ForEach(model.rows.filter { $0.id != ValueEditOptions.notSetID }) { row in
-                ValueEditRow(row: row, model: model, scale: scale)
+            dayField
+            VStack(alignment: .leading, spacing: ValueEditMetrics.rowGap * scale) {
+                ForEach(model.rows.filter { $0.id != ValueEditOptions.notSetID }) { row in
+                    ValueEditRow(row: row, model: model, scale: scale)
+                }
             }
             Divider().padding(.vertical, 5 * scale)
             ValueCalendar(selected: model.storedDate?.date, today: now, calendar: calendar, scale: scale) { model.chooseDay($0) }
@@ -169,6 +173,27 @@ struct ValueEditContent: View {
             model.measure(.rows, height)
             model.measure(.list, height)
         }
+    }
+
+    /// The day typed, as the board draws it: "25 Nov 2026" with a bare caret above the quick days. A day typed there is set
+    /// with Return; text that is no day stays with its reason.
+    private var dayField: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TextField("", text: Binding { model.dayDraft ?? model.dayText } set: { model.dayDraft = $0 }, prompt: Text("Not Set"))
+                .textFieldStyle(.plain)
+                .font(.system(size: ValueEditMetrics.textSize * scale))
+                .focused($fieldFocused)
+                .onSubmit { model.commitDay(closing: true) }
+                .onChange(of: fieldFocused) { _, focused in if focused { model.beginDay() } else { model.commitDay() } }
+                .frame(minHeight: ValueEditMetrics.fieldLine * scale)
+                .padding(.horizontal, 7 * scale)
+                .padding(.top, 4 * scale)
+                .padding(.bottom, 3 * scale)
+                .accessibilityLabel("Date")
+                .accessibilityIdentifier("ValueEditDay")
+            Divider()
+        }
+        .padding(.bottom, 4 * scale)
     }
 
     /// The time as one narrow field, trailing its label. It reads as a placeholder until a time is set; typing a time sets

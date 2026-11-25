@@ -104,9 +104,7 @@ struct EntriesEditor: View {
                         Text("Main").font(.system(size: 11 * scale, weight: .semibold)).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
-                    if let index { entryMenu(id, index: index, count: count) } else {
-                        Button("Cancel") { editing.cancelEntry() }.appButton(.secondary, size: .small)
-                    }
+                    if let index { entryMenu(id, index: index, count: count) }
                 }
                 .padding(.horizontal, 8 * scale)
                 .frame(height: 22 * scale)
@@ -116,6 +114,7 @@ struct EntriesEditor: View {
                 ForEach(fields.keys.filter { shape.member($0) == nil }.sorted(), id: \.self) { undeclared in
                     undeclaredMember(undeclared, holding: fields[undeclared], of: id)
                 }
+                if index == nil { addButtons }
             } else {
                 Text(verbatim: shape.summary(of: fields))
                     .padding(.horizontal, 8 * scale)
@@ -126,6 +125,25 @@ struct EntriesEditor: View {
         }
     }
 
+    /// Cancel and Add under the entry being added: Add writes it with everything typed, and Return in a field does the same.
+    private var addButtons: some View {
+        HStack(spacing: 6 * scale) {
+            Spacer(minLength: 0)
+            Button("Cancel") { editing.cancelEntry() }
+                .appButton(.secondary, size: .small)
+                .accessibilityIdentifier("ItemListAddCancel.\(key)")
+            Button("Add") { addEntry() }
+                .appButton(.primary, size: .small)
+                .disabled(!editing.canAdd(in: shape, value: value))
+                .accessibilityIdentifier("ItemListAddConfirm.\(key)")
+        }
+        .padding(.horizontal, 8 * scale)
+        .padding(.top, 4 * scale)
+        .padding(.bottom, 2 * scale)
+    }
+
+    @discardableResult private func addEntry() -> Bool { editing.addEntry(in: shape, value: value, write: onChange) }
+
     private func memberField(_ member: ListShape.Member, of id: UUID, holding stored: PropertyValue?, index: Int?) -> some View {
         let slot = ListEditing.Slot(entry: id, member: member.key)
         return MemberField(
@@ -134,6 +152,8 @@ struct EntriesEditor: View {
             isConflict: isEditable && editing.conflicts(slot, in: value),
             set: { editing.set(member.key, to: $0, of: id, in: shape, value: value, write: onChange) },
             commit: { overwriting in editing.commit(member, of: id, in: shape, value: value, overwriting: overwriting, write: onChange) },
+            commitsOnLeave: index != nil,
+            submit: { index == nil ? addEntry() : editing.commit(member, of: id, in: shape, value: value, write: onChange) },
             discard: { editing.discard(slot, in: value) })
     }
 
@@ -199,6 +219,11 @@ private struct MemberField: View {
     let set: (PropertyValue?) -> Bool
     /// Writes the typed text, over a change made elsewhere where `overwriting`.
     let commit: (_ overwriting: Bool) -> Bool
+    /// Whether leaving the field writes it. The entry being added is written only by Add or Return, so a member typed first
+    /// does not write it before the rest is.
+    let commitsOnLeave: Bool
+    /// Return: writes the member, or adds the entry being added.
+    let submit: () -> Bool
     let discard: () -> Void
     @FocusState private var focused: Bool
     @Environment(\.colorScheme) private var scheme
@@ -242,8 +267,8 @@ private struct MemberField: View {
                 .labelsHidden()
                 .textFieldStyle(.plain)
                 .focused($focused)
-                .onSubmit { _ = commit(false) }
-                .onChange(of: focused) { if !focused { _ = commit(false) } }
+                .onSubmit { _ = submit() }
+                .onChange(of: focused) { if !focused, commitsOnLeave { _ = commit(false) } }
                 .onExitCommand { discard(); focused = false }
                 .padding(.horizontal, 7 * scale)
                 .frame(height: 22 * scale)

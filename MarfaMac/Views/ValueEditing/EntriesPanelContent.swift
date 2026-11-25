@@ -10,20 +10,38 @@ struct EntriesPanelContent: View {
 
     var body: some View {
         if case .entries(let field, let shape) = model.kind {
-            ScrollView {
-                EntriesEditor(
-                    shape: shape, label: field.label, key: field.key, value: model.value, isEditable: model.isEditable,
-                    editing: model.entries, isWriting: model.request.item.map { model.library.isWritingProperties(of: $0) } ?? false,
-                    onChange: model.writeEntries)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { model.measure(.rows, $0) }
+            VStack(alignment: .leading, spacing: 0) {
+                ScrollView {
+                    EntriesEditor(
+                        shape: shape, label: field.label, key: field.key, value: model.value, isEditable: model.isEditable,
+                        editing: model.entries, isWriting: model.request.item.map { model.library.isWritingProperties(of: $0) } ?? false,
+                        onChange: model.writeEntries)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { model.measure(.rows, $0) }
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(height: shownHeight)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { model.measure(.list, $0) }
+                doneRow
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .frame(height: shownHeight)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { model.measure(.list, $0) }
             .padding(ValueEditMetrics.padding * scale)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { model.measure(.total, $0) }
             .accessibilityIdentifier("EntriesPanel")
+        }
+    }
+
+    /// Done ends the panel, which writes what was typed or gives it back, as a click outside does.
+    private var doneRow: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider().padding(.vertical, 4 * scale)
+            HStack {
+                Spacer(minLength: 0)
+                Button("Done") { model.close() }
+                    .appButton(.primary, size: .small)
+                    .accessibilityIdentifier("EntriesDone")
+            }
+            .padding(.horizontal, 8 * scale)
+            .padding(.bottom, 2 * scale)
         }
     }
 

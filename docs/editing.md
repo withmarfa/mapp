@@ -36,8 +36,8 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 ## Changing type
 
 - **The title and text move to the new type's own keys in one edit** (`TypeChange`), because Marfa reads them from those keys. Marfa keeps every other value, as an unlisted property where the new type has no such field.
-- **The current type is a locked chip in the panel's field,** and the types follow in rows.
-- **A required field the items lack is asked for first** (`TypeValuesSheet`), once for the selection. It is the one sheet in editing: Change Type, "Task needs these values:", a field for each, then Cancel and Change Type.
+- **The current type is a locked chip in the panel's field,** and the types follow in rows: the sidebar's own in its order, then the rest by name under a line.
+- **A required field the items lack is asked for first** (`TypeValuesSheet`), once for the selection. It is the one sheet in editing: Change Type, "Task needs these values:", a field for each, then Cancel and Change Type. The title it needs starts as the item's name, for one item.
 - **Some changes are never offered:** a file's type, a type with no text for an item that has some, and a type whose field cannot hold the value under its key.
 
 ## A field's menu

@@ -442,6 +442,28 @@ final class ListEditing {
         notice = nil
     }
 
+    /// Whether everything the list requires of the entry being added is typed, so Add can write it.
+    func canAdd(in shape: ListShape, value: PropertyValue?) -> Bool {
+        shape.members.filter(\.required).allSatisfy {
+            !text(Slot(entry: pendingID, member: $0.key), in: value).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    /// Adds the entry being added with all that was typed into it: the members the list does not require first, then the
+    /// required ones, the last of which writes it. False where the entry stays as typed, with `notice` saying why.
+    @discardableResult
+    func addEntry(in shape: ListShape, value: PropertyValue?, write: (PropertyValue?) -> Bool) -> Bool {
+        guard pending != nil else { return true }
+        for member in shape.members.filter({ !$0.required }) + shape.members.filter(\.required) {
+            guard commit(member, of: pendingID, in: shape, value: value, write: write) else { return false }
+        }
+        guard pending != nil else { return true }
+        if notice == nil, let missing = shape.members.first(where: { $0.required && pending?[$0.key] == nil }) {
+            notice = String(localized: "\(missing.label) is required.")
+        }
+        return false
+    }
+
     /// Drops the entry being added and what was typed into it, at the person's word.
     func cancelEntry() {
         pending = nil

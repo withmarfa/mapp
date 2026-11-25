@@ -9246,6 +9246,9 @@
     "That restore point can’t be read. No settings were changed." : {
 
     },
+    "That time doesn’t exist on that day in this time zone." : {
+
+    },
     "The %@ aren’t public. Change them first, then turn this off." : {
 
     },
@@ -12128,6 +12131,12 @@
 
     },
     "“%@” is not a shortcuts file that the app can read. No shortcuts were changed." : {
+
+    },
+    "“%@” isn’t a date and time, so the date wasn’t changed." : {
+
+    },
+    "“%@” isn’t a date, so the date wasn’t changed." : {
 
     },
     "“%@” isn’t a time, so the time wasn’t changed." : {

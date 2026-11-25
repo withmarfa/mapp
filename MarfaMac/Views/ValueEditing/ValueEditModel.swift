@@ -57,6 +57,12 @@ final class ValueEditModel {
         /// Why the list refused the entry.
         var reason: String?
     }
+    /// A day typed into the date panel's top field and not written yet, with the value it was typed against.
+    struct DayInput {
+        var text: String
+        var base: PropertyValue?
+    }
+    var dayInput: DayInput?
     var unsaved: UnsavedInput? {
         didSet { if isDate, unsaved == nil { shownValue = value } }
     }
@@ -115,7 +121,8 @@ final class ValueEditModel {
         let items = request.library.activeItems
         switch request.kind {
         case .people(let field, let shape):
-            pool = PeopleSuggestions.pool(from: items.map { $0.value(of: field.key) }, shape: shape)
+            let named = PeopleSuggestions.pool(from: items.map { $0.value(of: field.key) }, shape: shape)
+            pool = named + PeopleSuggestions.pool(of: items, catalogue: request.library.catalogue, shape: shape, excluding: named)
             wordPool = []
         case .words(let field):
             pool = []
@@ -341,10 +348,17 @@ final class ValueEditModel {
     }
 
     private var typeRows: [ValueListRow] {
-        let options = library.typeChangeOptions(for: request.targets).map {
-            ValueListRow(id: Self.typePrefix + $0.id.rawValue, role: .option, title: $0.label, mark: .type(icon: $0.icon))
+        narrowed(Self.typeRows(of: library.typeChangeOptions(for: request.targets), shown: ValueEditPresenter.shared.sidebarTypes(library)))
+    }
+
+    /// The types the items can become: the sidebar's own first, in its order, then the rest by name under a line.
+    static func typeRows(of options: [ItemTypeOption], shown: [TypeID]) -> [ValueListRow] {
+        func row(_ option: ItemTypeOption) -> ValueListRow {
+            ValueListRow(id: typePrefix + option.id.rawValue, role: .option, title: option.label, mark: .type(icon: option.icon))
         }
-        return narrowed(options)
+        let first = shown.compactMap { id in options.first { $0.id == id } }
+        let rest = options.filter { option in !first.contains(option) }
+        return first.map(row) + (first.isEmpty || rest.isEmpty ? [] : [.separator]) + rest.map(row)
     }
 
     static let typePrefix = "type:"
@@ -393,9 +407,10 @@ final class ValueEditModel {
     func listLimit(scale: CGFloat) -> CGFloat {
         switch kind {
         case .status, .entries: return .infinity
+        case .type: return ValueEditMetrics.typeListHeight * scale
         default: break
         }
-        return CGFloat(ValueEditMetrics.visibleRows) * ValueEditMetrics.rowHeight * scale
+        return CGFloat(ValueEditMetrics.visibleRows) * (ValueEditMetrics.rowHeight + ValueEditMetrics.rowGap) * scale
     }
 
     /// The height the content wants with nothing scrolled past `listLimit`.
@@ -601,8 +616,10 @@ final class ValueEditModel {
         guard !cancelled else {
             // The time field loses focus as the panel goes, which would otherwise write what was cancelled.
             unsaved = nil
+            dayInput = nil
             return
         }
+        commitDay(isEnding: true)
         commitTime(isEnding: true)
         handBackUnsaved()
         guard kind.isTyped, let field = kind.field else { return }

@@ -60,9 +60,10 @@ nonisolated extension MarfaMapping {
             case "datetime": kind = .date(includesTime: true)
             default: return nil
             }
-            // The core labels every member; the key stands only if a catalog came without one.
+            // The core labels every member; a catalog that came without one is read as its key in words ("street_address").
+            let words = key.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
             return ListShape.Member(
-                key: key, label: definition["label"]?.string ?? key, kind: kind, required: definition["required"]?.bool == true)
+                key: key, label: definition["label"]?.string ?? words, kind: kind, required: definition["required"]?.bool == true)
         }
         // A member the app cannot read would be dropped from an entry it edits, so such a list is shown but not edited.
         return members.count == declared.keys.count ? ListShape(members: members) : nil

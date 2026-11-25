@@ -217,6 +217,39 @@ nonisolated enum TimeOfDay {
         }
         return hour < 24 ? (hour, minute) : nil
     }
+
+    /// `hour` and `minute` on the day of `day` in `calendar`, or nil where that day's clock has no such time (a clock put
+    /// forward). The next time that does exist is never taken for it.
+    static func moment(hour: Int, minute: Int, on day: Date, calendar: Calendar) -> Date? {
+        var parts = calendar.dateComponents([.year, .month, .day], from: day)
+        (parts.hour, parts.minute, parts.second) = (hour, minute, 0)
+        guard let moment = calendar.date(from: parts) else { return nil }
+        let kept = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: moment)
+        return kept.year == parts.year && kept.month == parts.month && kept.day == parts.day && kept.hour == hour && kept.minute == minute ? moment : nil
+    }
+}
+
+/// A day typed into a date panel's field: "25 Nov 2026", "2026-11-25", "tomorrow". The system's date reader takes it,
+/// so it follows the person's language and order; only a text that is wholly one day is taken.
+nonisolated enum TypedDay {
+    /// The start of the day `text` names, in `calendar`, or nil where it names none or more than one.
+    static func parse(_ text: String, calendar: Calendar) -> Date? {
+        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty, let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue) else { return nil }
+        let whole = NSRange(typed.startIndex..., in: typed)
+        let matches = detector.matches(in: typed, options: [], range: whole)
+        guard matches.count == 1, let match = matches.first, match.range == whole, let date = match.date else { return nil }
+        // The reader places the day in the system's zone; the day is what it names, whatever zone the panel reads in.
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return calendar.date(from: parts).map { calendar.startOfDay(for: $0) }
+    }
+
+    /// A day and a time typed together, "25 Nov 2026 at 09:00": the two parts, the time nil where there is none.
+    static func split(_ text: String) -> (day: String, time: String?) {
+        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let match = typed.wholeMatch(of: /(.+?)\s+(?:at|@)\s+(.+)/.ignoresCase()) else { return (typed, nil) }
+        return (String(match.1), String(match.2))
+    }
 }
 
 /// The days a date panel offers before its calendar, in the person's calendar.
@@ -316,6 +349,39 @@ nonisolated enum PeopleSuggestions {
         return counts.values
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.person.name.localizedStandardCompare($1.person.name) == .orderedAscending }
             .map(\.person)
+    }
+
+    /// The people the library holds as items of its own, as entries of `shape`: the name in the first member and, where the
+    /// second takes an address and the person's type has a list that starts with one, the first address in it. Those the
+    /// lists already name (`known`) are left out, so nobody is offered twice.
+    static func pool(of items: [Item], catalogue: Catalogue, shape: ListShape, excluding known: [Person]) -> [Person] {
+        guard let nameMember = shape.members.first else { return [] }
+        let addressMember = shape.members.dropFirst().first.flatMap { member -> ListShape.Member? in
+            if case .text(.email) = member.kind { member } else { nil }
+        }
+        var taken = Set(known.map(\.identity))
+        var people: [Person] = []
+        var personTypes: [TypeID: Bool] = [:]
+        for item in items {
+            let isPerson = personTypes[item.type] ?? (PageHeaderKind.of(item.type, in: catalogue) == .person)
+            personTypes[item.type] = isPerson
+            guard isPerson, let name = item.name, !name.isEmpty else { continue }
+            var entry: ListEntries.Entry = [nameMember.key: .string(name)]
+            if let addressMember, let address = firstAddress(of: item, catalogue: catalogue) { entry[addressMember.key] = .string(address) }
+            guard let person = Person(entry: entry, shape: shape), taken.insert(person.identity).inserted else { continue }
+            people.append(person)
+        }
+        return people.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private static func firstAddress(of item: Item, catalogue: Catalogue) -> String? {
+        for field in catalogue.itemTypes[item.type]?.fields ?? [] {
+            guard case .list(let shape) = field.kind, let first = shape.members.first, case .text(.email) = first.kind else { continue }
+            for case let entry? in ListEntries.entries(of: item.value(of: field.key)).map(ListEntries.object) {
+                if let text = shape.text(of: first, in: entry) { return text }
+            }
+        }
+        return nil
     }
 
     /// The people to offer for what is typed: those whose name or any member contains it, less those already held.

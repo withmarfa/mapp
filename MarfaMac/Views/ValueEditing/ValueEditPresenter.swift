@@ -20,6 +20,9 @@ final class ValueEditPresenter {
     /// Opens a type's page in Settings > Types, which a status panel's Edit Statuses asks for. The app sets it once.
     var editType: ((TypeID) -> Void)?
 
+    /// The types the sidebar lists, in its order, which the type panel offers first. The app sets it once.
+    var sidebarTypes: (any ItemLibrary) -> [TypeID] = { _ in [] }
+
     private let panels = PanelPresenter()
     private let makeSession: Factory
 

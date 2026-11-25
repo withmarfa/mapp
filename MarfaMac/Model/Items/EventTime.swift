@@ -76,10 +76,13 @@ nonisolated struct EventTime: Hashable, Sendable {
     /// Why a pick was not taken, in the person's words.
     enum Refusal: Error, Equatable, Sendable {
         case endBeforeStart
+        /// The clock time the person typed does not exist on that day in the event's zone (a clock put forward).
+        case noSuchTime
 
         var message: String {
             switch self {
             case .endBeforeStart: String(localized: "The end can’t be before the start.")
+            case .noSuchTime: String(localized: "That time doesn’t exist on that day in this time zone.")
             }
         }
     }
@@ -111,14 +114,18 @@ nonisolated struct EventTime: Hashable, Sendable {
         guard !reading.allDay else { return reading }
         let calendar = reading.calendar(mac: mac)
         var new = reading
-        func at(_ date: Date) -> Date { calendar.date(bySettingHour: hour, minute: minute, second: 0, of: date) ?? date }
+        // Strict: a time that is not on that day's clock is refused, never moved to the nearest one that is.
+        func at(_ date: Date) throws(Refusal) -> Date {
+            guard let moment = TimeOfDay.moment(hour: hour, minute: minute, on: date, calendar: calendar) else { throw .noSuchTime }
+            return moment
+        }
         switch part {
         case .start:
-            let moment = at(reading.start ?? now)
+            let moment = try at(reading.start ?? now)
             new.start = moment
             if let old = reading.start, let end = reading.end { new.end = end.addingTimeInterval(moment.timeIntervalSince(old)) }
         case .end:
-            let moment = at(reading.end ?? reading.start ?? now)
+            let moment = try at(reading.end ?? reading.start ?? now)
             if let start = reading.start, moment <= start { throw .endBeforeStart }
             new.end = moment
         }
@@ -153,12 +160,15 @@ nonisolated struct EventTime: Hashable, Sendable {
         calendar.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? day
     }
 
-    /// `day` with the clock time of `basis`, or its midnight for whole days.
+    /// `day` with the whole clock time of `basis`, seconds included, or its midnight for whole days. A clock time that the
+    /// day does not have goes to the next one that it does, as a calendar moves an event onto such a day.
     private static func moving(_ day: Date, to calendar: Calendar, keepingTimeOf basis: Date, whole: Bool) -> Date {
         let start = calendar.startOfDay(for: day)
         guard !whole else { return start }
-        let time = calendar.dateComponents([.hour, .minute], from: basis)
-        return calendar.date(bySettingHour: time.hour ?? 0, minute: time.minute ?? 0, second: 0, of: start) ?? start
+        var parts = calendar.dateComponents([.year, .month, .day], from: start)
+        let time = calendar.dateComponents([.hour, .minute, .second, .nanosecond], from: basis)
+        (parts.hour, parts.minute, parts.second, parts.nanosecond) = (time.hour, time.minute, time.second, time.nanosecond)
+        return calendar.date(from: parts) ?? start
     }
 
     /// The properties to write for the person's change from `old` to `new`: only a part that changed, so a time the person
@@ -175,13 +185,12 @@ nonisolated struct EventTime: Hashable, Sendable {
             .string(new.allDay ? ItemDate.day(date, calendar: calendar) : ItemDate.instant(date))
         }
         if let moment = new.start, old.start != moment || switched { result[start.key] = text(moment) }
-        guard let end else { return result }
+        guard let end, old.end != new.end || switched else { return result }
         let holdsEnd = InspectorFields.hasValue(item.value(of: end.key))
         guard let last = new.end else {
             if holdsEnd { result.updateValue(nil, forKey: end.key) }
             return result
         }
-        guard old.end != last || switched else { return result }
         if new.allDay {
             // The end is the midnight that closes the last day. A single day with no end of its own needs none.
             let single = new.start.map { calendar.isDate(last, inSameDayAs: $0) } ?? false

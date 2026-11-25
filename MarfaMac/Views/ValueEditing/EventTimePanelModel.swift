@@ -18,12 +18,29 @@ final class EventTimePanelModel {
     /// Why the last change was not made, in one line.
     var notice: String?
 
-    /// A time being typed into a part's field, with the time the field showed when typing began.
+    /// What a part held when typing into it began: the date, the clock text and the zone it was read in. A time typed
+    /// against a part that has since changed in any of these is not written over the change.
+    struct Basis: Equatable {
+        var moment: Date?
+        var text: String
+        var zone: String?
+        var allDay: Bool
+    }
+
+    /// A time being typed into a part's field, with what the part held when typing began.
     struct Typed {
         var text: String
-        var base: String
+        var base: Basis
     }
     var typed: [EventTime.Part: Typed] = [:]
+
+    /// A day being typed into the top field, for the part that was chosen when typing began.
+    struct DayInput {
+        var part: EventTime.Part
+        var text: String
+        var base: Basis
+    }
+    var dayInput: DayInput?
 
     /// What the panel last wrote, shown while the library is still taking it.
     @ObservationIgnored private var pending: (reading: EventTime.Reading, mark: Int?)?
@@ -110,6 +127,7 @@ final class EventTimePanelModel {
     }
 
     func choose(day: Date) {
+        dayInput = nil
         let (part, reading, mac) = (part, reading, mac)
         attempt { () throws(EventTime.Refusal) -> EventTime.Reading in try EventTime.choosing(day, for: part, in: reading, mac: mac) }
     }
@@ -136,56 +154,125 @@ final class EventTimePanelModel {
 
     // MARK: Typing
 
+    func basis(of which: EventTime.Part) -> Basis {
+        let reading = reading
+        return Basis(moment: which == .start ? reading.start : reading.end, text: timeText(of: which), zone: reading.zone?.identifier, allDay: reading.allDay)
+    }
+
     func beginTyping(in which: EventTime.Part) {
         self.part = which
-        if typed[which] == nil { typed[which] = Typed(text: timeText(of: which), base: timeText(of: which)) }
+        if typed[which] == nil { typed[which] = Typed(text: timeText(of: which), base: basis(of: which)) }
     }
 
     func type(_ text: String, into which: EventTime.Part) {
-        let base = typed[which]?.base ?? timeText(of: which)
-        typed[which] = Typed(text: text, base: base)
+        typed[which] = Typed(text: text, base: typed[which]?.base ?? basis(of: which))
     }
 
     func shownTime(of which: EventTime.Part) -> String { typed[which]?.text ?? timeText(of: which) }
 
-    private func discardTyping() { typed = [:] }
+    private func discardTyping() {
+        typed = [:]
+        dayInput = nil
+    }
+
+    // MARK: The typed day
+
+    /// What the top field shows: the day being typed, else the day of the part that is chosen.
+    var shownDay: String { dayInput?.text ?? dayText(of: part) ?? "" }
+
+    func beginDay() {
+        if dayInput == nil { dayInput = DayInput(part: part, text: dayText(of: part) ?? "", base: basis(of: part)) }
+    }
+
+    func typeDay(_ text: String) {
+        beginDay()
+        dayInput?.text = text
+    }
+
+    /// Sets the day typed for the part it began on, keeping that part's clock and the length, as picking the day does. A
+    /// text that is no day, or a day the end cannot take, stays in the field with the reason; it is given back to the
+    /// person where the panel ends or the part changed meanwhile.
+    func commitDay(isEnding: Bool = false) {
+        guard let input = dayInput else { return }
+        let text = input.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty || text == dayText(of: input.part) {
+            dayInput = nil
+            return
+        }
+        let label = String(localized: "Date")
+        guard canEdit else { return handBack(text, label: label, reason: PropertyLoss.notEditable.reason) }
+        guard input.base == basis(of: input.part) else {
+            dayInput = nil
+            return handBack(text, label: label, reason: PropertyLoss.conflict.reason)
+        }
+        func refuse(_ reason: String) {
+            if isEnding { dayInput = nil; handBack(text, label: label, reason: reason) } else { notice = reason }
+        }
+        guard let day = TypedDay.parse(text, calendar: calendar) else {
+            return refuse(String(localized: "“\(text)” isn’t a date, so the date wasn’t changed."))
+        }
+        let (reading, mac) = (reading, mac)
+        do throws(EventTime.Refusal) {
+            guard apply(try EventTime.choosing(day, for: input.part, in: reading, mac: mac)) else {
+                return refuse(notice ?? String(localized: "The time couldn’t be saved."))
+            }
+            dayInput = nil
+        } catch {
+            refuse(error.message)
+        }
+    }
 
     /// Writes the time typed for `which`. Nothing is written where it is what the item holds, and a time typed against a
-    /// time that has changed since is given back to the person, never written over the change.
+    /// part that has changed since, in its date, time or zone, is given back to the person, never written over the change.
+    /// What was typed leaves the field only once the write is taken: a refused time stays for the person to correct, and is
+    /// given back where the panel is ending.
     func commitTime(of which: EventTime.Part, isEnding: Bool = false) {
         guard let input = typed[which] else { return }
         let text = input.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text == timeText(of: which) || text == input.base {
+        let current = basis(of: which)
+        if text == current.text || text == input.base.text {
             typed[which] = nil
             return
         }
         guard canEdit else { return handBack(text, reason: PropertyLoss.notEditable.reason, of: which) }
-        guard input.base == timeText(of: which) else {
-            return handBack(text, reason: PropertyLoss.conflict.reason, of: which)
-        }
+        guard input.base == current else { return handBack(text, reason: PropertyLoss.conflict.reason, of: which) }
         guard let time = TimeOfDay.parse(text) else {
             if isEnding { return handBack(text, reason: String(localized: "“\(text)” isn’t a time, so the time wasn’t changed."), of: which) }
             notice = String(localized: "Enter a time such as 9:30.")
             return
         }
-        typed[which] = nil
         let (reading, mac, now) = (reading, mac, now)
-        attempt { () throws(EventTime.Refusal) -> EventTime.Reading in
-            try EventTime.setting(hour: time.hour, minute: time.minute, for: which, in: reading, mac: mac, now: now)
+        let taken: Bool
+        do throws(EventTime.Refusal) {
+            taken = apply(try EventTime.setting(hour: time.hour, minute: time.minute, for: which, in: reading, mac: mac, now: now))
+        } catch {
+            notice = error.message
+            if isEnding { handBack(text, reason: error.message, of: which) }
+            return
+        }
+        if taken {
+            typed[which] = nil
+        } else if isEnding {
+            handBack(text, reason: notice ?? String(localized: "The time couldn’t be saved."), of: which)
         }
     }
 
     private func handBack(_ text: String, reason: String, of which: EventTime.Part) {
         typed[which] = nil
-        library.notices.notKept(String(localized: "Property Not Saved"), text: "\(String(localized: "Time")): \(text)", reason: reason)
+        handBack(text, label: String(localized: "Time"), reason: reason)
+    }
+
+    private func handBack(_ text: String, label: String, reason: String) {
+        library.notices.notKept(String(localized: "Property Not Saved"), text: "\(label): \(text)", reason: reason)
     }
 
     /// The panel is ending: a time typed and not yet written is written, or handed back, unless the person cancelled.
     func finish(cancelled: Bool) {
         guard !cancelled else {
-            typed = [:]
+            discardTyping()
             return
         }
+        commitDay(isEnding: true)
         for which in [EventTime.Part.start, .end] { commitTime(of: which, isEnding: true) }
     }
 }

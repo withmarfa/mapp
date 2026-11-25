@@ -9,12 +9,14 @@ struct EventTimePanelContent: View {
     @Environment(\.interfaceTextSize) private var textSize
     @Environment(\.colorScheme) private var scheme
     @FocusState private var focus: EventTime.Part?
+    @FocusState private var dayFocused: Bool
 
     private var scale: CGFloat { InterfaceStyle.scale(for: textSize) }
 
     var body: some View {
         let reading = model.reading
         VStack(alignment: .leading, spacing: 0) {
+            dayField
             ValueCalendar(
                 selected: model.date(of: model.part) ?? model.date(of: .start), today: model.now, calendar: model.calendar, scale: scale
             ) { model.choose(day: $0) }
@@ -38,6 +40,31 @@ struct EventTimePanelContent: View {
             panel.measure(.list, 0)
         }
         .disabled(!model.canEdit)
+        .task {
+            await Task.yield()
+            dayFocused = true
+        }
+    }
+
+    // MARK: Day
+
+    /// The day of the chosen end, typed: "26 Nov 2026" with a bare caret. Return sets it.
+    private var dayField: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TextField("", text: Binding { model.shownDay } set: { model.typeDay($0) }, prompt: Text("None"))
+                .textFieldStyle(.plain)
+                .focused($dayFocused)
+                .onSubmit { model.commitDay() }
+                .onChange(of: dayFocused) { _, focused in if focused { model.beginDay() } else { model.commitDay() } }
+                .frame(minHeight: ValueEditMetrics.fieldLine * scale)
+                .padding(.horizontal, 7 * scale)
+                .padding(.top, 4 * scale)
+                .padding(.bottom, 3 * scale)
+                .accessibilityLabel("Date")
+                .accessibilityIdentifier("EventTimeDayField")
+            Divider()
+        }
+        .padding(.bottom, 4 * scale)
     }
 
     // MARK: Parts

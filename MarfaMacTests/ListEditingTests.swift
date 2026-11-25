@@ -110,6 +110,25 @@ import Testing
         #expect(editing.rows(of: store.value).map(\.id) == [pendingID])
     }
 
+    @Test func addWritesTheNewEntryWithTheLabelTypedBesideItAndNeedsTheRequiredValue() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let store = Store(nil)
+        let editing = ListEditing()
+        editing.startEntry()
+        let id = editing.pendingID
+        editing.type("work", into: ListEditing.Slot(entry: id, member: "label"), in: store.value)
+        #expect(!editing.canAdd(in: shape, value: store.value))
+        #expect(!editing.addEntry(in: shape, value: store.value, write: store.write))
+        #expect(store.writes.isEmpty && editing.pending != nil)
+        #expect(editing.text(ListEditing.Slot(entry: id, member: "label"), in: store.value) == "work")
+
+        editing.type("a@example.com", into: ListEditing.Slot(entry: id, member: "value"), in: store.value)
+        #expect(editing.canAdd(in: shape, value: store.value))
+        #expect(editing.addEntry(in: shape, value: store.value, write: store.write))
+        #expect(store.value == .array([Self.email("a@example.com", "work")]) && store.writes.count == 1)
+        #expect(editing.pending == nil)
+    }
+
     @Test func aNewEntryWithABadValueSaysWhyAndKeepsTheText() throws {
         let shape = try Self.shape(Self.scoresField)
         let editing = ListEditing()
