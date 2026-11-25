@@ -677,6 +677,35 @@ struct EditorTests {
         #expect(page.changes.last == written.replacingOccurrences(of: "Milk", with: "- [ ] Milk"))
     }
 
+    @Test func thePageAndSourceRolesScaleWithoutChangingMarkdown() async throws {
+        let page = try await Page()
+        let written = "# One\n\n## Two\n\n### Three\n\n#### Four\n\nBody.\n\n```\ncode\n```\n"
+        try await page.load(written)
+        page.editor.setHeader(Self.header("Title"))
+        let web = page.editor.webView
+
+        for size in [13, 20, 13] {
+            page.editor.setStyle(PageStyle(textSize: size))
+            let metrics = try await web.callAsyncJavaScript("""
+                return ['.item-title', '.ProseMirror h1', '.ProseMirror h2', '.ProseMirror h3',
+                        '.ProseMirror h4', '.ProseMirror p', '.inkkit-plain', '.ProseMirror pre > code'].map(selector =>
+                  parseFloat(getComputedStyle(document.querySelector(selector)).fontSize));
+                """, arguments: [:], in: nil, contentWorld: .page)
+            let actual = try #require(metrics as? [Double])
+            let expected = [Typography.title, Typography.headingSize(1), Typography.headingSize(2),
+                            Typography.headingSize(3), Typography.headingSize(4), 13, 13, 13]
+            #expect(actual.count == expected.count)
+            for (measured, base) in zip(actual, expected) {
+                #expect(abs(measured - base * Double(size) / 13) < 0.01)
+            }
+        }
+        page.editor.setSourceMode(true)
+        let source = try await web.evaluateJavaScript("document.querySelector('.inkkit-plain').value") as? String
+        #expect(source == written)
+        page.editor.setSourceMode(false)
+        #expect(page.changes.isEmpty)
+    }
+
     @Test func anItemExportsAsAPDFOfItsTextAndPageStyle() async throws {
         let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 500), styleMask: [.titled], backing: .buffered, defer: false)

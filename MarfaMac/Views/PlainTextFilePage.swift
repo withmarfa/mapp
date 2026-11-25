@@ -27,7 +27,8 @@ struct PlainTextFilePage: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .firstTextBaseline, spacing: 16) {
                     Text(verbatim: title)
-                        .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .bold))
+                        .font(.system(size: style.titleSize, weight: .semibold))
+                        .tracking(style.titleSize * Typography.titleTracking)
                         .lineLimit(1)
                         .accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 0)
@@ -47,7 +48,8 @@ struct PlainTextFilePage: View {
                 VStack(alignment: .leading, spacing: 30) {
                     HStack(alignment: .firstTextBaseline, spacing: 16) {
                         Text(verbatim: title)
-                            .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .bold))
+                            .font(.system(size: style.titleSize, weight: .semibold))
+                            .tracking(style.titleSize * Typography.titleTracking)
                             .accessibilityAddTraits(.isHeader)
                         Spacer(minLength: 0)
                     }

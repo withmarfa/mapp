@@ -71,7 +71,7 @@ struct VersionThreadColumn: View {
         return List(selection: selection) {
             ForEach(blocks) { block in
                 Text(VersionBlocks.title(of: block.kind, now: now, calendar: .autoupdatingCurrent))
-                    .interfaceFont(.subheadline.weight(.semibold))
+                    .interfaceFont(InterfaceStyle.captionFont.weight(.semibold))
                     .foregroundStyle(VersionLooks.faint)
                     .padding(.top, block.id == blocks.first?.id ? 0 : 10)
                     .accessibilityAddTraits(.isHeader)
@@ -159,21 +159,21 @@ private struct VersionThreadRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 7) {
-                    Text(when).interfaceFont(.body.weight(.medium)).lineLimit(1)
+                    Text(when).interfaceFont(InterfaceStyle.primaryFont.weight(.medium)).lineLimit(1)
                     if entry.isCurrent {
                         Text("Current")
-                            .interfaceFont(.subheadline)
+                            .interfaceFont(InterfaceStyle.captionFont)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
                             .frame(minHeight: 17)
                             .background(VersionLooks.currentWash, in: RoundedRectangle(cornerRadius: 5))
                     }
                 }
-                Text(summary).interfaceFont(.callout).foregroundStyle(.secondary).lineLimit(1)
+                Text(summary).interfaceFont(InterfaceStyle.captionFont).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
             if let writer = entry.writer {
-                Text(verbatim: writer.displayName).interfaceFont(.subheadline).foregroundStyle(VersionLooks.faint).lineLimit(1)
+                Text(verbatim: writer.displayName).interfaceFont(InterfaceStyle.captionFont).foregroundStyle(VersionLooks.faint).lineLimit(1)
             }
         }
         .padding(.vertical, 3)

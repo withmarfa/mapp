@@ -60,9 +60,8 @@ enum TitleLines {
 /// How an item's page is set out. The defaults here are the only ones; stored settings fall back to them.
 nonisolated struct PageStyle: Equatable {
     var fullWidth = false
-    /// The body text's size in points; headings, spacing and the reading width scale with it. The title is 28 on 34 at
-    /// the default.
-    var textSize = 15
+    /// The body text size in points. Headings, spacing and reading width scale with it.
+    var textSize = Typography.body
     var checksSpelling = true
     var lineSpacing = LineSpacing.standard
     var paragraphSpacing = ParagraphSpacing.standard
@@ -78,7 +77,7 @@ nonisolated struct PageStyle: Equatable {
     var showsCodeLineNumbers = false
     /// How wide the text runs when not full width, in steps of `readingStep`. The default is the design's column of 680
     /// points at the default text size.
-    var readingWidth = 45
+    var readingWidth = Self.defaultReadingWidth
     /// How a link to another item reads in the text.
     var linkLook = LinkLook.standard
     /// The page's accent, its highlight color and the families of its text and its code, as Settings > Appearance
@@ -90,7 +89,10 @@ nonisolated struct PageStyle: Equatable {
 
     /// One step of the reading width in ems of the item's text, so a width holds about as many words whatever the text
     /// size.
-    static let readingStep = 680.0 / (45 * 15)
+    private static let defaultReadingWidth = 45
+    static let readingStep = 680.0 / Double(defaultReadingWidth * Typography.body)
+
+    var titleSize: CGFloat { Typography.pageSize(Typography.title, at: CGFloat(textSize)) }
 
     /// The reading width in ems of the item's text, as the editor's page takes it.
     var readingEms: Double { Double(readingWidth) * Self.readingStep }

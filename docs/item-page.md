@@ -56,7 +56,7 @@ A pause of 600 ms on a linked item (a chip, a foot or panel row, a link in the t
 
 - **How a row shows belongs to the type** (`PagePlacements`, `RowShows`) and changes no item, so a read-only item can be arranged. A type nobody changed has no entry, so a better default reaches it; Settings › Layouts › Restore Defaults removes the entry.
 - **Linked From has one place,** the page's foot or the panel's Links, chosen for a type in Settings › Layouts.
-- **Text is 15 points by default** (title 28 on 34), in steps of 13 to 24; a stored 11 or 12 reads as the nearest.
+- **Actual Size is 13 points**, with a 24.7-point title and a 680-point reading column at the default width. A saved 15 stays at 15. Saved 11 and 12 display at 13. Page zoom scales Markdown, Source, plain text, Version History, Reader, and printed and exported text. Original keeps the site's styling.
 - **Pinned properties are a setting, off** (Settings › Editor). While on, the status and the parent are pinned unless the person chose others, at most four, and a pinned row leaves the rows.
 
 ## The panel beside the page
