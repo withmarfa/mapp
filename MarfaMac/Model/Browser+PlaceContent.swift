@@ -244,16 +244,16 @@ extension Browser {
         if let held = tableMemo, held.key == key { return held.content }
         let held = heldTables[shown].flatMap { $0.key.derived.library == key.derived.library ? $0 : nil }
         if let held, arranging?.key == key { return held.content }
-        let items = derived.items ?? items(in: library)
-        if let held, items.count > Self.arrangesAlongsideAbove {
-            arrange(key, items: items, after: held, in: library)
+        let listed = derived.items ?? items(in: library)
+        if let held, listed.count > Self.arrangesAlongsideAbove {
+            arrange(key, items: listed, after: held, in: library)
             return held.content
         }
         arranging?.task.cancel()
         arranging = nil
-        let content = ItemTableContent(browser: self, library: library, items: items)
+        let content = ItemTableContent(browser: self, library: library, items: listed)
         tableMemo = (key, content)
-        if items.count > Self.arrangesAlongsideAbove { heldTables[shown] = (key, content) }
+        if listed.count > Self.arrangesAlongsideAbove { heldTables[shown] = (key, content) }
         return content
     }
 
@@ -277,7 +277,7 @@ extension Browser {
         let pinned = sameChoices && selection.count == 1 ? selection.first : nil
         let task = Task { [weak self] in
             if settles {
-                try? await Task.sleep(for: Self.arrangeSettling)
+                try? await Task.sleep(for: Browser.arrangeSettling)
                 guard !Task.isCancelled else { return }
             }
             guard let self, self.shown == place, self.isShowing(library) else { return }
@@ -286,7 +286,7 @@ extension Browser {
             let sort = content.sort
             let sorted = await Task.detached(priority: .userInitiated) { ItemTableLayout.sorted(kept, by: sort) }.value
             guard !Task.isCancelled, self.arranging?.key == key, self.shown == place else { return }
-            content.rows = Self.holding(pinned, in: sorted, as: pinned == nil ? nil : earlier.content.rows)
+            content.rows = Browser.holding(pinned, in: sorted, as: pinned == nil ? nil : earlier.content.rows)
             self.arranging = nil
             self.tableMemo = (key, content)
             self.heldTables[place] = (key, content)
