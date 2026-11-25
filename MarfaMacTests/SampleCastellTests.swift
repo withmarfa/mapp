@@ -93,12 +93,16 @@ import Testing
             #expect(ids(.type(TypeID(type)), .all, kinds: false) == Set(own.map { ItemID($0.id) }), "\(type)")
             #expect(ids(.type(TypeID(type)), .all).isSuperset(of: ids(.type(TypeID(type)), .all, kinds: false)), "\(type)")
         }
-        #expect(library.count(in: .type(TypeID(SampleCastell.Kind.note)), scope: .library) == 223)
-        #expect(library.count(in: .type(TypeID(SampleCastell.Kind.task)), scope: .library) == 103)
-        #expect(library.count(in: .type(TypeID(SampleCastell.Kind.bookmark)), scope: .library) == 168)
-        #expect(library.count(in: .type(TypeID(SampleCastell.Kind.highlight)), scope: .library) == 130)
-        #expect(library.count(in: .type(TypeID(SampleCastell.Kind.file)), scope: .library) == 149)
-        #expect(library.count(in: .type(TypeID(SampleCastell.Kind.collection)), scope: .library) == 4)
+        // The boards count a type's own items; its place also lists its kinds, as the count of the place says.
+        for type in Set(active.map(\.type)) {
+            #expect(library.count(in: .type(TypeID(type)), scope: .library) == ids(.type(TypeID(type)), .library).count, Comment(rawValue: type))
+        }
+        #expect(ids(.type(TypeID(SampleCastell.Kind.note)), .library, kinds: false).count == 223)
+        #expect(ids(.type(TypeID(SampleCastell.Kind.task)), .library, kinds: false).count == 103)
+        #expect(ids(.type(TypeID(SampleCastell.Kind.bookmark)), .library, kinds: false).count == 168)
+        #expect(ids(.type(TypeID(SampleCastell.Kind.highlight)), .library, kinds: false).count == 130)
+        #expect(ids(.type(TypeID(SampleCastell.Kind.file)), .library, kinds: false).count == 149)
+        #expect(ids(.type(TypeID(SampleCastell.Kind.collection)), .library, kinds: false).count == 4)
 
         // Each collection lists the active items filed in it.
         let collections = active.filter { $0.type == SampleCastell.Kind.collection }
