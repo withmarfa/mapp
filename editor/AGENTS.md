@@ -1,76 +1,82 @@
 # Editor page
 
-The item editor's page: TypeScript on Inkkit, built by Vite into one self-contained file, `MarfaMac/Editor/Page/editor.html`. The Swift host that loads it is in `MarfaMac/Editor/`; read `MarfaMac/Editor/AGENTS.md` before changing the bridge or anything the host serves. The modules named here say in their doc comments how they draw and what they ask; read them before changing their behavior.
+The item editor's page: TypeScript on Inkkit, built by Vite into one self-contained file, `MarfaMac/Editor/Page/editor.html`. Its host is `MarfaMac/Editor/`; read `MarfaMac/Editor/AGENTS.md` before you change the bridge or anything the host serves. Read a module's doc comment before you change it.
 
 ## Build and dependencies
 
-- The built page and its license notices are committed so the app builds without Node. After any change in `editor/`, run `pnpm build` and commit `MarfaMac/Editor/Page/` with the change. A build of an unchanged checkout leaves those files byte-identical. The host-generated notice follows this app's lockfile; Inkkit's notices (`INKKIT-THIRD-PARTY-NOTICES.txt`) cover what it bundles, Pele among them.
-- Import only Inkkit's public facade, `@aicayzer/inkkit`, and its stylesheet. Never import Inkkit's Milkdown or ProseMirror internals. If the page needs something the facade lacks, it belongs in a new Inkkit release (`aicayzer/inkkit`); say so rather than reach past the facade.
-- Inkkit rejects a label it does not know. `window.marfaLabels` carries the app's own words beside Inkkit's, and `splitLabels` in `editor/src/editor.ts` hands Inkkit only its own.
+- **The built page and its notices are committed,** so the app builds without Node. After any change here, run `pnpm build` and commit `MarfaMac/Editor/Page/` with it. A build of an unchanged checkout leaves those files byte-identical.
+- **Import only Inkkit's public facade,** `@aicayzer/inkkit`, and its stylesheet. If the facade lacks something, it needs a new Inkkit release (`aicayzer/inkkit`): say so.
+- **Inkkit rejects a label it does not know.** The app's words and Inkkit's share `window.marfaLabels`, and `splitLabels` hands Inkkit only its own.
 
 ## Network and files
 
-- The page fetches nothing from the network and never navigates, including for a picture at a web address, which it asks the app for. Its Content-Security-Policy, in `editor/editor.html`, starts from `default-src 'none'` and allows the app's `marfa-embed:` scheme only for images, media, and frames. Do not widen it.
-- The page learns what an embed is only through the `embeds` message, and loads an embedded file only through `marfa-embed:`. It asks with the embed's text exactly as written (`FileReference.raw`: alias, size suffix, escapes, a table cell's `\|`), and the app answers from what Marfa's core bound that text to. The page applies no rule of its own for what an embed names. `embedsChanged(texts)` has the page forget those answers and redraw just those embeds with Inkkit's `refreshReferences`, which changes no document.
-- An embed of an item is not a file and shows as File Not Found: the page never transcludes an item. A PDF shows as a card with Open; keep Inkkit's frame sandbox and do not loosen it to paint PDFs.
-- A file card's corner holds Quick Look (`src/file-actions.ts`) before Open. Quick Look posts `quickLookEmbed` with the embed's text as written and the page shows nothing itself; its name takes the app's `quickLookNamed` words and the file's name. Inkkit refuses an action on a card that is a placeholder or opens by activating the card, so keep both off a file card.
-- A picture at a web address is never asked of the `embeds` handler and never fetched by the page. `src/pictures.ts` (`WebPictures`) asks the app through the `pictures` message (`askPicture` in `src/bridge.ts`) and draws each picture's state; the page decides nothing of the setting or of which items Always applies to. Printing and export ask with `'cached'` (`printable()` sets `cacheOnly`) and show only what the app already holds. A loaded picture is redrawn with `refreshReferences`, which changes no document. A picture that waits or is loading is Inkkit's placeholder, drawn as one full-width row with a hairline outline in the interface's font, its Load button at the row's trailing end, and styled by the `--inkkit-file-placeholder-*` tokens on `body` in `src/style.css`, which take the `--picture-*` values the banner's buttons use (the app's small gray button); Inkkit has no token for the font, the outline or the row's width and margins, so `style.css` sets them with rules on the placeholder and its button. A picture whose description only repeats the item's title is named "Picture" in that line (`WebPictures.setTitle`, from the header's title), for display only. A waiting one's Load button loads that picture alone (`choose`); only the banner at the top of the page, above the title (`#picture-bar`), loads them all (`chooseAll`), and its close button loads nothing and hides it until an item is opened again (`load`).
-- An image's width is kept in its alt text as `![name|400](…)` or `![[name|400]]`, since Obsidian reads both. Keep both forms working.
+- **The page fetches nothing and never navigates.** Its Content-Security-Policy, in `editor/editor.html`, starts from `default-src 'none'`. Do not widen it.
+- **What an embed is comes only from the `embeds` request,** asked with the embed's text exactly as written (`FileReference.raw`), and a file loads only through `marfa-embed:`. The page has no rule for what an embed names.
+- **`embedsChanged(texts)` redraws just those embeds** with Inkkit's `refreshReferences`, which changes no document. Pictures and links are redrawn the same way.
+- **An embed of an item shows as a file that is not found,** because the page never transcludes an item.
+- **Keep Inkkit's frame sandbox.** A PDF is a card with Open; do not loosen the sandbox to paint it.
+- **A file card's corner holds Quick Look before Open** (`src/file-actions.ts`). Inkkit refuses an action on a card that is a placeholder or opens when activated, so keep both off a file card.
+- **A picture at a web address is asked of the app** (`src/pictures.ts`, `askPicture`), never of `embeds`. The page decides nothing of the setting. Printing and export ask with `'cached'`.
+- **A waiting picture's Load button loads that picture alone** (`choose`), and only the bar at the top of the page loads them all (`chooseAll`).
+- **Style a waiting picture with Inkkit's placeholder tokens** (`--inkkit-file-placeholder-*`). `src/style.css` adds rules only for what has no token.
+- **A picture's width stays in its name, as `|400`,** in a Markdown picture and in an embed, because Obsidian reads both. Keep both forms working.
 
 ## Layout
 
-- Size text and the reading width in `rem`, so the text size setting scales them. The reading width comes from the page's margins, so a click beside the text still places the caret.
-- The item's header (`editor/src/header.ts`) is drawn above Inkkit's root and its footer below it, so both scroll with the text as one surface. They belong to the app's page, not to Inkkit. Do not move the header back into a native overlay.
-- Inkkit's viewport scroll container is `document.body`, not `document.documentElement`, whose `clientHeight` is the window's: measured there, Inkkit's visible rectangle fell short by the scroll offset, and reveals (the Outline's included) and Find went wrong once the page scrolled.
-- `--inkkit-column-inset`, set once on `body` in `editor/src/style.css`, pads the text, `#item-header` and `#item-footer`. Keep all three on that one value, and override no Inkkit selector to pad the text.
-- The header draws the rows and the kind Swift sends (`PropertyRow`, `PageHeaderKind` as `kind`, `showsTitle`, `showsText`, `symbol`, `mark`) and never decides a kind, names a type or loads anything. A link value posts `openItem` or `openLink`. A row Swift flags `editable` posts `editValue` (the row id and the value's rectangle) from its label, and from its value where that holds no link; Swift opens the editor under it; the page edits nothing and shows no error of its own for a refused write. A row dragged by its key (`row-drag.ts`) posts `moveRow` with the whole order it shows after the move, folded rows included; Swift stores that order; the page draws what comes back.
-- Keep every size on the 4 point grid (`--step`) and scale it with the interface text size. Draw property rows as flex rows, never a grid (the comment in `style.css` says why).
+- **Size text and the reading width in `rem`,** so the text size setting scales them, and keep other sizes on `--step`. The reading width comes from the page's margins, so a click beside the text places the caret.
+- **The header (`src/header.ts`) is above Inkkit's root and the footer below it,** so they scroll as one surface. They are the app's. Do not move the header back into a native overlay.
+- **Trap:** Inkkit's scroll container is `document.body`. Measured on `document.documentElement`, reveals and Find go wrong once the page has scrolled.
+- **`--inkkit-column-inset`, set once on `body`, pads the text, the header and the footer.** Keep all three on it, and override no Inkkit selector to pad the text.
+- **Draw property rows as flex rows, never a grid.** The comment in `style.css` says why.
+- **The row above the title takes no room** and is only faded at rest, so a hover moves nothing and the keyboard and VoiceOver reach it.
+
+## Header
+
+- **The header draws what Swift sends and decides nothing:** not a kind, a type, which pins, a cap, an order or a menu. A pin's value keeps to one line and its whole text is the help.
+- **It edits nothing and shows no error for a refused write.** A row flagged `editable` posts `editValue`, a field's name `fieldMenu`, a pin's button `headerMenu`, and Swift opens the editor or menu under the rectangle.
+- **A dragged row posts `moveRow` with the whole order it shows,** folded rows included (`row-drag.ts`). Swift stores it and the page draws what comes back.
+- **Report scrolling only when something changes for the toolbar** (`headerScrolledAway`, `contentUnderToolbar`), never at every scroll.
 
 ## Editing
 
-- Inkkit's slash menu is on with every built-in command and the app's own Link to Item, and `[[` offers the library's items through the wiki link adapter. `editor/test/consumer.test.ts` mounts Inkkit with the app's labels (`EditorController.editorLabels`).
-- Inkkit's text-input and display options come from Settings > Editor, and reach the page as one set: `window.editor.setOptions({ textInput, display })`, which the app sends on load and whenever a setting changes. Each Inkkit call replaces its whole set (`setTextInputPreferences`, `setDisplayPreferences`), so the page sends both together and never one option on a path of its own; a call made while the person composes waits for it to end. Smart quotes and dashes are on only when the person turns them on (`textInput.smartPunctuation`). Line and paragraph spacing are `--inkkit-line-height` and `--inkkit-paragraph-spacing`, set on `body` (`setLineSpacing`, `setParagraphSpacing`), where the page's stylesheet sets them.
-- `hidden-text` is not a fault: an edit touched folded or not-yet-shown text, and Inkkit has opened the section. A command the app sends that changes text at the selection (`format`) is run once more after the next paint (`guardedCommand(…, { retry: true })`); `appendImages` and `insertImages` are asked again by the app after the next paint (`EditorController.appendPendingEmbeds`, `place`), up to `hiddenTextRetryLimit` times, and then the images are named to the person as attached but not in the text. A replacement from Find that is refused changes nothing and the page sends the matches again, so the same replacement can be asked once the section has painted. An input the person typed, pasted or dropped is refused and dropped by Inkkit, which opens the section and reports it through `events.error` with neither the input nor a cause (0.7.15), so it cannot be replayed or handed over: the page posts `hiddenText` (`hostMessage`) and the app tells the person once that what they typed reached a folded section, which is now open, and was not added. Never drop a refused input without telling them.
-- Inkkit paints the selection. The page sets its colors as `--inkkit-selection-background` and `--inkkit-inactive-selection-background` on `:root`; override no `::selection` or `::highlight` rule. `window.editor.setHostActive` changes no focus, text or history.
-- `window.editor.appendImages(images, expected)` adds embeds after the last block in one undo step, saved like typing, and does nothing to an item loaded since. It refuses in source editing and with `preservation` where it would change any other text; keep the defensive source comparison in `ItemEditor.appendImages`, and never write the images into the source here.
-- The pins under the title are the rows Swift sends in `pins`, in order, each in a fixed slot, laid out as a wrapping row. A value keeps to one line, cut with an ellipsis, and its whole text is the help. The page chooses none of them, caps no list and drops nothing: a list arrives as its first value and `more`, the words ("+4 more") for the rest, worded and localized by Swift. A pin opens its editor as its row does (`editable`); the status and parent pins keep their buttons, which ask for the same editor, and a linked item still opens. A value the item does not have yet is a row of kind `empty`, drawn as the word Empty in quiet text, which asks for its editor. A row's `help` stands for its words in the hover; an event's time is its first pin, and its slot takes the room the time needs. [docs/item-page.md](../docs/item-page.md) says what the pins are.
-- The row above the title (Linked From's count, Customize Layout) takes no room: it is absolute in the header's top padding and only faded while it rests, so a hover moves nothing and the keyboard and VoiceOver always reach it. It shows with the pointer over it or the title, with keyboard focus in it (`:focus-visible`, so a click that leaves focus on a tool does not light it), and while the app says Customize Layout is on (`layoutOn`). The page posts `toggleLayout` and `showLinked` and decides neither the count nor whether the mode is offered.
-- The header's actions are native: the page sends the title's input and commit, each pin's menu request and each field name's `fieldMenu` request (the row, whether its value follows a link, the name's rectangle), and the app saves and opens menus. The page reports scrolling only when something changes for the toolbar (`headerScrolledAway`, `contentUnderToolbar`); do not post a message for every scroll.
+- **Every option reaches the page as one set** (`window.editor.setOptions`), because each Inkkit call replaces its whole set. One option on a path of its own would reset the others.
+- **`hidden-text` is not a fault.** An edit touched folded or unpainted text, and Inkkit has opened the section. A command is run once more after the next paint (`guardedCommand`), images are asked again by the app, and a refused replacement sends the matches again.
+- **Input refused in folded text cannot be replayed,** because Inkkit drops it. The page posts `hiddenText`. Never drop a refused input without telling the person.
+- **Inkkit paints the selection.** Set its color tokens on `:root`, and override no `::selection` or `::highlight` rule.
+- **`appendImages` adds embeds after the last block in one undo step** and does nothing to an item loaded since. It refuses where it would change other text; keep the source comparison in `ItemEditor.appendImages`.
 
 ## Links
 
-- The page asks the app about items through the `items` message handler, which answers every request: `suggest` after `[[`, `pick` for Link to Item (answered when the person has chosen or declined), and `resolve`. A command that gets nothing back leaves the line as typed. Change these with `MarfaMac/Editor/ItemRequests.swift`.
-- Opening a `[[link]]` posts `openItemLink` with its exact authored `raw` text. Forward `WikiLinkReference.raw` unchanged through opening, resolution and cache identity, since Marfa binds each spelling separately. The page never guesses which item a name means. A link to a heading of its own item is followed in the page (`ItemEditor.revealHeading`, by the heading's text). A row of the sidebar's Outline goes to a heading by its place in Inkkit's own heading list (`ItemEditor.revealHeadingAt`), so two headings that read the same each have their own. The app keeps no heading parser: the page reports its list (see Bridge).
-- An address leaves the page to be opened only through `openLink` in `src/bridge.ts`, which drops what Inkkit's `canOpenLink` refuses, and the app checks nothing more. Send `openLink` nowhere else. The one other way an address reaches the app is `linkMenu`, which carries `openable` (Inkkit's answer and `canOpenLink`'s together), and the app opens the address only where it is true.
-- Inkkit's `linkMenu` event posts `linkMenu` (the link, the pointer's place and the window's height, under the load's generation) when the person right-clicks a link; Inkkit has selected the link, and the app builds the menu. Edit Link and Remove Link then run through `format('link', address)`, `format('link')` and, for a link to an item, `unlinkSelected(text, generation)`, which writes the words the link showed where it stood. The page keeps no menu of its own. Open Link's key is Inkkit's `openLink` binding (`setKeymap`); Inkkit reads a capital letter in a key as Shift.
-- `editor/src/links.ts` answers Inkkit's `WikiLinkAdapter.resolve` from what the app last said, for the item on the page only, and `linksChanged` asks again. Links are drawn again with `refreshReferences` (`ItemEditor.drawLinksAgain`), which never changes the item's text, for just the links whose answer changed. Inkkit styles wiki links; the page adds no rule for them.
-- The `resolve` reply (`askLinks`) gives each link `missing` and, for a link that is not missing, its icon and tone: the type's where it is bound to one item, otherwise a neutral link mark, with each icon's image once in `icons`. The page decides neither: it hands Inkkit the icon and `var(--link-icon-<tone>)`/`var(--link-tint-<tone>)`, and checks the app's data first, since Inkkit throws on an icon or color it cannot read.
-- The app sets the accent (`--inkkit-accent-color`), the highlight color (`--item-highlight`, which the page's one `mark` rule reads, falling back to Inkkit's yellow) and the text and code fonts (`--inkkit-font-family`, `--inkkit-monospace-font`, on `body`) as inline custom properties through `EditorController.applyAccent` and `applyFonts`, and removes the font ones for a default. The page names no font and no highlight color of its own beyond those fallbacks.
-- How a link looks is the app's setting: `window.editor.setLinkStyle(variables)` (`src/link-style.ts`) sets only `--inkkit-link-*`, `--inkkit-wiki-link-*` and `--link-*` custom properties on the root and removes any a later style leaves out. The page holds no look of its own.
+- **The page asks about items through the `items` handler,** which answers every request: `suggest`, `pick` and `resolve`. A command that gets nothing back leaves the line as typed. Change these with `MarfaMac/Editor/ItemRequests.swift`.
+- **Forward `WikiLinkReference.raw` unchanged** through opening, resolution and cache identity, because Marfa binds each spelling separately. The page never guesses which item a name means.
+- **A heading of the same item is revealed by its text** (`ItemEditor.revealHeading`), and the Outline by its place in the list (`ItemEditor.revealHeadingAt`), so two that read the same each have their own.
+- **An address leaves to be opened only through `openLink` in `src/bridge.ts`,** which drops what Inkkit's `canOpenLink` refuses; the app checks nothing more. `linkMenu` carries `openable`, and the app opens its address only where that is true.
+- **The page keeps no link menu.** The app builds it, and Edit Link and Remove Link come back as `format` and `unlinkSelected`.
+- **Trap:** Inkkit reads a capital letter in a `setKeymap` key as Shift.
+- **`src/links.ts` answers Inkkit from what the app last said,** for the item on the page only, and `linksChanged` asks again. Links are drawn again (`ItemEditor.drawLinksAgain`) without changing the text.
+- **Check the app's icon and color first,** because Inkkit throws on one it cannot read. The page decides neither.
+- **How a link looks is the app's setting** (`src/link-style.ts`). The page holds no look, accent, highlight color or font of its own beyond fallbacks.
 
 ## Bridge
 
-- The bridge has two sides: `editor/src/bridge.ts` and `MarfaMac/Editor/EditorMessages.swift`. Change both in the same commit.
-- `editor/bridge-messages.json` lists every message, request and `window.editor` function; `test/bridge-messages.test.ts` and `MarfaMacTests/EditorBridgeTests.swift` read it, so edit it with the change.
-- After each `load` the page posts `painted` with its generation once the browser has drawn the document, and not if a later `load` or `reload` has given the page another generation by then. The app ends its `item.open` signpost there.
-- The page posts `headings` (Inkkit's `headings()` as `{level, text}` in document order, the ordinal being the index, a heading with no words included) with its generation after each `load` and `reload`, and after an edit only when the list differs from the last one posted for that generation. It is the only source of the sidebar's Outline.
+- **Change `editor/src/bridge.ts` and `MarfaMac/Editor/EditorMessages.swift` in one commit,** with `editor/bridge-messages.json`, which lists every message, request and `window.editor` function and which both sides' tests read.
+- **After each `load` the page posts `painted` with its generation,** unless a later load has taken over. The app ends its `item.open` signpost there.
+- **The page posts `headings` after each load, and after an edit only when the list differs.** It is the Outline's only source.
 
 ## Byte preservation
 
-- Inkkit keeps the text of every block an edit did not reach, and keeps link definitions, authored embeds, and `[[link]]` source. Only edited or new blocks take Inkkit's canonical form. Where Inkkit cannot write an embed back as it was read, it keeps the block as literal Markdown and the page asks nothing for it.
-- `editor/fixtures/corpus/` holds texts in unusual but valid markdown. Each has one paragraph containing `EDIT HERE`, which `editor/test/consumer.test.ts` edits and undoes, and expects every other byte back. Add a fixture for any form found to be rewritten.
+- **Inkkit keeps the text of every block an edit did not reach,** and link definitions, embeds and `[[link]]` source. Only edited or new blocks take its canonical form.
+- **`editor/fixtures/corpus/` holds unusual but valid Markdown.** Each text has one paragraph with `EDIT HERE`, which `editor/test/consumer.test.ts` edits and undoes, expecting every other byte back. Add a fixture for any form found rewritten.
 
 ## Commands
 
-Run these in `editor/`: `pnpm install`, `pnpm test` (Vitest with jsdom), `pnpm typecheck`, `pnpm format:check` (`pnpm format` rewrites), and `pnpm build`, which writes `MarfaMac/Editor/Page/editor.html`.
-
-The `EditorTests` suite (`MarfaMacTests/EditorTests*.swift`) runs the built page in real WebKit through the app's bridge, so run the unit tests after `pnpm build`.
+Run these in `editor/`: `pnpm install`, `pnpm test`, `pnpm typecheck`, `pnpm format:check` and `pnpm build`. The `EditorTests` suite (`MarfaMacTests/EditorTests*.swift`) runs the built page in real WebKit, so run it after a build.
 
 ## Code Review Rules
 
-- **Page out of date.** Flag a change under `editor/` whose commit does not include the rebuilt `MarfaMac/Editor/Page/editor.html`.
-- **Inkkit internals.** Flag any import from Inkkit other than `@aicayzer/inkkit` and its stylesheet.
-- **Network or navigation.** Flag a widened Content-Security-Policy, a fetch, or a navigation. Safe path: load embedded files and pictures through `marfa-embed:` only, and ask the app, through `pictures`, for a picture at a web address.
-- **Rewritten source.** Flag a change that alters bytes outside the edited block, or a fix for a rewritten form without a corpus fixture.
-- **One-sided bridge.** Flag a message added, renamed, or removed on one side of the bridge only, including a request to the `items` handler.
-- **Unanswered page.** Flag a `items` request the app can leave without an answer, since the page's command then waits for ever.
+- **Page out of date.** Flag a change under `editor/` whose commit lacks the rebuilt `MarfaMac/Editor/Page/editor.html`.
+- **Inkkit internals.** Flag an import from Inkkit other than `@aicayzer/inkkit` and its stylesheet.
+- **Network or navigation.** Flag a widened Content-Security-Policy, a fetch or a navigation. Safe path: `marfa-embed:` for files, and `pictures` for a picture at a web address.
+- **Rewritten source.** Flag a change that alters bytes outside the edited block, or a fix for a rewritten form without a fixture.
+- **One-sided bridge.** Flag a message or request added, renamed or removed on one side only.
+- **Unanswered page.** Flag an `items` request that the app can leave without an answer, because the page's command then waits for ever.
