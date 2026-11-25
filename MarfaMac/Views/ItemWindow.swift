@@ -63,8 +63,8 @@ struct ItemWindow: View {
         }
         .modifier(ToolbarTrayWatch { isToolbarTrayOpen = $0 })
         .focusedSceneValue(\.detailsPresentation, details)
-        .environment(details)
         .toastOverlay()
+        .environment(details)
         .modifier(CommandValuePanels(details: details))
         .modifier(FieldEditSheets(details: details))
         .sheet(item: Binding { details.typeValues } set: { details.typeValues = $0 }) { TypeValuesSheet(request: $0) }
