@@ -152,7 +152,8 @@ import Testing
         await sync.flush()
         let held = await copy.unitsHeld(item)
         #expect(held[.member(.general, StartWith.key)] == PreferenceJSON.text(StartWith.place(.favorites).rawValue))
-        #expect(held[.row(.places, setting: "placeDefaults", key: task)] == #"{"layout":"board"}"#, "the earlier row stays")
+        let earlierRow = try #require(held[.row(.places, setting: "placeDefaults", key: task)], "the earlier row stays")
+        #expect(try JSONDecoder().decode(PlaceDefault.self, from: Data(earlierRow.utf8)).layout == .board)
         // Copied once: what the person clears at the new key stays clear through the next sync.
         PlaceDensities.update(in: defaults) { $0.set(nil, for: .library) }
         await sync.flush()
