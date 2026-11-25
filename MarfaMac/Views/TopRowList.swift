@@ -31,9 +31,9 @@ private struct TopRowOverList: ViewModifier {
     let isBesidePage: Bool
     let signal: AnyHashable
 
-    /// The layouts that stand the views beside the title from the start: the calendar has a header of its own and the
-    /// board's lanes scroll by themselves, so neither has rows to scroll a row of views away.
-    private var isAlwaysBeside: Bool { !browser.showsPlaceIndex && (browser.viewMode == .calendar || browser.viewMode == .board) }
+    /// The layouts that stand the views beside the title from the start: the calendar has a header of its own, the
+    /// board's lanes scroll by themselves and the map does not scroll, so none has rows to scroll a row of views away.
+    private var isAlwaysBeside: Bool { !browser.showsPlaceIndex && (browser.viewMode == .calendar || browser.viewMode == .board || browser.viewMode == .map) }
 
     func body(content: Content) -> some View {
         let _ = (orders, hidden)

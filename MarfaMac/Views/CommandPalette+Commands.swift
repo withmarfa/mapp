@@ -27,6 +27,7 @@ extension CommandPalette {
             addLayout(.board, String(localized: "View as Board"), "rectangle.split.3x1", .viewAsBoard)
             addLayout(.timeline, String(localized: "View as Timeline"), ItemViewMode.timeline.symbol, .viewAsTimeline)
             addLayout(.calendar, String(localized: "View as Calendar"), ItemViewMode.calendar.symbol, .viewAsCalendar)
+            addLayout(.map, String(localized: "View as Map"), ItemViewMode.map.symbol, .viewAsMap)
             if browser.kindsType(in: library) != nil {
                 let isOn = browser.listing.includesKinds
                 add(isOn ? String(localized: "Show This Type Only") : String(localized: "Include Kinds"), IncludeKinds.symbol, in: .view) {

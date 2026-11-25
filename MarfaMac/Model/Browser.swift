@@ -495,6 +495,7 @@ final class Browser {
         placeHidesEmptyGroups = [:]
         placeQuickActions = [:]
         placeOpenings = [:]
+        placeMaps = [:]
         openedView = nil
         placeProperties = [:]
         placeCalendarScales = [:]
@@ -678,6 +679,8 @@ final class Browser {
     var placeQuickActions: PlaceMemory<Bool> = [:]
     /// Where each place that is not a saved view opens its items, as its default view keeps it; none follows Settings.
     var placeOpenings: PlaceMemory<ItemOpening> = [:]
+    /// The map's choices of each place that is not a saved view, as its default view keeps them (`mapChoices`).
+    var placeMaps: PlaceMemory<MapChoices> = [:]
     /// The Properties list of each place that is not a saved view, as its default view keeps it (`properties`).
     var placeProperties: PlaceMemory<ViewProperties> = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.
@@ -688,6 +691,8 @@ final class Browser {
     var showsCalendarMonth = false
     /// Counts the asks to scroll the timeline to today (`requestTimelineToday`).
     var timelineTodayRequests = 0
+    /// Counts the asks to fit every marker on the map (`requestMapFit`).
+    var mapFitRequests = 0
 
     /// Counts the changes to the densities this Mac keeps for places, which a list reads to know its own changed
     /// (`Browser+SavedViews`).

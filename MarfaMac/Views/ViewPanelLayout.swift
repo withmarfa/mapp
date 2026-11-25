@@ -29,6 +29,15 @@ struct ViewPanelLayoutRows: View {
         case .timeline:
             timelineDate
             ViewPanelPropertiesRow(browser: browser, panel: panel)
+        case .map:
+            ViewPanelChoiceRow(
+                symbol: "square.2.layers.3d", label: String(localized: "Style"), choices: ItemMapStyle.allCases, title: \.title,
+                selection: browser.mapStyle, choose: { browser.setMapStyle($0) })
+                .accessibilityIdentifier("ViewPanelMapStyle")
+            ViewPanelSwitchRow(
+                symbol: "circle.grid.2x2", label: String(localized: "Group Nearby Items"), isOn: browser.groupsNearbyItems,
+                set: { browser.setGroupsNearbyItems($0) })
+                .accessibilityIdentifier("ViewPanelMapGroups")
         }
     }
 
@@ -148,6 +157,7 @@ struct ViewLayoutCommands: View {
             choice("View as Board", .board, command: .viewAsBoard)
             choice("View as Timeline", .timeline, command: .viewAsTimeline)
             choice("View as Calendar", .calendar, command: .viewAsCalendar)
+            choice("View as Map", .map, command: .viewAsMap)
         }
         .disabled(browser == nil)
     }
@@ -182,6 +192,8 @@ struct CurrentLayoutCommands: View {
                 .disabled(!grouped)
             Button("Expand All Groups") { browser.expandAllGroups() }
                 .disabled(!grouped)
+        case .map:
+            Button("Fit All Items", systemImage: "scope") { browser.requestMapFit() }
         case .board, .gallery:
             EmptyView()
         }

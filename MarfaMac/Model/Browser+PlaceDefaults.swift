@@ -123,6 +123,7 @@ extension Browser {
         if placeProperties[place] != properties { placeProperties[place] = properties }
         if placeQuickActions[place] != stored.quickActions { placeQuickActions[place] = stored.quickActions }
         if placeOpenings[place] != stored.opening { placeOpenings[place] = stored.opening }
+        if placeMaps[place] != stored.map { placeMaps[place] = stored.map }
         observedChoices[place] = ViewChoices(options: options, timelineDate: stored.timelineField)
         // A place with no layout kept opens in its own, so one place's table is not carried to the next.
         apply(layout: stored.layout ?? naturalLayout(of: place), in: library)
@@ -171,6 +172,7 @@ extension Browser {
         placeProperties[place] = nil
         placeQuickActions[place] = nil
         placeOpenings[place] = nil
+        placeMaps[place] = nil
         observedChoices[place] = ViewChoices(options: ItemTableOptions(), timelineDate: nil)
         let natural = naturalLayout(of: place)
         if viewMode != natural, availableViewModes(in: library).contains(natural) { set(layout: natural) }
@@ -195,5 +197,6 @@ extension Browser {
         placeProperties[place] = stored.properties.isChanged ? stored.properties : nil
         placeQuickActions[place] = stored.quickActions
         placeOpenings[place] = stored.opening
+        placeMaps[place] = stored.map
     }
 }

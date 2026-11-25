@@ -16,7 +16,7 @@ nonisolated extension ItemViewMode {
     var hasCorner: Bool {
         switch self {
         case .calendar, .timeline, .gallery: true
-        case .list, .table, .board: false
+        case .list, .table, .board, .map: false
         }
     }
 }

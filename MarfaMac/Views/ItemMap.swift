@@ -1,0 +1,160 @@
+import MapKit
+import SwiftUI
+
+/// The map layout: Apple's map from edge to edge under the top row, with the items that have a place as markers in their
+/// type's tone and groups with a count where markers crowd (`MapController`). A quiet pill at the foot counts the items
+/// the map cannot place and lists them. Choosing a marker is choosing the item (`Browser.selection`), and a double-click
+/// opens it as every layout does. The placing of a large place is worked out off the main actor (`MapPlacingWork`), and
+/// this body does not read the selection, so choosing a marker redraws the map's own views and no more.
+struct ItemMap: View {
+    @CurrentLibrary private var library
+    @Bindable var browser: Browser
+    var pane: FocusState<Browser.Pane?>.Binding
+    @State private var work = MapPlacingWork()
+    @State private var controller = MapController()
+    @Environment(\.topRowSpace) private var space
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.interfaceTextSize) private var textSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let (items, key) = browser.mapItems(in: library)
+        let placing = work.placing(for: key, items: items, catalogue: library.catalogue)
+        ItemMapCanvas(
+            controller: controller,
+            inputs: MapController.Inputs(
+                browser: browser, catalogue: library.catalogue, placing: placing, style: browser.mapStyle, groups: browser.groupsNearbyItems,
+                placeToken: AnyHashable(MapPlaceToken(library: key.library, place: key.place)), scheme: scheme, textSize: textSize,
+                reduceMotion: reduceMotion))
+            .ignoresSafeArea()
+            .overlay(alignment: .top) {
+                // The row's own band shows only once rows scroll under it, and the map is under it from the start.
+                ToolbarBand(toolbarHeight: space.lineHeight, isShown: true, strength: 0.78)
+            }
+            .overlay(alignment: .bottomTrailing) { MapControls(controller: controller, browser: browser) }
+            .overlay(alignment: .bottom) {
+                if let placing, !placing.unplaced.isEmpty {
+                    NoLocationPill(ids: placing.unplaced, browser: browser)
+                        .padding(.bottom, 14)
+                }
+            }
+            .overlay {
+                if let placing, placing.pins.isEmpty, !items.isEmpty { NothingOnMap() }
+            }
+            .overlay {
+                if items.isEmpty {
+                    if browser.narrowsBySearch {
+                        SearchEmptyState(browser: browser)
+                    } else {
+                        PlaceEmptyState(browser: browser)
+                    }
+                }
+            }
+            .searchStatus(browser)
+            .filteredEmptyState(browser)
+            .background(ChosenRowOpensSidebar(browser: browser))
+            .onChange(of: browser.mapFitRequests) { controller.fitAll() }
+            .onDisappear { work.cancel() }
+            .accessibilityLabel("Map")
+    }
+}
+
+private struct MapPlaceToken: Hashable {
+    let library: ObjectIdentifier
+    let place: PlaceView
+}
+
+/// Where the map holds nothing: items are listed and none has a place to stand on.
+private struct NothingOnMap: View {
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("Nothing to Show on the Map").interfaceFont(.headline)
+            Text("None of these items has a location.").interfaceFont(.callout).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The system's zoom stepper and the button that fits every marker, in the map's corner above Apple's Legal link.
+private struct MapControls: View {
+    let controller: MapController
+    let browser: Browser
+
+    var body: some View {
+        HStack(spacing: 8) {
+            MapZoomControl(controller: controller)
+                .frame(width: 64, height: 28)
+            Button { browser.requestMapFit() } label: {
+                Image(systemName: "scope").frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: .circle)
+            .help("Fit All Items")
+            .accessibilityLabel("Fit All Items")
+            .accessibilityIdentifier("MapFit")
+        }
+        .padding(.trailing, 14)
+        .padding(.bottom, 34)
+    }
+}
+
+/// The quiet pill that counts what the map cannot place, and opens those items as a list.
+private struct NoLocationPill: View {
+    @CurrentLibrary private var library
+    let ids: [ItemID]
+    let browser: Browser
+    @State private var isOpen = false
+
+    var body: some View {
+        Button { isOpen.toggle() } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "list.bullet")
+                Text("No Location")
+                Text(ids.count, format: .number).foregroundStyle(.secondary).monospacedDigit()
+            }
+            .interfaceFont(.callout)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .popover(isPresented: $isOpen, arrowEdge: .top) { UnplacedList(ids: ids, browser: browser, isOpen: $isOpen) }
+        .accessibilityLabel(Text("No Location, \(ids.count) items"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("MapNoLocation")
+    }
+}
+
+/// The items that have no place on the map, as a list that draws only the rows in view.
+private struct UnplacedList: View {
+    @CurrentLibrary private var library
+    let ids: [ItemID]
+    let browser: Browser
+    @Binding var isOpen: Bool
+
+    var body: some View {
+        List(ids, id: \.self) { id in
+            if let item = library.item(id) {
+                Button {
+                    isOpen = false
+                    browser.selection = [id]
+                    _ = browser.open([id])
+                } label: {
+                    HStack(spacing: 6) {
+                        TonedGlyph(id: library.catalogue.icon(for: item.type))
+                        Text(item.displayTitle).lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .listStyle(.plain)
+        .frame(width: 300, height: min(CGFloat(ids.count) * 26 + 16, 360))
+        .accessibilityLabel("Items With No Location")
+    }
+}

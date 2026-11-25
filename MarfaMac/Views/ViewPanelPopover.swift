@@ -286,8 +286,8 @@ private struct ViewPanelItemsRows: View {
             panel.page = .filter
         }
         .accessibilityIdentifier("ViewPanelFilterRow")
-        // The timeline and the calendar place items by time, so a sort would change nothing there.
-        if mode != .timeline, mode != .calendar {
+        // The timeline and the calendar place items by time and the map by place, so a sort would change nothing there.
+        if mode != .timeline, mode != .calendar, mode != .map {
             ViewPanelOpenRow(symbol: "arrow.up.arrow.down", label: String(localized: "Sort"), value: sortValue(content)) {
                 panel.page = .sort
             }
@@ -400,6 +400,7 @@ extension ItemViewMode {
         case .board: String(localized: "Board")
         case .timeline: String(localized: "Timeline")
         case .calendar: String(localized: "Calendar")
+        case .map: String(localized: "Map")
         }
     }
 }
