@@ -216,10 +216,10 @@ extension Browser {
     }
 
     /// Whether the new view holds the person's work: a name they typed, a value they changed since the starting point,
-    /// or a Create View that could not make it yet.
+    /// or a Create View that Marfa has not taken yet, still on its way or refused.
     func isNewViewTouched(_ panel: ViewPanel) -> Bool {
         guard panel.isNew, viewPanel === panel else { return false }
-        return panel.problem != nil || panel.hasTypedName || newViewValues() != panel.startingValues
+        return panel.form?.isSaving == true || panel.problem != nil || panel.hasTypedName || newViewValues() != panel.startingValues
     }
 
     /// Whether a click outside the panel must not end it: while the new view holds the person's work, whatever
@@ -279,14 +279,26 @@ extension Browser {
         words += [String(localized: "as a"), viewMode.title]
         if viewMode != .timeline, viewMode != .calendar, !keepsPlaceOrder {
             let sort = SavedViews.arrangement(self, content: content, order: storedOrder).sort
-            if let first = sort.first { words += [String(localized: "sorted by"), first.column.label] }
+            if let first = sort.first {
+                let direction = first.order == .forward ? first.column.ascendingTitle : first.column.descendingTitle
+                words += [String(localized: "sorted by"), first.column.label + ",", direction.localizedLowercase]
+            }
             let grouping = shownGrouping(in: library)
             if grouping != .none, let found = groupOffer(in: library).entry(for: grouping) {
                 words += [String(localized: "grouped by"), found.entry.label]
             }
         }
-        return name + "\n" + words.joined(separator: " ")
+        var lines = [name, words.joined(separator: " ")]
+        if offersNewViewQuickActions {
+            lines.append(showsQuickActions ? String(localized: "Quick Actions: On") : String(localized: "Quick Actions: Off"))
+        }
+        let addsToSidebar = panel?.addsToSidebar == true
+        lines.append(addsToSidebar ? String(localized: "Add to Sidebar: On") : String(localized: "Add to Sidebar: Off"))
+        return lines.joined(separator: "\n")
     }
+
+    /// Whether the new view offers Quick Actions: only where it lists the Feed, whose rows they are for.
+    var offersNewViewQuickActions: Bool { listing.scope.includes(.feed) }
 
     /// The Feed's sources an inbox can list, by name with their counts.
     func inboxSources(in library: any ItemLibrary) -> [(code: String, name: String, count: Int)] {
