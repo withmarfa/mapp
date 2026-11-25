@@ -49,8 +49,9 @@ struct PlacesMenuView: View {
     var body: some View {
         // The keys are drawn beside the commands the menu bar binds them to; a menu's own items bind none.
         Group {
-            Button("Search", systemImage: "magnifyingglass") { browser.palette = .search }
-                .shortcut(.searchItems, shortcuts)
+            // As the sidebar's Search row does.
+            Button("Search", systemImage: "magnifyingglass") { browser.palette = .commands }
+                .shortcut(.commandPalette, shortcuts)
             Button("New", systemImage: "square.and.pencil") { browser.openQuickAdd(remembered: lastType, in: library) }
                 .shortcut(.newItem, shortcuts)
             Divider()

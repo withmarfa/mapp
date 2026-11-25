@@ -334,10 +334,7 @@ struct SidebarPlaceRow: View, Equatable {
         .onHover { isHovering = $0 }
         // On a page of the Library the Library's row is already chosen, so the list is told of no click: the row
         // goes to the Library itself.
-        .simultaneousGesture(TapGesture().onEnded {
-            guard data.opens == .library, !customizing, !PlaceView.library.isSame(browser.showing) else { return }
-            browser.show(.library, in: library, order: order)
-        }, isEnabled: data.opens == .library && !customizing)
+        .simultaneousGesture(TapGesture().onEnded { goToLibrary() }, isEnabled: goesToLibrary)
         .sidebarRowGround(isHovering && !customizing)
         .contextMenu {
             SidebarPlaceMenu(data: data, groups: groups, customizing: customizing, browser: browser, order: order)
@@ -345,7 +342,15 @@ struct SidebarPlaceRow: View, Equatable {
         .accessibilityActions {
             if data.adds, !customizing { Button(addName) { add() } }
         }
+        .modifier(LibraryPress(isEnabled: goesToLibrary, press: goToLibrary))
         .accessibilityIdentifier(identifier)
+    }
+
+    private var goesToLibrary: Bool { data.opens == .library && !customizing }
+
+    private func goToLibrary() {
+        guard goesToLibrary, !PlaceView.library.isSame(browser.showing) else { return }
+        browser.show(.library, in: library, order: order)
     }
 
     private var content: some View {
@@ -389,6 +394,16 @@ struct SidebarPlaceRow: View, Equatable {
 
     private var identifier: String {
         if case .view(let id) = data.place { "SidebarView-\(id.rawValue)" } else { "SidebarPlace-\(data.place.key)" }
+    }
+}
+
+/// The Library row's press for VoiceOver, which goes to the Library from a page of it as a click does.
+private struct LibraryPress: ViewModifier {
+    let isEnabled: Bool
+    let press: () -> Void
+
+    func body(content: Content) -> some View {
+        if isEnabled { content.accessibilityElement(children: .combine).accessibilityAction(.default, press) } else { content }
     }
 }
 
