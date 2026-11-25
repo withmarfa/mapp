@@ -49,8 +49,7 @@ nonisolated enum NewViewStart: String, CaseIterable, Hashable, Identifiable, Sen
 }
 
 /// Making a view from a starting point: which ones fit the place, what each does to the window, which the person already
-/// has, the name the panel suggests, and Create View's checks. The window shows the view as it will list, and the
-/// panel's snapshot puts the place back on Cancel.
+/// has, the name the panel suggests, and Create View's checks. The window previews the items in its current layout.
 extension Browser {
     /// The search's tokens This Search starts from: the window's search, or the one set aside while another starting
     /// point shows its own list.
@@ -182,7 +181,7 @@ extension Browser {
             layout = .table
         }
         tableOptions[place] = options
-        if layout != viewMode { set(layout: layout) }
+        panel.draftLayout = layout
         panel.start = start
         panel.suggest(suggestedViewName(in: library))
         panel.startingValues = newViewValues()
@@ -205,13 +204,13 @@ extension Browser {
 
     // MARK: What the person has made of it
 
-    /// The new view's values as the window shows them now.
+    /// The new view's values, including the layout it will open in.
     func newViewValues() -> ViewPanel.Values? {
         guard let panel = viewPanel, panel.isNew, let place = panel.snapshot?.place else { return nil }
         var options = (tableOptions[place] ?? ItemTableOptions()).settled
         options.collapsed = nil
         return ViewPanel.Values(
-            options: options, layout: viewMode, timelineDate: timelineFields[place], quickActions: panel.quickActions,
+            options: options, layout: viewPanelLayout, timelineDate: timelineFields[place], quickActions: panel.quickActions,
             addsToSidebar: panel.addsToSidebar, choosesNoSource: panel.choosesNoSource)
     }
 
@@ -239,6 +238,7 @@ extension Browser {
     /// The summary given back when an unsaved draft closes.
     func newViewDescription(in library: any ItemLibrary) -> String {
         let panel = viewPanel
+        let layout = viewPanelLayout
         let typed = panel?.trimmedName ?? ""
         let name = typed.isEmpty ? suggestedViewName(in: library) : typed
         let content = tableContent(in: library)
@@ -276,15 +276,15 @@ extension Browser {
                 ? said.formatted(.list(type: .or, width: .standard)) : said.formatted(.list(type: .and, width: .standard))
             words += [String(localized: "where"), joined]
         }
-        words += [String(localized: "as a"), viewMode.title]
-        if viewMode != .timeline, viewMode != .calendar, viewMode != .map, !keepsPlaceOrder {
-            let sort = SavedViews.arrangement(self, content: content, order: storedOrder).sort
+        words += [String(localized: "as a"), layout.title]
+        if layout != .timeline, layout != .calendar, layout != .map, !keepsPlaceOrder {
+            let sort = SavedViews.arrangement(self, content: content, order: storedOrder, layout: layout).sort
             if let first = sort.first {
                 let direction = first.order == .forward ? first.column.ascendingTitle : first.column.descendingTitle
                 words += [String(localized: "sorted by"), first.column.label + ",", direction.localizedLowercase]
             }
-            let grouping = shownGrouping(in: library)
-            if grouping != .none, let found = groupOffer(in: library).entry(for: grouping) {
+            let grouping = shownGrouping(in: library, layout: layout)
+            if grouping != .none, let found = groupOffer(in: library, layout: layout).entry(for: grouping) {
                 words += [String(localized: "grouped by"), found.entry.label]
             }
         }

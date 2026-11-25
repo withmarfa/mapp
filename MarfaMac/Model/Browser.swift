@@ -97,14 +97,19 @@ final class Browser {
         guard library.isLoaded else { return ItemViewMode.allCases }
         let membership = library.membershipRevision
         // A saved view lists what the library reads for it, later, and without a membership change.
+        let viewItems = isViewPlace ? placeItems(in: library) : nil
+        let emptyViewLayout = viewItems?.isEmpty == true ? shown.savedView.flatMap { macSettings(for: $0).layout } : nil
         let key = ViewModesKey(
             library: ObjectIdentifier(library), membership: membership, place: shown, listing: listing,
-            viewItems: isViewPlace ? placeItems(in: library).map(\.id) : nil)
+            viewItems: viewItems?.map(\.id), emptyViewLayout: emptyViewLayout)
         if let held = viewModesMemo, held.key == key { return held.modes }
         let modes = Cost.measure(.viewModes) {
-            var types = Set(placeItems(in: library).map(\.type))
+            var types = Set((viewItems ?? placeItems(in: library)).map(\.type))
             if case .type(let type) = shown.place { types.insert(type) }
-            return ItemViewMode.available(forTypes: types, catalogue: library.catalogue)
+            var available = ItemViewMode.available(forTypes: types, catalogue: library.catalogue)
+            // A just-created view's items are read asynchronously. It opens in its saved layout while it is empty.
+            if let emptyViewLayout, !available.contains(emptyViewLayout) { available.append(emptyViewLayout) }
+            return available
         }
         viewModesMemo = (key, modes)
         return modes
@@ -116,6 +121,7 @@ final class Browser {
         let place: PlaceView
         let listing: PlaceListing
         let viewItems: [ItemID]?
+        let emptyViewLayout: ItemViewMode?
     }
 
     /// Where each item stands in the sort the board's cards follow: the place's sort where the person or the view set
@@ -169,7 +175,7 @@ final class Browser {
     /// A window left on a layout its place cannot show goes back to the list without saying so. Types, Collections and
     /// Sources have no layout, so they leave it as it is for the place that follows to judge.
     func fallBackToListIfUnavailable(in library: any ItemLibrary) {
-        guard !showsPlaceIndex, !availableViewModes(in: library).contains(viewMode) else { return }
+        guard viewPanel?.isNew != true, !showsPlaceIndex, !availableViewModes(in: library).contains(viewMode) else { return }
         set(layout: .list)
     }
     /// How each place's table is grouped, sorted and filtered, as the person left it. A place that is not a saved view

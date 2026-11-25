@@ -9,6 +9,9 @@ extension Browser {
     /// Whether the window shows the panel.
     var showsViewPanel: Bool { viewPanel != nil }
 
+    /// A draft's layout is chosen in the panel and applied only after the view is saved.
+    var viewPanelLayout: ItemViewMode { viewPanel?.draftLayout ?? viewMode }
+
     /// View…: a view opens its own panel, and any other place that can show a table opens one with no name.
     func openViewPanel(in library: any ItemLibrary) {
         if viewPanel != nil { return }
@@ -86,14 +89,6 @@ extension Browser {
         dismissViewPanel(in: library)
     }
 
-    /// The popover closed under the View button made for `layout`. The window makes its toolbar again with each layout
-    /// (`MainView`), so a button made for another layout was just taken away, as a starting point or a layout chosen in
-    /// the panel takes it: the panel stays, and the new button shows it. Only the button in view takes a click outside.
-    func viewPanelPopoverClosed(anchoredIn layout: ItemViewMode, in library: any ItemLibrary) {
-        guard layout == viewMode else { return }
-        dismissViewPanel(in: library)
-    }
-
     /// Handles dismissal by the popover. A rename is submitted and handed back if the write fails.
     func dismissViewPanel(in library: any ItemLibrary) {
         guard let panel = viewPanel else { return }
@@ -113,7 +108,10 @@ extension Browser {
         guard shown.isSame(snapshot.place) else { return }
         restoreSetAsideSearch(of: panel)
         // A saved view shows what it became while the draft held the window: a change elsewhere, or an Undo of its own.
-        if let id = snapshot.place.savedView, let library { followView(id, after: snapshot, in: library) }
+        if let library {
+            if let id = snapshot.place.savedView { followView(id, after: snapshot, in: library) }
+            fallBackToListIfUnavailable(in: library)
+        }
     }
 
     /// Hands back an unsaved draft or rename when the window changes place.
@@ -156,12 +154,12 @@ extension Browser {
             seed: id.flatMap { viewSeeds[$0] })
     }
 
-    /// Puts the place back. A new view that was made keeps the layout the person chose for it.
-    func restore(_ snapshot: ViewPanel.Snapshot, keepingLayout: Bool = false) {
+    /// Puts the place back as it was before the draft or Reset View.
+    func restore(_ snapshot: ViewPanel.Snapshot) {
         tableOptions[snapshot.place] = snapshot.options
         timelineFields[snapshot.place] = snapshot.timelineDate
         observedChoices[snapshot.place] = ViewChoices(options: snapshot.options ?? ItemTableOptions(), timelineDate: snapshot.timelineDate)
-        if !keepingLayout, snapshot.viewMode != viewMode { set(layout: snapshot.viewMode) }
+        if snapshot.viewMode != viewMode { set(layout: snapshot.viewMode) }
         if let columns = snapshot.columns {
             defaults.set(columns, forKey: ItemTableColumnLayouts.key)
         } else {
@@ -202,7 +200,7 @@ extension Browser {
         // A starting point's own order is written as it is, never left to the order a layout or a search gives, while
         // the person has changed neither the sort nor the layout since choosing it. Otherwise the draft's own order stands.
         if let start = panel.start, let own = start.sort, let chosen = panel.startingValues,
-           tableOptions[shown]?.sort == own.window, viewMode == chosen.layout {
+           tableOptions[shown]?.sort == own.window, viewPanelLayout == chosen.layout {
             draft.sort = own.saved
         }
         panel.problem = nil
@@ -217,7 +215,7 @@ extension Browser {
         guard viewPanel === panel else { return view }
         viewPanel = nil
         dropUndoSteps(of: panel)
-        if let snapshot = panel.snapshot { restore(snapshot, keepingLayout: true) }
+        if let snapshot = panel.snapshot { restore(snapshot) }
         show(.saved(view.id), in: library, order: order)
         followView(in: library)
         return view

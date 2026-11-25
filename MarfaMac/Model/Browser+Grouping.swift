@@ -5,16 +5,17 @@ import Foundation
 /// view or written to a saved view by the window's funnel (`choicesChanged`).
 extension Browser {
     /// What Group by offers in the open place and layout.
-    func groupOffer(in library: any ItemLibrary) -> GroupOffer {
+    func groupOffer(in library: any ItemLibrary, layout: ItemViewMode? = nil) -> GroupOffer {
+        let mode = layout ?? viewMode
         let content = tableContent(in: library)
-        if let held = groupOfferMemo, held.content === content, held.layout == viewMode { return held.offer }
+        if let held = groupOfferMemo, held.content === content, held.layout == mode { return held.offer }
         let offer = Cost.measure(.groupOffer) {
             GroupOffer.make(
                 columns: content.columns, types: listedTypes(in: library).union(content.allRows.map(\.item.type)), rows: content.allRows,
                 catalogue: library.catalogue,
-                layout: viewMode)
+                layout: mode)
         }
-        groupOfferMemo = GroupOfferMemo(content: content, layout: viewMode, offer: offer)
+        groupOfferMemo = GroupOfferMemo(content: content, layout: mode, offer: offer)
         return offer
     }
 
@@ -27,16 +28,17 @@ extension Browser {
     /// How the open layout groups, as Group by shows it ticked: a board's lanes (`boardGrouping`); a list or gallery
     /// nobody has arranged in the starting order Settings > Lists gives, its date by day; otherwise the place's grouping,
     /// where a place's own is by its status's groups.
-    func shownGrouping(in library: any ItemLibrary) -> ItemTableOptions.Grouping {
-        if viewMode == .board { return boardGrouping(in: library) ?? .none }
-        if let dated = datedList {
+    func shownGrouping(in library: any ItemLibrary, layout: ItemViewMode? = nil) -> ItemTableOptions.Grouping {
+        let layout = layout ?? viewMode
+        if layout == .board { return boardGrouping(in: library) ?? .none }
+        if let dated = datedList(for: layout) {
             guard dated.hasSections, let column = dated.sort.first?.column else { return .none }
             return .column(column.id, by: .bucket(.day))
         }
         let content = tableContent(in: library)
         switch tableOptions[shown]?.grouping ?? .automatic {
         // A place's own grouping by status is the table's; an arranged list or gallery groups only as asked.
-        case .automatic: return viewMode == .table ? content.grouping.map { .column($0.id, by: .statusGroups) } ?? .none : .none
+        case .automatic: return layout == .table ? content.grouping.map { .column($0.id, by: .statusGroups) } ?? .none : .none
         case .none: return .none
         case .column(let id, let mode): return content.grouping?.id == id ? .column(id, by: mode) : .none
         }
@@ -45,7 +47,7 @@ extension Browser {
     /// The grouping a board makes its lanes of: the place's own where the board can show it, else the status or the
     /// first field offered (`GroupOffer.fallback`), which leaves the place's choice as it is for the layouts that can.
     func boardGrouping(in library: any ItemLibrary) -> ItemTableOptions.Grouping? {
-        let offer = groupOffer(in: library)
+        let offer = groupOffer(in: library, layout: .board)
         if let stored = tableOptions[shown]?.grouping, case .column = stored, offer.entry(for: stored) != nil {
             return stored
         }
@@ -55,9 +57,9 @@ extension Browser {
     /// Groups the open place as Group by's `grouping` says. A place's list or gallery that showed the starting order keeps
     /// the order it showed, now as the place's own. A saved view's sort stays as the view holds it, since a grouping is
     /// written alone and a sort the Mac cannot show (by source, say) must not be replaced.
-    func chooseGrouping(_ grouping: ItemTableOptions.Grouping) {
+    func chooseGrouping(_ grouping: ItemTableOptions.Grouping, layout: ItemViewMode? = nil) {
         var options = tableOptions[shown] ?? ItemTableOptions()
-        if shown.savedView == nil, let dated = datedList, options.sort == nil { options.sort = dated.sort }
+        if shown.savedView == nil, let dated = datedList(for: layout ?? viewMode), options.sort == nil { options.sort = dated.sort }
         options.group(by: grouping)
         tableOptions[shown] = options
     }
@@ -113,7 +115,7 @@ extension Browser {
     /// The groups of the open layout in order, hidden ones too, as the View panel's Group lists them: a board's lanes, else the
     /// groups of the list or table.
     func groupRows(in library: any ItemLibrary) -> [GroupRow] {
-        if viewMode == .board {
+        if viewPanelLayout == .board {
             return boardLanes(in: library)?.all.map { GroupRow(key: $0.groupKey, title: $0.title, count: $0.items.count, status: $0.symbol) } ?? []
         }
         let content = tableContent(in: library)
@@ -206,7 +208,7 @@ extension Browser {
     /// A board showing a grouping the place does not hold (`boardGrouping`'s fallback) takes it as the place's own before
     /// its lanes are ordered or hidden, so the order names the lanes it was made on.
     private func adoptBoardGrouping(in library: any ItemLibrary) {
-        guard viewMode == .board, let shown = boardGrouping(in: library), shown != tableOptions[self.shown]?.grouping else { return }
-        chooseGrouping(shown)
+        guard viewPanelLayout == .board, let shown = boardGrouping(in: library), shown != tableOptions[self.shown]?.grouping else { return }
+        chooseGrouping(shown, layout: .board)
     }
 }

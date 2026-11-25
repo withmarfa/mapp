@@ -165,7 +165,7 @@ struct ViewLayoutCommands: View {
     @ViewBuilder
     private func choice(_ title: LocalizedStringKey, _ mode: ItemViewMode, command: ShortcutCommand) -> some View {
         if modes.contains(mode) {
-            Toggle(title, systemImage: mode.symbol, isOn: Binding { browser?.viewMode == mode } set: { _ in browser?.viewMode = mode })
+            Toggle(title, systemImage: mode.symbol, isOn: Binding { browser?.viewPanelLayout == mode } set: { _ in browser?.chooseLayout(mode) })
                 .shortcut(command, shortcuts)
                 .accessibilityIdentifier("ViewAs\(mode.rawValue.capitalized)")
         }

@@ -853,10 +853,12 @@ struct ViewPanelTests {
         let before = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
         browser.openNewViewPanel(in: library)
         undo.beginUndoGrouping()
-        browser.viewMode = .gallery
+        browser.chooseLayout(.gallery)
         browser.changeDensity(.compact)
         Self.close(undo)
         #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id) == before, "the view's own settings stay")
+        #expect(browser.viewMode == .table)
+        #expect(browser.viewPanelLayout == .gallery)
         #expect(browser.density == .compact, "the window shows the draft's")
         Self.arrive(on: browser) { $0.layout = .board }
         browser.escapeViewPanel(in: library)
@@ -866,13 +868,14 @@ struct ViewPanelTests {
         Self.arrive(on: browser) { $0.layout = .table }
         browser.openNewViewPanel(in: library)
         undo.beginUndoGrouping()
-        browser.viewMode = .gallery
+        browser.chooseLayout(.gallery)
         browser.changeDensity(.compact)
         Self.close(undo)
         await browser.finishViewPanel(in: library, order: Self.order)
         let made = try #require(library.views.first { $0.id != Self.id })
         let settings = ViewLayouts.stored(in: browser.defaults).settings(for: made.id)
         #expect(settings?.layout == .gallery)
+        #expect(browser.viewMode == .gallery)
         #expect(settings?.density == .compact)
         let original = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
         #expect(original?.layout == .table)
@@ -895,7 +898,7 @@ struct ViewPanelTests {
         let (browser, library, undo) = Self.opened()
         browser.openNewViewPanel(in: library)
         undo.beginUndoGrouping()
-        browser.viewMode = .gallery
+        browser.chooseLayout(.gallery)
         browser.changeDensity(.compact)
         Self.close(undo)
         let sort = browser.tableOptions[browser.shown]?.sort
@@ -904,7 +907,8 @@ struct ViewPanelTests {
         changed.sort = [LibraryViewSort(field: "title", ascending: true)]
         library.views = [changed]
         browser.followView(in: library)
-        #expect(browser.viewMode == .gallery)
+        #expect(browser.viewMode == .table)
+        #expect(browser.viewPanelLayout == .gallery)
         #expect(browser.density == .compact)
         #expect(browser.tableOptions[browser.shown]?.sort == sort, "the draft's sort stays")
         await browser.finishViewPanel(in: library, order: Self.order)

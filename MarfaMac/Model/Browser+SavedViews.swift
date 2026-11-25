@@ -209,7 +209,11 @@ extension Browser {
     /// What the list or gallery shows while neither the person nor the view arranged it: the list's own order. Nil in
     /// every other layout, and once a sort or a column to group by orders it.
     var datedList: ViewDraft.Dated? {
-        guard !SavedViews.isArranged(self) else { return nil }
+        datedList(for: viewMode)
+    }
+
+    func datedList(for layout: ItemViewMode) -> ViewDraft.Dated? {
+        guard !SavedViews.isArranged(self, layout: layout) else { return nil }
         let arrangement = SavedViews.datedArrangement(storedOrder)
         return ViewDraft.Dated(sort: arrangement.sort, hasSections: arrangement.hasDateSections)
     }
@@ -392,6 +396,19 @@ extension Browser {
         return (before, after)
     }
 
+    /// A layout command changes the draft while one is open.
+    func chooseLayout(_ layout: ItemViewMode) {
+        guard let panel = viewPanel, let old = panel.draftLayout else {
+            viewMode = layout
+            return
+        }
+        guard old != layout else { return }
+        panel.draftLayout = layout
+        registerUndo(String(localized: "Change Layout")) { browser in
+            browser.chooseLayout(old)
+        }
+    }
+
     /// Takes the person's own change of layout, which is kept in the app's settings at once. Undo goes back to the layout
     /// the window showed.
     func recordLayout(from old: ItemViewMode) {
@@ -403,9 +420,8 @@ extension Browser {
             return
         }
         let layout = viewMode
-        let draft = newViewPanel(from: id)
-        guard let step = writeViewSettings(id, draft: draft, { $0.layout = layout }) else { return }
-        registerLayoutUndo(of: id, draft: draft, from: old, to: layout, stored: step)
+        guard let step = writeViewSettings(id, draft: nil, { $0.layout = layout }) else { return }
+        registerLayoutUndo(of: id, from: old, to: layout, stored: step)
     }
 
     /// A place that is not a view keeps its layout in its default view, and Undo puts the earlier one back.
@@ -418,17 +434,16 @@ extension Browser {
         }
     }
 
-    /// A step of the view's layout is undone in the view's settings; the window shows it unless a draft made from the
-    /// view is open, whose layout the window shows instead.
+    /// A step of the view's layout is undone in its settings. An open draft keeps the window's layout until it closes.
     private func registerLayoutUndo(
-        of id: ItemID, draft: ViewPanel?, from old: ItemViewMode, to new: ItemViewMode,
+        of id: ItemID, from old: ItemViewMode, to new: ItemViewMode,
         stored step: (before: ViewMacSettings, after: ViewMacSettings)
     ) {
-        registerUndo(String(localized: "Change Layout"), owner: draft ?? self) { browser in
+        registerUndo(String(localized: "Change Layout"), owner: self) { browser in
             guard browser.shown.isSame(.saved(id)) else { return }
-            if draft != nil || browser.newViewPanel(from: id) == nil { browser.set(layout: old) }
-            guard let back = browser.writeViewSettings(id, draft: draft, { $0.undo(step) }) else { return }
-            browser.registerLayoutUndo(of: id, draft: draft, from: new, to: old, stored: back)
+            if browser.newViewPanel(from: id) == nil { browser.set(layout: old) }
+            guard let back = browser.writeViewSettings(id, draft: nil, { $0.undo(step) }) else { return }
+            browser.registerLayoutUndo(of: id, from: new, to: old, stored: back)
         }
     }
 

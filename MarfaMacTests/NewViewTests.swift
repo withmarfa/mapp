@@ -408,34 +408,68 @@ struct NewViewTests {
         #expect(!library.notices.waiting.contains { $0.isNotKept })
     }
 
-    /// A starting point that changes the layout, as Recently Added's list does, makes the window's toolbar again, and
-    /// the popover under the View button it replaced closes. That is not the person's click outside: in every place,
-    /// each starting point it offers keeps the panel, its draft and the tile chosen. The button in view still ends it.
-    @Test func everyStartingPointKeepsThePanelThroughTheLayoutItSets() throws {
-        for place in [PlaceView.library, .feed, PlaceView(.type(Self.task))] {
+    @Test func anUntouchedRecentlyAddedDraftSurvivesReloadingPlaceDefaultsAndDismissesQuietly() {
+        let (browser, library) = Self.window(.library)
+        var stored = PlaceDefault()
+        stored.layout = .table
+        PlaceDefaults.update(in: browser.defaults) { $0.set(stored, for: .library) }
+        browser.openNewViewPanel(in: library)
+        #expect(browser.pickStart(.recentlyAdded, in: library, order: Self.order) == nil)
+        // The window's observer reloads the defaults when mounted.
+        browser.followPlaceDefault(in: library)
+        #expect(browser.tableOptions[.library]?.sort == NewViewStart.recentlyAdded.sort?.window)
+        #expect(browser.viewPanelLayout == .list)
+        #expect(!browser.keepsNewViewOpen)
+        browser.dismissViewPanel(in: library)
+        #expect(browser.viewPanel == nil)
+        #expect(browser.viewMode == .table)
+        #expect(library.notices.waiting.isEmpty)
+    }
+
+    @Test func eachStartingPointAppliesItsLayoutOnlyAfterCreateView() async throws {
+        let places: [(PlaceView, ItemViewMode)] = [(.library, .table), (.feed, .list), (PlaceView(.type(Self.task)), .gallery)]
+        func draftWindow(_ place: PlaceView, layout: ItemViewMode) -> (Browser, FakeItemLibrary) {
             let (browser, library) = Self.window(place)
+            let status = ItemTypeInfo.Field(key: "status", label: "Status", kind: .status([
+                StatusWord(value: "todo", group: .notStarted), StatusWord(value: "done", group: .completed),
+            ]), declaredBy: Self.task)
+            let due = ItemTypeInfo.Field(key: "due_at", label: "Due", kind: .date(includesTime: false), declaredBy: Self.task)
+            library.catalogue = MarfaMac.Catalogue(itemTypes: [
+                ItemTypeInfo(id: Self.task, label: "Task", fields: [status, due], titleField: "title", bodyField: "body", parent: nil),
+            ])
+            library.items[1].tier = .feed
+            browser.set(layout: layout)
+            browser.addSearchToken(FilterClause(field: FilterTarget.tags.id, op: .includes, values: ["tag"]))
             browser.openNewViewPanel(in: library)
-            let panel = try #require(browser.viewPanel)
+            return (browser, library)
+        }
+
+        for (place, layout) in places {
+            let (browser, library) = draftWindow(place, layout: layout)
             let starts = browser.newViewStarts(in: library)
-            #expect(starts.contains(.recentlyAdded))
-            // A tile for a view the person has, as the Library's Favorites, opens theirs instead.
+            #expect(Set(starts).isSuperset(of: [.search, .recentlyAdded, .calendar, .byStatus]))
+            // The Library's Favorites tile opens the existing view.
             for start in starts where browser.existingView(for: start, in: library) == nil {
-                let anchor = browser.viewMode
+                let (browser, library) = draftWindow(place, layout: layout)
+                let panel = try #require(browser.viewPanel)
+                let expected: ItemViewMode = switch start {
+                case .search, .favorites, .inTheFeed: layout
+                case .recentlyAdded, .inbox: .list
+                case .calendar: .calendar
+                case .byStatus: .board
+                case .byType, .bySource, .blank: .table
+                }
                 #expect(browser.pickStart(start, in: library, order: Self.order) == nil)
-                // Only a layout that changed replaced the button.
-                if browser.viewMode != anchor { browser.viewPanelPopoverClosed(anchoredIn: anchor, in: library) }
                 #expect(browser.viewPanel === panel, "\(place) \(start)")
                 #expect(panel.start == start, "\(place) \(start)")
-                #expect(panel.form?.isBusy == false, "\(place) \(start)")
-                #expect(!library.notices.waiting.contains { $0.isNotKept }, "\(place) \(start)")
+                #expect(browser.viewMode == layout, "\(place) \(start)")
+                #expect(browser.viewPanelLayout == expected, "\(place) \(start)")
+                #expect(!browser.keepsNewViewOpen, "\(place) \(start)")
+                let made = try #require(await browser.finishViewPanel(in: library, order: Self.order))
+                #expect(browser.viewPanel == nil, "\(place) \(start)")
+                #expect(browser.viewMode == expected, "\(place) \(start)")
+                #expect(ViewLayouts.stored(in: browser.defaults).settings(for: made.id)?.layout == expected, "\(place) \(start)")
             }
-            browser.chooseStart(.recentlyAdded, in: library)
-            #expect(browser.viewMode == .list)
-            #expect(browser.viewPanel === panel)
-            browser.viewPanelPopoverClosed(anchoredIn: browser.viewMode, in: library)
-            #expect(browser.viewPanel == nil)
-            #expect(!library.notices.waiting.contains { $0.isNotKept })
-            #expect(browser.viewMode == .table)
         }
     }
 
@@ -588,11 +622,15 @@ struct NewViewTests {
         let (browser, library) = Self.window()
         browser.openNewViewPanel(in: library)
         browser.chooseStart(.recentlyAdded, in: library)
-        browser.viewMode = .board
+        browser.chooseLayout(.board)
+        #expect(browser.viewMode == .table)
+        #expect(browser.viewPanelLayout == .board)
+        #expect(browser.keepsNewViewOpen)
         let window = SavedViews.window(browser, in: library, order: Self.order)
         let draft = try #require(ViewDraft.draft(window, catalogue: library.catalogue, views: []))
         let made = try #require(await browser.finishViewPanel(in: library, order: Self.order))
         #expect(made.sort == draft.sort)
+        #expect(browser.viewMode == .board)
     }
 
     @Test func aSortChosenAfterAStartingPointIsTheOneWritten() async throws {

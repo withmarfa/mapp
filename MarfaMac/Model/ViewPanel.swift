@@ -91,6 +91,8 @@ final class ViewPanel {
 
     /// The starting point the person chose, which the window shows.
     var start: NewViewStart?
+    /// The layout the new view will open in after Create View.
+    var draftLayout: ItemViewMode?
     /// Whether the new view is kept in the sidebar. Off until the person turns it on.
     var addsToSidebar = false
     /// The new view's Quick Actions on this Mac; nil follows the place.
@@ -169,6 +171,7 @@ final class ViewPanel {
         knownTitle = ""
         form = ViewTitleForm(library: library)
         self.snapshot = snapshot
+        draftLayout = snapshot.viewMode
         mac = snapshot.mac
         notices = library.notices
         Self.open.add(self)
@@ -193,6 +196,7 @@ final class ViewPanel {
         purpose = .new
         form = ViewTitleForm(library: library)
         self.snapshot = snapshot
+        draftLayout = snapshot.viewMode
         mac = snapshot.mac
         notices = library.notices
     }

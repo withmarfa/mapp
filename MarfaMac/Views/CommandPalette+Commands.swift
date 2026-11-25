@@ -19,7 +19,7 @@ extension CommandPalette {
             add(String(localized: "Search List"), "magnifyingglass", keys(.searchList), in: .edit) { browser.focusRequest = .search }
             let modes = browser.showsPlaceIndex ? [] : browser.availableViewModes(in: library)
             func addLayout(_ mode: ItemViewMode, _ title: String, _ systemImage: String, _ command: ShortcutCommand) {
-                if modes.contains(mode) { add(title, systemImage, keys(command), in: .view) { browser.viewMode = mode } }
+                if modes.contains(mode) { add(title, systemImage, keys(command), in: .view) { browser.chooseLayout(mode) } }
             }
             addLayout(.list, String(localized: "View as List"), "list.bullet", .viewAsList)
             addLayout(.gallery, String(localized: "View as Gallery"), "square.grid.2x2", .viewAsGallery)
