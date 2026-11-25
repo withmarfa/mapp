@@ -18,16 +18,11 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The two fixed zones | Search and New, then Library with its count and Feed with none. The Feed's symbol is `water.waves`. Search opens the Command Palette. | `SidebarGroups.swift`, `SidebarTypeRow.swift` | `Rethink-Sidebars`, `Rethink-Library` |
-| Under the pointer | A plus takes the place of the count on a type, a kind and a collection. Search and New show their shortcuts. A section's heading shows Add and More. Nothing in a row moves. | `SidebarTypeRow.swift`, `SidebarGroups.swift` | `Rethink-Sidebar-Pointer`, `Rethink-Sidebar-Sections` |
-| Pinned and Types | Pinned holds views, collections and items. Types list their kinds under them. A person's arrangement is read into the new sidebar: views they placed keep their sections, the rest go to Pinned, and an unknown group is ignored. | `SidebarLayout`, `SidebarGroups.swift` | `Rethink-Sidebars` |
-| Customize Sidebar | Dashed places (Tab, Command, a Library list, Pinned, Type, Section) each open a menu of what can go there. One tabs row shows while customizing. | `CustomizeSidebar.swift` | `Rethink-Customize-Sidebar`, `Rethink-Customize-Sidebar-Add` |
 | Sidebar closed | The title gets an arrow that opens the sidebar's rows as a menu. Back and Forward stay. The control after the count follows the title. | `SidebarToolbar.swift`, `MainView.swift` | `Rethink-Sidebar-Closed`, `Rethink-Sidebar-Closed-Menu` |
 | The top row | Title and count on one baseline, the Library or Feed control, the place's views, then the buttons. At rest the views have their own row; scrolled, they sit beside the title. Types, Collections and Sources fold into one menu first, then views into N More, then one pill. **The main risk:** prototype it in the system toolbar and in the content under a hidden title, and choose by folding, full screen, dragging, VoiceOver, text size and customizing. | `WindowToolbar.swift`, `ListToolbar.swift`, `IndexScrollAway.swift` | `Rethink-Library-Scrolled`, `Rethink-Top-Row-Columns`, `Rethink-Top-Row-Lists` |
 | Customize Toolbar goes | Its commands stay in the menus and the palette. | `WindowToolbarLayout` | `Rethink-Library` |
 | Smallest window | The window goes down to 760 by 520. The panel folds first, then the sidebar by itself under 900 wide, then the control, the views, and a table's columns from the last. | `MarfaMacApp.swift`, `MainView.swift` | `Rethink-Small-Window`, `Rethink-Panel-Sizes` |
 | The Marfa's panel | The foot opens a panel: the Marfa's name and count, its latest sources, and the Marfas the app has signed in to, with a tick and a plus on the heading. Switching signs out of nothing. Pages flush first, and changes that were not sent stay queued. | `SidebarFoot.swift`, `MarfaHost` | `Rethink-Marfa` |
-| Sidebar color | Gray or White, in Appearance, synced. | `Sidebar.swift`, `PreferencesMap` | `Rethink-Sidebars` |
 
 ## Library and its places
 

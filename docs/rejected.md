@@ -85,9 +85,9 @@ Search this page before you propose a look. Each line is a refused design, then 
 
 - **The Marfa's name at the top, an app mark beside it, or a green dot with "Up to date".** The line at the foot.
 - **An "Add a Marfa…" row in the Marfa's panel.** The plus on its heading.
-- **A tab bar with one tab, or a Customize button in the sidebar.** A Control-click.
+- **A tab bar with one tab outside Customize Sidebar, or a Customize button in the sidebar.** A Control-click.
 - **Customizing in Settings, a window or a panel.** The sidebar in place, handles trailing.
-- **Checkboxes or a Show More line while customizing.** A section's menu sets how many show.
+- **Checkboxes while customizing.** Faint dashed places, each a menu of what can go there.
 - **A view's mark as a round tile, or pins with indentation.** Its symbol.
 - **An In Sidebar column in Types.** The row's menu.
 

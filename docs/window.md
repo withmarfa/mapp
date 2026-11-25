@@ -25,13 +25,19 @@ paths:
 
 ## Sidebar
 
-- **A person arranges the sidebar in place** (`SidebarLayout`): tabs, sections, order, colors and what is hidden. A place the layout does not name, such as a new type, shows after the rest.
-- **A row whose thing is gone keeps its place in the layout**, so a thing that comes back, or is late in a sync, returns to where it was.
-- **A shortcut acts, or goes somewhere, and is not a place** (`SidebarShortcut`). Search and New are shortcuts.
-- **A row's menu is AppKit's** (`SidebarPlaceMenu`), because SwiftUI menus cannot hold the color swatches.
-- **Go lists the same places, views and types** (`GoMenu`), hidden types too, so a window without its sidebar reaches them.
-- **A sidebar row opens a place or one of its views.** A saved view opens at its home ([Two kinds of view](lists.md#two-kinds-of-view)).
-- **The Library and the Feed keep the keys earlier copies gave All Items and Inbox** (`all`, `inbox`), so an arranged sidebar reads unchanged. A Recents row reads as nothing and stays stored. A section of a kind this copy does not know is left out alone and written back where it was; with only those, the sidebar shows no sections.
+- **Search and New, the Library and the Feed, then Pinned, Types and the person's sections** (`SidebarLayout`). Only the Library has a count. Search opens the Command Palette.
+- **Pinned holds views, collections and items.** A saved view is pinned until the person takes it out.
+- **A type counts its items and its kinds'.** Types shows five, then "N More".
+- **Under the pointer** a type, a kind and a collection show a plus for the count, and a heading Add and More. Sections never fold.
+- **Customize Sidebar works in place,** with faint places that each open a menu of what can go there (`SidebarAddPlace`).
+- **A row whose thing is gone keeps its place**, so it returns there.
+- **Go lists the same places, views and types** (`GoMenu`).
+
+### A layout an earlier copy stored
+
+- **Nothing this copy cannot read is dropped:** it is written back as it was.
+- **An earlier Library or Views section is kept and drawn as nothing.** This copy adds `places` and `pinned` where they stood; Pinned takes the Views section's name and hidden state.
+- **What the person put under Library or Views is read under Pinned;** their own sections keep theirs. Hidden stays hidden; `views` in `hidden` hides every saved view.
 - **Recently Deleted is a page of Settings**, never a row.
 
 ## Toolbar
