@@ -57,7 +57,7 @@ struct ValueEditingTests {
         #expect(ValueEditKind(field: Self.labels) == .words(Self.labels))
         let done = ItemTypeInfo.Field(key: "done", label: "Done", kind: .boolean, declaredBy: Self.task)
         #expect(ValueEditKind(field: done) == .yesNo(done))
-        #expect([ValueEditKind.tags, .parent, .text(Self.note)].map(\.rowID) == [PagePlacement.tags, PagePlacement.parent, "note"])
+        #expect([ValueEditKind.tags, .relation(PagePlacement.parent), .text(Self.note)].map(\.rowID) == [PagePlacement.tags, PagePlacement.parent, "note"])
     }
 
     // MARK: Typed values
@@ -131,29 +131,75 @@ struct ValueEditingTests {
         #expect(model.query.isEmpty)
     }
 
-    @Test func aParentTheLibraryRefusesStaysOpenWithTheReason() async {
-        let (child, other) = (Self.item(), Self.item(id: "10000000-0000-0000-0000-000000000002"))
-        let library = Self.library([child, other])
-        library.refusals[child.id] = [other.id: "That would make a loop."]
-        library.acceptsRelationships = true
-        let model = ValueEditModel(Self.request(.parent, item: child, in: library))
-        var closed = false
-        model.close = { closed = true }
-        model.activate("parent:" + other.id.rawValue)
-        while model.isSaving { await Task.yield() }
-        #expect(!closed && model.notice == "That would make a loop." && library.relationshipWrites.isEmpty)
+    // MARK: Links
+
+    private static let parentField = RelationField(
+        field: "child-of", label: "Parent", cardinality: .one, allowedTypes: [], targets: [], editability: .editable)
+    private static let aboutField = RelationField(
+        field: "about", label: "About", cardinality: .many, allowedTypes: [], targets: [], editability: .editable)
+
+    /// A panel for `field` over an item that holds no link yet, with one other item to link.
+    private func linkPanel(_ field: RelationField) -> (model: ValueEditModel, library: FakeItemLibrary, item: Item, other: Item) {
+        let (item, other) = (Self.item(), Self.item(id: "10000000-0000-0000-0000-000000000002"))
+        let library = Self.library([item, other])
+        library.relationFieldsByItem[item.id] = [field]
+        library.candidatesByItem[item.id] = [other]
+        let model = ValueEditModel(Self.request(.relation(field.field), item: item, in: library))
+        return (model, library, item, other)
     }
 
-    @Test func aParentTheLibraryTakesClosesThePanel() async {
-        let (child, other) = (Self.item(), Self.item(id: "10000000-0000-0000-0000-000000000002"))
-        let library = Self.library([child, other])
-        library.acceptsRelationships = true
-        let model = ValueEditModel(Self.request(.parent, item: child, in: library))
+    @Test func aLinkTheLibraryRefusesStaysOpenWithTheReasonAndKeepsWhatWasTyped() async {
+        let (model, library, item, other) = linkPanel(Self.parentField)
+        library.refusals[item.id] = [other.id: "That would make a loop."]
         var closed = false
         model.close = { closed = true }
-        model.activate("parent:" + other.id.rawValue)
+        model.query = other.displayTitle
+        model.activate(ValueEditModel.linkPrefix + other.id.rawValue)
         while model.isSaving { await Task.yield() }
-        #expect(closed && library.relationshipWrites.map(\.adding) == [[other.id]])
+        #expect(!closed && model.notice == "That would make a loop.")
+        #expect(model.query == other.displayTitle, "a refusal loses nothing typed")
+    }
+
+    @Test func aCopyNotYetWholeSaysSoAndChangesNothing() async {
+        let (model, library, _, other) = linkPanel(Self.aboutField)
+        library.linkAnswer = .incomplete
+        model.activate(ValueEditModel.linkPrefix + other.id.rawValue)
+        while model.isSaving { await Task.yield() }
+        #expect(model.notice == EdgeVerdict.incomplete.reason)
+    }
+
+    @Test func aLinkTheLibraryTakesClosesAPanelOfOneLinkAndReplacesWhatItHeld() async {
+        let (model, library, item, other) = linkPanel(Self.parentField)
+        library.acceptsRelationships = true
+        var closed = false
+        model.close = { closed = true }
+        model.activate(ValueEditModel.linkPrefix + other.id.rawValue)
+        while model.isSaving { await Task.yield() }
+        #expect(closed)
+        #expect(library.relationshipWrites.count == 1, "one commit is one call, so one undo step")
+        #expect(library.relationshipWrites.first?.item == item.id && library.relationshipWrites.first?.adding == [other.id])
+    }
+
+    @Test func aLinkTheLibraryTakesLeavesAPanelOfManyOpenAndNamesOnlyWhatChanged() async {
+        let (model, library, _, other) = linkPanel(Self.aboutField)
+        library.acceptsRelationships = true
+        var closed = false
+        model.close = { closed = true }
+        model.query = "oth"
+        model.activate(ValueEditModel.linkPrefix + other.id.rawValue)
+        while model.isSaving { await Task.yield() }
+        #expect(!closed && model.query.isEmpty)
+        #expect(library.relationshipWrites.map(\.adding) == [[other.id]] && library.relationshipWrites.map(\.removing) == [[]])
+    }
+
+    @Test func aPanelForAFieldTheItemCannotChangeTakesNoLink() async {
+        let locked = RelationField(
+            field: "references", label: "References", cardinality: .many, allowedTypes: [], targets: [], editability: .readOnly("In the text."))
+        let (model, library, _, other) = linkPanel(locked)
+        library.acceptsRelationships = true
+        #expect(!model.isEditable)
+        model.activate(ValueEditModel.linkPrefix + other.id.rawValue)
+        #expect(library.relationshipWrites.isEmpty)
     }
 
     // MARK: Lists written quickly

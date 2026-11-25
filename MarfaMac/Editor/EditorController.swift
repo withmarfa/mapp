@@ -80,7 +80,7 @@ final class EditorController: NSObject {
     @ObservationIgnored var menuRow: (item: ItemID, row: String)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
-    /// A link in the page names this item, which the window opens as choosing it in the list does.
+    /// A window that shows an item beside the list reveals it as choosing it in the list does.
     @ObservationIgnored var onOpenItem: (ItemID) -> Void = { _ in }
     /// A link in the item's text names this item. A window that opens items as Settings > General > Open Items says
     /// sets this; without it the link opens as any other (`onOpenItem`).

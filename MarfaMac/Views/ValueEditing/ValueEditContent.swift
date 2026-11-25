@@ -7,8 +7,15 @@ struct ValueEditContent: View {
     @Environment(\.interfaceTextSize) private var textSize
     @FocusState private var fieldFocused: Bool
     @FocusState private var timeFocused: Bool
+    /// The height the chips and the field want, which the field is held to until eight lines of chips.
+    @State private var chipsHeight: CGFloat = 0
 
     private var scale: CGFloat { InterfaceStyle.scale(for: textSize) }
+
+    /// Eight lines of chips with the field's own padding.
+    private var chipsLimit: CGFloat {
+        (CGFloat(ValueEditMetrics.chipLines) * (ValueEditMetrics.fieldLine + 5) + 7) * scale
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -32,20 +39,26 @@ struct ValueEditContent: View {
 
     @ViewBuilder private var searchArea: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ChipFieldLayout(spacing: 5 * scale, lineHeight: ValueEditMetrics.fieldLine * scale, queryFloor: (model.query.isEmpty ? 16 : 48) * scale) {
-                ForEach(model.chips) { chip in
-                    ValueChipView(chip: chip, scale: scale) { model.remove(chip) }
+            // Past eight lines of chips the field scrolls, so the list under it keeps its room.
+            ScrollView {
+                ChipFieldLayout(spacing: 5 * scale, lineHeight: ValueEditMetrics.fieldLine * scale, queryFloor: (model.query.isEmpty ? 16 : 48) * scale) {
+                    ForEach(model.chips) { chip in
+                        ValueChipView(chip: chip, scale: scale) { model.remove(chip) }
+                    }
+                    TextField(model.chips.isEmpty ? model.searchPrompt : "", text: Bindable(model).query)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: ValueEditMetrics.textSize * scale))
+                        .focused($fieldFocused)
+                        .accessibilityLabel(model.searchPrompt)
+                        .accessibilityIdentifier("ValueEditSearch")
                 }
-                TextField(model.chips.isEmpty ? model.searchPrompt : "", text: Bindable(model).query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: ValueEditMetrics.textSize * scale))
-                    .focused($fieldFocused)
-                    .accessibilityLabel(model.searchPrompt)
-                    .accessibilityIdentifier("ValueEditSearch")
+                .padding(.horizontal, 7 * scale)
+                .padding(.top, 4 * scale)
+                .padding(.bottom, 3 * scale)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { chipsHeight = $0 }
             }
-            .padding(.horizontal, 7 * scale)
-            .padding(.top, 4 * scale)
-            .padding(.bottom, 3 * scale)
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: min(max(chipsHeight, (ValueEditMetrics.fieldLine + 7) * scale), chipsLimit))
             Divider()
         }
         .padding(.bottom, 4 * scale)

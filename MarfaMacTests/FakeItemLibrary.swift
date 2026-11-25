@@ -273,9 +273,13 @@ final class FakeItemLibrary: ItemLibrary {
     var relationFieldsByItem: [ItemID: [RelationField]] = [:]
     func relationFields(of id: ItemID) -> [RelationField] { relationFieldsByItem[id] ?? [] }
     func childIDs(of id: ItemID) -> [ItemID] { items.filter { $0.parentID == id }.map(\.id) }
-    func relationshipCandidates(for id: ItemID, field: String) -> [Item] { [] }
+    /// What `relationshipCandidates(for:field:)` answers, by item.
+    var candidatesByItem: [ItemID: [Item]] = [:]
+    func relationshipCandidates(for id: ItemID, field: String) -> [Item] { candidatesByItem[id] ?? [] }
     /// The refusal for each (item, other) a test sets; any other link is taken.
     var refusals: [ItemID: [ItemID: String]] = [:]
+    /// What `changeLinks` answers whatever it is asked, where a test sets one.
+    var linkAnswer: EdgeVerdict?
     /// The refusal for a new item filed under each parent a test sets.
     var childRefusals: [ItemID: String] = [:]
     /// Waits before `newChildVerdict` answers, as the core's check does for a moment.
@@ -491,6 +495,8 @@ final class FakeItemLibrary: ItemLibrary {
     func tookPropertyWrite(_ mark: Int) -> Bool { false }
     func changeLinks(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> EdgeVerdict {
         relationshipWrites.append((id, field, adding, removing))
+        if let answer = linkAnswer { return answer }
+        if let reason = adding.lazy.compactMap({ self.refusals[id]?[$0] }).first { return .refused(reason) }
         return acceptsRelationships ? .taken : .refused("Refused.")
     }
 

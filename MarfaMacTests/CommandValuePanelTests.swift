@@ -29,10 +29,10 @@ struct CommandValuePanelTests {
 
     @Test func choosingACollectionFilesEveryItemThePanelIsForAndKeepsThePanelOpen() {
         let world = world()
-        let model = model(.collections, over: [world.first.id, world.second.id], in: world.library)
+        let model = model(.relation(MarfaMapping.collectionEdge), over: [world.first.id, world.second.id], in: world.library)
         var closed = false
         model.close = { closed = true }
-        model.activate(ValueEditModel.collectionPrefix + world.reading.id.rawValue)
+        model.activate(ValueEditModel.linkPrefix + world.reading.id.rawValue)
         #expect(world.library.item(world.first.id)?.collectionIDs == [world.reading.id])
         #expect(world.library.item(world.second.id)?.collectionIDs == [world.reading.id])
         #expect(!closed, "the person may add the item to another collection")
@@ -43,10 +43,10 @@ struct CommandValuePanelTests {
     @Test func aCollectionOnlySomeOfTheItemsAreInIsNotShownAsHeldAndCanBeChosenForTheRest() {
         let world = world()
         #expect(world.library.addToCollection([world.first.id], world.reading.id, undoManager: nil))
-        let model = model(.collections, over: [world.first.id, world.second.id], in: world.library)
+        let model = model(.relation(MarfaMapping.collectionEdge), over: [world.first.id, world.second.id], in: world.library)
         #expect(model.chips.isEmpty)
         #expect(model.rows.map(\.title) == ["Reading", "Work"])
-        model.activate(ValueEditModel.collectionPrefix + world.reading.id.rawValue)
+        model.activate(ValueEditModel.linkPrefix + world.reading.id.rawValue)
         #expect(world.library.item(world.second.id)?.collectionIDs == [world.reading.id])
         #expect(model.chips.map(\.title) == ["Reading"])
     }
@@ -55,7 +55,7 @@ struct CommandValuePanelTests {
         let world = world()
         try #require(world.library.addToCollection([world.first.id], world.reading.id, undoManager: nil))
         try #require(world.library.addToCollection([world.first.id], world.work.id, undoManager: nil))
-        let model = model(.collections, over: [world.first.id], in: world.library)
+        let model = model(.relation(MarfaMapping.collectionEdge), over: [world.first.id], in: world.library)
         let chip = try #require(model.chips.first { $0.title == "Reading" })
         model.remove(chip)
         #expect(world.library.item(world.first.id)?.collectionIDs == [world.work.id])
@@ -63,15 +63,10 @@ struct CommandValuePanelTests {
 
     @Test func aPanelForItemsNoneCanJoinIsNotEditableAndSavesNothing() {
         let world = world()
-        let model = model(.collections, over: [world.reading.id], in: world.library)
+        let model = model(.relation(MarfaMapping.collectionEdge), over: [world.reading.id], in: world.library)
         #expect(!model.isEditable, "a collection is no member of a collection here")
-        model.activate(ValueEditModel.collectionPrefix + world.work.id.rawValue)
+        model.activate(ValueEditModel.linkPrefix + world.work.id.rawValue)
         #expect(world.library.item(world.reading.id)?.collectionIDs.isEmpty == true)
-    }
-
-    @Test func theCollectionRowIsTheMembershipEdge() {
-        #expect(ValueEditKind.collections.rowID == MarfaMapping.collectionEdge)
-        #expect(!ValueEditKind.collections.closesOnChoice)
     }
 
     // MARK: Tags

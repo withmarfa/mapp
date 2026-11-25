@@ -9,7 +9,7 @@ import Marfa
 /// panel shows and takes the last day itself, as a person says it ("Sat 28 to Sun 29 Nov").
 nonisolated struct EventTime: Hashable, Sendable {
     /// The row's identifier on the page, which stands for the whole of the event's time.
-    static let rowID = "when"
+    static let rowID = PagePlacement.when
     /// The fields an event keeps beside its start and end, which a type may or may not declare.
     static let allDayKey = "all_day"
     static let zoneKey = "timezone"
