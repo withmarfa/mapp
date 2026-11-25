@@ -30,16 +30,8 @@ struct SidebarFoot: View {
             openPanel: host == nil ? nil : { showsPanel.toggle() },
             openProblems: { browser.showSettings(.connection) },
             openSettings: { browser.showSettings() })
-        // A popover centres on what it hangs from, so it hangs from an empty area as wide as the panel that starts where
-        // the row does: the panel's leading edge lines up with the row's, as the board draws it, inside the window.
-        .overlay(alignment: .topLeading) {
-            Color.clear
-                .frame(width: MarfaPanel.width, height: 56)
-                .allowsHitTesting(false)
-                .popover(isPresented: $showsPanel, arrowEdge: .top) {
-                    if let host { panel(name, host: host) }
-                }
-                .padding(.leading, 10)
+        .popover(isPresented: $showsPanel, arrowEdge: .top) {
+            if let host { panel(name, host: host) }
         }
     }
 
