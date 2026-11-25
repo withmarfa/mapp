@@ -55,12 +55,11 @@ extension Browser {
     func newViewStarts(in library: any ItemLibrary) -> [NewViewStart] {
         guard let snapshot = viewPanel?.snapshot, snapshot.place.view == .own else { return [] }
         let place = snapshot.place.place
-        let content = tableContent(in: library)
         var starts: [NewViewStart] = []
         if !searchTokenFilters(in: library).isEmpty { starts.append(.search) }
         starts += [.recentlyAdded, .favorites]
         if availableViewModes(in: library).contains(.calendar) { starts.append(.calendar) }
-        if content.grouping != nil { starts.append(.byStatus) }
+        if statusColumn(in: library) != nil { starts.append(.byStatus) }
         switch place {
         case .type: break
         case .feed: starts.append(.bySource)
@@ -70,6 +69,11 @@ extension Browser {
         if place == .feed { starts.append(.inbox) }
         starts.append(.blank)
         return starts
+    }
+
+    /// The status field the place's types share, which By Status groups by.
+    private func statusColumn(in library: any ItemLibrary) -> ItemTableColumn? {
+        tableContent(in: library).columns.first { $0.groups(by: .statusGroups) }
     }
 
     /// The view the person already has for `start` in the place, which its tile opens instead of making another.
@@ -114,7 +118,7 @@ extension Browser {
             layout = .calendar
         case .byStatus:
             layout = .board
-            if let status = tableContent(in: library).grouping { options.group(by: .column(status.id, by: .statusGroups)) }
+            if let status = statusColumn(in: library) { options.group(by: .column(status.id, by: .statusGroups)) }
         case .byType:
             layout = .table
             options.group(by: .column(ItemTableColumn.type.id))
