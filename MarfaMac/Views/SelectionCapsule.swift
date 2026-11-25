@@ -290,12 +290,14 @@ extension View {
 }
 
 /// ⌘⌫ deletes the chosen items, as it does in the list, and the system's Delete command too, in a layout that has no
-/// handler for it. Several items ask first, as the capsule's Delete does.
+/// handler for it. Several items ask first, as the capsule's Delete does. A choice outlives what a layout shows, as when
+/// the calendar moves to another week, so a key deletes only the chosen items `shown` names.
 private struct DeletesChosen: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     let browser: Browser
+    let shown: () -> Set<ItemID>
 
     func body(content: Content) -> some View {
         content
@@ -312,11 +314,15 @@ private struct DeletesChosen: ViewModifier {
     }
 
     private func deleteChosen() {
-        guard !browser.selection.isEmpty else { return }
-        library.deleteAfterSaving(browser.selection, undoManager: undoManager, asking: details)
+        let ids = browser.selection.intersection(shown())
+        guard !ids.isEmpty else { return }
+        library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
     }
 }
 
 extension View {
-    func deletesChosen(_ browser: Browser) -> some View { modifier(DeletesChosen(browser: browser)) }
+    /// `shown` is read when a key is pressed, never while the layout draws.
+    func deletesChosen(_ browser: Browser, shown: @escaping () -> Set<ItemID>) -> some View {
+        modifier(DeletesChosen(browser: browser, shown: shown))
+    }
 }

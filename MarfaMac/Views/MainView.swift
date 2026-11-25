@@ -504,7 +504,7 @@ struct MainView: View {
         let arguments = ProcessInfo.processInfo.arguments
         guard SampleLibrary.isRequested, let flag = arguments.firstIndex(of: "-MarfaMacSelectCount"),
               arguments.indices.contains(flag + 1) else { return nil }
-        return Int(arguments[flag + 1])
+        return Int(arguments[flag + 1]).flatMap { $0 >= 0 ? $0 : nil }
     }
 
     private var launchSelection: ItemID? {
@@ -549,6 +549,7 @@ private struct SelectionSummaryKeeper: View {
         Color.clear
             .onChange(of: browser.selection, initial: true) { summary.update(browser.selection, in: library) }
             .onChange(of: library.membershipRevision) { summary.update(browser.selection, in: library) }
+            .onChange(of: library.contentRevision) { summary.refreshTop(browser.selection, in: library) }
             .onChange(of: library.isLoaded) { summary.update(browser.selection, in: library) }
     }
 }

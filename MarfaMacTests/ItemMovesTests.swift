@@ -214,9 +214,9 @@ import Testing
         let (library, source) = try await loaded()
         // Chosen: two live items, one in the bin, and one a sync has since removed.
         let facts = SelectionFacts.make([F.n1, F.n2, F.n3, ItemID("removed")], in: library)
-        #expect(facts.ids == [F.n1, F.n2, F.n3], "an item the library no longer holds is not acted on")
+        #expect(facts.ids == [F.n1, F.n2, F.n3, ItemID("removed")], "the commands get the whole choice, as a menu's do")
         #expect(facts.moves == [.keep, .moveToFeed, .archive])
-        #expect(facts.title == "3 Notes")
+        #expect(facts.title == "4 Items")
 
         var outcome: CommandOutcome?
         library.perform(.archive, on: facts.ids, undoManager: Self.manager(), details: nil) { outcome = $0 }
@@ -224,7 +224,24 @@ import Testing
         for write in source.submitted { source.send(.taken(write.id)) }
         var skips = BatchSkips()
         skips.skip(.inBin)
-        #expect(await eventually { outcome == CommandOutcome(changed: 2, onlyItem: nil, skips: skips) }, "the item in the bin is counted, not passed over")
+        skips.skip(.gone)
+        #expect(await eventually { outcome == CommandOutcome(changed: 2, onlyItem: nil, skips: skips) }, "the item in the bin and the removed one are counted, not passed over")
+    }
+
+    @Test func theTopCardOfThePileFollowsTheItemEditedLast() async throws {
+        let (library, source) = try await loaded()
+        let summary = SelectionSummary()
+        let choice: Set<ItemID> = [F.n1, F.n2]
+        summary.update(choice, in: library)
+        let first = try #require(summary.facts.topID)
+        let other = first == F.n1 ? F.n2 : F.n1
+        var edited = try #require(library.item(other))
+        edited.modified = try #require(library.item(first)).modified.addingTimeInterval(60)
+        source.send(.upserted([edited]))
+        try #require(await eventually { library.item(other)?.modified == edited.modified })
+        summary.refreshTop(choice, in: library)
+        #expect(summary.facts.topID == other, "an edit to a chosen item puts it on top without choosing again")
+        #expect(summary.facts.moves == SelectionFacts.make(choice, in: library).moves)
     }
 
     @Test func aMenuListsTheTierMovesThenArchiveAndUnarchiveOnlyWhereNothingCanBeArchived() async throws {

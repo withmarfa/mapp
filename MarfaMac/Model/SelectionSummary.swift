@@ -4,7 +4,7 @@ import Observation
 /// What the capsule and the pile say about the items chosen: which commands apply and how to name the choice. It is
 /// worked out once for each change of the choice or of the items, never for each frame or for each button.
 struct SelectionFacts: Equatable {
-    /// The chosen items the library still holds, so a command never reaches one a sync has removed.
+    /// The whole choice, as a menu's command gets it: an item a sync has removed is counted by the command as gone.
     var ids: Set<ItemID> = []
     /// The moves that would change at least one chosen item (`ItemLibrary.selectionCommands`).
     var moves: Set<ItemMove> = []
@@ -34,7 +34,7 @@ struct SelectionFacts: Equatable {
         for id in selection {
             if let item = library.item(id) { held.append(item) }
         }
-        facts.ids = Set(held.map(\.id))
+        facts.ids = selection
         guard !held.isEmpty else { return facts }
         facts.moves = library.selectionCommands(facts.ids)
         facts.isAllInBin = held.allSatisfy { $0.state == .trashed }
@@ -45,14 +45,24 @@ struct SelectionFacts: Equatable {
         let starred = held.filter { $0.state != .trashed && $0.obstacle(to: .favorite) == nil }
         facts.canFavorite = !starred.isEmpty
         facts.allFavorites = !starred.isEmpty && starred.allSatisfy(\.isFavorite)
-        if let first = held.first, held.allSatisfy({ $0.type == first.type }) {
+        if held.count == selection.count, let first = held.first, held.allSatisfy({ $0.type == first.type }) {
             let plural = library.catalogue.plural(for: first.type)
-            facts.title = String(localized: "\(held.count) \(plural)")
+            facts.title = String(localized: "\(selection.count) \(plural)")
         } else {
-            facts.title = String(localized: "\(held.count) Items")
+            facts.title = String(localized: "\(selection.count) Items")
         }
-        facts.topID = held.max { ($0.modified, $0.id.rawValue) < ($1.modified, $1.id.rawValue) }?.id
+        facts.topID = Self.edited(lastOf: held)
         return facts
+    }
+
+    private static func edited(lastOf items: [Item]) -> ItemID? {
+        items.max { ($0.modified, $0.id.rawValue) < ($1.modified, $1.id.rawValue) }?.id
+    }
+
+    /// The item edited last among `selection`, which an edit changes without changing any command.
+    @MainActor
+    static func topID(of selection: Set<ItemID>, in library: any ItemLibrary) -> ItemID? {
+        edited(lastOf: selection.compactMap(library.item))
     }
 }
 
@@ -66,5 +76,13 @@ final class SelectionSummary {
     func update(_ selection: Set<ItemID>, in library: any ItemLibrary) {
         let new = selection.count > 1 ? SelectionFacts.make(selection, in: library) : SelectionFacts()
         if new != facts { facts = new }
+    }
+
+    /// Takes the pile's top card from the item edited last, after an item changed. Only a title or text edit moves it,
+    /// and no command depends on that, so the rest of the facts stand. One pass over the choice for each change.
+    func refreshTop(_ selection: Set<ItemID>, in library: any ItemLibrary) {
+        guard facts.count > 1, selection == facts.ids else { return }
+        let top = SelectionFacts.topID(of: selection, in: library)
+        if top != facts.topID { facts.topID = top }
     }
 }

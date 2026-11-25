@@ -27,6 +27,7 @@ struct ItemCalendar: View {
         let visible = scale == .week
             ? DateInterval(start: firstShown, end: calendar.date(byAdding: .day, value: 7, to: firstShown) ?? firstShown)
             : CalendarLayout.interval(of: scale, containing: anchor, calendar: calendar)
+        let drawn = CalendarLayout.drawn(scale, firstShown: firstShown, anchor: anchor, calendar: calendar)
 
         Group {
             switch scale {
@@ -65,7 +66,7 @@ struct ItemCalendar: View {
             keyboard.day = nil
             return .handled
         }
-        .deletesChosen(browser)
+        .deletesChosen(browser) { CalendarLayout.ids(in: placed.entries, within: drawn) }
         .searchStatus(browser)
         .overlay {
             if items.isEmpty {
