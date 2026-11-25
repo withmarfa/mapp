@@ -322,14 +322,15 @@ nonisolated extension SidebarLayout {
         groups?.append(moved)
     }
 
-    /// Names a section; an empty name returns it to the kind's own.
+    /// Names a section; an empty name returns it to the kind's own. The name it already shows changes nothing.
     mutating func renameGroup(_ id: String, to name: String) {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let title = name.isEmpty ? nil : name
-        guard let index = allGroups.firstIndex(where: { $0.id == id }), allGroups[index].hasHeading,
-              allGroups[index].title != title else { return }
+        guard let index = allGroups.firstIndex(where: { $0.id == id }), allGroups[index].hasHeading else { return }
+        var renamed = allGroups[index]
+        renamed.title = name.isEmpty ? nil : name
+        guard renamed.name != allGroups[index].name else { return }
         materialize()
-        groups?[index].title = title
+        groups?[index].title = renamed.title
     }
 
     /// Hides a built-in section, which the Section place brings back, or takes a person's own away, with where its
@@ -409,8 +410,7 @@ nonisolated extension SidebarLayout {
         if let put = homes?[place.key] {
             if allGroups.contains(where: { $0.id == put && $0.holds(place) }) { return put }
             if place.isPinnable { return firstGroup(.pinned) }
-            // An earlier Library section held its pages by default, which this copy no longer draws.
-            if !earlierGroupIDs.contains(put), SidebarPlace.pages.contains(place) { return firstGroup(.places) }
+            if SidebarPlace.pages.contains(place) { return firstGroup(.places) }
         }
         switch place {
         case .library, .feed: return firstGroup(.places)

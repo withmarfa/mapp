@@ -36,18 +36,19 @@ paths:
 
 - **An earlier Library or Views section is kept, drawn as nothing;** `places` and `pinned` stand there instead.
 - **What was put under them is pinned; what a hidden one held stays hidden, row by row.** `views` in `hidden` hides every saved view; one shown again goes in `shown`. The Library and the Feed are fixed, whatever was stored.
-- **A row whose section is gone shows under Pinned,** its stored home kept.
+- **A row whose section is gone shows under Pinned, a page under the Library;** its home is kept.
+- **The later arrangement wins whole,** also when two Macs change what is hidden before syncing.
 - **Accepted:** an older copy draws it its own way, and its Views edits miss Pinned, until Sparkle updates it.
 - **Recently Deleted is a page of Settings**, never a row.
 
 ## Toolbar
 
 - **The top row is drawn in the content under a hidden title;** a plain `toolbar` holds the buttons.
-  - It folds by the room it has. In the toolbar it needs a measured width, and an error, larger text or a closed sidebar sends everything to the overflow menu.
+  - It folds by the room it has. In the toolbar it needs a measured width; an error, larger text or a closed sidebar sends all to overflow.
   - It keeps one line with the sidebar closed or larger text, and VoiceOver reads it in order.
 - **An on button is gray, never the accent.**
 - **An item that cannot act dims**, so the row keeps its shape.
-- **Trap:** the row needs its own drag gesture and double click to move and zoom the window, and the window must hide its title, which returns in full screen.
+- **Trap:** the row needs its own drag and double click to move and zoom the window, and the title stays hidden but in full screen.
 
 ## Corner
 
@@ -58,7 +59,7 @@ paths:
 ## Menus and palettes
 
 - **Every menu of items is one menu** (`ItemRowMenu`), in every layout.
-- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`). Search Items is the same panel searching titles and text. Palette Actions lists what can be done with the chosen row.
+- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`). Search Items is that panel searching text. Palette Actions lists what can be done with the chosen row.
 - **Trap:** Actions grows out of the palette's bar with an ordinary transition, because a Liquid Glass morph hung the app.
 - **A command that takes the keyboard says so** (`takesFocus`), so the palette does not give it back to the page first.
 
@@ -66,16 +67,16 @@ paths:
 
 - **Open, Return, a double click and a link follow Open Items** (`ItemOpening`), and the menu offers the other ways.
 - **A modal and a full page show one item.** New Window takes several and asks first above a limit (`ItemWindows`).
-- **The modal hosts the same page with the window's one editor** (`ItemModal`), so two editors never write one item. The page beside the list steps aside.
-- **Escape, Close and a click outside save and close the modal.** Up and down follow the list behind it (`ListNeighbors`), and a link followed in it stays in it.
+- **The modal hosts the page with the window's one editor** (`ItemModal`), so two never write one item; the page beside the list steps aside.
+- **Escape, Close and a click outside save and close the modal.** Up and down follow the list behind (`ListNeighbors`); a link followed stays in it.
 - **A full page's Back returns to the layout**, and the list's view options are not offered over it.
 
 ## Item links
 
 - **An item's app link is `marfa://`, its Marfa's id, then its own,** both exact and lowercase (`ItemAppLink`). Any other form is refused.
-- **A link only opens.** It never writes, signs in, changes a setting or calls the server, because any app or web page can send one.
+- **A link only opens,** never writes, signs in, changes a setting or calls the server: any app or page can send one.
 - **It opens only when** the Marfa it names is the connected one, the copy holds the item, and the item is not in Recently Deleted. Otherwise the person is told why (`ItemLinkRoute`).
 - **It opens in the main window last in front** (`ItemLinkOpener`), as a full page where Open Items says so and over the list otherwise. With no window open, one is opened.
-- **The newest link wins** over one that waits for the library or a window. The link is decided again when a window takes it.
+- **The newest link wins** over one waiting for the library or a window, and is decided again when a window takes it.
 - **Copy Link copies the server's `https` address**, and the `marfa://` one where the server gives none. Copy Wiki Link copies the text form.
 - **Trap:** a Debug test build registers another scheme (`ITEM_LINK_SCHEME`), so it never takes the installed app's links.

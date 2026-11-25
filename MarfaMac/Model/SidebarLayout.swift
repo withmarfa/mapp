@@ -155,10 +155,8 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     /// The sections this copy cannot read, such as a kind a later copy added, by their position among all the sections,
     /// written back there so that copy keeps them.
     private var laterGroups: [Int: JSONValue] = [:]
-    /// The identifiers of the Library and Views sections an earlier copy made, which this copy keeps as written and
-    /// reads only to know where the person put a place (`home(of:)`).
-    private(set) var earlierGroupIDs: Set<String> = []
-    /// Those of them the person had hidden: what they held stays hidden (`isHidden`).
+    /// The Library and Views sections an earlier copy made and the person had hidden, which this copy keeps as written:
+    /// what they held stays hidden (`isHidden`).
     private var hiddenEarlierGroupIDs: Set<String> = []
     /// The earlier Views section, which held every saved view not put in another section.
     private var earlierViewsID: String?
@@ -174,7 +172,7 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         laterMembers = try SidebarLaterMembers(from: decoder, known: CodingKeys.allCases.map(\.rawValue))
         hidden = try values.decodeIfPresent(Set<String>.self, forKey: .hidden) ?? []
-        shown = try values.decodeIfPresent(Set<String>.self, forKey: .shown) ?? []
+        shown = (try values.decodeIfPresent(Set<String>.self, forKey: .shown) ?? []).subtracting(hidden)
         order = try values.decodeIfPresent([String].self, forKey: .order) ?? []
         collapsed = try values.decodeIfPresent(Set<String>.self, forKey: .collapsed) ?? []
         tabs = try values.decodeIfPresent([SidebarTab].self, forKey: .tabs)
@@ -188,7 +186,6 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
                 } else {
                     laterGroups[index] = raw
                     if let group = try? JSONDecoder().decode(EarlierGroup.self, from: data) {
-                        earlierGroupIDs.insert(group.id)
                         if group.isHidden { hiddenEarlierGroupIDs.insert(group.id) }
                         if earlier[group.kind] == nil { earlier[group.kind] = EarlierGroup.Found(group: group, at: known.count, stored: index) }
                     }
@@ -243,10 +240,12 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
 
     func encode(to encoder: any Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
-        try values.encode(hidden, forKey: .hidden)
-        if !shown.isEmpty { try values.encode(shown, forKey: .shown) }
+        // Sets are written sorted, so a change elsewhere rewrites none of them.
+        try values.encode(hidden.sorted(), forKey: .hidden)
+        let shown = shown.subtracting(hidden)
+        if !shown.isEmpty { try values.encode(shown.sorted(), forKey: .shown) }
         try values.encode(order, forKey: .order)
-        try values.encode(collapsed, forKey: .collapsed)
+        try values.encode(collapsed.sorted(), forKey: .collapsed)
         try values.encodeIfPresent(tabs, forKey: .tabs)
         if groups != nil || !laterGroups.isEmpty {
             var all = try (groups ?? []).map { try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode($0)) }
@@ -266,14 +265,12 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     }
 
     /// Whether an earlier copy held the place in a Library or Views section the person had hidden: put there, or a
-    /// saved view not put in any section that copy had, which its Views section held.
+    /// saved view put nowhere, which its Views section held. A row put in a section that is gone is not held by it.
     private func cameFromHiddenSection(_ place: SidebarPlace) -> Bool {
-        guard place.isPinnable, !hiddenEarlierGroupIDs.isEmpty else { return false }
-        let put = homes?[place.key]
-        if let put, hiddenEarlierGroupIDs.contains(put) { return true }
-        guard case .view = place, let views = earlierViewsID, hiddenEarlierGroupIDs.contains(views) else { return false }
-        guard let put else { return true }
-        return !earlierGroupIDs.contains(put) && !allGroups.contains { $0.id == put }
+        guard place.isPinnable || SidebarPlace.pages.contains(place), !hiddenEarlierGroupIDs.isEmpty else { return false }
+        if let put = homes?[place.key] { return hiddenEarlierGroupIDs.contains(put) }
+        guard case .view = place, let views = earlierViewsID else { return false }
+        return hiddenEarlierGroupIDs.contains(views)
     }
 
     /// The word an earlier copy kept in `hidden` for Hide Views from Sidebar, which hid every saved view.
@@ -323,34 +320,40 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         }
     }
 
-    /// A drag of a section's rows in place: moves as `move(_:shown:by:fromOffsets:toOffset:)` does, then records every
-    /// place of the section as put there, so the section reads as the one list the person arranged and a row can cross
-    /// from one of its blocks to another (`SidebarGroupPlan`).
+    /// A drag of a section's rows in place: moves as `move(_:shown:by:fromOffsets:toOffset:)` does, then records the
+    /// rows dragged as put there, so the section reads as the one list the person arranged and a row can cross from
+    /// one of its blocks to another (`SidebarGroupPlan`). Every other row keeps the home it has.
     mutating func moveInSection(
         _ group: String, places: [SidebarPlace], shown: [SidebarPlace], fromOffsets source: IndexSet, toOffset destination: Int
     ) {
-        guard allGroups.contains(where: { $0.id == group && $0.holdsPlaces }) else { return }
-        move(places, shown: shown, by: \.key, fromOffsets: source, toOffset: destination)
+        guard allGroups.contains(where: { $0.id == group && $0.holdsPlaces }),
+              move(places, shown: shown, by: \.key, fromOffsets: source, toOffset: destination) else { return }
         tabs = allTabs
         groups = allGroups
-        homes = (homes ?? [:]).merging(places.map { ($0.key, group) }) { _, new in new }
+        let dragged = source.filter(shown.indices.contains).map { (shown[$0].key, group) }
+        homes = (homes ?? [:]).merging(dragged) { _, new in new }
     }
 
     /// `places`, in the order they are drawn, with the ones in `shown` moved as the list showing only those moves
     /// them: the offsets are of `shown` as given. The hidden ones keep their slots, so showing one again puts it back
-    /// where it was.
+    /// where it was. A move that leaves the shown order as it was changes nothing, and returns false.
+    @discardableResult
     mutating func move<Place>(
         _ places: [Place], shown: [Place], by key: (Place) -> String, fromOffsets source: IndexSet, toOffset destination: Int
-    ) {
+    ) -> Bool {
         let shownKeys = Set(shown.map(key))
-        var visible = shown.map(key)
-        let moved = source.sorted().map { visible[$0] }
+        let before = shown.map(key)
+        let source = source.filter(before.indices.contains)
+        var visible = before
+        let moved = source.map { visible[$0] }
         let target = destination - source.filter { $0 < destination }.count
-        for index in source.sorted().reversed() { visible.remove(at: index) }
-        visible.insert(contentsOf: moved, at: min(target, visible.count))
+        for index in source.reversed() { visible.remove(at: index) }
+        visible.insert(contentsOf: moved, at: max(0, min(target, visible.count)))
+        guard visible != before else { return false }
         var next = visible.makeIterator()
         let keys = places.map(key).map { shownKeys.contains($0) ? next.next()! : $0 }
         order = order.filter { !keys.contains($0) } + keys
+        return true
     }
 
     /// Keeps `places` in the order given as the person's own, whatever order was stored for them.
@@ -691,7 +694,9 @@ final class SidebarLayouts {
     func update(_ library: String, _ change: (inout SidebarLayout) -> Void) {
         var layout = layout(for: library)
         change(&layout)
-        guard layout != self.layout(for: library), let value = try? JSONEncoder().encode(layout),
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard layout != self.layout(for: library), let value = try? encoder.encode(layout),
               let key = try? JSONEncoder().encode(library) else { return }
         layouts[library] = layout
         if let index = entries.firstIndex(where: { $0.library == library }) {

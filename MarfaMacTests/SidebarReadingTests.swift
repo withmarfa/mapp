@@ -65,13 +65,13 @@ struct SidebarReadingTests {
         #expect(layout.allTabs.map(\.id) == ["home", "work"])
         #expect(layout.groups(in: "home").map(\.kind) == [.shortcuts, .places, .pinned, .types])
         #expect(plan.section(.shortcuts)?.group.shortcuts == [.new, .search, .go("view:v-A")], "the person's commands, as stored")
-        #expect(plan.section(.places)?.shown == [.library, .feed])
+        #expect(plan.section(.places)?.shown == [.library, .feed, .sources], "a page put in the earlier Library stays under it")
         let pinned = try #require(plan.section(.pinned))
         #expect(pinned.group.name == "Reading", "Pinned keeps the name the person gave their views")
         #expect(pinned.shown == [view("B"), loose], "what was placed under Views is pinned; hidden stays hidden")
         #expect(!pinned.members.contains(.source("rss")), "a source the copy does not hold has no row")
         #expect(plan.groups.first { $0.id == "mine" }?.shown == [view("A"), kept], "the person's own section keeps what they put there")
-        #expect(!plan.groups.contains { $0.members.contains(.sources) || $0.members.contains(.collections) })
+        #expect(!plan.groups.contains { $0.members.contains(.collections) }, "a page put nowhere has no row")
         #expect(layout.isCollapsed(.type("core.note")))
     }
 
@@ -106,6 +106,23 @@ struct SidebarReadingTests {
             "homes":{"sources":"mine","collections":"mine"}}
             """)
         #expect(SidebarPlan(library(), layout: layout).groups.first { $0.id == "mine" }?.shown == [.collections, .sources])
+    }
+
+    @Test func everyLibraryPageAnEarlierLibraryHeldIsUnderTheLibrary() throws {
+        let layout = try read("""
+            {"groups":[{"id":"library","kind":"library","tab":"home","isHidden":false,"shortcuts":[]}],
+            "homes":{"sources":"library","collections":"library","index:types":"library"}}
+            """)
+        #expect(SidebarPlan(library(), layout: layout).section(.places)?.shown == [.library, .feed, .types, .collections, .sources])
+    }
+
+    @Test func aHiddenViewsSectionHidesOnlyWhatItHeld() throws {
+        let layout = try read("""
+            {"groups":[{"id":"views","kind":"views","tab":"home","isHidden":true,"shortcuts":[]}],
+            "homes":{"view:v-A":"a-section-now-gone","view:v-B":"views"}}
+            """)
+        #expect(SidebarPlan(library(), layout: layout).section(.pinned)?.shown == [view("A")],
+                "a view whose section is gone falls back to Pinned, shown; one put in Views or put nowhere stays hidden")
     }
 
     @Test func viewsAnEarlierCopyHidAllAtOnceStayHiddenAndOneComesBackAlone() throws {
@@ -148,7 +165,27 @@ struct SidebarReadingTests {
         #expect(SidebarPlan(library, layout: layout).section(.places)?.shown == [.feed, .library])
     }
 
+    @Test func aDragInPinnedRehomesOnlyTheRowDragged() throws {
+        let library = library()
+        let fallback = SidebarPlace.collection(library.collections[0].id)
+        var layout = try read(#"{"hidden":["view:v-C"],"homes":{""# + fallback.key + #"":"from-another-mac"}}"#)
+        let pinned = try #require(SidebarPlan(library, layout: layout).section(.pinned))
+        #expect(pinned.shown == [view("A"), view("B"), fallback])
+        layout.moveInSection("pinned", places: pinned.members, shown: pinned.shown, fromOffsets: IndexSet(integer: 1), toOffset: 0)
+        #expect(SidebarPlan(library, layout: layout).section(.pinned)?.shown == [view("B"), view("A"), fallback])
+        #expect(layout.homes == ["view:v-B": "pinned", fallback.key: "from-another-mac"], "the hidden view and the fallback keep their homes")
+    }
+
     // MARK: Writing back
+
+    @Test func shownNeverHoldsAHiddenKeyAndIsWrittenSorted() throws {
+        var layout = try read(#"{"hidden":["views","view:v-A"],"shown":["view:v-C","view:v-A","view:v-B"]}"#)
+        #expect(layout.isHidden(view("A")) && !layout.isHidden(view("B")))
+        layout.setCollapsed(.type("core.task"), true)
+        let written = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(layout)) as? [String: Any])
+        #expect(written["shown"] as? [String] == ["view:v-B", "view:v-C"])
+        #expect(written["hidden"] as? [String] == ["view:v-A", "views"])
+    }
 
     @Test func writingBackKeepsEveryWordThisCopyDoesNotRead() throws {
         let library = library()
@@ -187,6 +224,14 @@ struct SidebarReadingTests {
         _ = SidebarPlan(library(), layout: layouts.layout(for: "marfa:one"))
         layouts.update("marfa:one") { $0.renameTab("home", to: "Home") }
         layouts.update("marfa:one") { $0.renameGroup("pinned", to: "") }
+        layouts.update("marfa:one") { $0.renameGroup("pinned", to: "Pinned") }
+        let pinned = try #require(SidebarPlan(library(), layout: layouts.layout(for: "marfa:one")).section(.pinned))
+        #expect(pinned.shown.count == 2)
+        for offset in [0, 1] {
+            layouts.update("marfa:one") {
+                $0.moveInSection("pinned", places: pinned.members, shown: pinned.shown, fromOffsets: IndexSet(integer: 0), toOffset: offset)
+            }
+        }
         layouts.update("marfa:one") { $0.moveShortcuts(in: "shortcuts", fromOffsets: IndexSet(integer: 0), toOffset: 0) }
         #expect(defaults.data(forKey: SidebarLayouts.defaultsKey) == Data(stored.utf8), "nothing changed, so nothing is written")
 
