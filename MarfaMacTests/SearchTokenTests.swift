@@ -63,7 +63,91 @@ struct SearchTokenTests {
         #expect(browser.searchTokens.isEmpty && browser.searchText.isEmpty && !browser.isSearchExpanded)
     }
 
+    private static let taskType = TypeID("core.task")
+
+    /// An item of `type`, titled `title`, as the fake holds one.
+    private static func item(_ title: String, type: TypeID, id: ItemID = .mint()) -> Item {
+        Item(
+            id: id, type: type, title: title, name: title, titleRule: .property("title"), version: ItemVersion(1),
+            created: .distantPast, modified: .distantPast)
+    }
+
+    @Test func aTypeTokenNeverWidensAPlaceToAnotherType() {
+        let library = FakeItemLibrary(
+            items: [Self.item("Zine note", type: TypeID("core.note")), Self.item("Zine task", type: Self.taskType)])
+        let browser = Browser()
+        browser.show(.type(Self.taskType), in: library, order: ItemOrder())
+        browser.searchText = "zine"
+        browser.addSearchToken(FilterClause(field: FilterTarget.type.id, op: .is, values: ["core.note"]))
+        guard case .query(let query) = browser.searchScope(in: library) else {
+            Issue.record("a place that lists items searches by query")
+            return
+        }
+        #expect(query.types == [Self.taskType], "the place's types are the search's, whatever the token says")
+        #expect(browser.filteredItems(in: library).isEmpty, "in a one-type place, a token for another type keeps nothing")
+
+        browser.clearSearch()
+        browser.searchText = "zine"
+        browser.addSearchToken(FilterClause(field: FilterTarget.type.id, op: .is, values: [Self.taskType.rawValue]))
+        #expect(browser.filteredItems(in: library).map(\.title) == ["Zine task"], "a token for the place's own type keeps it")
+    }
+
     // MARK: What typing offers
+
+    @Test func aStatusIsOfferedWhereNoItemMatchesTheWords() {
+        let library = FakeItemLibrary(items: [Self.item("Garden", type: Self.taskType)])
+        let browser = Browser()
+        browser.show(.type(Self.taskType), in: library, order: ItemOrder())
+        browser.searchText = "todo"
+        #expect(browser.searchResults(in: library)?.items.isEmpty == true, "nothing matches the words")
+        let offers = browser.searchOffers(in: library)
+        let status = offers.first { $0.field == "Status" }
+        #expect(status?.value == ItemTypeInfo.Field.label(ofOption: "todo"), "the place's fields, not the results', give the offers")
+        #expect(offers.last?.kind == .text)
+    }
+
+    @Test func offersAreHeldUntilTheirKeyChanges() {
+        let library = FakeItemLibrary(items: [Self.item("Garden", type: Self.taskType)])
+        let browser = Browser()
+        browser.show(.type(Self.taskType), in: library, order: ItemOrder())
+        browser.searchText = "todo"
+        let first = browser.searchOffers(in: library)
+        #expect(browser.offerMemo?.offers == first)
+        browser.searchText = "tod"
+        #expect(browser.offerMemo?.key.text == "todo", "held until the next ask")
+        _ = browser.searchOffers(in: library)
+        #expect(browser.offerMemo?.key.text == "tod")
+    }
+
+    @Test func aParentIsOfferedByTitleWhereTheTypeCanHaveOne() {
+        let project = Self.item("The Lisbon zine", type: TypeID("test.project"))
+        let library = FakeItemLibrary(items: [project])
+        library.parentCandidates[Self.taskType.rawValue] = [project.id]
+        let browser = Browser()
+        browser.show(.type(Self.taskType), in: library, order: ItemOrder())
+        browser.searchText = "zine"
+        let parent = browser.searchOffers(in: library).first { $0.field == "Parent" }
+        #expect(parent?.value == "The Lisbon zine")
+        #expect(parent?.clause?.values == [project.id.rawValue])
+
+        let bare = FakeItemLibrary(items: [])
+        let other = Browser()
+        other.show(.type(Self.taskType), in: bare, order: ItemOrder())
+        other.searchText = "zine"
+        #expect(!other.searchOffers(in: bare).contains { $0.field == "Parent" }, "no type that can have a parent, no Parent")
+    }
+
+    @Test func removingTokensTakesTheLastOneInOrder() {
+        let browser = Browser()
+        let first = FilterClause(field: "tier", op: .is, values: ["feed"])
+        let second = FilterClause(field: FilterTarget.tags.id, op: .includes, values: ["zine"])
+        browser.addSearchToken(first)
+        browser.addSearchToken(second)
+        #expect(browser.removeLastSearchToken())
+        #expect(browser.searchTokens == [first])
+        browser.removeSearchToken(first)
+        #expect(!browser.removeLastSearchToken())
+    }
 
     private func context(calendar: Calendar = SearchTokenTests.calendar, now: Date = SearchTokenTests.noon(2026, 3, 20)) -> SearchOffers.Context {
         var values = SearchOffers.Values()
