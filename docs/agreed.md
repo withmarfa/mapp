@@ -46,7 +46,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Feed | No count on its row, no words of waiting. Its first view is named All. | `SidebarGroups.swift`, `Browser` | `Rethink-Inbox`, `Rethink-Inbox-View`, `Rethink-Inbox-Page`, `Rethink-Inbox-Modal` |
 | Library or Feed control | After the count on a type, collection, or source with Feed items, offer All Items, Library, and Feed with their counts. Keep it quiet on the default and hide it first when space runs out. The title counts what is listed. The sidebar count stays the same. | `ListToolbar.swift`, `ListScope` | `Rethink-Scope-Menu`, `Rethink-Type-Inbox` |
 | Default From | Settings > Lists offers All Items (the default) and Library. | `PreferencesMap`, Settings > Lists | `Rethink-Scope-Menu` |
-| Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. | `ItemRow.swift`, `ItemTableCells.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
+| Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. The table has it (`docs/lists.md`); the list and gallery do not yet. | `ItemRow.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
 | A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. **Waits for the package:** its catalogue does not say which types hold a table, and the app names no type (marfa-swift#561). | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |
 | Quick Actions | Keep, Archive and Delete on the row under the pointer, a choice of each view, with the default that `docs/concepts.md` gives. | `ItemRow.swift`, `ViewMacSettings` | `Rethink-Inbox-Actions`, `Rethink-View-Quick-Actions` |
 | In | A value on the panel's Info for every item, Library or Feed, that a person changes there. | `ItemInspector.swift` | `Rethink-Feed-Page-In` |
@@ -58,7 +58,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Undo of state and tier where the copy cannot be sure | **Waits for Marfa:** an expected state on a transition (marfa#3523) and an update that refuses a stale version (marfa#3528). Until then, Undo does nothing and says so when the copy shows a change, and a change the copy has not yet learned of can still be overwritten. | `MarfaEngine+Writing.swift`, `MarfaLibrary+Bin.swift`, `MarfaLibrary+Moves.swift` | `Rethink-Archive-Toast` |
-| Library's Archive | Its own count and its own layout choice in the Library's row of lists. One type's archived items are this place narrowed by a token in Search. | `SidebarIndex.swift` | `Rethink-Archive`, `Rethink-Type-Archive` |
+| One type's archive | One type's archived items are the Archive narrowed by a token in Search. | Search | `Rethink-Type-Archive` |
 | An archived item's page | Says Archived over its title, and edits as any other. | `ItemPageHeader.swift`, `BatchSkips` | `Rethink-Archived-Page` |
 
 ## Several items

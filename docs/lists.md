@@ -39,6 +39,9 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 ## Layouts
 
+- **The Archive is a place of its own,** listing the archived items of both tiers. It opens as a table of Name, Type, Source and Edited, newest first, and keeps its layout, columns and sort as any place does. Its title is the Library's, with the Archive's count beside it ("10 of 213" while a search or filter narrows it). Empty, it says "Nothing is archived." (`PlaceEmpty`).
+- **A row of the Archive has Unarchive and Delete on it** while the pointer is on it (`RowQuickActions`), through the calls the menu uses, so Unarchive toasts with Undo and Delete asks as it does there. The same view will serve the Quick Actions setting.
+- **A Feed item in a table of both tiers has the Feed's mark after its name.**
 - **A layout draws the list it is given** (`ItemViewMode`) and never changes which items show.
 - **One row menu, one density and one drag serve every layout.**
 - **An item's date is its own type's** (`ItemPlacement`), so a place of several types puts each where it belongs. A person can point the view at one field.

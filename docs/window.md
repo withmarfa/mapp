@@ -21,6 +21,7 @@ paths:
 - **A window shows a place and one of its views** (`PlaceView`, `Place`, `ViewChoice`), each stored as a word. An unknown word is kept as written, and an unknown view reads as the place's own.
 - **A window left in a place this copy cannot read** opens where a new window would, and keeps that place until the person moves (`Browser.laterPlace`).
 - **A window follows its view to a new place,** with what it keeps for the view (`PlaceMemory`). Views sort by the app's order, a synced `viewOrder` row (`ViewOrders`), then title.
+- **The Archive is reached from the Library's page,** by the button at the end of its tabs beside Collections and Sources (`LibraryPlaces`), by the Go menu and by the palette's places. No sidebar row opens it, so none is chosen while it shows. Types has no page yet and is not in that row.
 - **A window's snapshot and Start With have slots of their own** (`window`, `opening`, `openingLastPlace`). An earlier window of a place that still exists keeps its open item and scroll position, and one favorite opens where that item is listed. Files is no place: the person is told once.
 
 ## Sidebar
@@ -50,7 +51,7 @@ paths:
 
 ## Menus and palettes
 
-- **Every menu of items is one menu** (`ItemRowMenu`), in every layout.
+- **Every menu of items is one menu** (`ItemRowMenu`), in every layout. A row of it draws its symbol and, for Delete, ⌘⌫.
 - **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`). Search Items is the same panel searching titles and text. Palette Actions lists what can be done with the chosen row.
 - **Trap:** Actions grows out of the palette's bar with an ordinary transition, because a Liquid Glass morph hung the app.
 - **A command that takes the keyboard says so** (`takesFocus`), so the palette does not give it back to the page first.

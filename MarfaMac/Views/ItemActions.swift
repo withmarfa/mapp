@@ -122,8 +122,8 @@ struct ItemRemoveActions: View {
             Button("Delete", systemImage: "trash") {
                 library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }
-            .shortcut(.delete, shortcuts)
-            .keyboardShortcut(showsDeleteKey ? KeyboardShortcut(.delete, modifiers: .command) : nil)
+            // One binding, not two: a second `keyboardShortcut` that is nil would take the first one away.
+            .keyboardShortcut(showsDeleteKey ? KeyboardShortcut(.delete, modifiers: .command) : shortcuts?.shortcut(for: .delete)?.keyboardShortcut)
             .disabled(context.items.isEmpty)
         }
     }
