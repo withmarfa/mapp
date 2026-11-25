@@ -30,6 +30,8 @@ export interface HeaderPin {
   /** Only the parent pill has these: the parent's type icon, a key of `HeaderIcons.symbols`, and its tone's name. */
   icon?: string | null
   tone?: string | null
+  /** Only the parent pill has it: the parent's item id, so a pause on the pill shows the parent's card. */
+  item?: string | null
 }
 
 /** An item a row links to: drawn as its type's mark in the item's own tone and its title on a grey fill, or, for a person,
@@ -574,6 +576,8 @@ export class ItemHeader {
     if (pin === this.statusPin) this.drawStatusMark()
     if (pin === this.parentPin) {
       useTone(pin, model?.tone)
+      if (model?.item) pin.dataset.cardItem = model.item
+      else delete pin.dataset.cardItem
       this.drawParentIcon()
     }
   }

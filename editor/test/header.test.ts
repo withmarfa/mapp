@@ -597,6 +597,44 @@ test('the Linked From and Timeline headings are a row the menu can name, and Sub
   expect(header.rowAt(footer.querySelector('.item-foot-subItems .item-foot-heading'))).toBeNull()
 })
 
+test('the parent chip names its item for the card, and a status pill never does', () => {
+  header.set({ ...ticket, parent: { label: 'Field Research', enabled: true, item: 'parent' } })
+  expect(pin('ItemParentPin').dataset.cardItem).toBe('parent')
+  expect(pin('ItemStatusPin').dataset.cardItem).toBeUndefined()
+  header.set({ ...ticket, parent: { label: 'Field Research', enabled: true } })
+  expect(pin('ItemParentPin').dataset.cardItem).toBeUndefined()
+})
+
+test('a foot row puts its status mark or its type icon in one slot, so the names line up', () => {
+  header.set({
+    ...ticket,
+    foot: [
+      {
+        kind: 'subItems',
+        title: 'Sub-Items',
+        total: 2,
+        key: 'subItems',
+        rows: [
+          {
+            item: 'a',
+            title: 'Task',
+            symbol: 'link',
+            date: '',
+            mark: { symbol: 'circle', tint: 'blue' },
+          },
+          { item: 'b', title: 'Event', symbol: 'link', date: '' },
+        ],
+      },
+    ],
+  })
+  const slots = [...footer.querySelectorAll('.item-foot-open')].map(
+    (open) => open.firstElementChild!,
+  )
+  expect(slots.map((slot) => slot.className)).toEqual(['item-foot-slot', 'item-foot-slot'])
+  expect(slots[0]!.querySelector('.item-foot-mark')).not.toBeNull()
+  expect(slots[1]!.querySelector('.item-glyph')).not.toBeNull()
+})
+
 test('a URL that is not web is shown as text, not as a link', () => {
   header.set({
     ...ticket,

@@ -123,8 +123,10 @@ export class Foot {
     button.dataset.cardItem = row.item
     useTone(button, row.tone)
     button.addEventListener('click', () => postToHost({ type: 'openItem', item: row.item }))
+    // The status mark and a type's icon share one slot, so the names line up whichever a row has.
+    const slot = element('span', 'item-foot-slot', button)
     if (row.mark) {
-      const mark = element('span', 'item-foot-mark item-status-mark', button)
+      const mark = element('span', 'item-foot-mark item-status-mark', slot)
       mark.setAttribute('aria-hidden', 'true')
       const icon = symbols[row.mark.symbol]
       maskSymbol(mark, icon)
@@ -134,7 +136,7 @@ export class Foot {
         mark.style.height = `${icon.height}px`
       }
     } else {
-      this.glyph(row.symbol, button)
+      this.glyph(row.symbol, slot)
     }
     element('span', 'item-foot-name', button).textContent = row.title
     element('span', 'item-foot-date', button).textContent = row.date

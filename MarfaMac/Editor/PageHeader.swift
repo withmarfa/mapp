@@ -29,6 +29,8 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         /// Only the parent pin has these: the parent's type icon and the tone of its chip, as a linked item's has.
         var icon: TypeIconRef?
         var tone: String?
+        /// Only the parent pin has it: the parent's item, so a pause on the pill shows the parent's card.
+        var item: String?
     }
 
     /// The kicker as the page draws it: the type's mark in its tone and its name, then each flag with its symbol.

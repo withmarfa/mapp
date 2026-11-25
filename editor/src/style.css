@@ -1111,6 +1111,12 @@ button.item-kicker-type:focus-visible {
 
 /* The arrow of a row with sub-items points down while they show and across while they are folded. */
 .item-foot-arrow .item-chevron {
+  flex: none;
+  width: var(--icon-indicator-width, 0.6em);
+  height: var(--icon-indicator-height, 0.6em);
+  background: var(--label-secondary);
+  -webkit-mask: var(--icon-indicator) center / contain no-repeat;
+  mask: var(--icon-indicator) center / contain no-repeat;
   transform: rotate(-90deg);
 }
 
@@ -1139,13 +1145,22 @@ button.item-kicker-type:focus-visible {
   text-decoration: underline;
 }
 
-.item-foot-open > .item-glyph,
+/* The status mark or the type's icon, centred in one width. */
+.item-foot-slot {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--interface-text-size) * 18 / 13);
+}
+
+.item-foot-slot > .item-glyph,
 .item-foot-mark {
   flex: none;
 }
 
 /* A type's icon takes the type's tone, as a linked item's chip does. */
-.item-foot-open > .item-glyph {
+.item-foot-slot > .item-glyph {
   background: var(--tone, var(--label-secondary));
 }
 

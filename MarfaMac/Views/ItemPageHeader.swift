@@ -95,7 +95,9 @@ struct ItemPageHeader: ViewModifier {
             parent: Self.parent(in: relationships).flatMap { parent in
                 guard let target = parent.targets.first else { return nil }
                 let icon = target.itemID.flatMap { PageHead.typeIcon(of: $0, in: library) }
-                return PageHeader.Pin(label: target.title, enabled: true, icon: .init(name: icon), tone: TypeTone(icon: icon).rawValue)
+                return PageHeader.Pin(
+                    label: target.title, enabled: true, icon: .init(name: icon), tone: TypeTone(icon: icon).rawValue,
+                    item: target.itemID?.rawValue)
             },
             pins: head.pins,
             rows: head.rows,
