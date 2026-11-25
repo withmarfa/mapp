@@ -28,9 +28,9 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 - **A place's default view is the app's** (`PlaceDefaults`). Every change is kept as it is made, and Reset View puts the place back. Types, Collections and Sources have none.
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest (`ViewMacSettings` in `ViewLayouts`): layout, properties, cards, density, week or month and column widths.
-- **A change to a saved view is written as it is made** (`Browser+ViewWrites`), naming only the settings that changed, so it never writes over another app's.
-- **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`); offline, it waits.
-- **Revert View puts back the view as the window opened it** (`openedView`).
+- **A change to a saved view is written as it is made** (`Browser+ViewWrites`), naming only the settings that changed.
+- **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits (`PendingViewChanges`) through closing and quitting; a refusal goes to the clipboard.
+- **Revert View puts back what the window changed since opening the view** (`openedView`), not another app's.
 - **The window lists what it shows while a change waits:** while its filters, From or Archived Items differ from the view's, it reads the view's query with its own choices (`viewPreview`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**

@@ -453,6 +453,7 @@ final class Browser {
     /// the clipboard, as the window's view of the library left went (`QuickAdd.Departure.libraryChanged`).
     func adopt(_ library: any ItemLibrary, undoManager: UndoManager? = nil) {
         let id = ObjectIdentifier(library)
+        Browser.open.add(self)
         if let undoManager { self.undoManager = undoManager }
         guard libraryID != id else { return }
         self.library = library
@@ -535,8 +536,23 @@ final class Browser {
 
     struct OpenedView {
         let id: ItemID
+        /// The view's choices as the window opened it, for the settings this window has not changed since: another
+        /// app's change to one of those moves it, so Revert View never puts back what another app changed.
         var choices: ViewChoices
         var mac: ViewMacSettings
+        /// The settings this window changed since it opened the view, and its choices after its last change: Revert
+        /// View puts back only those, and only where the view still holds what this window made.
+        var changed: Set<ViewChoices.Part> = []
+        var mine: ViewChoices?
+
+        /// Takes the view's choices as read for `parts`, but where they are still this window's own change: a setting
+        /// another app changed becomes the opening one, and no longer this window's to put back.
+        mutating func follow(_ parts: Set<ViewChoices.Part>, of other: ViewChoices) {
+            let own = mine.map { changed.subtracting(other.parts(differingFrom: $0)) } ?? []
+            let taken = parts.subtracting(own)
+            choices.take(taken, from: other)
+            changed.subtract(taken)
+        }
     }
 
     /// Views this window is deleting, whose absence from the library is its own doing and not news from elsewhere.

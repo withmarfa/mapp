@@ -127,7 +127,7 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// it can't be read. Reads only the copy.
     func instanceID() async -> String?
 
-    // MARK: Views, written to the server at once and never queued
+    // MARK: Views, written to the server at once
 
     /// Each throws `ViewWriteFailure`. A write that failed for want of the server is sent again with the same
     /// `idempotencyKey`, so a request the server took before the answer was lost is not made twice.

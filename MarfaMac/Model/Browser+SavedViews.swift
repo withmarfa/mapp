@@ -41,7 +41,8 @@ extension Browser {
         // A change of the view's filters can move it to another home, and the window goes with it.
         let home = PlaceView(Place.home(of: view.query, catalogue: library.catalogue), .saved(id))
         if showing != home { showing = home }
-        if pendingViewWrites.remove(id) != nil { scheduleWrite(of: id) }
+        // A change the store is sending lands in the window by itself (`Browser.pendingChangeLanded`).
+        if pendingViewWrites.remove(id) != nil, !PendingViewChanges.isSending(id) { scheduleWrite(of: id) }
         defer { noteOpened(id) }
         guard let seed = viewSeeds[id] else {
             apply(layout: ViewLayouts.stored(in: defaults).settings(for: id)?.layout, in: library)
@@ -75,8 +76,13 @@ extension Browser {
         tableOptions[place] = options
         timelineFields[place] = timelineDate
         observedChoices[place] = ViewChoices(options: options, timelineDate: timelineDate)
-        // The view as Marfa now holds it is what Revert View goes back to, not the window's choices it replaced.
-        if openedView?.id == view.id { openedView?.choices = ViewChoices(options: options, timelineDate: timelineDate) }
+        // The view as Marfa now holds it is what Revert View goes back to for each setting this window did not change.
+        if openedView?.id == view.id {
+            var parts = Set(ViewChoices.Part.allCases)
+            // Filters the view says as before, perhaps in other words than the window's, are no other app's change.
+            if let earlier, options.filter.isSame(as: earlier.viewFilter) { parts.remove(.filters) }
+            openedView?.follow(parts, of: ViewChoices(options: options, timelineDate: timelineDate))
+        }
     }
 
     /// Keeps the view as the window first shows it, for Revert View, until the window shows another place.
@@ -111,6 +117,7 @@ extension Browser {
         parts = parts.intersection(choices(in: place).parts(differingFrom: returned, dated: dated))
         guard !parts.isEmpty else { return }
         put(returned, in: place, only: parts)
+        if openedView?.id == place.savedView { openedView?.follow(parts, of: returned) }
         // Not the person's change: no step of Undo, and nothing to write.
         if var observed = observedChoices[place] {
             observed.take(parts, from: returned)
@@ -384,8 +391,9 @@ extension Browser {
 
     // MARK: Putting the window back to the view
 
-    /// Puts the view back as it was when the window opened it, and writes that back to Marfa and this Mac. One step of
-    /// Undo brings the person's changes back.
+    /// Puts back each setting this window changed since it opened the view, where the view still holds what the window
+    /// made, and writes that to Marfa and this Mac. A setting another app changed since stays. One step of Undo brings
+    /// the person's changes back.
     func revertView(in library: any ItemLibrary) {
         guard let opened = openedView, shown.isSame(.saved(opened.id)), isViewChanged else { return }
         let id = opened.id
@@ -397,10 +405,16 @@ extension Browser {
             settings.take(choicesOf: opened.mac)
             settings.layout = layout
         }
-        put(opened.choices, in: shown)
+        put(opened.choices, in: shown, only: Self.revertible(opened, now: liveChoices))
         choicesChanged()
         // The steps of one event are one step of Undo.
         undoManager?.setActionName(String(localized: "Revert View"))
+    }
+
+    /// The settings Revert View puts back: those this window changed, less any whose value is no longer the window's.
+    static func revertible(_ opened: OpenedView, now: ViewChoices) -> Set<ViewChoices.Part> {
+        guard let mine = opened.mine else { return [] }
+        return opened.changed.subtracting(now.parts(differingFrom: mine))
     }
 
     /// The change that writes the window's choices to the view it shows, the version it is based on, and what of

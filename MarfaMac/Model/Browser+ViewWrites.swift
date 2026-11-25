@@ -97,14 +97,43 @@ extension Browser {
         undoManager?.removeAllActions(withTarget: panel)
     }
 
-    /// The server can be reached again: each view a write could not reach it for is written now, or when the window
-    /// shows it again, and a later stretch without it is told again.
+    /// The server can be reached again: the view the window shows is written from the window, every other change
+    /// kept while it could not be reached is sent from this Mac's store (`PendingViewChanges`), and a later stretch
+    /// without it is told again.
     func reachabilityChanged(in library: any ItemLibrary) {
         guard library.reachesServer else { return }
         let waiting = toldOffline
         toldOffline.removeAll()
-        for id in waiting {
-            if shown.isSame(.saved(id)) { scheduleWrite(of: id) } else { pendingViewWrites.insert(id) }
+        for id in waiting where shown.isSame(.saved(id)) { scheduleWrite(of: id) }
+        let defaults = self.defaults
+        Task { await PendingViewChanges.send(in: library, defaults: defaults) }
+    }
+
+    /// The windows open on a library, which a change sent from the store reaches whatever they show.
+    static let open = NSHashTable<Browser>.weakObjects()
+
+    private static func windows(of library: any ItemLibrary) -> [Browser] {
+        open.allObjects.filter { $0.library.map(ObjectIdentifier.init) == ObjectIdentifier(library) }
+    }
+
+    /// Whether a window is about to write the view itself: it writes now, or shows the view with the change in it.
+    static func isWriting(_ id: ItemID, in library: any ItemLibrary) -> Bool {
+        windows(of: library).contains { $0.writingViews.contains(id) || ($0.shown.isSame(.saved(id)) && $0.hasViewChanges) }
+    }
+
+    /// A change sent from the store landed: each window that holds the view takes it as a write of its own would.
+    static func pendingChangeLanded(_ view: LibraryView, sent: LibraryViewChange, in library: any ItemLibrary) {
+        for browser in windows(of: library) where browser.viewSeeds[view.id] != nil {
+            browser.pendingViewWrites.remove(view.id)
+            browser.seed(view, catalogue: library.catalogue, keepingWindow: true, sent: sent)
+        }
+    }
+
+    /// Marfa refused a change sent from the store, which the person has on the clipboard: each window shows the view.
+    static func pendingChangeRefused(_ id: ItemID, in library: any ItemLibrary) {
+        for browser in windows(of: library) where browser.viewSeeds[id] != nil {
+            browser.pendingViewWrites.remove(id)
+            browser.viewRefused(id, in: library)
         }
     }
 
@@ -129,9 +158,14 @@ extension Browser {
         }
         guard current != before else { return nil }
         observedChoices[place] = current
+        if let id = place.savedView, openedView?.id == id {
+            openedView?.changed.formUnion(current.parts(differingFrom: before))
+            openedView?.mine = current
+        }
         registerChoiceUndo(in: place, from: before, to: current)
         keepPlaceChoices(of: place)
         guard let id = place.savedView, viewPanel?.isNew != true else { return nil }
+        keepOffline(id)
         return scheduleWrite(of: id)
     }
 
@@ -200,6 +234,14 @@ extension Browser {
 
     // MARK: Writing a view
 
+    /// Keeps the window's change to the view on this Mac while the server cannot be reached, so it is sent once the
+    /// server is back, whether or not the window still shows the view (`PendingViewChanges`).
+    private func keepOffline(_ id: ItemID) {
+        guard let library, !library.reachesServer, shown.isSame(.saved(id)),
+              let update = viewUpdate(SavedViews.window(self, in: library), in: library) else { return }
+        PendingViewChanges.keep(update.change, baseVersion: update.baseVersion, for: id, in: defaults)
+    }
+
     /// Writes the window's choices to the view, one write at a time, and again if they changed while one was under way.
     @discardableResult
     func scheduleWrite(of id: ItemID) -> Task<Void, Never>? {
@@ -266,15 +308,17 @@ extension Browser {
         }
         guard let update = viewUpdate(SavedViews.window(self, in: library), in: library) else { return }
         if update.change.isEmpty {
+            PendingViewChanges.forget(id, in: defaults)
             // A change the view cannot hold is the person's to hear of, though there is nothing to write.
             tellUnkept(update.unkept, of: id, in: library)
             return
         }
         guard library.reachesServer else {
+            PendingViewChanges.keep(update.change, baseVersion: update.baseVersion, for: id, in: defaults)
             if toldOffline.insert(id).inserted {
                 library.notices.tell(
                     String(localized: "View Not Saved"),
-                    String(localized: "Your Marfa server can’t be reached. The window keeps your change and saves it once the server is back."))
+                    String(localized: "Your Marfa server can’t be reached. Marfa for Mac keeps your change and saves it once the server is back."))
             }
             return
         }
@@ -282,6 +326,7 @@ extension Browser {
         let sent = choices(in: place)
         switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
         case .success(let view):
+            PendingViewChanges.forget(id, in: defaults)
             if update.change.group != nil, let replaced = update.view.group { replacedGroups[id, default: [:]][replaced.field] = replaced }
             let changedSince = choices(in: place).parts(differingFrom: sent)
             if !changedSince.isEmpty { rewritingViews.insert(id) }
@@ -319,13 +364,15 @@ extension Browser {
             // leaves the window as the person chose.
             switch failure.kind {
             case .conflict:
+                PendingViewChanges.forget(id, in: defaults)
                 undoManager?.removeAllActions(withTarget: self)
                 viewRefused(id, in: library)
             case .offline:
                 // The library has told the person; the change is written once the server is back.
+                PendingViewChanges.keep(update.change, baseVersion: update.baseVersion, for: id, in: defaults)
                 toldOffline.insert(id)
             case .gone, .notPermitted, .refused:
-                break
+                PendingViewChanges.forget(id, in: defaults)
             }
         }
     }
@@ -346,18 +393,28 @@ extension Browser {
     // MARK: Naming a view
 
     /// Writes the name the person typed, once they commit it with Return or leave the field. An empty name goes back to the view's.
+    /// A panel that has ended gives back a name it could not write (`ViewPanel.leave(because:)`).
     func commitViewName(of panel: ViewPanel? = nil, in library: any ItemLibrary) async {
-        guard let panel = panel ?? viewPanel, let id = panel.viewID, let view = library.views.first(where: { $0.id == id }) else { return }
+        guard let panel = panel ?? viewPanel, let id = panel.viewID else { return }
+        guard let view = library.views.first(where: { $0.id == id }) else {
+            if panel.hasLeftWithRename { panel.handOffBecauseGone() }
+            return
+        }
         let name = panel.trimmedName
         guard !name.isEmpty else {
             panel.name = view.title
             return
         }
-        guard name != view.title, panel.renaming != name else { return }
+        guard name != view.title else {
+            panel.finishRename(name: name, kept: true)
+            return
+        }
+        guard panel.renaming != name else { return }
         // A rename queued ahead of this one either lands first or fails, so the view then has either title.
         let expected = Set([view.title] + [panel.renaming].compactMap { $0 })
         panel.renaming = name
-        let kept = await writeName(name, of: id, expecting: expected, in: library)
+        // A panel that has ended gives the name back itself, which says why.
+        let kept = await writeName(name, of: id, expecting: expected, in: library, tellsOffline: !panel.hasLeftWithRename)
         panel.finishRename(name: name, kept: kept)
         if kept { registerNameUndo(of: id, restoring: view.title, from: name) }
     }
@@ -373,22 +430,27 @@ extension Browser {
 
     /// Writes a title, where the view still has the one this change was made from.
     @discardableResult
-    private func writeName(_ name: String, of id: ItemID, expecting titles: Set<String>, in library: any ItemLibrary) async -> Bool {
+    private func writeName(
+        _ name: String, of id: ItemID, expecting titles: Set<String>, in library: any ItemLibrary, tellsOffline: Bool = true
+    ) async -> Bool {
         await lockView(id)
-        let kept = await writeNameLocked(name, of: id, expecting: titles, in: library)
+        let kept = await writeNameLocked(name, of: id, expecting: titles, in: library, tellsOffline: tellsOffline)
         // A choice changed while the name was written is written now, so it is never left behind.
         await writeUntilSettled(id, in: library)
         unlockView(id)
         return kept
     }
 
-    private func writeNameLocked(_ name: String, of id: ItemID, expecting titles: Set<String>, in library: any ItemLibrary) async -> Bool {
+    private func writeNameLocked(
+        _ name: String, of id: ItemID, expecting titles: Set<String>, in library: any ItemLibrary, tellsOffline: Bool
+    ) async -> Bool {
         guard let view = library.views.first(where: { $0.id == id }), let seed = viewSeeds[id] else { return false }
         guard titles.contains(view.title) else {
             library.notices.tell(String(localized: "Can’t Rename"), String(localized: "This view was renamed elsewhere, so its name was left as it is."))
             return false
         }
         guard library.reachesServer else {
+            guard tellsOffline else { return false }
             library.notices.tell(String(localized: "View Not Renamed"), String(localized: "Your Marfa server can’t be reached, so the view keeps its name. Rename it again once it is back."))
             return false
         }
