@@ -5924,6 +5924,9 @@
     "Latest" : {
 
     },
+    "Latest Updates" : {
+
+    },
     "Layout" : {
 
     },
@@ -6288,6 +6291,9 @@
 
     },
     "Marfa keeps this link itself." : {
+
+    },
+    "Marfas" : {
 
     },
     "Marfa’s" : {
@@ -7192,6 +7198,9 @@
 
     },
     "On the server’s own page, in a sheet." : {
+
+    },
+    "On this Mac" : {
 
     },
     "One command uses %@." : {
@@ -8838,6 +8847,9 @@
       "extractionState" : "manual"
     },
     "Shown once, when it was made." : {
+
+    },
+    "Shows the Marfa’s latest updates." : {
 
     },
     "Shows the group’s items" : {
