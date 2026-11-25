@@ -52,11 +52,12 @@ extension Browser {
         return offer.fallback
     }
 
-    /// Groups the open place as Group by's `grouping` says. A list or gallery that showed the starting order keeps the
-    /// order it showed, now as the place's own.
+    /// Groups the open place as Group by's `grouping` says. A place's list or gallery that showed the starting order keeps
+    /// the order it showed, now as the place's own. A saved view's sort stays as the view holds it, since a grouping is
+    /// written alone and a sort the Mac cannot show (by source, say) must not be replaced.
     func chooseGrouping(_ grouping: ItemTableOptions.Grouping) {
         var options = tableOptions[shown] ?? ItemTableOptions()
-        if let dated = datedList, options.sort == nil { options.sort = dated.sort }
+        if shown.savedView == nil, let dated = datedList, options.sort == nil { options.sort = dated.sort }
         options.group(by: grouping)
         tableOptions[shown] = options
     }
@@ -160,13 +161,14 @@ extension Browser {
         let key = column.field?.key ?? ""
         let lanes: [ItemBoardLane]
         if mode == .statusGroups {
-            lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: library.catalogue, order: order, statusGroups: true)
+            lanes = ItemBoardLayout.lanes(
+                items: items, key: key, catalogue: library.catalogue, order: order, statusGroups: true, asMarfa: isViewPlace)
         } else if mode == .value, let field = column.field, ItemBoardLayout.isCompatible(field) {
             lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: library.catalogue, order: order)
         } else {
             let groups = ItemTableLayout.groups(
-                of: content.kept, by: column, mode: mode, catalogue: library.catalogue, declared: true, calendar: content.calendar,
-                now: library.now())
+                of: content.kept, by: column, mode: mode, catalogue: library.catalogue, declared: true, asMarfa: isViewPlace,
+                calendar: content.calendar, now: library.now())
             lanes = ItemBoardLayout.lanes(of: groups, mode: mode, order: order)
         }
         let options = tableOptions[shown]

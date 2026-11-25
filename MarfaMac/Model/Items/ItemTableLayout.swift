@@ -383,13 +383,16 @@ nonisolated enum ItemTableLayout {
     /// `catalogue` tells which types declare the field and their status words; without it every row is applicable.
     /// With `declared`, a grouping whose groups are known before the rows are (a choice, a status, yes or no, Set or
     /// Not Set, status groups) lists the empty ones too, for Hide Empty Groups to leave out.
+    /// With `asMarfa`, as a saved view groups, every row is in a group Marfa names, so a group hidden in one app hides the
+    /// same items in all: a row whose type lacks the field is Not Set or has no value (`device/view-group-presence`), and a
+    /// status word its type does not declare is No Status (`device/view-group-status`).
     static func groups(
         of rows: [ItemTableRow], by column: ItemTableColumn, mode: GroupMode, catalogue: Catalogue? = nil, declared: Bool = false,
-        calendar: Calendar = .current, now: Date = .now
+        asMarfa: Bool = false, calendar: Calendar = .current, now: Date = .now
     ) -> [ItemTableGroup] {
         var applicable = rows
         var notApplicable: [ItemTableRow] = []
-        if let catalogue, mode != .statusGroups, let key = column.field?.key {
+        if let catalogue, mode != .statusGroups, !asMarfa, let key = column.field?.key {
             applicable = []
             for row in rows {
                 if catalogue.itemTypes[row.item.type]?.fields.contains(where: { $0.key == key }) == false {
@@ -403,7 +406,7 @@ nonisolated enum ItemTableLayout {
         switch mode {
         case .bucket(let bucket): groups = dated(applicable, by: column, bucket: bucket, calendar: calendar, now: now)
         case .presence: groups = presence(applicable, by: column, declared: declared)
-        case .statusGroups: groups = statusGroups(applicable, by: column, catalogue: catalogue, declared: declared)
+        case .statusGroups: groups = statusGroups(applicable, by: column, catalogue: catalogue, declared: declared, asMarfa: asMarfa)
         case .value: groups = categories(of: applicable, by: column, including: declared ? column.declaredValues : [], byLabel: true)
         }
         if !notApplicable.isEmpty {
@@ -455,9 +458,10 @@ nonisolated enum ItemTableLayout {
 
     /// Marfa's four status groups in their order, then the words no group claims, then No Status. Each row goes by its
     /// own type's status field where the catalogue is given, so types that keep their status under different names
-    /// share the groups; a type with no status field, or a row with no word, is No Status.
+    /// share the groups; a type with no status field, or a row with no word, is No Status, and so is a word no group
+    /// claims where the groups are Marfa's (`asMarfa`).
     private static func statusGroups(
-        _ rows: [ItemTableRow], by column: ItemTableColumn, catalogue: Catalogue?, declared: Bool
+        _ rows: [ItemTableRow], by column: ItemTableColumn, catalogue: Catalogue?, declared: Bool, asMarfa: Bool
     ) -> [ItemTableGroup] {
         var buckets: [StatusBucket: [ItemTableRow]] = [:]
         var empty: [ItemTableRow] = []
@@ -467,7 +471,12 @@ nonisolated enum ItemTableLayout {
                 empty.append(row)
                 continue
             }
-            buckets[field.statusBucket(of: word), default: []].append(row)
+            let bucket = field.statusBucket(of: word)
+            if asMarfa, bucket == .other {
+                empty.append(row)
+                continue
+            }
+            buckets[bucket, default: []].append(row)
         }
         if declared { for group in StatusGroup.allCases where buckets[.group(group)] == nil { buckets[.group(group)] = [] } }
         var groups = buckets.keys.sorted { $0.rank < $1.rank }.map { ItemTableGroup(id: $0.id, title: $0.title, rows: buckets[$0]!) }

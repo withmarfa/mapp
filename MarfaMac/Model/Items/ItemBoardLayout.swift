@@ -88,11 +88,12 @@ nonisolated enum ItemBoardLayout {
     /// item needs them. A board's fields are closed, so a word no type declares is an invalid value. Where the types
     /// keep their status in different fields, or the person groups by them (`statusGroups`), the lanes are Marfa's
     /// status groups instead. Within a lane the cards follow `order`, each item's place in the sort the window shows, or
-    /// the title where nothing sorts them.
+    /// the title where nothing sorts them. With `asMarfa`, as a saved view groups, status groups put a word no group
+    /// claims in No Status, as Marfa does (`device/view-group-status`).
     static func lanes(
-        items: [Item], key: String, catalogue: Catalogue, order: [ItemID: Int]? = nil, statusGroups: Bool = false
+        items: [Item], key: String, catalogue: Catalogue, order: [ItemID: Int]? = nil, statusGroups: Bool = false, asMarfa: Bool = false
     ) -> [ItemBoardLane] {
-        if statusGroups { return groupLanes(items: items, catalogue: catalogue, order: order) }
+        if statusGroups { return groupLanes(items: items, catalogue: catalogue, order: order, asMarfa: asMarfa) }
         var values: [(word: String, bucket: StatusBucket)] = []
         var isStatus = false
         var seen: Set<String> = []
@@ -128,8 +129,11 @@ nonisolated enum ItemBoardLayout {
 
     /// The lanes of a board whose types keep their status in different fields: Marfa's four status groups, which
     /// every type shares, then No Status (which holds a type with no status too), and Invalid Value where an item needs it.
-    private static func groupLanes(items: [Item], catalogue: Catalogue, order: [ItemID: Int]?) -> [ItemBoardLane] {
-        let groups = Dictionary(grouping: items) { groupedLane(for: $0, catalogue: catalogue) }
+    private static func groupLanes(items: [Item], catalogue: Catalogue, order: [ItemID: Int]?, asMarfa: Bool) -> [ItemBoardLane] {
+        let groups = Dictionary(grouping: items) { item in
+            let lane = groupedLane(for: item, catalogue: catalogue)
+            return asMarfa && lane == .invalid ? .missing : lane
+        }
         let types = Set(items.map(\.type))
         let fields = types.compactMap { type in eligibleFields(of: type, catalogue: catalogue).first(where: \.isStatus) }
         var lanes = StatusGroup.allCases.map { group in
