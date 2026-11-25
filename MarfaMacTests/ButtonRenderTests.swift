@@ -81,7 +81,7 @@ import Testing
 
     private func indexPage(searching: Bool) -> some View {
         let browser = Browser()
-        browser.sidebarItem = .collections
+        browser.showing = .collections
         browser.isSearchExpanded = searching
         return IndexHost(browser: browser, rows: indexRows())
     }

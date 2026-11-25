@@ -78,7 +78,7 @@ struct ItemTablePagingTests {
     // MARK: When the count starts again
 
     private static func key(
-        place: SidebarItem = .allItems, search: String = "", configure: (inout ItemTableOptions) -> Void = { _ in }
+        place: PlaceView = .library, search: String = "", configure: (inout ItemTableOptions) -> Void = { _ in }
     ) -> TablePagingKey {
         var options = ItemTableOptions()
         configure(&options)
@@ -93,9 +93,9 @@ struct ItemTablePagingTests {
         let browser = Browser()
         browser.loadMoreTableRows()
         #expect(browser.tablePaging.pages == 2)
-        browser.tableOptions[browser.item, default: .init()].collapsed = ["x"]
+        browser.tableOptions[browser.shown, default: .init()].collapsed = ["x"]
         #expect(browser.tablePaging.pages == 2)
-        browser.tableOptions[browser.item, default: .init()].pageSize = .twentyFive
+        browser.tableOptions[browser.shown, default: .init()].pageSize = .twentyFive
         #expect(browser.tablePaging.pages == 1)
         browser.loadMoreTableRows()
         browser.searchText = "plan"

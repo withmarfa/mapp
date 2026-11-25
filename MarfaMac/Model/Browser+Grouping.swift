@@ -35,7 +35,7 @@ extension Browser {
             return .column(column.id, by: .bucket(.day))
         }
         let content = tableContent(in: library)
-        switch tableOptions[item]?.grouping ?? .automatic {
+        switch tableOptions[shown]?.grouping ?? .automatic {
         // A place's own grouping by status is the table's; an arranged list or gallery groups only as asked.
         case .automatic: return viewMode == .table ? content.grouping.map { .column($0.id, by: .statusGroups) } ?? .none : .none
         case .none: return .none
@@ -47,7 +47,7 @@ extension Browser {
     /// first field offered (`GroupOffer.fallback`), which leaves the place's choice as it is for the layouts that can.
     func boardGrouping(in library: any ItemLibrary) -> ItemTableOptions.Grouping? {
         let offer = groupOffer(in: library)
-        if let stored = tableOptions[item]?.grouping, case .column = stored, let found = offer.entry(for: stored), found.choice.isKept {
+        if let stored = tableOptions[shown]?.grouping, case .column = stored, let found = offer.entry(for: stored), found.choice.isKept {
             return stored
         }
         return offer.fallback
@@ -56,34 +56,34 @@ extension Browser {
     /// Groups the open place as Group by's `grouping` says. A list or gallery that showed the starting order keeps the
     /// order it showed, now as the place's own.
     func chooseGrouping(_ grouping: ItemTableOptions.Grouping) {
-        var options = tableOptions[item] ?? ItemTableOptions()
+        var options = tableOptions[shown] ?? ItemTableOptions()
         if let dated = datedList, options.sort == nil { options.sort = dated.sort }
         options.group(by: grouping)
-        tableOptions[item] = options
+        tableOptions[shown] = options
     }
 
     /// Sorts the open place. A list or gallery that showed the starting order Settings gives keeps its sections by date
     /// where the new sort is by one of the list's own dates, now as that date by day.
     func chooseSort(_ sort: [ItemTableComparator]) {
-        var options = tableOptions[item] ?? ItemTableOptions()
+        var options = tableOptions[shown] ?? ItemTableOptions()
         if let dated = datedList, options.sort == nil, dated.hasSections, let column = sort.first?.column,
            [ItemTableColumn.created.id, ItemTableColumn.edited.id].contains(column.id) {
             options.group(by: .column(column.id, by: .bucket(.day)))
         }
         options.sort = sort
-        tableOptions[item] = options
+        tableOptions[shown] = options
     }
 
     /// Folds every group of the list or table, or opens them all. The window's own, kept with the place's options.
     func collapseAllGroups(in library: any ItemLibrary) {
-        tableOptions[item, default: .init()].collapsed = Set(tableContent(in: library).groups.map(\.id))
+        tableOptions[shown, default: .init()].collapsed = Set(tableContent(in: library).groups.map(\.id))
     }
 
     /// Folds or opens one group of the list or table.
     func toggleGroup(_ key: String, in library: any ItemLibrary) {
         var collapsed = tableContent(in: library).collapsed
         if collapsed.contains(key) { collapsed.remove(key) } else { collapsed.insert(key) }
-        tableOptions[item, default: .init()].collapsed = collapsed
+        tableOptions[shown, default: .init()].collapsed = collapsed
     }
 
     /// How many items the arranged list holds, hidden and folded groups included, since those leave the list and not
@@ -107,7 +107,7 @@ extension Browser {
     }
 
     func expandAllGroups() {
-        tableOptions[item, default: .init()].collapsed = []
+        tableOptions[shown, default: .init()].collapsed = []
     }
 
     /// The groups of the open layout in order, hidden ones too, as Edit View lists them: a board's lanes, else the
@@ -124,15 +124,15 @@ extension Browser {
         let order = groupRows(in: library).map(\.key).filter { $0 != GroupKey.notApplicable }
         let moved = Reordering.moving(key, onto: other, in: order)
         guard moved != order else { return }
-        tableOptions[item, default: .init()].groupOrder = moved
+        tableOptions[shown, default: .init()].groupOrder = moved
     }
 
     /// Shows or hides one group. Its items stay in the place and count in it (`device/view-group-hidden`).
     func setGroup(_ key: String, hidden: Bool, in library: any ItemLibrary) {
         adoptBoardGrouping(in: library)
-        var hiddenGroups = tableOptions[item]?.hiddenGroups ?? []
+        var hiddenGroups = tableOptions[shown]?.hiddenGroups ?? []
         if hidden { hiddenGroups.insert(key) } else { hiddenGroups.remove(key) }
-        tableOptions[item, default: .init()].hiddenGroups = hiddenGroups.isEmpty ? nil : hiddenGroups
+        tableOptions[shown, default: .init()].hiddenGroups = hiddenGroups.isEmpty ? nil : hiddenGroups
     }
 }
 
@@ -170,7 +170,7 @@ extension Browser {
                 now: library.now())
             lanes = ItemBoardLayout.lanes(of: groups, mode: mode, order: order)
         }
-        let options = tableOptions[item]
+        let options = tableOptions[shown]
         let own = options?.grouping == grouping
         let all = ItemBoardLayout.arranged(lanes, order: own ? options?.groupOrder : nil, hidden: nil, hidesEmpty: false)
         return BoardLanes(all: all, key: key, byStatusGroups: mode == .statusGroups, isOwn: own)
@@ -178,14 +178,14 @@ extension Browser {
 
     /// The lanes the board shows: less the hidden ones, and the empty ones where Hide Empty Groups is on.
     func shownBoardLanes(_ lanes: BoardLanes) -> [ItemBoardLane] {
-        let hidden = lanes.isOwn ? tableOptions[item]?.hiddenGroups : nil
+        let hidden = lanes.isOwn ? tableOptions[shown]?.hiddenGroups : nil
         return ItemBoardLayout.arranged(lanes.all, order: nil, hidden: hidden, hidesEmpty: hidesEmptyGroups)
     }
 
     /// A board showing a grouping the place does not hold (`boardGrouping`'s fallback) takes it as the place's own before
     /// its lanes are ordered or hidden, so the order names the lanes it was made on.
     private func adoptBoardGrouping(in library: any ItemLibrary) {
-        guard viewMode == .board, let shown = boardGrouping(in: library), shown != tableOptions[item]?.grouping else { return }
+        guard viewMode == .board, let shown = boardGrouping(in: library), shown != tableOptions[self.shown]?.grouping else { return }
         chooseGrouping(shown)
     }
 }

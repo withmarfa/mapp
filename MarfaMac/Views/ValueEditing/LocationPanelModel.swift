@@ -114,7 +114,7 @@ final class LocationPanelModel {
         var specs: [TypeID: ItemLocation] = [:]
         var without: Set<TypeID> = []
         var points: [(date: Date, point: LocationPoint)] = []
-        for other in library.items(in: .allItems) where other.id != itemID {
+        for other in library.activeItems where other.id != itemID {
             let type = other.type
             if without.contains(type) { continue }
             if specs[type] == nil {

@@ -54,7 +54,7 @@ final class IndexRowsModel {
     private static func rows(for place: IndexPlace, in library: any ItemLibrary) -> [IndexRow] {
         switch place {
         case .sources:
-            IndexRows.sources(of: library.items(in: .allItems), catalogue: library.catalogue, directory: library.sources)
+            IndexRows.sources(of: library.activeItems, catalogue: library.catalogue, directory: library.sources)
         default:
             // Items has rows of its own kind, which `ItemIndexModel` keeps, and no place of this page.
             IndexRows.collections(

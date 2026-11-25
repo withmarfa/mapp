@@ -8,7 +8,7 @@ import Testing
 @MainActor
 @Suite(.serialized, .hangLimit)
 struct PlaceDefaultsTests {
-    private static let tasks = SidebarItem.itemType("core.task")
+    private static let tasks = PlaceView.type(TypeID("core.task"))
     private static let status = "field.status"
 
     private static func library() -> FakeItemLibrary {
@@ -23,12 +23,12 @@ struct PlaceDefaultsTests {
 
     /// A window on `place`, as the window opens one: the default view is followed before anything can change.
     private static func window(
-        _ defaults: UserDefaults, library: FakeItemLibrary, place: SidebarItem = tasks
+        _ defaults: UserDefaults, library: FakeItemLibrary, place: PlaceView = tasks
     ) -> Browser {
         let browser = Browser()
         browser.defaults = defaults
         browser.adopt(library)
-        browser.sidebarItem = place
+        browser.showing = place
         browser.followPlaceDefault(in: library)
         browser.choicesChanged()
         return browser
@@ -89,7 +89,7 @@ struct PlaceDefaultsTests {
         #expect(!Browser.hasDefaultView(.view(ItemID("v"))))
         #expect(!Browser.hasDefaultView(.sources))
         #expect(!Browser.hasDefaultView(.collections))
-        #expect(!Browser.hasDefaultView(.allItems))
+        #expect(!Browser.hasDefaultView(.library))
         #expect(Browser.hasDefaultView(.collection(ItemID("c"))))
     }
 
@@ -102,8 +102,8 @@ struct PlaceDefaultsTests {
         one.choicesChanged()
         // The other window keeps what it shows until it opens the place again.
         #expect(two.tableOptions[two.item]?.isFiltering != true)
-        two.sidebarItem = .recents
-        two.sidebarItem = Self.tasks
+        two.showing = .recents
+        two.showing = Self.tasks
         two.followPlaceDefault(in: library)
         #expect(two.tableOptions[two.item]?.filter.valuesByField == [Self.status: ["todo"]])
         two.tableOptions[two.item, default: .init()].grouping = .none
@@ -127,7 +127,7 @@ struct PlaceDefaultsTests {
         #expect(browser.isDefaultViewChanged)
 
         browser.resetView(in: library)
-        #expect(browser.tableOptions[browser.item]?.isFiltering != true)
+        #expect(browser.tableOptions[browser.shown]?.isFiltering != true)
         #expect(browser.viewMode == Browser.naturalLayout)
         #expect(browser.density == nil)
         #expect(!browser.isDefaultViewChanged)
@@ -164,7 +164,7 @@ struct PlaceDefaultsTests {
         let browser = Browser()
         browser.defaults = defaults
         browser.adopt(library, undoManager: undo)
-        browser.sidebarItem = Self.tasks
+        browser.showing = Self.tasks
         browser.followPlaceDefault(in: library)
         undo.beginUndoGrouping()
         browser.changeProperties { $0.setShown(.created, true) }
@@ -188,7 +188,7 @@ struct PlaceDefaultsTests {
         let browser = Browser()
         browser.defaults = defaults
         browser.adopt(library, undoManager: undo)
-        browser.sidebarItem = Self.tasks
+        browser.showing = Self.tasks
         browser.followPlaceDefault(in: library)
         undo.beginUndoGrouping()
         browser.setFilter(Self.status, values: ["todo"])
@@ -199,7 +199,7 @@ struct PlaceDefaultsTests {
         undo.endUndoGrouping()
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)
         undo.undo()
-        #expect(browser.tableOptions[browser.item]?.filter.valuesByField == [Self.status: ["todo"]])
+        #expect(browser.tableOptions[browser.shown]?.filter.valuesByField == [Self.status: ["todo"]])
         #expect(FilterState(clauses: PlaceDefaults.stored(in: defaults).default(for: Self.tasks)?.filter ?? []).valuesByField == [Self.status: ["todo"]])
     }
 
@@ -234,12 +234,12 @@ struct PlaceDefaultsTests {
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == before)
         browser.escapeViewPanel(in: library)
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == before)
-        #expect(browser.tableOptions[browser.item]?.filter.valuesByField == [Self.status: ["todo"]])
+        #expect(browser.tableOptions[browser.shown]?.filter.valuesByField == [Self.status: ["todo"]])
     }
 
     // MARK: What can have gone stale
 
-    private static func store(_ value: PlaceDefault, for place: SidebarItem, in defaults: UserDefaults) {
+    private static func store(_ value: PlaceDefault, for place: PlaceView, in defaults: UserDefaults) {
         PlaceDefaults.update(in: defaults) { $0.set(value, for: place) }
     }
 
@@ -265,12 +265,12 @@ struct PlaceDefaultsTests {
         var stored = PlaceDefault()
         stored.filter = FilterState(is: [Self.status: ["todo"], "type": ["test.gone"]]).clauses
         stored.layout = .board
-        Self.store(stored, for: .itemType("test.gone"), in: defaults)
+        Self.store(stored, for: .type(TypeID("test.gone")), in: defaults)
         Self.store(stored, for: .collection(ItemID("gone")), in: defaults)
         let library = Self.library()
-        let browser = Self.window(defaults, library: library, place: .itemType("test.gone"))
+        let browser = Self.window(defaults, library: library, place: .type(TypeID("test.gone")))
         // Nothing of the type's fields is declared, so the field condition goes; the built-in column's stays.
-        #expect(browser.tableOptions[browser.item]?.filter.valuesByField == ["type": ["test.gone"]])
+        #expect(browser.tableOptions[browser.shown]?.filter.valuesByField == ["type": ["test.gone"]])
         #expect(browser.viewMode != .board)
         // The place a person is in is not touched by another's.
         #expect(Self.window(defaults, library: library).tableOptions[Self.tasks]?.isFiltering != true)
@@ -280,9 +280,9 @@ struct PlaceDefaultsTests {
         let defaults = ViewPanelTests.defaults()
         var stored = PlaceDefault()
         stored.layout = .board
-        Self.store(stored, for: .itemType("core.note"), in: defaults)
+        Self.store(stored, for: .type(TypeID("core.note")), in: defaults)
         let library = Self.library()
-        let browser = Self.window(defaults, library: library, place: .itemType("core.note"))
+        let browser = Self.window(defaults, library: library, place: .type(TypeID("core.note")))
         #expect(!browser.availableViewModes(in: library).contains(.board))
         #expect(browser.viewMode == .list)
     }
@@ -317,7 +317,7 @@ struct PlaceDefaultsTests {
         let good = try String(decoding: JSONEncoder().encode(PlaceDefault(layout: .board)), as: UTF8.self)
         let object: [String: Any] = [
             Self.tasks.storageKey: try JSONSerialization.jsonObject(with: Data(bad.utf8)),
-            SidebarItem.favorites.storageKey: try JSONSerialization.jsonObject(with: Data(good.utf8)),
+            PlaceView.favorites.storageKey: try JSONSerialization.jsonObject(with: Data(good.utf8)),
         ]
         defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: PlaceDefaults.key)
         #expect(PlaceDefaults.stored(in: defaults).default(for: .favorites)?.layout == .board)
@@ -366,8 +366,8 @@ struct PlaceDefaultsTests {
     @Test func entriesOfWhatNoLongerExistsAreForgottenOnlyOnceTheCopyIsWhole() {
         let defaults = ViewPanelTests.defaults()
         let library = Self.library()
-        let gone = SidebarItem.collection(ItemID("gone"))
-        let lost = SidebarItem.itemType("test.gone")
+        let gone = PlaceView.collection(ItemID("gone"))
+        let lost = PlaceView.type(TypeID("test.gone"))
         for place in [Self.tasks, gone, lost, .favorites] { Self.store(PlaceDefault(layout: .table), for: place, in: defaults) }
         let browser = Self.window(defaults, library: library)
 

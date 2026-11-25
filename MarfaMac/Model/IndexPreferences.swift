@@ -26,11 +26,11 @@ nonisolated enum IndexPlace: String, CaseIterable, Sendable {
         }
     }
 
-    init?(_ item: SidebarItem) {
+    init?(_ item: PlaceView) {
         switch item {
         case .sources: self = .sources
         case .collections: self = .collections
-        case .allItems: self = .items
+        case .library: self = .items
         default: return nil
         }
     }
@@ -187,5 +187,5 @@ nonisolated enum IndexPreferences {
 
 extension Browser {
     /// The index page the window shows, if it shows one.
-    var indexPlace: IndexPlace? { showsSidebarIndex ? IndexPlace(item) : nil }
+    var indexPlace: IndexPlace? { showsSidebarIndex ? IndexPlace(shown) : nil }
 }

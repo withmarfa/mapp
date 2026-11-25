@@ -142,7 +142,7 @@ import Testing
     @Test func aSaveReadOnALocalCreateFollowsTheSaveBeforeTheAnswers() async throws {
         let (library, source) = try await loaded()
         let id = try #require(library.createItem(
-            typeID: F.note.rawValue, title: "Call the plumber", body: "Leak", parentID: nil, in: .allItems,
+            typeID: F.note.rawValue, title: "Call the plumber", body: "Leak", parentID: nil, in: .library,
             undoManager: nil))
         let create = try #require(source.submitted.last?.id)
         var made = F.item(id, F.note, "Call the plumber", age: 0)
@@ -234,7 +234,7 @@ extension LiveMarfaTests {
             func end() async {
                 await source.flush()
                 // Conflicted copies the tests caused, found by their tag and the token in their title.
-                for item in library.items(in: .allItems) + library.deletedItems
+                for item in library.items(in: .library) + library.deletedItems
                 where item.tags.contains(MarfaProblems.conflictedCopyTag) && item.title.hasPrefix("MARFAMACTEST review") {
                     made.add(item.id)
                 }
@@ -245,7 +245,7 @@ extension LiveMarfaTests {
             do {
                 source.refresh()
                 try #require(await eventually {
-                    library.isLoaded && library.connection == .online && library.count(in: .allItems) > 100
+                    library.isLoaded && library.connection == .online && library.count(in: .library) > 100
                 })
                 try await body(library, source, made)
             } catch {
@@ -257,7 +257,7 @@ extension LiveMarfaTests {
 
         private func make(_ library: MarfaLibrary, _ source: MarfaSource, _ made: LiveMarfa.Made, _ token: String) async throws -> ItemID {
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MARFAMACTEST review \(token)", body: "start", parentID: nil, in: .allItems,
+                typeID: "core.note", title: "MARFAMACTEST review \(token)", body: "start", parentID: nil, in: .library,
                 undoManager: nil))
             made.add(id)
             await source.flush()
@@ -271,7 +271,7 @@ extension LiveMarfaTests {
         private func conflicts(_ library: MarfaLibrary, _ id: ItemID, _ token: String) -> [String] {
             var found: [String] = []
             if case .conflicted = library.item(id)?.sync { found.append("item sync is conflicted") }
-            for item in library.items(in: .allItems)
+            for item in library.items(in: .library)
             where item.tags.contains(MarfaProblems.conflictedCopyTag) && item.title.contains(token) {
                 found.append("conflicted copy \(item.id.rawValue)")
             }
@@ -302,12 +302,12 @@ extension LiveMarfaTests {
             library.sendWaitingText()
             await source.flush()
             _ = await eventually {
-                library.items(in: .allItems).contains {
+                library.items(in: .library).contains {
                     $0.tags.contains(MarfaProblems.conflictedCopyTag) && $0.title.contains(token)
                         && library.body(of: $0.id)?.text == text
                 }
             }
-            return library.items(in: .allItems).filter {
+            return library.items(in: .library).filter {
                 $0.tags.contains(MarfaProblems.conflictedCopyTag) && $0.title.contains(token)
             }
         }

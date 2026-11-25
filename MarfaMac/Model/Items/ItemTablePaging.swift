@@ -79,12 +79,12 @@ nonisolated struct TablePaging: Hashable, Sendable {
 /// What a page count belongs to. Anything that changes the rows or their order, or the page size, starts again at
 /// one page; an edit to an item, a folded group or the selection does not.
 nonisolated struct TablePagingKey: Hashable, Sendable {
-    let place: SidebarItem
+    let place: PlaceView
     let search: String
     let byRelevance: Bool
     let options: ItemTableOptions
 
-    init(place: SidebarItem, search: String, byRelevance: Bool, options: ItemTableOptions) {
+    init(place: PlaceView, search: String, byRelevance: Bool, options: ItemTableOptions) {
         self.place = place
         self.search = search
         self.byRelevance = byRelevance

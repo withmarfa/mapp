@@ -39,12 +39,12 @@ struct ItemTable: View {
 
     var body: some View {
         let _ = daysSeen
-        let _ = placeTrace.bodyRan(for: browser.item)
+        let _ = placeTrace.bodyRan(for: browser.shown)
         let content = tableContent()
         let _ = setStartingWidths(browser.shownColumns(content.columns))
         let (allRows, rows) = (content.allRows, content.rows)
         let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
+        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
 
         ItemTableSelection(browser: browser, content: content) { selection in
             table(selection: selection, columns: content.columns, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
@@ -62,7 +62,7 @@ struct ItemTable: View {
                     HiddenGroupsEmptyState()
                 } else if rows.isEmpty {
                     EmptyState(title: Text("No Matching Items"), detail: Text("No items match the filters.")) {
-                        Button("Clear Filters") { browser.tableOptions[browser.item, default: .init()].clearFilters() }
+                        Button("Clear Filters") { browser.tableOptions[browser.shown, default: .init()].clearFilters() }
                     }
                 }
             }
@@ -190,7 +190,7 @@ struct ItemTable: View {
     private func toggle(_ group: String, collapsed: Set<String>) {
         var next = collapsed
         if next.contains(group) { next.remove(group) } else { next.insert(group) }
-        browser.tableOptions[browser.item, default: .init()].collapsed = next
+        browser.tableOptions[browser.shown, default: .init()].collapsed = next
     }
 
     /// What the header may not do with a column. The name always shows and stays first. Any other column can be hidden
@@ -209,17 +209,17 @@ struct ItemTable: View {
     private func sortBinding(_ columns: [ItemTableColumn]) -> Binding<[ItemTableComparator]> {
         Binding {
             browser.ordersByRelevance ? [] : ItemTableLayout.sort(
-                browser.tableOptions[browser.item] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
+                browser.tableOptions[browser.shown] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
         } set: { sort in
             if !sort.isEmpty { browser.orderSearch(byRelevance: false) }
-            browser.tableOptions[browser.item, default: .init()].sort = Array(sort.prefix(ViewDraft.maxSortKeys))
+            browser.tableOptions[browser.shown, default: .init()].sort = Array(sort.prefix(ViewDraft.maxSortKeys))
         }
     }
 
     // MARK: Column layouts
 
     private var viewID: ItemID? {
-        if case .view(let id) = browser.item { id } else { nil }
+        if let id = browser.shown.savedView { id } else { nil }
     }
 
     /// The table's column widths, which a place keeps for itself and a saved view keeps on its own. The table reads and
@@ -240,7 +240,7 @@ struct ItemTable: View {
             guard resizing.isDragging else { return }
             let widths = Self.widthsOnly(next, columns)
             guard let id = viewID else {
-                storedColumns = ItemTableColumnLayouts.storing(widths, for: browser.item, in: storedColumns, setAsideIn: browser.defaults)
+                storedColumns = ItemTableColumnLayouts.storing(widths, for: browser.shown, in: storedColumns, setAsideIn: browser.defaults)
                 return
             }
             do {
@@ -268,11 +268,11 @@ struct ItemTable: View {
             place = id.rawValue
         } else {
             data = storedColumns
-            place = browser.item.storageKey
+            place = browser.shown.storageKey
         }
         if widthCache.data != data || widthCache.place != place {
             widthCache.decoded = viewID == nil
-                ? ItemTableColumnLayouts.layout(for: browser.item, in: data)
+                ? ItemTableColumnLayouts.layout(for: browser.shown, in: data)
                 : (try? JSONDecoder().decode(TableColumnCustomization<ItemTableRow>.self, from: data)) ?? .init()
             widthCache.data = data
             widthCache.place = place
@@ -323,11 +323,11 @@ struct ItemTable: View {
 /// gallery or by launching, is a layout change, which is not a place change.
 @MainActor
 private final class TablePlaceTrace {
-    private var place: SidebarItem?
+    private var place: PlaceView?
     private var current: (id: Int, interval: Telemetry.Interval)?
     private var counter = 0
 
-    func bodyRan(for place: SidebarItem) {
+    func bodyRan(for place: PlaceView) {
         guard place != self.place else { return }
         let isMount = self.place == nil
         self.place = place
@@ -356,20 +356,20 @@ enum ItemTableColumnLayouts {
     /// Each entry is stored data that could not be read, in the order it was found.
     static let setAsideKey = "itemTableColumnsSetAside"
 
-    static func key(for place: SidebarItem) -> String { place.storageKey }
+    static func key(for place: PlaceView) -> String { place.storageKey }
 
-    static func layout(for place: SidebarItem, in stored: Data) -> TableColumnCustomization<ItemTableRow> {
+    static func layout(for place: PlaceView, in stored: Data) -> TableColumnCustomization<ItemTableRow> {
         layouts(in: stored)?[key(for: place)] ?? .init()
     }
 
     /// Whether the person arranged the place's columns: an entry with nothing in it is the table's own arrangement.
-    static func isChanged(for place: SidebarItem, in stored: Data) -> Bool {
+    static func isChanged(for place: PlaceView, in stored: Data) -> Bool {
         layouts(in: stored)?[key(for: place)].map { $0 != .init() } ?? false
     }
 
     /// The stored layouts without the place's, so its table starts again from its own columns. Data that cannot be read
     /// holds no layout of the place to remove, so it comes back as it was.
-    static func removing(_ place: SidebarItem, in stored: Data) -> Data {
+    static func removing(_ place: PlaceView, in stored: Data) -> Data {
         guard var layouts = layouts(in: stored), layouts[key(for: place)] != nil else { return stored }
         layouts[key(for: place)] = nil
         return (try? JSONEncoder().encode(layouts)) ?? stored
@@ -378,7 +378,7 @@ enum ItemTableColumnLayouts {
     /// The stored layouts with the place's changed. Data that cannot be read is kept aside in `defaults` first, since the
     /// layouts then start again from this one.
     static func storing(
-        _ layout: TableColumnCustomization<ItemTableRow>, for place: SidebarItem, in stored: Data,
+        _ layout: TableColumnCustomization<ItemTableRow>, for place: PlaceView, in stored: Data,
         setAsideIn defaults: UserDefaults = .standard
     ) -> Data {
         var layouts = layouts(in: stored)
@@ -393,7 +393,7 @@ enum ItemTableColumnLayouts {
     /// The stored layouts: none where nothing is stored, and nil where what is stored cannot be read.
     private static func layouts(in stored: Data) -> [String: TableColumnCustomization<ItemTableRow>]? {
         if stored.isEmpty { return [:] }
-        return try? JSONDecoder().decode([String: TableColumnCustomization<ItemTableRow>].self, from: stored)
+        return (try? JSONDecoder().decode([String: TableColumnCustomization<ItemTableRow>].self, from: stored)).map(EarlierPlace.carried)
     }
 }
 

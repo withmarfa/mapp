@@ -53,8 +53,8 @@ struct ItemsIndex: View {
             }
             // An item that goes (deleted here or by another app, or gone on a sync) takes the right sidebar's content with it.
             .onChange(of: library.membershipRevision, initial: true) { browser.keepItemChoice(in: library) }
-            .onDisappear { if browser.item != .allItems { model.stop() } }
-            .navigationTitle(library.name(of: browser.item))
+            .onDisappear { if browser.shown != .library { model.stop() } }
+            .navigationTitle(library.name(of: browser.shown))
             .accessibilityIdentifier("ItemsIndex")
     }
 
@@ -65,7 +65,7 @@ struct ItemsIndex: View {
             let shown = tabs.rows(for: tab)
             IndexScaffold { browser.isIndexHeaderAway = $0 } top: {
                 IndexPageTop(
-                    title: library.name(of: browser.item), browser: browser,
+                    title: library.name(of: browser.shown), browser: browser,
                     tabs: Self.place.tabs.map { (tab: $0, count: tabs.count(for: $0)) },
                     tab: Binding { tab } set: { storedTab = $0 },
                     new: { browser.openQuickAddFromIndex(remembered: lastType, in: library) })

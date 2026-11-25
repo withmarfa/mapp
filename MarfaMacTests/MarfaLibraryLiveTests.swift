@@ -41,7 +41,7 @@ extension LiveMarfaTests {
         func browsesEveryPlaceAndFollowsEdgesBothWays() async throws {
             try await withLibrary { library, source, made in
                 let token = "zb" + UUID().uuidString.prefix(8).lowercased()
-                @MainActor func make(_ title: String, under parent: ItemID? = nil, in place: SidebarItem = .allItems) throws -> ItemID {
+                @MainActor func make(_ title: String, under parent: ItemID? = nil, in place: PlaceView = .library) throws -> ItemID {
                     let id = library.createItem(
                         typeID: "core.note", title: "MARFAMACTEST \(title) \(token)", body: "Made by the app tests.",
                         parentID: parent, in: place, undoManager: nil)
@@ -58,8 +58,8 @@ extension LiveMarfaTests {
                         == Set(children) && library.item(captured) != nil
                 })
 
-                let types = Set(library.items(in: .allItems).map(\.type))
-                for place in [SidebarItem.inbox, .allItems, .favorites, .files] + types.map({ SidebarItem.itemType($0.rawValue) }) {
+                let types = Set(library.items(in: .library).map(\.type))
+                for place in [PlaceView.inbox, .library, .favorites, .files] + types.map({ PlaceView.type($0) }) {
                     let items = library.items(in: place)
                     #expect(library.count(in: place) == items.count, "\(place)")
                     #expect(!library.name(of: place).isEmpty, "\(place)")
@@ -67,7 +67,7 @@ extension LiveMarfaTests {
                     case .favorites: #expect(items.allSatisfy { $0.isFavorite && $0.state == .active })
                     case .inbox: #expect(items.allSatisfy { $0.tier == .feed })
                     // A type's place holds only its own items, never its subtypes'.
-                    case .itemType(let type): #expect(items.allSatisfy { $0.type == TypeID(type) && $0.state == .active }, "\(place)")
+                    case .type(let type): #expect(items.allSatisfy { $0.type == TypeID(type) && $0.state == .active }, "\(place)")
                     default: #expect(items.allSatisfy { $0.state == .active }, "\(place)")
                     }
                 }
@@ -78,7 +78,7 @@ extension LiveMarfaTests {
                 let inbox = library.items(in: .inbox)
                 #expect(inbox.contains { $0.id == captured })
                 #expect(!inbox.contains { $0.id == project })
-                #expect(Set(inbox.map(\.id)).isSubset(of: Set(library.items(in: .allItems).map(\.id))))
+                #expect(Set(inbox.map(\.id)).isSubset(of: Set(library.items(in: .library).map(\.id))))
 
                 // Each child holds its parent as `child-of`, which makes the parent no collection.
                 let below = try #require(library.relationships(for: project).first { $0.field == "inverse:parent-of" })
@@ -104,7 +104,7 @@ extension LiveMarfaTests {
                 @MainActor func make(_ title: String, type: String) throws -> ItemID {
                     let id = library.createItem(
                         typeID: type, title: "MARFAMACTEST \(title) \(token)", body: "", properties: [:], parentID: nil,
-                        in: .allItems, undoManager: nil)
+                        in: .library, undoManager: nil)
                     if let id { made.add(id) }
                     return try #require(id)
                 }
@@ -154,7 +154,7 @@ extension LiveMarfaTests {
                 @MainActor func make(_ title: String, under parent: ItemID? = nil) throws -> ItemID {
                     let id = library.createItem(
                         typeID: "core.note", title: "MARFAMACTEST \(title) \(token)", body: "Made by the app tests.",
-                        parentID: parent, in: .allItems, undoManager: nil)
+                        parentID: parent, in: .library, undoManager: nil)
                     if let id { made.add(id) }
                     return try #require(id)
                 }
@@ -285,10 +285,10 @@ extension LiveMarfaTests {
             try await withLibrary { library, source, made in
                 let token = "zq" + UUID().uuidString.prefix(8).lowercased()
                 let kept = try #require(library.createItem(
-                    typeID: "core.note", title: "MARFAMACTEST bin kept \(token)", body: "Kept.", parentID: nil, in: .allItems,
+                    typeID: "core.note", title: "MARFAMACTEST bin kept \(token)", body: "Kept.", parentID: nil, in: .library,
                     undoManager: nil))
                 let purged = try #require(library.createItem(
-                    typeID: "core.note", title: "MARFAMACTEST bin purged \(token)", body: "Purged.", parentID: nil, in: .allItems,
+                    typeID: "core.note", title: "MARFAMACTEST bin purged \(token)", body: "Purged.", parentID: nil, in: .library,
                     undoManager: nil))
                 made.add(kept)
                 made.add(purged)
@@ -304,7 +304,7 @@ extension LiveMarfaTests {
                 library.recover([kept], undoManager: nil)
                 try #require(await eventually { library.item(kept)?.state == .active })
                 #expect(!library.deletedItems.contains { $0.id == kept })
-                #expect(library.items(in: .allItems).contains { $0.id == kept })
+                #expect(library.items(in: .library).contains { $0.id == kept })
 
                 // Permanently Delete needs the server and takes the item out of the bin and the copy.
                 try #require(library.reachesServer)
@@ -325,10 +325,10 @@ extension LiveMarfaTests {
                 let token = "zq" + UUID().uuidString.prefix(8).lowercased()
                 let targetTitle = "MARFAMACTEST link target \(token)"
                 let target = try #require(library.createItem(
-                    typeID: "core.note", title: targetTitle, body: "Linked.", parentID: nil, in: .allItems, undoManager: nil))
+                    typeID: "core.note", title: targetTitle, body: "Linked.", parentID: nil, in: .library, undoManager: nil))
                 let host = try #require(library.createItem(
                     typeID: "core.note", title: "MARFAMACTEST link host \(token)", body: "Nothing yet.", parentID: nil,
-                    in: .allItems, undoManager: nil))
+                    in: .library, undoManager: nil))
                 made.add(target)
                 made.add(host)
                 try #require(await eventually { library.item(target) != nil && library.item(host) != nil })
@@ -394,7 +394,7 @@ extension LiveMarfaTests {
                 let token = "zv" + UUID().uuidString.prefix(8).lowercased()
                 let title = "MARFAMACTEST view note \(token)"
                 let id = try #require(library.createItem(
-                    typeID: "core.note", title: title, body: "Made by the app tests.", parentID: nil, in: .allItems,
+                    typeID: "core.note", title: title, body: "Made by the app tests.", parentID: nil, in: .library,
                     undoManager: nil))
                 made.add(id)
                 await source.flush()
@@ -402,14 +402,14 @@ extension LiveMarfaTests {
                 let view = try await source.copy.createView(ViewSettings(title: "MARFAMACTEST view \(token)", query: query))
                 func deleteView() async { try? await source.copy.deleteView(view.id) }
                 do {
-                    let place = SidebarItem.view(ItemID(view.id))
+                    let place = PlaceView.saved(ItemID(view.id))
                     try #require(await eventually { library.views.contains { $0.id.rawValue == view.id } })
                     #expect(SidebarPlan(library, layout: SidebarLayout()).library.contains(.views))
                     #expect(library.name(of: place) == "MARFAMACTEST view \(token)")
                     #expect(await eventually { library.items(in: place).map(\.id) == [id] })
 
                     #expect(library.item(ItemID(view.id)) == nil)
-                    #expect(!library.items(in: .allItems).contains { $0.id.rawValue == view.id })
+                    #expect(!library.items(in: .library).contains { $0.id.rawValue == view.id })
                     #expect(!library.itemTypeCounts.contains { $0.id.rawValue.hasPrefix("system.") })
                     // The view's title holds the token too, so only an item reaches the results.
                     #expect(await eventually { library.search(token, in: .everywhere).items.map(\.id) == [id] })
@@ -419,7 +419,7 @@ extension LiveMarfaTests {
                     await deleteView()
                     try #require(await eventually { !library.views.contains { $0.id.rawValue == view.id } })
                     browser.placeRemoved(in: library, order: ItemOrder())
-                    #expect(browser.sidebarItem == .allItems)
+                    #expect(browser.showing == .library)
                 } catch {
                     await deleteView()
                     throw error
@@ -436,7 +436,7 @@ extension LiveMarfaTests {
                 let title = "MARFAMACTEST typed after quick add " + UUID().uuidString.prefix(8).lowercased()
                 let id = try #require(library.createItem(
                     typeID: "core.note", title: title, body: "Ask about the leak under the sink.", parentID: nil,
-                    in: .allItems, undoManager: nil))
+                    in: .library, undoManager: nil))
                 made.add(id)
                 // The page opens the item as soon as it is made, so it reads the text of the create before the server
                 // answers it, at version 0.

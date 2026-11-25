@@ -6,10 +6,10 @@ extension Browser {
     /// Whether the row shows. A saved view opens with it hidden, since the count on the View Options button says filters
     /// apply, and any other place shows it whenever it holds a filter, until the person hides it.
     var showsFilterRow: Bool {
-        if let choice = filterRowChoice[item] { return choice }
-        if case .view = item { return false }
-        if item == .collections { return !collectionSourceFilter.isEmpty }
-        return tableOptions[item]?.isFiltering == true
+        if let choice = filterRowChoice[shown] { return choice }
+        if shown.savedView != nil { return false }
+        if shown == .collections { return !collectionSourceFilter.isEmpty }
+        return tableOptions[shown]?.isFiltering == true
     }
 
     /// What the command that shows or hides the row is called now.
@@ -19,17 +19,17 @@ extension Browser {
 
     /// How many filters the open place holds.
     var filterCount: Int {
-        tableOptions[item]?.filter.complete.clauses.count ?? 0
+        tableOptions[shown]?.filter.complete.clauses.count ?? 0
     }
 
     /// View Options' and the View menu's Show Filters and Hide Filters.
     func toggleFilterRow() {
-        filterRowChoice[item] = !showsFilterRow
+        filterRowChoice[shown] = !showsFilterRow
     }
 
     /// Add Filter…: shows the row and asks it to open its panel.
     func requestAddFilter() {
-        filterRowChoice[item] = true
+        filterRowChoice[shown] = true
         isAddFilterRequested = true
     }
 
@@ -38,19 +38,19 @@ extension Browser {
     /// (`dropUnfinishedFilters`).
     @discardableResult
     func addFilter(on target: FilterTarget) -> Int {
-        filterRowChoice[item] = true
-        var options = tableOptions[item] ?? ItemTableOptions()
+        filterRowChoice[shown] = true
+        var options = tableOptions[shown] ?? ItemTableOptions()
         options.filter.clauses.append(FilterClause(field: target.id, op: target.kind.startingOperator))
-        tableOptions[item] = options
+        tableOptions[shown] = options
         return options.filter.clauses.count - 1
     }
 
     /// Changes one clause of the row, keeping the row in view.
     func changeFilter(at index: Int, _ change: (inout FilterClause) -> Void) {
-        guard var options = tableOptions[item], options.filter.clauses.indices.contains(index) else { return }
-        filterRowChoice[item] = true
+        guard var options = tableOptions[shown], options.filter.clauses.indices.contains(index) else { return }
+        filterRowChoice[shown] = true
         change(&options.filter.clauses[index])
-        tableOptions[item] = options
+        tableOptions[shown] = options
     }
 
     /// Gives a clause another operator. The values stay where the new operator asks for the same kind of value (is and is
@@ -70,29 +70,29 @@ extension Browser {
 
     /// Removes one filter.
     func removeFilter(at index: Int) {
-        guard var options = tableOptions[item], options.filter.clauses.indices.contains(index) else { return }
+        guard var options = tableOptions[shown], options.filter.clauses.indices.contains(index) else { return }
         options.filter.clauses.remove(at: index)
         if options.filter.clauses.count < 2 { options.filter.matchesAny = false }
-        tableOptions[item] = options
+        tableOptions[shown] = options
     }
 
     /// Drops the filters that still ask for a value, once their panel is closed.
     func dropUnfinishedFilters() {
-        guard var options = tableOptions[item], options.filter.clauses.contains(where: { !$0.isComplete }) else { return }
+        guard var options = tableOptions[shown], options.filter.clauses.contains(where: { !$0.isComplete }) else { return }
         options.filter.clauses.removeAll { !$0.isComplete }
         if options.filter.clauses.count < 2 { options.filter.matchesAny = false }
-        tableOptions[item] = options
+        tableOptions[shown] = options
     }
 
     /// Whether an item needs to meet every filter or any one of them.
     func setFiltersMatchAny(_ any: Bool) {
-        guard var options = tableOptions[item], options.filter.matchesAny != any else { return }
+        guard var options = tableOptions[shown], options.filter.matchesAny != any else { return }
         options.filter.matchesAny = any
-        tableOptions[item] = options
+        tableOptions[shown] = options
     }
 
     /// Removes every filter.
     func clearFilters() {
-        tableOptions[item, default: .init()].clearFilters()
+        tableOptions[shown, default: .init()].clearFilters()
     }
 }

@@ -3,7 +3,7 @@ import Foundation
 /// The pages of the table a window has loaded (`TablePaging`).
 extension Browser {
     private var pagingKey: TablePagingKey {
-        TablePagingKey(place: item, search: searchText, byRelevance: ordersByRelevance, options: tableOptions[item] ?? ItemTableOptions())
+        TablePagingKey(place: shown, search: searchText, byRelevance: ordersByRelevance, options: tableOptions[shown] ?? ItemTableOptions())
     }
 
     /// The pages loaded for what the table shows now: one again whenever the place, the search, the order, the
@@ -13,7 +13,7 @@ extension Browser {
         return held.paging
     }
 
-    var tablePageSize: TablePageSize { tableOptions[item]?.pageSize ?? .standard }
+    var tablePageSize: TablePageSize { tableOptions[shown]?.pageSize ?? .standard }
 
     /// Adds a page to the place, grouped or not.
     func loadMoreTableRows() {

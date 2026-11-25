@@ -35,7 +35,7 @@ struct IndexRowsTests {
     @Test func sourcesAndTheirCountsComeFromOneGrouping() {
         let items = [item("a", source: "b"), item("b", source: "A"), item("c", source: "b"), item("d")]
         let library = FakeItemLibrary(items: items, now: base)
-        let groups = IndexRows.groupedBySource(library.items(in: .allItems))
+        let groups = IndexRows.groupedBySource(library.items(in: .library))
         #expect(library.sourceCounts.map(\.code) == groups.map(\.code))
         #expect(library.sourceCounts.map(\.count) == groups.map(\.items.count))
     }

@@ -110,7 +110,7 @@ import Testing
         try #require(await eventually { library.isLoaded })
         source.send(.upserted([newer]))
         try #require(await eventually { library.item(newer.id) != nil })
-        #expect(library.items(in: .allItems).map(\.id) == [newer.id, older.id])
+        #expect(library.items(in: .library).map(\.id) == [newer.id, older.id])
         #expect(library.item(older.id)?.allows(.text) == true)
         #expect(library.syncReport.fill?.listed == 1)
         await source.close()

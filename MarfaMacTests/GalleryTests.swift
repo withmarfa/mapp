@@ -39,7 +39,7 @@ struct GalleryTests {
             GalleryCard(item: item, browser: browser, width: width, cards: cards, content: said ?? content(item), attachments: attached)
         }
         let before = card(newer)
-        browser.show(.allItems, in: library, order: ItemOrder())
+        browser.show(.library, in: library, order: ItemOrder())
         browser.selection = [newer.id]
         #expect(before == card(newer), "a selection that moves leaves the card alone")
         browser.selection = [other.id]

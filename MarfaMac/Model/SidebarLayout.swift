@@ -1,38 +1,40 @@
 import Foundation
 import Observation
 
-/// A place the sidebar can show, named by a key that stays the same across launches, so what the person chose to hide
-/// or move is found again.
+/// A row the sidebar can show, named by a key that stays the same across launches, so what the person chose to hide
+/// or move is found again. The Library and the Feed keep the keys earlier copies gave All Items and Inbox, so a layout
+/// arranged then reads as it was; Recents is no row now, and its key is left where it is stored, for those copies.
 nonisolated enum SidebarPlace: Hashable, Sendable {
-    case inbox, recents, all, favorites, sources
+    case library, feed, favorites, sources
     /// The index of items other items are filed under.
     case collections
     /// The block that holds the library's types.
     case types
-    /// The saved views in the Views block; hiding it hides every saved view and leaves Inbox, Recents and Favorites.
+    /// The pinned saved views; hiding it hides every one and leaves the Feed and Favorites.
     case views
     /// A type's row, or a group of types by its stem (`TypeNode.id`).
     case type(String)
-    /// One saved view's row, by its item ID.
+    /// One saved view's row, by its item ID, which opens the view at its home.
     case view(ItemID)
     /// One collection's row, by its item ID, which a section the person made holds.
     case collection(ItemID)
     /// One source's row, by its code, which a section the person made holds.
     case source(String)
+    /// One pinned item's row, by its item ID, which opens the item.
+    case item(ItemID)
 
     /// The places in the Library group, under New and Search, in their default order.
-    static let destinations: [SidebarPlace] = [.all, .sources, .collections]
-    /// The built-in views at the top of the Views block, in their default order.
-    static let builtInViews: [SidebarPlace] = [.inbox, .recents, .favorites]
+    static let destinations: [SidebarPlace] = [.library, .sources, .collections]
+    /// The rows at the top of the Pinned block, in their default order.
+    static let builtInViews: [SidebarPlace] = [.feed, .favorites]
 
     /// Every saved view's symbol: a view is a filtered list, whatever it lists.
     static let viewSymbol = "square.stack.3d.up"
 
     var key: String {
         switch self {
-        case .inbox: "inbox"
-        case .recents: "recents"
-        case .all: "all"
+        case .library: "all"
+        case .feed: "inbox"
         case .favorites: "favorites"
         case .sources: "sources"
         case .collections: "collections"
@@ -42,15 +44,15 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .view(let id): "view:" + id.rawValue
         case .collection(let id): "collection:" + id.rawValue
         case .source(let code): "source:" + code
+        case .item(let id): "item:" + id.rawValue
         }
     }
 
     /// The place a key names, or nil for a key that names none.
     init?(key: String) {
         switch key {
-        case "inbox": self = .inbox
-        case "recents": self = .recents
-        case "all": self = .all
+        case "all": self = .library
+        case "inbox": self = .feed
         case "favorites": self = .favorites
         case "sources": self = .sources
         case "collections": self = .collections
@@ -65,58 +67,58 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
             case "view": self = .view(ItemID(value))
             case "collection": self = .collection(ItemID(value))
             case "source": self = .source(value)
+            case "item": self = .item(ItemID(value))
             default: return nil
             }
         }
     }
 
-    /// The mark of a place that is drawn by symbol; a type draws its own, from the catalogue.
+    /// The mark of a place that is drawn by symbol; a type and an item draw their type's own, from the catalogue.
     var symbol: String? {
         switch self {
-        case .inbox: "tray"
-        case .recents: "clock"
-        case .all: "square.grid.2x2"
+        case .library: "square.grid.2x2"
+        case .feed: "tray"
         case .favorites: "star"
         case .sources: "antenna.radiowaves.left.and.right"
         case .collections, .collection: "square.stack"
         case .source: "antenna.radiowaves.left.and.right"
         case .types: "rectangle.3.group"
         case .views, .view: Self.viewSymbol
-        case .type: nil
+        case .type, .item: nil
         }
     }
 
-    /// What the place opens, where it opens something of its own: the six places and a saved view.
-    var item: SidebarItem? {
+    /// What the row opens, where it opens a place: a saved view opens at its home, which `Browser.show` finds. A
+    /// pinned item opens the item, which is no place.
+    var opens: PlaceView? {
         switch self {
-        case .inbox: .inbox
-        case .recents: .recents
-        case .all: .allItems
+        case .library: .library
+        case .feed: .feed
         case .favorites: .favorites
         case .sources: .sources
         case .collections: .collections
-        case .view(let id): .view(id)
+        case .view(let id): .saved(id)
         case .collection(let id): .collection(id)
         case .source(let code): .source(code)
-        case .types, .views, .type: nil
+        case .types, .views, .type, .item: nil
         }
     }
 
     /// A mark takes the color the person chose for it, or gray. Every place with a symbol of its own has one: the
-    /// views, the three indexes, and a collection or a source in a section the person made. A type draws its own mark,
-    /// and the two blocks that hold rows have none.
+    /// views, the three indexes, and a collection or a source in a section the person made. A type and an item draw
+    /// their type's mark, and the two blocks that hold rows have none.
     var defaultTone: TypeTone? {
         switch self {
-        case .type, .types, .views: nil
+        case .type, .types, .views, .item: nil
         default: .gray
         }
     }
 
-    /// Whether the row carries a count. Recents always holds the same number, so it says nothing, and the indexes and
-    /// a saved view list what the copy holds on their own.
+    /// Whether the row carries a count. The indexes and a saved view list what the copy holds on their own, and an
+    /// item is one.
     var showsCount: Bool {
         switch self {
-        case .all, .inbox, .favorites, .collection, .source: true
+        case .library, .feed, .favorites, .collection, .source: true
         default: false
         }
     }
@@ -256,7 +258,7 @@ struct SidebarPlan {
     /// The places in the Library group: every item, the sources they came from, and the collections they are filed
     /// under. Files are included in Items.
     let destinations: [SidebarPlace]
-    /// The built-in views at the top of the Views block: Inbox, Recents and Favorites. They are places, not saved
+    /// The rows at the top of the Pinned block: the Feed and the Library's Favorites. They are places, not saved
     /// views, and no data model sits behind the grouping.
     let builtInViews: [SidebarPlace]
     /// The saved views in the Views block, where the server has saved any views the library can read, then the Types
@@ -320,14 +322,14 @@ struct SidebarPlan {
         /// Fold the row of this identifier shut (`collapsed`) or open.
         case fold(String, collapsed: Bool)
         /// Select this row.
-        case select(SidebarItem)
+        case select(PlaceView)
     }
 
     /// What the system's outline does with an arrow key, for the selected type row, or nil where it does nothing.
     /// Left folds a row that is open, and otherwise selects the row's parent. Right opens a row that is folded, and
     /// otherwise selects the first row under it that opens a list. A group has no list to select, so a parent that
     /// is one is passed over for the nearest above it that has.
-    func outcome(of arrow: Arrow, selected: SidebarItem?) -> ArrowOutcome? {
+    func outcome(of arrow: Arrow, selected: PlaceView?) -> ArrowOutcome? {
         let path = path(to: selected)
         guard let node = path.last else { return nil }
         let isExpanded = !layout.isCollapsed(.type(node.id))
@@ -344,18 +346,18 @@ struct SidebarPlan {
 
     /// The row to select as `id` folds shut, when the selected type is somewhere under it: the nearest row that
     /// opens a list, from that row upward. Nil where the selection stays as it is.
-    func selectionAfterFolding(_ id: String, selected: SidebarItem?) -> SidebarItem? {
+    func selectionAfterFolding(_ id: String, selected: PlaceView?) -> PlaceView? {
         let path = path(to: selected)
         guard let index = path.firstIndex(where: { $0.id == id }), index < path.count - 1 else { return nil }
         return path[...index].last(where: \.opens).flatMap(Self.item)
     }
 
-    private static func item(_ node: TypeNode) -> SidebarItem? {
-        node.type.map { .itemType($0.rawValue) }
+    private static func item(_ node: TypeNode) -> PlaceView? {
+        node.type.map { .type($0) }
     }
 
     /// The shown rows from the top of the tree down to the one `selected` names, or none where it names no shown row.
-    private func path(to selected: SidebarItem?) -> [TypeNode] {
+    private func path(to selected: PlaceView?) -> [TypeNode] {
         guard let selected else { return [] }
         func search(_ nodes: [TypeNode]) -> [TypeNode]? {
             for node in nodes {

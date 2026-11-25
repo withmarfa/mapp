@@ -50,7 +50,7 @@ struct PlaceEmptyState: View {
 
     var body: some View {
         let offered = QuickAdd.isAvailable(in: library) ? QuickAdd.types(in: library).map(\.id.rawValue) : []
-        let empty = PlaceEmpty.of(browser.item, in: library.catalogue, offered: offered)
+        let empty = PlaceEmpty.of(browser.shown, in: library.catalogue, offered: offered)
         EmptyState(title: Text(verbatim: empty.title), detail: empty.line.map { Text(verbatim: $0) }) {
             if let type = empty.makes, let title = empty.buttonTitle {
                 Button(title, systemImage: "plus") { browser.openQuickAdd(typeID: type, in: library) }

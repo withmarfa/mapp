@@ -287,12 +287,12 @@ struct EngineCostTests {
         try #require(await eventually { opened.library.isLoaded })
         let loaded = ContinuousClock.now - start
         line("\(label)_to_first_loaded", loaded)
-        line("\(label)_first_loaded_items", Double(opened.library.count(in: .allItems)), "count")
+        line("\(label)_first_loaded_items", Double(opened.library.count(in: .library)), "count")
         try #require(await eventually { self.whole(opened.library) })
         line("\(label)_to_complete", ContinuousClock.now - start)
         await opened.source.engineTook()
         line("\(label)_to_engine_idle", ContinuousClock.now - start)
-        line("\(label)_library_items", Double(opened.library.count(in: .allItems)), "count")
+        line("\(label)_library_items", Double(opened.library.count(in: .library)), "count")
         return opened
     }
 
@@ -362,12 +362,12 @@ struct EngineCostTests {
             let opened = try await openWhole(bench)
             let library = opened.library
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MARFAMACTEST change 0", body: "", properties: [:], parentID: nil, in: .allItems, undoManager: nil))
+                typeID: "core.note", title: "MARFAMACTEST change 0", body: "", properties: [:], parentID: nil, in: .library, undoManager: nil))
             bench.made.add(id)
             try #require(await eventually { library.item(id)?.sync == .settled })
 
-            let places: [(String, SidebarItem)] = [("all_items", .allItems), ("inbox", .inbox)]
-                + library.catalogue.itemTypes.keys.sorted { $0.rawValue < $1.rawValue }.map { ("type_\($0.rawValue)", .itemType($0.rawValue)) }
+            let places: [(String, PlaceView)] = [("all_items", .library), ("inbox", .inbox)]
+                + library.catalogue.itemTypes.keys.sorted { $0.rawValue < $1.rawValue }.map { ("type_\($0.rawValue)", .type($0)) }
             var itemsTimes: [String: [Double]] = [:]
             var countTimes: [String: [Double]] = [:]
             var totals: [Double] = []
@@ -409,7 +409,7 @@ struct EngineCostTests {
             let opened = try await openWhole(bench)
             let library = opened.library, source = opened.source
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MARFAMACTEST write", body: "First", properties: [:], parentID: nil, in: .allItems, undoManager: nil))
+                typeID: "core.note", title: "MARFAMACTEST write", body: "First", properties: [:], parentID: nil, in: .library, undoManager: nil))
             bench.made.add(id)
             try #require(await eventually { library.item(id)?.sync == .settled })
             await source.engineTook()

@@ -12,7 +12,7 @@ extension Browser {
     /// Edit View: a view opens its own panel, and any other place that can show a table opens one with no name.
     func openViewPanel(in library: any ItemLibrary) {
         if viewPanel != nil { return }
-        if case .view(let id) = item, let view = library.views.first(where: { $0.id == id }) {
+        if let id = shown.savedView, let view = library.views.first(where: { $0.id == id }) {
             followView(in: library)
             viewPanel = ViewPanel(editing: view, notices: library.notices)
         } else if offersViewOptions {
@@ -23,10 +23,10 @@ extension Browser {
     /// Edit View on a row of the sidebar's Views, which opens the view first.
     func editView(_ id: ItemID, in library: any ItemLibrary, order: ItemOrder) {
         guard library.views.contains(where: { $0.id == id }) else { return }
-        if viewPanel?.viewID == id, item == .view(id) { return openViewPanel(in: library) }
+        if viewPanel?.viewID == id, shown == .saved(id) { return openViewPanel(in: library) }
         closeViewPanel(in: library)
-        if item != .view(id) {
-            show(.view(id), in: library, order: order)
+        if shown != .saved(id) {
+            show(.saved(id), in: library, order: order)
             followView(in: library)
         }
         openViewPanel(in: library)
@@ -112,8 +112,8 @@ extension Browser {
     // MARK: Putting a place back
 
     func viewSnapshot() -> ViewPanel.Snapshot {
-        let place = item
-        let id: ItemID? = if case .view(let id) = place { id } else { nil }
+        let place = shown
+        let id: ItemID? = if let id = place.savedView { id } else { nil }
         return ViewPanel.Snapshot(
             place: place, options: tableOptions[place], timelineDate: timelineFields[place], viewMode: viewMode,
             columns: defaults.data(forKey: ItemTableColumnLayouts.key), mac: id.map { macSettings(for: $0) },
@@ -132,7 +132,7 @@ extension Browser {
         } else {
             defaults.removeObject(forKey: ItemTableColumnLayouts.key)
         }
-        if case .view(let id) = snapshot.place {
+        if let id = snapshot.place.savedView {
             if let mac = snapshot.mac { keep(mac, for: id) }
         } else {
             placeCards[snapshot.place] = snapshot.cards
@@ -165,7 +165,7 @@ extension Browser {
         viewPanel = nil
         dropUndoSteps(of: panel)
         if let snapshot = panel.snapshot { restore(snapshot, keepingLayout: true) }
-        show(.view(view.id), in: library, order: order)
+        show(.saved(view.id), in: library, order: order)
         followView(in: library)
     }
 
@@ -181,7 +181,7 @@ extension Browser {
         if let kept = ViewLayouts.stored(in: defaults).settings(for: id) {
             ViewLayouts.update(in: defaults) { $0.set(kept, for: copy.id) }
         }
-        show(.view(copy.id), in: library, order: order)
+        show(.saved(copy.id), in: library, order: order)
         followView(in: library)
         return copy
     }

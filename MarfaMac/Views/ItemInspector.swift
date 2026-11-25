@@ -113,7 +113,7 @@ struct ItemInspectorHost: View {
             browser.showSettings(.recentlyDeleted)
             return
         }
-        browser.sidebarItem = .allItems
+        browser.showing = .library
         browser.selection = [id]
         browser.focusRequest = .list
     }

@@ -42,7 +42,7 @@ struct ItemGallery: View {
         let sections = browser.sections(in: library, order: order, now: library.now())
         let ids = Cost.measure(.galleryBody) { sections.flatMap { $0.items.map(\.id) } }
         let count = browser.listedCount(in: library) ?? ids.count
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
+        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
         // The picture's opening lines are drawn on the card when the preview allows them, so the line under the title
         // does not say them again.
         let shape = CardShape(dropsOpening: browser.cards.preview == .pictureOrText || browser.cards.preview == .text)
@@ -111,7 +111,7 @@ struct ItemGallery: View {
             .focusable()
             .focusEffectDisabled()
             .focused(pane, equals: .list)
-            .accessibilityLabel(browser.isSearching ? String(localized: "Search") : library.name(of: browser.item))
+            .accessibilityLabel(browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown))
             .accessibilityIdentifier("ItemGallery")
             .onAppear {
                 if let selected = ids.first(where: browser.selection.contains) { proxy.scrollTo(selected) }

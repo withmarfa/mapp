@@ -143,7 +143,7 @@ enum LibraryDescription {
         return ClientPluginCalls(server: confirmingServer, client: confirmingClient, releaseAddress: address)
     }
 
-    func itemCount(ofType id: String) -> Int { libraries.current?.count(in: .itemType(id)) ?? 0 }
+    func itemCount(ofType id: String) -> Int { libraries.current?.count(in: .type(TypeID(id))) ?? 0 }
 
     func typePlural(of id: String) -> String? {
         guard let catalogue = libraries.current?.catalogue, catalogue.itemTypes[TypeID(id)] != nil else { return nil }
@@ -295,7 +295,7 @@ enum LibraryDescription {
         guard let mainWindows, mainWindows.hasMainWindow, libraries.current != nil else { return nil }
         return { [libraries] id in
             guard let library = libraries.current, let browser = mainWindows.mainWindowForward() else { return }
-            browser.show(.itemType(id), in: library, order: browser.storedOrder)
+            browser.show(.type(TypeID(id)), in: library, order: browser.storedOrder)
         }
     }
 

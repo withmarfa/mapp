@@ -34,7 +34,7 @@ import Testing
     private func browserOnItems(_ library: FakeItemLibrary) -> Browser {
         let browser = Browser()
         browser.defaults = ThrowawayDefaults.make("ItemIndexTests")
-        browser.sidebarItem = .allItems
+        browser.showing = .library
         return browser
     }
 

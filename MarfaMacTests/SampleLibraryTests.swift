@@ -22,7 +22,7 @@ import Testing
         let (library, source) = try await Self.loaded()
         let id = try #require(library.createItem(
             typeID: "core.note", title: "Call the plumber", body: "Ask about the leak under the sink.", parentID: nil,
-            in: .allItems, undoManager: nil))
+            in: .library, undoManager: nil))
         let read = ItemBody(id: id, text: "Ask about the leak under the sink.", version: ItemVersion(0))
         await source.flush()
         try #require(await eventually {
@@ -68,7 +68,7 @@ import Testing
         let defaults = ThrowawayDefaults.make("MarfaMac.SampleLibraryTests.columns")
         var layout = TableColumnCustomization<ItemTableRow>()
         layout[visibility: "field.status"] = .hidden
-        let place = SidebarItem.itemType("core.task")
+        let place = PlaceView.type(TypeID("core.task"))
         defaults.set(ItemTableColumnLayouts.storing(layout, for: place, in: Data()), forKey: ItemTableColumnLayouts.key)
         defaults.set(Data("{}".utf8), forKey: ViewLayouts.key)
         defaults.set(Data("{}".utf8), forKey: PlaceDefaults.key)

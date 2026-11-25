@@ -2,10 +2,11 @@ import Foundation
 
 extension Browser {
     func searchScope(in library: any ItemLibrary) -> SearchScope {
-        guard searchesPlace, SearchScope.narrows(item) else { return .everywhere }
-        // A type's place lists its subtypes' items too while it includes them, and the search follows the list.
-        if case .itemType(let type) = item, stacksSubtypes(in: library) { return .typeWithSubtypes(TypeID(type)) }
-        return .place(item)
+        guard searchesPlace, SearchScope.narrows(shown) else { return .everywhere }
+        if let id = shown.savedView { return .view(id) }
+        // The search follows what the place lists: its From, its archived items and a type's kinds.
+        return ViewDraft.query(for: shown, listing: listing, catalogue: library.catalogue, views: library.views)
+            .map(SearchScope.query) ?? .everywhere
     }
 
     /// What the search finds, or nil while the window is not searching.
@@ -13,54 +14,79 @@ extension Browser {
         isSearching ? library.search(searchText, in: searchScope(in: library)) : nil
     }
 
-    /// The items the list shows: the search results while searching, the sidebar item's items otherwise.
+    /// The items the list shows: the search results while searching, the place's items otherwise.
     func items(in library: any ItemLibrary) -> [Item] {
         Cost.measure(.items) { searchResults(in: library)?.items ?? placeItems(in: library) }
     }
 
     /// Whether the open place lists anything, without copying its items.
-    /// A search, or a saved view's list, is the copy's answer, filters included. No index count matches it.
-    /// Chip filters narrow a layout after the list is made. They are not part of what `items(in:)` answered.
+    /// A search, a saved view's list or the Favorites view is the copy's answer, filters included. No index count
+    /// matches it. Chip filters narrow a layout after the list is made. They are not part of what `items(in:)` answered.
     func listsAnything(in library: any ItemLibrary) -> Bool {
-        if isSearching || isViewPlace {
+        if isSearching || shown.view != .own || listing.archived != .hidden || !listing.includesKinds {
             return !items(in: library).isEmpty
         }
-        // Include Subtypes lists a subtype's items. This is true only when one of those subtypes holds an item,
-        // so the place lists something even when the type itself does not.
-        if stacksSubtypes(in: library) { return true }
-        // Recents' count does not read `membershipRevision` itself. The rest do. Either way the answer follows
-        // membership, which is what moves an item into or out of the place, and not a keystroke.
+        // The answer follows membership, which is what moves an item into or out of the place, and not a keystroke.
         _ = library.membershipRevision
-        return library.count(in: item) > 0
+        return library.count(in: shown.place, scope: listing.scope) > 0
     }
 
-    /// The type whose list could also show its subtypes: the open place when it is a type that has subtypes holding
-    /// items.
-    func stackableType(in library: any ItemLibrary) -> String? {
-        guard case .itemType(let type) = item else { return nil }
-        let key = StackableKey(library: ObjectIdentifier(library), membership: library.membershipRevision, type: type)
-        if let held = stackableMemo, held.key == key { return held.type }
-        let stackable = library.subtypesHoldingItems(of: type).isEmpty ? nil : type
-        stackableMemo = (key, stackable)
-        return stackable
+    /// The From, Archived Items and Include Kinds of the open place.
+    var listing: PlaceListing { listing(in: shown) }
+
+    /// What `shown` lists besides its filters, as the person or a saved view chose, else the place's own: the Library
+    /// lists its tier and the Feed its own; the Favorites view starts on the Library whatever Settings says, and a type,
+    /// a collection or a source on Settings' From (`ListScope.defaultScope`). Archived items are hidden and a type
+    /// lists its kinds until the person chooses otherwise.
+    func listing(in shown: PlaceView) -> PlaceListing {
+        let options = tableOptions[shown]
+        let scope: ListScope = switch (shown.view, shown.place) {
+        case (.favorites, _): options?.scope ?? .library
+        case (.saved, _): options?.scope ?? .all
+        case (.own, .library): .library
+        case (.own, .feed): .feed
+        case (.own, .type), (.own, .collection), (.own, .source): options?.scope ?? ListScope.defaultScope(in: defaults)
+        case (.own, _): .all
+        }
+        let archived = shown.place == .archive && shown.view == .own ? .only : options?.archived ?? .hidden
+        return PlaceListing(scope: scope, archived: archived, includesKinds: options?.includesKinds ?? true)
     }
 
-    struct StackableKey: Equatable {
-        let library: ObjectIdentifier
-        let membership: Int
-        let type: String
+    /// Sets the open place's From, through the window's funnel, so it is kept and, in a saved view, written.
+    func setScope(_ scope: ListScope) {
+        tableOptions[shown, default: ItemTableOptions()].scope = scope
+        choicesChanged()
     }
 
-    /// Whether the open place lists its subtypes' items with its own.
-    func stacksSubtypes(in library: any ItemLibrary) -> Bool {
-        stackableType(in: library).map(stackedTypes.contains) ?? false
+    /// Sets whether the open place lists its archived items.
+    func setArchived(_ archived: ArchivedItems) {
+        tableOptions[shown, default: ItemTableOptions()].archived = archived
+        choicesChanged()
     }
 
-    /// What the open place lists. A type lists its own items, and its subtypes' too while it is stacked.
+    /// Sets whether the open type lists its kinds.
+    func setIncludesKinds(_ includes: Bool) {
+        tableOptions[shown, default: ItemTableOptions()].includesKinds = includes
+        choicesChanged()
+    }
+
+    /// The type whose list can leave out its kinds: the open place when it is a type with kinds.
+    func kindsType(in library: any ItemLibrary) -> TypeID? {
+        guard shown.view == .own, case .type(let type) = shown.place, !library.catalogue.descendants(of: type).isEmpty else { return nil }
+        return type
+    }
+
+    /// What the open place lists: a saved view's list, or its preview while the window has changed its filters; the
+    /// Library's Favorites; or the place by its From, archived items and kinds.
     func placeItems(in library: any ItemLibrary) -> [Item] {
         if let preview = viewPreview { return library.previewItems(ofView: preview.view, query: preview.query) }
-        guard stacksSubtypes(in: library), case .itemType(let type) = item else { return library.items(in: item) }
-        return library.items(inTypeAndSubtypes: type)
+        let listing = listing
+        switch shown.view {
+        case .saved(let id): return library.items(inView: id)
+        case .favorites: return library.favoriteItems(in: listing.scope, archived: listing.archived)
+        case .own:
+            return library.items(in: shown.place, scope: listing.scope, archived: listing.archived, includingKinds: listing.includesKinds)
+        }
     }
 
     /// The items in the order the window last drew them: the table's rows in the table, else the list's or gallery's
@@ -73,7 +99,7 @@ extension Browser {
     /// Whether the list shows its place's own order rather than the chosen sort: a collection lists its members in
     /// the order Marfa keeps for them, until a search lists results instead.
     var keepsPlaceOrder: Bool {
-        guard !isSearching, case .collection = item else { return false }
+        guard !isSearching, shown.view == .own, case .collection = shown.place else { return false }
         return true
     }
 
@@ -121,7 +147,7 @@ extension Browser {
     }
 
     var listShape: ListShape? {
-        guard let options = tableOptions[item] else { return nil }
+        guard let options = tableOptions[shown] else { return nil }
         var grouped = false
         if options.grouping.columnID != nil { grouped = true }
         let arranged = options.sort != nil || grouped
@@ -173,13 +199,13 @@ extension Browser {
     /// The items the open place shows in the layouts that arrange them themselves (the board, the timeline): the
     /// place's items, less those the filters hide. `items(in:)` stays whole, for whatever needs every item.
     func filteredItems(in library: any ItemLibrary) -> [Item] {
-        guard tableOptions[item]?.isFiltering == true else { return items(in: library) }
+        guard tableOptions[shown]?.isFiltering == true else { return items(in: library) }
         return tableContent(in: library).kept.map(\.item)
     }
 
     /// Whether the open place has filters that hide everything it lists.
     func filtersHideEverything(in library: any ItemLibrary) -> Bool {
-        guard tableOptions[item]?.isFiltering == true else { return false }
+        guard tableOptions[shown]?.isFiltering == true else { return false }
         let content = tableContent(in: library)
         return content.kept.isEmpty && !content.allRows.isEmpty
     }
@@ -192,7 +218,7 @@ extension Browser {
     /// a command about it, until the items, the place's options or the search change. Reading it does not depend on
     /// the selection, so a selection never makes it again.
     func tableContent(in library: any ItemLibrary) -> ItemTableContent {
-        let keyed = (tableOptions[item] ?? ItemTableOptions()).settled
+        let keyed = (tableOptions[shown] ?? ItemTableOptions()).settled
         let derived = derivedKey(in: library)
         let key = TableKey(
             derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, counts: library.counts.revision,
@@ -210,25 +236,20 @@ extension Browser {
     /// back so the caller does not list them twice. Reading it observes the library's revisions, so a view that asks
     /// is told of the next change.
     private func derivedKey(in library: any ItemLibrary) -> (key: DerivedKey, items: [Item]?) {
-        let listed = isSearching || isViewPlace ? items(in: library) : nil
+        let listed = isSearching || shown.savedView != nil ? items(in: library) : nil
         let key = DerivedKey(
             library: ObjectIdentifier(library), content: library.contentRevision, membership: library.membershipRevision,
-            place: item, stacked: stacksType, ids: listed?.map(\.id), byRelevance: ordersByRelevance,
+            place: shown, listing: listing, ids: listed?.map(\.id), byRelevance: ordersByRelevance,
             keepsPlaceOrder: keepsPlaceOrder, favoritesFirst: !isSearching && !showsOnlyFavorites)
         return (key, listed)
-    }
-
-    /// Whether the open place is a type the person has stacked, which lists its subtypes' items too.
-    var stacksType: Bool {
-        if case .itemType(let type) = item { stackedTypes.contains(type) } else { false }
     }
 
     struct DerivedKey: Equatable {
         let library: ObjectIdentifier
         let content: Int
         let membership: Int
-        let place: SidebarItem
-        let stacked: Bool
+        let place: PlaceView
+        let listing: PlaceListing
         let ids: [ItemID]?
         let byRelevance: Bool
         let keepsPlaceOrder: Bool
@@ -256,8 +277,5 @@ extension Browser {
         let relativeDay: Date?
     }
 
-    private var showsOnlyFavorites: Bool {
-        if case .favoriteItem = item { return true }
-        return item == .favorites
-    }
+    private var showsOnlyFavorites: Bool { shown.isFavorites }
 }

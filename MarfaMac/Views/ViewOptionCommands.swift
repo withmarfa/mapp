@@ -52,7 +52,7 @@ struct ViewOptionCommand {
     }
 
     private static func table(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
-        let place = browser.item
+        let place = browser.shown
         let content = browser.tableContent(in: library)
         let first = content.sort.first
         var commands: [ViewOptionCommand] = []
@@ -122,7 +122,7 @@ struct ViewOptionCommand {
     }
 
     private static func board(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
-        let place = browser.item
+        let place = browser.shown
         var commands = grouping(browser, library)
         let compact = browser.compactBoards[place, default: false]
         commands.append(.init(
@@ -171,7 +171,7 @@ struct ViewOptionCommand {
     }
 
     private static func timeline(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
-        let place = browser.item
+        let place = browser.shown
         let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
         var commands = [ViewOptionCommand(title: String(localized: "Today"), systemImage: "calendar.circle", key: .today) {

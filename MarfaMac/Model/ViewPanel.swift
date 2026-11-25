@@ -17,7 +17,7 @@ final class ViewPanel {
 
     /// A place as it was when a new view began, so cancelling or saving leaves it as it was.
     struct Snapshot {
-        let place: SidebarItem
+        let place: PlaceView
         let options: ItemTableOptions?
         let timelineDate: String?
         let viewMode: ItemViewMode

@@ -104,13 +104,13 @@ struct ViewGroupKeptTests {
         let browser = Browser()
         browser.defaults = ViewPanelTests.defaults()
         browser.adopt(library)
-        browser.sidebarItem = .view(ItemID("view-tasks"))
+        browser.showing = .view(ItemID("view-tasks"))
         browser.viewMode = .table
         browser.followView(in: library)
         browser.choicesChanged()
-        #expect(browser.tableOptions[browser.item]?.grouping == ItemTableOptions.Grouping.none)
+        #expect(browser.tableOptions[browser.shown]?.grouping == ItemTableOptions.Grouping.none)
 
-        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title)]
         await browser.choicesChanged()?.value
         #expect(library.views.first?.sort == [LibraryViewSort(field: "title", ascending: true)])
         #expect(library.views.first?.group == group)
@@ -156,7 +156,7 @@ struct ViewGroupKeptTests {
 
     @Test func aNewViewWritesTheOrderTheAppListsItsGroupsIn() throws {
         var window = Self.window(grouping: Self.statusColumn)
-        window.place = .itemType(Self.task.rawValue)
+        window.place = .type(Self.task)
         let draft = try #require(ViewDraft.draft(window, catalogue: Self.catalogue, views: []))
         #expect(draft.group?.order == [.string("todo"), .string("doing"), .string("done")])
         window.layout = .board
@@ -188,22 +188,22 @@ struct ViewGroupKeptTests {
         let browser = Browser()
         browser.defaults = ViewPanelTests.defaults()
         browser.adopt(library)
-        browser.sidebarItem = .view(ItemID("view-tasks"))
+        browser.showing = .view(ItemID("view-tasks"))
         browser.viewMode = .table
         browser.followView(in: library)
         browser.choicesChanged()
-        #expect(browser.timelineFields[browser.item] == "due_at")
-        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.due_at", by: .bucket(.day)))
+        #expect(browser.timelineFields[browser.shown] == "due_at")
+        #expect(browser.tableOptions[browser.shown]?.grouping == .column("field.due_at", by: .bucket(.day)))
 
-        browser.timelineFields[browser.item] = "starts_at"
+        browser.timelineFields[browser.shown] = "starts_at"
         await browser.choicesChanged()?.value
-        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.starts_at", by: .bucket(.day)))
+        #expect(browser.tableOptions[browser.shown]?.grouping == .column("field.starts_at", by: .bucket(.day)))
         #expect(library.views.first?.group == LibraryViewGroup(field: "properties.starts_at", bucket: .day))
         #expect(!browser.hasViewChanges)
 
-        browser.tableOptions[browser.item]?.grouping = .column("field.priority")
+        browser.tableOptions[browser.shown]?.grouping = .column("field.priority")
         await browser.choicesChanged()?.value
-        #expect(browser.timelineFields[browser.item] == nil)
+        #expect(browser.timelineFields[browser.shown] == nil)
         #expect(library.views.first?.group?.field == "properties.priority")
         #expect(!browser.hasViewChanges)
     }
@@ -221,7 +221,7 @@ struct ViewGroupKeptTests {
         let browser = Browser()
         browser.defaults = ViewPanelTests.defaults()
         browser.adopt(library)
-        browser.sidebarItem = .view(view.id)
+        browser.showing = .view(view.id)
         browser.viewMode = .table
         browser.followView(in: library)
         browser.choicesChanged()
@@ -234,11 +234,11 @@ struct ViewGroupKeptTests {
     @Test func aGroupingAnotherAppSetDuringASortIsShownAndNeverClearedByTheNextWrite() async throws {
         let (browser, library) = Self.opened(Self.view(LibraryViewGroup(field: "edge[cites]")))
         library.changedElsewhere = { $0.group = Self.statusElsewhere }
-        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title)]
         await browser.choicesChanged()?.value
         #expect(library.views.first?.group == Self.statusElsewhere)
         // The window shows what the view now holds, and holds nothing of its own to write.
-        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.status"))
+        #expect(browser.tableOptions[browser.shown]?.grouping == .column("field.status"))
         #expect(!browser.hasViewChanges)
 
         browser.setFilter("field.priority", values: ["high"])
@@ -255,10 +255,10 @@ struct ViewGroupKeptTests {
         await browser.commitViewName(in: library)
         #expect(library.views.first?.title == "Renamed")
         #expect(library.views.first?.group == Self.statusElsewhere)
-        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.status"))
+        #expect(browser.tableOptions[browser.shown]?.grouping == .column("field.status"))
         #expect(!browser.hasViewChanges)
 
-        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title)]
         await browser.choicesChanged()?.value
         #expect(library.views.first?.sort == [LibraryViewSort(field: "title", ascending: true)])
         #expect(library.views.first?.group == Self.statusElsewhere)
@@ -268,12 +268,12 @@ struct ViewGroupKeptTests {
         let week = LibraryViewGroup(field: "properties.due_at", bucket: .week)
         let cites = LibraryViewGroup(field: "edge[cites]", order: [.string("item-1")])
         let (browser, library) = Self.opened(Self.view(week))
-        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.due_at", by: .bucket(.week)))
+        #expect(browser.tableOptions[browser.shown]?.grouping == .column("field.due_at", by: .bucket(.week)))
         library.changedElsewhere = { $0.group = cites }
-        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title)]
         await browser.choicesChanged()?.value
         #expect(library.views.first?.group == cites)
-        #expect(browser.tableOptions[browser.item]?.grouping == ItemTableOptions.Grouping.none)
+        #expect(browser.tableOptions[browser.shown]?.grouping == ItemTableOptions.Grouping.none)
         #expect(!browser.hasViewChanges)
 
         browser.setFilter("field.priority", values: ["high"])
@@ -303,8 +303,8 @@ struct ViewGroupKeptTests {
         let (browser, library) = Self.opened(read)
         library.views = LibraryView.ordered(views)
         #expect(library.views.count == 3)
-        #expect(browser.tableOptions[browser.item]?.grouping == ItemTableOptions.Grouping.none)
-        #expect(browser.tableOptions[browser.item]?.groupOrder == nil)
+        #expect(browser.tableOptions[browser.shown]?.grouping == ItemTableOptions.Grouping.none)
+        #expect(browser.tableOptions[browser.shown]?.groupOrder == nil)
 
         browser.openViewPanel(in: library)
         browser.viewPanel?.name = "Renamed"
@@ -328,15 +328,15 @@ struct ViewGroupKeptTests {
             $0.sort = [LibraryViewSort(field: "title", ascending: true)]
             $0.query.filter = filter
         }
-        browser.tableOptions[browser.item]?.grouping = .column("field.priority")
+        browser.tableOptions[browser.shown]?.grouping = .column("field.priority")
         await browser.choicesChanged()?.value
         let held = try #require(library.views.first)
         #expect(held.group?.field == "properties.priority")
         #expect(held.sort == [LibraryViewSort(field: "title", ascending: true)])
         #expect(held.query.filter == filter)
-        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.priority"))
-        #expect(browser.tableOptions[browser.item]?.sort?.map(\.column.id) == ["title"])
-        #expect(browser.tableOptions[browser.item]?.filter.clauses == [FilterClause(field: "field.priority", op: .is, values: ["high"])])
+        #expect(browser.tableOptions[browser.shown]?.grouping == .column("field.priority"))
+        #expect(browser.tableOptions[browser.shown]?.sort?.map(\.column.id) == ["title"])
+        #expect(browser.tableOptions[browser.shown]?.filter.clauses == [FilterClause(field: "field.priority", op: .is, values: ["high"])])
         #expect(!browser.hasViewChanges)
 
         // A later change writes only itself.
@@ -353,11 +353,11 @@ struct ViewGroupKeptTests {
     @Test func groupOrderAndHiddenGroupsAnotherAppSetDuringASortAreShownAndKept() async throws {
         let (browser, library) = Self.opened(Self.view(LibraryViewGroup(field: "properties.status")))
         library.changedElsewhere = { $0.group = Self.statusElsewhere }
-        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title)]
         await browser.choicesChanged()?.value
         #expect(library.views.first?.group == Self.statusElsewhere)
-        #expect(browser.tableOptions[browser.item]?.groupOrder == ["doing"])
-        #expect(browser.tableOptions[browser.item]?.hiddenGroups == ["done"])
+        #expect(browser.tableOptions[browser.shown]?.groupOrder == ["doing"])
+        #expect(browser.tableOptions[browser.shown]?.hiddenGroups == ["done"])
         #expect(!browser.hasViewChanges)
 
         browser.setFilter("field.priority", values: ["high"])
@@ -372,11 +372,11 @@ struct ViewGroupKeptTests {
         library.changedElsewhere = { $0.group = Self.statusElsewhere }
         await browser.commitViewName(in: library)
         #expect(library.views.first?.title == "Renamed")
-        #expect(browser.tableOptions[browser.item]?.groupOrder == ["doing"])
-        #expect(browser.tableOptions[browser.item]?.hiddenGroups == ["done"])
+        #expect(browser.tableOptions[browser.shown]?.groupOrder == ["doing"])
+        #expect(browser.tableOptions[browser.shown]?.hiddenGroups == ["done"])
         #expect(!browser.hasViewChanges)
 
-        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title)]
         await browser.choicesChanged()?.value
         #expect(library.views.first?.group == Self.statusElsewhere)
     }
@@ -385,13 +385,13 @@ struct ViewGroupKeptTests {
     @Test func aNewSpanKeepsTheGroupOrderAndTheWindowShowsIt() async throws {
         let week = LibraryViewGroup(field: "properties.due_at", bucket: .week, order: [.string("2026-11-23")], hidden: [.null])
         let (browser, library) = Self.opened(Self.view(week))
-        #expect(browser.tableOptions[browser.item]?.groupOrder == ["2026-11-23"])
-        browser.tableOptions[browser.item]?.grouping = .column("field.due_at", by: .bucket(.month))
+        #expect(browser.tableOptions[browser.shown]?.groupOrder == ["2026-11-23"])
+        browser.tableOptions[browser.shown]?.grouping = .column("field.due_at", by: .bucket(.month))
         await browser.choicesChanged()?.value
         let month = LibraryViewGroup(field: "properties.due_at", bucket: .month, order: [.string("2026-11-23")], hidden: [.null])
         #expect(library.views.first?.group == month)
-        #expect(browser.tableOptions[browser.item]?.groupOrder == ["2026-11-23"])
-        #expect(browser.tableOptions[browser.item]?.hiddenGroups == [GroupKey.none])
+        #expect(browser.tableOptions[browser.shown]?.groupOrder == ["2026-11-23"])
+        #expect(browser.tableOptions[browser.shown]?.hiddenGroups == [GroupKey.none])
         #expect(!browser.hasViewChanges)
 
         browser.setFilter("field.priority", values: ["high"])
@@ -411,15 +411,15 @@ struct ViewGroupKeptTests {
             await withCheckedContinuation { release = $0 }
         }
         library.changedElsewhere = { $0.group = Self.statusElsewhere }
-        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title)]
         let write = browser.choicesChanged()
         #expect(await eventually(within: .seconds(20)) { release != nil })
-        browser.tableOptions[browser.item]?.grouping = .column("field.priority")
+        browser.tableOptions[browser.shown]?.grouping = .column("field.priority")
         browser.choicesChanged()
         release?.resume()
         await write?.value
         #expect(await eventually(within: .seconds(20)) { library.views.first?.group?.field == "properties.priority" })
-        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.priority"))
+        #expect(browser.tableOptions[browser.shown]?.grouping == .column("field.priority"))
     }
 
     // MARK: Grouping by a date

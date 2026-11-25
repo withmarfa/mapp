@@ -77,9 +77,9 @@ extension Browser {
         searchText = ""
         isSearchExpanded = false
         // The edge is queued, so the collection's list may not hold the item yet; it soon will.
-        let joinedShown = joined && entry.collection.map { item == .collection($0) } == true
+        let joinedShown = joined && entry.collection.map { shown == .collection($0) } == true
         if !joinedShown, !placeItems(in: library).contains(where: { $0.id == entry.id }) {
-            sidebarItem = entry.isFile ? .files : .itemType(entry.typeID)
+            showing = .type(TypeID(entry.typeID))
         }
         selection = [entry.id]
         open([entry.id], as: entry.opening)

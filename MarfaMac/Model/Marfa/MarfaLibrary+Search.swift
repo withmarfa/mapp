@@ -80,20 +80,9 @@ extension MarfaLibrary {
 
     private func target(for scope: SearchScope) -> SearchTarget {
         switch scope {
-        case .everywhere:
-            return .items(Self.searchScope)
-        case .typeWithSubtypes(let type):
-            // The copy takes a type with its subtypes, so the place's own-items-only condition is left off.
-            guard var query = ViewDraft.query(for: .itemType(type.rawValue), catalogue: catalogue, views: views) else {
-                return .items(Self.searchScope)
-            }
-            query.filter = nil
-            return Self.target(of: query)
-        case .place(let place):
-            guard SearchScope.narrows(place) else { return .items(Self.searchScope) }
-            if case .view(let id) = place, views.contains(where: { $0.id == id }) { return .view(id) }
-            guard let query = ViewDraft.query(for: place, catalogue: catalogue, views: views) else { return .items(Self.searchScope) }
-            return Self.target(of: query)
+        case .everywhere: .items(Self.searchScope)
+        case .view(let id): views.contains(where: { $0.id == id }) ? .view(id) : .items(Self.searchScope)
+        case .query(let query): Self.target(of: query)
         }
     }
 

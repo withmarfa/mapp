@@ -97,7 +97,7 @@ struct MarfaLinkAnswerTests {
 
     @Test func aTitleThatTwoItemsGoByIsLinkedByIdentityAndNotSuggested() async throws {
         let scene = try await Self.scene(["Reader", "Plan", "Plan", "Plan B"])
-        let first = try #require(scene.library.items(in: .allItems).first { $0.title == "Plan" })
+        let first = try #require(scene.library.items(in: .library).first { $0.title == "Plan" })
         let link = try #require(await scene.library.bodyLink(to: first.id, in: scene.id("Reader")))
         #expect(link == "[[\(first.id.rawValue)|Plan]]")
         let names = await scene.library.itemNames(matching: "plan", in: scene.id("Reader"), using: MarfaMac.ItemLinks.Index())

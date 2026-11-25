@@ -14,15 +14,15 @@ struct PagePlacementsTests {
     }
 
     private static let catalogue = Catalogue(itemTypes: [
-        MarfaMapping.itemType(ItemType(
+        MarfaMapping.type(TypeID(ItemType(
             id: "aic.ticket", label: "Ticket", fields: [field("title", "aic.ticket"), field("github_id", "aic.ticket"), field("repo", "aic.ticket")],
-            titleField: "title")),
-        MarfaMapping.itemType(ItemType(
+            titleField: "title"))),
+        MarfaMapping.type(TypeID(ItemType(
             id: "aic.comment", label: "Comment", fields: [field("title", "aic.comment"), field("github_id", "aic.comment")],
-            titleField: "title", linkField: "github_id")),
-        MarfaMapping.itemType(ItemType(id: "core.entity.person", label: "Person", fields: [], icon: "lucide:user")),
-        MarfaMapping.itemType(ItemType(id: "aic.folder", label: "Folder", fields: [], roles: [MarfaMapping.containerRole])),
-        MarfaMapping.itemType(ItemType(
+            titleField: "title", linkField: "github_id"))),
+        MarfaMapping.type(TypeID(ItemType(id: "core.entity.person", label: "Person", fields: [], icon: "lucide:user"))),
+        MarfaMapping.type(TypeID(ItemType(id: "aic.folder", label: "Folder", fields: [], roles: [MarfaMapping.containerRole]))),
+        MarfaMapping.type(TypeID(ItemType(
             id: "aic.task", label: "Task",
             fields: [
                 field("title", "aic.task"),
@@ -30,8 +30,8 @@ struct PagePlacementsTests {
                     name: "state", type: "status", declaredBy: "aic.task",
                     definition: ["status_values": [["value": "open", "group": "not_started"], ["value": "shut", "group": "completed"]]]),
             ],
-            titleField: "title")),
-        MarfaMapping.itemType(ItemType(id: "aic.subtask", label: "Subtask", parent: "aic.task", fields: [])),
+            titleField: "title"))),
+        MarfaMapping.type(TypeID(ItemType(id: "aic.subtask", label: "Subtask", parent: "aic.task", fields: []))),
     ])
     private static let task = TypeID("aic.task")
     private static let subtask = TypeID("aic.subtask")

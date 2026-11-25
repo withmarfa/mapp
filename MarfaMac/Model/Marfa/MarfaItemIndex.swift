@@ -13,13 +13,58 @@ nonisolated struct MarfaItemIndex {
         var position: Double? = nil
     }
 
+    /// Active and archived items, split by tier and state, so a place is counted without a pass over it.
+    struct Split: Sendable {
+        private var sets: [Tier: [ItemState: Set<ItemID>]] = [:]
+
+        var isEmpty: Bool { sets.values.allSatisfy { $0.values.allSatisfy(\.isEmpty) } }
+
+        mutating func insert(_ id: ItemID, tier: Tier, state: ItemState) {
+            sets[tier, default: [:]][state, default: []].insert(id)
+        }
+
+        mutating func remove(_ id: ItemID, tier: Tier, state: ItemState) {
+            sets[tier]?[state]?.remove(id)
+        }
+
+        func ids(in scope: ListScope, _ archived: ArchivedItems) -> Set<ItemID> {
+            var found: Set<ItemID> = []
+            for tier in Tier.allCases where scope.includes(tier) {
+                for state in [ItemState.active, .archived] where archived.includes(state) {
+                    found.formUnion(sets[tier]?[state] ?? [])
+                }
+            }
+            return found
+        }
+
+        func count(in scope: ListScope, _ archived: ArchivedItems) -> Int {
+            var count = 0
+            for tier in Tier.allCases where scope.includes(tier) {
+                for state in [ItemState.active, .archived] where archived.includes(state) {
+                    count += sets[tier]?[state]?.count ?? 0
+                }
+            }
+            return count
+        }
+
+        func contains(_ id: ItemID, in scope: ListScope, _ archived: ArchivedItems) -> Bool {
+            Tier.allCases.contains { tier in
+                scope.includes(tier) && [ItemState.active, .archived].contains { state in
+                    archived.includes(state) && sets[tier]?[state]?.contains(id) == true
+                }
+            }
+        }
+    }
+
     private(set) var byState: [ItemState: Set<ItemID>] = [:]
-    private(set) var activeByType: [TypeID: Set<ItemID>] = [:]
+    /// Every active and archived item.
+    private(set) var listed = Split()
+    private(set) var byType: [TypeID: Split] = [:]
+    private(set) var bySource: [String: Split] = [:]
+    /// Active and archived items tagged favorite.
     private(set) var favorites: Set<ItemID> = []
     /// How many active items carry each tag.
     private(set) var tagCounts: [String: Int] = [:]
-    /// Active items in the feed tier, which the Inbox shows.
-    private(set) var feed: Set<ItemID> = []
     private(set) var links: [EdgeID: Link] = [:]
     /// The `attached-to` edges each file holds. A file with any is a part of the item it points at, so the lists leave
     /// it to that item's page; a file with none stands alone.
@@ -29,6 +74,14 @@ nonisolated struct MarfaItemIndex {
     private var held: [ItemID: [EdgeID]] = [:]
 
     func ids(in state: ItemState) -> Set<ItemID> { byState[state] ?? [] }
+
+    /// The active items of `type` alone, in both tiers.
+    func active(ofType type: TypeID) -> Set<ItemID> { byType[type]?.ids(in: .all, .hidden) ?? [] }
+
+    /// How many of `ids` stand alone (`standalone`), counted through the attached files rather than through `ids`.
+    func standaloneCount(_ count: Int, among contains: (ItemID) -> Bool) -> Int {
+        count - attachments.keys.filter { contains($0) && isAttachedToHeldItem($0) }.count
+    }
 
     /// `ids` without the files that are attached to an item the index holds, whatever state that item is in: a
     /// binned parent keeps its files out of the lists with it, as Marfa's bin does (`withmarfa/marfa#2498`). A file
@@ -44,11 +97,14 @@ nonisolated struct MarfaItemIndex {
 
     mutating func insert(_ item: Item, catalogue: Catalogue) {
         byState[item.state, default: []].insert(item.id)
-        if item.state == .active {
-            activeByType[item.type, default: []].insert(item.id)
+        if item.state != .trashed {
+            listed.insert(item.id, tier: item.tier, state: item.state)
+            byType[item.type, default: Split()].insert(item.id, tier: item.tier, state: item.state)
+            if let source = item.source { bySource[source, default: Split()].insert(item.id, tier: item.tier, state: item.state) }
             if item.isFavorite { favorites.insert(item.id) }
+        }
+        if item.state == .active {
             for tag in item.tags { tagCounts[tag, default: 0] += 1 }
-            if item.tier == .feed { feed.insert(item.id) }
         }
         var holding: [EdgeID] = []
         for edge in item.edgesOut {
@@ -69,9 +125,10 @@ nonisolated struct MarfaItemIndex {
             }
         }
         byState[item.state]?.remove(item.id)
-        activeByType[item.type]?.remove(item.id)
+        listed.remove(item.id, tier: item.tier, state: item.state)
+        byType[item.type]?.remove(item.id, tier: item.tier, state: item.state)
+        if let source = item.source { bySource[source]?.remove(item.id, tier: item.tier, state: item.state) }
         favorites.remove(item.id)
-        feed.remove(item.id)
         for id in held.removeValue(forKey: item.id) ?? [] {
             guard let link = links.removeValue(forKey: id) else { continue }
             linksFrom[link.from]?.remove(id)

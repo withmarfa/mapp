@@ -43,7 +43,7 @@ struct ViewDraftTests {
     }
 
     private static func window(
-        _ place: SidebarItem, sort: [ItemTableComparator] = [], grouping: ItemTableColumn? = nil,
+        _ place: PlaceView, sort: [ItemTableComparator] = [], grouping: ItemTableColumn? = nil,
         filters: [String: Set<String>] = [:], negated: Set<String> = [], search: String? = nil, layout: ViewDraft.Layout = .table,
         timelineDate: String? = nil, includesSubtypes: Bool = false
     ) -> ViewDraft.Window {
@@ -68,23 +68,23 @@ struct ViewDraftTests {
 
     @Test func eachPlaceAViewCanStandForBecomesItsQuery() {
         let active: Set<ItemState> = [.active]
-        func query(_ place: SidebarItem) -> LibraryViewQuery? {
+        func query(_ place: PlaceView) -> LibraryViewQuery? {
             ViewDraft.query(for: place, catalogue: Self.catalogue, views: [])
         }
-        #expect(query(.allItems) == LibraryViewQuery(states: active))
+        #expect(query(.library) == LibraryViewQuery(states: active))
         #expect(query(.inbox) == LibraryViewQuery(tier: .feed, states: active))
         #expect(query(.favorites) == LibraryViewQuery(states: active, filter: #"tags contains "favorite""#))
         #expect(query(.files) == LibraryViewQuery(types: [TypeID.file], states: active))
         #expect(query(.source("mail")) == LibraryViewQuery(states: active, filter: #"source eq "mail""#))
         // A type's place holds its own items, and Marfa takes a type with its subtypes, so a type with any is narrowed.
-        #expect(query(.itemType("core.task")) == LibraryViewQuery(types: [Self.task], states: active))
-        #expect(query(.itemType("aic.ticket")) == LibraryViewQuery(types: [Self.ticket], states: active, filter: #"type eq "aic.ticket""#))
+        #expect(query(.type(TypeID("core.task"))) == LibraryViewQuery(types: [Self.task], states: active))
+        #expect(query(.type(TypeID("aic.ticket"))) == LibraryViewQuery(types: [Self.ticket], states: active, filter: #"type eq "aic.ticket""#))
         // A collection's members are the items with an `in-collection` edge to it, written at the member.
         #expect(query(.collection(ItemID("c1"))) == LibraryViewQuery(states: active, filter: #"edge[in-collection] eq "c1""#))
     }
 
     @Test func placesNoViewCanStandForOfferNone() {
-        for place: SidebarItem in [.recents, .sources, .collections, .favoriteItem(ItemID("a"))] {
+        for place: PlaceView in [.recents, .sources, .collections, .favoriteItem(ItemID("a"))] {
             #expect(ViewDraft.query(for: place, catalogue: Self.catalogue, views: []) == nil)
             #expect(Self.draft(Self.window(place)) == nil)
         }
@@ -104,7 +104,7 @@ struct ViewDraftTests {
 
     @Test func sortAndGroupKeepTheColumnsThatStandForFields() throws {
         let window = Self.window(
-            .allItems,
+            .library,
             sort: [
                 ItemTableComparator(column: Self.statusColumn, order: .forward),
                 ItemTableComparator(column: Self.dueColumn, order: .forward),
@@ -163,7 +163,7 @@ struct ViewDraftTests {
         // The table's own order and grouping, which the other layouts do not show, and a filter, which they all do.
         let sort = [ItemTableComparator(column: Self.statusColumn, order: .forward)]
         func draft(_ layout: ViewDraft.Layout) throws -> ViewDraft.Draft {
-            try #require(Self.draft(Self.window(.allItems, sort: sort, grouping: Self.statusColumn, filters: ["field.status": ["todo"]], layout: layout)))
+            try #require(Self.draft(Self.window(.library, sort: sort, grouping: Self.statusColumn, filters: ["field.status": ["todo"]], layout: layout)))
         }
         let byTitle = try draft(.list(ItemOrder(sort: .title, groupsByDate: true)))
         #expect(byTitle.sort == [LibraryViewSort(field: "title", ascending: true)])
@@ -186,7 +186,7 @@ struct ViewDraftTests {
         let board = try draft(.board)
         #expect(board.group == LibraryViewGroup(field: "properties.status", order: ViewDraft.declaredOrder(of: Self.statusColumn)))
         #expect(board.sort == [LibraryViewSort(field: "properties.status", ascending: true)])
-        let odd = try #require(Self.draft(Self.window(.allItems, grouping: Self.dueColumn, layout: .board)))
+        let odd = try #require(Self.draft(Self.window(.library, grouping: Self.dueColumn, layout: .board)))
         #expect(odd.unkept == [.group(column: "Due")])
 
         let timeline = try draft(.timeline(key: "due_at", label: "Due"))
@@ -402,67 +402,67 @@ struct ViewDraftTests {
 
     @Test func aTypesPlaceWithIncludeSubtypesOnSavesTheTypeWithItsSubtypes() throws {
         // Marfa lists a type with its subtypes, so the types alone hold what the window shows.
-        let on = try #require(Self.draft(Self.window(.itemType("aic.ticket"), includesSubtypes: true)))
+        let on = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), includesSubtypes: true)))
         #expect(on.query.types == [Self.ticket])
         #expect(on.query.filter == nil)
         #expect(on.unkept.isEmpty)
         // Filtered to one subtype, the window shows that subtype's items, which the types say.
-        let sub = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket.task"]], includesSubtypes: true)))
+        let sub = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket.task"]], includesSubtypes: true)))
         #expect(sub.query.types == [Self.ticketTask])
         #expect(sub.query.filter == nil)
         // Filtered to the parent alone, the window shows the parent's own items, so it stays exact.
-        let parent = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket"]], includesSubtypes: true)))
+        let parent = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket"]], includesSubtypes: true)))
         #expect(parent.query.filter == #"type eq "aic.ticket""#)
         // Off, the type's own items alone, as before.
-        let off = try #require(Self.draft(Self.window(.itemType("aic.ticket"), includesSubtypes: false)))
+        let off = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), includesSubtypes: false)))
         #expect(off.query.types == [Self.ticket])
         #expect(off.query.filter == #"type eq "aic.ticket""#)
     }
 
     @Test func aTypeFilterGoesIntoTheQueryTypes() throws {
-        let window = Self.window(.allItems, filters: ["type": ["core.task"]])
+        let window = Self.window(.library, filters: ["type": ["core.task"]])
         let draft = try #require(Self.draft(window))
         #expect(draft.query.types == [Self.task])
         #expect(draft.query.filter == nil)
         #expect(draft.unkept.isEmpty)
         // Several types are all of them.
-        let several = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task", "core.note"]])))
+        let several = try #require(Self.draft(Self.window(.library, filters: ["type": ["core.task", "core.note"]])))
         #expect(several.query.types == [TypeID("core.note"), Self.task])
     }
 
     @Test func aTypeWithSubtypesIsSavedAsAnExactTypeFilterBecauseMarfaListsItsSubtypesToo() throws {
         // Saving from the window with the Type filter on a type that has subtypes (#389).
-        let draft = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["aic.ticket"]])))
+        let draft = try #require(Self.draft(Self.window(.library, filters: ["type": ["aic.ticket"]])))
         #expect(draft.query.types.isEmpty)
         #expect(draft.query.filter == #"type eq "aic.ticket""#)
         #expect(draft.unkept.isEmpty)
         // A type the place does not list replaces the place's, so the saved view is not empty.
-        let beside = try #require(Self.draft(Self.window(.itemType("core.task"), filters: ["type": ["core.note"]])))
+        let beside = try #require(Self.draft(Self.window(.type(TypeID("core.task")), filters: ["type": ["core.note"]])))
         #expect(beside.query.types == [TypeID("core.note")])
         #expect(beside.query.filter == nil)
         #expect(beside.unkept.isEmpty)
         // With the list grouped by a column too, both are kept.
-        let grouped = try #require(Self.draft(Self.window(.allItems, grouping: Self.statusColumn, filters: ["type": ["aic.ticket"]])))
+        let grouped = try #require(Self.draft(Self.window(.library, grouping: Self.statusColumn, filters: ["type": ["aic.ticket"]])))
         #expect(grouped.group == LibraryViewGroup(field: "properties.status", order: ViewDraft.declaredOrder(of: Self.statusColumn)))
         #expect(grouped.query.filter == #"type eq "aic.ticket""#)
         // Is Not is a condition.
-        let not = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task"]], negated: ["type"])))
+        let not = try #require(Self.draft(Self.window(.library, filters: ["type": ["core.task"]], negated: ["type"])))
         #expect(not.query.filter == #"type neq "core.task""#)
     }
 
     @Test func aSubtypeChosenInATypesPlaceReplacesThePlacesOwnTypeTerms() throws {
         // A place of a type with subtypes saves its own items; the window filtered to a subtype shows that subtype's.
-        let place = try #require(ViewDraft.query(for: .itemType("aic.ticket"), catalogue: Self.catalogue, views: []))
+        let place = try #require(ViewDraft.query(for: .type(TypeID("aic.ticket")), catalogue: Self.catalogue, views: []))
         #expect(place.filter == #"type eq "aic.ticket""#)
-        let sub = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket.task"]])))
+        let sub = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket.task"]])))
         #expect(sub.query.types == [Self.ticketTask])
         #expect(sub.query.filter == nil)
         #expect(sub.unkept.isEmpty)
         // The parent alone is the place's own items already.
-        let parent = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket"]])))
+        let parent = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket"]])))
         #expect(parent.query == place)
         // Another type with its own subtypes is exact, and the place's terms are replaced.
-        let other = try #require(Self.draft(Self.window(.itemType("core.task"), filters: ["type": ["aic.ticket"]])))
+        let other = try #require(Self.draft(Self.window(.type(TypeID("core.task")), filters: ["type": ["aic.ticket"]])))
         #expect(other.query.types == [Self.ticket])
         #expect(other.query.filter == #"type eq "aic.ticket""#)
         // The place's other conditions stay.
@@ -545,11 +545,11 @@ struct ViewDraftTests {
     }
 
     @Test func aTypeFilterOfTwoTypesInItemsIsTheirTypes() throws {
-        let plain = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task", "core.note"]])))
+        let plain = try #require(Self.draft(Self.window(.library, filters: ["type": ["core.task", "core.note"]])))
         #expect(plain.query.types == [TypeID("core.note"), Self.task])
         #expect(plain.query.filter == nil)
         // With a type that has subtypes, the types are exact conditions joined by or.
-        let exact = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task", "aic.ticket"]])))
+        let exact = try #require(Self.draft(Self.window(.library, filters: ["type": ["core.task", "aic.ticket"]])))
         #expect(exact.query.types.isEmpty)
         #expect(exact.query.filter == #"type eq "aic.ticket" OR type eq "core.task""#)
         #expect(exact.unkept.isEmpty)

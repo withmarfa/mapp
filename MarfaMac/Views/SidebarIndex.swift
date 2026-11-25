@@ -29,14 +29,14 @@ struct SidebarIndex: View {
     var body: some View {
         let rows = model.rows(for: place)
         IndexContent(
-            place: place, title: library.name(of: browser.item), rows: rows, isBuilt: model.isBuilt(for: place), browser: browser, pane: pane, tab: tabBinding, choice: choice,
+            place: place, title: library.name(of: browser.shown), rows: rows, isBuilt: model.isBuilt(for: place), browser: browser, pane: pane, tab: tabBinding, choice: choice,
             edit: place == .sources ? { editing = $0 } : nil, delete: place == .collections ? { ask($0) } : nil,
             newCollection: place == .collections ? { browser.openQuickAddFromIndex(remembered: "", in: library) } : nil
         ) { row in
-            browser.show(row.place, in: library, order: order)
+            browser.show(PlaceView(row.place), in: library, order: order)
         }
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
-            IndexInspector(choice: choice, place: place, rows: rows) { browser.show($0.place, in: library, order: order) }
+            IndexInspector(choice: choice, place: place, rows: rows) { browser.show(PlaceView($0.place), in: library, order: order) }
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
                 .toolbar(id: WindowToolbarLayout.index) { InspectorToolbar(details: details, editor: nil, browser: browser) }
         }
@@ -71,7 +71,7 @@ struct SidebarIndex: View {
         .onDisappear { model.stop() }
         // The page has its own large title.
         .toolbar(removing: .title)
-        .navigationTitle(library.name(of: browser.item))
+        .navigationTitle(library.name(of: browser.shown))
         .accessibilityIdentifier("SidebarIndex")
     }
 

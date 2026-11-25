@@ -60,7 +60,7 @@ struct LayoutTypePage: View {
     }
 
     @ViewBuilder private var preview: some View {
-        let items = Array((library?.items(in: .itemType(type.rawValue)) ?? []).prefix(2))
+        let items = Array((library?.items(in: .type(type)) ?? []).prefix(2))
         if let library, !items.isEmpty {
             let list = RowList(date: .look, format: DateFormat.stored(), day: Calendar.current.startOfDay(for: library.now()))
             SettingsSection("Preview") {
@@ -136,7 +136,7 @@ struct LayoutTypePage: View {
     // MARK: Page
 
     private var rows: [PageLayout.Row] {
-        if let sample = library?.items(in: .itemType(type.rawValue)).first, let library {
+        if let sample = library?.items(in: .type(type)).first, let library {
             return PageLayout.rows(
                 of: sample, type: info, hidden: library.hiddenPropertyKeys(of: sample),
                 relationships: library.relationships(for: sample.id), catalogue: catalogue,

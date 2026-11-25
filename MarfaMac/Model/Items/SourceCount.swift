@@ -11,7 +11,7 @@ nonisolated struct SourceCount: Identifiable, Hashable {
 extension ItemLibrary {
     /// The sources the library lists, by name (`SourceDirectory.listing`), never the owner's source registry.
     var sourceCounts: [SourceCount] {
-        let loaded = IndexRows.groupedBySource(items(in: .allItems)).reduce(into: [:]) { $0[$1.code] = $1.items.count }
+        let loaded = IndexRows.groupedBySource(items(in: .library)).reduce(into: [:]) { $0[$1.code] = $1.items.count }
         return sources.listing(loaded: loaded).map { SourceCount(code: $0.code, name: $0.name, count: $0.count) }
     }
 

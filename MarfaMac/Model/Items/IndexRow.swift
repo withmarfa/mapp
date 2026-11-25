@@ -12,7 +12,7 @@ nonisolated struct TypeShare: Identifiable, Hashable, Sendable {
 
 /// One row of an index page: a place the page leads to, and what is known of the items in it.
 nonisolated struct IndexRow: Identifiable, Hashable, Sendable {
-    let place: SidebarItem
+    let place: Place
     let title: String
     let icon: RowIcon
     /// The types of its items, as a line of text.
@@ -29,7 +29,7 @@ nonisolated struct IndexRow: Identifiable, Hashable, Sendable {
     /// Whether a collection can be changed: a read-only one cannot be deleted.
     var readOnly = false
 
-    var id: SidebarItem { place }
+    var id: Place { place }
     /// The code of a source's row; nil for a collection's.
     var sourceCode: String? {
         if case .source(let code) = place { code } else { nil }

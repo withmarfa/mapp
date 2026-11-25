@@ -43,8 +43,8 @@ struct MarfaViewsTests {
         let library = MarfaLibrary(source: source, notices: Notices())
         try #require(await eventually { library.isLoaded })
         #expect(library.views == [Self.planning])
-        #expect(Set(library.items(in: .allItems).map(\.id)) == [ItemID("n1"), ItemID("n2")])
-        #expect(library.count(in: .allItems) == 2)
+        #expect(Set(library.items(in: .library).map(\.id)) == [ItemID("n1"), ItemID("n2")])
+        #expect(library.count(in: .library) == 2)
         #expect(library.items(in: .recents).count == 2)
         #expect(library.item(ItemID("view-planning")) == nil)
         #expect(!library.itemTypeCounts.contains { $0.id.rawValue.hasPrefix("system.") })
@@ -67,7 +67,7 @@ struct MarfaViewsTests {
         await source.hear(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
         #expect(await eventually { library.views == [Self.planning, Self.reading] })
         browser.placeRemoved(in: library, order: ItemOrder())
-        #expect(browser.sidebarItem == .view(Self.planning.id))
+        #expect(browser.showing == .view(Self.planning.id))
 
         // Once whole, the answer is what the copy holds.
         views.completeness.withLock { $0 = .complete }

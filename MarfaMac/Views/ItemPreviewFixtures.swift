@@ -68,8 +68,8 @@ enum ItemPreviewFixtures {
 
     static var browser: Browser {
         let browser = Browser()
-        // Items is an index with no page of its own; Recents lists every item with the item's page beside it.
-        browser.sidebarItem = .recents
+        // The Library is an index with no page of its own; the Feed's list has the selected item's page beside it.
+        browser.showing = .feed
         browser.selection = [ticketID]
         return browser
     }

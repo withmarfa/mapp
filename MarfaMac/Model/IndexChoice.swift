@@ -5,7 +5,7 @@ import Observation
 @MainActor
 @Observable
 final class IndexChoice {
-    var chosen: SidebarItem?
+    var chosen: Place?
 
     /// Clears the choice when its container is no longer among `rows`, the page's every row: deleted, or gone on a sync.
     /// A container the tab or the search leaves out of the table stays chosen.

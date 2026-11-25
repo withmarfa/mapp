@@ -12,7 +12,7 @@ extension Browser {
     /// Whether a filter is set on the page.
     var indexIsFiltered: Bool {
         switch indexPlace {
-        case .items: tableOptions[.allItems]?.isFiltering == true
+        case .items: tableOptions[.library]?.isFiltering == true
         case .collections: !collectionSourceFilter.isEmpty
         default: false
         }
@@ -31,13 +31,13 @@ extension Browser {
     /// Removes every filter the page holds.
     func clearIndexFilters() {
         collectionSourceFilter = []
-        if tableOptions[.allItems]?.isFiltering == true { tableOptions[.allItems, default: .init()].clearFilters() }
+        if tableOptions[.library]?.isFiltering == true { tableOptions[.library, default: .init()].clearFilters() }
     }
 
     /// The tabs of the Items page: the library's, or what the search found, less what the filters hide.
     func itemIndexTabs(in library: any ItemLibrary) -> ItemIndexTabs? {
         guard let tabs = isSearching ? searchedItemTabs(in: library) : itemIndex.tabs else { return nil }
-        guard showsItemsIndex, tableOptions[item]?.isFiltering == true else { return tabs }
+        guard showsItemsIndex, tableOptions[shown]?.isFiltering == true else { return tabs }
         let kept = Set(tableContent(in: library).kept.map(\.item.id))
         return tabs.keeping { kept.contains($0.id) }
     }

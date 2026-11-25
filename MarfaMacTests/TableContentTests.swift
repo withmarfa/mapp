@@ -8,11 +8,11 @@ import Testing
 /// comparison it replaced did.
 @MainActor
 @Suite(.hangLimit) struct TableContentTests {
-    private let tasks = SidebarItem.itemType("aic.ticket.task")
+    private let tasks = PlaceView.type(TypeID("aic.ticket.task"))
 
-    private func browser(showing place: SidebarItem) -> Browser {
+    private func browser(showing place: PlaceView) -> Browser {
         let browser = Browser()
-        browser.sidebarItem = place
+        browser.showing = place
         browser.viewMode = .table
         return browser
     }
@@ -66,7 +66,7 @@ import Testing
 
     @Test func aSearchThatAnswersReplacesWhatWasShownWhilePending() async throws {
         let (library, source) = try await BigLibrary.loaded()
-        let browser = browser(showing: .allItems)
+        let browser = browser(showing: .library)
         let found = Array(library.items(in: tasks).prefix(3).map(\.id))
         source.hits.withLock { $0["sidebar"] = found }
         browser.searchText = "sidebar"

@@ -9,8 +9,8 @@ struct BrowserTests {
         let (second, _, _, _) = makeFakeLibrary()
         let browser = Browser()
         browser.adopt(first)
-        browser.timelineFields[.allItems] = "starts_at"
-        browser.compactBoards[.allItems] = true
+        browser.timelineFields[.library] = "starts_at"
+        browser.compactBoards[.library] = true
         browser.adopt(second)
         #expect(browser.timelineFields.isEmpty)
         #expect(browser.compactBoards.isEmpty)

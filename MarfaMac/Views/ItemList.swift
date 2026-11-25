@@ -38,7 +38,7 @@ struct ItemList: View, Equatable {
         let results = browser.searchResults(in: library)
         let excerpts = results?.excerpts ?? [:]
         let isPending = results?.isPending == true
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
+        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
         // the list's full width.

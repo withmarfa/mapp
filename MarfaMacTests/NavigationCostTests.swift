@@ -169,18 +169,18 @@ struct NavigationCostTests {
 
     @Test func sizesOfTheData() async throws {
         let (library, _) = try await BigLibrary.loaded()
-        #expect(library.items(in: .allItems).count == BigLibrary.counts.map(\.1).reduce(0, +))
+        #expect(library.items(in: .library).count == BigLibrary.counts.map(\.1).reduce(0, +))
     }
 
     @Test func eachActionInEachPlace() async throws {
         let (library, _) = try await BigLibrary.loaded()
-        let places: [(String, SidebarItem)] = [
-            ("all", .allItems), ("decisions", .itemType("aic.decision")), ("tasks", .itemType("aic.ticket.task")),
-            ("sessions", .itemType("aic.session")), ("recents", .recents), ("favorites", .favorites),
+        let places: [(String, PlaceView)] = [
+            ("all", .library), ("decisions", .type(TypeID("aic.decision"))), ("tasks", .type(TypeID("aic.ticket.task"))),
+            ("sessions", .type(TypeID("aic.session"))), ("recents", .recents), ("favorites", .favorites),
         ]
         for (name, place) in places {
             let browser = Browser()
-            browser.sidebarItem = place
+            browser.showing = place
             let count = browser.items(in: library).count
             line(name, "items(\(count))", median { _ = browser.items(in: library) })
             line(name, "sections", median { _ = browser.sections(in: library, order: order, now: .now) })
@@ -206,7 +206,7 @@ struct NavigationCostTests {
     @Test func countsForOneNavigation() async throws {
         let (library, _) = try await BigLibrary.loaded()
         let browser = Browser()
-        browser.sidebarItem = .itemType("aic.decision")
+        browser.showing = .type(TypeID("aic.decision"))
         #if DEBUG
         Cost.resetTallies()
         _ = ItemTableContent(browser: browser, library: library, items: browser.items(in: library)).rows
@@ -221,16 +221,16 @@ struct NavigationCostTests {
     /// part of the window, so the wall time here includes whatever the window does besides these costs.
     @Test func aHostedWindowAcrossTheMovesAPersonMakes() async throws {
         try await hosted { browser, library, _, step in
-            try await step("open decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("open decisions (list)") { browser.showing = .type(TypeID("aic.decision")) }
             try await step("table") { browser.viewMode = .table }
-            try await step("select a row") { browser.selection = [library.items(in: .itemType("aic.decision"))[3].id] }
-            try await step("select another row") { browser.selection = [library.items(in: .itemType("aic.decision"))[4].id] }
-            try await step("tasks (table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("select a row") { browser.selection = [library.items(in: .type(TypeID("aic.decision")))[3].id] }
+            try await step("select another row") { browser.selection = [library.items(in: .type(TypeID("aic.decision")))[4].id] }
+            try await step("tasks (table)") { browser.showing = .type(TypeID("aic.ticket.task")) }
             try await step("board") { browser.viewMode = .board }
             try await step("timeline") { browser.viewMode = .timeline }
             try await step("gallery") { browser.viewMode = .gallery }
             try await step("list") { browser.viewMode = .list }
-            try await step("all items (list)") { browser.sidebarItem = .allItems }
+            try await step("all items (list)") { browser.showing = .library }
             try await step("table") { browser.viewMode = .table }
         }
     }
@@ -238,20 +238,20 @@ struct NavigationCostTests {
     /// Moving between places while the list stays, which is what a person does most.
     @Test func aHostedWindowMovingBetweenPlacesInTheList() async throws {
         try await hosted { browser, _, _, step in
-            try await step("all items (list)") { browser.sidebarItem = .allItems }
-            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
-            try await step("tasks (list)") { browser.sidebarItem = .itemType("aic.ticket.task") }
-            try await step("sessions (list)") { browser.sidebarItem = .itemType("aic.session") }
-            try await step("all items (list) again") { browser.sidebarItem = .allItems }
-            try await step("decisions (list) again") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("all items (list)") { browser.showing = .library }
+            try await step("decisions (list)") { browser.showing = .type(TypeID("aic.decision")) }
+            try await step("tasks (list)") { browser.showing = .type(TypeID("aic.ticket.task")) }
+            try await step("sessions (list)") { browser.showing = .type(TypeID("aic.session")) }
+            try await step("all items (list) again") { browser.showing = .library }
+            try await step("decisions (list) again") { browser.showing = .type(TypeID("aic.decision")) }
         }
     }
 
     /// Opening items one after another in the list, so each move builds a page's header and the inspector.
     @Test func aHostedWindowMovingBetweenItemsInTheList() async throws {
         try await hosted { browser, library, _, step in
-            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
-            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            try await step("decisions (list)") { browser.showing = .type(TypeID("aic.decision")) }
+            let ids = library.items(in: .type(TypeID("aic.decision"))).prefix(6).map(\.id)
             for (index, id) in ids.enumerated() {
                 try await step("open item \(index + 1)") { browser.selection = [id] }
             }
@@ -263,7 +263,7 @@ struct NavigationCostTests {
     /// soft selection's marks should follow the rows in view, not all of those selected.
     @Test func aHostedWindowSelectingEveryItemInTheList() async throws {
         try await hosted(scale: 15) { browser, library, _, step in
-            try await step("all items (list)") { browser.sidebarItem = .allItems }
+            try await step("all items (list)") { browser.showing = .library }
             try await step("select every item") {
                 #expect(NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: Self.longestTable(), from: nil))
             }
@@ -289,14 +289,14 @@ struct NavigationCostTests {
     /// The table of every item with no grouping, then the move between two places that stays on the table.
     @Test func aHostedWindowOnAnUngroupedTable() async throws {
         try await hosted { browser, _, _, step in
-            for place in [SidebarItem.allItems, .itemType("aic.decision"), .itemType("aic.ticket.task")] {
+            for place in [PlaceView.library, .type(TypeID("aic.decision")), .type(TypeID("aic.ticket.task"))] {
                 browser.tableOptions[place, default: .init()].grouping = .none
             }
-            try await step("all items (list)") { browser.sidebarItem = .allItems }
+            try await step("all items (list)") { browser.showing = .library }
             try await step("all items (ungrouped table)") { browser.viewMode = .table }
-            try await step("decisions (ungrouped table)") { browser.sidebarItem = .itemType("aic.decision") }
-            try await step("tasks (ungrouped table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
-            try await step("all items (ungrouped table) again") { browser.sidebarItem = .allItems }
+            try await step("decisions (ungrouped table)") { browser.showing = .type(TypeID("aic.decision")) }
+            try await step("tasks (ungrouped table)") { browser.showing = .type(TypeID("aic.ticket.task")) }
+            try await step("all items (ungrouped table) again") { browser.showing = .library }
             try await step("list") { browser.viewMode = .list }
         }
     }
@@ -304,14 +304,14 @@ struct NavigationCostTests {
     /// The gallery, then a selection that moves from card to card, which should make no card's derived values again.
     @Test func aHostedWindowOnTheGallery() async throws {
         try await hosted { browser, library, _, step in
-            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("decisions (list)") { browser.showing = .type(TypeID("aic.decision")) }
             try await step("gallery") { browser.viewMode = .gallery }
-            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            let ids = library.items(in: .type(TypeID("aic.decision"))).prefix(6).map(\.id)
             for (index, id) in ids.enumerated() {
                 try await step("select card \(index + 1)") { browser.selection = [id] }
             }
-            try await step("tasks (gallery)") { browser.sidebarItem = .itemType("aic.ticket.task") }
-            try await step("all items (gallery)") { browser.sidebarItem = .allItems }
+            try await step("tasks (gallery)") { browser.showing = .type(TypeID("aic.ticket.task")) }
+            try await step("all items (gallery)") { browser.showing = .library }
         }
     }
 
@@ -319,9 +319,9 @@ struct NavigationCostTests {
     /// card again and no other card.
     @Test func aHostedWindowOnTheGalleryWhileALinkChanges() async throws {
         try await hosted { browser, library, source, step in
-            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("decisions (list)") { browser.showing = .type(TypeID("aic.decision")) }
             try await step("gallery") { browser.viewMode = .gallery }
-            let host = try #require(library.items(in: .itemType("aic.decision")).first)
+            let host = try #require(library.items(in: .type(TypeID("aic.decision"))).first)
             var file = LibraryFixture.item(
                 ItemID("attached-file"), BigLibrary.note, "Photo.png", age: 0, properties: [Property(key: "title", value: .string("Photo.png"))],
                 content: .file(.png, byteCount: 10))
@@ -336,27 +336,27 @@ struct NavigationCostTests {
     /// The table, then a selection that moves from row to row, and the move between places that stays on the table.
     @Test func aHostedWindowOnTheTable() async throws {
         try await hosted { browser, library, _, step in
-            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("decisions (list)") { browser.showing = .type(TypeID("aic.decision")) }
             try await step("table") { browser.viewMode = .table }
-            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            let ids = library.items(in: .type(TypeID("aic.decision"))).prefix(6).map(\.id)
             for (index, id) in ids.enumerated() {
                 try await step("select row \(index + 1)") { browser.selection = [id] }
             }
-            try await step("tasks (table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
-            try await step("all items (table)") { browser.sidebarItem = .allItems }
-            try await step("decisions (table) again") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("tasks (table)") { browser.showing = .type(TypeID("aic.ticket.task")) }
+            try await step("all items (table)") { browser.showing = .library }
+            try await step("decisions (table) again") { browser.showing = .type(TypeID("aic.decision")) }
         }
     }
 
     /// The moves between places that stay on the table, on about ten thousand items, as a test instance holds.
     @Test func aHostedWindowMovingBetweenTablePlacesOnALargeLibrary() async throws {
         try await hosted(scale: 15) { browser, _, _, step in
-            try await step("all items (list)") { browser.sidebarItem = .allItems }
+            try await step("all items (list)") { browser.showing = .library }
             try await step("all items (table)") { browser.viewMode = .table }
             for round in 1...3 {
-                try await step("decisions (table) \(round)") { browser.sidebarItem = .itemType("aic.decision") }
-                try await step("tasks (table) \(round)") { browser.sidebarItem = .itemType("aic.ticket.task") }
-                try await step("all items (table) \(round)") { browser.sidebarItem = .allItems }
+                try await step("decisions (table) \(round)") { browser.showing = .type(TypeID("aic.decision")) }
+                try await step("tasks (table) \(round)") { browser.showing = .type(TypeID("aic.ticket.task")) }
+                try await step("all items (table) \(round)") { browser.showing = .library }
             }
         }
     }
@@ -415,7 +415,7 @@ struct NavigationCostTests {
     /// Moving from one item page to the next, twenty times, as arrowing down the list does.
     @Test func movingBetweenTwentyItemPages() async throws {
         let (library, _) = try await BigLibrary.loaded()
-        let ids = library.items(in: .allItems).prefix(20).map(\.id)
+        let ids = library.items(in: .library).prefix(20).map(\.id)
         let editor = EditorController(library: library)
         try #require(await eventually { editor.isReady })
         let drafts = DetailsPresentation()
@@ -432,7 +432,7 @@ struct NavigationCostTests {
         let epic = ItemID("\(BigLibrary.epic.rawValue)-0")
         let (editor, _) = try await openPage(epic, in: library)
         _ = editor
-        let unrelated = try #require(library.items(in: .itemType(BigLibrary.note.rawValue)).first)
+        let unrelated = try #require(library.items(in: .type(BigLibrary.note)).first)
         try await measurePage("edit 10 unrelated items with an epic open") {
             for index in 0..<10 {
                 var edited = unrelated
@@ -496,8 +496,8 @@ struct NavigationCostTests {
     /// item between places, a new item, and a favorite. Each is its own move, so the counts are for one change.
     @Test func aHostedWindowWhileItemsChange() async throws {
         try await hosted { browser, library, source, step in
-            try await step("all items (list)") { browser.sidebarItem = .allItems }
-            let edited = try #require(library.items(in: .itemType(BigLibrary.note.rawValue)).first)
+            try await step("all items (list)") { browser.showing = .library }
+            let edited = try #require(library.items(in: .type(BigLibrary.note)).first)
             for index in 0..<3 {
                 try await step("edit an item's title \(index + 1)") {
                     var item = edited
@@ -517,9 +517,9 @@ struct NavigationCostTests {
                 item.modified = Date(timeIntervalSince1970: 3_000_000)
                 source.send(.upserted([item]))
             }
-            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("decisions (list)") { browser.showing = .type(TypeID("aic.decision")) }
             try await step("edit an item in the place") {
-                var item = library.items(in: .itemType("aic.decision"))[2]
+                var item = library.items(in: .type(TypeID("aic.decision")))[2]
                 item.title = "Edited here"
                 item.modified = Date(timeIntervalSince1970: 4_000_000)
                 source.send(.upserted([item]))

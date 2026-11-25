@@ -38,13 +38,12 @@ extension CommandPalette {
 
     var isTyped: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    /// What the search keeps and leaves out: the Type filter, a type following its Include Subtypes choice, and what
-    /// this library leaves out of search.
+    /// What the search keeps and leaves out: the Type filter, each type with its kinds, and what this library leaves
+    /// out of search.
     private var narrowing: SearchNarrowing {
         let filters = filterState.filters
-        let stacked = Set(browser.stackedTypes.map { TypeID($0) })
         return SearchNarrowing(
-            types: filters.types, typesWithSubtypes: stacked.intersection(filters.types),
+            types: filters.types, typesWithSubtypes: filters.types,
             excludesTypes: filters.negated.contains(.type), leaveOut: libraries?.searchLeaveOut ?? SearchLeaveOut(),
             includesArchived: includesArchived, includesInbox: includesInbox)
     }

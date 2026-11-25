@@ -62,7 +62,7 @@ final class ItemTableContent {
         let start = ContinuousClock.now
         defer { Cost.record(.tableContent, since: start) }
         let looks = browser.looks(in: library)
-        let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
+        let options = browser.tableOptions[browser.shown] ?? ItemTableOptions()
         let wanted = ItemTableLayout.relations(
             of: Set(items.map(\.type)), looks: looks, options: options, shown: browser.shownRelations)
         allRows = ItemTableRow.rows(of: items, in: library, wanting: wanted, looks: looks)

@@ -110,14 +110,14 @@ nonisolated enum ItemLinks {
 extension ItemLibrary {
     /// The items the picker lists, most recently edited first. An item that cannot be linked is told when it is chosen.
     func itemsToLink(excluding id: ItemID? = nil) -> [Item] {
-        items(in: .allItems).filter { !$0.isFile && $0.id != id }.sorted { $0.modified > $1.modified }
+        items(in: .library).filter { !$0.isFile && $0.id != id }.sorted { $0.modified > $1.modified }
     }
 
     /// The titles to offer for what was typed after `[[` in `itemID`, best first, each one only where `[[title]]`, written
     /// there, the core binds to that item or leaves unresolved with that item the only one held (`LinkAnswer.offers`). A title that two items go by, or that a
     /// link cannot spell, is left out. The closest matches are asked of the core together, so a few left out leave the list full.
     func itemNames(matching query: String, in itemID: ItemID? = nil, using index: ItemLinks.Index, limit: Int = 12) async -> [String] {
-        let matches = await index.matches(for: query, among: items(in: .allItems), limit: limit * 4)
+        let matches = await index.matches(for: query, among: items(in: .library), limit: limit * 4)
             .filter { ItemLinks.spells($0.title, as: $0.title) }
         guard !matches.isEmpty, let answers = await linkAnswers(of: matches.map(\.title), in: itemID) else { return [] }
         return zip(matches, answers).compactMap { $0.1.offers($0.0.id) ? $0.0.title : nil }.prefix(limit).map { $0 }

@@ -6,7 +6,7 @@ extension Browser {
     /// are read and sent.
     struct ImportDestination {
         /// The place the files were dropped in, which decides their tier (the Inbox is the feed tier).
-        let place: SidebarItem
+        let place: PlaceView
         /// The collection the items join: the one dropped on, else the one the window showed.
         let collection: ItemID?
         /// Whether the drop was on a collection, rather than on the window.
@@ -15,7 +15,7 @@ extension Browser {
 
     /// The destination for files dropped now, on the collection `collection` when there is one.
     func importDestination(into collection: ItemID? = nil) -> ImportDestination {
-        ImportDestination(place: item, collection: collection ?? shownCollection, isOnCollection: collection != nil)
+        ImportDestination(place: shown, collection: collection ?? shownCollection, isOnCollection: collection != nil)
     }
 
     /// The one way files from outside become items: dropped from Finder on the list, the sidebar or the window, dropped
@@ -41,7 +41,7 @@ extension Browser {
         QuickAdd.File.tellUnreadable(notRead, unreadable: unreadable, to: library.notices)
         var added: [ItemID] = []
         for file in files {
-            if let id = await library.addFile(file.url, title: nil, parentID: nil, in: destination.place) { added.append(id) }
+            if let id = await library.addFile(file.url, title: nil, parentID: nil, in: destination.place.place) { added.append(id) }
         }
         guard !added.isEmpty else { return [] }
         var joined = false
@@ -49,13 +49,13 @@ extension Browser {
             await library.waitUntilHolding(added)
             joined = library.addToCollection(Set(added.filter { library.item($0) != nil }), target, undoManager: undoManager)
         }
-        guard isShowing(library), item == destination.place else { return added }
-        let shown = Set(placeItems(in: library).map(\.id))
-        if (joined && destination.collection == shownCollection) || added.allSatisfy(shown.contains) {
+        guard isShowing(library), shown == destination.place else { return added }
+        let listed = Set(placeItems(in: library).map(\.id))
+        if (joined && destination.collection == shownCollection) || added.allSatisfy(listed.contains) {
             selection = Set(added)
         } else if !destination.isOnCollection {
             await library.waitUntilHolding(added)
-            if isShowing(library), item == destination.place, let first = library.item(added[0]) {
+            if isShowing(library), shown == destination.place, let first = library.item(added[0]) {
                 reveal(first, in: library, order: order)
             }
         }
@@ -80,7 +80,7 @@ extension Browser {
 
     /// The collection the window shows.
     private var shownCollection: ItemID? {
-        if case .collection(let id) = item { id } else { nil }
+        if shown.view == .own, case .collection(let id) = shown.place { id } else { nil }
     }
 }
 

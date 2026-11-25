@@ -12,7 +12,6 @@ struct MainView: View {
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @StoredOrder private var order
-    @AppStorage(IncludedSubtypes.key) private var includedSubtypes = IncludedSubtypes()
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @AppStorage(InterfaceKey.showsSidebarHistory) private var showsSidebarHistory = true
@@ -97,7 +96,7 @@ struct MainView: View {
             if browser.showsCollection { editor.releaseFocus(); editor.flush() }
         }
         // Another place, or the index of one, is somewhere else to go: Version History is of the item it was opened for.
-        .onChange(of: browser.sidebarItem) { details.leaveHistory() }
+        .onChange(of: browser.showing) { details.leaveHistory() }
         .onChange(of: browser.showsSidebarIndex) { details.leaveHistory() }
     }
 
@@ -318,7 +317,7 @@ struct MainView: View {
         .onChange(of: browser.snapshotParts) {
             if restoresWindow {
                 browser.saveSnapshot { storedBrowser = $0 }
-                StartWith.remember(browser.item)
+                StartWith.remember(browser.shown)
             }
         }
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to
@@ -364,7 +363,6 @@ struct MainView: View {
                 if let item = library.item(id) { browser.reveal(item, in: library, order: order) }
             }
         }
-        .onChange(of: includedSubtypes.types, initial: true) { browser.stackedTypes = includedSubtypes.types }
         // Another Mac's settings reached the defaults: a list reads its density again.
         .onReceive(NotificationCenter.default.publisher(for: PreferencesSync.appliedNotification)) { _ in browser.densityRevision += 1 }
         // A window restores what it showed once the library has been read, since before then nothing is there. A
@@ -378,13 +376,13 @@ struct MainView: View {
                 if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order, start: StartWith.stored().startingPlace()) }
                 #if DEBUG
                 if SampleLibrary.isRequested, SampleLibrary.withCollections {
-                    browser.sidebarItem = .itemType("core.task")
+                    browser.showing = .type(TypeID("core.task"))
                     browser.set(layout: .board)
                 }
                 if let place = SampleLibrary.launchPlace {
                     // A type with no item yet has no place to stay on, so a server's copy still filling is waited for.
                     for _ in 0..<60 where library.count(in: place) == 0 { try? await Task.sleep(for: .milliseconds(500)) }
-                    browser.sidebarItem = place
+                    browser.showing = place
                 }
                 if let layout = SampleLibrary.launchLayout { browser.set(layout: layout) }
                 #endif

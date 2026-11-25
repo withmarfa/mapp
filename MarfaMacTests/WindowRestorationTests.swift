@@ -59,7 +59,7 @@ struct WindowBringBackTests {
     @Test func aRestoredPositionSurvivesRestoringThePlaceAndLayoutItBelongsTo() throws {
         let (library, _, _, _) = BrowserTests().makeFakeLibrary()
         let saved = Browser()
-        saved.sidebarItem = .favorites
+        saved.showing = .favorites
         saved.viewMode = .table
         saved.listMemory.scrollOffset = 420
         let data = try JSONEncoder().encode(saved.snapshot())
@@ -70,7 +70,7 @@ struct WindowBringBackTests {
 
     @Test func aWindowKeptBeforeTheseThingsWereKeptStillOpens() throws {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
-        var snapshot = Browser.Snapshot(place: .allItems, selection: [newer.id])
+        var snapshot = Browser.Snapshot(place: .library, selection: [newer.id])
         snapshot.opensItem = nil
         let data = try JSONEncoder().encode(snapshot)
         let back = Browser()

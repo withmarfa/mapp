@@ -17,8 +17,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Items a person has asked to erase for good, until a window asks them to confirm.
     var itemsToPurge: Set<ItemID> { get set }
     var catalogue: Catalogue { get }
-    /// The views saved on the server, by title, each a place of its own (`SidebarItem.view`). Empty where there are
-    /// none or they cannot be read.
+    /// The views saved on the server, by title, each shown at its home (`Place.home(of:catalogue:)`). Empty where
+    /// there are none or they cannot be read.
     var views: [LibraryView] { get }
     /// Whether the server can be reached now, which is what every write that is never queued needs: deleting items
     /// in Recently Deleted for good, saving, changing and deleting a view, and choosing a type's icon, and changing a type's fields.
@@ -58,7 +58,14 @@ protocol ItemLibrary: AnyObject, Observable {
     func headerItem(_ id: ItemID) -> Item?
     /// The item's version alone. It changes only when the version does, not when the text, preview, sync or embeds do.
     func itemVersion(_ id: ItemID) -> ItemVersion?
-    func items(in place: SidebarItem) -> [Item]
+    /// What `place` lists: the Library its tier and the Feed its own, a type, a collection or a source the tiers
+    /// `scope` names, and the Archive every archived item. `archived` says whether archived items are listed beside
+    /// the active ones, and `includingKinds` whether a type lists its kinds. An index lists nothing.
+    func items(in place: Place, scope: ListScope, archived: ArchivedItems, includingKinds: Bool) -> [Item]
+    /// What the saved view `id` lists, read from the copy beside the views.
+    func items(inView id: ItemID) -> [Item]
+    /// The Library's Favorites view: every item tagged favorite, of the tiers `scope` names.
+    func favoriteItems(in scope: ListScope, archived: ArchivedItems) -> [Item]
     /// What Recently Deleted holds, newest first. It is a page of Settings, not a place, so no window lists it.
     var deletedItems: [Item] { get }
     var deletedCount: Int { get }
@@ -76,12 +83,15 @@ protocol ItemLibrary: AnyObject, Observable {
     /// What that search finds among the items `narrowing` leaves out, at most `SearchResults.leftOutLimit`; nothing
     /// where nothing is left out. A library asks the copy only when this is read.
     func searchLeftOut(_ query: String, narrowedBy narrowing: SearchNarrowing) -> SearchResults
-    func count(in place: SidebarItem) -> Int
+    /// How many active items `place` lists in `scope`, a type's kinds included, read from the index.
+    func count(in place: Place, scope: ListScope) -> Int
+    /// How many active items `place` holds in each tier, a type's kinds included.
+    func scopeCounts(in place: Place) -> ScopeCounts
     /// The catalogue's types that hold items, with their labels and counts, for a sidebar that lists them. The
     /// default is built from `catalogue` and `count(in:)`, so a library answers it without a view asking what kind
     /// of library it is.
     var itemTypeCounts: [ItemTypeCount] { get }
-    func name(of place: SidebarItem) -> String
+    func name(of place: Place) -> String
     /// Whether a window kept for this item has nothing left to show, which is known only once the items are read.
     func isGone(_ id: ItemID?) -> Bool
     /// The items to open in windows of their own: those the library holds.
@@ -166,12 +176,12 @@ protocol ItemLibrary: AnyObject, Observable {
     /// itself, so a type whose fields are required is made whole in one write.
     func createItem(
         typeID: String, title: String, body: String, properties: [String: PropertyValue], parentID: ItemID?,
-        in place: SidebarItem, undoManager: UndoManager?
+        in place: Place, undoManager: UndoManager?
     ) -> ItemID?
     /// Adds the file at `file` as an item of its own, of the file type its media type calls for, titled `title` or by its name, under `parentID`
     /// where one is given. The file is read where it is while this runs. Nil when it could not be added, and the
     /// library tells the person why.
-    func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID?
+    func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: Place) async -> ItemID?
     /// Text typed on the page, over the text `body(of:)` gave at `readAt`. An edit typed on text older than the
     /// library now holds was made without seeing what replaced it, so it never silently overwrites that. Typing is
     /// undone by the page that holds it, so this registers nothing.
@@ -319,7 +329,7 @@ extension ItemLibrary {
     func newChildVerdict(under parent: ItemID) async -> EdgeVerdict { .taken }
 
     func createItem(
-        typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?
+        typeID: String, title: String, body: String, parentID: ItemID?, in place: Place, undoManager: UndoManager?
     ) -> ItemID? {
         createItem(typeID: typeID, title: title, body: body, properties: [:], parentID: parentID, in: place, undoManager: undoManager)
     }
@@ -442,9 +452,34 @@ extension ItemLibrary {
         return collections.filter { held.contains($0.id) }
     }
 
-    /// What a flat list of items, such as the palette or the link picker, says beside a title: Inbox for an item
-    /// waiting there, otherwise its type.
+    /// The active items `place` lists in both tiers, a type's kinds included.
+    func items(in place: Place) -> [Item] {
+        items(in: place, scope: .all, archived: .hidden, includingKinds: true)
+    }
+
+    /// How many active items `place` lists in both tiers, a type's kinds included.
+    func count(in place: Place) -> Int { count(in: place, scope: .all) }
+
+    /// The name of what a window shows: a saved view's title, Favorites, or the place's name.
+    func name(of shown: PlaceView) -> String {
+        if let id = shown.savedView { return views.first { $0.id == id }?.title ?? "" }
+        return shown.isFavorites ? String(localized: "Favorites") : name(of: shown.place)
+    }
+
+    /// How many active items a window showing `shown` lists, as a sidebar row counts them: a saved view's members, the
+    /// Library's favorites, or the place in both tiers.
+    func count(in shown: PlaceView) -> Int {
+        if let id = shown.savedView { return items(inView: id).count }
+        if shown.isFavorites { return favoriteItems(in: .library, archived: .hidden).count }
+        return count(in: shown.place)
+    }
+
+    /// Every active item, the Library's and then the Feed's.
+    var activeItems: [Item] { items(in: .library) + items(in: .feed) }
+
+    /// What a flat list of items, such as the palette or the link picker, says beside a title: Feed for an item
+    /// in the feed tier, otherwise its type.
     func placeLabel(of item: Item) -> String {
-        item.tier == .feed ? String(localized: "Inbox") : catalogue.label(for: item.type)
+        item.tier == .feed ? String(localized: "Feed") : catalogue.label(for: item.type)
     }
 }

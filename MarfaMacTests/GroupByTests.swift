@@ -115,11 +115,11 @@ struct GroupByTests {
         return library
     }
 
-    private static func window(_ library: FakeItemLibrary, place: SidebarItem, layout: ItemViewMode, defaults: UserDefaults = ViewPanelTests.defaults()) -> Browser {
+    private static func window(_ library: FakeItemLibrary, place: PlaceView, layout: ItemViewMode, defaults: UserDefaults = ViewPanelTests.defaults()) -> Browser {
         let browser = Browser()
         browser.defaults = defaults
         browser.adopt(library)
-        browser.sidebarItem = place
+        browser.showing = place
         browser.followPlaceDefault(in: library)
         browser.set(layout: layout)
         browser.choicesChanged()
@@ -130,7 +130,7 @@ struct GroupByTests {
         let items = [Self.item("a", Self.task, ["status": .string("todo")])]
         let library = Self.library(items)
         let defaults = ViewPanelTests.defaults()
-        let place = SidebarItem.itemType(Self.task.rawValue)
+        let place = PlaceView.type(Self.task)
         let first = Self.window(library, place: place, layout: .list, defaults: defaults)
         // The list starts in Settings' order, its edited date by day.
         #expect(first.shownGrouping(in: library) == .column(ItemTableColumn.edited.id, by: .bucket(.day)))
@@ -152,7 +152,7 @@ struct GroupByTests {
 
     @Test func saveAsViewNamesTheGroupingAViewCannotKeep() throws {
         let library = Self.library(Self.events)
-        let browser = Self.window(library, place: .itemType(Self.event.rawValue), layout: .board)
+        let browser = Self.window(library, place: .type(Self.event), layout: .board)
         browser.chooseGrouping(.column("field.starts_at", by: .presence))
         let window = SavedViews.window(browser, in: library, order: browser.storedOrder)
         let draft = try #require(ViewDraft.draft(window, catalogue: library.catalogue, views: []))
@@ -184,7 +184,7 @@ struct GroupByTests {
 
     @Test func aBoardByNotSetClearsAnOptionalFieldAndRefusesARequiredOne() {
         let library = Self.library(Self.events)
-        let browser = Self.window(library, place: .itemType(Self.event.rawValue), layout: .board)
+        let browser = Self.window(library, place: .type(Self.event), layout: .board)
         browser.chooseGrouping(.column("field.starts_at", by: .presence))
         let lanes = try! #require(browser.boardLanes(in: library))
         #expect(lanes.all.map(\.title) == ["Not Set", "Set"])
@@ -201,12 +201,12 @@ struct GroupByTests {
     @Test func aBoardShowsLanesWhereThePlaceHasNoneAndKeepsThePlacesChoice() {
         let items = [Self.item("t", Self.task, ["status": .string("todo")])]
         let library = Self.library(items)
-        let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .table)
+        let browser = Self.window(library, place: .type(Self.task), layout: .table)
         browser.chooseGrouping(.none)
         browser.choicesChanged()
         browser.set(layout: .board)
         #expect(browser.boardGrouping(in: library) == .column("field.status"))
-        #expect(browser.tableOptions[browser.item]?.grouping == ItemTableOptions.Grouping.none, "the board leaves the table's choice alone")
+        #expect(browser.tableOptions[browser.shown]?.grouping == ItemTableOptions.Grouping.none, "the board leaves the table's choice alone")
         browser.set(layout: .table)
         #expect(browser.shownGrouping(in: library) == .none)
     }

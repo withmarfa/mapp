@@ -17,19 +17,19 @@ struct InspectorFieldsTests {
         ]
     ]
 
-    private static let task = MarfaMapping.itemType(ItemType(
+    private static let task = MarfaMapping.type(TypeID(ItemType(
         id: "aic.ticket.task", label: "Task",
         fields: [
             field("title"), field("body"), field("description"),
             field("status", "status", definition: words),
             field("priority", "enum", definition: ["enum_values": ["low", "high"]])
         ],
-        titleField: "title", bodyField: "body"))
+        titleField: "title", bodyField: "body")))
 
-    private static let file = MarfaMapping.itemType(ItemType(
+    private static let file = MarfaMapping.type(TypeID(ItemType(
         id: "core.file", label: "File",
         fields: [field("blob_ref"), field("mime_type"), field("title"), field("description"), field("size_bytes", "integer")],
-        titleField: "title"))
+        titleField: "title")))
 
     private static func item(
         _ type: String, id: String = "10000000-0000-0000-0000-000000000001", properties: [Property] = [],
@@ -43,12 +43,12 @@ struct InspectorFieldsTests {
     // MARK: Status
 
     @Test func aFieldIsNotAStatusByItsNameOrItsDescription() {
-        let named = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("status")]))
-        let choice = MarfaMapping.itemType(ItemType(
-            id: "aic.y", label: "Y", fields: [Self.field("status", "enum", definition: ["enum_values": ["open", "done"]])]))
-        let described = MarfaMapping.itemType(ItemType(
-            id: "aic.z", label: "Z", fields: [Self.field("status", description: "Recommended values: open, done")]))
-        let number = MarfaMapping.itemType(ItemType(id: "aic.w", label: "W", fields: [Self.field("status", "integer")]))
+        let named = MarfaMapping.type(TypeID(ItemType(id: "aic.x", label: "X", fields: [Self.field("status")])))
+        let choice = MarfaMapping.type(TypeID(ItemType(
+            id: "aic.y", label: "Y", fields: [Self.field("status", "enum", definition: ["enum_values": ["open", "done"]])])))
+        let described = MarfaMapping.type(TypeID(ItemType(
+            id: "aic.z", label: "Z", fields: [Self.field("status", description: "Recommended values: open, done")])))
+        let number = MarfaMapping.type(TypeID(ItemType(id: "aic.w", label: "W", fields: [Self.field("status", "integer")])))
         #expect(named.statusField == nil)
         #expect(choice.statusField == nil)
         #expect(described.statusField == nil)
@@ -114,7 +114,7 @@ struct InspectorFieldsTests {
         #expect(status.options(including: "completed") == status.options)
         #expect(status.options(including: "waiting on Sam") == status.options + ["waiting on Sam"])
         #expect(ItemTypeInfo.Field.label(ofOption: "in_progress") == "In Progress")
-        let plain = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("note")])).fields[0]
+        let plain = MarfaMapping.type(TypeID(ItemType(id: "aic.x", label: "X", fields: [Self.field("note")]))).fields[0]
         #expect(plain.options(including: "anything").isEmpty)
     }
 
@@ -183,7 +183,7 @@ struct InspectorFieldsTests {
         var item = Self.item("aic.ticket.task")
         item.state = .trashed
         #expect(InspectorFields.addable(of: item, type: Self.task, hidden: []).isEmpty)
-        let list = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("tags", "array"), Self.field("note")]))
+        let list = MarfaMapping.type(TypeID(ItemType(id: "aic.x", label: "X", fields: [Self.field("tags", "array"), Self.field("note")])))
         #expect(InspectorFields.addable(of: Self.item("aic.x"), type: list, hidden: []).map(\.key) == ["note"])
     }
 
@@ -235,7 +235,7 @@ struct InspectorFieldsTests {
 
     @MainActor @Test func aMarfanItemKeepsItsPropertiesNamedLikeAFilesFacts() async throws {
         let note = Self.item("core.note", properties: [Property(key: "size_bytes", value: .number(1))])
-        let library = try await Self.marfa([note], types: [MarfaMapping.itemType(ItemType(id: "core.note", label: "Note", titleField: "title"))])
+        let library = try await Self.marfa([note], types: [MarfaMapping.type(TypeID(ItemType(id: "core.note", label: "Note", titleField: "title")))])
         #expect(library.hiddenPropertyKeys(of: note) == ["title"])
     }
 

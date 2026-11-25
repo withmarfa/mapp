@@ -289,8 +289,8 @@ nonisolated extension SidebarLayout {
         if let put = homes?[place.key], allGroups.contains(where: { $0.id == put && $0.holdsPlaces }) { return put }
         let kind: SidebarGroup.Kind
         switch place {
-        case .all, .sources, .collections: kind = .library
-        case .inbox, .recents, .favorites, .view: kind = .views
+        case .library, .sources, .collections: kind = .library
+        case .feed, .favorites, .view, .item: kind = .views
         default: return nil
         }
         return allGroups.first { $0.kind == kind }?.id

@@ -52,7 +52,7 @@ struct SidebarContent {
         typeRows = plan.typeRows
         let creatable = Set(QuickAdd.types(in: library).map(\.id.rawValue))
         func row(_ place: SidebarPlace) -> SidebarPlaceRowData? {
-            guard let item = place.item, let symbol = place.symbol else { return nil }
+            guard let item = place.opens, let symbol = place.symbol else { return nil }
             return SidebarPlaceRowData(
                 place: place, item: item, title: library.name(of: item), symbol: symbol,
                 count: place.showsCount ? library.count(in: item) : 0, tone: place.defaultTone == nil ? nil : layout.color(of: place))
@@ -102,7 +102,7 @@ struct SidebarContent {
             let saved = group.group.kind == .views
                 ? [SidebarShowChoice(place: .views, title: String(localized: "Saved Views"), isShown: !layout.isHidden(.views))] : []
             return saved + group.members.compactMap { place in
-                place.item.map { SidebarShowChoice(place: place, title: library.name(of: $0), isShown: !layout.isHidden(place)) }
+                place.opens.map { SidebarShowChoice(place: place, title: library.name(of: $0), isShown: !layout.isHidden(place)) }
             }
         }
     }
@@ -133,7 +133,7 @@ struct SidebarContent {
     static func shortcutRow(
         _ shortcut: SidebarShortcut, in library: any ItemLibrary, creatable: Set<String>
     ) -> SidebarShortcutRowData? {
-        func row(_ title: String, _ icon: RowIcon, opens item: SidebarItem? = nil) -> SidebarShortcutRowData {
+        func row(_ title: String, _ icon: RowIcon, opens item: PlaceView? = nil) -> SidebarShortcutRowData {
             SidebarShortcutRowData(shortcut: shortcut, title: title, icon: icon, item: item)
         }
         switch shortcut {
@@ -149,15 +149,15 @@ struct SidebarContent {
             switch place {
             case .type(let id):
                 guard library.catalogue.itemTypes[TypeID(id)] != nil else { return nil }
-                return row(library.catalogue.plural(for: TypeID(id)), .type(library.catalogue.icon(for: TypeID(id))), opens: .itemType(id))
+                return row(library.catalogue.plural(for: TypeID(id)), .type(library.catalogue.icon(for: TypeID(id))), opens: .type(TypeID(id)))
             case .view(let id):
                 guard library.views.contains(where: { $0.id == id }) else { return nil }
-                return row(library.name(of: .view(id)), .symbol(SidebarPlace.viewSymbol), opens: .view(id))
+                return row(library.name(of: .saved(id)), .symbol(SidebarPlace.viewSymbol), opens: .saved(id))
             case .collection(let id):
                 guard library.collections.contains(where: { $0.id == id }) else { return nil }
                 return row(library.name(of: .collection(id)), .symbol(place.symbol ?? "square.stack"), opens: .collection(id))
             default:
-                guard let item = place.item, let symbol = place.symbol else { return nil }
+                guard let item = place.opens, let symbol = place.symbol else { return nil }
                 return row(library.name(of: item), .symbol(symbol), opens: item)
             }
         }
@@ -179,7 +179,7 @@ nonisolated struct SidebarSectionData: Identifiable, Equatable {
 nonisolated struct SidebarPlaceRowData: Equatable {
     let place: SidebarPlace
     /// What choosing the row opens.
-    let item: SidebarItem
+    let item: PlaceView
     let title: String
     let symbol: String
     let count: Int
@@ -193,7 +193,7 @@ nonisolated struct SidebarShortcutRowData: Equatable, Identifiable {
     let title: String
     let icon: RowIcon
     /// Where it goes, for a shortcut that opens a place.
-    let item: SidebarItem?
+    let item: PlaceView?
 
     var id: String { shortcut.key }
 }
@@ -211,12 +211,12 @@ private struct SidebarList: View {
     let order: ItemOrder
 
     /// Empty clicks leave the destination intact. While customizing, a click chooses nothing.
-    private var selection: Binding<SidebarItem?> {
+    private var selection: Binding<PlaceView?> {
         Binding {
-            browser.sidebarItem
+            browser.showing
         } set: { item in
             guard let item, !browser.customizesSidebar else { return }
-            if item != browser.sidebarItem { browser.show(item, in: library, order: order) }
+            if item != browser.showing { browser.show(item, in: library, order: order) }
         }
     }
 
@@ -259,7 +259,7 @@ private struct SidebarList: View {
         }
         // The window mounts this list afresh when its presentation changes, so it starts where the last one was.
         .remembersScroll(in: browser.sidebarMemory)
-        .softSelection(rows: [content.marksSignature, browser.sidebarShowsAllTypes ? 1 : 0], selection: { browser.sidebarItem })
+        .softSelection(rows: [content.marksSignature, browser.sidebarShowsAllTypes ? 1 : 0], selection: { browser.showing })
         .contextMenu { if !content.customizing { SidebarCustomizeButton(browser: browser) } }
         .accessibilityIdentifier("Sidebar")
         // The right and left arrows open and close the selected type, as the system's outline does for its own rows.

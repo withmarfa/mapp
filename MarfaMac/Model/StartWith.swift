@@ -5,7 +5,7 @@ import Foundation
 /// which syncs through the Marfa (`PreferencesMap`); the place last used stays on this Mac.
 nonisolated enum StartWith: Hashable, Sendable, RawRepresentable {
     case leftOff
-    case place(SidebarItem)
+    case place(PlaceView)
 
     static let key = "startWith"
     /// The place the person last had a window in, which `leftOff` brings back.
@@ -37,19 +37,26 @@ nonisolated enum StartWith: Hashable, Sendable, RawRepresentable {
     }
 
     /// Remembers where a window is, for `leftOff`.
-    static func remember(_ place: SidebarItem, in defaults: UserDefaults = .standard) {
+    static func remember(_ place: PlaceView, in defaults: UserDefaults = .standard) {
         defaults.set(place.storageKey, forKey: lastPlaceKey)
     }
 
     /// The place a window with nothing to restore opens in, or nil for the library's usual start.
-    func startingPlace(in defaults: UserDefaults = .standard) -> SidebarItem? {
+    func startingPlace(in defaults: UserDefaults = .standard) -> PlaceView? {
         switch self {
         case .leftOff: defaults.string(forKey: Self.lastPlaceKey).flatMap(Self.place(from:))
         case .place(let place): place
         }
     }
 
-    private static func place(from text: String) -> SidebarItem? {
-        try? JSONDecoder().decode(SidebarItem.self, from: Data(text.utf8))
+    /// A place an earlier copy stored reads as the place that stands for it now (`EarlierPlace`); Files, which is no
+    /// place now, reads as the Library.
+    private static func place(from text: String) -> PlaceView? {
+        if let place = PlaceView(storageKey: text) { return place }
+        switch EarlierPlace.read(key: text) {
+        case .place(let place, _)?: return place
+        case .files?: return .library
+        case nil: return nil
+        }
     }
 }

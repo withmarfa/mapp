@@ -114,7 +114,7 @@ extension EditorTests {
         if close {
             editor.close()
         } else {
-            let other = try #require(library.items(in: .allItems).first { $0.id != item.id && !$0.isFile })
+            let other = try #require(library.items(in: .library).first { $0.id != item.id && !$0.isFile })
             source.setBody("Other body\n", of: other.id)
             source.sendBody(of: other.id)
             try #require(await eventually { library.body(of: other.id) != nil })

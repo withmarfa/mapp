@@ -8,26 +8,26 @@ enum SavedViews {
     /// and a collection cannot.
     static func canSave(_ browser: Browser, in library: any ItemLibrary) -> Bool {
         library.isLoaded && library.reachesServer && !browser.showsSidebarIndex
-            && ViewDraft.query(for: browser.item, catalogue: library.catalogue, views: library.views) != nil
+            && ViewDraft.query(for: browser.shown, catalogue: library.catalogue, views: library.views) != nil
     }
 
     /// Whether Edit View has a panel for the window's place: a saved view, or a place that could become one.
     static func canEdit(_ browser: Browser, in library: any ItemLibrary) -> Bool {
         library.isLoaded && !browser.showsSidebarIndex
             && (shown(browser, in: library) != nil
-                || ViewDraft.query(for: browser.item, catalogue: library.catalogue, views: library.views) != nil)
+                || ViewDraft.query(for: browser.shown, catalogue: library.catalogue, views: library.views) != nil)
     }
 
     /// The view the window shows, while the library holds it.
     static func shown(_ browser: Browser, in library: any ItemLibrary) -> LibraryView? {
-        guard case .view(let id) = browser.item else { return nil }
+        guard let id = browser.shown.savedView else { return nil }
         return library.views.first { $0.id == id }
     }
 
     /// What the window shows, as the table works it out. Every layout applies the place's filters.
     static func window(_ browser: Browser, in library: any ItemLibrary) -> ViewDraft.Window {
         let content = browser.tableContent(in: library)
-        let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
+        let options = browser.tableOptions[browser.shown] ?? ItemTableOptions()
         let search = browser.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         // The order and grouping come from what the layout shows (`arrangement`), which is what the panel shows too.
         let layoutShows = arrangement(browser, content: content, order: browser.storedOrder)
@@ -39,14 +39,14 @@ enum SavedViews {
             groupMode = mode
         }
         var seededTypes: [String]?
-        if case .view(let id) = browser.item { seededTypes = browser.viewSeeds[id]?.types }
+        if let id = browser.shown.savedView { seededTypes = browser.viewSeeds[id]?.types }
         return ViewDraft.Window(
-            place: browser.item, columns: content.columns, sort: layoutShows.sort, grouping: grouping, groupMode: groupMode,
+            place: browser.shown, columns: content.columns, sort: layoutShows.sort, grouping: grouping, groupMode: groupMode,
             groupOrder: options.groupOrder, hiddenGroups: options.hiddenGroups,
             filter: options.filter, targets: content.filterOffer.targets, search: search.isEmpty ? nil : search,
-            layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.item],
+            layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.shown],
             seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.hasDateSections) : nil,
-            includesSubtypes: browser.stacksSubtypes(in: library))
+            listing: browser.listing)
     }
 
     /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new
@@ -73,7 +73,7 @@ enum SavedViews {
             return .calendar
         case .timeline:
             let fields = browser.timelineFieldChoices(in: library)
-            let key = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
+            let key = ItemTimelineLayout.selectedField(browser.timelineFields[browser.shown], fields: fields)
             return .timeline(key: key, label: fields.first { $0.key == key }?.label ?? "")
         }
     }
@@ -86,14 +86,14 @@ enum SavedViews {
         if browser.viewMode == .calendar { settings.calendarScale = browser.calendarScale }
         settings.hidesEmptyGroups = browser.hidesEmptyGroups
         settings.properties = browser.properties
-        if case .view(let id) = browser.item { settings.calendarScale = browser.macSettings(for: id).calendarScale }
+        if let id = browser.shown.savedView { settings.calendarScale = browser.macSettings(for: id).calendarScale }
         return settings
     }
 
     /// Whether a place that is not a view shows something a view could keep, which Save as View offers to.
     static func hasChoicesToKeep(_ browser: Browser, in library: any ItemLibrary) -> Bool {
         shown(browser, in: library) == nil && canEdit(browser, in: library)
-            && (browser.tableOptions[browser.item]?.isFiltering == true || browser.listShape?.arranged == true)
+            && (browser.tableOptions[browser.shown]?.isFiltering == true || browser.listShape?.arranged == true)
     }
 
     // MARK: What the layout uses
@@ -120,7 +120,7 @@ enum SavedViews {
     static func arrangement(_ browser: Browser, content: ItemTableContent, order: ItemOrder) -> Arrangement {
         guard !isArranged(browser) else {
             // The board sorts its cards by title where nothing sorts them, which is what it then shows and keeps.
-            if browser.viewMode == .board, browser.tableOptions[browser.item]?.sort?.isEmpty != false {
+            if browser.viewMode == .board, browser.tableOptions[browser.shown]?.sort?.isEmpty != false {
                 return Arrangement(sort: [ItemTableComparator(column: .title)], isDated: false)
             }
             return Arrangement(sort: content.sort, isDated: false)

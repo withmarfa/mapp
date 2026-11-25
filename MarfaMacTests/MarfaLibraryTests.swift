@@ -169,7 +169,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.upserted([added]))
         #expect(await eventually { library.item(added.id) != nil })
         #expect(library.body(of: added.id)?.text == "Fresh")
-        #expect(library.count(in: .itemType("aic.ticket.task")) == 2)
+        #expect(library.count(in: .type(TypeID("aic.ticket.task"))) == 2)
 
         source.send(.removed([F.n1]))
         #expect(await eventually { library.isGone(F.n1) })
@@ -249,7 +249,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         let id = try #require(library.createItem(
-            typeID: "aic.ticket.task", title: "  New task ", body: "Text", parentID: F.p1, in: .allItems, undoManager: undo))
+            typeID: "aic.ticket.task", title: "  New task ", body: "Text", parentID: F.p1, in: .library, undoManager: undo))
         #expect(id.rawValue == id.rawValue.lowercased())
         #expect(id.rawValue.dropFirst(14).first == "7")
         #expect(source.writes == [.create(id: id, ItemDraft(type: F.task, title: "New task", body: "Text", parent: F.p1))])
@@ -274,10 +274,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func aCreateTheCatalogueRefusesIsToldAndNotSent() async throws {
         let (library, source) = try await loaded()
-        #expect(library.createItem(typeID: "no.such", title: "X", body: "", parentID: nil, in: .allItems, undoManager: nil) == nil)
+        #expect(library.createItem(typeID: "no.such", title: "X", body: "", parentID: nil, in: .library, undoManager: nil) == nil)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Create Item"))
         library.notices.answerAll()
-        #expect(library.createItem(typeID: "core.note", title: " ", body: "", parentID: nil, in: .allItems, undoManager: nil) == nil)
+        #expect(library.createItem(typeID: "core.note", title: " ", body: "", parentID: nil, in: .library, undoManager: nil) == nil)
         #expect(library.notices.waiting.last != nil)
         #expect(source.writes.isEmpty)
     }
@@ -887,7 +887,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.attaching.failure.withLock { $0 = SourceFailure(kind: .failed, message: "No room.") }
         source.attaching.failures.withLock { $0["b.pdf"] = SourceFailure(kind: .failed, message: "No room.") }
         await #expect(throws: SourceFailure.self) { try await library.attach(file: disk.url("b.pdf"), to: F.n1) }
-        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, in: .allItems) == nil)
+        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, in: .library) == nil)
         #expect(library.notices.waiting.last?.message == "No room.")
     }
 
@@ -1165,7 +1165,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         _ = try #require(library.createItem(
             typeID: LibraryFixture.task.rawValue, title: "Kept", body: "Only copy", properties: ["status": .string("open")],
-            parentID: nil, in: .allItems, undoManager: nil))
+            parentID: nil, in: .library, undoManager: nil))
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: MarfaEngine.closedCode, message: MarfaEngine.notKept))))
         #expect(await eventually { !library.notices.waiting.isEmpty })
@@ -1218,7 +1218,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func aCreateRefusedBeforeItWasQueuedGivesItsTextBack() async throws {
         let (library, source) = try await loaded()
         _ = try #require(library.createItem(
-            typeID: "core.note", title: "Kept", body: "Only copy", parentID: nil, in: .allItems, undoManager: nil
+            typeID: "core.note", title: "Kept", body: "Only copy", parentID: nil, in: .library, undoManager: nil
         ))
         let write = try #require(source.submitted.last?.id)
         let problem = SyncProblem(code: "type_not_permitted", message: "Not this type.", notQueued: true)

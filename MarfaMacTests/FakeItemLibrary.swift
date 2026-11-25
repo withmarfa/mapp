@@ -162,24 +162,32 @@ final class FakeItemLibrary: ItemLibrary {
     /// How often a place's items were listed, for tests of what is kept rather than asked for again.
     @ObservationIgnored private(set) var placeReads = 0
 
-    func items(in place: SidebarItem) -> [Item] {
+    func items(in place: Place, scope: ListScope, archived: ArchivedItems, includingKinds: Bool) -> [Item] {
         placeReads += 1
-        if place == .recents { return Self.recent(items) }
         return items.filter { item in
+            guard archived.includes(item.state) else { return false }
             switch place {
-            case .inbox: item.state == .active && item.tier == .feed
-            case .allItems: item.state == .active
-            case .sources, .collections: false
-            case .source(let name): item.state == .active && item.source == name
-            case .recents: false
-            case .favorites: item.state == .active && item.isFavorite
-            case .favoriteItem(let id): item.id == id && item.state == .active && item.isFavorite
-            case .itemType(let type): item.state == .active && item.type == TypeID(type)
-            case .collection(let id): item.state == .active && item.collectionIDs.contains(id)
-            case .files: item.state == .active && item.isFile
-            case .view(let id): item.state == .active && viewMembers[id]?.contains(item.id) == true
+            case .library: return item.tier == .library
+            case .feed: return item.tier == .feed
+            case .archive: return true
+            case .types, .collections, .sources: return false
+            case .type(let type):
+                let types = includingKinds ? catalogue.descendants(of: type).union([type]) : [type]
+                return scope.includes(item.tier) && types.contains(item.type)
+            case .collection(let id): return scope.includes(item.tier) && item.collectionIDs.contains(id)
+            case .source(let code): return scope.includes(item.tier) && item.source == code
             }
         }
+    }
+
+    func items(inView id: ItemID) -> [Item] {
+        placeReads += 1
+        return items.filter { $0.state == .active && viewMembers[id]?.contains($0.id) == true }
+    }
+
+    func favoriteItems(in scope: ListScope, archived: ArchivedItems) -> [Item] {
+        placeReads += 1
+        return items.filter { archived.includes($0.state) && scope.includes($0.tier) && $0.isFavorite }
     }
 
     func previewItems(ofView view: ItemID, query: LibraryViewQuery) -> [Item] {
@@ -193,8 +201,11 @@ final class FakeItemLibrary: ItemLibrary {
         guard !query.isEmpty else { return .none }
         let place: Set<ItemID>? = switch scope {
         case .everywhere: nil
-        case .place(let place): Set(items(in: place).map(\.id))
-        case .typeWithSubtypes(let type): Set(items(inTypeAndSubtypes: type.rawValue).map(\.id))
+        case .view(let id): Set(items(inView: id).map(\.id))
+        case .query(let query): Set(items.filter { item in
+            (query.types.isEmpty || query.types.contains(item.type)) && query.tier.map { $0 == item.tier } != false
+                && query.states.map { $0.contains(item.state) } != false
+        }.map(\.id))
         }
         return SearchResults(items: items.filter {
             $0.state == .active && place?.contains($0.id) != false && ($0.title.localizedCaseInsensitiveContains(query)
@@ -220,13 +231,18 @@ final class FakeItemLibrary: ItemLibrary {
 
     var deletedItems: [Item] { items.filter { $0.state == .trashed } }
     var deletedCount: Int { deletedItems.count }
-    func count(in place: SidebarItem) -> Int { items(in: place).count }
-    func name(of place: SidebarItem) -> String {
+    func count(in place: Place, scope: ListScope) -> Int {
+        let scope: ListScope = place == .library ? .library : place == .feed ? .feed : scope
+        return items(in: place, scope: scope, archived: .hidden, includingKinds: true).count
+    }
+    func scopeCounts(in place: Place) -> ScopeCounts {
+        ScopeCounts(library: count(in: place, scope: .library), feed: count(in: place, scope: .feed))
+    }
+    func name(of place: Place) -> String {
         switch place {
-        case .favoriteItem(let id), .collection(let id): item(id)?.title ?? ""
-        case .itemType(let type): catalogue.itemTypes[TypeID(type)]?.label ?? type
-        case .view(let id): views.first { $0.id == id }?.title ?? ""
-        default: "\(place)"
+        case .collection(let id): item(id)?.title ?? ""
+        case .type(let type): catalogue.itemTypes[type]?.label ?? type.rawValue
+        default: place.word
         }
     }
     func isGone(_ id: ItemID?) -> Bool { isLoaded && id.flatMap(item) == nil }
@@ -364,7 +380,7 @@ final class FakeItemLibrary: ItemLibrary {
 
     func createItem(
         typeID: String, title: String, body: String, properties: [String: PropertyValue], parentID: ItemID?,
-        in place: SidebarItem, undoManager: UndoManager?
+        in place: Place, undoManager: UndoManager?
     ) -> ItemID? {
         guard !title.isEmpty else { return nil }
         guard !refusesCreations else {
@@ -376,7 +392,7 @@ final class FakeItemLibrary: ItemLibrary {
         let item = Item(
             id: id, type: TypeID(typeID), title: title, titleRule: .property("title"),
             properties: properties.sorted { $0.key < $1.key }.map { Property(key: $0.key, value: $0.value) },
-            tier: place == .inbox ? .feed : .library,
+            tier: place == .feed ? .feed : .library,
             version: ItemVersion(1), created: now(), modified: now(), edgesOut: parent.map { [$0] } ?? [])
         bodies[item.id] = body
         created.append(item)
@@ -690,12 +706,12 @@ final class FakeItemLibrary: ItemLibrary {
     /// Every file added, and whether adding one is refused.
     private(set) var addedFiles: [(name: String, data: Data, title: String?, parent: ItemID?)] = []
     /// The place each file was added from, in step with `addedFiles`.
-    private(set) var addedPlaces: [SidebarItem] = []
+    private(set) var addedPlaces: [Place] = []
     var refusesFiles = false
     /// Awaited before a file is added, so a test can act while it is being sent.
     var sendingFile: (() async -> Void)?
 
-    func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID? {
+    func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: Place) async -> ItemID? {
         await sendingFile?()
         guard !refusesFiles else {
             notices.tell("Can’t Add File", "Refused")

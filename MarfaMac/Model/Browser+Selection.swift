@@ -3,14 +3,15 @@ import Foundation
 extension Browser {
     /// Shows a sidebar item as a person picks it in the sidebar, the menus or the palette: any search is cleared and the
     /// list's first item is selected, where the place is not an index, which chooses nothing until the person does.
-    func show(_ item: SidebarItem, in library: any ItemLibrary, order: ItemOrder) {
+    func show(_ item: PlaceView, in library: any ItemLibrary, order: ItemOrder) {
         let interval = Telemetry.begin(.navigation, "place.choose")
         defer { interval.end() }
         isCollectionItemPresented = false
         modalItem = nil
         searchText = ""
         isSearchExpanded = false
-        sidebarItem = item
+        // A saved view is shown at its home, wherever it was asked for.
+        showing = item.savedView.map { PlaceView.saved($0, in: library) } ?? item
         fallBackToListIfUnavailable(in: library)
         selectFirstItem(in: library, order: order)
     }
@@ -46,7 +47,7 @@ extension Browser {
     func collectionItemIDs(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
         guard followsCollection else { return [] }
         // Items has no layout: a full page opened from it follows the rows of its table.
-        if item == .allItems { return itemIndexIDs(in: library) }
+        if shown == .library { return itemIndexIDs(in: library) }
         guard !showsSidebarIndex else { return [] }
         guard viewMode == .table else {
             let shown = sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
@@ -54,7 +55,7 @@ extension Browser {
             let rest: [ItemID]
             if listShape?.arranged == true, !ordersByRelevance {
                 rest = tableContent(in: library).allRows.map(\.id)
-            } else if tableOptions[item]?.isFiltering == true {
+            } else if tableOptions[self.shown]?.isFiltering == true {
                 rest = items(in: library).map(\.id)
             } else {
                 return shown
@@ -99,21 +100,18 @@ extension Browser {
     /// Where the window should go instead, when the place it shows has gone; nil while the place stands. Reading it
     /// observes what a place's existence depends on (membership and the saved views), so a view that only asks this
     /// is told when the answer may have changed, and reads no list of the library's items to find out.
-    func placeFallback(in library: any ItemLibrary) -> SidebarItem? {
+    func placeFallback(in library: any ItemLibrary) -> PlaceView? {
         guard library.isLoaded else { return nil }
-        switch sidebarItem {
+        let shown = self.shown
+        if let id = shown.savedView { return library.views.contains { $0.id == id } ? nil : .library }
+        switch shown.place {
         case .collection(let id):
             // A collection's state is part of membership, which `item(_:)` follows only once the item is missing.
             _ = library.membershipRevision
-            return library.item(id)?.state != .active ? .allItems : nil
+            return library.item(id)?.state != .active ? .library : nil
         // A type is in the sidebar while it holds an item, so one whose last item went has no row to stay on.
-        case .itemType(let type):
-            return library.count(in: .itemType(type)) == 0 ? .allItems : nil
-        case .view(let id):
-            return library.views.contains { $0.id == id } ? nil : .allItems
-        case .favoriteItem(let id):
-            _ = library.membershipRevision
-            return library.item(id).map({ $0.state == .active && $0.isFavorite }) == true ? nil : .favorites
+        case .type(let type):
+            return library.count(in: .type(type), scope: .all) == 0 ? .library : nil
         default:
             return nil
         }

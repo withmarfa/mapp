@@ -327,7 +327,7 @@ struct FilterClauseTests {
         let combined = Self.filter(state.clauses)
         #expect(combined.filter == #"properties.priority eq "high""#, "the relative date is left out of the filter")
         // A new view of the window lists it, as the row reads it.
-        var window = ViewDraft.Window(place: .allItems, columns: Self.columns, sort: [], grouping: nil, filter: state, targets: Self.targets)
+        var window = ViewDraft.Window(place: .library, columns: Self.columns, sort: [], grouping: nil, filter: state, targets: Self.targets)
         window.layout = .table
         let draft = try #require(ViewDraft.draft(window, catalogue: Self.catalogue, views: []))
         #expect(draft.unkept == [.relativeFilter("Due is in the last 7 days")])
@@ -498,7 +498,7 @@ struct FilterClauseTests {
         let data = try JSONEncoder().encode(stored)
         let back = try JSONDecoder().decode(PlaceDefault.self, from: data)
         #expect(back == stored)
-        let opened = back.options(replacing: nil, in: .itemType("core.task"), catalogue: Self.catalogue)
+        let opened = back.options(replacing: nil, in: .type(TypeID("core.task")), catalogue: Self.catalogue)
         #expect(opened.filter.clauses.map(\.field) == ["field.due_at", "field.priority", "field.notes"])
         #expect(opened.filter.matchesAny)
         #expect(opened.filter.relative.count == 1)
@@ -519,7 +519,7 @@ struct FilterClauseTests {
         let kind = FilterKind.date
         let index = browser.addFilter(on: Self.targets["field.due_at"]!)
         browser.changeFilter(at: index) { $0.values = ["2026-01-01"] }
-        func clause() -> FilterClause { browser.tableOptions[browser.item]!.filter.clauses[index] }
+        func clause() -> FilterClause { browser.tableOptions[browser.shown]!.filter.clauses[index] }
         browser.setFilterOperator(at: index, to: .after, kind: kind)
         #expect(clause() == Self.clause("field.due_at", .after, ["2026-01-01"]))
         browser.setFilterOperator(at: index, to: .between, kind: kind)
@@ -534,11 +534,11 @@ struct FilterClauseTests {
         let word = browser.addFilter(on: Self.targets["field.status"]!)
         browser.changeFilter(at: word) { $0.values = ["done"] }
         browser.setFilterOperator(at: word, to: .isNot, kind: .status)
-        #expect(browser.tableOptions[browser.item]!.filter.clauses[word] == Self.clause("field.status", .isNot, ["done"]))
+        #expect(browser.tableOptions[browser.shown]!.filter.clauses[word] == Self.clause("field.status", .isNot, ["done"]))
 
         let text = browser.addFilter(on: Self.targets["field.notes"]!)
         browser.changeFilter(at: text) { $0.values = ["x"] }
         browser.setFilterOperator(at: text, to: .isNot, kind: .text)
-        #expect(browser.tableOptions[browser.item]!.filter.clauses[text] == Self.clause("field.notes", .isNot, ["x"]), "a text is one text under every operator")
+        #expect(browser.tableOptions[browser.shown]!.filter.clauses[text] == Self.clause("field.notes", .isNot, ["x"]), "a text is one text under every operator")
     }
 }

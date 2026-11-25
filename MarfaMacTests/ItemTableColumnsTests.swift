@@ -50,9 +50,9 @@ struct ItemTableColumnsTests {
     @Test func aStoredLayoutSurvivesTheRoundTripPerPlace() {
         var layout = TableColumnCustomization<ItemTableRow>()
         layout[visibility: "created"] = .hidden
-        let stored = ItemTableColumnLayouts.storing(layout, for: .allItems, in: Data())
-        #expect(ItemTableColumnLayouts.layout(for: .allItems, in: stored) == layout)
-        #expect(ItemTableColumnLayouts.layout(for: .itemType("aic.decision"), in: stored) == .init())
+        let stored = ItemTableColumnLayouts.storing(layout, for: .library, in: Data())
+        #expect(ItemTableColumnLayouts.layout(for: .library, in: stored) == layout)
+        #expect(ItemTableColumnLayouts.layout(for: .type(TypeID("aic.decision")), in: stored) == .init())
     }
 
     // MARK: In a window
@@ -75,7 +75,7 @@ struct ItemTableColumnsTests {
     @Test(arguments: [false, true]) func aWideWindowsTableHoldsEveryShownColumn(inSavedView: Bool) async throws {
         let (library, _) = try await BigLibrary.loaded()
         let browser = Browser()
-        browser.sidebarItem = inSavedView ? .view(ItemID("view-1")) : .allItems
+        browser.showing = inSavedView ? .view(ItemID("view-1")) : .library
         browser.viewMode = .table
         let defaults = ThrowawayDefaults.make("ItemTableColumnsTests.wide")
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 2600, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -102,7 +102,7 @@ struct ItemTableColumnsTests {
         var shownTableColumns: [NSTableColumn] { (table?.tableColumns ?? []).filter { !$0.isHidden } }
         /// The stored widths of the place the table shows, as the defaults hold them.
         var stored: Data {
-            guard case .view(let id) = browser.sidebarItem else { return defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data() }
+            guard let id = browser.showing.savedView else { return defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data() }
             return ViewLayouts.stored(in: defaults).settings(for: id)?.widths ?? Data()
         }
     }
@@ -131,7 +131,7 @@ struct ItemTableColumnsTests {
     private static func open(width: CGFloat, inSavedView: Bool, suite: String, seeded: Data = Data()) async throws -> Opened {
         let (library, _) = try await BigLibrary.loaded()
         let browser = Browser()
-        browser.sidebarItem = inSavedView ? .view(ItemID("view-1")) : .allItems
+        browser.showing = inSavedView ? .view(ItemID("view-1")) : .library
         browser.viewMode = .table
         let defaults = try #require(UserDefaults(suiteName: suite))
         browser.defaults = defaults
@@ -199,7 +199,7 @@ struct ItemTableColumnsTests {
         try #require(await eventually { !opened.stored.isEmpty })
 
         // The same table moves to a saved view that holds no widths of its own.
-        opened.browser.sidebarItem = .view(ItemID("view-1"))
+        opened.browser.showing = .view(ItemID("view-1"))
         let (library, _) = try await BigLibrary.loaded()
         let ideals = opened.browser.shownColumns(opened.browser.tableContent(in: library).columns).map { $0.widths.ideal.rounded() }
         try #require(await eventually { opened.shownTableColumns.count == ideals.count })

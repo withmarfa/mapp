@@ -102,7 +102,7 @@ final class ValueEditModel {
         if case .location(let spec) = request.kind, let item = request.item {
             location = LocationPanelModel(spec: spec, item: item, library: request.library, undoManager: request.undoManager)
         }
-        let items = request.library.items(in: .allItems)
+        let items = request.library.activeItems
         switch request.kind {
         case .people(let field, let shape):
             pool = PeopleSuggestions.pool(from: items.map { $0.value(of: field.key) }, shape: shape)

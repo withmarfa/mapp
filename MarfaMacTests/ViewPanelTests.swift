@@ -42,7 +42,7 @@ struct ViewPanelTests {
         let browser = Browser()
         browser.defaults = defaults()
         browser.adopt(library, undoManager: undo)
-        browser.sidebarItem = .view(id)
+        browser.showing = .view(id)
         browser.viewMode = .table
         browser.followView(in: library)
         browser.choicesChanged()
@@ -97,7 +97,7 @@ struct ViewPanelTests {
 
     @Test func undoOfAGroupingWritesTheEarlierGroupBack() async {
         let (browser, library, undo) = Self.opened()
-        await Self.change(browser) { browser.tableOptions[browser.item, default: .init()].grouping = .none }
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].grouping = .none }
         #expect(Self.held(library)?.group == nil)
         await Self.undo(undo, library) { $0?.group != nil }
         #expect(Self.held(library)?.group == LibraryViewGroup(field: "properties.status"))
@@ -115,7 +115,7 @@ struct ViewPanelTests {
         browser.followView(in: library)
         let sort = [LibraryViewSort(field: "title", ascending: true)]
         library.changedElsewhere = { $0.sort = sort }
-        await Self.change(browser) { browser.tableOptions[browser.item, default: .init()].grouping = .none }
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].grouping = .none }
         #expect(Self.held(library)?.group == nil)
         #expect(Self.held(library)?.sort == sort)
         await Self.undo(undo, library) { $0?.group != nil }
@@ -127,7 +127,7 @@ struct ViewPanelTests {
     @Test func undoOfASortWritesTheEarlierOrderBack() async {
         let (browser, library, undo) = Self.opened()
         await Self.change(browser) {
-            browser.tableOptions[browser.item, default: .init()].sort = [ItemTableComparator(column: .title, order: .forward)]
+            browser.tableOptions[browser.shown, default: .init()].sort = [ItemTableComparator(column: .title, order: .forward)]
         }
         #expect(Self.held(library)?.sort != Self.view().sort)
         await Self.undo(undo, library) { $0?.sort == Self.view().sort }
@@ -137,7 +137,7 @@ struct ViewPanelTests {
     @Test func undoTakesBackOneChangeAtATime() async {
         let (browser, library, undo) = Self.opened()
         await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
-        await Self.change(browser) { browser.tableOptions[browser.item, default: .init()].grouping = .none }
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].grouping = .none }
         await Self.undo(undo, library) { $0?.group != nil }
         #expect(Self.held(library)?.query.filter?.contains("todo") == true)
         await Self.undo(undo, library) { $0?.query.filter == nil }
@@ -187,28 +187,28 @@ struct ViewPanelTests {
 
     @Test func aPlaceKeepsItsDensityOnThisMacAndUndoPutsItBack() {
         let (browser, _, undo) = Self.opened()
-        browser.sidebarItem = .allItems
+        browser.showing = .library
         undo.beginUndoGrouping()
         browser.changeDensity(.compact)
         Self.close(undo)
         #expect(browser.density == .compact)
-        #expect(PlaceDensities.stored(in: browser.defaults).density(for: .allItems) == .compact)
+        #expect(PlaceDensities.stored(in: browser.defaults).density(for: .library) == .compact)
         // Opening the view stored its layout; a place's density adds nothing to it.
         #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.density == nil)
         undo.undo()
         #expect(browser.density == nil)
-        #expect(PlaceDensities.stored(in: browser.defaults).density(for: .allItems) == nil)
+        #expect(PlaceDensities.stored(in: browser.defaults).density(for: .library) == nil)
     }
 
     @Test func aPlacesDensityChangedInAnotherWindowIsReadAtOnce() {
         let (browser, _, _) = Self.opened()
-        browser.sidebarItem = .allItems
+        browser.showing = .library
         #expect(browser.density == nil)
         let other = Browser()
         other.defaults = browser.defaults
-        other.store(.compact, for: .allItems)
+        other.store(.compact, for: .library)
         #expect(browser.density == .compact)
-        PlaceDensities.update(in: browser.defaults) { $0.set(nil, for: .allItems) }
+        PlaceDensities.update(in: browser.defaults) { $0.set(nil, for: .library) }
         #expect(browser.density == nil)
     }
 
@@ -327,7 +327,7 @@ struct ViewPanelTests {
         browser.setFilter(Self.status, values: ["todo"])
         let task = browser.choicesChanged()
         #expect(await eventually(within: .seconds(20)) { release != nil })
-        browser.sidebarItem = .allItems
+        browser.showing = .library
         release?.resume()
         await task?.value
         #expect(Self.held(library)?.query.filter?.contains("todo") == true)
@@ -378,14 +378,14 @@ struct ViewPanelTests {
         await Self.change(browser) { browser.setFilter(priority, values: ["high"]) }
         #expect(Self.held(library)?.query.filter == #"properties.status neq "in_progress" AND properties.priority eq "high""#)
         // The window keeps the chip as the person made it, and nothing is unsaved.
-        #expect(browser.tableOptions[browser.item]?.filter.clauses.first == FilterClause(field: Self.status, op: .is, values: ["done", "todo"]))
+        #expect(browser.tableOptions[browser.shown]?.filter.clauses.first == FilterClause(field: Self.status, op: .is, values: ["done", "todo"]))
         #expect(!browser.hasViewChanges)
         #expect(library.notices.waiting.isEmpty, "the rewrite is silent")
         // Opened again, the view shows what it holds.
         let again = Browser()
         again.defaults = Self.defaults()
         again.adopt(library, undoManager: nil)
-        again.sidebarItem = .view(Self.id)
+        again.showing = .view(Self.id)
         again.followView(in: library)
         #expect(again.tableOptions[again.item]?.filter.clauses.first == FilterClause(field: Self.status, op: .isNot, values: ["in_progress"]))
     }
@@ -398,15 +398,15 @@ struct ViewPanelTests {
         await Self.change(browser) { browser.setFilter(Self.status, values: ["todo", "done"]) }
         await Self.change(browser) { browser.setFilter(priority, values: ["high"]) }
         let made = FilterClause(field: Self.status, op: .is, values: ["done", "todo"])
-        await Self.change(browser) { browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)] }
+        await Self.change(browser) { browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title)] }
         #expect(Self.held(library)?.sort == [LibraryViewSort(field: "title", ascending: true)])
-        #expect(browser.tableOptions[browser.item]?.filter.clauses.first == made)
+        #expect(browser.tableOptions[browser.shown]?.filter.clauses.first == made)
         #expect(!browser.hasViewChanges)
 
         library.changedElsewhere = { $0.query.filter = #"properties.priority eq "low""# }
-        await Self.change(browser) { browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title, order: .reverse)] }
+        await Self.change(browser) { browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title, order: .reverse)] }
         #expect(Self.held(library)?.query.filter == #"properties.priority eq "low""#)
-        #expect(browser.tableOptions[browser.item]?.filter.clauses == [FilterClause(field: priority, op: .is, values: ["low"])])
+        #expect(browser.tableOptions[browser.shown]?.filter.clauses == [FilterClause(field: priority, op: .is, values: ["low"])])
         #expect(Self.held(library)?.sort == [LibraryViewSort(field: "title", ascending: false)])
         #expect(!browser.hasViewChanges)
     }
@@ -414,12 +414,12 @@ struct ViewPanelTests {
     @Test func aRelativeDateIsKeptInTheWindowAndNeverWrittenToTheView() async {
         let (browser, library, _) = Self.opened()
         await Self.change(browser) {
-            browser.tableOptions[browser.item]?.filter.clauses.append(FilterClause(field: "edited", op: .inLast, values: ["7"]))
+            browser.tableOptions[browser.shown]?.filter.clauses.append(FilterClause(field: "edited", op: .inLast, values: ["7"]))
         }
         #expect(Self.held(library)?.version == 1, "nothing was written")
         #expect(library.notices.waiting.isEmpty, "the row says it at once, so no dialog does")
         #expect(browser.hasViewChanges)
-        #expect(browser.tableOptions[browser.item]?.filter.relative.count == 1)
+        #expect(browser.tableOptions[browser.shown]?.filter.relative.count == 1)
     }
 
     // MARK: Faults the review found
@@ -428,8 +428,8 @@ struct ViewPanelTests {
         let (browser, library, _) = Self.opened()
         browser.set(layout: .list)
         await Self.change(browser) {
-            browser.tableOptions[browser.item, default: .init()].grouping = .automatic
-            browser.tableOptions[browser.item, default: .init()].sort = nil
+            browser.tableOptions[browser.shown, default: .init()].grouping = .automatic
+            browser.tableOptions[browser.shown, default: .init()].sort = nil
         }
         // The list's sections by date are its edited date by day, which the view keeps.
         #expect(Self.held(library)?.group == LibraryViewGroup(field: "updated_at", bucket: .day))
@@ -515,10 +515,10 @@ struct ViewPanelTests {
         undo.beginUndoGrouping()
         browser.setFilter(Self.status, values: ["todo"])
         let task = browser.choicesChanged()
-        browser.sidebarItem = .allItems
+        browser.showing = .library
         await task?.value
         #expect(Self.held(library)?.version == 1)
-        browser.sidebarItem = .view(Self.id)
+        browser.showing = .view(Self.id)
         browser.followView(in: library)
         #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
     }
@@ -531,7 +531,7 @@ struct ViewPanelTests {
         let browser = Browser()
         browser.defaults = Self.defaults()
         browser.adopt(library, undoManager: undo)
-        browser.sidebarItem = .itemType("core.task")
+        browser.showing = .type(TypeID("core.task"))
         browser.viewMode = .list
         undo.removeAllActions()
         undo.beginUndoGrouping()

@@ -45,13 +45,13 @@ struct BrowserDerivedCacheTests {
         let browser = Browser()
         let before = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.id) }
         #expect(before.count == 5)
-        browser.tableOptions[.allItems] = ItemTableOptions(filter: FilterState(clauses: [FilterClause(field: "edited", op: .before, values: ["2000-01-01"])]))
+        browser.tableOptions[.library] = ItemTableOptions(filter: FilterState(clauses: [FilterClause(field: "edited", op: .before, values: ["2000-01-01"])]))
         let filtered = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.id) }
         #expect(filtered.count < before.count)
         let reads = library.placeReads
         _ = browser.sections(in: library, order: ItemOrder(), now: date)
         #expect(library.placeReads == reads)
-        browser.tableOptions[.allItems] = nil
+        browser.tableOptions[.library] = nil
         #expect(browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.id) } == before)
     }
 
@@ -60,7 +60,7 @@ struct BrowserDerivedCacheTests {
         let browser = Browser()
         _ = browser.sections(in: library, order: ItemOrder(), now: date)
         #expect(!browser.holdsTableContent)
-        browser.tableOptions[.allItems] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        browser.tableOptions[.library] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
         _ = browser.sections(in: library, order: ItemOrder(), now: date)
         #expect(browser.holdsTableContent)
     }
@@ -86,14 +86,14 @@ struct BrowserDerivedCacheTests {
     @Test func aNewViewFromASortedListKeepsNoGroupingTheListDoesNotShow() {
         let library = tasks()
         let browser = Browser()
-        browser.tableOptions[.allItems] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        browser.tableOptions[.library] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
         browser.viewMode = .table
         #expect(SavedViews.window(browser, in: library, order: ItemOrder()).grouping != nil)
         for mode in [ItemViewMode.list, .gallery] {
             browser.viewMode = mode
             #expect(SavedViews.window(browser, in: library, order: ItemOrder()).grouping == nil, "\(mode) kept the table's grouping")
         }
-        browser.tableOptions[.allItems]?.grouping = .column("field.status")
+        browser.tableOptions[.library]?.grouping = .column("field.status")
         browser.viewMode = .list
         #expect(SavedViews.window(browser, in: library, order: ItemOrder()).grouping != nil)
     }
@@ -101,11 +101,11 @@ struct BrowserDerivedCacheTests {
     @Test func aNegationOnAColumnWithNoFilterMakesNeitherTheTableNorTheSectionsAgain() {
         let library = library()
         let browser = Browser()
-        browser.tableOptions[.allItems] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        browser.tableOptions[.library] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
         let table = browser.tableContent(in: library)
         let sections = browser.sections(in: library, order: ItemOrder(), now: date)
         // A filter that says too little to filter by changes nothing the rows depend on.
-        browser.tableOptions[.allItems]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .is)])
+        browser.tableOptions[.library]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .is)])
         #expect(browser.tableContent(in: library) === table)
         let reads = library.placeReads
         _ = browser.sections(in: library, order: ItemOrder(), now: date)

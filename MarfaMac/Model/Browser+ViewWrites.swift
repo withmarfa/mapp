@@ -1,15 +1,17 @@
 import Foundation
 
-/// What Marfa holds of a place's choices: its filters, order, grouping and the date its timeline shows. Two are equal
+/// What Marfa holds of a place's choices: its filters, order, grouping, the date its timeline shows, and its From,
+/// Archived Items and Include Kinds. Two are equal
 /// where a view would be written the same, so a folded group or a page size is not a choice.
 struct ViewChoices: Equatable {
     var options: ItemTableOptions
     var timelineDate: String?
 
     /// The settings a view write names one by one, which the server merges or refuses one by one. The grouping holds its
-    /// group order and hidden groups, and the timeline's date, which in a view is a grouping by that date's day.
+    /// group order and hidden groups, and the timeline's date, which in a view is a grouping by that date's day. The
+    /// listing is the From and Archived Items, which a view keeps as its tier and states, and Include Kinds.
     enum Part: CaseIterable {
-        case sort, grouping, filters
+        case sort, grouping, filters, listing
     }
 
     static func == (lhs: ViewChoices, rhs: ViewChoices) -> Bool {
@@ -27,6 +29,10 @@ struct ViewChoices: Equatable {
             parts.insert(.grouping)
         }
         if !mine.filter.isSame(as: theirs.filter) { parts.insert(.filters) }
+        if options.scope != other.options.scope || options.archived != other.options.archived
+            || options.includesKinds != other.options.includesKinds {
+            parts.insert(.listing)
+        }
         return parts
     }
 
@@ -41,6 +47,11 @@ struct ViewChoices: Equatable {
         }
         if parts.contains(.filters) {
             options.filter = other.options.filter
+        }
+        if parts.contains(.listing) {
+            options.scope = other.options.scope
+            options.archived = other.options.archived
+            options.includesKinds = other.options.includesKinds
         }
     }
 }
@@ -63,10 +74,10 @@ struct ViewChoices: Equatable {
 ///   own (`Browser.seed(_:catalogue:keepingWindow:sent:)`), so the next write never sends the window's older value back.
 extension Browser {
     /// What the open place's choices are now.
-    var liveChoices: ViewChoices { choices(in: item) }
+    var liveChoices: ViewChoices { choices(in: shown) }
 
     /// What a place's choices are now, whether or not the window shows it.
-    func choices(in place: SidebarItem) -> ViewChoices {
+    func choices(in place: PlaceView) -> ViewChoices {
         ViewChoices(options: tableOptions[place] ?? ItemTableOptions(), timelineDate: timelineFields[place])
     }
 
@@ -100,10 +111,10 @@ extension Browser {
     /// where there is one.
     @discardableResult
     func choicesChanged() -> Task<Void, Never>? {
-        let place = item
+        let place = shown
         if let before = observedChoices[place] {
             startGroupsAfresh(in: place, from: before)
-            if case .view = place { followDayGrouping(in: place, from: before) }
+            if place.savedView != nil { followDayGrouping(in: place, from: before) }
         }
         let current = liveChoices
         guard let before = observedChoices[place] else {
@@ -114,12 +125,12 @@ extension Browser {
         observedChoices[place] = current
         registerChoiceUndo(in: place, from: before, to: current)
         keepPlaceChoices(of: place)
-        guard case .view(let id) = place, viewPanel?.isNew != true else { return nil }
+        guard let id = place.savedView, viewPanel?.isNew != true else { return nil }
         return scheduleWrite(of: id)
     }
 
     /// A new grouping orders and hides no group until the person does: the keys of the old one name other groups.
-    func startGroupsAfresh(in place: SidebarItem, from before: ViewChoices) {
+    func startGroupsAfresh(in place: PlaceView, from before: ViewChoices) {
         guard var options = tableOptions[place], options.grouping != before.options.grouping,
               options.groupOrder != nil || options.hiddenGroups != nil,
               options.groupOrder == before.options.groupOrder, options.hiddenGroups == before.options.hiddenGroups else { return }
@@ -130,7 +141,7 @@ extension Browser {
 
     /// A view groups by one thing, so its timeline's date and a grouping by that date's day are one setting: a change
     /// of either moves the other with it. A grouping by anything else leaves the timeline on each type's own date.
-    func followDayGrouping(in place: SidebarItem, from before: ViewChoices) {
+    func followDayGrouping(in place: PlaceView, from before: ViewChoices) {
         var options = tableOptions[place] ?? ItemTableOptions()
         let date = timelineFields[place]
         if date != before.timelineDate {
@@ -148,10 +159,10 @@ extension Browser {
         }
     }
 
-    private func registerChoiceUndo(in place: SidebarItem, from before: ViewChoices, to after: ViewChoices) {
+    private func registerChoiceUndo(in place: PlaceView, from before: ViewChoices, to after: ViewChoices) {
         let parts = after.parts(differingFrom: before)
         registerUndo(String(localized: "Change View")) { browser in
-            guard browser.item == place, browser.liveChoices.parts(differingFrom: after).isDisjoint(with: parts) else {
+            guard browser.shown == place, browser.liveChoices.parts(differingFrom: after).isDisjoint(with: parts) else {
                 browser.library?.notices.tell(
                     String(localized: "Can’t Undo"),
                     String(localized: "This view has changed since, so that change was left as it is."))
@@ -164,7 +175,7 @@ extension Browser {
 
     /// Puts the order, grouping, filters and timeline date back, or only `parts` of them, and leaves the rest of the
     /// place's options.
-    func put(_ choices: ViewChoices, in place: SidebarItem, only parts: Set<ViewChoices.Part> = Set(ViewChoices.Part.allCases)) {
+    func put(_ choices: ViewChoices, in place: PlaceView, only parts: Set<ViewChoices.Part> = Set(ViewChoices.Part.allCases)) {
         var current = self.choices(in: place)
         current.take(parts, from: choices)
         var options = tableOptions[place] ?? ItemTableOptions()
@@ -233,14 +244,14 @@ extension Browser {
 
     /// Writes again what the window holds and Marfa has not taken, as Save View asks.
     func writeViewAgain() {
-        guard case .view(let id) = item else { return }
+        guard let id = shown.savedView else { return }
         scheduleWrite(of: id)
     }
 
     private func writeOnce(_ id: ItemID, in library: any ItemLibrary) async {
         guard viewPanel?.isNew != true else { return }
         // The window's choices are the open place's: a view that is not open writes them when it is shown again.
-        guard item == .view(id) else {
+        guard shown == .saved(id) else {
             pendingViewWrites.insert(id)
             return
         }
@@ -258,7 +269,7 @@ extension Browser {
             }
             return
         }
-        let place = SidebarItem.view(id)
+        let place = PlaceView.saved(id)
         let sent = choices(in: place)
         switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
         case .success(let view):

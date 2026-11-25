@@ -27,29 +27,29 @@ struct SidebarNavigationTests {
         let browser = Browser()
         browser.searchText = "First"
         browser.show(.favoriteItem(second.id), in: library, order: ItemOrder())
-        #expect(browser.item == .favoriteItem(second.id))
+        #expect(browser.shown == .favoriteItem(second.id))
         #expect(browser.selection == [second.id])
         #expect(browser.items(in: library).map(\.id) == [second.id])
         #expect(browser.searchText.isEmpty)
-        #expect(library.name(of: browser.item) == "Second favorite")
+        #expect(library.name(of: browser.shown) == "Second favorite")
         #expect(browser.sections(in: library, order: ItemOrder(), now: date).first?.group != .favorites)
     }
 
     @Test func aSnapshotWithNoPlaceFailsToDecodeSoTheWindowOpensAtItsDefault() {
-        let saved = Data(#"{"sidebarItem":{"pinned":{}},"selection":[]}"#.utf8)
+        let saved = Data(#"{"showing":{"pinned":{}},"selection":[]}"#.utf8)
         #expect(throws: DecodingError.self) { try JSONDecoder().decode(Browser.Snapshot.self, from: saved) }
     }
 
     @Test func aFavoriteCollectionAndTheCollectionHaveDistinctDestinations() throws {
         let library = FakeItemLibrary(now: date)
-        let collection = try #require(library.createItem(typeID: FakeItemLibrary.collectionType.rawValue, title: "Field research", body: "", parentID: nil, in: .allItems, undoManager: nil).flatMap { library.item($0) })
-        let member = try #require(library.createItem(typeID: "core.task", title: "Read the findings", body: "", parentID: nil, in: .allItems, undoManager: nil))
+        let collection = try #require(library.createItem(typeID: FakeItemLibrary.collectionType.rawValue, title: "Field research", body: "", parentID: nil, in: .library, undoManager: nil).flatMap { library.item($0) })
+        let member = try #require(library.createItem(typeID: "core.task", title: "Read the findings", body: "", parentID: nil, in: .library, undoManager: nil))
         #expect(library.addToCollection([member], collection.id, undoManager: nil))
         library.setFavorite([collection.id], true, undoManager: nil)
-        #expect(SidebarItem.collection(collection.id) != .favoriteItem(collection.id))
+        #expect(PlaceView.collection(collection.id) != .favoriteItem(collection.id))
         #expect(library.items(in: .collection(collection.id)).map(\.id) == [member])
         #expect(library.items(in: .favoriteItem(collection.id)).map(\.id) == [collection.id])
-        #expect(library.items(in: .itemType(FakeItemLibrary.collectionType.rawValue)).map(\.id) == [collection.id])
-        #expect(library.name(of: .itemType(FakeItemLibrary.collectionType.rawValue)) == "Collection")
+        #expect(library.items(in: .type(FakeItemLibrary.collectionType)).map(\.id) == [collection.id])
+        #expect(library.name(of: .type(FakeItemLibrary.collectionType)) == "Collection")
     }
 }

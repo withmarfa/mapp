@@ -193,8 +193,8 @@ struct MarfaMappingTests {
 
     @Test func titleAndBodyFallBackToTitleAndBodyWhereTheTypeDeclaresThem() {
         func type(_ id: String, _ fields: [String], title: String? = nil, body: String? = nil) -> ItemTypeInfo {
-            MarfaMapping.itemType(ItemType(
-                id: id, fields: fields.map { Self.field($0, by: id) }, titleField: title, bodyField: body))
+            MarfaMapping.type(TypeID(ItemType(
+                id: id, fields: fields.map { Self.field($0, by: id) }, titleField: title, bodyField: body)))
         }
         // A type naming neither hint, as a folder does, is read under `title` and `body`.
         let folder = type("system.folder", ["title", "body", "path"])

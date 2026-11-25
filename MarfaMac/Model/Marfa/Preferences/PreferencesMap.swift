@@ -77,7 +77,7 @@ enum PreferencesMap {
             DateFormat.key, WeekStart.key, StartWith.key, NewItemType.key, ListKey.openItemsIn, RemotePictureSetting.key,
         ], in: .general)
         + members(PageKey.all + [SourceViewMode.key], in: .editor)
-        + members([ListKey.density, ListKey.showsQuickAdd, CalendarHourHeight.key, NewRowTypes.key] + OrderKey.all, in: .lists)
+        + members([ListKey.density, ListKey.showsQuickAdd, CalendarHourHeight.key, NewRowTypes.key, ListScope.defaultScopeKey] + OrderKey.all, in: .lists)
         + members(SearchOptions.keys, in: .search)
         + [SyncedSetting(key: SearchLeaveOuts.defaultsKey, place: .serverMember(.search, .data(SearchLeaveOuts.setAsideKey)))]
 
@@ -87,7 +87,6 @@ enum PreferencesMap {
         SyncedSetting(key: PagePlacements.key, place: .rows(
             .types, setting: "pagePlacements", .string, wrapper: nil, local: [], .string(PagePlacements.setAsideKey))),
         SyncedSetting(key: TypeLooks.defaultsKey, place: .serverRows(.types, setting: "look", .data(TypeLooks.setAsideKey))),
-        SyncedSetting(key: IncludedSubtypes.key, place: .set(.types, setting: "includedSubtypes")),
         // A table's widths are kept with the view on this Mac alone.
         SyncedSetting(key: ViewLayouts.key, place: .rows(
             .views, setting: "viewLayout", .string, wrapper: nil, local: ["widths"], .string(ViewLayouts.setAsideKey))),
@@ -95,6 +94,8 @@ enum PreferencesMap {
             .places, setting: "placeDefaults", .data, wrapper: nil, local: [], .data(PlaceDefaults.setAsideKey))),
         SyncedSetting(key: PlaceDensities.key, place: .rows(
             .places, setting: "placeDensity", .data, wrapper: nil, local: [], .data(PlaceDensities.setAsideKey))),
+        SyncedSetting(key: ViewOrders.key, place: .rows(
+            .places, setting: "viewOrder", .data, wrapper: nil, local: [], .data(ViewOrders.setAsideKey))),
         SyncedSetting(key: "indexTab", place: .placeRows(.places, setting: "indexTab", places: IndexPlace.allCases.map(\.rawValue))),
         SyncedSetting(key: "indexSort", place: .placeRows(.places, setting: "indexSort", places: IndexPlace.allCases.map(\.rawValue))),
         SyncedSetting(key: SidebarLayouts.defaultsKey, place: .sidebar(.data(SidebarLayouts.setAsideKey))),

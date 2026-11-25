@@ -23,7 +23,7 @@ struct SidebarTests {
 
     static func counts(_ counts: [String: Int], in catalogue: Catalogue) -> [ItemTypeCount] {
         counts.map { id, count in
-            ItemTypeCount(id: TypeID(id), label: catalogue.label(for: TypeID(id)), icon: nil, count: count)
+            ItemTypeCount(id: TypeID(id), label: catalogue.label(for: TypeID(id)), icon: nil, count: count, own: count)
         }
     }
 
