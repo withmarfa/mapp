@@ -193,10 +193,12 @@ nonisolated final class WindowTests: XCTestCase {
         let prompt = window.buttons["SelectionCount"]
         app.typeKey("a", modifierFlags: .command)
         XCTAssertTrue(prompt.waitForExistence(timeout: 3), "Command-A selects every item in the list")
+        XCTAssertEqual(prompt.value as? String, "\(total) items selected")
         row(titled: "Bike service").click()
         XCTAssertTrue(prompt.waitForNonExistence(timeout: 3), "a click chooses one item again")
         app.menuBars.menuBarItems["Edit"].menuItems["Select All"].click()
         XCTAssertTrue(prompt.waitForExistence(timeout: 3), "the Edit menu's Select All selects every item in the list")
+        XCTAssertEqual(prompt.value as? String, "\(total) items selected")
     }
 
     @MainActor func testCommandDeleteDeletesTheSelectedItem() {

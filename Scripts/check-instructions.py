@@ -65,7 +65,7 @@ BUDGETS = {  # words
     "docs/concepts.md": 2600,
     "docs/editing.md": 900,
     "docs/item-page.md": 1600,
-    "docs/lists.md": 1540,
+    "docs/lists.md": 1400,
     "docs/look.md": 1200,
     "docs/model.md": 1100,
     "docs/owner-settings.md": 1800,

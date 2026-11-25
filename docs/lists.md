@@ -50,7 +50,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 - **The Library opens as a table, and as a list while it holds ten items or fewer** (`Browser.naturalLayout`). It and the Archive, reached from the Library's row and Go, list Name, Type, Source and Edited, latest first (`listsByOrigin`).
 - **Unarchive and Delete stand on an Archive row under the pointer** (`RowQuickActions`).
-- **A layout draws the list it is given** (`ItemViewMode`) and never changes which items show.
+- **Layouts draw the supplied items** (`ItemViewMode`).
 - **One row menu, one density and one drag serve every layout.**
 - **An item's date is its own type's** (`ItemPlacement`), so a place of several types puts each where it belongs. The view can point at one field.
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
@@ -62,14 +62,13 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 ## Several items chosen
 
-- **Two or more chosen items are one capsule at the foot of the content in every layout, and under a pile of cards in the page column beside a list** (`SelectionCapsule`, `SelectionPile`). Keep leads where any chosen item is in the Feed, and a mixed choice offers it beside Move to Feed in More.
-- **Each button calls the command its menu item calls,** so it asks, skips, counts, toasts and undoes as the menu does, and acts only on the items the library still holds (`SelectionSummary`).
-- **A narrow column folds Add Tag, Add to Collection and Change Type into More.** The corner and a toast lift above the capsule.
-- **Escape lets go and ⌘⌫ deletes in every layout** (`clearsSeveralOnEscape`, `deletesChosen`). Share and Copy Links are not offered, since each reads one item.
+- **Several selected items show a capsule at the foot** (`SelectionCapsule`), beneath a pile beside a list (`SelectionPile`). Keep leads for Feed items. More offers Move to Feed where it applies.
+- **The capsule uses the item commands.** In narrow columns, Add Tag, Add to Collection and Change Type move into More. Toasts and the corner sit above it.
+- **The count and Escape clear the selection.** ⌘⌫ deletes selected items (`deletesChosen`). Share and Copy Link require one item.
 
 ## The View panel
 
-- **The View button opens the panel** (`ViewPanelPopover`). The footer, or a new view's one line, says where settings are saved. Add to Sidebar starts off; Quick Actions shows only for the Feed.
+- **The View panel** (`ViewPanelPopover`) says where settings are saved. Add to Sidebar defaults off. Quick Actions appears only for the Feed.
 
 ## Grouping
 
@@ -93,7 +92,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 | Which rows a filter keeps in the window | `FilterMatching` |
 | To and from a saved view's query | `ViewDraft` in `ViewDraft+Filters.swift` |
 
-- **A new operator or kind changes every row of that table.** `FilterMatching` and the query must keep the same items; test both directions (`FilterClauseTests`, `ViewDraftTests`).
+- **Filter changes reach every part above.** Test that local matching and queries keep the same items (`FilterClauseTests`, `ViewDraftTests`).
 - **Marfa's filter is one list, joined all by and or all by or.** A mix is refused before it is sent (`search-and-filters/filter-mixed-logic`), except that "is" several words of a closed field is written as "is not" the others.
 - **An untouched Type condition stays in the filter,** as does every type in an Any filter, whatever the view's types.
 - **A view takes ten conditions.** Each value and each bound of a date counts.
