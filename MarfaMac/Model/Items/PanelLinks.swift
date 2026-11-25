@@ -46,21 +46,24 @@ nonisolated enum PanelLinks {
         }
 
         var result: [PanelLinkGroup] = []
-        func add(_ kind: PanelLinkGroup.Kind, _ links: [PanelLink]) {
-            if !links.isEmpty { result.append(PanelLinkGroup(kind: kind, links: links)) }
+        let fields = library.relationFields(of: item.id)
+        func add(_ kind: PanelLinkGroup.Kind, _ links: [PanelLink], field: String? = nil) {
+            guard !links.isEmpty else { return }
+            let editable = field.flatMap { name in fields.first { $0.field == name && $0.editability == .editable } }?.field
+            result.append(PanelLinkGroup(kind: kind, links: links, editableField: editable))
         }
 
         let collections = item.collectionIDs.compactMap { library.headerItem($0) }
             .filter { $0.state == .active && library.catalogue.isCollection($0.type) }
             .sorted { $0.displayTitle.localizedStandardCompare($1.displayTitle) == .orderedAscending }
-        add(.inCollection, collections.map { link($0, detail: "") })
+        add(.inCollection, collections.map { link($0, detail: "") }, field: MarfaMapping.collectionEdge)
 
         let referencing = relationships.filter {
             $0.field.hasPrefix(inversePrefix) && !leftToOtherGroups.contains(String($0.field.dropFirst(inversePrefix.count)))
         }
         add(.referencedBy, links(referencing.flatMap(\.targets)))
         add(.linksInText, links(mentions, newestFirst: false))
-        add(.excerpts, links(inverse(MarfaMapping.excerptEdge, in: relationships)))
+        add(.excerpts, links(inverse(MarfaMapping.excerptEdge, in: relationships)), field: inversePrefix + MarfaMapping.excerptEdge)
 
         let books = own(MarfaMapping.excerptEdge, in: relationships).compactMap(\.itemID)
         var fellows: [ItemRelationshipTarget] = []
@@ -80,7 +83,7 @@ nonisolated enum PanelLinks {
         add(.attachments, files.map { held in
             guard case .file(_, let bytes) = held.content, bytes > 0 else { return link(held) }
             return link(held, detail: ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
-        })
+        }, field: inversePrefix + MarfaMapping.attachmentEdge)
         return result
     }
 
