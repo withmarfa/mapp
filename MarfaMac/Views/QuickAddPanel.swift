@@ -16,6 +16,7 @@ struct QuickAddPanel: View {
     let editor: EditorController
     @FocusState private var focus: Field?
     @State private var bodySelection: TextSelection?
+    @State private var titleSelection: TextSelection?
     /// The field, or the parent (`parentEditingKey`), whose popover is open.
     @State private var editing: String?
     @State private var isChoosingFile = false
@@ -109,6 +110,9 @@ struct QuickAddPanel: View {
             // Asked any sooner, the field is not yet in the window and the list keeps the keyboard.
             try? await Task.sleep(for: .milliseconds(50))
             focus = .title
+            // A field that takes the keyboard selects its words; the caret goes after them, as the line left it.
+            try? await Task.sleep(for: .milliseconds(10))
+            if let title = quickAdd.draft?.title { titleSelection = TextSelection(insertionPoint: title.endIndex) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("New Item")
@@ -186,7 +190,9 @@ struct QuickAddPanel: View {
     // MARK: What it holds
 
     private func titleField(isFile: Bool) -> some View {
-        TextField(isFile ? "Title (Optional)" : "Title", text: Binding { quickAdd.draft?.title ?? "" } set: { quickAdd.draft?.title = $0 })
+        TextField(
+            isFile ? "Title (Optional)" : "Title", text: Binding { quickAdd.draft?.title ?? "" } set: { quickAdd.draft?.title = $0 },
+            selection: $titleSelection)
             .textFieldStyle(.plain)
             .interfaceFont(isFile ? .title3 : .title2.weight(.semibold))
             .focused($focus, equals: .title)
