@@ -2,7 +2,7 @@ import MarfaIcons
 import SwiftUI
 
 /// One chip, for one kind of value, drawn in SwiftUI from the same looks as the item page's web header: the sizes and
-/// fills of `ChipLooks.current`, scaled with the interface's text size (the design's 12 points). A chip is a word from
+/// fills of `ChipLooks.current`, scaled with the interface's text size (the design's 13 points). A chip is a word from
 /// a set: a status, an option or a tag. A type or a linked item is never a chip, it is a mark and a name (`MarkedName`),
 /// and only the type being given to an item takes a tint (`TintedChip`). It serves the page, the right sidebar and, at
 /// `.row` size, a list row. A chip is as tall as its size says whatever it holds, so chips side by side line up.
@@ -177,20 +177,11 @@ struct TintedChip: View {
 }
 
 /// Whether the type being given to an item is tinted in its own color or gray, chosen in Settings > Appearance.
-nonisolated enum TypeChipTint: String, CaseIterable, Identifiable, Sendable {
+nonisolated enum TypeChipTint: String, Sendable {
     case tinted, gray
 
     static let key = "typeChipTint"
     static let standard = TypeChipTint.tinted
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .tinted: String(localized: "Tinted")
-        case .gray: String(localized: "Gray")
-        }
-    }
 }
 
 /// A person's initials in a pale purple circle with no edge, the one look a person has wherever the app shows one. A name with no

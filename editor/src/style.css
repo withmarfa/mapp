@@ -440,7 +440,7 @@ body[data-text='none'] #editor {
     sans-serif;
 }
 
-/* The app's own keyboard focus ring: 3 points, grey (`AppButtonStyle.focusRing`). */
+/* The app's own keyboard focus ring: 3 points, gray (`AppButtonStyle.focusRing`). */
 :root {
   --focus-ring: color-mix(in srgb, var(--label-primary) 26%, transparent);
 }

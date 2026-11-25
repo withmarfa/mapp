@@ -35,7 +35,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 
     /// Every chip look as CSS custom properties for the page, resolved for light and for dark so an appearance
     /// change needs no resend: the sizes and fills (`ChipLooks.cssVariables`) and each tone's colors as
-    /// `--tone-<name>`, `--tone-<name>-ink`, `--tone-<name>-mark` and `--tone-<name>-chip`. A chip names its tone and the page forwards the name.
+    /// `--tone-<name>`, `--tone-<name>-ink` and `--tone-<name>-mark`. A chip names its tone and the page forwards the name.
     struct ChipStyle: Encodable, Equatable, Sendable {
         var light: [String: String]
         var dark: [String: String]

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The grey that marks a chosen row and a row under the pointer in a value panel, a filter panel and a calendar, as
+/// The gray that marks a chosen row and a row under the pointer in a value panel, a filter panel and a calendar, as
 /// `SoftSelection` does in a list. Black over light and white over dark, at the same strength (`docs/look.md`).
 nonisolated enum SelectionLooks {
     static let chosenOpacity = 0.08

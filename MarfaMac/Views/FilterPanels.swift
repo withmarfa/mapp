@@ -435,7 +435,7 @@ struct FilterFieldPanel: View {
     }
 }
 
-/// One line of any panel, as a value panel draws its rows: the mark, the title, and the grey under the pointer. A heading
+/// One line of any panel, as a value panel draws its rows: the mark, the title, and the gray under the pointer. A heading
 /// that picks nothing is only a label.
 private struct FilterOptionRow: View {
     let option: FilterValueOption

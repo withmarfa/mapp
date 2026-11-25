@@ -22,7 +22,7 @@ Search this page before you propose a look. Each line is a refused design, then 
 
 - **A tinted chip, except for the type being given to an item,** or a hairline round a status. A type or a link is a mark and a name, and every other chip is the one quiet wash.
 - **A glass mark with a shadow, or a filled tile behind a sidebar icon.** The plain mark.
-- **A person in a gray chip, in gray or with an edge, or drawn smaller than the chips beside.** Initials in a pale purple circle with no edge.
+- **A person in a gray chip, a circle with an edge, or one drawn smaller than the chips beside.** Initials in a pale purple circle with no edge.
 - **A tag with the tag symbol or an outline.** The `number` symbol, on the one chip wash.
 - **Chips of two heights, or squeezed to a few letters.** Fit whole chips, then a count.
 - **A bordered plus for an empty value.** The word Empty.

@@ -109,7 +109,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
             ]
         case .appearance:
             [
-                String(localized: "Theme"), String(localized: "Accent"), String(localized: "Highlights"), String(localized: "Text Size"),
+                String(localized: "Theme"), String(localized: "Accent"), String(localized: "Highlights"), String(localized: "Type Chips"), String(localized: "Text Size"),
                 String(localized: "Text Font"), String(localized: "Code Font"), String(localized: "Value Panels"),
                 String(localized: "Palettes"), String(localized: "Title When Scrolling"), String(localized: "Toolbar Background When Scrolling"),
                 String(localized: "Symbols on Subtypes"), String(localized: "Window Layout"), String(localized: "Sidebar"), String(localized: "List"),

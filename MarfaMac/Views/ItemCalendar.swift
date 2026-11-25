@@ -204,7 +204,7 @@ extension CalendarCell {
 }
 
 extension View {
-    /// The quiet fill of an item, or the soft grey of the chosen one.
+    /// The quiet fill of an item, or the soft gray of the chosen one.
     func calendarFill(_ isSelected: Bool, radius: CGFloat) -> some View {
         modifier(CalendarFill(isSelected: isSelected, radius: radius))
     }

@@ -31,25 +31,26 @@ Each kind of thing has one drawing, used on the page, in the right sidebar, in a
 | Date, number, address, source | Plain text |
 
 - **A value from a set is a chip, and anything else is text or a fact**, so a value that can be picked is told from one that was typed.
-- **A chip has one gray wash and no edge:** radius 7, text 12 at medium weight (11.5 at regular in a row). Only the type being given to an item is tinted (`TintedChip`); Appearance chooses Tinted, the default, or Gray (`TypeChipTint`).
-- **A person's circle is 18 points, purple letters on pale purple, with no edge** (`PersonCircle`).
-- **Chips come from one family** (`PageChip`, `PersonCircle`, `ChipLine`) in two sizes (`ChipSize`). `ChipLooks` owns the measures and the web header draws from its `--chip-*` variables; `ChipLooksTests` checks that they agree.
-- **Several values show as the first two, then a count.**
-- **A type's mark in a row, on the page and in a palette is its glyph in its tone** (`TonedGlyph`, 14 points). A tile (`TypeTile`) stays only on a gallery cover with no picture and on the Settings type page.
+- **A chip has one gray wash and no edge:** radius 7, text 12 at medium weight (11.5 at regular in a row). Only the type being given to an item is tinted (`TintedChip`); Appearance chooses Tinted (default) or Gray.
+- **A person's circle is 18 points: purple letters on pale purple, no edge** (`PersonCircle`).
+- **Chips come from one family** (`PageChip`, `PersonCircle`, `ChipLine`) in two sizes (`ChipSize`). `ChipLooks` owns the measures, the web header reads them as `--chip-*` variables, and `ChipLooksTests` checks they agree.
+- **Several values show as two, then a count.**
+- **A type's mark in a row, on the page and in a palette is its glyph in its tone** (`TonedGlyph`, 14 points). A tile (`TypeTile`) is only for a gallery cover with no picture and the Settings type page.
 - **A filter chip reads in order:** field, operator, values, then its close button.
 
 ### Dark values
 
-Neutral washes are white at the same strength, hairlines are white at 12%, and a tone keeps its hue at the macOS dark weight (`TypeTone`). Yellow and pale purple in dark are not yet checked on screen.
+Neutral washes are white at the same strength, hairlines are white at 12%, and a tone keeps its hue at the macOS dark weight (`TypeTone`).
 
 | Color | Light | Dark | Where used |
 | --- | --- | --- | --- |
 | Chip wash | Ink 3.5% | White 3.5% | Every chip |
 | Tinted type chip | Tone 14% | Tone 20% | `TintedChip` |
 | Person fill | Purple 15% | Purple 26% | `PersonCircle` |
+| Letters and marks | Tone toward black: 28% person, 46% tinted name, 22% mark | Tone ink: 8% toward white, luminance at most 0.36 | `PersonCircle`, `TintedChip`, `TonedGlyph` |
 | Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Panels, calendars (`SelectionLooks`) |
 | Keycap edge | Ink 20% | White 20% | `KeyCap` |
-| Focus ring | Ink 26% | White 26% | Every control that takes the keyboard |
+| Focus ring | Ink 26% | White 26% | Every keyboard control |
 
 ## Status, priority and empty values
 
