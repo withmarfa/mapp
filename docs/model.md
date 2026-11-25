@@ -63,7 +63,7 @@ Two defaults name types: the sidebar's and toolbar's starting set for New, and t
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on the one Settings gives (`lists.defaultScope`).
 - **The Library's Favorites view has an ordinary From,** kept by the app like a place's own view. It starts on Library whatever `lists.defaultScope` says, and a person may set it to All Items, since a Feed item can be a favorite. Its Feed items carry the Feed's mark, as in any list.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
-- **What earlier copies kept is read in once** (`EarlierPlace`). Recents' settings stay where they are, since the Library already takes All Items'. Files is no place: the person is told once, and its settings stay for older copies. Include Subtypes is not read in, because it started off and Include Kinds starts on.
+- **What earlier copies kept is read in once on each Mac** (`EarlierPlace.readIn`): it is copied to the new keys, and the earlier entries stay for those copies. The Library takes All Items' settings, and Recents fills what All Items left unset, since Recents was the Library sorted by Edited. Files is no place: the person is told once, and its settings stay for older copies. Include Subtypes is not read in, because it started off and Include Kinds starts on.
 
 ## Vocabulary
 

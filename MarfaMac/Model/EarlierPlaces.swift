@@ -4,7 +4,7 @@ import Foundation
 /// stored a place as a JSON object, such as `{"itemType":{"_0":"core.task"}}`. Inbox is the Feed; All Items and Recents
 /// are the Library; Favorites is the Library's Favorites view, and one favorite the Library with that item chosen; a
 /// saved view is the view at its home. Files is no place now, so what was kept for it is left where it is, readable by
-/// those copies, and the person is told once (`tellFilesOnce`).
+/// those copies, and the person is told once (`tellFilesOnce`). What an earlier copy kept is never removed.
 nonisolated enum EarlierPlace {
     /// What an earlier place reads as.
     enum Reading: Equatable {
@@ -42,24 +42,45 @@ nonisolated enum EarlierPlace {
         }
     }
 
-    /// The new key what an earlier copy kept under `key` moves to: only where one earlier place stands for the new one,
-    /// so neither Recents, which shares the Library with All Items, nor one favorite or Files is moved.
-    static func carriedKey(for key: String) -> String? {
-        guard let parts = parts(of: key), parts.name != "recents",
-              case .place(let place, nil)? = read(name: parts.name, value: parts.value) else { return nil }
-        return place.storageKey
+    /// The new key what an earlier copy kept under `key` is copied to, and whether it fills only what All Items left:
+    /// Recents shares the Library with All Items. One favorite and Files stand for no place, so nothing is copied.
+    private static func carriedKey(for key: String) -> (key: String, fills: Bool)? {
+        guard let parts = parts(of: key), case .place(let place, nil)? = read(name: parts.name, value: parts.value) else { return nil }
+        return (place.storageKey, parts.name == "recents")
     }
 
-    /// `entries` with what earlier copies kept moved to the new keys. A new key already held wins, and the earlier entry
-    /// goes; an entry no new key stands for is left as it is, for those copies.
-    static func carried<Value>(_ entries: [String: Value]) -> [String: Value] {
-        var result = entries
+    /// `entries` with what earlier copies kept copied to the new keys, the earlier entries left for those copies. A new
+    /// key already held comes first, then the one earlier place that stands for it, then Recents for the Library;
+    /// `fill` takes from a later one what an earlier one left unset.
+    static func carried<Value>(_ entries: [String: Value], fill: (Value, Value) -> Value = { held, _ in held }) -> [String: Value] {
+        var sources: [String: [(fills: Bool, value: Value)]] = [:]
         for (key, value) in entries {
             guard let new = carriedKey(for: key) else { continue }
-            result[key] = nil
-            if entries[new] == nil { result[new] = value }
+            sources[new.key, default: []].append((new.fills, value))
+        }
+        var result = entries
+        for (key, found) in sources {
+            let ordered = found.filter { !$0.fills } + found.filter(\.fills)
+            result[key] = ordered.reduce(entries[key]) { held, source in held.map { fill($0, source.value) } ?? source.value }
         }
         return result
+    }
+
+    /// Whether what earlier copies kept for each place has been copied to the new keys on this Mac.
+    static let readInKey = "earlierPlacesReadIn"
+
+    /// Copies what earlier copies kept for each place to the new keys, once on this Mac, so a place opens as the person
+    /// left it. The earlier entries stay for those copies, and an entry the person clears later does not come back.
+    @MainActor static func readIn(in defaults: UserDefaults = .standard) {
+        guard !defaults.bool(forKey: readInKey) else { return }
+        defaults.set(true, forKey: readInKey)
+        let densities = PlaceDensities.stored(in: defaults).places
+        if carried(densities) != densities { PlaceDensities.update(in: defaults) { $0 = PlaceDensities(carried($0.places)) } }
+        let placeDefaults = PlaceDefaults.stored(in: defaults).places
+        if carried(placeDefaults, fill: { $0.filled(from: $1) }) != placeDefaults {
+            PlaceDefaults.update(in: defaults) { $0 = PlaceDefaults(carried($0.places) { $0.filled(from: $1) }) }
+        }
+        ItemTableColumnLayouts.readIn(in: defaults)
     }
 
     /// Whether the person has been told that Files is no longer a place, on this Mac.

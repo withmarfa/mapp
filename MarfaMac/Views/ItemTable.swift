@@ -393,7 +393,16 @@ enum ItemTableColumnLayouts {
     /// The stored layouts: none where nothing is stored, and nil where what is stored cannot be read.
     private static func layouts(in stored: Data) -> [String: TableColumnCustomization<ItemTableRow>]? {
         if stored.isEmpty { return [:] }
-        return (try? JSONDecoder().decode([String: TableColumnCustomization<ItemTableRow>].self, from: stored)).map(EarlierPlace.carried)
+        return try? JSONDecoder().decode([String: TableColumnCustomization<ItemTableRow>].self, from: stored)
+    }
+
+    /// Copies the columns earlier copies kept for each place to the new keys (`EarlierPlace.readIn`). Data that cannot
+    /// be read is left as it is.
+    static func readIn(in defaults: UserDefaults) {
+        guard let stored = defaults.data(forKey: key), let layouts = layouts(in: stored) else { return }
+        let carried = EarlierPlace.carried(layouts) { held, earlier in held == .init() ? earlier : held }
+        guard carried != layouts, let data = try? JSONEncoder().encode(carried) else { return }
+        defaults.set(data, forKey: key)
     }
 }
 

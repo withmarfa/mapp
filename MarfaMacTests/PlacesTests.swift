@@ -78,33 +78,38 @@ struct PlacesTests {
         #expect(EarlierPlace.read(key: "feed") == nil)
     }
 
-    @Test func aTypesAndASavedViewsColumnsAndSortCarryOver() throws {
+    @Test func whatEarlierCopiesKeptIsCopiedOnceAndNeverRemoved() throws {
         let defaults = ThrowawayDefaults.make("PlacesTests.carried")
         let sort = Self.choice(sort: [PlaceDefault.SortKey(column: "title", reversed: true)])
         let earlier = [
             #"{"itemType":{"_0":"core.task"}}"#: sort,
             #"{"view":{"_0":"v1"}}"#: Self.choice(.board),
-            #"{"recents":{}}"#: Self.choice(.timeline),
+            #"{"allNotes":{}}"#: Self.choice(.table),
+            #"{"recents":{}}"#: Self.choice(.timeline, sort: [PlaceDefault.SortKey(column: "updated", reversed: true)]),
             #"{"files":{}}"#: Self.choice(.gallery),
         ]
         defaults.set(try JSONEncoder().encode(earlier), forKey: PlaceDefaults.key)
+        let columns = try JSONEncoder().encode([#"{"itemType":{"_0":"core.task"}}"#: TableColumnCustomization<ItemTableRow>()])
+        defaults.set(columns, forKey: ItemTableColumnLayouts.key)
+        defaults.set(try JSONEncoder().encode([#"{"recents":{}}"#: "compact"]), forKey: PlaceDensities.key)
+        EarlierPlace.readIn(in: defaults)
+
         let stored = PlaceDefaults.stored(in: defaults)
         #expect(stored.default(for: .type(TypeID("core.task"))) == sort)
         #expect(stored.default(for: .saved(ItemID("v1")))?.layout == .board)
-        // Recents shares the Library with All Items, and Files is no place, so neither moves, and both stay stored.
-        #expect(stored.default(for: .library) == nil)
-        #expect(stored.places[#"{"recents":{}}"#] != nil && stored.places[#"{"files":{}}"#] != nil)
-
-        let columns = TableColumnCustomization<ItemTableRow>()
-        let widths = try JSONEncoder().encode([#"{"itemType":{"_0":"core.task"}}"#: columns, #"{"view":{"_0":"v1"}}"#: columns])
-        // Each is found at its new key, so it can be cleared there.
-        #expect(ItemTableColumnLayouts.removing(.type(TypeID("core.task")), in: widths) != widths)
-        #expect(ItemTableColumnLayouts.removing(.saved(ItemID("v1")), in: widths) != widths)
-        #expect(ItemTableColumnLayouts.removing(.library, in: widths) == widths)
-
-        // A density kept for All Items is the Library's.
-        defaults.set(try JSONEncoder().encode([#"{"allNotes":{}}"#: "compact"]), forKey: PlaceDensities.key)
+        // All Items' choices are the Library's, and Recents fills what they leave.
+        #expect(stored.default(for: .library) == Self.choice(.table, sort: [PlaceDefault.SortKey(column: "updated", reversed: true)]))
         #expect(PlaceDensities.stored(in: defaults).density(for: .library) == .compact)
+        let carriedColumns = try #require(defaults.data(forKey: ItemTableColumnLayouts.key))
+        #expect(ItemTableColumnLayouts.removing(.type(TypeID("core.task")), in: carriedColumns) != carriedColumns)
+        // Every earlier entry stays for the copies that read it, through a later write too.
+        PlaceDefaults.update(in: defaults) { $0.set(nil, for: .library) }
+        let kept = try JSONDecoder().decode([String: PlaceDefault].self, from: try #require(defaults.data(forKey: PlaceDefaults.key)))
+        #expect(Set(earlier.keys).isSubset(of: kept.keys))
+        #expect(kept["library"] == nil)
+        // A place the person cleared stays clear.
+        EarlierPlace.readIn(in: defaults)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: .library) == nil)
     }
 
     @Test func filesIsToldOnceAndWhatWasKeptForItStaysReadable() throws {

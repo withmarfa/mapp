@@ -53,7 +53,7 @@ nonisolated struct PlaceDensities: Equatable, Sendable {
         for (place, word) in words {
             if let density = Density(rawValue: word) { readable[place] = density } else { unreadable[place] = word }
         }
-        return (PlaceDensities(EarlierPlace.carried(readable)), unreadable.isEmpty ? nil : try? encode(unreadable))
+        return (PlaceDensities(readable), unreadable.isEmpty ? nil : try? encode(unreadable))
     }
 
     private static func encode(_ value: some Encodable) throws -> Data {

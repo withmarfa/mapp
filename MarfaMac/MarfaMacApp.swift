@@ -168,6 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
         super.init()
         DateFormat.setAsideUnreadable()
+        EarlierPlace.readIn()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

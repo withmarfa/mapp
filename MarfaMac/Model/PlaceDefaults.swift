@@ -115,6 +115,28 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
 
     var isEmpty: Bool { self == PlaceDefault() }
 
+    /// This default with what it leaves unset taken from `other`. The grouping and its groups go together, as do the
+    /// filters and whether any one will do.
+    func filled(from other: PlaceDefault) -> PlaceDefault {
+        var filled = self
+        filled.layout = layout ?? other.layout
+        if sort.isEmpty { filled.sort = other.sort }
+        if grouping == nil, groupOrder.isEmpty, hiddenGroups.isEmpty {
+            (filled.grouping, filled.groupOrder, filled.hiddenGroups) = (other.grouping, other.groupOrder, other.hiddenGroups)
+        }
+        if !hidesEmptyGroups { filled.hidesEmptyGroups = other.hidesEmptyGroups }
+        if filter.isEmpty, !matchesAny { (filled.filter, filled.matchesAny) = (other.filter, other.matchesAny) }
+        filled.timelineField = timelineField ?? other.timelineField
+        if !compactBoard { filled.compactBoard = other.compactBoard }
+        if cards == ViewCards() { filled.cards = other.cards }
+        filled.calendarScale = calendarScale ?? other.calendarScale
+        if properties == ViewProperties() { filled.properties = other.properties }
+        filled.scope = scope ?? other.scope
+        filled.archived = archived ?? other.archived
+        filled.includesKinds = includesKinds ?? other.includesKinds
+        return filled
+    }
+
     /// Whether the person changed something the place would not show by itself: a layout that is the place's own does not
     /// count, since choosing it leaves the place as it was.
     func isChanged(naturalLayout: ItemViewMode) -> Bool {
@@ -240,7 +262,7 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
             readable[place] = value
         }
         let aside = unreadable.isEmpty ? nil : try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
-        return (PlaceDefaults(EarlierPlace.carried(readable)), aside)
+        return (PlaceDefaults(readable), aside)
     }
 
     /// The stored defaults; data that cannot be read is no defaults, never a failure.

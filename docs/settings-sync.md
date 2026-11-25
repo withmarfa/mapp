@@ -33,6 +33,7 @@ Read this before you add, move, reset or restore a setting.
 - **Two Macs that change different settings both keep their change.** A field is written by member and a table by row, so split a value into rows where its parts change apart. A list whose order matters is one row, and the later arrangement wins whole.
 - **A set is written sorted**, so saving it again is not a change.
 - **What is kept for a place is keyed by its word** (`PlaceView.storageKey`), and for a saved view by its id, since its place can change. Each place's order of views is a `viewOrder` row (`ViewOrders`).
+- **What an earlier copy kept under its own key for a place is never removed**, so that copy still reads it (`EarlierPlace`). An earlier copy that rewrites a `viewLayout` row drops the members it does not know, such as `quickActions`; that downgrade is accepted.
 - **A sign-in asks for `app.*:write`, never the app's own vendor scope**, because discovery lists no vendor scope before its first type exists (withmarfa/marfa#3522).
 
 ## The first launch against a Marfa
