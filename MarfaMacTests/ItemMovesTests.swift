@@ -98,17 +98,19 @@ import Testing
     }
 
     @Test func aKeepMergedOverAnotherDevicesKeepIsNotThisMacsToUndo() async throws {
-        let (_, source, undo) = try await keep(answering: [.merged(fields: [MarfaMapping.tierField])])
+        let (library, source, undo) = try await keep(answering: [.merged(fields: [MarfaMapping.tierField])])
         undo.undo()
         #expect(source.writes.isEmpty, "the other device's Keep stands")
+        withExtendedLifetime(library) {}
     }
 
     @Test func aKeepBlockedThenWithdrawnLeavesNothingToUndo() async throws {
-        let (_, source, undo) = try await keep(answering: [
+        let (library, source, undo) = try await keep(answering: [
             .blocked(.conflictUnresolved, nil), .refused(SyncProblem(code: MarfaEngine.withdrawnCode)),
         ])
         undo.undo()
         #expect(source.writes.isEmpty)
+        withExtendedLifetime(library) {}
     }
 
     @Test func undoAndRedoLeaveATierAnotherDeviceSetAlone() async throws {
