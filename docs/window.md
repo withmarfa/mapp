@@ -54,7 +54,7 @@ paths:
 - **The views are a radio group;** VoiceOver reads every view, whatever has folded.
 - **The row folds by the room it has** (`ToolbarRoomProbe`) and holds no width.
 - **An on button is gray, never the accent.** An item that cannot act dims.
-- **Trap:** hide the title on the window (`hidesWindowTitle`), or it returns in full screen. Read the row's line from `TopRowSpace`, never a safe area: full screen hides the toolbar.
+- **Trap:** hide the title on the window (`hidesWindowTitle`), or it returns in full screen. Read the row's line from `TopRowSpace`, never a safe area: full screen hides the toolbar, and slides it down with the menu bar without changing the safe area, so the row follows that window (`ToolbarRevealProbe`).
 
 ## Sidebar closed
 

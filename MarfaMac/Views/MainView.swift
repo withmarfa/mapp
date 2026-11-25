@@ -310,6 +310,7 @@ struct MainView: View {
             .animation(.easeOut(duration: 0.15), value: browser.isModalPresented)
         }
         .focusedSceneValue(\.detailsPresentation, details)
+        .focusedSceneValue(\.sidebarVisibility, Binding { isSidebarVisible } set: { isSidebarVisible = $0 })
         .modifier(CommandValuePanels(details: details))
         .modifier(FieldEditSheets(details: details))
         .sheet(item: Binding { details.typeValues } set: { details.typeValues = $0 }) { TypeValuesSheet(request: $0) }

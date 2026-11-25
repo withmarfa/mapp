@@ -49,6 +49,8 @@ struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
     /// The toolbar's height as the column's top inset says, which is zero while full screen hides the toolbar.
     @State private var insetTop: CGFloat = TopRowMetrics.lineHeight
     @State private var room = TopRowRoom()
+    /// How far full screen has slid the toolbar down to show the menu bar.
+    @State private var reveal: CGFloat = 0
     let scroll: TopRowScroll?
     /// The room the row of views takes at rest, or zero where there is none.
     let restHeight: CGFloat
@@ -84,10 +86,11 @@ struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
             )
             .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { insetTop = $0 }
             .background { ToolbarRoomProbe(room: $room, signal: signal) }
+            .background { ToolbarRevealProbe(reveal: $reveal) }
             .overlay(alignment: .top) {
                 TopRowStack(
                     scroll: scroll, restHeight: restHeight, height: lineHeight, bands: bands && showsBackground, dragClearance: dragClearance, room: room,
-                    line: line, rest: rest)
+                    reveal: reveal, line: line, rest: rest)
                 .ignoresSafeArea(.container, edges: .top)
             }
     }
@@ -101,12 +104,15 @@ private struct TopRowStack<Line: View, Rest: View>: View {
     let bands: Bool
     let dragClearance: CGFloat
     let room: TopRowRoom
+    /// How far the toolbar has slid down to show the menu bar, which the line follows.
+    let reveal: CGFloat
     let line: (TopRowRoom, Bool) -> Line
     let rest: Rest
 
     var body: some View {
         let offset = scroll?.offset ?? 0
-        let isAway = restHeight == 0 || offset >= restHeight - 0.5
+        // Slid down with the toolbar, the line takes the room of the row of views, whose views then stand beside the title.
+        let isAway = restHeight == 0 || offset >= restHeight - 0.5 || reveal > 0
         let headings = scroll?.headingHeight ?? 0
         // The first row is as far below the toolbar as the row of views and the headings are tall.
         let isUnder = bands && offset > restHeight + headings + 0.5
@@ -126,6 +132,7 @@ private struct TopRowStack<Line: View, Rest: View>: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .top)
+        .offset(y: reveal)
     }
 }
 
@@ -367,6 +374,68 @@ private struct WindowTitleHider: NSViewRepresentable {
         }
 
         isolated deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }
+    }
+}
+
+/// Reports how far full screen has slid the toolbar down to show the menu bar. The content's safe area does not change
+/// as it does: only the toolbar's own window moves, so the row drawn under the toolbar reads that window's frame.
+private struct ToolbarRevealProbe: NSViewRepresentable {
+    @Binding var reveal: CGFloat
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+
+    func updateNSView(_ probe: Probe, context: Context) {
+        probe.report = { new in if reveal != new { reveal = new } }
+    }
+
+    final class Probe: NSView {
+        var report: (CGFloat) -> Void = { _ in }
+        private var observers: [any NSObjectProtocol] = []
+        private var barObservers: [any NSObjectProtocol] = []
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            observers.forEach { NotificationCenter.default.removeObserver($0) }
+            observers = []
+            guard let window else { return followBar() }
+            for name in [NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification] {
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.followBar() }
+                })
+            }
+            followBar()
+        }
+
+        /// In full screen the toolbar and the window's buttons stand in a window of their own, which slides.
+        private var bar: NSWindow? {
+            guard let window, window.styleMask.contains(.fullScreen), let bar = window.standardWindowButton(.closeButton)?.window,
+                  bar !== window else { return nil }
+            return bar
+        }
+
+        private func followBar() {
+            barObservers.forEach { NotificationCenter.default.removeObserver($0) }
+            barObservers = []
+            if let bar {
+                barObservers.append(NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: bar, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.measure() }
+                })
+            }
+            measure()
+        }
+
+        private func measure() {
+            guard let window, let bar else { return report(0) }
+            // Hidden above the screen it is not over the row, which then stays.
+            report(max(0, window.frame.maxY - bar.frame.maxY))
+        }
+
+        isolated deinit {
+            observers.forEach { NotificationCenter.default.removeObserver($0) }
+            barObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        }
     }
 }
 

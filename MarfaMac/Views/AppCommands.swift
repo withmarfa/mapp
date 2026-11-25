@@ -12,13 +12,23 @@ struct AppCommands: Commands {
     @FocusedValue(\.focusedItems) private var focused
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.detailsPresentation) private var details
+    @FocusedValue(\.sidebarVisibility) private var sidebarVisibility
     @FocusedValue(\.settingsNavigation) private var settingsNavigation
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
 
     var body: some Commands {
-        SidebarCommands()
+        // The window's own, as its toolbar button is: the system's command goes up the responder chain, where the
+        // panel's split view answers it and its title stays Show Sidebar while the sidebar shows.
+        CommandGroup(replacing: .sidebar) {
+            Button(sidebarVisibility?.wrappedValue == true ? "Hide Sidebar" : "Show Sidebar", systemImage: "sidebar.left") {
+                withAnimation { sidebarVisibility?.wrappedValue.toggle() }
+            }
+            .shortcut(.toggleSidebar, shortcuts)
+            .disabled(sidebarVisibility == nil)
+            .labelStyle(.titleAndIcon)
+        }
 
         CommandGroup(after: .sidebar) {
             Group {

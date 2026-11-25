@@ -11,6 +11,8 @@ extension FocusedValues {
     /// The main window in front, for commands that change what it shows.
     @Entry var browser: Browser?
     @Entry var detailsPresentation: DetailsPresentation?
+    /// Whether the main window in front shows its sidebar, which View's command reads and sets.
+    @Entry var sidebarVisibility: Binding<Bool>?
     @Entry var focusedItems: FocusedItems?
     /// The editor of the window in front, for the Format menu. Held weakly: SwiftUI keeps the last focused
     /// values after their window closes, which would otherwise keep that window's editor, page and library.

@@ -87,6 +87,7 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | View | Show a Week, Show a Month | ⌥⌘1, ⌥⌘2 | Yes |
 | View | Show or Hide Month | ⇧⌘D | Yes |
 | View | Show or Hide Details | ⌥⌘I | Yes |
+| View | Show or Hide Sidebar | ⌃⌘S | Yes |
 | View | Back, Forward | ⌘[, ⌘] | Yes |
 | View | Previous Item, Next Item | ⌥⌘↑, ⌥⌘↓ | Yes |
 | View | Make Text Bigger, Smaller | ⌘+, ⌘- | Yes |

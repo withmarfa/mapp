@@ -207,6 +207,11 @@ extension CommandPalette {
                     Task { await browser.finishViewPanel(in: library, order: order) }
                 }
             }
+            if let sidebar = sidebarVisibility {
+                add(sidebar.wrappedValue ? String(localized: "Hide Sidebar") : String(localized: "Show Sidebar"), "sidebar.left", keys(.toggleSidebar), in: .view) {
+                    withAnimation { sidebar.wrappedValue.toggle() }
+                }
+            }
             if browser.customizesSidebar {
                 add(String(localized: "Finish Customizing Sidebar"), "checkmark", in: .view) { browser.customizesSidebar = false }
             } else {
