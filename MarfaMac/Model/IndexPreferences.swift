@@ -12,7 +12,7 @@ nonisolated enum IndexPlace: String, CaseIterable, Sendable {
     var tabs: [IndexTab] {
         switch self {
         case .sources: [.all, .apps, .keys]
-        case .collections, .items: [.all, .yours, .fromApps]
+        case .collections, .items: [.all, .library, .feed]
         }
     }
 
@@ -39,16 +39,17 @@ nonisolated enum IndexPlace: String, CaseIterable, Sendable {
 /// A tab of an index page: which of its rows it lists. Collections split by the tier they are kept in; sources into
 /// the apps a person signed in and the keys they made.
 nonisolated enum IndexTab: String, Sendable {
-    case all, yours, fromApps, apps, keys
+    /// The library tier and the feed tier are kept under the words earlier copies stored.
+    case all, library = "yours", feed = "fromApps", apps, keys
 
-    /// Whether the row belongs under this tab. A collection is Yours in the library tier and From Apps in the feed
+    /// Whether the row belongs under this tab. A collection is Library in the library tier and Feed in the feed
     /// tier; a source is an app when its code starts with `oauth:`, which the contract keeps for apps signed in and
     /// no key may claim, and a key otherwise.
     func includes(_ row: IndexRow) -> Bool {
         switch self {
         case .all: true
-        case .yours: row.tier == .library
-        case .fromApps: row.tier == .feed
+        case .library: row.tier == .library
+        case .feed: row.tier == .feed
         case .apps: row.sourceCode.map(SourceCode.isApp) == true
         case .keys: row.sourceCode.map { !SourceCode.isApp($0) } == true
         }

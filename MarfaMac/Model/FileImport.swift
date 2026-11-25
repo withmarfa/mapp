@@ -5,7 +5,7 @@ extension Browser {
     /// Where an import puts what it adds, fixed when the files are dropped, since the person may move on while they
     /// are read and sent.
     struct ImportDestination {
-        /// The place the files were dropped in, which decides their tier (the Inbox is the feed tier).
+        /// The place the files were dropped in, which decides their tier (the Feed is the feed tier).
         let place: PlaceView
         /// The collection the items join: the one dropped on, else the one the window showed.
         let collection: ItemID?

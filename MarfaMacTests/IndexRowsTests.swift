@@ -56,10 +56,10 @@ struct IndexPreferencesTests {
     @Test func eachPageKeepsItsOwnTabAndSort() {
         let defaults = defaults()
         IndexPreferences.set(.keys, for: .sources, in: defaults)
-        IndexPreferences.set(.fromApps, for: .collections, in: defaults)
+        IndexPreferences.set(.feed, for: .collections, in: defaults)
         IndexPreferences.set(IndexSort(column: .latest, ascending: false), for: .sources, in: defaults)
         #expect(IndexPreferences.tab(for: .sources, in: defaults) == .keys)
-        #expect(IndexPreferences.tab(for: .collections, in: defaults) == .fromApps)
+        #expect(IndexPreferences.tab(for: .collections, in: defaults) == .feed)
         #expect(IndexPreferences.sort(for: .sources, in: defaults) == IndexSort(column: .latest, ascending: false))
         #expect(IndexPreferences.sort(for: .collections, in: defaults) == IndexPlace.collections.defaultSort)
     }

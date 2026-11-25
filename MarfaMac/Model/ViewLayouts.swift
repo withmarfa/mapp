@@ -44,6 +44,8 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
     var widths: Data?
     /// Whether the calendar shows a week or a month. Nil is a week.
     var calendarScale: CalendarScale?
+    /// Whether the list offers its quick actions. Nil follows `showsQuickActions(_:in:scope:)`.
+    var quickActions: Bool?
 
     init(
         layout: ItemViewMode? = nil, properties: ViewProperties = ViewProperties(), hidesEmptyGroups: Bool = false,
@@ -61,7 +63,7 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
 
     /// The Properties list is stored under the key the table's columns used, so a view's choices carry over.
     private enum CodingKeys: String, CodingKey {
-        case layout, hidesEmptyGroups, cards, density, widths, calendarScale
+        case layout, hidesEmptyGroups, cards, density, widths, calendarScale, quickActions
         case properties = "columns"
     }
 
@@ -75,12 +77,20 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         density = try? container.decodeIfPresent(Density.self, forKey: .density)
         widths = try? container.decodeIfPresent(Data.self, forKey: .widths)
         calendarScale = try? container.decodeIfPresent(CalendarScale.self, forKey: .calendarScale)
+        quickActions = try? container.decodeIfPresent(Bool.self, forKey: .quickActions)
+    }
+
+    /// Whether a list offers its quick actions: as the person chose, else only at the Feed and in a view whose From is
+    /// the Feed, where items wait to be dealt with.
+    static func showsQuickActions(_ chosen: Bool?, in shown: PlaceView, scope: ListScope) -> Bool {
+        chosen ?? (shown.savedView == nil ? shown == .feed : scope == .feed)
     }
 
     /// Whether the choices a Save keeps are the same, leaving the widths out, which are kept as they are dragged.
     func sameChoices(as other: ViewMacSettings) -> Bool {
         layout == other.layout && properties == other.properties && hidesEmptyGroups == other.hidesEmptyGroups
             && cards == other.cards && density == other.density && calendarScale == other.calendarScale
+            && quickActions == other.quickActions
     }
 
     /// Takes the choices of another and keeps its own widths.
@@ -91,6 +101,7 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         cards = other.cards
         density = other.density
         calendarScale = other.calendarScale
+        quickActions = other.quickActions
     }
 }
 

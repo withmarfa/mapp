@@ -159,8 +159,8 @@ private struct IndexContent: View {
         if browser.isSearching { return .search() }
         return switch tab {
         case .all: EmptyState("No Results")
-        case .yours: EmptyState("No Collections Of Yours", detail: "Collections you make show here.")
-        case .fromApps: EmptyState("No Collections From Apps", detail: "Collections that apps make show here.")
+        case .library: EmptyState("No Collections in the Library", detail: "Collections you make show here.")
+        case .feed: EmptyState("No Collections in the Feed", detail: "Collections that apps make show here.")
         case .apps: EmptyState("No Apps", detail: "Apps you sign in show here.")
         case .keys: EmptyState("No Keys", detail: "Keys you make show here.")
         }

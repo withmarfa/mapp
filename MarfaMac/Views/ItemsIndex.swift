@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Items as an index: every item of the library under the tabs All, Yours (the library tier) and From Apps (the feed
+/// Items as an index: every item of the library under the tabs All, Library (the library tier) and Feed (the feed
 /// tier), as a table with no list column. The chosen row is the window's selection, which the right sidebar shows
 /// (`ItemInspectorHost`), and opening one follows Settings > General > Open Items (`Browser.open`).
 ///
@@ -103,8 +103,8 @@ struct ItemsIndex: View {
             EmptyState("No Items", detail: "Items you make or apps send show here.")
         } else {
             switch tab {
-            case .yours: EmptyState("No Items Of Yours", detail: "Items you make show here.")
-            case .fromApps: EmptyState("No Items From Apps", detail: "Items that apps send show here.")
+            case .library: EmptyState("No Items in the Library", detail: "Items you make show here.")
+            case .feed: EmptyState("No Items in the Feed", detail: "Items that apps send show here.")
             case .all, .apps, .keys: EmptyState("No Items")
             }
         }

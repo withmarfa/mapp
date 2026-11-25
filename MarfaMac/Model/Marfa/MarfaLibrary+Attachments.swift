@@ -45,7 +45,7 @@ extension MarfaLibrary {
     func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: Place) async -> ItemID? {
         let cantAdd = String(localized: "Can’t Add File")
         do {
-            // The Inbox is the feed tier, so a file added there stays where it was added.
+            // The Feed is the feed tier, so a file added there stays where it was added.
             return try await source.embeds.addFile(file, title: title, tier: place == .feed ? .feed : nil, parent: parentID)
         } catch let failure as SourceFailure {
             notices.tell(cantAdd, failure.message)

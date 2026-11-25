@@ -133,8 +133,8 @@ struct SearchPage: View {
             SettingsRow("Archived Items") {
                 SettingsToggle(title: "Archived Items", isOn: $includesArchived).accessibilityIdentifier("SearchArchived")
             }
-            SettingsRow("Inbox Items", line: "What isn’t filed yet.") {
-                SettingsToggle(title: "Inbox Items", isOn: $includesInbox).accessibilityIdentifier("SearchInbox")
+            SettingsRow("Feed Items", line: "What your apps send.") {
+                SettingsToggle(title: "Feed Items", isOn: $includesInbox).accessibilityIdentifier("SearchInbox")
             }
         }
     }

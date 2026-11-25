@@ -42,7 +42,7 @@ struct ItemInspectorHost: View {
                 ItemInspector(
                     item: item,
                     type: library.catalogue.itemTypes[item.type],
-                    place: item.tier == .feed ? String(localized: "Inbox") : String(localized: "Library"),
+                    place: item.tier == .feed ? String(localized: "Feed") : String(localized: "Library"),
                     source: item.source.map { library.sources.info($0) },
                     catalogue: library.catalogue,
                     hiddenKeys: library.hiddenPropertyKeys(of: item),

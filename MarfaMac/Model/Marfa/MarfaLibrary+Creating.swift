@@ -14,7 +14,7 @@ extension MarfaLibrary {
         }
         let id = ItemID.mint(at: now())
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : body
-        // The Inbox is the feed tier, so an item made there stays where it was made.
+        // The Feed is the feed tier, so an item made there stays where it was made.
         let draft = ItemDraft(
             type: type, title: title, body: text, properties: properties, tier: place == .feed ? .feed : nil, parent: parentID)
         do {

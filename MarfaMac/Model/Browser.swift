@@ -278,13 +278,13 @@ final class Browser {
     /// while they are showing, not an item page opened from them, which hides their controls.
     var offersViewOptions: Bool { !isCollectionItemPresented }
 
-    /// Shows the place that lists an item no place on screen does: All Items, or for a deleted item Settings >
-    /// Recently Deleted, the only list that holds it.
+    /// Shows the place that lists an item no place on screen does: the Archive for an archived item, the Feed or the
+    /// Library by its tier, or for a deleted item Settings > Recently Deleted, the only list that holds it.
     private func showListing(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
-        if item.state == .trashed {
-            showSettings(.recentlyDeleted)
-        } else {
-            show(.library, in: library, order: order)
+        switch item.state {
+        case .trashed: showSettings(.recentlyDeleted)
+        case .archived: show(.archive, in: library, order: order)
+        default: show(item.tier == .feed ? .feed : .library, in: library, order: order)
         }
     }
 
@@ -359,7 +359,7 @@ final class Browser {
     }
 
     /// Shows the item before, or after, the one shown, skipping any that are gone. It is shown in the place it was
-    /// last seen when that place still lists it, and in All Items otherwise; any search is put away to show it.
+    /// last seen when that place still lists it, and in the Library otherwise; any search is put away to show it.
     func go(_ direction: SelectionHistory.Direction, in library: any ItemLibrary) {
         guard let (index, entry) = history.target(direction, in: library, shown: selection) else { return }
         isMovingThroughHistory = true

@@ -18,8 +18,8 @@ extension IndexTab {
     var title: LocalizedStringKey {
         switch self {
         case .all: "All"
-        case .yours: "Yours"
-        case .fromApps: "From Apps"
+        case .library: "Library"
+        case .feed: "Feed"
         case .apps: "Apps"
         case .keys: "Keys"
         }
