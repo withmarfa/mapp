@@ -52,8 +52,7 @@ import Testing
         #expect(plan.beneath == [F.e1], "Bug one is archived already, and the item in the bin is left there")
 
         let undo = UndoManager()
-        let outcome = library.archive([F.p1], beneath: true, undoManager: undo)
-        #expect(outcome == CommandOutcome(changed: 2, onlyItem: nil, skips: BatchSkips()))
+        library.archive([F.p1], beneath: true, undoManager: undo)
         #expect(Set(source.writes) == [.transition(F.p1, .archived, from: .active), .transition(F.e1, .archived, from: .active)])
         try await show([F.p1, F.e1], in: library, source) { $0.state = .archived }
         acceptAll(source)
@@ -76,17 +75,36 @@ import Testing
         try await show([F.n2], in: library, source) { $0.state = .archived }
         let item = try #require(library.item(F.n2))
         let undo = UndoManager()
-        let outcome = library.setTier([F.n2, F.n1], to: .library, undoManager: undo)
-        #expect(outcome.onlyItem == F.n2 && outcome.skips.isEmpty, "an item in the Library already needs nothing")
-        #expect(library.movedMessage(.keep, outcome) == "Kept “Feed note” in the Library")
+        var outcome: CommandOutcome?
+        library.setTier([F.n2, F.n1], to: .library, undoManager: undo) { outcome = $0 }
         #expect(source.writes == [.retier(F.n2, .library, base: item.version)])
         try await show([F.n2], in: library, source) { $0.tier = .library }
         acceptAll(source)
+        // The Undo waits for the server's answer to the Keep, so the library takes it first.
+        try #require(await eventually { library.tierWrites.isEmpty })
+        let moved = try #require(outcome)
+        #expect(moved.onlyItem == F.n2 && moved.skips.isEmpty, "an item in the Library already needs nothing")
+        #expect(library.movedMessage(.keep, moved) == "Kept “Feed note” in the Library")
         #expect(library.item(F.n2)?.state == .archived)
 
         undo.undo()
         #expect(source.writes == [.retier(F.n2, .feed, base: item.version)])
         #expect(undo.undoActionName.isEmpty && undo.redoActionName == ItemMove.keep.name)
+    }
+
+    @Test func whatAMoveSaysItMovedIsWhatTheCopyQueued() async throws {
+        let (library, source) = try await loaded()
+        var outcome: CommandOutcome?
+        library.archive([F.p1], beneath: true, undoManager: nil) { outcome = $0 }
+        #expect(outcome == nil, "the engine has judged nothing yet")
+        let epic = try #require(source.submitted.first { $0.write == .transition(F.e1, .archived, from: .active) })
+        let alpha = try #require(source.submitted.first { $0.write == .transition(F.p1, .archived, from: .active) })
+        // Another device moved Epic task to Recently Deleted before the engine queued its write.
+        source.send(.answered(epic.id, .refused(MarfaEngine.skipped(.inBin).problem)))
+        source.send(.taken(alpha.id))
+        var skips = BatchSkips()
+        skips.skip(.inBin)
+        #expect(await eventually { outcome == CommandOutcome(changed: 1, onlyItem: F.p1, skips: skips) })
     }
 
     /// Keeps Feed note, whose write the copy shows, and answers it each of `outcomes` in turn.

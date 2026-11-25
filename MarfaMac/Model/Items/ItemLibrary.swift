@@ -257,17 +257,17 @@ protocol ItemLibrary: AnyObject, Observable {
 
     // MARK: Tier and state
 
+    // Each registers its undo step at once and calls `moved` once the copy has queued or skipped every write, with
+    // what it queued, so a toast never names a move the copy did not make.
+
     /// Moves each of `ids` that `tierPlan` changes to `tier`, each its own queued write, in one undoable change named
     /// for the command. What it leaves alone is told. An Undo moves back only an item still in the tier this left.
-    @discardableResult
-    func setTier(_ ids: Set<ItemID>, to tier: Tier, undoManager: UndoManager?) -> CommandOutcome
+    func setTier(_ ids: Set<ItemID>, to tier: Tier, undoManager: UndoManager?, moved: ((CommandOutcome) -> Void)?)
     /// Archives what `archivePlan` gives for `ids`, and the items beneath them where `beneath`, in one undoable change.
     /// An Undo makes active again only what this archived and is still archived; an item archived before stays so.
-    @discardableResult
-    func archive(_ ids: Set<ItemID>, beneath: Bool, undoManager: UndoManager?) -> CommandOutcome
+    func archive(_ ids: Set<ItemID>, beneath: Bool, undoManager: UndoManager?, moved: ((CommandOutcome) -> Void)?)
     /// Makes each archived item among `ids` active, in one undoable change. Items beneath them stay as they are.
-    @discardableResult
-    func unarchive(_ ids: Set<ItemID>, undoManager: UndoManager?) -> CommandOutcome
+    func unarchive(_ ids: Set<ItemID>, undoManager: UndoManager?, moved: ((CommandOutcome) -> Void)?)
 
     // MARK: Views
 

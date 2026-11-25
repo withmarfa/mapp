@@ -44,6 +44,10 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         counts[reason, default: 0] += 1
     }
 
+    mutating func add(_ other: BatchSkips) {
+        counts.merge(other.counts, uniquingKeysWith: +)
+    }
+
     /// One sentence for each reason, in a steady order, or nil where nothing was skipped.
     var message: String? {
         let sentences = Reason.allCases.compactMap { reason in counts[reason].map { Self.sentence(reason, count: $0) } }

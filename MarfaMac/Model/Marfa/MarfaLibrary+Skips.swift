@@ -9,8 +9,12 @@ extension MarfaLibrary {
         var skips = BatchSkips()
         /// Whether the copy took any of its writes.
         var changed = false
+        /// The item each write moves, and those whose write the copy took.
+        var items: [WriteID: ItemID] = [:]
+        var queued: Set<ItemID> = []
         var waiting: Set<WriteID> = []
         var isOpen = true
+        var answered: ((SkipNotice) -> Void)?
 
         init(failing: String) {
             self.failing = failing
@@ -18,9 +22,11 @@ extension MarfaLibrary {
     }
 
     /// Runs `command`, gathering what it and the engine skip into one notice titled `failing` where nothing changed.
-    func gatheringSkips(failing title: String, _ command: () -> Void) {
+    /// `answered` runs once every write has its first answer.
+    func gatheringSkips(failing title: String, answered: ((SkipNotice) -> Void)? = nil, _ command: () -> Void) {
         let outer = gathering
         let notice = SkipNotice(failing: title)
+        notice.answered = answered
         gathering = notice
         command()
         gathering = outer
@@ -50,6 +56,7 @@ extension MarfaLibrary {
         switch outcome {
         case nil, .accepted?, .merged?:
             notice.changed = true
+            if let item = notice.items[write] { notice.queued.insert(item) }
         case .refused(let problem)?:
             if let reason = MarfaEngine.skipReason(problem.code) {
                 notice.skips.skip(reason)
@@ -65,5 +72,8 @@ extension MarfaLibrary {
     private func tellIfAnswered(_ notice: SkipNotice) {
         guard !notice.isOpen, notice.waiting.isEmpty else { return }
         tellSkipped(notice.skips, didChange: notice.changed, failing: notice.failing)
+        let answered = notice.answered
+        notice.answered = nil
+        answered?(notice)
     }
 }

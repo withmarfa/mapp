@@ -9,7 +9,7 @@ nonisolated enum ItemMove: Hashable, Sendable, CaseIterable {
     case unarchive
 }
 
-/// The command's planned changes and planner skips. The engine can skip additional items when it queues the writes.
+/// What a move command queued, and every item it or the engine skipped.
 nonisolated struct CommandOutcome: Equatable, Sendable {
     var changed: Int
     var onlyItem: ItemID?
@@ -76,7 +76,19 @@ extension ItemMove {
 }
 
 extension ItemLibrary {
-    /// Formats the planned move, using the item's name if the plan includes one item.
+    func setTier(_ ids: Set<ItemID>, to tier: Tier, undoManager: UndoManager?) {
+        setTier(ids, to: tier, undoManager: undoManager, moved: nil)
+    }
+
+    func archive(_ ids: Set<ItemID>, beneath: Bool, undoManager: UndoManager?) {
+        archive(ids, beneath: beneath, undoManager: undoManager, moved: nil)
+    }
+
+    func unarchive(_ ids: Set<ItemID>, undoManager: UndoManager?) {
+        unarchive(ids, undoManager: undoManager, moved: nil)
+    }
+
+    /// Formats the move, using the item's name where it moved one item.
     func movedMessage(_ move: ItemMove, _ outcome: CommandOutcome) -> String {
         move.movedMessage(count: outcome.changed, title: outcome.onlyItem.flatMap(item)?.name)
     }
