@@ -5,8 +5,8 @@ import UniformTypeIdentifiers
 /// ⌘N and every New, unless Settings > General > New Opens says Text Form: one line that makes an item. The kind is
 /// the capsule at its start, which Tab moves on; `#` adds a tag, `@` a parent and `/` a property of the kind, each
 /// from a list of matches in its row under the line; a day typed is the item's due or start date; a pasted web address
-/// makes a bookmark. What the line reads leaves the words for a chip after them, in the order made, and Delete puts
-/// the words back. Return adds it and leaves the line open, empty, with the same kind; ⌘Return adds it and opens it;
+/// makes a bookmark. What the line reads shows as a chip after the words, which stay as typed until Add takes them out;
+/// Delete on a chip stops the line reading its words. Return adds it and leaves the line open, empty, with the same kind; ⌘Return adds it and opens it;
 /// ⇧Return hands everything typed to the text form. Escape or a click outside puts it away, keeping what was typed
 /// (`NewItemDrafts`).
 ///
@@ -27,7 +27,7 @@ struct NewItemLinePanel: View {
     var opensElsewhere: ((ItemID, String) -> Void)?
     let onClose: () -> Void
 
-    /// What has the keyboard: the title, or a chip the person chose, which Delete puts back into the title.
+    /// What has the keyboard: the title, or a chip the person chose, whose words Delete keeps as text.
     private enum LineFocus: Hashable {
         case title
         case chip(QuickAdd.Chip)
@@ -39,6 +39,9 @@ struct NewItemLinePanel: View {
     @State private var titleWidth: CGFloat = 0
     /// The match the arrow keys are on.
     @State private var highlighted = 0
+    /// Whether the arrow keys moved through the matches since the last change of text, so Return takes the match
+    /// the person chose rather than the first.
+    @State private var arrowed = false
     /// The property, by key, whose value panel is open.
     @State private var editing: String?
     @State private var isChoosingFile = false
@@ -99,16 +102,20 @@ struct NewItemLinePanel: View {
 
     // MARK: The line
 
-    /// The kind, then the title, then a chip for each part the line read or the person chose, in the order made.
+    /// The kind, then the title, then a chip for each part the line read or the person chose (`QuickAdd.lineChips`).
     private func fieldRow(_ draft: QuickAdd.Draft) -> some View {
         let catalogue = library.catalogue
-        let chips = QuickAdd.lineChips(draft, in: catalogue)
+        let reads = lineReads(draft)
+        let chips = QuickAdd.lineChips(draft, reads: reads, in: catalogue)
+        let read = QuickAdd.withReads(draft, reads)
         let isFile = QuickAdd.isFile(draft.typeID, in: catalogue)
         return HStack(spacing: 12) {
             kindPill(draft)
             TagFlowLayout(spacing: 7) {
                 titleField(draft, fills: chips.isEmpty && !isFile)
-                ForEach(chips, id: \.self) { chip in lineChip(chip, in: draft) }
+                ForEach(chips, id: \.self) { chip in
+                    lineChip(chip, in: read, words: reads.first { $0.chip == chip }?.words ?? draft.marks.first { $0.chip == chip }?.words)
+                }
                 if isFile { fileToken(draft) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -167,6 +174,7 @@ struct NewItemLinePanel: View {
             quickAdd.draft?.title = text
             browser.lineTextChanged(from: old, in: library)
             highlighted = 0
+            arrowed = false
         }, selection: $titleSelection)
         .textFieldStyle(.plain)
         .interfaceFont(.title3)
@@ -192,34 +200,24 @@ struct NewItemLinePanel: View {
         .onKeyPress(keys: [.upArrow, .downArrow]) { press in
             guard let count = matches(for: draft)?.count, count > 0 else { return .ignored }
             highlighted = (highlighted + (press.key == .upArrow ? count - 1 : 1)) % count
+            arrowed = true
             return .handled
-        }
-        .onKeyPress(.delete) {
-            guard caretIsAtStart(of: draft.title) else { return .ignored }
-            return putBack(nil) ? .handled : .ignored
         }
         .accessibilityIdentifier("NewItemLineTitle")
     }
 
-    /// Whether the caret stands before the first character with nothing selected, where Delete takes the last chip.
-    private func caretIsAtStart(of title: String) -> Bool {
-        if title.isEmpty { return true }
-        guard case .selection(let range)? = titleSelection?.indices else { return false }
-        return range.isEmpty && range.lowerBound == title.startIndex
-    }
-
-    /// One chip of the line: what it sets in secondary, its value in primary. Delete, or Keep as Text in its menu,
-    /// puts the words it was read from back into the title; a property's chip opens its value panel when clicked.
+    /// One chip of the line: what it sets in secondary, its value in primary. `typed` is the title's words it stands
+    /// for, which Delete, or Keep as Text in its menu, leaves as text; a property's chip opens its value panel when
+    /// clicked. `draft` holds what the line reads.
     @ViewBuilder
-    private func lineChip(_ chip: QuickAdd.Chip, in draft: QuickAdd.Draft) -> some View {
+    private func lineChip(_ chip: QuickAdd.Chip, in draft: QuickAdd.Draft, words typed: String?) -> some View {
         let words = QuickAdd.lineChipWords(chip, in: draft, library: library, calendar: .current, locale: .current)
-        let source = draft.sources[chip]
         let chipView = LineChip(name: words.name, value: words.value, isChosen: focus == .chip(chip))
             .focusable()
             .focused($focus, equals: .chip(chip))
             .focusEffectDisabled()
             .onKeyPress(keys: [.delete, .deleteForward]) { _ in
-                putBack(chip)
+                decline(chip)
                 return .handled
             }
             .onTapGesture {
@@ -227,8 +225,8 @@ struct NewItemLinePanel: View {
                 if case .field(let key) = chip { editing = key }
             }
             .contextMenu {
-                if let source {
-                    Button("Keep “\(source.words)” as Text") { putBack(chip) }
+                if let typed {
+                    Button("Keep “\(typed)” as Text") { decline(chip) }
                 } else if QuickAdd.isRemovable(chip, typeID: draft.typeID, in: library.catalogue) {
                     Button("Remove") {
                         if editing.map({ chip == .field($0) }) == true { editing = nil }
@@ -239,14 +237,14 @@ struct NewItemLinePanel: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(words.value.map { "\(words.name) \($0)" } ?? words.name)
-            .accessibilityAction(named: source.map { "Keep “\($0.words)” as Text" } ?? String(localized: "Remove")) { putBack(chip) }
+            .accessibilityAction(named: typed.map { "Keep “\($0)” as Text" } ?? String(localized: "Remove")) { decline(chip) }
         if case .field(let key) = chip, let field = QuickAdd.fields(of: draft.typeID, in: library.catalogue).first(where: { $0.key == key }) {
             chipView
                 .popover(isPresented: Binding { editing == key } set: { if !$0, editing == key { editing = nil } }, arrowEdge: .bottom) {
                     ItemPropertyRow(definition: field, value: draft.properties[key], isEditable: true, onChange: { newValue in
+                        // A value set by hand stops the line reading a value for the field; the words stay as typed.
                         quickAdd.draft?.properties[key] = newValue
-                        // A value set by hand is no longer the words it was read from.
-                        quickAdd.draft?.sources[chip] = nil
+                        quickAdd.draft?.add(chip)
                         return true
                     }, retainedDraft: field.kind.isList ? quickAdd.listDraft(for: key) : nil, startsEditing: true,
                        handsOffOnLeave: !field.kind.isList)
@@ -259,14 +257,15 @@ struct NewItemLinePanel: View {
         }
     }
 
-    /// Takes a chip out, or the last one where none is named, and gives the title the keyboard, its caret at the end.
-    @discardableResult
-    private func putBack(_ chip: QuickAdd.Chip?) -> Bool {
-        if let chip, case .field(let key) = chip, editing == key { editing = nil }
-        guard browser.putBackLineChip(chip, in: library) else { return false }
+    /// Stops the line reading the chip's words, which stay in the title, and gives the title the keyboard.
+    private func decline(_ chip: QuickAdd.Chip) {
+        if case .field(let key) = chip, editing == key { editing = nil }
+        guard browser.declineLineChip(chip, in: library) else { return }
         focus = .title
-        if let title = quickAdd.draft?.title { titleSelection = TextSelection(insertionPoint: title.endIndex) }
-        return true
+    }
+
+    private func lineReads(_ draft: QuickAdd.Draft) -> [QuickAdd.ReadWord] {
+        QuickAdd.lineReads(draft, finishing: false, in: library, now: .now, calendar: .current, locale: .current)
     }
 
     /// A file item's file: the one chosen, or a button to choose one, which a drop on the panel also gives.
@@ -298,7 +297,7 @@ struct NewItemLinePanel: View {
     /// A row for each key the line reads: its key, what it sets, and offers from this library, the recent first. While
     /// nothing is typed, the first row offers kinds; while a key's word is typed, its row lists the matches instead.
     private func keyRows(_ draft: QuickAdd.Draft) -> some View {
-        let typing = NewItemText.typing(in: draft.title)
+        let typing = QuickAdd.lineTyping(draft)
         let matches = matches(for: draft)
         let recents = NewItemRecents.stored(for: library.serverKey, in: browser.defaults)
         let canHaveParent = library.canHaveParent(typeID: draft.typeID)
@@ -464,7 +463,7 @@ struct NewItemLinePanel: View {
 
     /// The matches for the marked word at the end of the line, or nil while none is being typed.
     private func matches(for draft: QuickAdd.Draft) -> [Match]? {
-        guard let typing = NewItemText.typing(in: draft.title) else { return nil }
+        guard let typing = QuickAdd.lineTyping(draft) else { return nil }
         let query = typing.query
         switch typing.mark {
         case .tag:
@@ -563,7 +562,7 @@ struct NewItemLinePanel: View {
     /// The kind's fields the person can still add as a chip, matching `query`.
     private func offeredFields(_ draft: QuickAdd.Draft, query: String) -> [ItemTypeInfo.Field] {
         let fields = QuickAdd.fields(of: draft.typeID, in: library.catalogue)
-        let shown = Set(QuickAdd.lineChips(draft, in: library.catalogue))
+        let shown = Set(QuickAdd.lineChips(draft, reads: lineReads(draft), in: library.catalogue))
         return fields.filter { field in
             !shown.contains(.field(field.key)) && (query.isEmpty || field.label.localizedStandardContains(query))
         }
@@ -603,7 +602,7 @@ struct NewItemLinePanel: View {
             wherePicker(draft)
             Spacer(minLength: 0)
             Button {
-                browser.handOverToTextForm()
+                browser.handOverToTextForm(in: library)
             } label: {
                 HStack(spacing: 8) {
                     Text("Add Text")
@@ -695,10 +694,12 @@ struct NewItemLinePanel: View {
 
     private func returnPressed(shift: Bool) {
         if shift {
-            browser.handOverToTextForm()
+            browser.handOverToTextForm(in: library)
             return
         }
-        if let draft = quickAdd.draft, let matches = matches(for: draft), !matches.isEmpty {
+        // A tag the line keeps for itself, such as Favorite, is never made another by Return alone.
+        if let draft = quickAdd.draft, let matches = matches(for: draft), !matches.isEmpty,
+           arrowed || QuickAdd.lineTyping(draft).map({ $0.mark != .tag || QuickAdd.takesTag($0.query, in: library) }) == true {
             choose(matches[min(highlighted, matches.count - 1)])
             return
         }
@@ -770,10 +771,10 @@ struct NewItemLinePanel: View {
         if QuickAdd.isFile(draft.typeID, in: library.catalogue) {
             // A file item holds one file; the text form says so where more were given.
             quickAdd.draft?.files = taken
-            if taken.count > 1 { browser.handOverToTextForm() }
+            if taken.count > 1 { browser.handOverToTextForm(in: library) }
         } else {
             quickAdd.draft?.files += taken.filter { !draft.files.contains($0) }
-            browser.handOverToTextForm()
+            browser.handOverToTextForm(in: library)
         }
     }
 }

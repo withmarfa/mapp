@@ -51,7 +51,4 @@ extension MarfaLibrary {
         }
     }
 
-    func wasRefused(creating id: ItemID) -> Bool {
-        refusedCreations.contains(id)
-    }
 }

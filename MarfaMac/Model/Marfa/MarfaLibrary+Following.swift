@@ -136,6 +136,8 @@ extension MarfaLibrary {
         if changed { contentRevision += 1 }
         if moved { membershipRevision += 1 }
         if renamed { namesRevision += 1 }
+        // A copy still filling may not have its instance yet; each step it takes in may bring it.
+        if isLoaded, serverKey.isEmpty { Task { await readServerKey() } }
     }
 
     /// Tells every item an edge of `item` touches, this item included, that the edge came, went or changed.
@@ -210,7 +212,7 @@ extension MarfaLibrary {
                 notices.tell(refusal.title, message)
             }
         }
-        if let created = creating.removeValue(forKey: id), case .refused = outcome, records[created] == nil {
+        if let created = creating.removeValue(forKey: id), case .refused = outcome {
             refusedCreations.insert(created)
         }
         settleReplacement(id, outcome)

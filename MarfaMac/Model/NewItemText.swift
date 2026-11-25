@@ -47,42 +47,59 @@ nonisolated enum NewItemText {
 
     // MARK: Tags
 
-    /// Takes the finished tags out of the text, in the order typed, and gives the text without them. A tag is `#`
+    /// The finished tags in the text, each where it stands, in the order typed, a tag typed twice twice. A tag is `#`
     /// at the start of the text or after a space, then a letter, then letters, digits, `-`, `_`, `/` or `.`; it is
     /// finished by the space after it, or by `finishing` (Add) at the end of the text. A full stop that ends it is
     /// the sentence's, not the tag's. `Issue #12`, `C#` and `#1st` stay text, as does any word the library would
     /// refuse as a tag (`refuses`).
-    static func takeTags(from text: String, finishing: Bool, refuses: (String) -> Bool = { _ in false }) -> (tags: [String], text: String) {
-        var tags: [String] = []
-        var kept = ""
-        var index = text.startIndex
-        while index < text.endIndex {
-            let atWordStart = index == text.startIndex || text[text.index(before: index)].isWhitespace
-            guard atWordStart, text[index] == "#" else {
-                kept.append(text[index])
-                index = text.index(after: index)
+    static func tags(in text: String, finishing: Bool, refuses: (String) -> Bool = { _ in false }) -> [(tag: String, range: Range<Int>)] {
+        let characters = Array(text)
+        var found: [(tag: String, range: Range<Int>)] = []
+        var index = 0
+        while index < characters.count {
+            let atWordStart = index == 0 || characters[index - 1].isWhitespace
+            guard atWordStart, characters[index] == "#" else {
+                index += 1
                 continue
             }
-            let wordStart = text.index(after: index)
-            let wordEnd = text[wordStart...].firstIndex(where: \.isWhitespace) ?? text.endIndex
-            var word = String(text[wordStart..<wordEnd])
-            while word.hasSuffix(".") { word.removeLast() }
-            let ended = wordEnd < text.endIndex || finishing
-            if ended, Self.isTag(word), !refuses(word) {
-                if !tags.contains(word) { tags.append(word) }
-                // The space after the tag goes with it, so no double space is left.
-                index = wordEnd < text.endIndex ? text.index(after: wordEnd) : wordEnd
-                if text[wordStart..<wordEnd].hasSuffix(".") {
-                    while kept.last == " " { kept.removeLast() }
-                    kept.append(".")
-                    if wordEnd < text.endIndex { kept.append(" ") }
-                }
+            var end = index + 1
+            while end < characters.count, !characters[end].isWhitespace { end += 1 }
+            var wordEnd = end
+            while wordEnd > index + 1, characters[wordEnd - 1] == "." { wordEnd -= 1 }
+            let word = String(characters[(index + 1)..<wordEnd])
+            if end < characters.count || finishing, Self.isTag(word), !refuses(word) {
+                found.append((word, index..<wordEnd))
+            }
+            index = end
+        }
+        return found
+    }
+
+    /// The text with each of `ranges` (in characters) taken out, and the spaces either side made one. A full stop or
+    /// comma that followed what went keeps to the word before it.
+    static func removing(_ ranges: [Range<Int>], from text: String) -> String {
+        var characters = Array(text)
+        var merged: [Range<Int>] = []
+        for range in ranges.sorted(by: { $0.lowerBound < $1.lowerBound })
+        where range.lowerBound >= 0 && range.upperBound <= characters.count && !range.isEmpty {
+            if let last = merged.last, range.lowerBound <= last.upperBound {
+                merged[merged.count - 1] = last.lowerBound..<max(last.upperBound, range.upperBound)
             } else {
-                kept += text[index..<wordEnd]
-                index = wordEnd
+                merged.append(range)
             }
         }
-        return (tags, kept)
+        for range in merged.reversed() {
+            var lower = range.lowerBound
+            var upper = range.upperBound
+            if lower == 0 || characters[lower - 1].isWhitespace {
+                while upper < characters.count, characters[upper].isWhitespace { upper += 1 }
+                if upper < characters.count, ".,;:!?".contains(characters[upper]) {
+                    while lower > 0, characters[lower - 1].isWhitespace { lower -= 1 }
+                }
+            }
+            characters.removeSubrange(lower..<upper)
+        }
+        return String(characters)
     }
 
     /// Whether the word, after its `#`, is a tag as the line reads one.
@@ -100,6 +117,23 @@ nonisolated enum NewItemText {
               let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme), url.host() != nil
         else { return nil }
         return url
+    }
+
+    /// The first word of the text that is a web address (`webAddress`), and where it stands, in characters.
+    static func firstWebAddress(in text: String) -> (url: URL, range: Range<Int>)? {
+        let characters = Array(text)
+        var index = 0
+        while index < characters.count {
+            guard !characters[index].isWhitespace else {
+                index += 1
+                continue
+            }
+            var end = index
+            while end < characters.count, !characters[end].isWhitespace { end += 1 }
+            if let url = webAddress(String(characters[index..<end])) { return (url, index..<end) }
+            index = end
+        }
+        return nil
     }
 
     // MARK: Days
@@ -135,19 +169,6 @@ nonisolated enum NewItemText {
             }
         }
         return detectedDay(in: text, calendar: calendar)
-    }
-
-    /// The text with the words that named `day` taken out where they stand, and the spaces either side made one.
-    /// Text that no longer holds those words there is left as it is.
-    static func removing(_ day: FoundDay, from text: String) -> String {
-        guard day.range.upperBound <= text.count else { return text }
-        let start = text.index(text.startIndex, offsetBy: day.range.lowerBound)
-        let end = text.index(start, offsetBy: day.range.count)
-        guard text[start..<end] == day.phrase else { return text }
-        let before = text[..<start]
-        var after = text[end...]
-        if before.last?.isWhitespace != false { after = after.drop { $0.isWhitespace } }
-        return String(before) + after
     }
 
     /// The value a day is written as in `field`: an instant where the field and the words hold a time, else the day.

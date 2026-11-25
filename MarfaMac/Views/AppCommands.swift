@@ -40,7 +40,7 @@ struct AppCommands: Commands {
                     if let library { browser?.openNewItem(in: library) }
                 }
                     .shortcut(.newItem, shortcuts)
-                    .disabled(browser == nil || library?.isLoaded != true)
+                    .disabled(browser == nil || library.map(QuickAdd.isAvailable) != true)
                 Button("New Window", systemImage: "macwindow.badge.plus") {
                     openWindow(id: MarfaMacApp.mainWindowID)
                 }

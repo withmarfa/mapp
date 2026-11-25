@@ -55,7 +55,7 @@ extension Browser {
     /// to another library counts as refused once this one has loaded without it, since it will not come.
     private func isRefused(_ entry: NewItem, in library: any ItemLibrary) -> Bool {
         if entry.library !== library { return library.isLoaded }
-        return NewItemDrafts.answer(creating: entry.id, in: library, madeHere: true) == .refused
+        return NewItemDrafts.answer(creating: entry.id, in: library) == .refused
     }
 
     /// Finishes each item the window made that the library now holds or refused. A create the library refused is

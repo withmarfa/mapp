@@ -41,7 +41,7 @@ extension Browser {
         QuickAdd.File.tellUnreadable(notRead, unreadable: unreadable, to: library.notices)
         var added: [ItemID] = []
         for file in files {
-            if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: destination.place.place)) { added.append(id) }
+            if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: destination.place.place), tags: []) { added.append(id) }
         }
         guard !added.isEmpty else { return [] }
         var joined = false

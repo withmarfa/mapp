@@ -443,7 +443,6 @@ final class FakeItemLibrary: ItemLibrary {
     /// Creates refused after `createItem` answered, as a server's source refuses one it cannot queue.
     var refusedCreations: Set<ItemID> = []
     func finish() {}
-    func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
 
     /// Every call of `setItemProperties`, in order, with the changes as asked.
@@ -736,11 +735,13 @@ final class FakeItemLibrary: ItemLibrary {
     private(set) var addedFiles: [(name: String, data: Data, title: String?, parent: ItemID?)] = []
     /// The tier each file was added to, in step with `addedFiles`.
     private(set) var addedTiers: [Tier] = []
+    /// The tags each file was added with, in step with `addedFiles`.
+    private(set) var addedFileTags: [[String]] = []
     var refusesFiles = false
     /// Awaited before a file is added, so a test can act while it is being sent.
     var sendingFile: (() async -> Void)?
 
-    func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier) async -> ItemID? {
+    func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier, tags: [String]) async -> ItemID? {
         await sendingFile?()
         guard !refusesFiles else {
             notices.tell("Can’t Add File", "Refused")
@@ -753,6 +754,7 @@ final class FakeItemLibrary: ItemLibrary {
         }
         addedFiles.append((name, data, title, parentID))
         addedTiers.append(tier)
+        addedFileTags.append(tags)
         let id = ItemID.mint()
         let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", from: id, to: .item($0), origin: .property("child-of")) }
         items.append(Item(

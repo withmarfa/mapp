@@ -44,8 +44,6 @@ final class NewItemDrafts {
     private var entries: [UUID: Entry]
     /// The drafts a holder has open, which no other may take.
     private var claimed: Set<UUID> = []
-    /// The drafts whose create this run made, which the library may not show for a moment.
-    private var sentHere: Set<UUID> = []
     private let now: () -> Date
     /// Where a draft that cannot be written to disk is told, once until a write works again.
     weak var notices: Notices?
@@ -138,13 +136,15 @@ final class NewItemDrafts {
     }
 
     /// The draft is about to be added as `item`: written so before the create is made. Answers whether it was
-    /// kept, so a create is made only from a draft the store can follow.
+    /// written, so a create is made only from a draft the store can follow after a crash.
     @discardableResult
     func sending(_ id: UUID, as item: ItemID) -> Bool {
-        guard entries[id] != nil else { return false }
+        guard let entry = entries[id], !entry.library.isEmpty else { return false }
         entries[id]?.sent = item
-        sentHere.insert(id)
-        save()
+        guard save() else {
+            entries[id]?.sent = nil
+            return false
+        }
         return true
     }
 
@@ -161,7 +161,6 @@ final class NewItemDrafts {
         guard entries[id] != nil else { return }
         entries[id]?.sent = nil
         entries[id]?.addingFile = false
-        sentHere.remove(id)
         save()
     }
 
@@ -173,7 +172,6 @@ final class NewItemDrafts {
         guard entries[id] != nil else { return }
         entries[id]?.sent = item
         entries[id]?.addingFile = false
-        sentHere.insert(id)
         save()
     }
 
@@ -190,24 +188,22 @@ final class NewItemDrafts {
     }
 
     /// Settles the drafts added in `library`, once it has read its copy and what waits to be sent. One whose create
-    /// Marfa accepted is dropped. One whose create Marfa refused for good, or that an earlier run never got into the
-    /// copy, is offered again, as typed, and marked returned (`takeReturned`) until a holder takes it. One whose
-    /// create still waits, is held up or only shows in the copy stays hidden, since it may yet be accepted.
+    /// Marfa accepted is dropped. One whose create Marfa refused for good is offered again, as typed, and marked
+    /// returned (`takeReturned`) until a holder takes it. Every other stays hidden, since it may yet be accepted: a
+    /// create that waits, is held up, or is not in the copy yet.
     func settle(in library: any ItemLibrary) {
         if failing { save() }
         guard library.isLoaded, library.syncReport.queueRead else { return }
         var changed = false
         for entry in entries.values where entry.library == library.serverKey {
             guard let item = entry.sent else { continue }
-            switch Self.answer(creating: item, in: library, madeHere: sentHere.contains(entry.id)) {
+            switch Self.answer(creating: item, in: library) {
             case .accepted:
                 entries[entry.id] = nil
-                sentHere.remove(entry.id)
                 changed = true
             case .refused:
                 entries[entry.id]?.sent = nil
                 entries[entry.id]?.returned = true
-                sentHere.remove(entry.id)
                 changed = true
             case .waiting:
                 break
@@ -226,16 +222,10 @@ final class NewItemDrafts {
         case accepted, refused, waiting
     }
 
-    static func answer(creating item: ItemID, in library: any ItemLibrary, madeHere: Bool) -> CreateAnswer {
-        let refused = library.wasRefused(creating: item) || library.syncReport.problems.contains {
-            $0.itemID == item && $0.change == .create && $0.kind == .refused
-        }
-        if refused { return .refused }
-        guard let held = library.item(item) else {
-            // A create this run made may not be in the copy yet; one from an earlier run that is not there never
-            // reached it.
-            return madeHere ? .waiting : .refused
-        }
+    static func answer(creating item: ItemID, in library: any ItemLibrary) -> CreateAnswer {
+        if library.refusedCreates.contains(item) { return .refused }
+        // Only Marfa's refusal gives a draft back. A create not in the copy may be on its way, so it waits.
+        guard let held = library.item(item) else { return .waiting }
         switch held.sync {
         case .waiting, .blocked: return .waiting
         case .settled, .conflicted, .refused: return .accepted
@@ -255,15 +245,16 @@ final class NewItemDrafts {
         if !keepingClaim { claimed.remove(id) }
         if keepingClaim, let entry = entries[id] { pending[id] = (entry.slot, entry.library, entry.draft) }
         guard entries.removeValue(forKey: id) != nil else { return }
-        sentHere.remove(id)
         save()
     }
 
     /// Writes every draft at once, whole, so a quit or a crash keeps what was last typed. A write that fails is told
-    /// once, and tried again at the next change.
-    private func save() {
-        guard let file else { return }
-        let stored = entries.values.sorted { $0.updated < $1.updated }.map(StoredEntry.init)
+    /// once, and tried again at the next change. A draft whose library has not read its instance yet stays in memory,
+    /// since no later run could tell which library it is for.
+    @discardableResult
+    private func save() -> Bool {
+        guard let file else { return true }
+        let stored = entries.values.filter { !$0.library.isEmpty }.sorted { $0.updated < $1.updated }.map(StoredEntry.init)
         do {
             if blocked { throw CocoaError(.fileReadNoPermission) }
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -273,13 +264,15 @@ final class NewItemDrafts {
                 try JSONEncoder().encode(stored).write(to: file, options: .atomic)
             }
             failing = false
+            return true
         } catch {
             Telemetry.logger(.navigation).error("New item drafts not written: \(error.localizedDescription)")
-            guard !failing else { return }
+            guard !failing else { return false }
             failing = true
             notices?.tell(
                 String(localized: "New Items Not Saved"),
                 String(localized: "The app can’t save what you type in new items on this Mac, so it would be lost if the app quit. It keeps trying."))
+            return false
         }
     }
 
@@ -323,7 +316,7 @@ private struct StoredEntry: Codable {
     var files: [String]
     var tags: [String]
     var feed: Bool
-    var sources: [String: StoredSource]
+    var marks: [StoredMark]
     var declined: [String]
     var setAside: [String: StoredValue]
     var setAsideParent: ItemID?
@@ -345,7 +338,7 @@ private struct StoredEntry: Codable {
         declinedPrefill = draft.declinedPrefill
         parentID = draft.parentID
         chips = draft.chips.map(\.stored)
-        sources = Dictionary(uniqueKeysWithValues: draft.sources.map { ($0.key.stored, StoredSource(words: $0.value.words, offset: $0.value.offset)) })
+        marks = draft.marks.map { StoredMark(lower: $0.range.lowerBound, upper: $0.range.upperBound, words: $0.words, chip: $0.chip.stored) }
         declined = draft.declined
         files = draft.files.map { $0.url.path(percentEncoded: false) }
         tags = draft.tags
@@ -365,8 +358,10 @@ private struct StoredEntry: Codable {
         draft.declinedPrefill = declinedPrefill
         draft.parentID = parentID
         draft.chips = chips.map(QuickAdd.Chip.init(stored:))
-        for (chip, source) in sources {
-            draft.sources[QuickAdd.Chip(stored: chip)] = QuickAdd.Source(words: source.words, offset: source.offset)
+        // A mark that no longer fits the title it was kept with is left out, so Add never takes the wrong words.
+        draft.marks = marks.compactMap { mark in
+            guard mark.lower >= 0, mark.lower <= mark.upper, mark.upper <= title.count else { return nil }
+            return QuickAdd.Mark(range: mark.lower..<mark.upper, words: mark.words, chip: QuickAdd.Chip(stored: mark.chip))
         }
         draft.declined = declined
         var missing: [String] = []
@@ -384,10 +379,12 @@ private struct StoredEntry: Codable {
     }
 }
 
-/// The words a chip was read from, as the file holds them.
-private struct StoredSource: Codable {
+/// The typed words a chosen chip was read from, as the file holds them.
+private struct StoredMark: Codable {
+    var lower: Int
+    var upper: Int
     var words: String
-    var offset: Int
+    var chip: String
 }
 
 extension QuickAdd.Chip {

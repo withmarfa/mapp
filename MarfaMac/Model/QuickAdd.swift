@@ -88,11 +88,13 @@ final class QuickAdd {
         case tag(String)
     }
 
-    /// The words on the line a chip was read from, and where they stood in the title, so Delete can put them back.
-    struct Source: Equatable {
+    /// A word typed on the line that a chip chosen for it stands for, as `@lis` for the parent chosen while it was
+    /// typed. The word stays in the title, which Add takes out where it then stands.
+    struct Mark: Equatable {
+        /// Where the word stands in the title, in characters, moved with each edit before it.
+        var range: Range<Int>
         let words: String
-        /// How many characters of the title stood before the words.
-        let offset: Int
+        let chip: Chip
     }
 
     struct Draft: Equatable {
@@ -118,9 +120,9 @@ final class QuickAdd {
         /// Where the item goes: the Library, or the Feed. It starts as the place the panel opened in says
         /// (`QuickAdd.startingTier`), and the In row changes it.
         var tier: Tier = .library
-        /// The words each chip on the line was read from (`QuickAdd.Source`), which Delete puts back into the title.
-        var sources: [Chip: Source] = [:]
-        /// Words the person put back into the title from a chip, which the line no longer reads.
+        /// The words on the line that chips chosen for them stand for (`QuickAdd.Mark`).
+        var marks: [Mark] = []
+        /// Words the person told the line not to read, by Delete on their chip, which stay text.
         var declined: [String] = []
         /// Values typed for fields the kind now lacks, by key, kept and not sent, which come back when the kind
         /// changes to one that has the field.
@@ -195,10 +197,11 @@ final class QuickAdd {
             add(.tag(tag))
         }
 
-        /// Takes a chip and its value out, and the words it was read from.
+        /// Takes a chip and its value out. A word on the line it stood for stays, as text the line no longer reads.
         private mutating func takeOut(_ chip: Chip) {
             chips.removeAll { $0 == chip }
-            sources[chip] = nil
+            for mark in marks where mark.chip == chip && !declined.contains(mark.words) { declined.append(mark.words) }
+            marks.removeAll { $0.chip == chip }
             switch chip {
             case .parent: parentID = nil
             case .field(let key):
@@ -209,41 +212,61 @@ final class QuickAdd {
             }
         }
 
-        /// Delete on a chip of the line. A chip read from words takes its value out and puts the words back in the
-        /// title where they stood, as text the line no longer reads, so nothing typed is lost. A chip chosen from a
-        /// row goes, unless it holds a value the person set in its panel, which stays. Returns whether it went.
+        /// Delete on a chip of the line: a chip read from words stops being read, and a chosen one goes, unless it
+        /// holds a value the person set in its panel. Every word typed stays in the title. Returns whether it changed
+        /// anything.
         @discardableResult
-        mutating func putBack(_ chip: Chip) -> Bool {
-            if let source = sources[chip] {
+        mutating func decline(_ chip: Chip, readFrom words: [String]) -> Bool {
+            var changed = false
+            for phrase in words where !declined.contains(phrase) {
+                declined.append(phrase)
+                changed = true
+            }
+            let chosen = switch chip {
+            case .parent: parentID != nil
+            case .field(let key): chips.contains(chip) && typedProperties[key] == nil
+            case .tag(let tag): tags.contains(tag)
+            }
+            if chosen {
                 takeOut(chip)
-                insert(source.words, at: source.offset)
-                if !declined.contains(source.words) { declined.append(source.words) }
-                return true
+                changed = true
             }
-            if case .field(let key) = chip, typedProperties[key] != nil { return false }
-            takeOut(chip)
-            return true
+            return changed
         }
 
-        /// Empties the line's chips read from words, as emptying the title does: their words went with the text.
-        mutating func dropReadChips() {
-            for chip in Array(sources.keys) { takeOut(chip) }
-            declined = []
+        /// Moves each mark with an edit of the title from `old`: one before the edit stays, one after it moves with
+        /// it, and one the edit reached, or joined to without a space, is gone, so its words are text again.
+        mutating func followMarks(from old: String) {
+            guard !marks.isEmpty, old != title else { return }
+            let before = Array(old)
+            let after = Array(title)
+            var prefix = 0
+            while prefix < before.count, prefix < after.count, before[prefix] == after[prefix] { prefix += 1 }
+            var suffix = 0
+            while suffix < before.count - prefix, suffix < after.count - prefix,
+                  before[before.count - 1 - suffix] == after[after.count - 1 - suffix] { suffix += 1 }
+            let editEnd = before.count - suffix
+            let shift = after.count - before.count
+            let inserted = after[prefix..<(after.count - suffix)]
+            marks = marks.compactMap { mark in
+                if mark.range.upperBound < prefix || (mark.range.upperBound == prefix && inserted.first?.isWhitespace != false) {
+                    return mark
+                }
+                guard mark.range.lowerBound > editEnd || (mark.range.lowerBound == editEnd && inserted.last?.isWhitespace != false)
+                else { return nil }
+                var moved = mark
+                moved.range = (mark.range.lowerBound + shift)..<(mark.range.upperBound + shift)
+                return moved
+            }
         }
 
-        /// Puts `words` into the title at `offset`, moved on to the end of any word it falls in, with a space either
-        /// side where the title has none.
-        private mutating func insert(_ words: String, at offset: Int) {
-            var at = title.index(title.startIndex, offsetBy: min(max(offset, 0), title.count))
-            while at > title.startIndex, at < title.endIndex, !title[at].isWhitespace, !title[title.index(before: at)].isWhitespace {
-                at = title.index(after: at)
+        /// Whether the draft still holds the chip a mark stands for, in `catalogue`'s fields for its kind.
+        func holds(_ chip: Chip, in catalogue: Catalogue) -> Bool {
+            switch chip {
+            case .parent: parentID != nil
+            case .field(let key): chips.contains(chip) && QuickAdd.fields(of: typeID, in: catalogue).contains { $0.key == key }
+            case .tag(let tag): tags.contains(tag)
             }
-            let before = title[..<at]
-            let after = title[at...]
-            var piece = words
-            if let last = before.last, !last.isWhitespace { piece = " " + piece }
-            if let first = after.first, !first.isWhitespace { piece += " " }
-            title = String(before) + piece + after
         }
     }
 
@@ -659,6 +682,8 @@ extension Browser {
     /// place says (`QuickAdd.startingTier`). A kind the line cannot make whole (`QuickAdd.lineOffers`) opens the
     /// text form.
     func openNewItem(kind: String? = nil, title: String = "", form: QuickAdd.Form? = nil, in library: any ItemLibrary) {
+        // A draft is kept for one instance, so none is begun before the library knows which it reads.
+        guard QuickAdd.isAvailable(in: library) else { return }
         let interval = Telemetry.begin(.navigation, "quickAdd.open")
         defer { interval.end() }
         palette = nil
@@ -701,8 +726,13 @@ extension Browser {
         return true
     }
 
-    /// Moves the draft from the line to the text form, as Add Text does, with everything typed.
-    func handOverToTextForm() {
+    /// Moves the draft from the line to the text form, as Add Text does, with everything typed. The text form reads
+    /// no words, so what the line read leaves the title for its tokens, as at Add (`QuickAdd.finishLine`).
+    func handOverToTextForm(in library: any ItemLibrary, now: Date = .now, calendar: Calendar = .current, locale: Locale = .current) {
+        if quickAdd.form == .line, var draft = quickAdd.draft {
+            QuickAdd.finishLine(&draft, in: library, now: now, calendar: calendar, locale: locale)
+            if draft != quickAdd.draft { quickAdd.draft = draft }
+        }
         quickAdd.form = .text
         quickAdd.lastAdded = nil
     }
@@ -786,17 +816,18 @@ extension Browser {
         in library: any ItemLibrary, undoManager: UndoManager?, opening: Bool = true, toasts: ToastPresenter? = nil,
         now: Date = .now, calendar: Calendar = .current, locale: Locale = .current
     ) async -> ItemID? {
-        if quickAdd.form == .line, var lined = quickAdd.draft {
-            QuickAdd.finishLine(&lined, in: library, now: now, calendar: calendar, locale: locale)
-            if lined != quickAdd.draft { quickAdd.draft = lined }
+        // The line's words stay as typed until the item is made; only what is sent has the read words taken out.
+        guard let typed = quickAdd.draft else { return nil }
+        var draft = typed
+        if quickAdd.form == .line {
+            QuickAdd.finishLine(&draft, in: library, now: now, calendar: calendar, locale: locale)
             // A required value the line has no place for is asked for by the text form, with everything typed.
-            if !QuickAdd.missingRequired(lined, in: library.catalogue).isEmpty {
-                handOverToTextForm()
+            if !QuickAdd.missingRequired(draft, in: library.catalogue).isEmpty {
+                handOverToTextForm(in: library, now: now, calendar: calendar, locale: locale)
                 return nil
             }
         }
-        guard let draft = quickAdd.draft, !quickAdd.isSaving, QuickAdd.canSave(draft, in: library), quickAdd.unfinishedLists.isEmpty
-        else { return nil }
+        guard !quickAdd.isSaving, QuickAdd.canSave(draft, in: library), quickAdd.unfinishedLists.isEmpty else { return nil }
         let missing = draft.files.filter { !$0.isOnDisk }
         guard missing.isEmpty else {
             quickAdd.draft?.files.removeAll { missing.contains($0) }
@@ -821,7 +852,7 @@ extension Browser {
             quickAdd.checking(parent: false)
             // Text typed while the core was asked stays as typed; nothing is made from the draft as it was. A draft
             // that left the window is kept already.
-            guard quickAdd.draft == draft else {
+            guard quickAdd.draft == typed else {
                 if quickAdd.draft != nil {
                     library.notices.tell(
                         String(localized: "Item Not Added"),
@@ -841,9 +872,10 @@ extension Browser {
         var startsGroup = undoManager?.groupingLevel == 0
         let id: ItemID?
         if isFile, let file = draft.files.first {
-            quickAdd.saving(draft)
+            quickAdd.saving(typed)
             let title = NameText.trimmed(draft.title)
-            id = await library.addFile(file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, tier: draft.tier)
+            id = await library.addFile(
+                file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, tier: draft.tier, tags: draft.tags)
             quickAdd.saving(nil)
             guard let id else {
                 quickAdd.notCreated()
@@ -856,7 +888,7 @@ extension Browser {
             library.registerNewItemUndo(id, undoManager: undoManager)
             if opensGroup { undoManager?.endUndoGrouping() }
             // The person may have changed the draft while the file was sent; only the file sent is taken from it.
-            guard quickAdd.draft == draft else {
+            guard quickAdd.draft == typed else {
                 quickAdd.notCreated()
                 quickAdd.draft?.files.removeAll { $0 == file }
                 return id
@@ -864,7 +896,12 @@ extension Browser {
         } else {
             // Kept as sent before it is made, so a crash or a held-up write never makes it twice.
             let made = ItemID.mint(at: now)
-            guard quickAdd.willCreate(made) else { return nil }
+            guard quickAdd.willCreate(made) else {
+                library.notices.tell(
+                    String(localized: "Item Not Added"),
+                    String(localized: "The app couldn’t save the new item on this Mac before sending it, so nothing was added. What you typed is still there. Try again."))
+                return nil
+            }
             let opensGroup = startsGroup && undoManager?.groupsByEvent == false
             if opensGroup { undoManager?.beginUndoGrouping() }
             id = library.createItem(

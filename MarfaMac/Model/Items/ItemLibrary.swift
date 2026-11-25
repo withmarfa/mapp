@@ -205,10 +205,10 @@ protocol ItemLibrary: AnyObject, Observable {
         as id: ItemID, typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String],
         parentID: ItemID?, tier: Tier, undoManager: UndoManager?
     ) -> ItemID?
-    /// Adds the file at `file` as an item of its own, of the file type its media type calls for, titled `title` or by its name, under `parentID`
+    /// Adds the file at `file` as an item of its own, of the file type its media type calls for, titled `title` or by its name, with `tags`, under `parentID`
     /// where one is given. The file is read where it is while this runs. Nil when it could not be added, and the
     /// library tells the person why.
-    func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier) async -> ItemID?
+    func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier, tags: [String]) async -> ItemID?
     /// Registers the step that undoes adding the item `id`, named and run as a created item's is, for a file added
     /// where a person would undo it.
     func registerNewItemUndo(_ id: ItemID, undoManager: UndoManager?)
@@ -222,9 +222,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Sends at once any typed text the library holds back to send fewer writes, as every hand-over of the pages
     /// ends with, so nothing typed before a hand-over still waits after it.
     func sendWaitingText()
-    /// Whether the create of `id` was refused before the library held the item, so the window has no item to open and the
-    /// library has told the person. A library that refuses a create at once answers nil from `createItem` instead.
-    func wasRefused(creating id: ItemID) -> Bool
+    /// The creates Marfa refused after `createItem` answered, before or after the library showed the item, which the
+    /// library has told the person of. A library that refuses a create at once answers nil from `createItem` instead.
+    var refusedCreations: Set<ItemID> { get }
     @discardableResult
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool
     /// Several properties of one item in one edit and one undo step named `actionName`, each given its value or, where
@@ -349,6 +349,10 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     var namesRevision: Int { membershipRevision }
+    /// Every create Marfa refused for good: those refused as they were sent, and those the copy lists as refused.
+    var refusedCreates: Set<ItemID> {
+        refusedCreations.union(syncReport.problems.compactMap { $0.change == .create && $0.kind == .refused ? $0.itemID : nil })
+    }
     var serverKey: String { "" }
     func headerItem(_ id: ItemID) -> Item? { item(id) }
     func itemVersion(_ id: ItemID) -> ItemVersion? { item(id)?.version }

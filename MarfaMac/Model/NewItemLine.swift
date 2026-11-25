@@ -78,81 +78,85 @@ extension QuickAdd {
         return fields.first { catalogue.isDueDate($0, of: type) } ?? fields.first { catalogue.isStartDate($0, of: type) }
     }
 
-    /// The day the line's words name for the draft's kind, while the person has not put its words back and its field
-    /// holds no value of their own.
-    static func foundDay(
-        in draft: Draft, catalogue: Catalogue, now: Date, calendar: Calendar, locale: Locale
-    ) -> (field: ItemTypeInfo.Field, day: NewItemText.FoundDay)? {
-        guard let field = dayField(of: draft.typeID, in: catalogue), draft.typedProperties[field.key] == nil,
-              let day = NewItemText.day(in: draft.title, now: now, calendar: calendar, locale: locale),
-              !draft.declined.contains(day.phrase)
-        else { return nil }
-        return (field, day)
+    /// Something the line reads in its words as a chip: a tag, a day or a web address, where it stands in the title.
+    struct ReadWord: Equatable {
+        let chip: Chip
+        /// Where the words stand in the title, in characters.
+        let range: Range<Int>
+        let words: String
+        /// The value it gives its field; nil for a tag.
+        let value: PropertyValue?
     }
 
-    /// Takes the finished tags out of the line's words into the draft's tags, each a chip that remembers its words.
-    /// `finishing` (Add) takes a tag at the very end too. A word the library would refuse as a tag stays text, as does
-    /// one the person put back.
-    static func takeTags(_ draft: inout Draft, finishing: Bool, in library: any ItemLibrary) {
-        let declined = draft.declined
-        let text = draft.title
-        let taken = NewItemText.takeTags(from: text, finishing: finishing) { !takesTag($0, in: library) || declined.contains("#" + $0) }
-        guard !taken.tags.isEmpty else { return }
-        draft.title = taken.text
-        // Where each tag stood in the text left, counting what the tags before it took out.
-        var removed = 0
-        var searchFrom = text.startIndex
-        for tag in taken.tags {
-            let words = "#" + tag
-            var offset = taken.text.count
-            if let range = wordRange(of: words, in: text, from: searchFrom) {
-                offset = text.distance(from: text.startIndex, to: range.lowerBound) - removed
-                removed += words.count + (range.upperBound < text.endIndex && text[range.upperBound].isWhitespace ? 1 : 0)
-                searchFrom = range.upperBound
+    /// What the line reads in the draft's title, which stays as typed: each tag finished (or, with `finishing`, at
+    /// the very end too), a bookmark's web address, and the day for the kind's day field (`dayField`). Words the
+    /// person declined, words a chosen chip stands for (`Draft.marks`), a tag the library would refuse, and a field
+    /// holding a value of the person's are not read.
+    static func lineReads(
+        _ draft: Draft, finishing: Bool, in library: any ItemLibrary, now: Date, calendar: Calendar, locale: Locale
+    ) -> [ReadWord] {
+        let catalogue = library.catalogue
+        let title = draft.title
+        let characters = Array(title)
+        var taken = draft.marks.map(\.range)
+        func isFree(_ range: Range<Int>, _ words: String) -> Bool {
+            !draft.declined.contains(words) && !taken.contains { $0.overlaps(range) }
+        }
+        var reads: [ReadWord] = []
+        for found in NewItemText.tags(in: title, finishing: finishing, refuses: { !takesTag($0, in: library) }) {
+            let words = String(characters[found.range])
+            guard isFree(found.range, words) else { continue }
+            reads.append(ReadWord(chip: .tag(found.tag), range: found.range, words: words, value: nil))
+            taken.append(found.range)
+        }
+        if let field = catalogue.bookmarkAddress(of: TypeID(draft.typeID)), draft.typedProperties[field.key] == nil,
+           let address = NewItemText.firstWebAddress(in: title) {
+            let words = String(characters[address.range])
+            if isFree(address.range, words) {
+                reads.append(ReadWord(chip: .field(field.key), range: address.range, words: words, value: .string(address.url.absoluteString)))
+                taken.append(address.range)
             }
-            if !draft.tags.contains(tag) { draft.sources[.tag(tag)] = Source(words: words, offset: max(0, offset)) }
-            draft.addTag(tag)
+        }
+        if let field = dayField(of: draft.typeID, in: catalogue), draft.typedProperties[field.key] == nil,
+           let day = NewItemText.day(in: title, now: now, calendar: calendar, locale: locale), isFree(day.range, day.phrase) {
+            reads.append(ReadWord(
+                chip: .field(field.key), range: day.range, words: day.phrase,
+                value: NewItemText.value(of: day, in: field, calendar: calendar)))
+        }
+        return reads
+    }
+
+    /// The draft with what the line reads set as its values and tags, and its title as typed, as its chips show it.
+    static func withReads(_ draft: Draft, _ reads: [ReadWord]) -> Draft {
+        var read = draft
+        for word in reads { apply(word, to: &read) }
+        return read
+    }
+
+    private static func apply(_ word: ReadWord, to draft: inout Draft) {
+        switch word.chip {
+        case .tag(let tag): draft.addTag(tag)
+        case .field(let key):
+            draft.properties[key] = word.value
+            draft.add(.field(key))
+        case .parent: break
         }
     }
 
-    /// Where `words` first stand as a word of their own in `text`, from `start`.
-    private static func wordRange(of words: String, in text: String, from start: String.Index) -> Range<String.Index>? {
-        var from = start
-        while let range = text.range(of: words, range: from..<text.endIndex) {
-            if range.lowerBound == text.startIndex || text[text.index(before: range.lowerBound)].isWhitespace { return range }
-            from = range.upperBound
-        }
-        return nil
-    }
-
-    /// Takes a day the words name out of the title into its field, as a chip that remembers its words, once the
-    /// person has typed a whole word after it, so a day still being typed (`Fri 27`) is not cut short. `finishing`
-    /// (Add) takes it wherever it stands.
-    static func takeDay(_ draft: inout Draft, finishing: Bool, in catalogue: Catalogue, now: Date, calendar: Calendar, locale: Locale) {
-        guard let found = foundDay(in: draft, catalogue: catalogue, now: now, calendar: calendar, locale: locale) else { return }
-        if !finishing {
-            let after = draft.title.dropFirst(found.day.range.upperBound)
-            guard after.first?.isWhitespace == true else { return }
-            let next = after.drop { $0.isWhitespace }
-            guard let end = next.firstIndex(where: \.isWhitespace), end > next.startIndex else { return }
-        }
-        let removed = NewItemText.removing(found.day, from: draft.title)
-        guard removed != draft.title else { return }
-        draft.title = removed
-        draft.properties[found.field.key] = NewItemText.value(of: found.day, in: found.field, calendar: calendar)
-        draft.sources[.field(found.field.key)] = Source(words: found.day.phrase, offset: found.day.range.lowerBound)
-        draft.add(.field(found.field.key))
-    }
-
-    /// The chips the line shows after its title, in the order they were made: the tags, the parent and the fields
-    /// the person added or the line read. A field the kind does not have is never shown.
-    static func lineChips(_ draft: Draft, in catalogue: Catalogue) -> [Chip] {
+    /// The chips the line shows after its title: those read from its words and those chosen for a word, in the
+    /// order their words stand; then the chips chosen from a row, in the order chosen. A field the kind does not have
+    /// is never shown.
+    static func lineChips(_ draft: Draft, reads: [ReadWord], in catalogue: Catalogue) -> [Chip] {
+        var placed = reads.map { (chip: $0.chip, at: $0.range.lowerBound) }
+        for mark in draft.marks where draft.holds(mark.chip, in: catalogue) { placed.append((mark.chip, mark.range.lowerBound)) }
+        var shown: [Chip] = []
+        for entry in placed.sorted(by: { $0.at < $1.at }) where !shown.contains(entry.chip) { shown.append(entry.chip) }
         let keys = Set(fields(of: draft.typeID, in: catalogue).map(\.key))
-        var shown = draft.chips.filter { chip in
+        for chip in draft.chips where !shown.contains(chip) {
             switch chip {
-            case .parent: draft.parentID != nil
-            case .field(let key): keys.contains(key)
-            case .tag(let tag): draft.tags.contains(tag)
+            case .parent: if draft.parentID != nil { shown.append(chip) }
+            case .field(let key): if keys.contains(key) { shown.append(chip) }
+            case .tag(let tag): if draft.tags.contains(tag) { shown.append(chip) }
             }
         }
         for tag in draft.tags where !shown.contains(.tag(tag)) { shown.append(.tag(tag)) }
@@ -160,20 +164,30 @@ extension QuickAdd {
         return shown
     }
 
+    /// The marked word being typed at the end of the title, unless a chip was chosen for it or the person declined it.
+    static func lineTyping(_ draft: Draft) -> NewItemText.Typing? {
+        guard let typing = NewItemText.typing(in: draft.title) else { return nil }
+        let range = typing.before.count..<draft.title.count
+        let words = String(draft.title.dropFirst(typing.before.count))
+        guard !draft.declined.contains(words), !draft.marks.contains(where: { $0.range.overlaps(range) }) else { return nil }
+        return typing
+    }
+
     /// Keeps Favorite and tags set by the library out of parsing and suggestions.
     static func takesTag(_ word: String, in library: any ItemLibrary) -> Bool {
         NewItemText.isTag(word) && word != ItemTag.favorite && !library.reservedTags.contains(word)
     }
 
-    /// What the tag row offers for the word after `#`: up to six tags the library knows, the recent first, and the word
-    /// itself as a new tag, only where the line would take it.
+    /// What the tag row offers for the word after `#`: up to six tags the library knows, the one typed exactly first,
+    /// then the recent, and the word itself as a new tag, only where the line would take it.
     static func tagOffers(
         _ query: String, draft: Draft, recents: [String], in library: any ItemLibrary
     ) -> (known: [String], new: String?) {
         let all = recents + library.knownTags.filter { !recents.contains($0) }
-        let known = all.filter { tag in
+        var known = all.filter { tag in
             (query.isEmpty || tag.localizedStandardContains(query)) && !draft.tags.contains(tag) && takesTag(tag, in: library)
         }
+        if let exact = known.firstIndex(of: query), exact > 0 { known.insert(known.remove(at: exact), at: 0) }
         let new = !query.isEmpty && !known.contains(query) && !draft.tags.contains(query) && takesTag(query, in: library) ? query : nil
         return (Array(known.prefix(6)), new)
     }
@@ -206,12 +220,20 @@ extension QuickAdd {
         return Array((leading.sorted { $0.rank < $1.rank }.map(\.item) + rest).prefix(limit))
     }
 
-    /// The draft as the line's Add sends it: the last tag taken, and a day found written to its field with its words
-    /// taken out of the title.
+    /// The draft as it leaves the line, at Add or for the text form: what the line reads set as values and tags,
+    /// and those words, and the words of each chip chosen for a word that the draft still holds, taken out of the
+    /// title where they stand now. A word whose chip the kind cannot hold stays.
     static func finishLine(_ draft: inout Draft, in library: any ItemLibrary, now: Date, calendar: Calendar, locale: Locale) {
-        takeTags(&draft, finishing: true, in: library)
-        takeDay(&draft, finishing: true, in: library.catalogue, now: now, calendar: calendar, locale: locale)
-        draft.title = NameText.trimmed(draft.title)
+        let reads = lineReads(draft, finishing: true, in: library, now: now, calendar: calendar, locale: locale)
+        let characters = Array(draft.title)
+        var ranges = reads.map(\.range)
+        for mark in draft.marks where draft.holds(mark.chip, in: library.catalogue) && mark.range.upperBound <= characters.count
+            && String(characters[mark.range]) == mark.words {
+            ranges.append(mark.range)
+        }
+        for word in reads { apply(word, to: &draft) }
+        draft.title = NameText.trimmed(NewItemText.removing(ranges, from: draft.title))
+        draft.marks = []
     }
 
     /// The bookmark kind a pasted web address makes, among the kinds the line offers, and its address field.
@@ -240,59 +262,60 @@ extension QuickAdd {
 }
 
 extension Browser {
-    /// What the line does with the words as they change. A web address pasted into an empty line makes the item a
-    /// bookmark of it; each finished tag, and a day once a word follows it, leave the words for a chip after them.
-    /// Emptying the title in one edit, as Select All and Delete does, takes out the chips read from it; a single
-    /// Delete that empties it does not, so the next Delete can put the last chip's words back (`putBackLineChip`).
-    func lineTextChanged(
-        from old: String, in library: any ItemLibrary, now: Date = .now, calendar: Calendar = .current, locale: Locale = .current
-    ) {
+    /// What the line does with the words as they change: they stay as typed, and the chips follow what they read.
+    /// Each chosen chip's word moves with the edit, or is text again where the edit reached it. A web address pasted
+    /// into an empty line makes the item a bookmark of it.
+    func lineTextChanged(from old: String, in library: any ItemLibrary) {
         guard var draft = quickAdd.draft else { return }
-        if NameText.trimmed(draft.title).isEmpty, old.count > 1 { draft.dropReadChips() }
-        let pasted = NameText.trimmed(draft.title)
-        if NameText.trimmed(old).isEmpty, let address = NewItemText.webAddress(draft.title), let bookmark = QuickAdd.bookmarkKind(in: library),
-           draft.properties[bookmark.field.key] == nil, !draft.declined.contains(pasted) {
-            if draft.typeID != bookmark.typeID {
-                quickAdd.draft = draft
-                chooseQuickAddType(bookmark.typeID, in: library)
-                draft = quickAdd.draft ?? draft
-            }
-            draft.properties[bookmark.field.key] = .string(address.absoluteString)
-            draft.sources[.field(bookmark.field.key)] = QuickAdd.Source(words: pasted, offset: 0)
-            draft.add(.field(bookmark.field.key))
-            draft.title = ""
+        draft.followMarks(from: old)
+        if NameText.trimmed(old).isEmpty, NewItemText.webAddress(draft.title) != nil, let bookmark = QuickAdd.bookmarkKind(in: library),
+           draft.typeID != bookmark.typeID, draft.typedProperties[bookmark.field.key] == nil,
+           !draft.declined.contains(NameText.trimmed(draft.title)) {
+            quickAdd.draft = draft
+            chooseQuickAddType(bookmark.typeID, in: library)
+            return
         }
-        QuickAdd.takeDay(&draft, finishing: false, in: library.catalogue, now: now, calendar: calendar, locale: locale)
-        QuickAdd.takeTags(&draft, finishing: false, in: library)
         if draft != quickAdd.draft { quickAdd.draft = draft }
     }
 
-    /// Delete on a chip of the line, or at the start of its title on the last chip: the chip goes, and the words it
-    /// was read from go back into the title (`QuickAdd.Draft.putBack`). Returns whether a chip went.
+    /// Delete on a chip of the line: the line stops reading its words, which stay in the title, and a chosen chip
+    /// goes (`QuickAdd.Draft.decline`). Returns whether anything changed.
     @discardableResult
-    func putBackLineChip(_ chip: QuickAdd.Chip? = nil, in library: any ItemLibrary) -> Bool {
-        guard var draft = quickAdd.draft,
-              let chip = chip ?? QuickAdd.lineChips(draft, in: library.catalogue).last,
-              draft.putBack(chip)
-        else { return false }
+    func declineLineChip(
+        _ chip: QuickAdd.Chip, in library: any ItemLibrary, now: Date = .now, calendar: Calendar = .current, locale: Locale = .current
+    ) -> Bool {
+        guard var draft = quickAdd.draft else { return false }
+        let reads = QuickAdd.lineReads(draft, finishing: false, in: library, now: now, calendar: calendar, locale: locale)
+        guard draft.decline(chip, readFrom: reads.filter { $0.chip == chip }.map(\.words)) else { return false }
         quickAdd.draft = draft
         return true
     }
 
-    /// Puts a tag, a parent or a property chosen from the line's rows in place of the marked word being typed.
+    /// Adds a tag, a parent or a property chosen from the line's rows. Chosen for the marked word being typed, the
+    /// chip stands for that word, which stays in the title until Add.
     func chooseLineMatch(_ choice: LineChoice, in library: any ItemLibrary) {
         guard var draft = quickAdd.draft else { return }
-        if let typing = NewItemText.typing(in: draft.title) { draft.title = typing.before }
+        let typing = QuickAdd.lineTyping(draft)
+        let chip: QuickAdd.Chip
+        let mark: NewItemText.Mark
         switch choice {
         case .tag(let tag):
             guard QuickAdd.takesTag(tag, in: library) else { return }
             draft.addTag(tag)
-        case .parent(let id): draft.setParent(id)
-        case .field(let key): draft.add(.field(key))
+            (chip, mark) = (.tag(tag), .tag)
+        case .parent(let id):
+            draft.setParent(id)
+            (chip, mark) = (.parent, .parent)
+        case .field(let key):
+            draft.add(.field(key))
+            (chip, mark) = (.field(key), .property)
         case .kind(let typeID):
-            quickAdd.draft = draft
             chooseQuickAddType(typeID, in: library)
             return
+        }
+        if let typing, typing.mark == mark {
+            let range = typing.before.count..<draft.title.count
+            draft.marks.append(QuickAdd.Mark(range: range, words: String(draft.title.dropFirst(typing.before.count)), chip: chip))
         }
         quickAdd.draft = draft
     }

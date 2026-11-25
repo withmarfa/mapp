@@ -440,6 +440,8 @@ struct MainView: View {
         .onChange(of: newItemIsSettled) {
             if newItemIsSettled { browser.finishNewItems(in: library) }
         }
+        // Marfa can refuse a create after the copy showed its row, which gives the draft back to the line.
+        .onChange(of: library.refusedCreates) { browser.finishNewItems(in: library) }
         // The files the new item attached go at the end of the new item's text, once the page shows it.
         .onChange(of: browser.newEmbeds) {
             guard let attached = browser.newEmbeds else { return }

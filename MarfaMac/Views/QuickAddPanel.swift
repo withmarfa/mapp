@@ -107,12 +107,17 @@ struct QuickAddPanel: View {
         .onAppear { returnFocus = editor.isFocused ? .page : .list }
         .defaultFocus($focus, .title)
         .task {
+            let handed = quickAdd.draft?.title
             // Asked any sooner, the field is not yet in the window and the list keeps the keyboard.
             try? await Task.sleep(for: .milliseconds(50))
             focus = .title
-            // A field that takes the keyboard selects its words; the caret goes after them, as the line left it.
+            // A field that takes the keyboard selects its words; the caret goes after them, as the line left it,
+            // unless the person typed or moved the caret meanwhile.
             try? await Task.sleep(for: .milliseconds(10))
-            if let title = quickAdd.draft?.title { titleSelection = TextSelection(insertionPoint: title.endIndex) }
+            guard let title = quickAdd.draft?.title, title == handed else { return }
+            if let titleSelection, case .selection(let range) = titleSelection.indices,
+               range != title.startIndex..<title.endIndex { return }
+            titleSelection = TextSelection(insertionPoint: title.endIndex)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("New Item")

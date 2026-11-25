@@ -1049,16 +1049,16 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.attaching.attached.withLock { $0.map(\.file) } == ["plan.pdf"])
 
         let id = await library.addFile(
-            disk.url("photo.png", "png"), title: "Holiday", parentID: F.p1, tier: .feed)
+            disk.url("photo.png", "png"), title: "Holiday", parentID: F.p1, tier: .feed, tags: ["trip"])
         #expect(id != nil)
         let added = try #require(source.attaching.added.withLock { $0.first })
         #expect(added.file == "photo.png" && added.data == Data("png".utf8))
-        #expect(added.title == "Holiday" && added.tier == .feed && added.parent == F.p1)
+        #expect(added.title == "Holiday" && added.tier == .feed && added.tags == ["trip"] && added.parent == F.p1)
 
         source.attaching.failure.withLock { $0 = SourceFailure(kind: .failed, message: "No room.") }
         source.attaching.failures.withLock { $0["b.pdf"] = SourceFailure(kind: .failed, message: "No room.") }
         await #expect(throws: SourceFailure.self) { try await library.attach(file: disk.url("b.pdf"), to: F.n1) }
-        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, tier: .library) == nil)
+        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, tier: .library, tags: []) == nil)
         #expect(library.notices.waiting.last?.message == "No room.")
     }
 
@@ -1298,7 +1298,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: "hydration_incomplete", message: MarfaEngine.notCurrent))))
-        #expect(await eventually { library.wasRefused(creating: id) })
+        #expect(await eventually { library.refusedCreations.contains(id) })
         #expect(browser.isNewItemSettled(in: library))
         browser.finishNewItems(in: library)
 
