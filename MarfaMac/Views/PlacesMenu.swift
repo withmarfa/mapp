@@ -82,8 +82,8 @@ struct PlacesMenuView: View {
             }) {
                 label(row.entry.title, row.entry.icon)
             }
-            // The count at the row's end, as the sidebar draws it; none hides it.
-            .badge(row.count ?? 0)
+            // The count at the row's end, as the sidebar draws it, 0 among them; only none hides it.
+            .badge(row.count.map { Text($0, format: .number) })
         }
     }
 
