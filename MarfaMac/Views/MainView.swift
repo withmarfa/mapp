@@ -416,6 +416,8 @@ struct MainView: View {
         .libraryDialogs()
         .handlesFiles(in: browser, order: order)
         .deleteConfirmation(for: details)
+        .archiveQuestion(for: details)
+        .feedLimitQuestion(for: details)
         .savedViewDialogs(browser: browser, details: details)
     }
 

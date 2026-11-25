@@ -80,6 +80,10 @@ final class DetailsPresentation {
     var tagRequest: TagRequest?
     /// The items the window asks the person to confirm moving to Recently Deleted.
     var deletion: DeleteRequest?
+    /// The items the window asks whether to archive with what is under them.
+    var archiving: ArchiveRequest?
+    /// The items the window asks to confirm moving to the Feed, which would let them go.
+    var feedLimit: FeedLimitRequest?
     /// How long the question before moving several items waits for the server's preview before it is asked without one.
     static let previewDeadline: Duration = .milliseconds(1500)
     /// The latest question asked for; an answer for an earlier one is dropped.

@@ -54,6 +54,18 @@ extension ItemMove {
         }
     }
 
+    /// The moves a menu lists out of those `selectionCommands` offered, in the menu's order: Keep, Move to Feed, then
+    /// Archive, or Unarchive where nothing in the selection can be archived. A selection in both tiers lists both tier moves.
+    static func inMenu(_ offered: Set<ItemMove>) -> [ItemMove] {
+        var moves: [ItemMove] = [.keep, .moveToFeed].filter(offered.contains)
+        if offered.contains(.archive) {
+            moves.append(.archive)
+        } else if offered.contains(.unarchive) {
+            moves.append(.unarchive)
+        }
+        return moves
+    }
+
     /// The command's name, which its undo step carries.
     var name: String {
         switch self {
@@ -61,6 +73,16 @@ extension ItemMove {
         case .moveToFeed: String(localized: "Move to Feed")
         case .archive: String(localized: "Archive")
         case .unarchive: String(localized: "Unarchive")
+        }
+    }
+
+    /// The command's symbol, which its menu items and its toast draw.
+    var symbol: String {
+        switch self {
+        case .keep: "tray.and.arrow.down"
+        case .moveToFeed: "water.waves"
+        case .archive: "archivebox"
+        case .unarchive: "arrow.uturn.backward"
         }
     }
 
@@ -116,8 +138,8 @@ extension ItemLibrary {
     }
 
     /// The items among `ids` that Archive moves, every active item beneath them through `parent-of` at any depth,
-    /// and why the others do not move. An item already archived needs nothing, and one beneath that is archived or in
-    /// Recently Deleted is left as it is. `beneath` holds none of `archiving`.
+    /// and why the others do not move. An item already archived needs nothing and adds nothing beneath it, and one
+    /// beneath that is archived or in Recently Deleted is left as it is. `beneath` holds none of `archiving`.
     func archivePlan(_ ids: Set<ItemID>) -> (archiving: Set<ItemID>, beneath: Set<ItemID>, skips: BatchSkips) {
         var archiving = Set<ItemID>()
         var skips = BatchSkips()
@@ -131,8 +153,10 @@ extension ItemLibrary {
                 skips.skip(reason)
                 continue
             }
-            roots.append(id)
-            if item.state == .active { archiving.insert(id) }
+            if item.state == .active {
+                archiving.insert(id)
+                roots.append(id)
+            }
         }
         var beneath = Set<ItemID>()
         var seen = Set(roots)
@@ -179,8 +203,8 @@ extension ItemLibrary {
         return offered
     }
 
-    /// The question to ask before Move to Feed of `ids`. Nil for now: it waits for the type's feed window in the
-    /// catalogue (withmarfa/marfa#3560, withmarfa/marfa-swift#559), which `GET /types` alone does not give the copy.
+    /// Nil for now: the question waits for the type's feed window in the catalogue (withmarfa/marfa#3560,
+    /// withmarfa/marfa-swift#559), which `GET /types` alone does not give the copy.
     func feedLimitQuestion(for ids: Set<ItemID>) -> FeedLimitQuestion? { nil }
 
     /// A collection, a view or the app's settings stays in the Library.

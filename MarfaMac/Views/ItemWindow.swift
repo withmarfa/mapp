@@ -63,6 +63,7 @@ struct ItemWindow: View {
         }
         .modifier(ToolbarTrayWatch { isToolbarTrayOpen = $0 })
         .focusedSceneValue(\.detailsPresentation, details)
+        .toastOverlay()
         .environment(details)
         .modifier(CommandValuePanels(details: details))
         .modifier(FieldEditSheets(details: details))
@@ -91,6 +92,8 @@ struct ItemWindow: View {
             undoManager?.removeAllActions()
         }
         .libraryDialogs()
+        .archiveQuestion(for: details)
+        .feedLimitQuestion(for: details)
     }
 
     /// The item's page with its inspector, which Version History takes the place of.

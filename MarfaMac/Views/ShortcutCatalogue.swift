@@ -26,6 +26,9 @@ nonisolated extension ShortcutCommand {
     static let changeType = ShortcutCommand("changeType", in: .file, String(localized: "Change Type…"))
     static let customizeLayout = ShortcutCommand("customizeLayout", in: .file, String(localized: "Customize Layout…"))
     static let versionHistory = ShortcutCommand("versionHistory", in: .file, String(localized: "Version History…"))
+    static let keepInLibrary = ShortcutCommand("keepInLibrary", in: .file, String(localized: "Keep in Library"), "k", [.control, .command])
+    static let moveToFeed = ShortcutCommand("moveToFeed", in: .file, String(localized: "Move to Feed"))
+    static let archive = ShortcutCommand("archive", in: .file, String(localized: "Archive or Unarchive"), "a", [.control, .command])
     static let delete = ShortcutCommand("delete", in: .file, String(localized: "Delete"))
     static let exportPDF = ShortcutCommand("exportPDF", in: .file, String(localized: "Export as PDF…"))
     static let print = ShortcutCommand("print", in: .file, String(localized: "Print…"), "p")
@@ -91,7 +94,7 @@ nonisolated extension ShortcutCommand {
     static var all: [ShortcutCommand] {
         let commands: [ShortcutCommand] = [
             settings, newItem, newWindow, refresh, open, openAsModal, openAsFullPage, openInNewWindow, quickLook, openOriginal, openInBrowser,
-            favorite, addTag, changeType, customizeLayout, versionHistory, delete, exportPDF, print,
+            favorite, addTag, changeType, customizeLayout, versionHistory, keepInLibrary, moveToFeed, archive, delete, exportPDF, print,
             copyLink, addAttachment, searchItems, commandPalette, paletteActions, searchList, find, findNext, findPrevious, useSelectionForFind,
             toggleSource, toggleReader, toggleFormats, focus, viewAsList, viewAsGallery, viewAsTable, viewAsBoard, viewAsTimeline, viewAsCalendar,
             toggleFilters, addFilter, clearFilters, today, previousPeriod, nextPeriod, showWeek, showMonthScale, toggleMonth,
@@ -131,8 +134,8 @@ nonisolated extension Shortcut {
 }
 
 extension View {
-    /// Binds the key the person chose for `command`, in the menu bar: with no `bindings` (the toolbar's copy of a command, a
-    /// row's menu), none, so a key is never registered twice.
+    /// Binds the key the person chose for `command`, in the menu bar: with no `bindings` (the toolbar's copy of a command), none,
+    /// so a key is never registered twice. A row's menu passes them only to draw the key beside the command.
     func shortcut(_ command: ShortcutCommand, _ bindings: ShortcutBindings?) -> some View {
         keyboardShortcut(bindings?.shortcut(for: command)?.keyboardShortcut)
     }

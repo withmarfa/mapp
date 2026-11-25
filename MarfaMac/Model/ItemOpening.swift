@@ -86,7 +86,9 @@ nonisolated enum RowMenuEntry: Equatable, Sendable {
     case favorite, tag, collection
     /// What the layout adds, such as a board's Move To.
     case layoutActions
-    case changeType, customizeLayout, editLayouts, versionHistory
+    case changeType, versionHistory
+    /// Keep in Library, Move to Feed, Archive or Unarchive: whichever would change the selection.
+    case moves
     /// Recover, for items that are in Recently Deleted.
     case recover
     /// Delete, or Delete Immediately for items in Recently Deleted.
@@ -99,8 +101,8 @@ nonisolated enum RowMenuEntry: Equatable, Sendable {
         if inBin { return open + [.divider, .quickLook, .share, .copyLink, .divider, .recover, .versionHistory, .divider, .delete] }
         return open + [
             .divider, .quickLook, .share, .copyLink,
-            .divider, .favorite, .tag, .collection, .layoutActions, .changeType, .customizeLayout, .editLayouts, .versionHistory,
-            .divider, .delete,
+            .divider, .favorite, .tag, .collection, .layoutActions, .changeType, .versionHistory,
+            .divider, .moves, .delete,
         ]
     }
 }

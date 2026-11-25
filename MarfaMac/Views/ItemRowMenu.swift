@@ -5,6 +5,7 @@ import SwiftUI
 /// as the board's Move To.
 struct ItemRowMenu<LayoutActions: View>: View {
     @CurrentLibrary private var library
+    @Environment(Libraries.self) private var libraries
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @AppStorage(ListKey.openItemsIn) private var opening = ItemOpening.standard
     let browser: Browser
@@ -44,25 +45,13 @@ struct ItemRowMenu<LayoutActions: View>: View {
         case .collection: CollectionActions(selection: ids, details: details, undoManager: undoManager)
         case .layoutActions: layoutActions
         case .changeType: TypeChangeButton(ids: ids, details: details, undoManager: undoManager)
-        case .customizeLayout:
-            // A right click on a card with no page open has nothing to arrange.
-            if details?.showsPage != false { CustomizeLayoutButton(ids: ids, details: details) }
-        case .editLayouts:
-            EditLayoutsCommand(types: Self.types(of: items, in: library)) { browser.showLayouts(of: $0) }
         case .versionHistory: VersionHistoryButton(ids: ids, details: details)
+        case .moves: ItemMoveActions(ids: ids, undoManager: undoManager, shortcuts: libraries.shortcuts)
         case .recover:
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
-        case .delete: ItemRemoveActions(ids: ids, undoManager: undoManager)
+        case .delete: ItemRemoveActions(ids: ids, undoManager: undoManager, showsDeleteKey: true)
         case .divider: Divider()
         }
-    }
-}
-
-extension ItemRowMenu {
-    /// The types of the items the menu is for, by name: the pages Edit Layouts… can lead to.
-    static func types(of items: [Item], in library: any ItemLibrary) -> [ItemTypeInfo] {
-        Set(items.map(\.type)).compactMap { library.catalogue.itemTypes[$0] }
-            .sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
     }
 }
 

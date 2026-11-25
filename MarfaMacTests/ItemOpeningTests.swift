@@ -12,4 +12,10 @@ struct ItemOpeningTests {
         #expect(entries.contains(.copyLink))
         #expect(entries.last == .delete)
     }
+
+    @Test func theMovesEndTheMenuBeforeDelete() {
+        let entries = RowMenuEntry.entries(opening: .modal, inBin: false)
+        #expect(Array(entries.suffix(3)) == [.divider, .moves, .delete])
+        #expect(!RowMenuEntry.entries(opening: .modal, inBin: true).contains(.moves))
+    }
 }
