@@ -207,7 +207,8 @@ extension MarfaEngine {
     /// with `conflict=auto`, so a change the copy has not yet learned of is still written over. A row the copy does not
     /// hold is left to the package.
     private func judge(_ id: ItemID, state: ItemState? = nil, tier: Tier? = nil) async throws {
-        guard let row = try await copy.items.get(id.rawValue) else { return }
+        // `get` of one id does not answer a row in the bin, so a binned item would pass as one the copy does not hold.
+        guard let row = try await copy.items.get([id.rawValue], includingBin: true).rows.first else { return }
         let now = MarfaMapping.state(row.state)
         if now == .trashed, state != .trashed { throw Self.skipped(.inBin) }
         if let state, now != state { throw Self.skipped(.changedSince) }

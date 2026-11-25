@@ -232,6 +232,20 @@ struct MarfaSourceOfflineTests {
             state.changes.contains { if case .taken(unarchived) = $0 { true } else { false } }
         })
         #expect(taken.answer(to: archived) == nil)
+
+        // An item the copy shows in Recently Deleted is judged as there, never as one the copy does not hold.
+        source.submit(.transition(id, .trashed, from: .active), as: WriteID())
+        let inBin = MarfaEngine.skipped(.inBin).problem
+        for write in [ItemWrite.transition(id, .archived, from: .active), .retier(id, .feed, base: item.version)] {
+            let sent = WriteID()
+            source.submit(write, as: sent)
+            let answered = try #require(await log.wait { $0.answer(to: sent) != nil })
+            guard case .refused(let problem) = answered.answer(to: sent) else {
+                Issue.record("\(write) was answered \(String(describing: answered.answer(to: sent)))")
+                continue
+            }
+            #expect(problem.code == inBin.code, "\(write)")
+        }
         await source.close()
     }
 
