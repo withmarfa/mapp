@@ -522,26 +522,6 @@
         }
       }
     },
-    "%@, %@ items" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@, %2$@ items"
-          }
-        }
-      }
-    },
-    "%@, %@ of %@ items" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@, %2$@ of %3$@ items"
-          }
-        }
-      }
-    },
     "%@, %@ of ^[%lld item](inflect: true)" : {
       "localizations" : {
         "en" : {
@@ -572,6 +552,9 @@
         }
       }
     },
+    "%@, Archived" : {
+
+    },
     "%@, ^[%lld item](inflect: true)" : {
       "localizations" : {
         "en" : {
@@ -581,9 +564,6 @@
           }
         }
       }
-    },
-    "%@, Archived" : {
-
     },
     "%@, changed" : {
 
@@ -1417,9 +1397,6 @@
     "%lld more left out of search." : {
 
     },
-    "%lld more views" : {
-
-    },
     "%lld not started" : {
       "extractionState" : "manual"
     },
@@ -2132,9 +2109,6 @@
     "Add Row Below" : {
 
     },
-    "Add Section" : {
-
-    },
     "Add Sort" : {
 
     },
@@ -2546,9 +2520,6 @@
     "Archive All" : {
 
     },
-    "Archive Is Empty" : {
-
-    },
     "Archive Only These Items" : {
 
     },
@@ -2585,6 +2556,9 @@
 
     },
     "Archived Items" : {
+
+    },
+    "Archived items leave your lists. You can find them in Library > Archive." : {
 
     },
     "Archived “%@”" : {
@@ -4203,9 +4177,6 @@
     "Disk" : {
 
     },
-    "Dismiss" : {
-
-    },
     "Display" : {
 
     },
@@ -5584,9 +5555,6 @@
     "Items you add show here." : {
 
     },
-    "Items you archive show here." : {
-
-    },
     "Items you delete wait here before they are permanently deleted." : {
 
     },
@@ -6424,6 +6392,9 @@
     "Move Up" : {
 
     },
+    "Move ^[%lld item](inflect: true) to the Feed?" : {
+
+    },
     "Move to Feed" : {
 
     },
@@ -6434,6 +6405,9 @@
 
     },
     "Move to Tab" : {
+
+    },
+    "Move “%@” to the Feed?" : {
 
     },
     "Moved an item to Recently Deleted" : {
@@ -8034,6 +8008,9 @@
     "Remove from Favorites" : {
 
     },
+    "Remove from Sidebar" : {
+
+    },
     "Remove from “%@”" : {
       "extractionState" : "manual"
     },
@@ -9378,6 +9355,15 @@
       "extractionState" : "manual"
     },
     "The Connector" : {
+
+    },
+    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
+
+    },
+    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
+
+    },
+    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
 
     },
     "The Folder Is Missing Where This Copy Is Kept" : {
@@ -11369,9 +11355,6 @@
     },
     "View as Timeline" : {
       "extractionState" : "manual"
-    },
-    "View, %@" : {
-
     },
     "View, Collection, or Item" : {
 
