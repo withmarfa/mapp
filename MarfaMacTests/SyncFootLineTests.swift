@@ -26,7 +26,7 @@ struct SyncFootLineTests {
 
     @Test func aMarfaOnThisMacSaysSoInPlaceOfUpdatedAndKeepsEveryTrouble() throws {
         #expect(try #require(line(onThisMac: true)).text == "On this Mac")
-        #expect(try #require(line(onThisMac: true, synced: nil)).kind == .onThisMac)
+        #expect(try #require(line(synced: nil, onThisMac: true)).kind == .onThisMac)
         #expect(try #require(line(.offline(reason: nil), onThisMac: true)).text == "Offline, updated 2 minutes ago")
         #expect(try #require(line(.keyRefused, onThisMac: true)).text == "Couldn’t sync")
         #expect(try #require(line(problems: [problem()], onThisMac: true)).kind == .needsAttention)
