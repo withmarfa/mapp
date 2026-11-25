@@ -614,9 +614,8 @@ nonisolated extension ViewDraft {
     }
 
     /// The view's query with the window's filters in place of the conditions the window showed: the conditions
-    /// it could not show stay as they are, in order. A Type filter within the view's listed types leaves them as
-    /// they are and is saved as an exact-type condition (`keepsListedTypes`); one outside them replaces them. A window filter the view
-    /// cannot hold leaves the query whole, so a filter is never dropped for one the window could not save.
+    /// it could not show stay in order. An untouched Type condition stays in the filter. An edited Type condition may
+    /// replace the listed types (`narrowing`). A filter the view cannot hold leaves the query whole.
     static func replacing(
         _ query: LibraryViewQuery, with state: FilterState, targets: [String: FilterTarget], seededTypes: [String]?, catalogue: Catalogue,
         calendar: Calendar = .current

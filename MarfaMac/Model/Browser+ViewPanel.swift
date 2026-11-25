@@ -155,7 +155,7 @@ extension Browser {
         } else {
             defaults.removeObject(forKey: ItemTableColumnLayouts.key)
         }
-        // A view's own settings were never changed for the new view (`ViewPanel.mac`), so nothing is written back to them.
+        // A saved view's draft has its own settings (`ViewPanel.mac`), so its row needs no restore.
         if snapshot.place.savedView == nil {
             placeCards[snapshot.place] = snapshot.cards
             store(snapshot.density, for: snapshot.place)

@@ -195,8 +195,7 @@ extension Browser {
 
     // MARK: This Mac's settings for a view
 
-    /// The layout, columns, empty groups, cards and density the window shows for a view, which are what the Mac holds,
-    /// or a new view's made from it while its panel is open.
+    /// The settings the window uses for the saved view, or those of the draft made from it.
     func macSettings(for id: ItemID) -> ViewMacSettings {
         newViewPanel(from: id)?.mac ?? viewSeeds[id]?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
     }
@@ -554,8 +553,7 @@ extension Browser {
 }
 
 nonisolated extension ViewMacSettings {
-    /// Puts back the members a step changed, from `before` to `after`, and keeps the rest as they are now. Members are
-    /// compared as they are stored, so one a later version adds is put back too.
+    /// Restores the top-level keys that changed between the step's encoded settings.
     mutating func undo(_ step: (before: ViewMacSettings, after: ViewMacSettings)) {
         guard var now = Self.members(of: self), let before = Self.members(of: step.before), let after = Self.members(of: step.after)
         else { return }
