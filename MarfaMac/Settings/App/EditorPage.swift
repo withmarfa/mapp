@@ -41,7 +41,7 @@ struct EditorPage: View {
     private var text: some View {
         SettingsSection("Text") {
             SettingsRow("Text Size", line: "An item’s own text.") {
-                SettingsPopUp(title: "Text Size", selection: $textSize) {
+                SettingsPopUp(title: "Text Size", selection: Binding(get: { PageStyle.nearestTextSize(textSize) }, set: { textSize = $0 })) {
                     ForEach(PageStyle.textSizes, id: \.self) { Text("\($0) pt").tag($0) }
                 }
                 .accessibilityIdentifier("TextSize")

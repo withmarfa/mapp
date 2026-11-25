@@ -60,8 +60,9 @@ enum TitleLines {
 /// How an item's page is set out. The defaults here are the only ones; stored settings fall back to them.
 nonisolated struct PageStyle: Equatable {
     var fullWidth = false
-    /// The body text's size in points; headings, spacing and the reading width scale with it.
-    var textSize = 13
+    /// The body text's size in points; headings, spacing and the reading width scale with it. The title is 28 on 34 at
+    /// the default.
+    var textSize = 15
     var checksSpelling = true
     var lineSpacing = LineSpacing.standard
     var paragraphSpacing = ParagraphSpacing.standard
@@ -92,7 +93,13 @@ nonisolated struct PageStyle: Equatable {
         max(CGFloat(textSize * 3), fullWidth ? 0 : (width - CGFloat(readingWidth * textSize)) / 2)
     }
 
-    static let textSizes = [11, 12, 13, 14, 16, 18, 20, 24]
+    static let textSizes = [13, 14, 15, 16, 18, 20, 24]
+
+    /// The step nearest `size`, the smaller of two equally near. A size stored before these steps (11 or 12 points) is
+    /// kept in the defaults as it is and read as this, wherever the page, its menus and Settings show or use it.
+    static func nearestTextSize(_ size: Int) -> Int {
+        textSizes.min { abs($0 - size) < abs($1 - size) } ?? size
+    }
     static let readingWidths = 36...80
 }
 
@@ -123,7 +130,7 @@ struct StoredPageStyle: DynamicProperty {
 
     var wrappedValue: PageStyle {
         PageStyle(
-            fullWidth: fullWidth, textSize: textSize, checksSpelling: checksSpelling, lineSpacing: lineSpacing,
+            fullWidth: fullWidth, textSize: PageStyle.nearestTextSize(textSize), checksSpelling: checksSpelling, lineSpacing: lineSpacing,
             paragraphSpacing: paragraphSpacing, smartPunctuation: smartPunctuation, pairsBrackets: pairsBrackets,
             continuesLists: continuesLists, indentWith: indentWith, pasteAs: pasteAs, editingMode: editingMode,
             foldsHeadings: foldsHeadings, showsCodeLineNumbers: showsCodeLineNumbers, readingWidth: readingWidth, linkLook: linkLook,

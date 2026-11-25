@@ -27,18 +27,19 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 - **The kicker** is the type's mark and name, then Read Only with a lock, Feed or Archived where true. It is a heading. The type's name opens Change Type where the item can change type.
 - **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset and hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
 - **A type that keeps no text shows its first six rows,** empty or not.
-- **A row is dragged by its name,** which shows a grey fill and six dots under the pointer. The type has one order, and a drag stores the whole of it. VoiceOver reads grabber, name and value as three elements.
+- **A row is dragged by its name,** which shows a grey fill and six dots under the pointer. A drag or Move Up or Down moves only that row in the type's one order. VoiceOver reads grabber, name and value as three elements.
 - **An event's time is one row, When,** always first, with how far off it is or All Day in grey.
 - **Long text stops after two lines;** an email, a phone and a number to call (`ListShape.numberToCall`) open; Location stands for latitude and longitude.
 - **A value is cut, never reworded,** and a linked item that cannot be read, is gone or is in the bin shows nothing, never an id.
 - **The head is never drawn again while the person types,** and a rebuild keeps the caret and the text's undo (`EditorController.showHeader`).
-- **Once the head is out of sight** the page says so with the item, title and mark (`DetailsPresentation.scrolledHead`), for the toolbar.
+- **Once the head is out of sight** the page says so with the item, title and mark (`DetailsPresentation.scrolledHead`).
 
 ## A row's menu
 
 `FieldMenu` is the rule; a row's name, or a right-click on the row, opens it: Show When It Has a Value, Always Show, Hide on <Type> Pages (and Pin Under the Title while pinned properties are on), then Move Up and Move Down, then the field's own entries.
 
 - **How a row shows belongs to the type** (`PagePlacements`, `RowShows`) and changes no item, so a read-only item can be arranged.
+- **Text is 15 points by default** (title 28 on 34), in steps of 13 to 24; a stored 11 or 12 reads as the nearest.
 - **Pinned properties are a setting, off** (Settings › Editor). While on, the status and the parent are pinned unless the person chose others, at most four, and a pinned row leaves the rows.
 
 ## The panel beside the page
@@ -71,7 +72,6 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 - **A type nobody customized has no entry** (`PagePlacements`), so a better default reaches it. Use Defaults removes the entry.
 - **Escape ends it, and Focus waits for it**, because it arranges the header that Focus hides.
 - **Trap:** `Choice.pins` of nil means the default pins and an empty list means no pins. Treating one as the other pins properties that a person removed. `PagePlacement` gives the defaults.
-- **A choice saved as shown or hidden** (`rows`) is read as When It Has a Value or Hidden and written back as `shows`.
 
 ## The corner
 
