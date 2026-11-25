@@ -47,5 +47,7 @@ struct RowQuickActions: View {
                 }
             }
         }
+        // The table's cell is narrower than the capsule's words, which must not be squeezed out.
+        .fixedSize()
     }
 }
