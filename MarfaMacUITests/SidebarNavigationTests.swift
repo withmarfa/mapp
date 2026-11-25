@@ -128,7 +128,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         }
         XCTAssertTrue(sidebarText("Favorites").exists)
         XCTAssertTrue(sidebarText("Types").exists)
-        // Items is an index page; a type lists its items.
+        // A type lists its items.
         element("SidebarType-core.note").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading list")).firstMatch
         XCTAssertTrue(note.waitForExistence(timeout: 3))

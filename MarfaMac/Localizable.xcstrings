@@ -5491,9 +5491,6 @@
     "Items About This" : {
       "extractionState" : "manual"
     },
-    "Items Page" : {
-
-    },
     "Items deleted more than %@ ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered." : {
       "extractionState" : "manual"
     },
@@ -8703,9 +8700,6 @@
 
     },
     "Show Property" : {
-
-    },
-    "Show Quick Add Options" : {
 
     },
     "Show Reader" : {
