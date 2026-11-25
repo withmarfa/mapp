@@ -155,7 +155,8 @@ struct InspectorToolbar: ToolbarContent {
     }
 }
 
-/// The Details button of a toolbar above the inspector: on, because the inspector is open.
+/// The Details button, over the panel while it is open and beside the page while it is closed: one toggle either way,
+/// so VoiceOver reads it as on or off.
 struct DetailsToggle: View {
     let details: DetailsPresentation
 
@@ -163,7 +164,7 @@ struct DetailsToggle: View {
         Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
             // Gray while on, as every on button is, rather than the accent color.
             .tint(.secondary)
-            .help("Hide Details")
+            .help(details.isPresented ? "Hide Details" : "Show Details")
             .accessibilityIdentifier("DetailsToggle")
     }
 }
@@ -272,11 +273,8 @@ struct ItemToolbarActions {
             .accessibilityIdentifier("ShareToolbar")
     }
 
-    @ViewBuilder var detailsButton: some View {
-        Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
-            .help(details.isPresented ? "Hide Details" : "Show Details")
-            .disabled((browser?.selection.count ?? items.count) != 1)
-            .accessibilityIdentifier("DetailsToggle")
+    var detailsButton: some View {
+        DetailsToggle(details: details).disabled((browser?.selection.count ?? items.count) != 1)
     }
 
     var ids: Set<ItemID> { browser.map(\.selection) ?? Set(items.map(\.id)) }

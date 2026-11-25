@@ -49,6 +49,8 @@ struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
     /// The toolbar's height as the column's top inset says, which is zero while full screen hides the toolbar.
     @State private var insetTop: CGFloat = TopRowMetrics.lineHeight
     @State private var room = TopRowRoom()
+    /// How far full screen has slid the toolbar down to show the menu bar.
+    @State private var reveal: CGFloat = 0
     let scroll: TopRowScroll?
     /// The room the row of views takes at rest, or zero where there is none.
     let restHeight: CGFloat
@@ -84,10 +86,11 @@ struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
             )
             .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { insetTop = $0 }
             .background { ToolbarRoomProbe(room: $room, signal: signal) }
+            .background { ToolbarRevealProbe(reveal: $reveal) }
             .overlay(alignment: .top) {
                 TopRowStack(
                     scroll: scroll, restHeight: restHeight, height: lineHeight, bands: bands && showsBackground, dragClearance: dragClearance, room: room,
-                    line: line, rest: rest)
+                    reveal: reveal, line: line, rest: rest)
                 .ignoresSafeArea(.container, edges: .top)
             }
     }
@@ -101,12 +104,15 @@ private struct TopRowStack<Line: View, Rest: View>: View {
     let bands: Bool
     let dragClearance: CGFloat
     let room: TopRowRoom
+    /// How far the toolbar has slid down to show the menu bar, which the line follows.
+    let reveal: CGFloat
     let line: (TopRowRoom, Bool) -> Line
     let rest: Rest
 
     var body: some View {
         let offset = scroll?.offset ?? 0
-        let isAway = restHeight == 0 || offset >= restHeight - 0.5
+        // Slid down with the toolbar, the line takes the room of the row of views, whose views then stand beside the title.
+        let isAway = restHeight == 0 || offset >= restHeight - 0.5 || reveal > 0
         let headings = scroll?.headingHeight ?? 0
         // The first row is as far below the toolbar as the row of views and the headings are tall.
         let isUnder = bands && offset > restHeight + headings + 0.5
@@ -126,6 +132,7 @@ private struct TopRowStack<Line: View, Rest: View>: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .top)
+        .offset(y: reveal)
     }
 }
 
@@ -179,10 +186,10 @@ private struct TopRowTable: ViewModifier {
 }
 
 /// Reaches the `NSScrollView` behind a table or a list. SwiftUI's `contentMargins` leaves their scroll views alone, so the
-/// room for the row of views is the scroll view's own top inset, to which AppKit adds the headings' height. The headings'
-/// container is then set at the title line's lower edge, or lower while the row of views still shows, and set again
-/// whenever the scroll view or AppKit moves it. The line's height is the top row's (`TopRowSpace`), not the scroll view's
-/// safe area, which is empty while full screen hides the toolbar and changes as it comes and goes.
+/// room for the row of views is added to the scroll view's own safe area, from which AppKit sets its insets with the
+/// toolbar's height, the sidebar over the column and the headings' height. The headings' container is then set at the
+/// title line's lower edge, or lower while the row of views still shows, and set again whenever the scroll view or AppKit
+/// moves it. The line's height is the top row's (`TopRowSpace`), which stands also while full screen hides the toolbar.
 private struct TopRowTableProbe: NSViewRepresentable {
     let space: TopRowSpace
 
@@ -202,8 +209,6 @@ private struct TopRowTableProbe: NSViewRepresentable {
         private weak var table: NSTableView?
         private var observers: [any NSObjectProtocol] = []
         private var isPlacing = false
-        /// The scroll view's safe area as the insets last took it, so the sides move by what changes.
-        private var safeSides: NSEdgeInsets?
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -221,28 +226,17 @@ private struct TopRowTableProbe: NSViewRepresentable {
         func refresh() {
             guard window != nil, let table = nearestTable(), let scroll = table.enclosingScrollView else { return }
             if self.table !== table { follow(table, in: scroll) }
-            let room = space.lineHeight + space.restHeight
-            if scroll.automaticallyAdjustsContentInsets { scroll.automaticallyAdjustsContentInsets = false }
-            // Switching the adjustment off freezes the sides at what they were, so a change of the safe area moves them
-            // here: a sidebar that floats over this column, shown or hidden, moves where the rows begin.
-            let safe = scroll.safeAreaInsets
-            var wanted = scroll.contentInsets
-            wanted.top = room
-            if let last = safeSides {
-                wanted.left += safe.left - last.left
-                wanted.right += safe.right - last.right
-                wanted.bottom += safe.bottom - last.bottom
-            }
-            safeSides = safe
-            let current = scroll.contentInsets
-            if current.top != wanted.top || current.left != wanted.left || current.bottom != wanted.bottom || current.right != wanted.right {
-                let clip = scroll.contentView
-                let scrolled = clip.bounds.origin.y + clip.contentInsets.top
-                let moved = wanted.left - current.left
-                scroll.contentInsets = wanted
-                // Keeps the rows where they were: the same distance from the first, and the same sideways place or the new edge.
-                clip.scroll(to: NSPoint(x: clip.bounds.origin.x - moved, y: scrolled - clip.contentInsets.top))
-                scroll.reflectScrolledClipView(clip)
+            // AppKit keeps the insets from the safe area, so they follow a sidebar shown or hidden over the column at once.
+            // What the title bar and toolbar already cover, none while full screen hides them: measured from the window,
+            // never from the safe area, which holds what was added here until AppKit next lays out.
+            guard let window else { return }
+            let top = scroll.convert(scroll.bounds, to: nil).maxY
+            let covered = max(0, top - window.contentLayoutRect.maxY)
+            let extra = max(0, space.lineHeight + space.restHeight - covered)
+            if scroll.additionalSafeAreaInsets.top != extra {
+                var added = scroll.additionalSafeAreaInsets
+                added.top = extra
+                scroll.additionalSafeAreaInsets = added
             }
             place()
         }
@@ -250,13 +244,15 @@ private struct TopRowTableProbe: NSViewRepresentable {
         private func follow(_ table: NSTableView, in scroll: NSScrollView) {
             stop()
             self.table = table
-            safeSides = nil
-            // The split view moves its columns, and a sidebar over this one changes its safe area, with no layout of this view.
-            var ancestor: NSView? = scroll.superview
-            while let view = ancestor, !(view is NSSplitView) { ancestor = view.superview }
-            if let split = ancestor {
+            // The room the toolbar leaves is read from the scroll view's frame and the window's, which a resize sets after
+            // this view's layout: the insets are set again once each has its new size.
+            scroll.postsFrameChangedNotifications = true
+            observers.append(NotificationCenter.default.addObserver(
+                forName: NSView.frameDidChangeNotification, object: scroll, queue: .main
+            ) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } })
+            if let window = scroll.window {
                 observers.append(NotificationCenter.default.addObserver(
-                    forName: NSSplitView.didResizeSubviewsNotification, object: split, queue: .main
+                    forName: NSWindow.didResizeNotification, object: window, queue: .main
                 ) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } })
             }
             scroll.contentView.postsBoundsChangedNotifications = true
@@ -389,6 +385,68 @@ private struct WindowTitleHider: NSViewRepresentable {
         }
 
         isolated deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }
+    }
+}
+
+/// Reports how far full screen has slid the toolbar down to show the menu bar. The content's safe area does not change
+/// as it does: only the toolbar's own window moves, so the row drawn under the toolbar reads that window's frame.
+private struct ToolbarRevealProbe: NSViewRepresentable {
+    @Binding var reveal: CGFloat
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+
+    func updateNSView(_ probe: Probe, context: Context) {
+        probe.report = { new in if reveal != new { reveal = new } }
+    }
+
+    final class Probe: NSView {
+        var report: (CGFloat) -> Void = { _ in }
+        private var observers: [any NSObjectProtocol] = []
+        private var barObservers: [any NSObjectProtocol] = []
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            observers.forEach { NotificationCenter.default.removeObserver($0) }
+            observers = []
+            guard let window else { return followBar() }
+            for name in [NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification] {
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.followBar() }
+                })
+            }
+            followBar()
+        }
+
+        /// In full screen the toolbar and the window's buttons stand in a window of their own, which slides.
+        private var bar: NSWindow? {
+            guard let window, window.styleMask.contains(.fullScreen), let bar = window.standardWindowButton(.closeButton)?.window,
+                  bar !== window else { return nil }
+            return bar
+        }
+
+        private func followBar() {
+            barObservers.forEach { NotificationCenter.default.removeObserver($0) }
+            barObservers = []
+            if let bar {
+                barObservers.append(NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: bar, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.measure() }
+                })
+            }
+            measure()
+        }
+
+        private func measure() {
+            guard let window, let bar else { return report(0) }
+            // Hidden above the screen it is not over the row, which then stays.
+            report(max(0, window.frame.maxY - bar.frame.maxY))
+        }
+
+        isolated deinit {
+            observers.forEach { NotificationCenter.default.removeObserver($0) }
+            barObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        }
     }
 }
 

@@ -202,6 +202,11 @@ extension CommandPalette {
             for command in SavedViewCommand.commands(for: browser, in: library, order: order) {
                 add(command.title, command.systemImage, in: .view, action: command.action)
             }
+            if let sidebar = sidebarVisibility {
+                add(sidebar.wrappedValue ? String(localized: "Hide Sidebar") : String(localized: "Show Sidebar"), "sidebar.left", keys(.toggleSidebar), in: .view) {
+                    withAnimation { sidebar.wrappedValue.toggle() }
+                }
+            }
             if browser.customizesSidebar {
                 add(String(localized: "Finish Customizing Sidebar"), "checkmark", in: .view) { browser.customizesSidebar = false }
             } else {

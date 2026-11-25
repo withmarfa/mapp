@@ -17,15 +17,30 @@ struct BesideColumn: ViewModifier {
     @State private var settler = BesideSettler()
     /// This column's identity for `Browser.columnBeside`.
     @State private var host = UUID()
+    /// The width the layout and the page share; 0 until measured.
+    @State private var shared: CGFloat = 0
 
-    /// The column's width in points.
+    /// The column's widest, in points.
     static let width: CGFloat = 372
+    /// What the layout keeps before the page gives way: about a table's Name column.
+    static let layoutKeeps: CGFloat = 320
+
+    /// The page's width in `shared`: it gives way first, so the layout keeps `layoutKeeps`, but keeps a third of the two.
+    static func pageWidth(in shared: CGFloat) -> CGFloat {
+        guard shared > 0 else { return width }
+        return min(width, max(shared - layoutKeeps, shared / 3))
+    }
 
     func body(content: Content) -> some View {
         let _ = layouts
         let isShown = browser.showsBesidePage(opening: browser.chosenOpening ?? opening)
+        let pageWidth = Self.pageWidth(in: shared)
         HStack(spacing: 0) {
-            content
+            // Neither side holds a least width. The split view adds the sidebar and the panel over the column to its least
+            // width, and they change as it lays out: with a table's columns and the page's fixed width under them it came
+            // to more than the window, which AppKit's constraint pass never settles, and the app aborted. The page's widest
+            // comes from the width measured instead.
+            content.frame(minWidth: 0, maxWidth: .infinity)
             if isShown {
                 Divider()
                 // One container, so the column's frame, its corner and its accessibility element each apply once, to the
@@ -38,14 +53,17 @@ struct BesideColumn: ViewModifier {
                         Color.clear
                     }
                 }
-                .frame(width: Self.width)
+                .frame(minWidth: 0, idealWidth: pageWidth, maxWidth: pageWidth)
                 .frame(maxHeight: .infinity)
                 .overlay { BesideCorner(browser: browser) }
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(Text("Item"))
                 .accessibilityIdentifier("BesideColumn")
+                // The page takes its width first; the layout has what is left.
+                .layoutPriority(1)
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { shared = $0 }
         .onChange(of: isShown, initial: true) { browser.columnBeside(host, isShown: isShown) }
         .onDisappear { browser.columnBeside(host, isShown: false) }
         .onChange(of: isShown ? browser.selection.first : nil, initial: true) { _, chosen in

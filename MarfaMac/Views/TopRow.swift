@@ -205,6 +205,9 @@ private struct TopRowTitle: View {
                     .layoutPriority(1)
             }
         }
+        // One element: a menu's label gives each element in it a button of its own.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
     }
 
     var body: some View {
@@ -217,8 +220,6 @@ private struct TopRowTitle: View {
                     .accessibilityHint("Opens the sidebar's places")
             } else {
                 cluster
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(label)
             }
         }
         .accessibilityAddTraits(.isHeader)
@@ -258,6 +259,8 @@ private struct TopRowScopeLabel: View {
             Text(title)
             Image(systemName: "chevron.up.chevron.down").font(.system(size: 8 * scale, weight: .semibold))
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
         .font(.system(size: 12 * scale, weight: .medium))
         .foregroundStyle(isQuiet ? .secondary : .primary)
         .padding(.horizontal, 8)
@@ -297,6 +300,9 @@ private struct TopRowMenuLabel: View {
             title
             Image(systemName: "chevron.down").font(.system(size: 9 * scale, weight: .semibold))
         }
+        // One element: a menu's label gives each element in it a button of its own.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
         .font(.system(size: 13 * scale, weight: isChosen ? .medium : .regular))
         .foregroundStyle(isChosen ? .primary : .secondary)
         .padding(.horizontal, padding)

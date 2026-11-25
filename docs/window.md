@@ -58,13 +58,13 @@ paths:
 
 ## Sidebar closed
 
-- **The title opens the sidebar's rows as a menu** (`PlacesMenu`); over a column that spans the window, place, views and buttons share one row, and beside a page the views have the row below.
+- **The title opens the sidebar's rows as a menu** (`PlacesMenu`); place, views and buttons share one row; in a list column, or beside a page under 800 wide, title and views go below.
 
 ## Smallest window
 
-- **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900, and under 800 the views are one pill beside the title.
-- **Only what the window folded opens again,** also after a quit.
+- **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900 (only what folded reopens), and under 800 the views are one pill beside the title.
 - **The panel is 300 wide** in every window (`PanelWidth`).
+- **The page beside a layout, up to 372, gives way first,** to a third, so the layout keeps 320 (`BesideColumn`).
 
 ## Corner
 
@@ -81,11 +81,11 @@ paths:
 ## Opening an item
 
 - **Open, Return, a double click and a link follow Open Items** (`ItemOpening`).
-- **Beside the List is the standard:** a layout that spans the window shows the chosen item's page in a column of 372 (`BesideColumn`), and a new row replaces it once the selection rests (`BesideSettler`).
+- **Beside the List is the standard:** a layout that spans the window shows the chosen item's page beside it, and a new row replaces it once the selection rests (`BesideSettler`).
 - **A column, a modal and a full page show one item** with the window's one editor, one at a time. New Window takes several and asks first above a limit (`ItemWindows`).
 - **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`), Keep moves on once queued, and a followed link stays in it.
 - **An item's window has the modal's controls and the panel** (`ItemWindowToolbar`); Back and Forward walk its links (`ItemWindow.go`).
-- **A full page's Back returns to the layout**, and the list's view options are not offered.
+- **A full page's Back returns to the layout**, without view options.
 
 ## Item links
 

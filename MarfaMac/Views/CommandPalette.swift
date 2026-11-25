@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 struct CommandPalette: View {
     @CurrentLibrary var library
     @FocusedValue(\.detailsPresentation) var details
+    @FocusedValue(\.sidebarVisibility) var sidebarVisibility
     @Environment(\.undoManager) var undoManager
     @Environment(\.openWindow) var openWindow
     @Environment(\.openURL) var openURL
