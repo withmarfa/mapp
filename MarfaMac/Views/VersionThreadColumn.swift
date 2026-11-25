@@ -21,7 +21,7 @@ struct VersionThreadColumn: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Version History").interfaceFont(.title3.weight(.bold))
+            Text("Version History").interfaceFont(.title2.weight(.bold))
             if let count = countText {
                 Text(count).interfaceFont(.callout).foregroundStyle(.secondary)
             }
@@ -156,7 +156,7 @@ private struct VersionThreadRow: View {
                     Text(when).interfaceFont(.body.weight(.medium)).lineLimit(1)
                     if entry.isCurrent {
                         Text("Current")
-                            .interfaceFont(.caption)
+                            .interfaceFont(.subheadline)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
                             .frame(minHeight: 17)
@@ -167,7 +167,7 @@ private struct VersionThreadRow: View {
             }
             Spacer(minLength: 8)
             if let writer = entry.writer {
-                Text(verbatim: writer.displayName).interfaceFont(.caption).foregroundStyle(.tertiary).lineLimit(1)
+                Text(verbatim: writer.displayName).interfaceFont(.subheadline).foregroundStyle(.tertiary).lineLimit(1)
             }
         }
         .padding(.vertical, 3)

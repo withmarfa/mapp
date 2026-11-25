@@ -10,8 +10,8 @@ nonisolated struct VersionFactRow: Identifiable, Hashable, Sendable {
     var symbol: String?
 }
 
-/// What the right sidebar says of the version chosen: who wrote it and when, what it changed from the version before,
-/// and what has changed since. Pure, so the sidebar only draws it.
+/// What the panel says of the version chosen: who wrote it and when, what it changed from the version before,
+/// and what has changed since. Pure, so the panel only draws it.
 nonisolated struct VersionFacts: Equatable, Sendable {
     var writtenBy: String?
     var version: Int
