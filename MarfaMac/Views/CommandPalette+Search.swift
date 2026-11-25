@@ -281,8 +281,7 @@ extension CommandPalette {
             return Entry(
                 id: Self.offerPrefix + offer.id, title: offer.title, icon: .symbol(offer.symbol), takesFocus: true, group: nil, staysOpen: true
             ) {
-                tokens.clauses.append(clause)
-                query = ""
+                addToken(clause)
             }
         }
     }

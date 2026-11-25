@@ -37,6 +37,12 @@ struct CommandPalette: View {
     /// Whether an arrow key has moved the choice since the words last changed, so Return on a list of nothing but offers
     /// makes the item and not a token.
     @State private var arrowed = false
+
+    /// Makes `clause` a token and puts the words that offered it away.
+    func addToken(_ clause: FilterClause) {
+        tokens.clauses.append(clause)
+        query = ""
+    }
     /// Where the keyboard was before the palette took it, and goes back to once the palette is put away.
     @State private(set) var returnFocus: Browser.Pane = .list
     /// Every item's title folded once while the palette is open, so a keystroke folds only what was typed.
