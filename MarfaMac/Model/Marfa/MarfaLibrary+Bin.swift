@@ -127,7 +127,8 @@ extension MarfaLibrary {
         if let (id, moving) = moving, answer != .made || !moving.awaitsArchive {
             movingTo[id] = nil
         }
-        stateAnswers.removeValue(forKey: write)?(write, answer)
+        // A blocked or dead write may still be withdrawn, so it is followed to its next answer.
+        if answer == .mayBeMade { stateAnswers[write]?(write, answer) } else { stateAnswers.removeValue(forKey: write)?(write, answer) }
         if answer == .mayBeMade, moving?.value.awaitsArchive == true { archivesDropped += 1 }
         if archivesDropped > 0, !movingTo.values.contains(where: \.awaitsArchive) { tellArchivesDropped() }
     }

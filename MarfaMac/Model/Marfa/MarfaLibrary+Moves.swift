@@ -79,11 +79,20 @@ extension MarfaLibrary {
     }
 
     /// A refused or conflicted tier write leaves the item where it was, so the step registered in return leaves it
-    /// alone. A blocked or dead one may still be made once released.
+    /// alone. So does one merged over a tier another device set since (`versions/auto-last-writer`): that device
+    /// moved the item too, and an Undo here would reverse its move. A blocked or dead one may still be made once
+    /// released, or be withdrawn, so it is followed to its next answer.
     func tierWriteAnswered(_ write: WriteID, _ outcome: WriteOutcome) {
-        guard let answered = tierWrites.removeValue(forKey: write) else { return }
+        guard let answered = tierWrites[write] else { return }
         if tierMoving[answered.item]?.write == write { tierMoving[answered.item] = nil }
-        if StateAnswer(outcome) == .notMade { answered.notMade() }
+        let answer: StateAnswer = if case .merged(let fields) = outcome, fields.contains(MarfaMapping.tierField) {
+            .notMade
+        } else {
+            StateAnswer(outcome)
+        }
+        guard answer != .mayBeMade else { return }
+        tierWrites[write] = nil
+        if answer == .notMade { answered.notMade() }
     }
 }
 

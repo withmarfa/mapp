@@ -23,6 +23,8 @@ nonisolated enum MarfaMapping {
     static let collectionEdge = "in-collection"
     /// The role a type plays to be a collection, which `in-collection` names at its to item.
     static let containerRole = "container"
+    /// How a merge verdict names the item's tier among the fields it resolved.
+    static let tierField = "tier"
     /// The type a task is, or descends from: only such a type's `priority` and `due_at` are read as a priority and a
     /// due date.
     static let taskType = TypeID("core.task")

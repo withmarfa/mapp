@@ -83,6 +83,44 @@ import Testing
         #expect(undo.undoActionName.isEmpty && undo.redoActionName == ItemMove.keep.name)
     }
 
+    /// Keeps Feed note, whose write the copy shows, and answers it each of `outcomes` in turn.
+    private func keep(answering outcomes: [WriteOutcome]) async throws -> (MarfaLibrary, FakeItemSource, UndoManager) {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        library.setTier([F.n2], to: .library, undoManager: undo)
+        let write = try #require(source.submitted.last)
+        try await show([F.n2], in: library, source) { $0.tier = .library }
+        source.send(.taken(write.id))
+        for outcome in outcomes { source.send(.answered(write.id, outcome)) }
+        try #require(await eventually { library.tierWrites.isEmpty })
+        source.clearWrites()
+        return (library, source, undo)
+    }
+
+    @Test func aKeepMergedOverAnotherDevicesKeepIsNotThisMacsToUndo() async throws {
+        let (_, source, undo) = try await keep(answering: [.merged(fields: [MarfaMapping.tierField])])
+        undo.undo()
+        #expect(source.writes.isEmpty, "the other device's Keep stands")
+    }
+
+    @Test func aKeepBlockedThenWithdrawnLeavesNothingToUndo() async throws {
+        let (_, source, undo) = try await keep(answering: [
+            .blocked(.conflictUnresolved, nil), .refused(SyncProblem(code: MarfaEngine.withdrawnCode)),
+        ])
+        undo.undo()
+        #expect(source.writes.isEmpty)
+    }
+
+    @Test func undoAndRedoLeaveATierAnotherDeviceSetAlone() async throws {
+        let (library, source, undo) = try await keep(answering: [.accepted])
+        // Another device moves Feed note back to the Feed.
+        try await show([F.n2], in: library, source) { $0.tier = .feed }
+        undo.undo()
+        #expect(source.writes.isEmpty)
+        undo.redo()
+        #expect(source.writes.isEmpty, "the redo leaves the item in the Feed where the other device put it")
+    }
+
     @Test func aMixedSelectionOffersBothTiersAndACollectionStaysInTheLibrary() async throws {
         let (library, _) = try await loaded()
         #expect(library.selectionCommands([F.n1, F.n2, F.t1]) == [.keep, .moveToFeed, .archive, .unarchive])
