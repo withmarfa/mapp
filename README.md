@@ -13,7 +13,7 @@ Marfa for Mac is a native macOS app for the items in a Marfa server. Its editor 
 xcodebuild -project MarfaMac.xcodeproj -scheme MarfaMac -destination 'platform=macOS' -derivedDataPath build test
 ```
 
-This builds the app and runs the unit tests. A pull request runs no Mac job in CI, because GitHub lets the organization run only 5 macOS jobs at once. `.github/workflows/main.yml` compiles Release and runs the unit tests after each merge to `main`, CI runs no UI tests. Run the build and the tests you need locally before you merge; `MarfaMacTests/AGENTS.md` lists the commands. To run the app, open `MarfaMac.xcodeproj` in Xcode and run the `MarfaMac` scheme.
+This builds the app and runs the unit tests. A pull request runs no Mac job in CI, because GitHub lets the organization run only 5 macOS jobs at once. `.github/workflows/main.yml` compiles Release and runs the unit tests after each merge to `main`. CI runs no UI tests. Run the build and the tests you need locally before you merge; `MarfaMacTests/AGENTS.md` lists the commands. To run the app, open `MarfaMac.xcodeproj` in Xcode and run the `MarfaMac` scheme.
 
 ## Signing
 
@@ -69,7 +69,7 @@ To rebuild a tag, re-run its workflow run. The run replaces the disk image and t
 
 ### Dry run
 
-A ready pull request that changes `.github/workflows/release.yml`, `Scripts/release/`, `MarfaMac/Info.plist` or `Config/` runs the dry run. You can also run it manually. It archives with ad hoc signing, makes the disk image, signs it with a throwaway Sparkle key and builds an appcast from a fixture feed. It skips the UI tests, Developer ID export, notarization and publishing. It reads no release secrets and uploads the disk image and appcast as the `dry-run` artifact. A tag run stops if the environment lacks any value it needs.
+A ready pull request that changes `.github/workflows/release.yml`, `Scripts/release/`, `MarfaMac/Info.plist` or `Config/` runs the dry run. You can also run it manually. It archives with ad hoc signing, makes the disk image, signs it with a throwaway Sparkle key and builds an appcast from a fixture feed. It skips Developer ID export, notarization and publishing. It reads no release secrets and uploads the disk image and appcast as the `dry-run` artifact. A tag run stops if the environment lacks any value it needs.
 
 ### Release scripts
 
@@ -81,7 +81,7 @@ python3 -m unittest discover -s Scripts/release
 
 ## Contributing
 
-[AGENTS.md](AGENTS.md) covers conventions and the rules for each part of the code, and [docs/](docs/) explains the concepts and the agreed design.
+[AGENTS.md](AGENTS.md) has the conventions and says which page of [docs/](docs/) to read before you change each part of the app.
 
 ## License
 

@@ -1,7 +1,7 @@
 import Foundation
 
 /// An index page: a table under tabs. Sources and Collections list the places that hold items, and Items lists the items.
-/// Each remembers its own tab and sort on this Mac.
+/// Each remembers its own tab and sort, among the settings that sync.
 nonisolated enum IndexPlace: String, CaseIterable, Sendable {
     case sources, collections, items
 

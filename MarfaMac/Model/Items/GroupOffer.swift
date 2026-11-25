@@ -1,7 +1,7 @@
 import Foundation
 
 /// What Group by offers for a place, worked out once and drawn alike by View Options, the View menu and Edit View
-/// ([docs/views-and-lists.md](../../../docs/views-and-lists.md#grouping)). The fields come from the types the place lists
+/// ([docs/lists.md](../../../docs/lists.md#grouping)). The fields come from the types the place lists
 /// (`Browser.listedTypes`), and the types of its items, never only from the items on screen, so a field no item fills
 /// can still be chosen; such a field waits under More Fields.
 ///

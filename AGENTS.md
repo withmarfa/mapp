@@ -31,11 +31,11 @@ A macOS app for a Marfa server's items. It works only through the `marfa-swift` 
 
 ## Working here
 
-- Say "note" only for a `core.note`'s text, a type's name or the Note callout. The app is for items of every type.
-- Use American English. Put no time estimates, absolute paths, machine or account names or credentials in files, which are public. A comment says only why.
+- Say "note" only for a `core.note`'s text, a type's name or the Note callout.
+- Use American English. Put no time estimates, absolute paths, machine or account names or credentials in files: they are public. A comment says only why.
 - Use scoped lowercase Conventional Commits in the present tense: `feat(app):`, `fix(editor):`.
 - Work in `.claude/worktrees/`. `.agents/skills/land-a-pull-request/SKILL.md` says what to run and how to merge; the folders' `AGENTS.md` files have the commands.
-- Keep no legacy: no shims, aliases or migration paths.
+- Keep no shims, aliases or migration paths.
 
 ## Platform
 
@@ -64,7 +64,7 @@ A macOS app for a Marfa server's items. It works only through the `marfa-swift` 
 
 ## Code Review Rules
 
-Report only a problem you can show: the input, state or step, and what goes wrong. Leave formatting to the tools.
+Report only a problem you can show: the input, state or step, and what goes wrong.
 
 - **Person's text lost.** Flag any path where a write that fails, is refused or races another change is dropped or written over newer text. Safe path: a conflicted copy, the queue or the clipboard, and tell the person.
 - **Bytes rewritten.** Flag any change that rewrites an item's text the person did not edit, or blocks outside the edit. Safe path: edit in place and add a fixture to `editor/fixtures/corpus/` for any form found rewritten.

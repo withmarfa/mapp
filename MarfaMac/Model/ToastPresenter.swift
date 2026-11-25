@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// What one window's toast says, and for how long (`docs/components.md`). A window has one presenter, held by its
+/// What one window's toast says, and for how long (`docs/look.md`). A window has one presenter, held by its
 /// `DetailsPresentation`, which sits above the split view, so another workspace does not drop a toast and another window
 /// never shows it. A new toast replaces the one showing. A toast leaves on its own after `duration`, waits while the
 /// pointer is over it (`hold`), and leaves at once when Undo is used.

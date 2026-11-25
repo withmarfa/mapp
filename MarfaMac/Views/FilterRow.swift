@@ -78,7 +78,7 @@ struct FilterRow: View {
         }
     }
 
-    /// The row's trailing words where a filter is relative to the day: a saved view cannot keep it (board N11).
+    /// The row's trailing words where a filter is relative to the day: a saved view cannot keep it.
     private func relativeNote(of state: FilterState, offer: FilterOffer) -> String? {
         let phrases = state.relative.filter { offer.targets[$0.field] != nil }
             .map { FilterWording.relativePhrase(of: $0, calendar: .current) }

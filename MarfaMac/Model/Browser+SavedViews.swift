@@ -154,14 +154,14 @@ extension Browser {
     }
 
     /// Whether the open place leaves out the groups with no items, in every layout that groups: a saved view's choice
-    /// on this Mac, else the place's default view's.
+    /// in the app's settings, else the place's default view's.
     var hidesEmptyGroups: Bool {
         guard case .view(let id) = item else { return placeHidesEmptyGroups[item] ?? false }
         return macSettings(for: id).hidesEmptyGroups
     }
 
-    /// Changes Hide Empty Groups. A saved view keeps it on this Mac as it is made, and a place in its default view. Undo
-    /// takes either back.
+    /// Changes Hide Empty Groups. A saved view's is kept in the app's settings as it is made, and a place's in its default
+    /// view. Undo takes either back.
     func setHidesEmptyGroups(_ hides: Bool) {
         if case .view(let id) = item {
             changeViewSettings(id) { $0.hidesEmptyGroups = hides }
@@ -183,14 +183,14 @@ extension Browser {
         if case .view(let id) = item { macSettings(for: id).cards } else { placeCards[item] ?? ViewCards() }
     }
 
-    /// Whether the calendar shows a week or a month in the open place: a saved view's choice on this Mac, else the
+    /// Whether the calendar shows a week or a month in the open place: a saved view's choice in the app's settings, else the
     /// place's default view's. A week until chosen.
     var calendarScale: CalendarScale {
         if case .view(let id) = item { macSettings(for: id).calendarScale ?? .week } else { placeCalendarScales[item] ?? .week }
     }
 
-    /// Changes the calendar's scale. A saved view keeps it on this Mac as it is made, and a place keeps it in its default
-    /// view. Undo takes either back.
+    /// Changes the calendar's scale. A saved view's is kept in the app's settings as it is made, and a place's in its
+    /// default view. Undo takes either back.
     func changeCalendarScale(_ scale: CalendarScale, calendar: Calendar = .chosenWeekStart) {
         // A week shown from a month starts where the calendar's weeks do, as a week chosen in the card does.
         if scale == .week, let day = calendarDay { calendarDay = CalendarLayout.firstDay(ofWeekHolding: day, calendar: calendar) }
@@ -236,8 +236,8 @@ extension Browser {
         PlaceDensities.stored(in: defaults)
     }
 
-    /// Changes the open place's density, where nil follows Settings. A saved view's is kept on this Mac as it is made,
-    /// like the view's other Mac settings, and a place's is kept for the place. Undo takes either back.
+    /// Changes the open place's density, where nil follows Settings. A saved view's is kept in the app's settings as it is made,
+    /// like the view's others, and a place's is kept for the place. Undo takes either back.
     func changeDensity(_ density: Density?) {
         if case .view(let id) = item {
             changeViewSettings(id) { $0.density = density }
@@ -259,7 +259,7 @@ extension Browser {
         densityRevision += 1
     }
 
-    /// Changes what the gallery draws on each card. A saved view's change is kept on this Mac as it is made, and a
+    /// Changes what the gallery draws on each card. A saved view's change is kept in the app's settings as it is made, and a
     /// place's in its default view. Undo takes either back.
     func changeCards(_ change: (inout ViewCards) -> Void) {
         if case .view(let id) = item {
@@ -295,7 +295,7 @@ extension Browser {
         }
     }
 
-    /// Stores a view's settings on this Mac, keeping the widths the table recorded.
+    /// Stores a view's settings in this app, keeping the widths the table recorded.
     func keep(_ settings: ViewMacSettings, for id: ItemID) {
         var kept = settings
         ViewLayouts.update(in: defaults) {
@@ -305,7 +305,7 @@ extension Browser {
         viewSeeds[id]?.mac = kept
     }
 
-    /// Takes the person's own change of layout, which a view keeps on this Mac at once. Undo goes back to the layout
+    /// Takes the person's own change of layout, which is kept in the app's settings at once. Undo goes back to the layout
     /// the window showed.
     func recordLayout(from old: ItemViewMode) {
         guard !isApplyingLayout else { return }
@@ -395,7 +395,7 @@ extension Browser {
         ViewLayouts.update(in: defaults) { $0.forget(id) }
     }
 
-    /// Deletes the view for good, once the person confirmed. Nothing of it stays on this Mac, and its panel closes
+    /// Deletes the view for good, once the person confirmed. Nothing of it stays in the app's settings, and its panel closes
     /// with nothing said: the person did this.
     func deleteView(_ id: ItemID, in library: any ItemLibrary) async {
         deletingView = nil

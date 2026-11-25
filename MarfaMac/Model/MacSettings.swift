@@ -1,8 +1,8 @@
 import Foundation
 
-/// Every setting the app keeps on this Mac, named once. Settings > General > Reset This App's Settings clears exactly these, and
+/// Every setting the app keeps in its defaults, named once. Settings > General > Reset This App's Settings clears exactly these, and
 /// a launch of the sample library clears them for a clean start, so a setting added to the app is added here and to
-/// [Settings storage](../../docs/settings-storage.md) or it is missed by both. The copy of the library, its queue, the
+/// `PreferencesMap` or it is missed by both. The copy of the library, its queue, the
 /// sign-in and the connection are not settings, and a value set aside because it could not be read is kept for recovery.
 enum MacSettings {
     /// The keys, one for each setting.

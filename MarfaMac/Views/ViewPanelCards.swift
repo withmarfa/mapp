@@ -2,8 +2,8 @@ import SwiftUI
 
 /// The panel's section for a gallery, in place of Columns: what fills each card's picture area, and how large a card
 /// is, and its shape. What a card says under its picture is its type's look (`TypeLook`) until the view's Properties
-/// list changes it. A saved view's choices are kept on this Mac as they are made, and a place's last as long as the
-/// window (`Browser.changeCards`).
+/// list changes it. A saved view's choices are kept in the app's settings as they are made, and a place's in its
+/// default view (`Browser.changeCards`).
 struct ViewPanelCards: View {
     let browser: Browser
     let panel: ViewPanel

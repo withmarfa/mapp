@@ -18,7 +18,7 @@ struct FilterCommands: View {
 }
 
 /// The table's part of View Options (`CurrentViewOptions`): Sort, Group and Properties. Sort and Group are the place's, kept
-/// in its default view or written to its saved view; Properties are kept on this Mac (`Browser.changeProperties`). The list
+/// in its default view or written to its saved view; Properties are kept in the app's settings (`Browser.changeProperties`). The list
 /// and the gallery of every place take the same Sort, Group and Properties, without the table's rows at a time (`table`
 /// false), and show the starting order Settings > Lists gives until the place has its own.
 struct ItemTableViewOptions: View {
