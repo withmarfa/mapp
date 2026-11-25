@@ -51,13 +51,13 @@ struct MarfaPanelContent {
 /// connected to. A latest update opens its source's place.
 struct MarfaPanel: View {
     @State private var showsAll = false
-    @State private var isOverMarfas = false
     let content: MarfaPanelContent
     /// Nil where no server is asked, so no sync is told.
     let lastSynced: Date?
     let open: (Place) -> Void
     let addMarfa: () -> Void
 
+    static let width: CGFloat = 300
     private static let rowHeight: CGFloat = 28
 
     var body: some View {
@@ -80,7 +80,7 @@ struct MarfaPanel: View {
         }
         .padding(.top, 14)
         .padding(.bottom, 6)
-        .frame(width: 300)
+        .frame(width: Self.width)
         .accessibilityIdentifier("MarfaPanel")
     }
 
@@ -148,7 +148,6 @@ struct MarfaPanel: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .opacity(isOverMarfas ? 1 : 0)
                 .help("Use Another Marfa")
                 .accessibilityLabel(Text("Use Another Marfa"))
                 .accessibilityIdentifier("MarfaPanelAdd")
@@ -169,7 +168,6 @@ struct MarfaPanel: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isSelected)
         }
-        .onHover { isOverMarfas = $0 }
     }
 
     // MARK: Parts

@@ -30,16 +30,18 @@ struct SidebarFoot: View {
             openPanel: host == nil ? nil : { showsPanel.toggle() },
             openProblems: { browser.showSettings(.connection) },
             openSettings: { browser.showSettings() })
-        .popover(isPresented: $showsPanel, arrowEdge: .top) {
+        // The panel's leading edge lines up with the row's, as the board draws it, not centred on the foot.
+        .popover(isPresented: $showsPanel, attachmentAnchor: .rect(.rect(CGRect(x: 10, y: 0, width: MarfaPanel.width, height: 56))), arrowEdge: .top) {
             if let host { panel(name, host: host) }
         }
     }
 
     private func panel(_ name: String, host: MarfaHost) -> some View {
         let address = host.configuredConnection.map { SettingsWording.hostName(of: $0.address) } ?? ""
+        let standing = FootStanding(host: host)
         return MarfaPanel(
             content: MarfaPanelContent(library: library, name: name, address: address),
-            lastSynced: host.hasServer ? host.lastSynced : nil,
+            lastSynced: standing.hasServer ? standing.lastSynced : nil,
             open: { place in
                 showsPanel = false
                 browser.show(PlaceView(place), in: library, order: order)
@@ -84,7 +86,7 @@ struct SidebarFootRow: View {
         ZStack {
             Button(action: { openPanel?() }) {
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(.primary.opacity(isHovering || isPanelOpen ? 0.055 : 0))
+                    .fill(.primary.opacity(isPanelOpen ? 0.055 : isHovering ? 0.045 : 0))
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
@@ -94,7 +96,7 @@ struct SidebarFootRow: View {
             .accessibilityLabel(Text(verbatim: name))
             .accessibilityHint(Text("Shows the Marfa’s latest updates."))
             .accessibilityIdentifier("SidebarMarfa")
-            HStack(alignment: .center, spacing: 6) {
+            HStack(alignment: .center, spacing: 4) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: name)
                         .interfaceFont(.body.weight(.medium))
@@ -142,7 +144,9 @@ struct SidebarFootRow: View {
     /// One quiet line, a step below the name, and the small Refresh after it. Where the person has to act the line is
     /// as strong as the name, after a warning mark, and opens Problems in Settings.
     private func syncRow(_ line: SyncFootLine) -> some View {
-        HStack(spacing: 4) {
+        // Refresh takes no room until it shows, so a long line keeps the whole of its width.
+        let showsRefresh = isHovering || focus == .refresh
+        return HStack(spacing: 0) {
             if line.asksForAction {
                 Button(action: openProblems) { syncLine(line) }
                     .buttonStyle(.plain)
@@ -155,6 +159,7 @@ struct SidebarFootRow: View {
             if line.showsSpinner {
                 ProgressView()
                     .controlSize(.mini)
+                    .padding(.leading, 4)
                     .accessibilityHidden(true)
             }
             Button(action: refresh) {
@@ -167,7 +172,9 @@ struct SidebarFootRow: View {
             .disabled(!canRefresh)
             .focused($focus, equals: .refresh)
             .simultaneousGesture(TapGesture().onEnded { focus = nil })
-            .opacity(isHovering || focus == .refresh ? 1 : 0)
+            .opacity(showsRefresh ? 1 : 0)
+            .padding(.leading, showsRefresh ? 4 : 0)
+            .frame(width: showsRefresh ? nil : 0)
             .accessibilityHidden(false)
             .help("Refresh")
             .accessibilityLabel(Text("Refresh"))
