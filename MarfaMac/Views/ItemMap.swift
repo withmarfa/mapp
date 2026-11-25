@@ -33,10 +33,7 @@ struct ItemMap: View {
             }
             .overlay(alignment: .bottomTrailing) { MapControls(controller: controller, browser: browser) }
             .overlay(alignment: .bottom) {
-                if let placing, !placing.unplaced.isEmpty {
-                    NoLocationPill(ids: placing.unplaced, browser: browser)
-                        .padding(.bottom, 14)
-                }
+                if let placing, !placing.unplaced.isEmpty { NoLocationPill(ids: placing.unplaced, browser: browser) }
             }
             .overlay {
                 if let placing, placing.pins.isEmpty, !items.isEmpty { NothingOnMap() }
@@ -82,6 +79,8 @@ private struct NothingOnMap: View {
 private struct MapControls: View {
     let controller: MapController
     let browser: Browser
+    @Environment(SelectionSummary.self) private var summary: SelectionSummary?
+    @Environment(\.interfaceTextSize) private var textSize
 
     var body: some View {
         HStack(spacing: 8) {
@@ -97,7 +96,8 @@ private struct MapControls: View {
             .accessibilityIdentifier("MapFit")
         }
         .padding(.trailing, 14)
-        .padding(.bottom, 34)
+        // Above Apple's Legal link, and above the capsule while several items are chosen.
+        .padding(.bottom, 34 + (summary?.isCapsuleShown == true ? SelectionSummary.capsuleRoom(scale: InterfaceStyle.scale(for: textSize)) - 22 : 0))
     }
 }
 
@@ -107,6 +107,8 @@ private struct NoLocationPill: View {
     let ids: [ItemID]
     let browser: Browser
     @State private var isOpen = false
+    @Environment(SelectionSummary.self) private var summary: SelectionSummary?
+    @Environment(\.interfaceTextSize) private var textSize
 
     var body: some View {
         Button { isOpen.toggle() } label: {
@@ -121,6 +123,7 @@ private struct NoLocationPill: View {
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .capsule)
+        .padding(.bottom, summary?.isCapsuleShown == true ? SelectionSummary.capsuleRoom(scale: InterfaceStyle.scale(for: textSize)) : 14)
         .popover(isPresented: $isOpen, arrowEdge: .top) { UnplacedList(ids: ids, browser: browser, isOpen: $isOpen) }
         .accessibilityLabel(Text("No Location, \(ids.count) items"))
         .accessibilityAddTraits(.isButton)
