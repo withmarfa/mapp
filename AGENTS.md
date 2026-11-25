@@ -16,7 +16,7 @@ A macOS app for a Marfa server's items. It works only through the `marfa-swift` 
 | A command, a menu or a shortcut | `docs/commands.md` |
 | A view, layout, filter, group, index or search | `docs/lists.md` |
 | What a row, card or column says | `docs/type-looks.md` |
-| An item's page or the panel beside it | `docs/item-page.md` |
+| An item's page or its panel | `docs/item-page.md` |
 | Making an item, its type, or a value's panel | `docs/editing.md`, `docs/value-panels.md` |
 | The Settings window | `docs/settings-window.md`; for `Settings/Marfa/`, `docs/owner-settings.md` |
 | Where a setting is kept | `docs/settings-sync.md` |
