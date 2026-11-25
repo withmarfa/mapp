@@ -877,15 +877,6 @@
     "%lld events." : {
 
     },
-    "%lld hours" : {
-
-    },
-    "%lld in progress" : {
-      "extractionState" : "manual"
-    },
-    "%lld in the trash" : {
-
-    },
     "%lld files were skipped because Marfa sets this property." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -908,6 +899,15 @@
           }
         }
       }
+    },
+    "%lld hours" : {
+
+    },
+    "%lld in progress" : {
+      "extractionState" : "manual"
+    },
+    "%lld in the trash" : {
+
     },
     "%lld items" : {
       "extractionState" : "manual",
@@ -2461,7 +2461,42 @@
     "Archive Is Empty" : {
 
     },
+    "Archive All" : {
+
+    },
+    "Archive Only These Items" : {
+
+    },
+    "Archive Only This Item" : {
+
+    },
+    "Archive ^[%lld item](inflect: true) and the ^[%lld item](inflect: true) under them?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Archive ^[%1$lld item](inflect: true) and the ^[%2$lld item](inflect: true) under them?"
+          }
+        }
+      }
+    },
+    "Archive or Unarchive" : {
+
+    },
+    "Archive “%@” and the ^[%lld item](inflect: true) under it?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Archive “%1$@” and the ^[%2$lld item](inflect: true) under it?"
+          }
+        }
+      }
+    },
     "Archived Items" : {
+
+    },
+    "Archived items leave your lists. You can find them in Library > Archive." : {
 
     },
     "Archived “%@”" : {
@@ -4083,9 +4118,6 @@
 
     },
     "Disk" : {
-
-    },
-    "Dismiss" : {
 
     },
     "Display" : {
@@ -6279,6 +6311,9 @@
     "Move Up" : {
 
     },
+    "Move ^[%lld item](inflect: true) to the Feed?" : {
+
+    },
     "Move to Feed" : {
 
     },
@@ -6289,6 +6324,9 @@
 
     },
     "Move to Tab" : {
+
+    },
+    "Move “%@” to the Feed?" : {
 
     },
     "Moved an item to Recently Deleted" : {
@@ -9200,6 +9238,15 @@
       "extractionState" : "manual"
     },
     "The Connector" : {
+
+    },
+    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
+
+    },
+    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
+
+    },
+    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
 
     },
     "The Folder Is Missing Where This Copy Is Kept" : {

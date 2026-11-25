@@ -37,9 +37,9 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | `unarchive(_:undoManager:moved:)` | Each archived item (`unarchivePlan`) | An active item |
 
 - **`ItemLibrary.perform(_:on:undoManager:details:)` is the one way a menu runs a move.** It asks first where it must, then calls `Browser.move`.
-- **A menu shows what `menuMoves` lists:** each move that would change at least one item, so a selection in both tiers lists Keep in Library and Move to Feed. Archive is listed whenever any item can be archived, and Unarchive only when none can. The menu bar and the More menu keep all three, dimmed where nothing would change. Keep, Move to Feed and Archive end the item menu before Delete.
+- **An item menu lists what `menuMoves` gives:** each tier move that would change an item, then Archive if any item can be archived, else Unarchive. They end the menu before Delete. The menu bar and More keep all three, dimmed where nothing would change.
 - **Archive and Unarchive are one command, ⌃⌘A,** which toggles by state and archives a mixed selection.
-- **A toast follows each move** (`Browser.move`): "Kept “x” in the Library", "Moved “x” to the Feed", "Archived “x”" or "Unarchived “x”", or the count. It shows only what the copy queued, and only once the library has answered. Its Undo is the step the move registered, so where the write it reverses is not yet answered the library puts the step back and tells the person.
+- **A toast follows each move** (`Browser.move`): "Kept “x” in the Library", "Moved “x” to the Feed", "Archived “x”" or "Unarchived “x”", or the count. It shows only what the copy queued. Its Undo is the step the move registered, and the library says so if it puts the step back.
 - **Archive asks when items are under the selection:** Archive All, Archive Only This Item or Cancel, with the count `archivePlan` puts beneath (`ArchiveRequest`).
 - **Move to Feed asks when the Feed would let the items go** (`FeedLimitRequest`). `feedLimitQuestion` answers nil until the catalogue gives a type's feed window (withmarfa/marfa#3560, withmarfa/marfa-swift#559), so no question is asked yet.
 - **A collection can be archived and is never moved to the Feed.** A table gets no Move to Feed once the package says which types hold one (withmarfa/marfa-swift#561).
