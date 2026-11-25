@@ -169,6 +169,8 @@ extension MarfaHost {
     /// between the read and the removal is read and asked again, once.
     func removeCopy(_ connection: MarfaConnection, agreed: Agreed, retrying: Bool = false) async -> Removal {
         let directory = location.directory(for: connection)
+        // Recorded first, so every spelling of the origin still names this folder, and its mark, once it is gone.
+        try? location.copies.change { $0.origins[MarfaCopies.origin(of: connection)] = directory.lastPathComponent }
         do {
             try await remover(location.store(for: connection), agreed)
             // The package removes the copy's files and leaves the folder that held them, which it releases its

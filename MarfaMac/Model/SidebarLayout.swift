@@ -556,8 +556,8 @@ struct SidebarPlan {
     }
 }
 
-/// The layouts a person has made, one for each library, kept in the defaults. A library is named by its server's
-/// address, so each keeps its own. A saved layout that cannot be read, such as one a later version of the app wrote,
+/// The layouts a person has made, one for each library, kept in the defaults. A library is named by the Marfa its copy
+/// holds (`Libraries.libraryKey`), so each keeps its own. A saved layout that cannot be read, such as one a later version of the app wrote,
 /// is moved aside under a key of its own, kept and never removed, and reported; the other libraries keep theirs, that
 /// library's sidebar starts from the default, and changes are saved as before. A change to one library's layout writes
 /// only its entry: every other entry is written back in the bytes it was stored in.
