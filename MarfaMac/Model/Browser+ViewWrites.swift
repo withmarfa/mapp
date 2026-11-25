@@ -181,10 +181,13 @@ extension Browser {
 
     /// A view groups by one thing, so its timeline's date and a grouping by that date's day are one setting: a change
     /// of either moves the other with it. A grouping by anything else leaves the timeline on each type's own date.
+    /// Both changed at once, as Undo and Revert View put them back, are already one setting.
     func followDayGrouping(in place: PlaceView, from before: ViewChoices) {
         var options = tableOptions[place] ?? ItemTableOptions()
         let date = timelineFields[place]
-        if date != before.timelineDate {
+        if date != before.timelineDate, options.grouping != before.options.grouping {
+            return
+        } else if date != before.timelineDate {
             let grouping: ItemTableOptions.Grouping = date.map { .column(Self.fieldColumnPrefix + $0, by: .bucket(.day)) } ?? .none
             guard options.grouping != grouping else { return }
             options.grouping = grouping

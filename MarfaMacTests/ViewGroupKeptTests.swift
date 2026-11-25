@@ -220,6 +220,21 @@ struct ViewGroupKeptTests {
         #expect(!browser.hasViewChanges)
     }
 
+    @Test func undoingATimelineDatePutsBackTheGroupingItMoved() {
+        let (browser, _) = Self.opened(Self.view(LibraryViewGroup(field: "properties.priority")))
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        browser.undoManager = undo
+        undo.beginUndoGrouping()
+        browser.timelineFields[browser.shown] = "starts_at"
+        browser.choicesChanged()
+        undo.endUndoGrouping()
+        #expect(browser.tableOptions[browser.shown]?.grouping == .column("field.starts_at", by: .bucket(.day)))
+        undo.undo()
+        #expect(browser.timelineFields[browser.shown] == nil)
+        #expect(browser.tableOptions[browser.shown]?.grouping == .column("field.priority"))
+    }
+
     // MARK: Another app's change merged into a write
 
     /// A window showing the view, as it opens.
