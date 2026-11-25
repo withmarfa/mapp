@@ -242,8 +242,8 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         var values = encoder.container(keyedBy: CodingKeys.self)
         // Sets are written sorted, so a change elsewhere rewrites none of them.
         try values.encode(hidden.sorted(), forKey: .hidden)
-        let shown = shown.subtracting(hidden)
-        if !shown.isEmpty { try values.encode(shown.sorted(), forKey: .shown) }
+        let shownKeys = shown.subtracting(hidden)
+        if !shownKeys.isEmpty { try values.encode(shownKeys.sorted(), forKey: .shown) }
         try values.encode(order, forKey: .order)
         try values.encode(collapsed.sorted(), forKey: .collapsed)
         try values.encodeIfPresent(tabs, forKey: .tabs)
@@ -330,7 +330,7 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
               move(places, shown: shown, by: \.key, fromOffsets: source, toOffset: destination) else { return }
         tabs = allTabs
         groups = allGroups
-        let dragged = source.filter(shown.indices.contains).map { (shown[$0].key, group) }
+        let dragged = source.filter { shown.indices.contains($0) }.map { (shown[$0].key, group) }
         homes = (homes ?? [:]).merging(dragged) { _, new in new }
     }
 
@@ -343,7 +343,7 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     ) -> Bool {
         let shownKeys = Set(shown.map(key))
         let before = shown.map(key)
-        let source = source.filter(before.indices.contains)
+        let source = source.filter { before.indices.contains($0) }
         var visible = before
         let moved = source.map { visible[$0] }
         let target = destination - source.filter { $0 < destination }.count
