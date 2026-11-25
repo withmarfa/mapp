@@ -37,20 +37,21 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 ### The line
 
 - **Keys:** Tab moves the kind, `#` a tag, `@` a parent, `/` a property. Before typing, each row offers the most recent (`NewItemRecents`).
-- **Add (↩) keeps the line open, empty, with the same kind,** and says "Added “name”" with an Undo of that add alone. ⌘↩ adds and opens; ⇧↩ moves the draft to the text form.
-- **A tag is `#` and a letter at a word's start** (`NewItemText.takeTags`), taken when a space or Add ends it. `Issue #12` and a reserved tag stay text.
-- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), read in the person's locale: `27/11` in Britain, `11/27` in the United States, `Fri 27 Nov`. Its words leave the title. Removing its token keeps them as text.
+- **Add (↩) keeps the line open, empty, with the same kind,** and says "Added “name”" with an Undo of that add alone. ⌘↩ adds and opens; ⇧↩ moves this line's draft to the text form.
+- **A tag is `#` and a letter at a word's start** (`NewItemText.takeTags`), taken when a space or Add ends it. `Issue #12` and reserved tags stay text.
+- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), read in the person's locale: `27/11` in Britain, `11/27` in the United States, `Fri 27 Nov`. Its whole words leave the title. Removing its token keeps them as text.
 - **A web address pasted into an empty line makes a bookmark of it** (`QuickAdd.bookmarkKind`).
+- **A kind change sets aside values it cannot hold** (`QuickAdd.tellSetAside`).
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps each new item typed and not added, through a closed window, a quit and a refused write. A slot is `Slot.line` or `Slot.inPlace(_:)`; a library is its `serverKey`.
+`NewItemDrafts` keeps each new item typed and not added, through a closed window, a quit and a refused write. A slot is `Slot.line` or `Slot.inPlace(_:)`; a library is its instance (`serverKey`).
 
 | Call | Does |
 | --- | --- |
-| `make(_:_:in:)`, `take(_:in:)` | Start a draft, or claim the latest kept one. Two holders never share one |
+| `make(_:_:in:)`, `take(_:in:)` | Start or claim a draft. Two holders never share one |
 | `update(_:_:)`, `escape(_:)` | Keep what was typed, and drop a draft that is empty |
-| `added(_:as:)`, `settle(in:)` | Hold the draft until the library holds the item; give back one it refused (`takeReturned(_:in:)`) |
+| `sending(_:as:)`, `settle(in:)` | Keep the item's ID first; hide the draft until Marfa accepts or refuses it for good (`takeReturned(_:in:)`) |
 | `release(_:)`, `drop(_:)` | The holder went, or the person cleared it |
 
 A kept file no longer on disk is named when its draft comes back.

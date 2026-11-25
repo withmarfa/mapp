@@ -1602,7 +1602,6 @@
     "Add Filter" : {},
     "Add Person to %@" : {},
     "Add Person…" : {},
-    "Add Property" : {},
     "Add Relationship" : {
       "extractionState" : "manual"
     },
@@ -2329,7 +2328,6 @@
       "extractionState" : "manual"
     },
     "Connection" : {},
-    "Connection Actions" : {},
     "Connector" : {},
     "Connector Deliveries" : {},
     "Connector Deliveries, Handled" : {},
@@ -3737,6 +3735,7 @@
     "New Items" : {},
     "New Items Are" : {},
     "New Items Go To" : {},
+    "New Items Not Saved" : {},
     "New Key" : {},
     "New Key…" : {},
     "New Link" : {},
@@ -3827,8 +3826,6 @@
     "No Owner Permissions" : {},
     "No Plugins Installed" : {},
     "No Preview Yet" : {},
-    "No Properties" : {},
-    "No Relationships" : {},
     "No Results" : {},
     "No Server Settings" : {},
     "No Shortcuts Found" : {},
@@ -3837,7 +3834,6 @@
     },
     "No Sources Yet" : {},
     "No Status" : {},
-    "No Tags" : {},
     "No Types" : {},
     "No Types of Your Own" : {},
     "No Value" : {
@@ -3881,6 +3877,7 @@
     "None saved yet." : {},
     "None selected" : {},
     "None yet." : {},
+    "Not Added to the Item" : {},
     "Not Answering" : {},
     "Not Applicable" : {
       "extractionState" : "manual"
@@ -4263,7 +4260,6 @@
     },
     "Pinned Properties" : {},
     "Pinned under the title." : {},
-    "Pinned under the title. Customize Layout on an item of this type changes the same." : {},
     "Place" : {},
     "Places" : {},
     "Plain Text" : {},
@@ -4396,7 +4392,6 @@
     "Relationship Added" : {},
     "Relationship Changed" : {},
     "Relationship Removed" : {},
-    "Relationships" : {},
     "Relative to Today" : {},
     "Relaxed" : {},
     "Relevance" : {
@@ -4411,7 +4406,6 @@
     "Remove %@?" : {},
     "Remove Choice" : {},
     "Remove Condition" : {},
-    "Remove Connection" : {},
     "Remove Downloaded Files" : {
       "extractionState" : "manual"
     },
@@ -4426,7 +4420,6 @@
     "Remove Sort" : {},
     "Remove Tab" : {},
     "Remove Tag" : {},
-    "Remove Tag %@" : {},
     "Remove Tag “%@”" : {},
     "Remove This App’s Settings from %@?" : {},
     "Remove Unused Files" : {},
@@ -5184,6 +5177,7 @@
     "The app can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit the app first, then move the folder “%@” to the Trash. Anything in it that hasn’t reached the server is lost." : {
       "extractionState" : "manual"
     },
+    "The app can’t save what you type in new items on this Mac, so it would be lost if the app quit. It keeps trying." : {},
     "The app can’t tell whether that copy holds changes that haven’t reached the server." : {
       "extractionState" : "manual"
     },
@@ -5308,6 +5302,7 @@
     },
     "The app lost the server partway through." : {},
     "The app needs a window to show the server’s sign-in page over. Open one of its windows, then try again, or use a code instead." : {},
+    "The app quit while this file was being added. Check that it isn’t in the library before you add it again." : {},
     "The app ran into a problem it can’t resolve itself. Choose Refresh to try again." : {},
     "The app reads and writes your library on a Marfa server. Enter its address and sign in from Settings." : {
       "extractionState" : "manual"
@@ -5337,7 +5332,6 @@
     "The collection is deleted for every app connected to your Marfa server." : {},
     "The command line." : {},
     "The command line’s way in." : {},
-    "The connection could not be removed." : {},
     "The connections could not be saved. Your selection has been kept." : {
       "extractionState" : "manual"
     },
@@ -5423,6 +5417,7 @@
     "The key itself stays the same, so nothing using it needs to change." : {},
     "The key or app that created this webhook no longer has access. Create a new webhook for future deliveries." : {},
     "The key “%@” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page." : {},
+    "The kind of item added can’t hold these, so they were left out." : {},
     "The last backup didn’t finish" : {},
     "The last backup run failed or lost files." : {},
     "The last check found no answer." : {},
@@ -5590,7 +5585,6 @@
     "The sign-in was declined at %@." : {},
     "The sign-in wasn’t confirmed partway through." : {},
     "The source can’t change later." : {},
-    "The tag could not be added." : {},
     "The time couldn’t be saved." : {},
     "The time in “%@” wasn’t cleared. %@" : {},
     "The title could not be saved. Enter a title." : {
