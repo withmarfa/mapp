@@ -27,7 +27,7 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ## Making an item
 
-- **`Browser.openNewItem` is every New's one way in,** the any-app shortcut and the search's New Item among them. It opens the new-item line, or the text form where New Opens says so (`NewOpens`) or the line cannot make the kind (`QuickAdd.lineOffers`).
+- **`Browser.openNewItem` opens each New command.** In a window, New Opens (`NewOpens`) chooses the line or the text form. The any-app shortcut requests the line. A kind that the line cannot make opens in the text form (`QuickAdd.lineOffers`).
 - **The kind to start with:** a type's own place starts with that type; anywhere else, New Items Are, then the last kind used, then a note (`QuickAdd.startingType`).
 - **One create holds the properties, tags and tier** (`Browser.saveQuickAdd`). The parent is a second write, and a refused parent is told. The In row sets the tier, starting from the place.
 - **A type gives a new item only its first status that has not started** (`QuickAdd.prefill`).

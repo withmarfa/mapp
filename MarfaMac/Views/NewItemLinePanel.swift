@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 /// typed to the text form. Escape or a click outside puts it away, keeping what was typed (`NewItemDrafts`).
 ///
 /// The window shows it over its content, with the window's toast; over another app it stands in a panel of its own
-/// (`AnywherePanel`), which has no toast, so it says what it added on a line of its own, with Undo.
+/// (`NewItemAnywhere`), with an Added message and Undo in the panel.
 struct NewItemLinePanel: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries

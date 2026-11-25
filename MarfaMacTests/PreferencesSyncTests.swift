@@ -263,7 +263,7 @@ import Testing
         PreferenceUnit.row(.sidebar, setting: "layout", key: "tabs"),
         PreferenceUnit.member(.search, "searchLeaveOuts"),
         PreferenceUnit.row(.commands, setting: "shortcut", key: "newItem"),
-        PreferenceUnit.row(.commands, setting: "anyAppShortcut", key: "newItem"),
+        PreferenceUnit.row(.commands, setting: "anyAppShortcut", key: "quickAdd"),
     ])
     func aValueAStoreCannotReadIsNeverDeletedFromTheMarfa(unit: PreferenceUnit) async throws {
         let later = #""a shape a later version of the app writes""#
