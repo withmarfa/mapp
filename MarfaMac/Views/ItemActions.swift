@@ -85,8 +85,8 @@ struct FavoriteButton: View {
     var shortcuts: ShortcutBindings?
 
     var body: some View {
-        // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change.
-        let active = ItemActionContext(library: library, ids: ids, keepsPlace: true).items.filter { $0.state == .active }
+        // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change. An archived one takes it.
+        let active = ItemActionContext(library: library, ids: ids, keepsPlace: true).items.filter { $0.state != .trashed }
         let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
         Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
             library.setFavorite(ids, !allFavorites, undoManager: undoManager)

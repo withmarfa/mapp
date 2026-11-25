@@ -29,6 +29,7 @@ struct RowQuickActions: View {
                     Button(move.name, systemImage: move.symbol) {
                         library.perform(move, on: [id], undoManager: undoManager, details: details)
                     }
+                    .labelStyle(.titleAndIcon)
                     .appButton(.secondary, size: .small)
                     .accessibilityIdentifier("RowAction.\(move.name)")
                 case .delete:
