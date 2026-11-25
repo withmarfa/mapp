@@ -276,8 +276,8 @@ extension Browser {
     }
 
     /// Makes the table for `key` with its rows sorted off the main actor, and shows it once it is still the one asked for.
-    /// One sort runs at a time: a newer arrangement waits for the one under way to end, and an arrangement replaced
-    /// meanwhile ends without sorting, so a steady run of edits never piles sorts up.
+    /// One arrangement works off the main actor at a time: a newer one waits for the one it replaces to end, which it does
+    /// at its next step, so a steady run of edits never piles sorts up.
     private func arrange(
         _ key: TableKey, items: [Item], after earlier: (key: TableKey, content: ItemTableContent), in library: any ItemLibrary
     ) {
@@ -289,33 +289,48 @@ extension Browser {
             && key.derived.ids == earlier.key.derived.ids && key.derived.byRelevance == earlier.key.derived.byRelevance
         // Only the items' own changes settle: a membership change may have taken an item away, which must not stay chosen.
         let settles = sameChoices && key.derived.membership == earlier.key.derived.membership
-        let previous = sorting
+        // The arrangement replaced ends once the work it has off the main actor ends.
+        let previous = arranging?.task
+        let options = tableOptions[shown] ?? ItemTableOptions()
         let task = Task { [weak self] in
             if settles { try? await Task.sleep(for: Browser.arrangeSettling) }
-            _ = await previous?.value
-            guard let self else { return }
-            // An arrangement that ends without landing lets the next ask for this key arrange it again.
-            func end() { if self.arranging?.key == key { self.arranging = nil } }
-            guard !Task.isCancelled, self.shown == place, self.isShowing(library) else { return end() }
-            let start = ContinuousClock.now
-            let content = ItemTableContent(browser: self, library: library, items: items)
-            let kept = content.kept
-            let sort = content.sort
+            await previous?.value
+            guard let self, !Task.isCancelled, self.shown == place, self.isShowing(library) else { self?.endArranging(key); return }
+            // The main actor only reads what the rows are made of, and takes the table as it lands.
+            let looks = self.looks(in: library)
+            let shownRelations = self.shownRelations
+            let wants = await Task.detached(priority: .userInitiated) {
+                ItemTableContent.Wants(items: items, looks: looks, options: options, shown: shownRelations)
+            }.value
+            guard !Task.isCancelled, self.arranging?.key == key, self.shown == place else { return self.endArranging(key) }
+            var start = ContinuousClock.now
+            let reading = ItemTableContent.reading(browser: self, library: library, items: items, wants: wants)
             Cost.record(.tableArrange, since: start)
-            let sorter = Task.detached(priority: .userInitiated) { ItemTableLayout.sorted(kept, by: sort) }
-            self.sorting = sorter
-            let sorted = await sorter.value
-            guard !Task.isCancelled, self.arranging?.key == key, self.shown == place else { return end() }
+            let made = await Task.detached(priority: .userInitiated) { ItemTableContent.Made(reading) }.value
+            guard !Task.isCancelled, self.arranging?.key == key, self.shown == place else { return self.endArranging(key) }
+            start = ContinuousClock.now
+            let content = ItemTableContent(browser: self, library: library, made: made)
+            let ordering = content.ordering
+            Cost.record(.tableArrange, since: start)
+            let ordered = await Task.detached(priority: .userInitiated) { ordering.ordered() }.value
+            guard !Task.isCancelled, self.arranging?.key == key, self.shown == place else { return self.endArranging(key) }
+            start = ContinuousClock.now
             // The chosen row is read as the table lands, where the held table shows it now.
             let pinned = sameChoices && self.selection.count == 1 ? self.selection.first : nil
             let shownRows = self.heldTables[place]?.content.rows ?? earlier.content.rows
-            content.rows = Browser.holding(pinned, in: sorted, as: pinned == nil ? nil : shownRows)
+            content.land(ordered, rows: Browser.holding(pinned, in: ordered.rows, as: pinned == nil ? nil : shownRows))
+            Cost.record(.tableArrange, since: start)
             self.arranging = nil
             self.tableMemo = (key, content)
             self.hold((key, content), for: place)
             self.tableArrangements += 1
         }
         arranging = (key, task)
+    }
+
+    /// Ends the arrangement for `key` that did not land, so the next ask for that table arranges it again.
+    private func endArranging(_ key: TableKey) {
+        if arranging?.key == key { arranging = nil }
     }
 
     /// `rows` with the row of `id` where it stood in `earlier`, where both hold it.

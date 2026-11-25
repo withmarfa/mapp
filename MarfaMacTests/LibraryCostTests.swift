@@ -49,7 +49,7 @@ struct LibraryCostTests {
         line("afterEditMainActor", milliseconds(since: start))
         try #require(await eventually(within: .seconds(60)) { _ = browser.tableContent(in: library); return browser.tableArrangements > before })
         line("afterEditLanded", milliseconds(since: start))
-        // The arrangement's own time on the main actor: its rows made and filtered, before the sort leaves it.
+        // The arrangement's own time on the main actor, which makes, filters and sorts the rows off it.
         line("afterEditArrangeMainActor", Cost.tallies[.tableArrange]?.milliseconds ?? 0)
 
         // Types and Sources, made again as at each change while one shows.
