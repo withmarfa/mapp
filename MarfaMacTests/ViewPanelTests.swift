@@ -861,7 +861,7 @@ struct ViewPanelTests {
         Self.arrive(on: browser) { $0.layout = .board }
         browser.escapeViewPanel(in: library)
         #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.layout == .board, "Cancel leaves another Mac's layout")
-        #expect(browser.viewMode == .table)
+        #expect(browser.viewMode == .board, "Cancel shows the layout another Mac chose meanwhile, never the one before the draft")
         // Create View gives the new view the draft's settings, and leaves the view's own.
         Self.arrive(on: browser) { $0.layout = .table }
         browser.openNewViewPanel(in: library)
@@ -980,18 +980,6 @@ struct ViewPanelTests {
         #expect(browser.tableOptions[browser.shown]?.sort == ViewDraft.options(for: held, catalogue: library.catalogue).sort)
         #expect(browser.tableOptions[browser.shown]?.filter == filter)
         #expect(!browser.hasViewChanges)
-    }
-
-    @Test func cancelOfADraftShowsTheLayoutAnotherMacChoseForTheView() {
-        let (browser, library, undo) = Self.opened()
-        browser.openNewViewPanel(in: library)
-        undo.beginUndoGrouping()
-        browser.viewMode = .gallery
-        Self.close(undo)
-        Self.arrive(on: browser) { $0.layout = .list }
-        browser.escapeViewPanel(in: library)
-        #expect(browser.viewMode == .list)
-        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.layout == .list)
     }
 
     @Test func revertViewIsNotOfferedWhileADraftIsOpenAndChangesNothing() {
