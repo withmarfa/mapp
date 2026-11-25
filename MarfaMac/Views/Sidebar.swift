@@ -195,6 +195,9 @@ private struct SidebarList: View {
     @State private var naming: SidebarNaming?
     @State private var name = ""
     @State private var choosingItem: SidebarItemRequest?
+    /// Whether rows have scrolled under the tabs, which then draw a band; it changes only as the list leaves or reaches its top.
+    @State private var isScrolled = false
+    @State private var tabBarHeight: CGFloat = 0
     let content: SidebarContent
     let browser: Browser
     let order: ItemOrder
@@ -235,9 +238,15 @@ private struct SidebarList: View {
             }
         }
         .listStyle(.sidebar)
+        .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 0.5 } action: { _, new in isScrolled = new }
         .safeAreaInset(edge: .top, spacing: 0) {
             if content.showsTabs {
                 SidebarTabBar(tabs: content.tabs, chosen: content.tab.id, customizing: content.customizing, browser: browser)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { tabBarHeight = $0 }
+                    // Rows scrolled under the tabs pass under a band through the toolbar too, as the foot's does below.
+                    .background(alignment: .bottom) {
+                        ToolbarBand(toolbarHeight: tabBarHeight + TopRowMetrics.lineHeight, isShown: isScrolled)
+                    }
             }
         }
         // The foot is a bar on the list's bottom edge that draws the toolbar's band mirrored, and only while rows pass

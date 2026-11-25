@@ -122,6 +122,8 @@ struct SidebarOfferMenu: View {
                 if let group { pins(in: group) } else { sections }
             }
         }
+        // On macOS a menu item draws its symbol only when the menu asks for it.
+        .labelStyle(.titleAndIcon)
     }
 
     private var heading: String {

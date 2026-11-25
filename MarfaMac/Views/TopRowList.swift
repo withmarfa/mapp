@@ -20,6 +20,7 @@ extension View {
 private struct TopRowOverList: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.interfaceTextSize) private var textSize
+    @AppStorage(ListKey.openItemsIn) private var opening = ItemOpening.standard
     let browser: Browser
     let scroll: TopRowScroll
     let opensPlaces: Bool
@@ -35,8 +36,9 @@ private struct TopRowOverList: ViewModifier {
         let row = TopRowContent.make(browser: browser, library: library)
         // With the sidebar closed the place, its views and the buttons share one row, and so they do at the smallest window.
         // Except in a list column beside a page: there the traffic lights, the sidebar's button and Back and Forward leave
-        // the first line no room for the title, so it, the scope and the views have the row below, which scrolls away.
-        let isCompact = opensPlaces && isBesidePage
+        // the first line no room for the title, so it, the scope and the views have the row below, which scrolls away. So
+        // too at the smallest window over a layout with the page beside it, which leaves the layout no wider than a list.
+        let isCompact = opensPlaces && (isBesidePage || (isSmall && browser.showsBesidePage(opening: opening)))
         let beside = !isCompact && (isAlwaysBeside || browser.isSearchExpanded || browser.isSearching || opensPlaces || isSmall)
         let restHeight = (row.hasViews || isCompact) && !beside
             ? TopRowMetrics.restHeight(scale: InterfaceStyle.scale(for: textSize)) : 0

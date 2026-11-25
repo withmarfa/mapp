@@ -149,10 +149,12 @@ struct SidebarTypesSection: View, Equatable {
         SidebarCustomizeButton(browser: browser)
     }
 
-    /// Makes an item of the row's type, where quick add can make one.
+    /// Makes an item of the row's type, where quick add can make one. A kind of file is made by adding a file, as File is.
     private func add(_ node: TypeNode) -> (() -> Void)? {
-        guard let type = node.type, creatable.contains(type.rawValue) else { return nil }
-        return { browser.openQuickAdd(typeID: type.rawValue, in: library) }
+        guard let type = node.type else { return nil }
+        let made = library.catalogue.isFileType(type) ? TypeID.file : type
+        guard creatable.contains(made.rawValue) else { return nil }
+        return { browser.openQuickAdd(typeID: made.rawValue, in: library) }
     }
 
     private func addName(_ node: TypeNode) -> String {

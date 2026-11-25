@@ -41,14 +41,26 @@ struct PlacesMenu {
 struct PlacesMenuView: View {
     @CurrentLibrary private var library
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
+    @Environment(ShortcutBindings.self) private var shortcuts: ShortcutBindings?
     let menu: PlacesMenu
     let browser: Browser
     let order: ItemOrder
 
     var body: some View {
-        Button("Search", systemImage: "magnifyingglass") { browser.palette = .search }
-        Button("New", systemImage: "square.and.pencil") { browser.openQuickAdd(remembered: lastType, in: library) }
-        Divider()
+        // The keys are drawn beside the commands the menu bar binds them to; a menu's own items bind none.
+        Group {
+            Button("Search", systemImage: "magnifyingglass") { browser.palette = .search }
+                .shortcut(.searchItems, shortcuts)
+            Button("New", systemImage: "square.and.pencil") { browser.openQuickAdd(remembered: lastType, in: library) }
+                .shortcut(.newItem, shortcuts)
+            Divider()
+            places
+        }
+        // On macOS a menu item draws its symbol only when the menu asks for it.
+        .labelStyle(.titleAndIcon)
+    }
+
+    @ViewBuilder private var places: some View {
         rows(menu.places)
         if !menu.pinned.isEmpty {
             Divider()
@@ -68,8 +80,10 @@ struct PlacesMenuView: View {
             Toggle(isOn: Binding { row.entry.item.isSame(browser.shown) } set: { _ in
                 browser.show(menu.menu.destination(of: row.entry, in: library), in: library, order: order)
             }) {
-                label(row)
+                label(row.entry.title, row.entry.icon)
             }
+            // The count at the row's end, as the sidebar draws it; none hides it.
+            .badge(row.count ?? 0)
         }
     }
 
@@ -88,10 +102,6 @@ struct PlacesMenuView: View {
                 label(row.title, row.menuIcon)
             }
         }
-    }
-
-    private func label(_ row: PlacesMenu.Row) -> some View {
-        label(row.count.map { "\(row.entry.title)  \($0.formatted())" } ?? row.entry.title, row.entry.icon)
     }
 
     @ViewBuilder private func label(_ title: String, _ icon: RowIcon) -> some View {
