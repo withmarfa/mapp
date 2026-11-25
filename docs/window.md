@@ -58,7 +58,7 @@ paths:
 
 ## Sidebar closed
 
-- **The title opens the sidebar's rows as a menu** (`PlacesMenu`); place, views and buttons share one row, but in a list column, or under 800 wide with a page beside the layout, the title and views have the row below.
+- **The title opens the sidebar's rows as a menu** (`PlacesMenu`); place, views and buttons share one row, but in a list column, or under 800 wide beside a page, the title and views take the row below.
 
 ## Smallest window
 
