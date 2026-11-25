@@ -59,6 +59,24 @@ struct ViewPropertiesTests {
         #expect(looks[TypeID("core.task")]?.secondary == Self.taskLook.secondary)
     }
 
+    @Test func everyDeclaredFieldIsOfferedAndTheDateItsTypeShowsIsOnUntilHidden() throws {
+        let types = [TypeID("core.task")]
+        let offered = ViewProperties.offered(Self.columns, in: .board, looks: Self.looks, types: types, catalogue: Self.catalogue)
+        // The task's look says its due date as its date, and the panel still lists it, on, as the card shows it.
+        let due = try #require(offered.first { $0.id == "field.due_at" })
+        #expect(ViewProperties().isShown(due))
+        var properties = ViewProperties()
+        properties.setShown(due, false)
+        let looks = Self.resolve(properties)
+        #expect(looks[TypeID("core.task")]?.date == .off)
+        // Shown, it stays the type's date and is never a chip as well.
+        properties.setShown(due, true)
+        #expect(!properties.isChanged)
+        properties.setShown(Self.column("field.priority"), false)
+        #expect(Self.resolve(properties)[TypeID("core.task")]?.date == Self.taskLook.date)
+        #expect(Self.resolve(properties)[TypeID("core.task")]?.facts.contains(.field("due_at")) == false)
+    }
+
     @Test func aPropertyATypeDoesNotDeclareIsSkippedForItAndKeptForTheOthers() {
         var properties = ViewProperties()
         properties.setShown(Self.column("field.completed_at"), true)

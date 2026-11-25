@@ -9,7 +9,8 @@ extension MarfaEngine {
         var properties = JSONObject(draft.properties.sorted { $0.key < $1.key }.map { ($0.key, MarfaMapping.json($0.value)) })
         var body = draft.body
         if let titleField = MarfaMapping.titleField(of: info) {
-            properties[titleField] = .string(draft.title)
+            // An empty title is left out, so a type that requires one refuses the item rather than take "".
+            if !draft.title.isEmpty { properties[titleField] = .string(draft.title) }
         } else if !draft.title.isEmpty {
             body = body.isEmpty ? draft.title : draft.title + "\n\n" + body
         }

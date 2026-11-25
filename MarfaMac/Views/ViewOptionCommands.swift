@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The View Options of every layout as the command palette lists them: each choice not already made.
+/// The View panel's choices for every layout as the command palette lists them: each choice not already made.
 struct ViewOptionCommand {
     let title: String
     let systemImage: String
@@ -86,15 +86,6 @@ struct ViewOptionCommand {
                 browser.tableOptions[place, default: .init()].pageSize = size
             })
         }
-        commands.append(.init(
-            title: String(localized: browser.toggleFiltersTitle),
-            systemImage: "line.3.horizontal.decrease"
-        ) {
-            browser.toggleFilterRow()
-        })
-        commands.append(.init(title: String(localized: "Add Filter…"), systemImage: "line.3.horizontal.decrease") {
-            browser.requestAddFilter()
-        })
         if browser.tableOptions[place]?.isFiltering == true {
             commands.append(.init(title: String(localized: "Clear Filters"), systemImage: "line.3.horizontal.decrease") {
                 browser.clearFilters()
@@ -184,6 +175,32 @@ struct ViewOptionCommand {
         if field != nil {
             commands.append(ViewOptionCommand(title: String(localized: "Date of Each Type"), systemImage: "calendar") {
                 browser.setTimelineField(nil, in: library)
+            })
+        }
+        return commands
+    }
+}
+
+extension ViewOptionCommand {
+    /// Group by's choices as palette commands: each one not already made, by its field and,
+    /// under a field with several, its way ("Group by Due: Week"), then Ungroup.
+    static func grouping(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
+        let offer = browser.groupOffer(in: library)
+        let shown = browser.shownGrouping(in: library)
+        var commands: [ViewOptionCommand] = []
+        for entry in offer.entries {
+            for choice in entry.choices where choice.grouping != shown {
+                // Each value of a field is the field itself; a field's other ways name the way.
+                let title = choice.grouping.mode == .value
+                    ? String(localized: "Group by \(entry.label)") : String(localized: "Group by \(entry.label): \(choice.label)")
+                commands.append(.init(title: title, systemImage: "rectangle.grid.1x2", group: .sortAndGroup) {
+                    browser.chooseGrouping(choice.grouping)
+                })
+            }
+        }
+        if offer.offersNone, shown != .none {
+            commands.append(.init(title: String(localized: "Ungroup"), systemImage: "rectangle.grid.1x2", group: .sortAndGroup) {
+                browser.chooseGrouping(.none)
             })
         }
         return commands

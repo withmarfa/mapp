@@ -16,7 +16,7 @@ struct ItemTimeline: View {
         let _ = daysSeen
         let items = browser.filteredItems(in: library)
         let fields = browser.timelineFieldChoices(in: library)
-        // Chosen in the toolbar's View Options (`ItemTimelineOptions`).
+        // Chosen in the View panel's Timeline section (`ViewPanelLayoutRows`).
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.shown], fields: fields)
         let looks = browser.looks(in: library)
         let now = library.now()

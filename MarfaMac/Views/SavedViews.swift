@@ -10,7 +10,7 @@ enum SavedViews {
             && ViewDraft.query(for: browser.shown, catalogue: library.catalogue, views: library.views) != nil
     }
 
-    /// Whether Edit View has a panel for the window's place: a saved view, or a place that could become one.
+    /// Whether the View panel can save the window's place: a saved view, or a place that could become one.
     static func canEdit(_ browser: Browser, in library: any ItemLibrary) -> Bool {
         library.isLoaded && !browser.showsPlaceIndex
             && (shown(browser, in: library) != nil
@@ -77,7 +77,9 @@ enum SavedViews {
         }
     }
 
-    /// This Mac's settings for a view made of what the window shows: its layout, its Properties, its cards and its density.
+    /// This Mac's settings for a view made of what the window shows: its layout, its Properties, its cards, its density,
+    /// its Open Items and its Quick Actions. Quick Actions is kept as the window shows it, since a view's default differs
+    /// from a place's.
     static func newViewSettings(_ browser: Browser, in library: any ItemLibrary) -> ViewMacSettings {
         var settings = ViewMacSettings(layout: browser.viewMode)
         settings.cards = browser.cards
@@ -85,11 +87,13 @@ enum SavedViews {
         if browser.viewMode == .calendar { settings.calendarScale = browser.calendarScale }
         settings.hidesEmptyGroups = browser.hidesEmptyGroups
         settings.properties = browser.properties
+        settings.opening = browser.chosenOpening
+        settings.quickActions = browser.showsQuickActions
         if let id = browser.shown.savedView { settings.calendarScale = browser.macSettings(for: id).calendarScale }
         return settings
     }
 
-    /// Whether a place that is not a view shows something a view could keep, which Save as View offers to.
+    /// Whether a place's list has filter, sort or group choices a saved view could keep.
     static func hasChoicesToKeep(_ browser: Browser, in library: any ItemLibrary) -> Bool {
         shown(browser, in: library) == nil && canEdit(browser, in: library)
             && (browser.tableOptions[browser.shown]?.isFiltering == true || browser.listShape?.arranged == true)

@@ -72,7 +72,7 @@ struct ColumnSearch: ToolbarContent {
 
 enum ColumnSearchMetrics {
     /// What a column's toolbar keeps beside an open field: the toolbar's margin on each side, so the glass sits as
-    /// far from what precedes it as from the column's end, and Filter and View Options in the same glass.
+    /// far from what precedes it as from the column's end, and the View button in the same glass.
     static let columnChrome: CGFloat = 89
     /// The room the sidebar button takes at the start of the list column's toolbar while the sidebar is hidden.
     static let sidebarButtonRoom: CGFloat = 46
@@ -93,6 +93,8 @@ enum ColumnSearchMetrics {
     static let fieldHeight: CGFloat = 24
     /// The most of the field its tokens take before they scroll, so the text always has room.
     static let chipShare: CGFloat = 0.6
+    /// The widest a token grows before its words are cut short.
+    static let chipWidest: CGFloat = 300
 }
 
 /// A token the field holds: the clause, and how the filter model words it.
@@ -146,8 +148,8 @@ private struct BrowserSearchField: View {
 /// A rounded search field for a toolbar's glass: a magnifier, the tokens, the prompt, and a clear button once there is
 /// something to clear. It takes the keyboard each time it opens, and draws the app's own focus ring and no accent selection.
 ///
-/// One AppKit text field with the tokens drawn beside it, rather than `NSTokenField`: the tokens are the filter row's chips,
-/// not the system's token style, and the field keeps the close-on-blur handling and the quiet caret below.
+/// One AppKit text field with the tokens drawn beside it, rather than `NSTokenField`: the tokens are drawn as chips, not the
+/// system's token style, and the field keeps the close-on-blur handling and the quiet caret below.
 struct ColumnSearchField: View {
     @Binding var text: String
     let prompt: String
@@ -294,7 +296,7 @@ private struct SearchChipView: View {
         .font(.system(size: looks.textSize * scale))
         .padding(.horizontal, looks.padding * scale)
         .frame(height: looks.height * scale)
-        .frame(maxWidth: FilterChipMetrics.widest * scale)
+        .frame(maxWidth: ColumnSearchMetrics.chipWidest * scale)
         .background(
             isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.3)) : AnyShapeStyle(.quaternary.opacity(0.6)),
             in: .rect(cornerRadius: looks.cornerRadius * scale, style: .continuous))

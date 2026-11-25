@@ -142,7 +142,7 @@ import Testing
     @Test func aSaveReadOnALocalCreateFollowsTheSaveBeforeTheAnswers() async throws {
         let (library, source) = try await loaded()
         let id = try #require(library.createItem(
-            typeID: F.note.rawValue, title: "Call the plumber", body: "Leak", parentID: nil, in: .library,
+            typeID: F.note.rawValue, title: "Call the plumber", body: "Leak", parentID: nil, tier: .library,
             undoManager: nil))
         let create = try #require(source.submitted.last?.id)
         var made = F.item(id, F.note, "Call the plumber", age: 0)
@@ -257,7 +257,7 @@ extension LiveMarfaTests {
 
         private func make(_ library: MarfaLibrary, _ source: MarfaSource, _ made: LiveMarfa.Made, _ token: String) async throws -> ItemID {
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MARFAMACTEST review \(token)", body: "start", parentID: nil, in: .library,
+                typeID: "core.note", title: "MARFAMACTEST review \(token)", body: "start", parentID: nil, tier: .library,
                 undoManager: nil))
             made.add(id)
             await source.flush()
@@ -419,7 +419,7 @@ extension LiveMarfaTests {
             try await withLibrary { library, source, made in
                 let token = "zt" + UUID().uuidString.prefix(8).lowercased()
                 let id = try #require(library.createItem(
-                    typeID: "core.note", title: "MARFAMACTEST review \(token)", body: "captured", parentID: nil, in: .feed,
+                    typeID: "core.note", title: "MARFAMACTEST review \(token)", body: "captured", parentID: nil, tier: .feed,
                     undoManager: nil))
                 made.add(id)
                 #expect(await eventually { library.items(in: .feed).contains { $0.id == id } })

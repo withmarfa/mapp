@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-// The panels a filter chip and the + open, and the bodies they hold. They take rows and actions and know nothing of
-// `Browser`; `FilterPanelPresenter` puts one on the screen. `FilterChips.swift` has the row they open from.
+// The bodies of a filter condition's panel, which the View panel's Filter opens in a popover. They take rows and
+// actions and know nothing of `Browser`.
 
 /// A value a filter can take, as the panel lists it.
 struct FilterValueOption: Identifiable, Hashable {
@@ -18,30 +18,22 @@ struct FilterValueOption: Identifiable, Hashable {
     var isIndented = false
 }
 
-/// A field a filter can be added on, as the Filter By panel lists it.
-struct FilterFieldOption: Identifiable, Hashable {
-    let id: String
-    var title: String
-    var symbol: String
-}
-
-/// A run of fields under a heading in Filter By: the place's types' fields, then what every item has.
-struct FilterFieldSection: Identifiable, Hashable {
-    var title: String
-    var fields: [FilterFieldOption]
-    var id: String { title }
-}
-
 /// The operators a field takes, as a pop-up: the fixed ones first, then presence, then dates relative to today under their own
-/// heading.
+/// heading. Where a saved view has `room` conditions left for the clause, an operator that needs more is not offered.
 struct FilterOperatorMenu: View {
     let kind: FilterKind
     let op: FilterOp
+    /// Whether the dates relative to today are offered.
+    var offersRelative = true
+    var room: Int?
     let choose: (FilterOp) -> Void
 
-    static func sections(for kind: FilterKind) -> [(title: String?, ops: [FilterOp])] {
+    static func sections(
+        for kind: FilterKind, relative: Bool = true, room: Int? = nil, current: FilterOp? = nil
+    ) -> [(title: String?, ops: [FilterOp])] {
         var result: [(title: String?, ops: [FilterOp])] = []
-        for entry in FilterOp.offered(for: kind) {
+        let fits = { (op: FilterOp) in op == current || room.map { ViewDraft.terms(of: op) <= $0 } ?? true }
+        for entry in FilterOp.offered(for: kind) where (relative || !entry.op.isRelative) && fits(entry.op) {
             if entry.startsSection || result.isEmpty {
                 result.append((entry.op.isRelative ? String(localized: "Relative to Today") : nil, []))
             }
@@ -51,7 +43,7 @@ struct FilterOperatorMenu: View {
     }
 
     var body: some View {
-        let sections = Self.sections(for: kind)
+        let sections = Self.sections(for: kind, relative: offersRelative, room: room, current: op)
         Menu {
             ForEach(sections.indices, id: \.self) { index in
                 if let title = sections[index].title {
@@ -83,6 +75,8 @@ struct FilterClausePanel<Content: View>: View {
     let field: String
     let kind: FilterKind
     let op: FilterOp
+    var offersRelative = true
+    var room: Int?
     let setOperator: (FilterOp) -> Void
     @ViewBuilder let content: Content
     @Environment(\.interfaceTextSize) private var textSize
@@ -92,7 +86,7 @@ struct FilterClausePanel<Content: View>: View {
         VStack(alignment: .leading, spacing: 6 * scale) {
             HStack(spacing: 6 * scale) {
                 Text(verbatim: field).fontWeight(.semibold)
-                FilterOperatorMenu(kind: kind, op: op, choose: setOperator)
+                FilterOperatorMenu(kind: kind, op: op, offersRelative: offersRelative, room: room, choose: setOperator)
                 Spacer(minLength: 0)
             }
             .font(.system(size: ValueEditMetrics.textSize * scale))
@@ -282,160 +276,6 @@ struct FilterTextBody: View {
             .padding(.horizontal, ValueEditMetrics.padding * scale)
             .onAppear { isFocused = true }
             .accessibilityIdentifier("FilterText")
-    }
-}
-
-/// The command palette's chip panel: the field's name, an is / is not pop-up, the chosen values as chips in a field, then the
-/// values still to pick, flush left with their marks. Picking adds a value and the panel stays open, since a filter holds several.
-struct FilterValuePanel: View {
-    let field: String
-    let isNegated: Bool
-    let chosen: [ValueChip]
-    let options: [FilterValueOption]
-    let setNegated: @MainActor (Bool) -> Void
-    let add: (String) -> Void
-    let remove: (String) -> Void
-    @Environment(\.interfaceTextSize) private var textSize
-
-    var body: some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        VStack(alignment: .leading, spacing: 6 * scale) {
-            HStack(spacing: 6 * scale) {
-                Text(verbatim: field).fontWeight(.semibold)
-                Picker("Relation", selection: Binding(get: { isNegated }, set: setNegated)) {
-                    Text("is").tag(false)
-                    Text("is not").tag(true)
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-                .accessibilityIdentifier("FilterRelation")
-                Spacer(minLength: 0)
-            }
-            .font(.system(size: ValueEditMetrics.textSize * scale))
-            .padding(.horizontal, 8 * scale)
-            .padding(.top, 4 * scale)
-            ChipFieldLayout(spacing: 4 * scale, lineHeight: 20 * scale) {
-                ForEach(chosen) { chip in
-                    ValueChipView(chip: chip, scale: scale) { remove(chip.id) }
-                }
-                if chosen.isEmpty {
-                    Text("Choose a value").font(.system(size: 12 * scale)).foregroundStyle(.tertiary)
-                } else {
-                    Color.clear.frame(height: 1)
-                }
-            }
-            .padding(6 * scale)
-            .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7 * scale, style: .continuous))
-            .padding(.horizontal, ValueEditMetrics.padding * scale)
-            Divider().padding(.horizontal, 8 * scale)
-            if options.isEmpty {
-                Text("No more values").foregroundStyle(.secondary)
-                    .font(.system(size: ValueEditMetrics.textSize * scale))
-                    .padding(.horizontal, 8 * scale)
-                    .frame(height: ValueEditMetrics.rowHeight * scale)
-            } else {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(options) { option in
-                            FilterOptionRow(option: option, scale: scale) { add(option.id) }
-                        }
-                    }
-                    .padding(.horizontal, ValueEditMetrics.padding * scale)
-                }
-                .frame(height: min(CGFloat(options.count), CGFloat(ValueEditMetrics.visibleRows)) * ValueEditMetrics.rowHeight * scale)
-            }
-        }
-        .padding(.bottom, ValueEditMetrics.padding * scale)
-        .accessibilityIdentifier("FilterValuePanel")
-    }
-}
-
-
-/// The Filter By panel (N7): a search field, then the fields a filter can be added on, each with its symbol, in the sections
-/// the place gives. Choosing one adds its chip; a field already filtered takes a second condition. The foot says how many
-/// conditions a view keeps once the row is near it.
-struct FilterFieldPanel: View {
-    let sections: [FilterFieldSection]
-    var footer: String?
-    let pick: (String) -> Void
-
-    init(sections: [FilterFieldSection], footer: String? = nil, pick: @escaping (String) -> Void) {
-        self.sections = sections
-        self.footer = footer
-        self.pick = pick
-    }
-
-    /// One run of fields with no heading, as the palette's filters list them.
-    init(fields: [FilterFieldOption], pick: @escaping (String) -> Void) {
-        self.init(sections: [FilterFieldSection(title: "", fields: fields)], pick: pick)
-    }
-
-    @State private var query = ""
-    @FocusState private var isFocused: Bool
-    @Environment(\.interfaceTextSize) private var textSize
-
-    var body: some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        let shown = sections.map { section in
-            FilterFieldSection(
-                title: section.title, fields: query.isEmpty ? section.fields : section.fields.filter { $0.title.localizedStandardContains(query) })
-        }.filter { !$0.fields.isEmpty }
-        let first = shown.first?.fields.first
-        let rows = shown.reduce(0) { $0 + $1.fields.count + 1 }
-        VStack(alignment: .leading, spacing: 4 * scale) {
-            TextField("Filter By", text: $query)
-                .textFieldStyle(.plain)
-                .focused($isFocused)
-                .font(.system(size: ValueEditMetrics.textSize * scale))
-                .padding(.horizontal, 8 * scale)
-                .frame(height: 28 * scale)
-                .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7 * scale, style: .continuous))
-                .appFocusRing(.rect(cornerRadius: 7 * scale, style: .continuous), isFocused: isFocused)
-                .padding(.horizontal, ValueEditMetrics.padding * scale)
-                .padding(.top, ValueEditMetrics.padding * scale)
-                .onSubmit { if let first { pick(first.id) } }
-                .accessibilityIdentifier("FilterBySearch")
-            if shown.isEmpty {
-                Text("No Matching Fields").foregroundStyle(.secondary)
-                    .font(.system(size: ValueEditMetrics.textSize * scale))
-                    .padding(.horizontal, 8 * scale)
-                    .frame(height: ValueEditMetrics.rowHeight * scale)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(shown) { section in
-                            if !section.title.isEmpty {
-                                Text(verbatim: section.title)
-                                    .font(.system(size: 11 * scale, weight: .semibold))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 8 * scale)
-                                    .frame(height: ValueEditMetrics.headerHeight * scale, alignment: .bottom)
-                            }
-                            ForEach(section.fields) { field in
-                                FilterOptionRow(
-                                    option: FilterValueOption(id: field.id, title: field.title, mark: .symbol(field.symbol)), scale: scale
-                                ) { pick(field.id) }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, ValueEditMetrics.padding * scale)
-                }
-                .frame(height: min(CGFloat(rows), CGFloat(ValueEditMetrics.visibleRows + 2)) * ValueEditMetrics.rowHeight * scale)
-            }
-            if let footer {
-                Divider().padding(.horizontal, 8 * scale)
-                Text(verbatim: footer)
-                    .font(.system(size: 11 * scale))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8 * scale)
-                    .padding(.vertical, 2 * scale)
-                    .accessibilityIdentifier("FilterByFooter")
-            }
-        }
-        .padding(.bottom, ValueEditMetrics.padding * scale)
-        .onAppear { isFocused = true }
-        .accessibilityIdentifier("FilterFieldPanel")
     }
 }
 

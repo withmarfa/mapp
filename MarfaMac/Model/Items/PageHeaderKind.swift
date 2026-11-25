@@ -10,6 +10,8 @@ nonisolated enum PageHeaderKind: String, Sendable {
     case event
     /// `core.entity.person`: a link to one is drawn as a person.
     case person
+    /// `core.entity.place`: its items are a Timeline at the page's foot, as a person's are.
+    case place
     /// `core.bookmark` and `core.media`: something to read, with an original to open.
     case reading
     /// `core.file.webpage`: the page itself. A file has no text to edit, so SwiftUI draws the head above the HTML
@@ -23,6 +25,7 @@ nonisolated enum PageHeaderKind: String, Sendable {
     private static let builtIn: [TypeID: PageHeaderKind] = [
         TypeID("core.event"): .event,
         TypeID("core.entity.person"): .person,
+        TypeID("core.entity.place"): .place,
         TypeID("core.bookmark"): .reading,
         TypeID("core.media"): .reading,
         TypeID("core.file.webpage"): .webpage,

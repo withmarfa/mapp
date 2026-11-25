@@ -35,15 +35,15 @@ extension EmptyState where Actions == EmptyView {
     }
 }
 
-/// What a grouped layout says when every group holding items is hidden: the items are there, and Edit View shows them.
+/// What a grouped layout says when every group holding items is hidden: the items are there, and the View panel shows them.
 struct HiddenGroupsEmptyState: View {
     var body: some View {
-        EmptyState("Groups Hidden", detail: "Every group with items is hidden. Show a group in Edit View to see its items.")
+        EmptyState("Groups Hidden", detail: "Every group with items is hidden. Show a group in the View panel to see its items.")
     }
 }
 
 /// What the window's place says when it holds nothing (`PlaceEmpty`): its own title and line, and for a type, New and the
-/// type's name, which opens quick add holding that type.
+/// type's name, which opens the new item holding that type.
 struct PlaceEmptyState: View {
     @CurrentLibrary private var library
     let browser: Browser
@@ -53,7 +53,7 @@ struct PlaceEmptyState: View {
         let empty = PlaceEmpty.of(browser.shown, in: library.catalogue, offered: offered)
         EmptyState(title: Text(verbatim: empty.title), detail: empty.line.map { Text(verbatim: $0) }) {
             if let type = empty.makes, let title = empty.buttonTitle {
-                Button(title, systemImage: "plus") { browser.openQuickAdd(typeID: type, in: library) }
+                Button(title, systemImage: "plus") { browser.openNewItem(kind: type, in: library) }
                     .appButton(.secondary)
                     .padding(.top, 6)
                     .accessibilityIdentifier("EmptyStateNew")
@@ -78,5 +78,28 @@ struct ListEmptyState: View {
         } else {
             PlaceEmptyState(browser: browser)
         }
+    }
+}
+
+/// The answer to filters that hide every item, in the layouts that have no empty state of their own for it.
+struct FilteredEmptyState: View {
+    @CurrentLibrary private var library
+    let browser: Browser
+
+    var body: some View {
+        if browser.filtersHideEverything(in: library) {
+            EmptyState(title: Text("No Matching Items"), detail: Text("No items match the filters.")) {
+                Button("Clear Filters") { browser.clearFilters() }
+            }
+            .background(.background)
+            .accessibilityIdentifier("FilteredEmptyState")
+        }
+    }
+}
+
+extension View {
+    /// Says so, with Clear Filters, where the place's filters hide every item.
+    func filteredEmptyState(_ browser: Browser) -> some View {
+        overlay { FilteredEmptyState(browser: browser) }
     }
 }

@@ -49,15 +49,3 @@ nonisolated struct RelationField: Identifiable, Sendable {
     let editability: Editability
     var id: String { field }
 }
-
-/// A group of links draws this many before the person asks for the rest, so an item that hundreds of others link
-/// to does not become hundreds of rows.
-nonisolated enum LinkLimit {
-    static let limit = 20
-
-    /// The links to draw, and how many are left out until the group is expanded.
-    static func split<Link>(_ links: [Link], expanded: Bool) -> (shown: ArraySlice<Link>, hidden: Int) {
-        guard !expanded, links.count > limit else { return (links[...], 0) }
-        return (links.prefix(limit), links.count - limit)
-    }
-}

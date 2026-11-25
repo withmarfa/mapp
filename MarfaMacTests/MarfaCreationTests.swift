@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import Synchronization
 import Testing
 @testable import MarfaMac
 
@@ -17,9 +18,10 @@ struct MarfaCreationTests {
                 TypeField(name: bodyKey, type: "string", required: true, declaredBy: "test.parent"),
             ], titleField: titleKey, bodyField: bodyKey)], edgeTypes: [])
         let source = FakeItemSource()
+        source.heldInstanceID.withLock { $0 = "creation-tests" }
         let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: [], catalogue: catalogue)))
-        try #require(await eventually { library.isLoaded })
+        try #require(await eventually { library.isLoaded && !library.serverKey.isEmpty })
         let browser = Browser()
         browser.adopt(library)
         let id = try #require(await browser.quickAdded("Untitled", typeID: typeID, in: library))
@@ -28,7 +30,7 @@ struct MarfaCreationTests {
             return
         }
         #expect(submittedID == id)
-        #expect(browser.newItem?.id == id)
+        #expect(browser.newItems.map(\.id) == [id])
         #expect(library.notices.waiting.last == nil)
 
         let properties = try MarfaEngine.creationProperties(draft, catalogue: catalogue)
@@ -52,7 +54,7 @@ struct MarfaCreationTests {
         try #require(await eventually { library.isLoaded })
         let undo = UndoManager()
 
-        #expect(library.createItem(typeID: type.id.rawValue, title: "Untitled", body: "", parentID: nil, in: .library, undoManager: undo) == nil)
+        #expect(library.createItem(typeID: type.id.rawValue, title: "Untitled", body: "", parentID: nil, tier: .library, undoManager: undo) == nil)
         #expect(source.writes.isEmpty)
         #expect(!undo.canUndo)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Create Item"))
@@ -62,8 +64,8 @@ struct MarfaCreationTests {
         source.send(.catalogue(Self.catalogue()))
         try #require(await eventually { library.catalogue.itemTypes[Self.type] != nil })
         let id = try #require(library.createItem(
-            typeID: Self.type.rawValue, title: "Untitled", body: "", parentID: nil, in: .library, undoManager: undo))
-        #expect(source.writes == [.create(id: id, ItemDraft(type: Self.type, title: "Untitled", body: ""))])
+            typeID: Self.type.rawValue, title: "Untitled", body: "", parentID: nil, tier: .library, undoManager: undo))
+        #expect(source.writes == [.create(id: id, ItemDraft(type: Self.type, title: "Untitled", body: "", tier: .library))])
     }
 
     @Test(arguments: [ItemTypeInfo.Field.Kind.number, .boolean, .date(includesTime: true), .choice(["open"]), .other])

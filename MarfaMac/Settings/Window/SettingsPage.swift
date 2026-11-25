@@ -101,7 +101,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         switch self {
         case .general:
             [
-                String(localized: "Start With"), String(localized: "Reopen Windows"), String(localized: "Open Items"),
+                String(localized: "Start With"), String(localized: "Reopen Windows"), String(localized: "Open Items"), String(localized: "New Opens"),
                 String(localized: "New Items Are"), String(localized: "Today and Yesterday"), String(localized: "Week Starts On"),
                 String(localized: "Date Format"), String(localized: "Time Format"), String(localized: "Pictures from Websites"),
                 String(localized: "Send Error Reports"), String(localized: "Check Automatically"), String(localized: "Beta Versions"),

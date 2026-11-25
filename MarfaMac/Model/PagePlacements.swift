@@ -306,7 +306,7 @@ nonisolated struct PagePlacement: Equatable, Sendable {
     }
 
     init(type: TypeID, catalogue: Catalogue, choice: PagePlacements.Choice) {
-        // A person's page lists who they have been with, and a collection's lists what it holds, so each keeps its
+        // A person's or a place's page lists what mentions it, and a collection's lists what it holds, so each keeps its
         // links on the page. Every other item's links are for looking up, which the panel is for.
         let kind = PageHeaderKind.of(type, in: catalogue)
         let info = catalogue.itemTypes[type]
@@ -314,7 +314,7 @@ nonisolated struct PagePlacement: Equatable, Sendable {
         let pins = choice.pins ?? defaults
         self.init(
             linkField: info?.linkField, choice: choice,
-            defaultLinkedFrom: kind == .person || catalogue.isCollection(type) ? .page : .inspector,
+            defaultLinkedFrom: kind == .person || kind == .place || catalogue.isCollection(type) ? .page : .inspector,
             bookkeeping: Set((info?.fields ?? []).filter(Self.isBookkeeping).map(\.key)), pins: Self.limited(pins))
     }
 

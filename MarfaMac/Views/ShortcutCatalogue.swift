@@ -54,7 +54,6 @@ nonisolated extension ShortcutCommand {
     static let viewAsTimeline = ShortcutCommand("viewAsTimeline", in: .view, String(localized: "View as Timeline"), "5")
     static let viewAsCalendar = ShortcutCommand("viewAsCalendar", in: .view, String(localized: "View as Calendar"), "6")
     static let toggleFilters = ShortcutCommand("toggleFilters", in: .view, String(localized: "Show or Hide Filters"))
-    static let addFilter = ShortcutCommand("addFilter", in: .view, String(localized: "Add Filter…"))
     static let clearFilters = ShortcutCommand("clearFilters", in: .view, String(localized: "Clear Filters"))
     static let today = ShortcutCommand("today", in: .view, String(localized: "Today"), "t")
     static let previousPeriod = ShortcutCommand("previousPeriod", in: .view, String(localized: "Previous Week or Month"), arrows["left"], [.command, .option])
@@ -62,9 +61,9 @@ nonisolated extension ShortcutCommand {
     static let showWeek = ShortcutCommand("showWeek", in: .view, String(localized: "Show a Week"), "1", [.command, .option])
     static let showMonthScale = ShortcutCommand("showMonthScale", in: .view, String(localized: "Show a Month"), "2", [.command, .option])
     static let toggleMonth = ShortcutCommand("toggleMonth", in: .view, String(localized: "Show or Hide Month"), "d", [.command, .shift])
-    static let newView = ShortcutCommand("newView", in: .view, String(localized: "New View"))
-    static let editView = ShortcutCommand("editView", in: .view, String(localized: "Edit View"))
-    static let saveAsView = ShortcutCommand("saveAsView", in: .view, String(localized: "Save as View…"))
+    static let newView = ShortcutCommand("newView", in: .view, String(localized: "New View…"))
+    static let editView = ShortcutCommand("editView", in: .view, String(localized: "View…"))
+    static let revertView = ShortcutCommand("revertView", in: .view, String(localized: "Revert View"))
     static let resetView = ShortcutCommand("resetView", in: .view, String(localized: "Reset View"))
     static let duplicateView = ShortcutCommand("duplicateView", in: .view, String(localized: "Duplicate View"))
     static let toggleDetails = ShortcutCommand("toggleDetails", in: .view, String(localized: "Show or Hide Details"), "i", [.command, .option])
@@ -97,8 +96,8 @@ nonisolated extension ShortcutCommand {
             favorite, addTag, changeType, versionHistory, keepInLibrary, moveToFeed, archive, delete, exportPDF, print,
             copyLink, addAttachment, searchItems, commandPalette, paletteActions, searchList, find, findNext, findPrevious, useSelectionForFind,
             toggleSource, toggleReader, toggleFormats, focus, viewAsList, viewAsGallery, viewAsTable, viewAsBoard, viewAsTimeline, viewAsCalendar,
-            toggleFilters, addFilter, clearFilters, today, previousPeriod, nextPeriod, showWeek, showMonthScale, toggleMonth,
-            newView, editView, saveAsView, resetView, duplicateView, toggleDetails, toggleSidebar, customizeSidebar, back, forward, previousItem, nextItem,
+            toggleFilters, clearFilters, today, previousPeriod, nextPeriod, showWeek, showMonthScale, toggleMonth,
+            editView, newView, revertView, resetView, duplicateView, toggleDetails, toggleSidebar, customizeSidebar, back, forward, previousItem, nextItem,
             makeTextBigger, makeTextSmaller, actualSize, zoomToFit, nextPage, previousPage,
         ]
         return commands + Format.allCases.map { format($0) }

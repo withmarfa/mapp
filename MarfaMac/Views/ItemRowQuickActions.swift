@@ -8,9 +8,13 @@ enum RowQuickAction: Hashable {
 }
 
 extension Browser {
-    /// The actions the open place puts on the row under the pointer. The Archive has them; the setting that turns them on
-    /// elsewhere (`docs/agreed.md`, Quick Actions) will decide here.
-    var quickActions: [RowQuickAction] { listsArchive ? [.move(.unarchive), .delete] : [] }
+    /// The actions the open place puts on the row under the pointer, where the View panel's Quick Actions has them on:
+    /// Unarchive in the Archive, Keep in Library from the Feed, and Archive elsewhere, each with Delete.
+    var quickActions: [RowQuickAction] {
+        guard showsQuickActions else { return [] }
+        if listsArchive { return [.move(.unarchive), .delete] }
+        return listing.scope == .feed ? [.move(.keep), .move(.archive), .delete] : [.move(.archive), .delete]
+    }
 }
 
 /// The quick actions of one row: a capsule for a move, a round button for Delete.

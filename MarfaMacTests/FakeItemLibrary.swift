@@ -390,25 +390,31 @@ final class FakeItemLibrary: ItemLibrary {
     /// While set, `createItem` refuses every create and tells the person, as a library does a type it cannot make.
     var refusesCreations = false
 
+    /// The tags each create was sent with, by item.
+    private(set) var createdTags: [ItemID: [String]] = [:]
+    /// The library a draft names, which a test sets to tell two apart.
+    var serverKey = "fake"
+
     func createItem(
-        typeID: String, title: String, body: String, properties: [String: PropertyValue], parentID: ItemID?,
-        in place: Place, undoManager: UndoManager?
+        as id: ItemID, typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String],
+        parentID: ItemID?, tier: Tier, undoManager: UndoManager?
     ) -> ItemID? {
-        guard !title.isEmpty else { return nil }
+        guard !title.isEmpty || !properties.isEmpty || !body.isEmpty else { return nil }
         guard !refusesCreations else {
             notices.tell("Can’t Create Item", "Refused")
             return nil
         }
-        let id = ItemID.mint()
         let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", from: id, to: .item($0), origin: .property("child-of")) }
         let item = Item(
             id: id, type: TypeID(typeID), title: title, titleRule: .property("title"),
             properties: properties.sorted { $0.key < $1.key }.map { Property(key: $0.key, value: $0.value) },
-            tier: place == .feed ? .feed : .library,
+            tier: tier, tags: Set(tags),
             version: ItemVersion(1), created: now(), modified: now(), edgesOut: parent.map { [$0] } ?? [])
+        createdTags[item.id] = tags
         bodies[item.id] = body
         created.append(item)
         if !holdsCreations { deliverCreated() }
+        registerNewItemUndo(item.id, undoManager: undoManager)
         return item.id
     }
 
@@ -437,7 +443,6 @@ final class FakeItemLibrary: ItemLibrary {
     /// Creates refused after `createItem` answered, as a server's source refuses one it cannot queue.
     var refusedCreations: Set<ItemID> = []
     func finish() {}
-    func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
 
     /// Every call of `setItemProperties`, in order, with the changes as asked.
@@ -585,6 +590,11 @@ final class FakeItemLibrary: ItemLibrary {
 
     func moreItemsTaken(with ids: Set<ItemID>) async -> Int? { nil }
 
+    func registerNewItemUndo(_ id: ItemID, undoManager: UndoManager?) {
+        undoManager?.registerUndo(withTarget: self) { library in library.delete([id], undoManager: nil) }
+        undoManager?.setActionName("New Item")
+    }
+
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         let plan = deletePlan(ids)
         tellSkipped(plan.skips, didChange: !plan.moving.isEmpty, failing: "Can’t Delete")
@@ -723,13 +733,15 @@ final class FakeItemLibrary: ItemLibrary {
 
     /// Every file added, and whether adding one is refused.
     private(set) var addedFiles: [(name: String, data: Data, title: String?, parent: ItemID?)] = []
-    /// The place each file was added from, in step with `addedFiles`.
-    private(set) var addedPlaces: [Place] = []
+    /// The tier each file was added to, in step with `addedFiles`.
+    private(set) var addedTiers: [Tier] = []
+    /// The tags each file was added with, in step with `addedFiles`.
+    private(set) var addedFileTags: [[String]] = []
     var refusesFiles = false
     /// Awaited before a file is added, so a test can act while it is being sent.
     var sendingFile: (() async -> Void)?
 
-    func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: Place) async -> ItemID? {
+    func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier, tags: [String]) async -> ItemID? {
         await sendingFile?()
         guard !refusesFiles else {
             notices.tell("Can’t Add File", "Refused")
@@ -741,7 +753,8 @@ final class FakeItemLibrary: ItemLibrary {
             return nil
         }
         addedFiles.append((name, data, title, parentID))
-        addedPlaces.append(place)
+        addedTiers.append(tier)
+        addedFileTags.append(tags)
         let id = ItemID.mint()
         let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", from: id, to: .item($0), origin: .property("child-of")) }
         items.append(Item(

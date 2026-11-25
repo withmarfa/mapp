@@ -132,10 +132,10 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     static let otherPrefix = "other:"
 
     /// Every row the item could show, whatever the person chose, in the order a person reads them: the type's fields as
-    /// the catalogue orders them, with the parent after the status (or first, where the type has no status), and one
-    /// Location for the latitude, the longitude and a name for the place; then every link the item's type may hold
-    /// (`links`), the ones it has first; then its tags; then the values no field describes, read only, under their own
-    /// heading. A field, a link or the tags with no value is a row too, read as Empty, which opens its editor where the
+    /// the catalogue orders them, with the parent after the status and the choices and dates that follow it (or first,
+    /// where the type has no status), and one Location for the latitude, the longitude and a name for the place; then
+    /// every link the item's type may hold (`links`), the ones it has first; then its tags; then the values no field
+    /// describes, read only, under their own heading. A field, a link or the tags with no value is a row too, read as Empty, which opens its editor where the
     /// item can take the edit. The keys in `hidden` are what the page shows another way, such as the title and the
     /// text. With `showsCoordinates`, the latitude and longitude are rows of their own beside the Location that stands
     /// for them.
@@ -164,7 +164,6 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 fields.append(set
                     ? PropertyRow(id: field.key, label: field.label, value: .status)
                     : PropertyRow(id: field.key, label: field.label, value: .empty(symbol: Value.status.symbol), editable: edits && field.isPicked))
-                if let parentRow { fields.append(parentRow) }
             } else if let value = value(of: field, in: item, format: format, long: true) {
                 var row = PropertyRow(
                     id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item), editable: edits,
@@ -177,13 +176,27 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 fields.append(PropertyRow(id: field.key, label: field.label, value: .empty(symbol: symbol(of: field)), editable: edits))
             }
         }
-        if let parentRow, !fields.contains(where: { $0.id == parentField }) { fields.insert(parentRow, at: 0) }
+        if let parentRow { fields.insert(parentRow, at: parentPlace(among: fields, of: type)) }
         var rows = fields
         for link in links where link.field != parentField { rows.append(edgeRow(link, icon: icon, isPerson: isPerson)) }
         rows.append(tags.isEmpty
             ? PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .empty(symbol: "tag"), editable: item.allows(.tags))
             : PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags), editable: item.allows(.tags)))
         return rows + otherRows(of: item, type: type, hidden: hidden, links: links, format: format, label: label)
+    }
+
+    /// Where the parent goes among the rows of the type's fields: after the status and the choices and dates that follow
+    /// it, which say how the item stands, or first where no row is the status.
+    private static func parentPlace(among rows: [PropertyRow], of type: ItemTypeInfo?) -> Int {
+        guard let status = type?.statusField?.key, var place = rows.firstIndex(where: { $0.id == status }) else { return 0 }
+        let following = Set((type?.fields ?? []).filter { field in
+            switch field.kind {
+            case .choice, .date: true
+            default: false
+            }
+        }.map(\.key))
+        repeat { place += 1 } while place < rows.count && following.contains(rows[place].id)
+        return place
     }
 
     /// The row of one link the item's type may hold: the items it reaches, or Empty. It opens its editor where the item
@@ -289,64 +302,5 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             return words.count == values.count && !words.isEmpty ? .options(words) : nil
         default: return nil
         }
-    }
-}
-
-/// An item that links to the one on the page, listed at its foot.
-nonisolated struct LinkedItem: Hashable, Sendable, Encodable {
-    let item: ItemID
-    let title: String
-    /// The icon of the item's type, an Iconify ID.
-    let icon: String?
-    let type: String
-    let date: String
-
-    /// Most items listed before "Show N more".
-    static let foldAfter = LinkLimit.limit
-
-    private enum CodingKeys: String, CodingKey { case item, title, symbol, type, date }
-
-    /// The editor page draws the icon from the images the app sends (`PageHeaderIcons`), which it finds by this key.
-    func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(item, forKey: .item)
-        try container.encode(title, forKey: .title)
-        try container.encode(TypeIconKey.value(for: icon), forKey: .symbol)
-        try container.encode(type, forKey: .type)
-        try container.encode(date, forKey: .date)
-    }
-
-    /// The active items that hold a link to `id` in any relationship the library reads (the inverse ones), once
-    /// each, the most recently edited first.
-    static func list(
-        pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date, format: DateFormat,
-        item: (ItemID) -> Item?, calendar: Calendar = .current, locale: Locale = .current
-    ) -> [LinkedItem] {
-        Cost.measure(.linkedItems) {
-            find(pointingTo: id, in: relationships, catalogue: catalogue, now: now, format: format, item: item, calendar: calendar, locale: locale)
-        }
-    }
-
-    private static func find(
-        pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date, format: DateFormat,
-        item: (ItemID) -> Item?, calendar: Calendar, locale: Locale
-    ) -> [LinkedItem] {
-        var seen: Set<ItemID> = [id]
-        var found: [Item] = []
-        for relationship in relationships where relationship.field.hasPrefix("inverse:") {
-            for target in relationship.targets {
-                guard let other = target.itemID, !target.isDeleted, let held = item(other), held.state == .active,
-                      seen.insert(other).inserted else { continue }
-                found.append(held)
-            }
-        }
-        return found
-            .sorted { $0.modified != $1.modified ? $0.modified > $1.modified : $0.title < $1.title }
-            .map { held in
-                LinkedItem(
-                    item: held.id, title: held.title, icon: catalogue.icon(for: held.type),
-                    type: catalogue.label(for: held.type),
-                    date: DateDisplay.text(of: held.modified, place: .list, format: format, now: now, calendar: calendar, locale: locale))
-            }
     }
 }

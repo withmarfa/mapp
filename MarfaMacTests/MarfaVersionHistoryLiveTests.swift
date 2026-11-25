@@ -46,7 +46,7 @@ extension LiveMarfaTests {
         ) async throws -> ItemID {
             let title = "MARFAMACTEST history \(UUID().uuidString.prefix(8).lowercased())"
             let id = try #require(library.createItem(
-                typeID: "core.note", title: title, body: Self.first, parentID: nil, in: .library, undoManager: nil))
+                typeID: "core.note", title: title, body: Self.first, parentID: nil, tier: .library, undoManager: nil))
             made.add(id)
             for text in [Self.second, Self.third] {
                 try #require(await eventually { library.body(of: id)?.text != nil && library.syncReport.waiting == 0 })

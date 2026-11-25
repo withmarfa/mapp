@@ -1,11 +1,11 @@
 import Foundation
 import UniformTypeIdentifiers
 
-nonisolated enum ItemState: Hashable, Sendable, CaseIterable {
+nonisolated enum ItemState: Hashable, Sendable, CaseIterable, Codable {
     case active, archived, trashed
 }
 
-nonisolated enum Tier: Hashable, Sendable, CaseIterable {
+nonisolated enum Tier: Hashable, Sendable, CaseIterable, Codable {
     case library, feed
 }
 

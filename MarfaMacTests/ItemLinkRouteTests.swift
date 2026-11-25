@@ -136,7 +136,7 @@ struct ItemLinkRouteTests {
             "\(library.propertiesSet.count)", "\(library.typeChanges.count)", "\(library.restored.count)",
             "\(library.tagWrites.count)", "\(library.relationshipWrites.count)", "\(library.editedFields.count)",
             "\(library.chosenIcons.count)", "\(library.sourceChanges.count)", "\(library.addedFiles.count)",
-            "\(library.attachedFiles.count)", "\(library.addedPlaces.count)", "\(library.downloadedAgain)",
+            "\(library.attachedFiles.count)", "\(library.addedTiers.count)", "\(library.downloadedAgain)",
             "\(library.itemsToPurge)", "\(library.views)",
         ]
     }

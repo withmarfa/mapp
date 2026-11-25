@@ -1,8 +1,8 @@
 import Foundation
 import Marfa
 
-/// How the filter row's clauses become the conditions of a saved view's `query.filter`, and a view's conditions the
-/// row's clauses. The core writes and reads the grammar (`FilterExpression`), so nothing here quotes or escapes a value.
+/// How the window's filter clauses become the conditions of a saved view's `query.filter`, and a view's conditions the
+/// window's clauses. The core writes and reads the grammar (`FilterExpression`), so nothing here quotes or escapes a value.
 ///
 /// A clause becomes a piece: the conditions it takes and how they join among themselves (a chip of several "is" values is
 /// OR, one of several "is not" values is AND, a date's bounds are AND). The pieces join by AND, or all by OR where the row
@@ -239,6 +239,66 @@ nonisolated extension ViewDraft {
         of state: FilterState, targets: [String: FilterTarget], catalogue: Catalogue, calendar: Calendar = .current
     ) -> Combination {
         combine(base: Parsed(terms: [], join: .all), adding: state, targets: targets, catalogue: catalogue, calendar: calendar, keeping: nil)
+    }
+
+    /// The same beside a saved view's own conditions that the window cannot show (`unshownConditions`), which a write
+    /// keeps and which count against `maxConditions` and stand beside the clauses with AND.
+    static func holdability(
+        of state: FilterState, beside query: LibraryViewQuery, targets: [String: FilterTarget], catalogue: Catalogue,
+        calendar: Calendar = .current
+    ) -> Combination {
+        guard let parsed = try? terms(of: query.filter) else {
+            return holdability(of: state, targets: targets, catalogue: catalogue, calendar: calendar)
+        }
+        let reading = read(parsed, among: scope(of: query, catalogue: catalogue), catalogue: catalogue, calendar: calendar)
+        let owned = Set(reading.items.filter { targets[$0.clause.field] != nil }.flatMap(\.conditions))
+        let kept = parsed.terms.filter { !owned.contains($0) }
+        return combine(
+            base: Parsed(terms: kept, join: parsed.join), adding: state, targets: targets, catalogue: catalogue, calendar: calendar,
+            keeping: nil)
+    }
+
+    /// The fewest of a Marfa filter's conditions an operator takes: a day's two bounds for On and Between, and one for
+    /// the rest. A set takes one more for each further value. One relative to today takes none, since a view never keeps it.
+    static func terms(of op: FilterOp) -> Int {
+        switch op {
+        case .on, .between: 2
+        case .beforeToday, .afterToday, .inLast, .inNext: 0
+        default: 1
+        }
+    }
+
+    /// How many conditions one clause has left within `maxConditions`, beside every other condition the view keeps: the
+    /// clause at `index`, or a new one where `index` is nil.
+    static func room(
+        for index: Int?, in state: FilterState, beside query: LibraryViewQuery?, targets: [String: FilterTarget], catalogue: Catalogue,
+        calendar: Calendar = .current
+    ) -> Int {
+        var others = state
+        if let index, others.clauses.indices.contains(index) { others.clauses.remove(at: index) }
+        let held = query.map { holdability(of: others, beside: $0, targets: targets, catalogue: catalogue, calendar: calendar) }
+            ?? holdability(of: others, targets: targets, catalogue: catalogue, calendar: calendar)
+        return maxConditions - held.count
+    }
+
+    /// The operator a new condition on `kind` starts with where `room` conditions are left: the kind's own where it fits,
+    /// else the first offered that does, or nil where none does.
+    static func startingOperator(for kind: FilterKind, room: Int) -> FilterOp? {
+        if terms(of: kind.startingOperator) <= room { return kind.startingOperator }
+        return FilterOp.offered(for: kind).map(\.op).first { !$0.isRelative && terms(of: $0) <= room }
+    }
+
+    /// Whether the clauses can be saved as Match Any: none needs AND within it (a date range) and no condition of the
+    /// view's own stands beside them.
+    static func canMatchAny(
+        _ state: FilterState, beside query: LibraryViewQuery?, targets: [String: FilterTarget], catalogue: Catalogue,
+        calendar: Calendar = .current
+    ) -> Bool {
+        var any = state
+        any.matchesAny = true
+        let held = query.map { holdability(of: any, beside: $0, targets: targets, catalogue: catalogue, calendar: calendar) }
+            ?? holdability(of: any, targets: targets, catalogue: catalogue, calendar: calendar)
+        return !held.unkept.contains(.mixedFilters)
     }
 
     /// Whether this leaves the whole filter unwritable, rather than only one clause's part of it.

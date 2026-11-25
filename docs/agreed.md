@@ -64,12 +64,8 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | The row of views | Pills in an order the app keeps for each place; a pill is dragged, and its menu has Hide. Past the room, N More, whose menu ends with New View…. A place with one view has no row. | `ListToolbar.swift`, `ViewMacSettings` | `Rethink-Top-Row-Lists`, `Rethink-View-Menu` |
-| The View panel | One panel replaces View Options, View As, Edit View and the filter row. Each part is one level in: Layout, Properties, Filter, Sort, Group, Types, From, Archived Items, Open Items, then the layout's own. | `ViewEditPanel.swift`, `ItemViewOptions.swift`, `FilterRow.swift` | `Rethink-View-Panels`, `Rethink-View-Filter`, `Rethink-View-Filter-Add`, `Rethink-View-Sort`, `Rethink-View-Group`, `Rethink-View-Properties`, `Rethink-View-Types`, `Rethink-View-From` |
-| Where it is kept | The foot of the View panel says "Kept for Marfa for Mac." for a place's first view, and "Saved in Marfa for every app." for a saved view alone. | `PlaceDefaults`, `ViewEditPanel.swift` | `Rethink-View-Panels` |
 | A changed view | A change is written as it is made. The pill's dot shows while the view differs from how it was when last opened on the Mac. Revert View puts that back; Save as New View… makes another. | `Browser+ViewWrites.swift`, `Browser+SavedViews.swift` | `Rethink-View-Changed` |
 | Offline | A change to a view waits, and the pill says so on hover. A new view waits too. | `Browser+ViewWrites.swift` | `Rethink-Offline` |
-| Plain filters first | Filter groups, and dates relative to the day, are offered only when Marfa can save them. | `ViewDraft`, `FilterOp` | `Rethink-View-Filter-Group` |
-| Set, Not Set and status groups | A saved view keeps them; Marfa and the package take them. | `ViewDraft`, `GroupMode` | `Rethink-View-Group` |
 | Groupings to come | By collection and by tag, with the order of a date's groups following the sort. | `GroupOffer`, `GroupMode` | `Rethink-View-Group` |
 
 ## Making a view
@@ -90,18 +86,15 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The new-item line | One line with rows for its keys: Tab a kind, # a tag, @ a parent, / a property, and In at the foot. Before typing it offers the most recent. It stays open after Add with the same kind; ⇧↩ opens the text form. | `QuickAdd`, `QuickAddPanel.swift` | `Rethink-New`, `Rethink-New-Line`, `Rethink-New-Line-Kinds`, `Rethink-New-Line-Task`, `Rethink-New-Line-Bookmark`, `Rethink-New-Kinds`, `Rethink-New-Filled` |
 | In place | A table's last row, a board lane's plus, a calendar's drag. The item stays where it was typed until the row is left. In a nested table it is top-level; in a grouped one it joins the group under the pointer, or the first. Escape drops an empty row and keeps typed text; leaving adds. | `ItemTable.swift`, `ItemBoard.swift`, `CalendarWeekView.swift` | `Rethink-New-In-Table`, `Rethink-New-In-Board`, `Rethink-New-In-Calendar` |
-| From any app | The same panel in the screen's upper third, with a drop of files. | `QuickAddPanel.swift` | `Rethink-New-Anywhere`, `Rethink-New-Drop` |
-| New Opens | A setting, One Line or the text form. | `PreferencesMap` | `Rethink-New-Line` |
 
 ## The item's page
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Stored `rows` | A page placement is stored with `rows` beside `shows`, because a copy from before `shows` sets the whole map aside without `rows`. Removed after the first v0.1 release: write `shows` only and keep reading an old `rows` once. | `PagePlacements.swift` | – |
+| Outline | The heading being read has a dark bar and dark text. The page does not report which it is yet. | `editor/src/bridge.ts`, `PanelOutlineView.swift` | `Rethink-Long-Page` |
 | Scrolled | The title sits in the toolbar on one line. | `ItemDetail.swift`, `WindowToolbar.swift` | `Rethink-Page-Scrolled`, `Rethink-White-Page` |
-| Foot | Sub-Items with nesting on any item that has them; a Timeline of mentions on a person and a place; more after 30. | `LinkedFromPlace`, `editor/src/header.ts` | `Rethink-Sub-Items`, `Rethink-Person`, `Rethink-Place` |
 | Blocks | A callout as a tinted block without a rail. A code block's actions in its corner; the place of its language is open. | `editor/src/style.css` | `Rethink-Blocks`, `Rethink-Blocks-Code` |
 
 ## Editing and links
@@ -111,8 +104,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Undo of a link in one call | Undo checks a link's id, type and ends, then deletes it by id in a second package call, so a move synced between the two is lost, as with state moves. **Waits for Marfa:** one package call that checks and deletes. | `MarfaEngine+Writing.swift` | – |
 | Conflict | A calm line with Keep My Edit and Use Current Value. | `ValueEditModel` | `Rethink-Edit-Conflict` |
 | Status where it is seen | A click on a status in a row or a lane opens its panel; the row stays until it is left. | `StatusSymbol`, `ItemRow.swift` | `Rethink-Status-In-List` |
-| Every link follows Open Items | In the text, rows, foot and panel, through one function of the browser. A picture in the text has Open Item and Copy Link on its menu. | `Browser`, `EditorController` | – |
-| Link card | After a pause on a linked item, a small card with its type, name and two lines. No keyboard focus, no server call. | new files in `MarfaMac/Views/`, `editor/src/` | `Rethink-Link-Card` |
 
 ## Each kind of item
 

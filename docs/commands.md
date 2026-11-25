@@ -50,7 +50,7 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 
 - **Only a person's choices are stored** (`ShortcutBindings`), and a stored command this build does not know is kept.
 - **A menu shortcut needs ⌘, ⌃ or ⌥.** A shortcut that a command already has asks to replace it, and one of the system's (`SystemShortcuts`) is refused.
-- **Any-app shortcuts are off until set** and stay on the Mac they were set on (`AnyAppShortcuts`). They need ⌘ or ⌃, and work only while the app runs.
+- **Any-app shortcuts are off until set** and stay on their Mac (`AnyAppShortcuts`). They need ⌘ or ⌃, and work while the app runs. New Item opens the line over the app in front (`NewItemAnywhere`), which gives the keyboard back.
 - **While the page has the keyboard, Back and Forward give up their keys,** because the page indents lists with them.
 - **While an image or a PDF is open, the text-size keys size the file** (`FileViewCommand`).
 
@@ -92,8 +92,8 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | View | Previous Item, Next Item | ⌥⌘↑, ⌥⌘↓ | Yes |
 | View | Make Text Bigger, Smaller | ⌘+, ⌘- | Yes |
 | View | Actual Size | ⌘0 | Yes |
-| View | Show Markdown Source or Formatted Text, Show Reader or Original, Show or Hide Formats, Show or Hide Filters, Add Filter…, Clear Filters, New View, Edit View, Save as View…, Reset View, Duplicate View, Delete View…, Save View, Revert View, Standard Width, Full Width, Customize Sidebar…, Close Modal, Zoom to Fit, Next Page, Previous Page | – | Yes |
-| View | View as Digest, View as Map, Show All Items, Show Library, Show Feed, Save as New View… | – | Agreed |
+| View | Show Markdown Source or Formatted Text, Show Reader or Original, Show or Hide Formats, Clear Filters, View…, New View…, Revert View, Reset View, Save View, Duplicate View, Delete View…, Collapse All Groups, Expand All Groups, Standard Width, Full Width, Customize Sidebar…, Close Modal, Zoom to Fit, Next Page, Previous Page | – | Yes |
+| View | View as Digest, View as Map, Show All Items, Show Library, Show Feed | – | Agreed |
 | Format | Heading 1, 2, 3 | ⇧⌘T, ⇧⌘H, ⇧⌘J | Yes |
 | Format | Body | ⇧⌘B | Yes |
 | Format | Bold, Italic, Strikethrough | ⌘B, ⌘I, ⇧⌘X | Yes |
@@ -104,4 +104,4 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | Format | Heading 4, 5, 6, Highlight, Code, Table's rows, columns and alignment | – | Yes |
 | Go | Each place, view and type | – | Yes |
 | Help | Marfa Help, Keyboard Shortcuts, and links | – | Yes |
-| Any app | Show Command Palette, Search Items, Quick Add | Off until set | Yes |
+| Any app | Show Command Palette, Search Items, New Item | Off until set | Yes |

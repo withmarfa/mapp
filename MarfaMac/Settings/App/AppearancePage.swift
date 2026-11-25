@@ -62,7 +62,7 @@ struct AppearancePage: View {
                     }
                     .accessibilityIdentifier("ValuePanelStyle")
                 }
-                SettingsRow("Palettes", line: "Command Palette, Search Items and Quick Add.") {
+                SettingsRow("Palettes", line: "Command Palette, Search Items and New Item.") {
                     SettingsPopUp(title: "Palettes", selection: $paletteMaterial) {
                         Text("Glass").tag(PaletteMaterial.glass)
                         Text("Translucent").tag(PaletteMaterial.translucent)

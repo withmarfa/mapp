@@ -151,6 +151,6 @@ nonisolated struct PanelLinkGroup: Identifiable, Equatable, Sendable {
         }
     }
 
-    /// How many links show before the rest wait behind Show All: the board draws six of a book's excerpts.
-    var shownFirst: Int { kind == .moreFromBook ? 6 : LinkLimit.limit }
+    /// How many links show before the rest wait behind Show All: the board draws six of a book's excerpts, and the rest page after 30.
+    var shownFirst: Int { kind == .moreFromBook ? 6 : PageFoot.step }
 }

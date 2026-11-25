@@ -29,6 +29,8 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         /// Only the parent pin has these: the parent's type icon and the tone of its chip, as a linked item's has.
         var icon: TypeIconRef?
         var tone: String?
+        /// Only the parent pin has it: the parent's item, so a pause on the pill shows the parent's card.
+        var item: String?
     }
 
     /// The kicker as the page draws it: the type's mark in its tone and its name, then each flag with its symbol.
@@ -111,12 +113,10 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var rows: [PropertyRow]
     /// "Show N More".
     var showMore: String
-    /// Items that link to this one, listed under its text.
-    var linked: [LinkedItem]
-    var linkedFoldAfter = LinkedItem.foldAfter
+    /// What is listed under the text: the item's sub-items, and the items that link to it.
+    var foot: PageFoot
     /// Whether the page has text to write. A collection with no text shows nothing to type into.
     var showsText: Bool
-    var showMoreLinked: String
     var interfaceTextSize: Int
     /// How many lines the title shows before an ellipsis cuts it, while it is not being edited.
     var titleLines: Int
@@ -125,7 +125,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// The icons of the types the head names, which the page draws as images.
     var typeIconNames: Set<String?> {
         var names: Set<String?> = [kicker.icon.name]
-        names.formUnion(linked.map(\.icon))
+        names.formUnion(foot.icons)
         if let parent = parent?.icon { names.insert(parent.name) }
         for value in (pins + rows).map(\.value) {
             if case .items(let targets) = value { names.formUnion(targets.map(\.icon)) }

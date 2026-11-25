@@ -68,8 +68,14 @@ extension Browser {
 
     /// Changes whether the open place's board draws compact cards, and keeps it.
     func setCompactBoard(_ isCompact: Bool, in place: PlaceView) {
+        let before = compactBoards[place] ?? false
+        guard before != isCompact else { return }
         compactBoards[place] = isCompact
         updatePlaceDefault(place) { $0.compactBoard = isCompact }
+        registerUndo(String(localized: "Change View")) { browser in
+            guard browser.shown.isSame(place) else { return }
+            browser.setCompactBoard(before, in: place)
+        }
     }
 
     // MARK: Pruning
@@ -115,6 +121,8 @@ extension Browser {
         if placeHidesEmptyGroups[place] != hides { placeHidesEmptyGroups[place] = hides }
         let properties: ViewProperties? = stored.properties.isChanged ? stored.properties : nil
         if placeProperties[place] != properties { placeProperties[place] = properties }
+        if placeQuickActions[place] != stored.quickActions { placeQuickActions[place] = stored.quickActions }
+        if placeOpenings[place] != stored.opening { placeOpenings[place] = stored.opening }
         observedChoices[place] = ViewChoices(options: options, timelineDate: stored.timelineField)
         // A place with no layout kept opens in its own, so one place's table is not carried to the next.
         apply(layout: stored.layout ?? naturalLayout(of: place), in: library)
@@ -161,9 +169,9 @@ extension Browser {
         placeCalendarScales[place] = nil
         placeHidesEmptyGroups[place] = nil
         placeProperties[place] = nil
+        placeQuickActions[place] = nil
+        placeOpenings[place] = nil
         observedChoices[place] = ViewChoices(options: ItemTableOptions(), timelineDate: nil)
-        // The row of a place with no filter left is not kept open, which only a filter the person put in would have done.
-        filterRowChoice[place] = nil
         let natural = naturalLayout(of: place)
         if viewMode != natural, availableViewModes(in: library).contains(natural) { set(layout: natural) }
         registerResetUndo(restoring: before)
@@ -185,5 +193,7 @@ extension Browser {
         placeCalendarScales[place] = stored.calendarScale
         placeHidesEmptyGroups[place] = stored.hidesEmptyGroups ? true : nil
         placeProperties[place] = stored.properties.isChanged ? stored.properties : nil
+        placeQuickActions[place] = stored.quickActions
+        placeOpenings[place] = stored.opening
     }
 }

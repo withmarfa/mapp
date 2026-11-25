@@ -47,12 +47,13 @@ final class ItemTableContent {
     lazy var rows: [ItemTableRow] = Cost.measure(.tableRows) {
         ItemTableLayout.sorted(kept, by: sort)
     }
-    /// Every group in order, the hidden and the empty ones too: what Edit View lists to order and hide. A grouping the
+    /// Every group in order, the hidden and the empty ones too: what the View panel's Group lists to order and hide. A grouping the
     /// person or the view chose lists its empty groups (`declared`), which a place's own grouping by status does not.
     lazy var allGroups: [ItemTableGroup] = Cost.measure(.tableGroups) {
         guard let grouping else { return [] }
         let made = ItemTableLayout.groups(
-            of: rows, by: grouping, mode: groupMode, catalogue: catalogue, declared: options.grouping != .automatic, calendar: calendar)
+            of: rows, by: grouping, mode: groupMode, catalogue: catalogue, declared: options.grouping != .automatic,
+            asMarfa: groupsAsMarfa, calendar: calendar)
         return ItemTableLayout.ordered(made, by: options.groupOrder)
     }
     /// The groups shown: all but the hidden ones (`device/view-group-hidden`), and the empty ones where Hide Empty Groups is on.
@@ -65,6 +66,8 @@ final class ItemTableContent {
     var hidesEveryGroup: Bool { grouping != nil && !rows.isEmpty && groups.allSatisfy(\.rows.isEmpty) }
     /// Whether a group with no items is left out (Hide Empty Groups).
     let hidesEmptyGroups: Bool
+    /// Whether the rows are grouped as Marfa groups a saved view's (`ItemTableLayout.groups`).
+    let groupsAsMarfa: Bool
 
     /// Works the table out for `items`, which are what `browser` shows in `library`. Nothing is kept: ask the
     /// browser, which keeps the last one while its inputs stand.
@@ -96,6 +99,7 @@ final class ItemTableContent {
         // A place's own grouping is by the status's groups, as a board of mixed types is.
         groupMode = options.grouping == .automatic ? .statusGroups : options.grouping.mode
         self.hidesEmptyGroups = hidesEmptyGroups
+        groupsAsMarfa = browser.isViewPlace
         calendar = browser.isViewPlace ? DateGroups.viewCalendar() : WeekStart.calendar(.current, in: browser.defaults)
     }
 

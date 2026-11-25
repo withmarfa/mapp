@@ -76,6 +76,7 @@ private struct PanelLinkHeading: View {
 /// offers Remove as an accessibility action.
 private struct PanelLinkRow: View {
     @Environment(\.interfaceTextSize) private var textSize
+    @CurrentLibrary private var library
     let group: PanelLinkGroup
     let link: PanelLink
     let onOpen: (ItemID) -> Void
@@ -83,6 +84,8 @@ private struct PanelLinkRow: View {
     let onRemove: (String) -> Void
     @State private var hovering = false
     @FocusState private var menuFocused: Bool
+    /// The row's frame in its window, which Show Card puts the card under.
+    @State private var frame = CGRect.zero
 
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
@@ -113,7 +116,9 @@ private struct PanelLinkRow: View {
                     Label("Link Actions", systemImage: "ellipsis").labelStyle(.iconOnly).frame(width: 24, height: 24)
                         .foregroundStyle(showsMenu ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.clear))
                 }
-                .menuStyle(.borderlessButton)
+                // A borderless menu draws its picture in its own color, so it could not be drawn clear.
+                .menuStyle(.button)
+                .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .focused($menuFocused)
@@ -121,6 +126,9 @@ private struct PanelLinkRow: View {
             }
         }
         .onHover { hovering = $0 }
+        .linkCard(of: link.item, in: library)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+        .accessibilityAction(named: Text("Show Card")) { showCard() }
         .contextMenu {
             if let field = group.editableField { actions(field) }
         }
@@ -130,7 +138,12 @@ private struct PanelLinkRow: View {
 
     @ViewBuilder private func actions(_ field: String) -> some View {
         Button("Open Item") { onOpen(link.item) }
+        Button("Show Card") { showCard() }
         Button("Remove", role: .destructive) { onRemove(field) }
+    }
+
+    private func showCard() {
+        LinkCardPresenter.shared.show(link.item, library: library, inWindowFrame: frame, announcing: true)
     }
 }
 

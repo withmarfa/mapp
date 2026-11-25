@@ -7,6 +7,8 @@ struct ValueEditContent: View {
     @Environment(\.interfaceTextSize) private var textSize
     @FocusState private var fieldFocused: Bool
     @FocusState private var timeFocused: Bool
+    /// The caret in the day field.
+    @State private var daySelection: TextSelection?
     /// The height the chips and the field want, which the field is held to until eight lines of chips.
     @State private var chipsHeight: CGFloat = 0
 
@@ -192,12 +194,21 @@ struct ValueEditContent: View {
     /// with Return; text that is no day stays with its reason.
     private var dayField: some View {
         VStack(alignment: .leading, spacing: 0) {
-            TextField("", text: Binding { model.dayDraft ?? model.dayText } set: { model.dayDraft = $0 }, prompt: Text("Not Set"))
+            TextField(
+                "", text: Binding { model.dayDraft ?? model.dayText } set: { model.dayDraft = $0 }, selection: $daySelection, prompt: Text("Not Set"))
                 .textFieldStyle(.plain)
                 .font(.system(size: ValueEditMetrics.textSize * scale))
                 .focused($fieldFocused)
                 .onSubmit { model.commitDay(closing: true) }
-                .onChange(of: fieldFocused) { _, focused in if focused { model.beginDay() } else { model.commitDay() } }
+                .onChange(of: fieldFocused) { _, focused in
+                    guard focused else { return model.commitDay() }
+                    model.beginDay()
+                    // A field that takes the keyboard selects all it holds, so the caret is put at its end a turn later.
+                    Task {
+                        let text = model.dayDraft ?? model.dayText
+                        daySelection = TextSelection(insertionPoint: text.endIndex)
+                    }
+                }
                 .frame(minHeight: ValueEditMetrics.fieldLine * scale)
                 .padding(.horizontal, 7 * scale)
                 .padding(.top, 4 * scale)

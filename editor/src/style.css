@@ -30,7 +30,8 @@
      Both are translucent, so the text keeps its contrast on the page in light and dark. */
   --inkkit-selection-background: color-mix(in srgb, var(--inkkit-accent-color) 30%, transparent);
   --inkkit-inactive-selection-background: color-mix(in srgb, CanvasText 15%, transparent);
-  --reading-width: 54rem;
+  /* The app's default, 680px at 15px text (`PageStyle.readingEms`). */
+  --reading-width: 45.3333rem;
   --page-width: var(--reading-width);
   color-scheme: light dark;
 }
@@ -616,20 +617,6 @@ button.item-kicker-type:focus-visible {
   mask: center / contain no-repeat;
 }
 
-/* The chevron of a chip that opens a menu. A chip the person cannot change has none. */
-.item-icon-indicator {
-  width: var(--icon-indicator-width, 0.6em);
-  height: var(--icon-indicator-height, 0.6em);
-  opacity: var(--chip-chevron-opacity, 0.5);
-  -webkit-mask-image: var(--icon-indicator);
-  mask-image: var(--icon-indicator);
-}
-
-.item-menu-pin:disabled .item-icon-indicator,
-.item-menu-pin[data-kind='link'] .item-icon-indicator {
-  display: none;
-}
-
 /* The status mark: the group's SF Symbol, which the app draws, as a mask in its tint. It takes the symbol's own size,
    which the app sends already scaled to the interface's text size. */
 .item-status-mark {
@@ -795,8 +782,7 @@ button.item-kicker-type:focus-visible {
 .item-props[hidden],
 .item-prop-sections[hidden],
 .item-more[hidden],
-.item-linked[hidden],
-.item-linked-list[hidden] {
+.item-foot[hidden] {
   display: none;
 }
 
@@ -818,8 +804,8 @@ button.item-kicker-type:focus-visible {
   flex-wrap: wrap;
   column-gap: 0;
   align-items: flex-start;
-  min-height: calc(var(--interface-text-size) * 28 / 13);
-  padding-block: calc(var(--interface-text-size) * 4 / 13);
+  min-height: calc(var(--interface-text-size) * 32 / 13);
+  padding-block: calc(var(--interface-text-size) * 5 / 13);
   box-sizing: border-box;
 }
 
@@ -1060,67 +1046,80 @@ button.item-kicker-type:focus-visible {
   color: var(--label-secondary);
 }
 
-/* Linked From and a collection's contents: a folded group under a faint hairline. */
-.item-linked {
-  border-top: 1px solid var(--label-quinary);
+/* What belongs to the item, under the text: Sub-Items, nested, and Timeline or Linked From. Every measure is its design
+   point at the 13 point interface text. */
+.item-foot + .item-foot {
+  margin-top: calc(var(--interface-text-size) * 30 / 13);
 }
 
-.item-linked + .item-linked {
-  margin-top: calc(var(--step) * 4);
+.item-foot-heading {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--interface-text-size) * 7 / 13);
+  padding-bottom: calc(var(--interface-text-size) * 8 / 13);
+  border-bottom: 1px solid var(--label-quinary);
+  color: var(--label-primary);
+  font-weight: 600;
 }
 
-.item-linked-toggle {
+.item-foot-count {
+  color: var(--label-tertiary);
+  font-size: calc(var(--interface-text-size) * 12 / 13);
+  font-weight: 400;
+}
+
+.item-foot-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item-foot-line {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: calc(var(--step) * 2);
-  width: 100%;
-  min-height: calc(var(--step) * 9);
+  gap: calc(var(--interface-text-size) * 9 / 13);
+  min-height: calc(var(--interface-text-size) * 36 / 13);
+  padding-inline-start: calc(var(--depth, 0) * var(--interface-text-size) * 23 / 13);
+  border-bottom: 1px solid var(--label-quinary);
+}
+
+.item-foot-arrow {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--interface-text-size) * 14 / 13);
+  height: calc(var(--interface-text-size) * 18 / 13);
   padding: 0;
   border: 0;
   background: none;
-  color: var(--label-secondary);
-  font: inherit;
-  text-align: start;
-  cursor: default;
 }
 
-/* The same small chevron the pins end in, last in the row after the count: down while the group is folded, up
-   while it is open. */
-.item-chevron {
+/* The arrow of a row with sub-items points down while they show and across while they are folded. */
+.item-foot-arrow .item-chevron {
   flex: none;
   width: var(--icon-indicator-width, 0.6em);
   height: var(--icon-indicator-height, 0.6em);
   background: var(--label-secondary);
   -webkit-mask: var(--icon-indicator) center / contain no-repeat;
   mask: var(--icon-indicator) center / contain no-repeat;
-  transition: transform 0.12s ease;
+  transform: rotate(-90deg);
 }
 
-.item-linked-toggle[aria-expanded='true'] .item-chevron {
-  transform: rotate(180deg);
+.item-foot-arrow[aria-expanded='true'] .item-chevron {
+  transform: none;
 }
 
-.item-linked-count {
-  margin-inline-start: auto;
-  color: var(--label-secondary);
-  opacity: 0.7;
-}
-
-.item-linked-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.item-linked-open {
+.item-foot-open {
   box-sizing: border-box;
   display: flex;
+  flex: 1;
   align-items: center;
-  gap: calc(var(--step) * 2);
-  width: 100%;
-  min-height: calc(var(--step) * 9);
-  /* Ends level with the count above, which sits before the chevron. */
-  padding: 0 calc(var(--icon-indicator-width, 0.6em) + var(--step) * 2) 0 0;
+  align-self: stretch;
+  gap: calc(var(--interface-text-size) * 9 / 13);
+  min-width: 0;
+  padding: 0;
   border: 0;
   background: none;
   color: var(--label-primary);
@@ -1129,28 +1128,50 @@ button.item-kicker-type:focus-visible {
   cursor: default;
 }
 
-.item-linked-open:hover .item-linked-name {
+.item-foot-open:hover .item-foot-name {
   text-decoration: underline;
 }
 
-.item-linked-name {
+/* The status mark or the type's icon, centred in one width. */
+.item-foot-slot {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--interface-text-size) * 18 / 13);
+}
+
+.item-foot-slot > .item-glyph,
+.item-foot-mark {
+  flex: none;
+}
+
+/* A type's icon takes the type's tone, as a linked item's chip does. */
+.item-foot-slot > .item-glyph {
+  background: var(--tone, var(--label-secondary));
+}
+
+.item-foot-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.item-linked-detail {
-  display: inline-flex;
-  align-items: center;
+.item-foot-date {
   flex: none;
   margin-inline-start: auto;
-  color: var(--label-secondary);
+  color: var(--label-tertiary);
   font-size: calc(var(--interface-text-size) * 12 / 13);
 }
 
-.item-linked-toggle:focus-visible,
-.item-linked-open:focus-visible,
+.item-foot-more-row {
+  padding-inline-start: calc(var(--depth, 0) * var(--interface-text-size) * 23 / 13);
+  list-style: none;
+}
+
+.item-foot-arrow:focus-visible,
+.item-foot-open:focus-visible,
 .item-more:focus-visible,
 .item-link:focus-visible {
   outline: 3px solid var(--focus-ring);

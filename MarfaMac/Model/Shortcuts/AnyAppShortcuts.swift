@@ -1,16 +1,19 @@
 import Foundation
 import Observation
 
-/// What a shortcut that works in any app does. Each brings the app forward and does its action in the window that was in
-/// front, until a palette can be shown over another app.
+/// What a shortcut that works in any app does. The palettes bring the app forward and open in the window that was in
+/// front; New Item opens the new-item line over the other app, which keeps the keyboard when it closes
+/// (`NewItemAnywhere`).
 nonisolated enum AnyAppCommand: String, CaseIterable, Sendable {
-    case commandPalette, searchItems, quickAdd
+    case commandPalette, searchItems
+    /// Stored under its first word, so a shortcut a person set is kept.
+    case newItem = "quickAdd"
 
     var title: String {
         switch self {
         case .commandPalette: String(localized: "Show Command Palette")
         case .searchItems: String(localized: "Search Items")
-        case .quickAdd: String(localized: "Quick Add")
+        case .newItem: String(localized: "New Item")
         }
     }
 
@@ -19,7 +22,7 @@ nonisolated enum AnyAppCommand: String, CaseIterable, Sendable {
         switch self {
         case .commandPalette: String(localized: "Over whatever you’re doing.")
         case .searchItems: nil
-        case .quickAdd: String(localized: "A new item, over any app.")
+        case .newItem: String(localized: "One line, over any app.")
         }
     }
 }

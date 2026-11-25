@@ -1,13 +1,13 @@
 import Foundation
 
-/// What Group by offers for a place, worked out once and drawn alike by View Options, the View menu and Edit View
+/// What Group by offers for a place, worked out once and drawn alike by the View panel and the palette
 /// ([docs/lists.md](../../../docs/lists.md#grouping)). The fields come from the types the place lists
 /// (`Browser.listedTypes`), and the types of its items, never only from the items on screen, so a field no item fills
 /// can still be chosen; such a field waits under More Fields.
 ///
 /// In order: None (not on a board, which always has lanes); Status, as Words and Groups where both apply, else one item;
-/// the choice and yes-or-no fields, then each date with its spans and Set or Not Set; then Type where the place shows
-/// several types, Parent, Created, Edited and Happened; then More Fields, every other optional field with Set or Not Set.
+/// the choice and yes-or-no fields, then each date with its spans and Set or Not Set; then Type, Parent, Source, Created,
+/// Edited and Happened; then More Fields, every other optional field with Set or Not Set.
 nonisolated struct GroupOffer: Hashable, Sendable {
     /// One way to group, as a menu item.
     struct Choice: Hashable, Sendable, Identifiable {
@@ -15,8 +15,6 @@ nonisolated struct GroupOffer: Hashable, Sendable {
         var grouping: ItemTableOptions.Grouping
         /// Whether a divider comes before it: Set or Not Set follows a date's spans.
         var startsSection = false
-        /// Whether a saved view can hold it; one it cannot is shown, and not offered, in a saved view.
-        var isKept = true
         var id: ItemTableOptions.Grouping { grouping }
     }
 
@@ -55,22 +53,20 @@ nonisolated struct GroupOffer: Hashable, Sendable {
     /// status, by its words where they are offered, else the first field offered. The place's choice stays as it is.
     var fallback: ItemTableOptions.Grouping? {
         let first = sections.first { !$0.isEmpty }?.first ?? moreFields.first
-        return (sections.first?.first { $0.id == Self.statusID } ?? first)?.choices.first { $0.isKept }?.grouping
-            ?? first?.choices.first?.grouping
+        return (sections.first?.first { $0.id == Self.statusID } ?? first)?.choices.first?.grouping
     }
 
     static let statusID = "\u{1}status"
 
     /// The offer for a place's `columns`, which hold every field of the `types` it lists; `rows` tell which fields
-    /// some item fills. `layout` leaves out what it cannot show, and `isView` marks what a saved view cannot hold.
+    /// some item fills. `layout` leaves out what it cannot show.
     static func make(
-        columns: [ItemTableColumn], types: Set<TypeID>, rows: [ItemTableRow], catalogue: Catalogue, layout: ItemViewMode, isView: Bool
+        columns: [ItemTableColumn], types: Set<TypeID>, rows: [ItemTableRow], catalogue: Catalogue, layout: ItemViewMode
     ) -> GroupOffer {
         let byID = Dictionary(columns.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let sortedTypes = types.sorted { $0.rawValue < $1.rawValue }
-        func kept(_ mode: GroupMode) -> Bool { !isView || mode.isKeptByView }
         func choice(_ label: String, _ id: String, _ mode: GroupMode, startsSection: Bool = false) -> Choice {
-            Choice(label: label, grouping: .column(id, by: mode), startsSection: startsSection, isKept: kept(mode))
+            Choice(label: label, grouping: .column(id, by: mode), startsSection: startsSection)
         }
         func spans(_ id: String, presence: Bool) -> [Choice] {
             LibraryViewGroup.Bucket.allCases.map { choice($0.title, id, .bucket($0)) }
@@ -138,6 +134,10 @@ nonisolated struct GroupOffer: Hashable, Sendable {
         if layout != .board, byID[ItemTableColumn.parent.id] != nil {
             let label = String(localized: "Parent")
             own.append(Entry(id: ItemTableColumn.parent.id, label: label, choices: [choice(label, ItemTableColumn.parent.id, .value)]))
+        }
+        // A card cannot move to another source, so a board has no lanes by it.
+        if layout != .board, let source = byID[ItemTableColumn.source.id] {
+            own.append(Entry(id: source.id, label: source.label, choices: [choice(source.label, source.id, .value)]))
         }
         // Every item has these dates, so they offer their spans alone.
         for column in [ItemTableColumn.created, .edited, .occurred] {

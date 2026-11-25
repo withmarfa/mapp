@@ -16,7 +16,6 @@ struct AppCommands: Commands {
     @FocusedValue(\.settingsNavigation) private var settingsNavigation
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
-    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
 
     var body: some Commands {
         // The window's own, as its toolbar button is: the system's command goes up the responder chain, where the
@@ -48,10 +47,10 @@ struct AppCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Group {
                 Button("New Item", systemImage: "plus") {
-                    if let library { browser?.openQuickAdd(remembered: lastType, in: library) }
+                    if let library { browser?.openNewItem(in: library) }
                 }
                     .shortcut(.newItem, shortcuts)
-                    .disabled(browser == nil || library?.isLoaded != true)
+                    .disabled(browser == nil || library.map(QuickAdd.isAvailable) != true)
                 Button("New Window", systemImage: "macwindow.badge.plus") {
                     openWindow(id: MarfaMacApp.mainWindowID)
                 }
@@ -139,15 +138,10 @@ struct AppCommands: Commands {
                 command(.toggleFocus)
                 Divider()
                 if browser?.showsPlaceIndex != true {
-                    ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, shortcuts: shortcuts)
+                    ViewLayoutCommands(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, shortcuts: shortcuts)
                 }
                 Divider()
                 SavedViewMenu(browser: browser, library: library, shortcuts: shortcuts)
-                // The toolbar's Done for a view's panel.
-                Button("Finish Editing View", systemImage: "checkmark") {
-                    if let browser, let library { Task { await browser.finishViewPanel(in: library, order: order) } }
-                }
-                .disabled(browser?.showsViewPanel != true)
                 Divider()
                 Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
                     details?.isPresented.toggle()
@@ -155,20 +149,15 @@ struct AppCommands: Commands {
                 .shortcut(.toggleDetails, shortcuts)
                 .disabled(details == nil || focused?.ids.count != 1)
                 Divider()
-                // The toolbar's View Options and its filters, for the view in front.
+                // What the layout in front moves through, and its filters and groups, which the View panel sets.
                 if let library, let browser {
                     // A table, board or timeline with an item page open has no view options to offer.
                     if browser.offersViewOptions, !browser.showsPlaceIndex {
                         // The library is given inside the branch that shows it, so the menu's views never read it while it is
                         // gone: SwiftUI can update a view of a branch it is about to drop, which then still has its old one.
-                        Group {
-                            FilterCommands(browser: browser, shortcuts: shortcuts)
-                            CurrentViewOptions(browser: browser, shortcuts: shortcuts)
-                        }
-                        .environment(\.library, library)
+                        CurrentLayoutCommands(browser: browser, shortcuts: shortcuts)
+                            .environment(\.library, library)
                     }
-                } else {
-                    CurrentViewOptions(browser: nil)
                 }
                 Divider()
                 PageWidthOptions()
@@ -265,7 +254,7 @@ extension AppCommands {
     }
 }
 
-/// The list's own search, beside View Options, from ⌥⌘F under Find, as Notes has it.
+/// The list's own search, beside the View button and available from Find with ⌥⌘F.
 struct SearchListButton: View {
     @FocusedValue(\.browser) private var browser
 

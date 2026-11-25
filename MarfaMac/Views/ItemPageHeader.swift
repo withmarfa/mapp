@@ -49,7 +49,7 @@ struct ItemPageHeader: ViewModifier {
     static func heldHeader(of editor: EditorController, in library: any ItemLibrary, drafts: DetailsPresentation) -> () -> PageHeader? {
         { [weak editor] in
             guard let id = editor?.heldItemID else { return nil }
-            return Cost.measure(.pageHeader) { header(of: id, in: library, drafts: drafts) }
+            return Cost.measure(.pageHeader) { header(of: id, in: library, drafts: drafts, footLimits: editor?.footLimits ?? [:]) }
         }
     }
 
@@ -57,7 +57,7 @@ struct ItemPageHeader: ViewModifier {
     static func header(
         of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, placements: PagePlacements = .stored(),
         pinsProperties: Bool = PinsProperties.stored(), titleLines: Int = TitleLines.stored(), dateFormat: DateFormat = .stored(),
-        showsCoordinates: Bool = ShowsCoordinates.stored()
+        showsCoordinates: Bool = ShowsCoordinates.stored(), footLimits: PageFoot.Limits = [:]
     ) -> PageHeader? {
         guard let item = library.headerItem(id) else { return nil }
         let draft = drafts.draft(for: item.id, key: "title")
@@ -65,11 +65,10 @@ struct ItemPageHeader: ViewModifier {
             of: item, in: library, placements: placements, pinsProperties: pinsProperties, dateFormat: dateFormat, showsCoordinates: showsCoordinates)
         let relationships = library.relationships(for: item.id)
         let status = library.catalogue.itemTypes[item.type]?.statusField
-        let linked = placements.placement(of: item.type, in: library.catalogue).linkedFromPlace == .page
-            ? LinkedItem.list(
-                pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: library.now(), format: dateFormat,
-                item: { library.headerItem($0) })
-            : []
+        let foot = PageFoot.of(
+            item, in: library, relationships: relationships,
+            showsLinkedFrom: placements.placement(of: item.type, in: library.catalogue).linkedFromPlace == .page, limits: footLimits,
+            format: dateFormat, now: library.now())
         let hasText = library.catalogue.itemTypes[item.type]?.bodyKey != nil
         // A collection with no text, as a folder a connector keeps has, offers nothing to type into: an editor with
         // nothing in it would only invite typing that the connector puts back. The body is read only for a collection,
@@ -96,14 +95,15 @@ struct ItemPageHeader: ViewModifier {
             parent: Self.parent(in: relationships).flatMap { parent in
                 guard let target = parent.targets.first else { return nil }
                 let icon = target.itemID.flatMap { PageHead.typeIcon(of: $0, in: library) }
-                return PageHeader.Pin(label: target.title, enabled: true, icon: .init(name: icon), tone: TypeTone(icon: icon).rawValue)
+                return PageHeader.Pin(
+                    label: target.title, enabled: true, icon: .init(name: icon), tone: TypeTone(icon: icon).rawValue,
+                    item: target.itemID?.rawValue)
             },
             pins: head.pins,
             rows: head.rows,
             showMore: head.showMore,
-            linked: linked,
+            foot: foot,
             showsText: showsText,
-            showMoreLinked: String(localized: "Show \(max(0, linked.count - LinkedItem.foldAfter)) More"),
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize,
             titleLines: titleLines,
             chips: .init()

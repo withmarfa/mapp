@@ -128,7 +128,7 @@ nonisolated final class WindowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Old packing list"].waitForExistence(timeout: 3))
     }
 
-    /// The list's search, a field only once its button beside View Options is clicked.
+    /// The list's search, a field only once its button beside View is clicked.
     @MainActor private var listSearch: XCUIElement { window.textFields["ColumnSearch"] }
 
     @MainActor func testTheListsSearchFindsItemsAndEscapePutsItAway() {
@@ -168,8 +168,8 @@ nonisolated final class WindowTests: XCTestCase {
     @MainActor func testCommandNOpensQuickAddAndCreatesTheTitledItem() {
         let before = count(of: "Items")
         app.typeKey("n", modifierFlags: .command)
-        XCTAssertTrue(window.descendants(matching: .any)["QuickAddTitle"].waitForExistence(timeout: 3))
-        XCTAssertFalse(window.buttons["QuickAddAdd"].isEnabled, "an empty draft cannot make an item")
+        XCTAssertTrue(window.descendants(matching: .any)["NewItemLineTitle"].waitForExistence(timeout: 3))
+        XCTAssertFalse(window.buttons["NewItemLineAddAndOpen"].exists, "an empty draft offers no Add")
         XCTAssertEqual(count(of: "Items"), before)
         window.completeQuickAdd(type: "Note", title: "Shopping")
         XCTAssertTrue(row(titled: "Shopping").waitForExistence(timeout: 3))
@@ -228,7 +228,7 @@ nonisolated final class WindowTests: XCTestCase {
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
         window.completeQuickAdd(type: "Note", title: "Palette note")
-        XCTAssertTrue(row(titled: "Palette note").waitForExistence(timeout: 3), "the command opened quick add and its item was made")
+        XCTAssertTrue(row(titled: "Palette note").waitForExistence(timeout: 3), "the command opened the new-item line and its item was made")
     }
 
     @MainActor func testEscapePutsTheCommandPaletteAway() {

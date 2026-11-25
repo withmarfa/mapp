@@ -15,8 +15,8 @@ paths:
 | Home | What it holds |
 | --- | --- |
 | The Marfa's own data | Items, types, views and the sign-in's grants. Never an app setting |
-| This app's settings | Every setting that should follow the person to another Mac |
-| This Mac only | What fits one screen or one Mac: widths, the last place open, any-app shortcuts, consent to error reports, export plans |
+| This app's settings | Settings that follow the person to another Mac, such as New Opens |
+| This Mac only | Widths, last place, recent kinds, tags and parents for New Item, any-app shortcuts, error-report consent, export plans |
 
 - **A setting has the narrowest home a person would expect**, and one home only. `PreferencesMap` names it, and a test fails for a key it does not place.
 - **To add a setting:** add its key to `MacSettings.keys` and to `PreferencesMap` in the same change. Reset, export, restore points and the sample library then include it.
@@ -31,7 +31,7 @@ paths:
 - **Two Macs that change different settings both keep their change.** A field is written by member and a table by row, so split a value into rows where its parts change apart. A list whose order matters is one row, and the later arrangement wins whole.
 - **A set is written sorted**, so saving it again is not a change.
 - **What is kept for a place is keyed by its word** (`PlaceView.storageKey`), and for a saved view by its id, as its place can change; an earlier copy's keys are never removed (`EarlierPlace`).
-- **An earlier copy drops members it does not know** from a row it rewrites, which is accepted: `quickActions` in `viewLayout`; `scope`, `archived` and `includesKinds` in `placeDefaults`.
+- **An earlier copy drops members it does not know** from a row it rewrites, which is accepted: `quickActions` and `opening` in `viewLayout`; `scope`, `archived`, `includesKinds`, `quickActions` and `opening` in `placeDefaults`.
 - **A sign-in asks for `app.*:write`, never the app's own vendor scope**, because discovery lists no vendor scope before its first type exists (withmarfa/marfa#3522).
 
 ## The first launch against a Marfa

@@ -12,7 +12,7 @@ extension EditorController {
     func applyStyle() {
         call("setFullWidth", String(style.fullWidth))
         call("setTextSize", String(style.textSize))
-        call("setReadingWidth", String(style.readingWidth))
+        call("setReadingWidth", String(style.readingEms))
         call("setOptions", json(EditorOptions(style)))
         call("setLineSpacing", String(style.lineSpacing.multiple))
         call("setParagraphSpacing", String(style.paragraphSpacing.multiple))
@@ -152,7 +152,6 @@ extension EditorController {
             "status": String(localized: "Status"),
             "empty": String(localized: "Empty"),
             "discardChanges": String(localized: "Discard Changes"),
-            "linkedFrom": String(localized: "Linked From"),
             "showLess": String(localized: "Show Less"),
             "properties": String(localized: "Properties"),
             "reorder": String(localized: "Drag to Reorder"),

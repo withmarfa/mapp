@@ -120,6 +120,13 @@ extension ItemLibrary {
         return failure.map(SavedPictureResolution.unavailable) ?? .none
     }
 
+    /// The file item an embed of `item` is bound to, which a picture's menu opens and copies the link of. Nil where the
+    /// core has bound it to none, or the item is in the bin.
+    func embeddedFileItem(_ reference: EmbedReference, in item: ItemID) -> ItemID? {
+        guard case .resolved(let file) = binding(of: reference, in: item), let held = self.item(file), held.state != .trashed else { return nil }
+        return file
+    }
+
     private func binding(of reference: EmbedReference, in item: ItemID) -> ReferenceResolution? {
         boundEmbeds(of: item).first { $0.text == reference.text }?.resolution
     }

@@ -44,6 +44,8 @@ nonisolated enum MarfaMapping {
     /// The type an event is, or descends from; with a task, the types whose `starts_at` is read as a start date.
     static let eventType = TypeID("core.event")
     static let startField = "starts_at"
+    /// The type a bookmark is, or descends from, and whose `urlField` a pasted address fills.
+    static let bookmarkType = TypeID("core.bookmark")
     /// Where an event or a session ends, which the table's hidden Duration column reads with `startField`.
     static let endField = "ends_at"
     /// The fields a look's presets read (`LookPreset`). Some are Marfa's core names (`from`, `emails`, `street_address`);
@@ -98,9 +100,10 @@ nonisolated enum MarfaMapping {
 
     private static func libraryGroup(_ group: ViewGrouping) -> LibraryViewGroup {
         let known = group.bucket.flatMap { LibraryViewGroup.Bucket(rawValue: $0.rawValue) }
+        let byPresence = group.bucket == .presence
         return LibraryViewGroup(
-            field: group.by, bucket: known, order: group.order, hidden: group.hidden,
-            otherBucket: known == nil ? group.bucket?.rawValue : nil)
+            field: group.by, bucket: known, order: group.order, hidden: group.hidden, byPresence: byPresence,
+            otherBucket: known == nil && !byPresence ? group.bucket?.rawValue : nil)
     }
 
     /// Nil where a view lists both tiers.
@@ -113,7 +116,8 @@ nonisolated enum MarfaMapping {
     }
 
     private static func marfaBucket(_ group: LibraryViewGroup) -> ViewGrouping.Bucket? {
-        (group.bucket?.rawValue ?? group.otherBucket).map(ViewGrouping.Bucket.init(rawValue:))
+        if group.byPresence { return .presence }
+        return (group.bucket?.rawValue ?? group.otherBucket).map(ViewGrouping.Bucket.init(rawValue:))
     }
 
     static func viewSettings(_ settings: LibraryViewSettings) -> ViewSettings {

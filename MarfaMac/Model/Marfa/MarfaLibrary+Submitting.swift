@@ -58,7 +58,7 @@ extension MarfaLibrary {
     }
 
     /// The text the person typed into a write, which nothing else holds once the package refuses it before queueing:
-    /// a body, a create's title, body and text values, since the person typed them in quick add, a tag, and the text values
+    /// a body, a create's title, body and text values, since the person typed them in the new-item form, a tag, and the text values
     /// of a property edit, a title among them, or of a change of type, the values typed in its sheet among them.
     private static func unqueuedText(_ write: ItemWrite) -> String? {
         switch write {

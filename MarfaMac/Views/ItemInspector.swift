@@ -23,10 +23,7 @@ struct ItemInspectorHost: View {
 
     var body: some View {
         Group {
-            if let browser, details.isEditingView, let panel = browser.viewPanel {
-                ViewEditPanel(browser: browser, panel: panel)
-                    .onExitCommand { browser.escapeViewPanel(in: library) }
-            } else if let id = selectedID, let item = library.headerItem(id) {
+            if let id = selectedID, let item = library.headerItem(id) {
                 ItemPanelLoader(
                     item: item, relationships: library.relationships(for: id), mentions: library.bodyMentions(for: id), editor: editor,
                     details: details, onOpen: open
@@ -46,19 +43,23 @@ struct ItemInspectorHost: View {
         .accessibilityIdentifier("ItemInspector")
     }
 
-    /// Follows a link as Settings > Open Items says. In a window of its own, which has no list, the item opens in
-    /// another window.
+    /// Follows a link as Settings > Open Items says, as a link in the page does (`EditorController.follow`), so a window
+    /// of its own opens it as that window does. With no page beside the panel, the item opens in another window. A
+    /// deleted item opens in Recently Deleted where a main window has the panel, and as any link in a window of its own,
+    /// whose page shows its deleted notice.
     private func open(_ id: ItemID) {
-        guard let browser else {
-            if library.item(id) != nil { openWindow(value: id) }
-            return
-        }
-        browser.clearSearch()
-        if library.item(id)?.state == .trashed {
+        if let browser, library.item(id)?.state == .trashed {
             browser.showSettings(.recentlyDeleted)
             return
         }
-        guard let item = library.item(id) else { return }
-        browser.follow(link: item, in: library, order: order)
+        guard library.item(id) != nil else { return }
+        browser?.clearSearch()
+        if let editor {
+            editor.follow(id)
+        } else if let browser, let item = library.item(id) {
+            browser.follow(link: item, in: library, order: order)
+        } else {
+            openWindow(value: id)
+        }
     }
 }

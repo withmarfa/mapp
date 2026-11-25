@@ -1,5 +1,9 @@
 import { openLink, postToHost } from './bridge'
+import { element, maskSymbol, useTone, type HeaderIcon } from './dom'
+import { Foot, type FootSection } from './foot'
 import { dragRows } from './row-drag'
+
+export type { HeaderIcon } from './dom'
 
 /** The symbol a tag's chip starts with, a key of `HeaderIcons.symbols`. */
 const tagSymbol = 'number'
@@ -26,6 +30,8 @@ export interface HeaderPin {
   /** Only the parent pill has these: the parent's type icon, a key of `HeaderIcons.symbols`, and its tone's name. */
   icon?: string | null
   tone?: string | null
+  /** Only the parent pill has it: the parent's item id, so a pause on the pill shows the parent's card. */
+  item?: string | null
 }
 
 /** An item a row links to: drawn as its type's mark in the item's own tone and its title on a grey fill, or, for a person,
@@ -100,15 +106,6 @@ export interface HeaderRow {
   section?: string
 }
 
-/** An item that links to the one on the page. */
-export interface HeaderLinked {
-  item: string
-  title: string
-  symbol: string
-  type: string
-  date: string
-}
-
 /** The grey line over the title: the type's mark and name, then what is true of the item among Read Only, Feed and
  *  Archived. The app decides all of it. */
 export interface HeaderKicker {
@@ -147,27 +144,19 @@ export interface HeaderModel {
   pins: HeaderRow[]
   /** Every row, in order. Those `folded` wait behind Show More. */
   rows: HeaderRow[]
-  linked: HeaderLinked[]
-  linkedFoldAfter: number
+  /** What the page lists under its text: the sub-items and the items that link to this one. */
+  foot: FootSection[]
   /** False where the page has no text to write, so the page draws no empty editor (`body[data-text='none']`): a
    *  collection with no text sends it. An empty editor only invites typing that a connector holding the item puts
    *  back. */
   showsText: boolean
-  /** "Show N More", worded by the app for the rows and for the linked items that are folded away. */
+  /** "Show N More", worded by the app for the rows that are folded away. */
   showMore: string
-  showMoreLinked: string
   /** The interface's text size in points, which the head and messages follow. */
   interfaceTextSize: number
   /** How many lines the title shows before an ellipsis cuts it, while it is not being edited. */
   titleLines: number
   chips?: HeaderChipStyle
-}
-
-/** A symbol the app drew, as an image the page uses as a mask so it takes the text's color. */
-export interface HeaderIcon {
-  url: string
-  width: number
-  height: number
 }
 
 export interface HeaderIcons {
@@ -183,7 +172,6 @@ export interface HeaderLabels {
   /** What a value the item does not have reads. */
   empty: string
   discardChanges: string
-  linkedFrom: string
   showLess: string
   properties: string
   /** What VoiceOver says of a row's grabber. */
@@ -203,40 +191,10 @@ const englishLabels: HeaderLabels = {
   status: 'Status',
   empty: 'Empty',
   discardChanges: 'Discard Changes',
-  linkedFrom: 'Linked From',
   showLess: 'Show Less',
   properties: 'Properties',
   reorder: 'Drag to Reorder',
   changeType: 'Change Type',
-}
-
-function element<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  className: string,
-  parent?: HTMLElement,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag)
-  node.className = className
-  parent?.append(node)
-  return node
-}
-
-/** Gives a chip the tone the app named, from the custom properties the app sent (`--tone-<name>`); the page chooses no
- *  color. A name that is not a word leaves the chip with no tone. */
-function useTone(node: HTMLElement, name: string | null | undefined) {
-  if (!name || !/^[a-z]+$/.test(name)) {
-    node.style.removeProperty('--tone')
-    return
-  }
-  node.style.setProperty('--tone', `var(--tone-${name})`)
-}
-
-/** A symbol the app drew, as a mask in the tone's color. */
-function maskSymbol(node: HTMLElement, icon: HeaderIcon | undefined) {
-  node.hidden = !icon
-  if (!icon) return
-  node.style.setProperty('-webkit-mask-image', `url("${icon.url}")`)
-  node.style.maskImage = `url("${icon.url}")`
 }
 
 function moreButton(parent: HTMLElement, action: () => void): HTMLButtonElement {
@@ -244,83 +202,6 @@ function moreButton(parent: HTMLElement, action: () => void): HTMLButtonElement 
   button.type = 'button'
   button.addEventListener('click', action)
   return button
-}
-
-/** A folded list of items under the text: its heading with a chevron and a count, then rows that open an item. */
-class LinkedSection {
-  private readonly root: HTMLElement
-  private readonly toggle: HTMLButtonElement
-  private readonly list: HTMLUListElement
-  private readonly more: HTMLButtonElement
-  private open = false
-  private all = false
-
-  constructor(
-    parent: HTMLElement,
-    className: string,
-    private readonly changed: () => void,
-    private readonly glyph: (name: string, parent: HTMLElement) => void,
-    row?: string,
-  ) {
-    this.root = element('section', `item-linked ${className}`, parent)
-    this.toggle = element('button', 'item-linked-toggle', this.root)
-    this.toggle.type = 'button'
-    if (row) this.toggle.dataset.row = row
-    this.toggle.addEventListener('click', () => {
-      this.open = !this.open
-      this.changed()
-    })
-    this.list = element('ul', 'item-linked-list', this.root)
-    this.more = moreButton(this.root, () => {
-      this.all = !this.all
-      this.changed()
-    })
-  }
-
-  /** What the section was last drawn from, so a change of what the person opened is drawn. */
-  get state(): [boolean, boolean] {
-    return [this.open, this.all]
-  }
-
-  /** A new item starts folded. */
-  reset() {
-    this.open = false
-    this.all = false
-  }
-
-  draw(
-    name: string,
-    items: HeaderLinked[],
-    foldAfter: number,
-    words: { more: string; less: string },
-  ) {
-    this.root.hidden = items.length === 0
-    this.toggle.replaceChildren()
-    this.toggle.setAttribute('aria-expanded', String(this.open))
-    this.root.setAttribute('aria-label', name)
-    element('span', 'item-linked-title', this.toggle).textContent = name
-    element('span', 'item-linked-count', this.toggle).textContent = String(items.length)
-    element('span', 'item-chevron', this.toggle).setAttribute('aria-hidden', 'true')
-    const shown = this.all ? items : items.slice(0, foldAfter)
-    this.list.hidden = !this.open
-    this.list.replaceChildren(
-      ...shown.map((linked) => {
-        const entry = element('li', 'item-linked-row')
-        const button = element('button', 'item-linked-open', entry)
-        button.type = 'button'
-        button.addEventListener('click', () => postToHost({ type: 'openItem', item: linked.item }))
-        this.glyph(linked.symbol, button)
-        element('span', 'item-linked-name', button).textContent = linked.title
-        const detail = element('span', 'item-linked-detail', button)
-        element('span', '', detail).textContent = linked.type
-        element('span', 'item-detail-dot', detail).setAttribute('aria-hidden', 'true')
-        element('span', '', detail).textContent = linked.date
-        return entry
-      }),
-    )
-    this.more.hidden = !this.open || items.length <= foldAfter
-    this.more.textContent = this.all ? words.less : words.more
-  }
 }
 
 /** A frame as whole points, which is how far a value has to move before the app is told. */
@@ -348,7 +229,7 @@ function valueFrame(value: HTMLElement): DOMRect {
  *  "Show N More", which draws them all in place, and "Show Less" once open. The status and the parent are one button
  *  each, moved into their row with their menu unchanged. A row is dragged by its name.
  *
- *  Linked From (a folded section of the items that link to this one) is drawn in the footer, under the text. */
+ *  The foot (the item's sub-items and the items that link to it) is drawn in the footer, under the text (`Foot`). */
 export class ItemHeader {
   private model?: HeaderModel
   private readonly labels: HeaderLabels
@@ -363,9 +244,9 @@ export class ItemHeader {
   private readonly sections: HTMLElement
   private readonly moreProperties: HTMLButtonElement
   private readonly rowsBox: HTMLDivElement
-  private readonly linked: LinkedSection
+  private readonly foot: Foot
   private symbols: Record<string, HeaderIcon> = {}
-  /** What the rows and the linked items were last drawn from, so an unchanged head is not drawn again under the
+  /** What the rows and the foot were last drawn from, so an unchanged head is not drawn again under the
    *  pointer. */
   private drawn = ''
   /** Whether the person has opened Show More, for the item on the page. */
@@ -382,7 +263,7 @@ export class ItemHeader {
    *  it has sent that item's head. */
   private wantedTitle?: string
 
-  /** `footer` holds what follows the text, Linked From. */
+  /** `footer` holds what follows the text: the foot. */
   constructor(
     readonly root: HTMLElement,
     readonly footer: HTMLElement,
@@ -431,13 +312,7 @@ export class ItemHeader {
       this.redraw()
     })
     const glyph = (name: string, parent: HTMLElement) => this.glyph(name, parent)
-    this.linked = new LinkedSection(
-      footer,
-      'item-linked-from',
-      () => this.redraw(),
-      glyph,
-      '#linked',
-    )
+    this.foot = new Foot(footer, () => this.redraw(), glyph)
 
     this.title.addEventListener('focus', () => {
       this.editing = this.model?.item
@@ -527,15 +402,20 @@ export class ItemHeader {
     return this.title.textContent ?? ''
   }
 
+  /** The item the head shows, which the page's links are read from. */
+  get item(): string | undefined {
+    return this.model?.item
+  }
+
   get isEditingTitle(): boolean {
     return document.activeElement === this.title
   }
 
-  /** Whether the footer holds anything, so the text above it can end where the text does. While it does, Linked
-   *  From follows the text directly (`main.ts` sets `--inkkit-min-height` to zero); the text fills the window only
+  /** Whether the footer holds anything, so the text above it can end where the text does. While it does, the
+   *  foot follows the text directly (`main.ts` sets `--inkkit-min-height` to zero); the text fills the window only
    *  when it holds nothing. */
   get hasFooterItems(): boolean {
-    return !!this.model && this.model.linked.length > 0
+    return !!this.model && this.model.foot.length > 0
   }
 
   get isHidden(): boolean {
@@ -573,7 +453,7 @@ export class ItemHeader {
       this.title.blur()
     }
     this.root.hidden = model.focused === true
-    this.footer.hidden = false
+    this.footer.hidden = model.foot.length === 0
     this.root.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.footer.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.root.style.setProperty('--title-lines', String(model.titleLines))
@@ -594,7 +474,7 @@ export class ItemHeader {
     this.showPin(this.parentPin, model.parent)
     if (previous?.item !== model.item) {
       this.expanded = { item: model.item, properties: false, rows: [] }
-      this.linked.reset()
+      this.foot.reset()
     }
     this.redraw()
     requestAnimationFrame(() => this.reportValueMoved())
@@ -696,6 +576,8 @@ export class ItemHeader {
     if (pin === this.statusPin) this.drawStatusMark()
     if (pin === this.parentPin) {
       useTone(pin, model?.tone)
+      if (model?.item) pin.dataset.cardItem = model.item
+      else delete pin.dataset.cardItem
       this.drawParentIcon()
     }
   }
@@ -713,7 +595,6 @@ export class ItemHeader {
         : element('span', 'item-pin-symbol item-chip-mark item-icon-parent', pin)
     symbol.setAttribute('aria-hidden', 'true')
     element('span', 'item-pin-label item-chip-text', pin)
-    element('span', 'item-pin-icon item-icon-indicator', pin).setAttribute('aria-hidden', 'true')
     // A native pop-up button opens as the mouse goes down, and from the keyboard on Space or Return.
     pin.addEventListener('pointerdown', (event) => {
       if (event.button !== 0 || pin.disabled) return
@@ -826,12 +707,14 @@ export class ItemHeader {
     if (target.kind === 'person') {
       const person = this.person(parent, 'button', target)
       person.type = 'button'
+      person.dataset.cardItem = target.item
       person.addEventListener('click', open)
       return
     }
     const link = element('button', 'item-chip', parent)
     link.type = 'button'
     link.dataset.kind = 'link'
+    link.dataset.cardItem = target.item
     useTone(link, target.tone)
     const symbol = this.symbols[target.symbol]
     if (symbol) {
@@ -860,7 +743,7 @@ export class ItemHeader {
     })
   }
 
-  /** Draws the kicker, the pins, the rows and the linked items from the model. */
+  /** Draws the kicker, the pins, the rows and the foot from the model. */
   private redraw() {
     const model = this.model
     if (!model) return
@@ -868,11 +751,10 @@ export class ItemHeader {
       model.kicker,
       model.pins,
       model.rows,
-      model.linked,
+      model.foot,
       model.showMore,
-      model.showMoreLinked,
       this.expanded,
-      this.linked.state,
+      this.foot.state,
       Object.keys(this.symbols).length,
     ])
     if (key === this.drawn) return
@@ -899,10 +781,7 @@ export class ItemHeader {
     this.rowsBox.hidden = visible.length === 0 && !folded
     this.rowsBox.classList.toggle('bare', visible.length === 0)
 
-    this.linked.draw(this.labels.linkedFrom, model.linked, model.linkedFoldAfter, {
-      more: model.showMoreLinked,
-      less: this.labels.showLess,
-    })
+    this.foot.draw(model.item, model.foot, this.symbols)
   }
 
   /** The rows under a heading, each heading once with its rows below it, in the order the app sent them. */
@@ -1080,7 +959,7 @@ export class ItemHeader {
     }
   }
 
-  /** The row that an event's target is in, for a context menu: a row of the head, or Linked From. Null over anything
+  /** The row that an event's target is in, for a context menu: a row of the head, or Linked From and Timeline. Null over anything
    *  else. */
   rowAt(target: EventTarget | null): { item: string; row: string } | null {
     const row = (target as Element | null)?.closest?.<HTMLElement>('[data-row]')?.dataset.row

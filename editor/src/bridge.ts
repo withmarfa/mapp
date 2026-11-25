@@ -1,5 +1,6 @@
 import { canOpenLink } from '@aicayzer/inkkit'
 import type { CaretState, FindState } from './editor'
+import type { CardTarget } from './card'
 import type { HeaderMenu } from './header'
 
 /** An embed as the item's text holds it, such as `![[photo.png|400]]` or `![](a.png)`, which the app
@@ -91,6 +92,27 @@ export type EditorMessage =
   | { type: 'noticeAction'; item: string; kind: string }
   | { type: 'openLink'; href: string }
   | { type: 'openItem'; item: string }
+  /** The pointer rests on a linked item: a row, a foot row or a chip names it (`item`, by identity), a link in the text is
+   *  named as authored (`wiki`), and the app says what it means. The app waits, then draws the card under `rect`. */
+  | {
+      type: 'cardHover'
+      item: string
+      card: CardTarget
+      rect: [number, number, number, number]
+      viewportHeight: number
+    }
+  /** The pointer left, or the page scrolled, took a key or a click: no card. */
+  | { type: 'cardEnd' }
+  /** The context menu is opening over a linked item, or over none when null, for the menu's Show Card under `rect`. */
+  | {
+      type: 'cardMenu'
+      item: string
+      card: CardTarget | null
+      rect: [number, number, number, number]
+      viewportHeight: number
+    }
+  /** Show More under a foot list: the app sends the next rows of the list with this key. */
+  | { type: 'footMore'; item: string; key: string }
   | { type: 'copy'; text: string }
   | { type: 'escape' }
   | { type: 'pasteImages' }

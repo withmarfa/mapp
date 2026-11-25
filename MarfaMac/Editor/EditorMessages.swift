@@ -81,6 +81,15 @@ nonisolated enum EditorMessage: Sendable {
     /// The same menu is opening over a row of the property block, or Linked From, or over none when nil: the row's
     /// identifier as `PagePlacement` names it, and the item the header was showing.
     case rowMenu((item: ItemID, row: String)?)
+    /// The pointer rests on a linked item of the item `item`, whose frame in the page's window (of height
+    /// `viewportHeight`) the card goes under.
+    case cardHover(ItemID, LinkCardTarget, CGRect, viewportHeight: Double)
+    /// The pointer left, or the page scrolled or took a key or a click.
+    case cardEnd
+    /// The context menu is opening over a linked item, or over none when nil, for Show Card under the frame.
+    case cardMenu(ItemID, LinkCardTarget?, CGRect, viewportHeight: Double)
+    /// Show More was pressed under the list of the item `item` that has this key (`PageFoot`).
+    case footMore(ItemID, key: String)
     /// A row of the property block was dragged: the whole order the page shows after the move, folded rows included.
     case moveRow(ItemID, row: String, order: [String])
     /// A `[[link]]` to an item was command-clicked in the item `item`.
@@ -213,6 +222,24 @@ nonisolated enum EditorMessage: Sendable {
             } else {
                 self = .rowMenu(nil)
             }
+        case "cardHover":
+            guard let item = dict["item"] as? String, !item.isEmpty, let target = LinkCardTarget(page: dict["card"]),
+                  let rect = dict["rect"] as? [Double], rect.count == 4,
+                  let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue
+            else { return nil }
+            self = .cardHover(ItemID(item), target, CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
+        case "cardEnd":
+            self = .cardEnd
+        case "cardMenu":
+            guard let item = dict["item"] as? String, !item.isEmpty, let rect = dict["rect"] as? [Double], rect.count == 4,
+                  let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue
+            else { return nil }
+            self = .cardMenu(
+                ItemID(item), LinkCardTarget(page: dict["card"]), CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]),
+                viewportHeight: viewportHeight)
+        case "footMore":
+            guard let item = dict["item"] as? String, !item.isEmpty, let key = dict["key"] as? String, !key.isEmpty else { return nil }
+            self = .footMore(ItemID(item), key: key)
         case "moveRow":
             guard let item = dict["item"] as? String, !item.isEmpty, let row = dict["row"] as? String, !row.isEmpty,
                   let order = dict["order"] as? [String], order.contains(row)

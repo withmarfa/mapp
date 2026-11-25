@@ -20,8 +20,8 @@ struct LibraryChangeTests {
                     content: SyncContent(title: "Untitled"), actions: [.discard])
             ], queueRead: true)
 
-        browser.finishNewItem(in: library)
-        #expect(browser.newItem == nil)
+        browser.finishNewItems(in: library)
+        #expect(browser.newItems.isEmpty)
         #expect(browser.selection.isEmpty)
     }
 

@@ -40,7 +40,6 @@ struct PlacesMenu {
 /// The menu's rows. Choosing one shows its place, as a row of the sidebar does.
 struct PlacesMenuView: View {
     @CurrentLibrary private var library
-    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     @Environment(ShortcutBindings.self) private var shortcuts: ShortcutBindings?
     let menu: PlacesMenu
     let browser: Browser
@@ -52,7 +51,7 @@ struct PlacesMenuView: View {
             // As the sidebar's Search row does.
             Button("Search", systemImage: "magnifyingglass") { browser.palette = .commands }
                 .shortcut(.commandPalette, shortcuts)
-            Button("New", systemImage: "square.and.pencil") { browser.openQuickAdd(remembered: lastType, in: library) }
+            Button("New", systemImage: "square.and.pencil") { browser.openNewItem(in: library) }
                 .shortcut(.newItem, shortcuts)
             Divider()
             places

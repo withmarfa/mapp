@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The page of the item chosen in a layout that spans the window, in a column beside it, when Open Items says Beside the
+/// The page of the item chosen in a layout that spans the window, in a column beside it, when the place's Open Items says Beside the
 /// List (`ItemOpening.besideList`). It is the window's one editor on a fourth place, after the list's page column, the
 /// full page and the modal, so it shows only while none of those has the editor (`Browser.showsBesidePage`). Its one
 /// corner button is Open as Page. Choosing another row replaces the page once the selection has rested
@@ -9,6 +9,8 @@ import SwiftUI
 struct BesideColumn: ViewModifier {
     @CurrentLibrary private var library
     @AppStorage(ListKey.openItemsIn) private var opening = ItemOpening.standard
+    /// Only watched: a saved view's Open Items is kept in the app's settings, which `Browser.chosenOpening` reads.
+    @AppStorage(ViewLayouts.key) private var layouts = ViewLayouts()
     let browser: Browser
     let editor: EditorController
     let details: DetailsPresentation
@@ -20,7 +22,8 @@ struct BesideColumn: ViewModifier {
     static let width: CGFloat = 372
 
     func body(content: Content) -> some View {
-        let isShown = browser.showsBesidePage(opening: opening)
+        let _ = layouts
+        let isShown = browser.showsBesidePage(opening: browser.chosenOpening ?? opening)
         HStack(spacing: 0) {
             // Neither side holds a least width. The split view adds the sidebar and the panel over the column to its least
             // width, and they change as it lays out: with a table's columns and the page's fixed width under them it came

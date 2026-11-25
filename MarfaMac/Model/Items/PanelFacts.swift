@@ -127,8 +127,8 @@ nonisolated enum PanelKeptBy {
     }
 
     private static func readOnly(_ source: String?) -> PanelKeptLine {
-        let text = source.map { String(localized: "Read only. \($0) keeps this item, so an edit here would be overwritten.") }
-            ?? String(localized: "Read only. A connector keeps this item, so an edit here would be overwritten.")
+        let text = source.map { String(localized: "Read only. \($0) keeps this item, so a change made here would be overwritten.") }
+            ?? String(localized: "Read only. A connector keeps this item, so a change made here would be overwritten.")
         return PanelKeptLine(symbol: "lock", text: text)
     }
 }

@@ -223,7 +223,7 @@ private struct PlaceIndexTable: View {
             Button("Open in New Window", systemImage: "macwindow") { openInNewWindow(row) }
             Divider()
             if let type = row.typeID, let made = newTitle(of: type) {
-                Button(made, systemImage: "square.and.pencil") { browser.openQuickAdd(typeID: type.rawValue, in: library) }
+                Button(made, systemImage: "square.and.pencil") { browser.openNewItem(kind: type.rawValue, in: library) }
             }
             if row.sourceCode == nil {
                 Button("New View…", systemImage: "plus") { newView(on: row) }
@@ -272,7 +272,7 @@ private struct PlaceIndexTable: View {
         openWindow(id: MarfaMacApp.mainWindowID)
     }
 
-    /// New and the type's name, where quick add can make one.
+    /// New and the type’s name, where a new item can be one.
     private func newTitle(of type: TypeID) -> String? {
         guard QuickAdd.isAvailable(in: library), QuickAdd.types(in: library).contains(where: { $0.id == type }) else { return nil }
         return String(localized: "New \(library.catalogue.label(for: type))")

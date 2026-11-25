@@ -77,12 +77,12 @@ extension CommandPalette {
             }
             entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: keys(.newItem),
                                  takesFocus: true) {
-                browser.openQuickAdd(remembered: lastType, in: library)
+                browser.openNewItem(in: library)
             })
             for type in QuickAdd.types(in: library) {
                 entries.append(Entry(id: "command:new:" + type.id.rawValue, title: String(localized: "New \(type.label)"),
                                      icon: .type(library.catalogue.icon(for: type.id)), takesFocus: true, group: nil) {
-                    browser.openQuickAdd(typeID: type.id.rawValue, in: library)
+                    browser.openNewItem(kind: type.id.rawValue, in: library)
                 })
             }
             // After New Item and the typed ones, so the commands "new" finds lead with New Item.
@@ -201,11 +201,6 @@ extension CommandPalette {
             }
             for command in SavedViewCommand.commands(for: browser, in: library, order: order) {
                 add(command.title, command.systemImage, in: .view, action: command.action)
-            }
-            if browser.showsViewPanel {
-                add(String(localized: "Finish Editing View"), "checkmark", in: .view) {
-                    Task { await browser.finishViewPanel(in: library, order: order) }
-                }
             }
             if let sidebar = sidebarVisibility {
                 add(sidebar.wrappedValue ? String(localized: "Hide Sidebar") : String(localized: "Show Sidebar"), "sidebar.left", keys(.toggleSidebar), in: .view) {
