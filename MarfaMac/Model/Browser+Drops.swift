@@ -12,9 +12,10 @@ extension Browser {
         let adding = library.collectionPlan(ids, joining: collection).joining
         let already = ids.filter { library.item($0)?.collectionIDs.contains(collection) == true }.count
         let title = library.item(collection)?.displayTitle ?? ""
-        let run = DropStep(undoManager)
+        // A group with nothing in it still leaves the manager something to undo, so one opens only for a step.
+        let run = adding.isEmpty ? nil : DropStep(undoManager)
         let taken = library.addToCollection(ids, collection, undoManager: undoManager)
-        let step = adding.isEmpty ? run.finish(named: nil) : run.finish(named: String(localized: "Add to Collection"))
+        let step = run?.finish(named: String(localized: "Add to Collection"))
         guard taken else { return false }
         let message: String
         if adding.isEmpty {
@@ -26,7 +27,7 @@ extension Browser {
                 : AttributedString(localized: "^[Added \(adding.count) item](inflect: true) to \(title)").text
             message = already > 0 ? String(localized: "\(added), \(already) already in it") : added
         }
-        say(message, symbol: "rectangle.stack.badge.plus", step: adding.isEmpty ? nil : step, toasts: toasts)
+        say(message, symbol: "rectangle.stack.badge.plus", step: step, toasts: toasts)
         return true
     }
 
@@ -57,12 +58,12 @@ struct DropStep {
         if opensGroup { undoManager?.beginUndoGrouping() }
     }
 
-    /// Closes the group, named `name` where the drop registered a step, and returns what the toast's Undo takes back:
-    /// nil where the drop opened no group of its own, since Undo would take other steps with it.
-    func finish(named name: String?) -> StepUndo? {
-        if let name { undoManager?.setActionName(name) }
+    /// Closes the group, named `name`, and returns what the toast's Undo takes back: nil where the drop began inside
+    /// another group, since Undo would take that group's other steps with it.
+    func finish(named name: String) -> StepUndo? {
+        undoManager?.setActionName(name)
         if opensGroup { undoManager?.endUndoGrouping() }
-        guard name != nil, startsGroup, let undoManager, undoManager.canUndo else { return nil }
+        guard startsGroup, let undoManager, undoManager.canUndo else { return nil }
         return StepUndo(undoManager: undoManager)
     }
 }
