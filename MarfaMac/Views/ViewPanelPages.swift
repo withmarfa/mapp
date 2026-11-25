@@ -124,12 +124,17 @@ struct ViewPanelFilter: View {
         let conditions = Self.conditions(in: browser)
         let titles = FilterTitles(content: content)
         let locked = lockedConditions()
-        let held = ViewDraft.holdability(of: state, targets: offer.targets, catalogue: library.catalogue)
+        let saved = SavedViews.shown(browser, in: library)?.query
+        // A saved view's own conditions the panel cannot show count too, since every write keeps them.
+        let held = saved.map { ViewDraft.holdability(of: state, beside: $0, targets: offer.targets, catalogue: library.catalogue) }
+            ?? ViewDraft.holdability(of: state, targets: offer.targets, catalogue: library.catalogue)
         let isView = ViewDraft.query(for: browser.shown, catalogue: library.catalogue, views: library.views) != nil
         let isFull = isView && held.count >= ViewDraft.maxConditions
+        let offersAny = saved == nil || state.matchesAny
+            || ViewDraft.canMatchAny(state, beside: saved, targets: offer.targets, catalogue: library.catalogue)
         ViewPanelHead(title: String(localized: "Filter"), back: { panel.page = .main }) {
             if state.clauses.count >= 2 {
-                matchMenu(isAny: state.matchesAny)
+                matchMenu(isAny: state.matchesAny, offersAny: offersAny, locked: !locked.isEmpty)
             }
         }
         ForEach(conditions.filter { !$0.clause.isRelative }, id: \.index) { condition in
@@ -171,10 +176,20 @@ struct ViewPanelFilter: View {
         return clauses.enumerated().filter { $0.offset != types }.map { ($0.offset, $0.element) }
     }
 
-    private func matchMenu(isAny: Bool) -> some View {
+    /// Match All or Any. A saved view takes Match Any only where every condition is one test, and no condition of its
+    /// own the panel cannot show stands beside them, so the menu says why it offers none.
+    private func matchMenu(isAny: Bool, offersAny: Bool, locked: Bool) -> some View {
         Menu {
             Toggle("Match All", isOn: Binding { !isAny } set: { _ in browser.setFiltersMatchAny(false) })
             Toggle("Match Any", isOn: Binding { isAny } set: { _ in browser.setFiltersMatchAny(true) })
+                .disabled(!offersAny)
+            if !offersAny {
+                Section {
+                    Text(locked
+                        ? "Match Any isn’t available because this view holds a condition that can’t be changed here."
+                        : "Match Any isn’t available because a condition, such as a date range, needs all of its parts to apply.")
+                }
+            }
         } label: {
             Text(isAny ? "Match Any" : "Match All")
                 .foregroundStyle(.secondary)

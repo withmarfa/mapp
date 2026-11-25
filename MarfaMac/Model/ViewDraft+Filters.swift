@@ -241,6 +241,36 @@ nonisolated extension ViewDraft {
         combine(base: Parsed(terms: [], join: .all), adding: state, targets: targets, catalogue: catalogue, calendar: calendar, keeping: nil)
     }
 
+    /// The same beside a saved view's own conditions that the window cannot show (`unshownConditions`), which a write
+    /// keeps and which count against `maxConditions` and stand beside the clauses with AND.
+    static func holdability(
+        of state: FilterState, beside query: LibraryViewQuery, targets: [String: FilterTarget], catalogue: Catalogue,
+        calendar: Calendar = .current
+    ) -> Combination {
+        guard let parsed = try? terms(of: query.filter) else {
+            return holdability(of: state, targets: targets, catalogue: catalogue, calendar: calendar)
+        }
+        let reading = read(parsed, among: scope(of: query, catalogue: catalogue), catalogue: catalogue, calendar: calendar)
+        let owned = Set(reading.items.filter { targets[$0.clause.field] != nil }.flatMap(\.conditions))
+        let kept = parsed.terms.filter { !owned.contains($0) }
+        return combine(
+            base: Parsed(terms: kept, join: parsed.join), adding: state, targets: targets, catalogue: catalogue, calendar: calendar,
+            keeping: nil)
+    }
+
+    /// Whether the clauses can be saved as Match Any: none needs AND within it (a date range) and no condition of the
+    /// view's own stands beside them.
+    static func canMatchAny(
+        _ state: FilterState, beside query: LibraryViewQuery?, targets: [String: FilterTarget], catalogue: Catalogue,
+        calendar: Calendar = .current
+    ) -> Bool {
+        var any = state
+        any.matchesAny = true
+        let held = query.map { holdability(of: any, beside: $0, targets: targets, catalogue: catalogue, calendar: calendar) }
+            ?? holdability(of: any, targets: targets, catalogue: catalogue, calendar: calendar)
+        return !held.unkept.contains(.mixedFilters)
+    }
+
     /// Whether this leaves the whole filter unwritable, rather than only one clause's part of it.
     static func refusesFilter(_ unkept: Unkept) -> Bool {
         switch unkept {
