@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// The View button at the end of a view's toolbar, which opens the View panel under it and stays pressed while it is
@@ -8,7 +7,6 @@ struct ViewPanelButton: View {
     @CurrentLibrary private var library
     @Environment(\.controlActiveState) private var activeState
     @Bindable var browser: Browser
-    @State private var room = TrailingRoom()
 
     var body: some View {
         let count = browser.filterCount
@@ -35,12 +33,11 @@ struct ViewPanelButton: View {
             }
         }
         .toggleStyle(.button)
-        .background(TrailingRoomProbe(room: room))
         .disabled(!browser.offersViewOptions || !library.isLoaded || browser.showsPlaceIndex)
         .help("View")
         .accessibilityLabel(Self.label(count: count, changed: changed))
         .accessibilityIdentifier("ViewOptionsToolbar")
-        .popover(isPresented: presented, attachmentAnchor: .rect(.rect(room.anchor(width: ViewPanelMetrics.width))), arrowEdge: .bottom) {
+        .popover(isPresented: presented, arrowEdge: .bottom) {
             if let panel = browser.viewPanel {
                 ViewPanelPopover(browser: browser, panel: panel)
                     .environment(\.library, library)
@@ -62,40 +59,6 @@ struct ViewPanelButton: View {
         Binding { browser.showsViewPanel } set: { shown in
             if !shown { browser.dismissViewPanel(in: library) }
         }
-    }
-}
-
-/// How far the window's trailing margin is from the View button, so the panel opens inside the window with its trailing
-/// edge at that margin, as the toolbar's other panels stand, rather than centred under the button and past the window's
-/// edge. Read when the button draws, which it does as the panel opens.
-@MainActor
-private final class TrailingRoom {
-    weak var view: NSView?
-
-    /// The window's margin, the inset of the toolbar's last button.
-    private static let margin: CGFloat = 14
-
-    /// The rect, in the button's space, under which a panel `width` wide stands with its trailing edge at the window's
-    /// margin. With no window yet it is the button's own bounds.
-    func anchor(width: CGFloat) -> CGRect {
-        guard let view, let window = view.window else { return CGRect(origin: .zero, size: view?.bounds.size ?? .zero) }
-        let frame = view.convert(view.bounds, to: nil)
-        let room = max(0, window.frame.width - Self.margin - frame.maxX)
-        return CGRect(x: view.bounds.width + room - width, y: 0, width: width, height: view.bounds.height)
-    }
-}
-
-private struct TrailingRoomProbe: NSViewRepresentable {
-    let room: TrailingRoom
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        room.view = view
-        return view
-    }
-
-    func updateNSView(_ view: NSView, context: Context) {
-        room.view = view
     }
 }
 
