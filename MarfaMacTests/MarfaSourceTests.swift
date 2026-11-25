@@ -1119,7 +1119,7 @@ extension LiveMarfaTests {
                 #expect(try await source.body(of: item.id).text == "Edited by the app tests.")
 
                 // Restoring an item the copy let go of is made by its id, and the item arrives once it is answered.
-                state = try await apply(.transition(item.id, .active))
+                state = try await apply(.restore(item.id))
                 #expect(state.item(titled: title)?.state == .active)
 
                 // Permanently Delete destroys an item in the bin, at the version shown, and takes it out of the copy.

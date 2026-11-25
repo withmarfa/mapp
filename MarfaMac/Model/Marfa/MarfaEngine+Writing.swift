@@ -163,14 +163,25 @@ extension MarfaEngine {
                 on ? try await copy.tags.add(tag, to: id.rawValue) : try await copy.tags.remove(tag, from: id.rawValue)
             ]
         case .transition(let id, let state):
-            switch state {
-            case .trashed: return [try await copy.items.delete(id.rawValue)]
-            case .active where rows[id.rawValue]?.state == .trashed || rows[id.rawValue] == nil:
+            if state == .trashed { return [try await copy.items.delete(id.rawValue)] }
+            // Marfa takes `trashed` to `active` and brings back what the delete took, so an item another device moved
+            // to Recently Deleted is left there. A transition names no state it expects (withmarfa/marfa#3523), so
+            // one queued before the copy shows the delete is still sent.
+            if rows[id.rawValue]?.state == .trashed {
+                throw Refused(problem: SyncProblem(code: "in_bin", message: BatchSkips.sentence(.inBin, count: 1)))
+            }
+            return [try await copy.items.transition(id.rawValue, to: MarfaMapping.marfaState(state))]
+        case .restore(let id):
+            switch rows[id.rawValue]?.state {
+            case .active:
+                return []
+            case .archived:
+                // Restored and archived elsewhere since: a restore would unarchive it.
+                throw Refused(problem: SyncProblem(code: "changed_since", message: BatchSkips.sentence(.changedSince, count: 1)))
+            default:
                 // A row the copy does not hold, as one the slice let go, is restored by its id and shown nowhere
                 // until the server answers.
                 return [try await copy.items.restore(id.rawValue)]
-            case .active, .archived:
-                return [try await copy.items.transition(id.rawValue, to: MarfaMapping.marfaState(state))]
             }
         case .link(let draft):
             return [

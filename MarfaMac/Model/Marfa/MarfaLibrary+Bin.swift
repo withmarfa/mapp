@@ -67,7 +67,7 @@ extension MarfaLibrary {
         let throughActive = change.from == .trashed && change.to == .archived
         let title = change.from == .trashed ? String(localized: "Can’t Recover") : String(localized: "Couldn’t Make This Change")
         let run = undoRun
-        sendState(id, throughActive ? .active : change.to, leaving: change.to, failing: title) { [weak self] restore, answer in
+        sendState(id, throughActive ? .active : change.to, from: change.from, leaving: change.to, failing: title) { [weak self] restore, answer in
             switch answer {
             case .notMade:
                 made.moves[id] = nil
@@ -89,7 +89,7 @@ extension MarfaLibrary {
             // Held like the step's own writes while the copy catches up, but the restore was made, so an archive the
             // engine gives back is told as not made rather than putting the step back.
             within(run) {
-                let archive = sendState(id, .archived, leaving: .archived, failing: String(localized: "Recovered but Not Archived")) { _, answer in
+                let archive = sendState(id, .archived, from: .active, leaving: .archived, failing: String(localized: "Recovered but Not Archived")) { _, answer in
                     if answer == .notMade { made.moves[id] = (from: change.from, to: .active) }
                 }
                 leaveOutOfGiveBack(archive)
@@ -100,10 +100,10 @@ extension MarfaLibrary {
     /// `answered` is told what the server's answer means for the move, at once where the source would not take it.
     @discardableResult
     private func sendState(
-        _ id: ItemID, _ state: ItemState, leaving final: ItemState, failing title: String,
+        _ id: ItemID, _ state: ItemState, from: ItemState, leaving final: ItemState, failing title: String,
         answered: @escaping (WriteID, StateAnswer) -> Void
     ) -> WriteID {
-        let write = submit(.transition(id, state), failing: title)
+        let write = submit(from == .trashed && state == .active ? .restore(id) : .transition(id, state), failing: title)
         guard isFollowed(write) else {
             answered(write, .notMade)
             return write

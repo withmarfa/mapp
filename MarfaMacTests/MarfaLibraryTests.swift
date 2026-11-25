@@ -266,7 +266,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         undo.undo()
         #expect(source.writes == [.transition(id, .trashed)])
         undo.redo()
-        #expect(source.writes == [.transition(id, .trashed), .transition(id, .active)])
+        #expect(source.writes == [.transition(id, .trashed), .restore(id)])
     }
 
     @Test func aCreateTheCatalogueRefusesIsToldAndNotSent() async throws {
@@ -448,10 +448,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes == [.transition(F.n1, .trashed)])
         #expect(undo.undoActionName == String(localized: "Delete Item"))
         undo.undo()
-        #expect(source.writes.last == .transition(F.n1, .active))
+        #expect(source.writes.last == .restore(F.n1))
         source.clearWrites()
         library.recover([F.n3, F.n1], undoManager: undo)
-        #expect(source.writes == [.transition(F.n3, .active)])
+        #expect(source.writes == [.restore(F.n3)])
         undo.undo()
         #expect(source.writes.last == .transition(F.n3, .trashed))
     }
@@ -468,7 +468,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.deletedCount == 2)
         source.clearWrites()
         undo.undo()
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
         #expect(library.notices.waiting.last == nil)
 
         // A restore the server refuses is told in the server's own words.

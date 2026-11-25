@@ -100,7 +100,7 @@ import UniformTypeIdentifiers
     @Test func aReadOnlyItemInTheBinCanStillBeRecovered() async throws {
         let (library, source) = try await loaded()
         library.recover([F.n3], undoManager: nil)
-        #expect(source.writes == [.transition(F.n3, .active)])
+        #expect(source.writes == [.restore(F.n3)])
         #expect(library.notices.told == 0)
     }
 }

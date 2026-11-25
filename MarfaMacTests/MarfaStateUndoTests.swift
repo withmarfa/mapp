@@ -70,9 +70,9 @@ import Testing
         let (library, source, undo) = try await binnedFromArchive()
         undo.undo()
         // The server takes an item out of the bin only to active, and the archive waits for that answer.
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
         try await accept(F.n1, .active, in: library, source)
-        #expect(await eventually { source.writes == [.transition(F.n1, .active), .transition(F.n1, .archived)] })
+        #expect(await eventually { source.writes == [.restore(F.n1), .transition(F.n1, .archived)] })
         try await accept(F.n1, .archived, in: library, source)
         #expect(library.item(F.n1)?.state == .archived)
         #expect(library.notices.waiting.isEmpty)
@@ -82,15 +82,15 @@ import Testing
         let (library, source, undo) = try await binnedFromArchive()
         undo.undo()
         let restore = try #require(source.submitted.last)
-        #expect(restore.write == .transition(F.n1, .active))
+        #expect(restore.write == .restore(F.n1))
         source.send(.answered(restore.id, .refused(SyncProblem(code: "item_not_found", message: "The server doesn’t hold this item."))))
         #expect(await eventually { library.notices.waiting.last?.title == String(localized: "Can’t Recover") })
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
         #expect(library.item(F.n1)?.state == .trashed)
 
         // Redo has nothing to put back, since the Undo made nothing.
         undo.redo()
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
         #expect(library.notices.waiting.last?.message == String(localized: "That change wasn’t made, so there is nothing to redo here."))
     }
 
@@ -100,12 +100,12 @@ import Testing
         let restore = try #require(source.submitted.last)
         source.send(.answered(restore.id, .blocked(.failingAlone, nil)))
         #expect(await eventually { library.notices.waiting.last?.message == Self.comesBackActive(1) })
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
 
         // The restore is released and lands, so Redo moves the item back to the bin.
         try await show(F.n1, .active, in: library, source)
         undo.redo()
-        #expect(source.writes == [.transition(F.n1, .active), .transition(F.n1, .trashed)])
+        #expect(source.writes == [.restore(F.n1), .transition(F.n1, .trashed)])
     }
 
     @Test func restoresBlockedTogetherAreToldInOneNoticeWithTheirCount() async throws {
@@ -144,9 +144,9 @@ import Testing
         try await accept(F.n1, .active, in: library, source)
         // Lets the library take the answer, which would send the archive at once.
         try await Task.sleep(for: .milliseconds(200))
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
         undo.redo()
-        #expect(source.writes == [.transition(F.n1, .active), .transition(F.n1, .trashed)])
+        #expect(source.writes == [.restore(F.n1), .transition(F.n1, .trashed)])
     }
 
     @Test func anUndoOfAnItemAlreadyWhereItWouldPutItIsMadeQuietly() async throws {
