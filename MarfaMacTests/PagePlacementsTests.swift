@@ -276,6 +276,50 @@ struct PagePlacementsTests {
         #expect(placements.choices["aic.ticket"]?.shows == ["repo": .always])
     }
 
+    @Test func aWordALaterVersionAddsSurvivesAnotherRowsChange() throws {
+        var placements = try #require(PagePlacements(rawValue: #"{"aic.ticket":{"shows":{"repo":"always","state":"sometimes"}}}"#))
+        placements.setPins(["repo"], of: Self.ticket)
+        let text = placements.rawValue
+        #expect(text.contains(#""state":"sometimes""#))
+        #expect(text.contains(#""repo":"always""#))
+        // A copy from before `shows` finds the row in `rows`.
+        #expect(text.contains(#""rows":{"repo":true,"state":true}"#))
+        // Only the row the person changes loses its kept word.
+        placements.setShows(.hidden, row: "repo", of: Self.ticket)
+        #expect(placements.rawValue.contains(#""state":"sometimes""#))
+        placements.setShows(.always, row: "state", of: Self.ticket)
+        #expect(!placements.rawValue.contains("sometimes"))
+        #expect(placements.choices["aic.ticket"]?.shows == ["repo": .hidden, "state": .always])
+    }
+
+    @Test func aChoiceHoldingOnlyALaterWordIsNotDropped() throws {
+        var placements = try #require(PagePlacements(rawValue: #"{"aic.ticket":{"shows":{"state":"sometimes"}}}"#))
+        #expect(placements.hasChoice(for: Self.ticket))
+        placements.setPins(["repo"], of: Self.ticket)
+        placements.setPins([], of: Self.ticket)
+        #expect(placements.rawValue.contains(#""state":"sometimes""#))
+        #expect(PagePlacements(rawValue: placements.rawValue) == placements)
+    }
+
+    @Test func aDragKeepsTheOrderItNamesFoldedRowsIncluded() {
+        var placements = PagePlacements()
+        // `folded` is a row the page lists under Show More; c is dragged above a.
+        placements.setRowOrder(["a", "folded", "b", "c"], of: Self.ticket)
+        placements.setDraggedOrder(["c", "folded", "a", "b"], of: Self.ticket)
+        #expect(placements.choices["aic.ticket"]?.rowOrder == ["c", "folded", "a", "b"])
+    }
+
+    @Test func aDragKeepsTheSavedPlaceOfRowsItDoesNotName() {
+        var placements = PagePlacements()
+        placements.setRowOrder(["pinned", "a", "absent", "folded", "b", "c"], of: Self.ticket)
+        placements.setDraggedOrder(["c", "folded", "a", "b"], of: Self.ticket)
+        #expect(placements.choices["aic.ticket"]?.rowOrder == ["pinned", "c", "folded", "a", "absent", "b"])
+        // With nothing saved, the drag's order is the order.
+        var fresh = PagePlacements()
+        fresh.setDraggedOrder(["b", "a", "b"], of: Self.ticket)
+        #expect(fresh.choices["aic.ticket"]?.rowOrder == ["b", "a"])
+    }
+
     @Test func anOrderRoundTripsAndEachRowIsNamedOnce() throws {
         var ordered = PagePlacements()
         ordered.setRowOrder(["repo", "#tags", "repo"], of: Self.ticket)

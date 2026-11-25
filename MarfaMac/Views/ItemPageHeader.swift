@@ -157,9 +157,9 @@ struct ItemPageHeader: ViewModifier {
                 PagePlacements.update { $0.set(false, row: row, of: type, in: library.catalogue) }
             case .moveRow(let row, let order, let id):
                 guard editor.isShowing(id), let type = library.item(id)?.type, row != PagePlacement.when else { return }
-                // The page lists the rows this item has, so the order it sends is the rows of this item only: the move
-                // goes into the type's saved order, which keeps the place of every row the item does not show.
-                PagePlacements.update { $0.moveRow(row, among: order.filter { $0 != PagePlacement.when }, of: type) }
+                // The order is every row this item lists, folded ones too, as the drag left them. The type's saved order
+                // takes it for those rows and keeps the place of every row the item does not list.
+                PagePlacements.update { $0.setDraggedOrder(order.filter { $0 != PagePlacement.when }, of: type) }
             }
         }
     }

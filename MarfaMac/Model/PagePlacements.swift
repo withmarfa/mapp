@@ -18,6 +18,9 @@ nonisolated struct PagePlacements: Equatable, Sendable {
     struct Choice: Codable, Equatable, Sendable {
         /// How each row the person placed shows on the type's pages, by its identifier (`PagePlacement`).
         var shows: [String: RowShows] = [:]
+        /// The word a row's `shows` holds that this version does not name, by row, as it was stored. Rewriting the choice
+        /// keeps it until the person chooses how that row shows.
+        var otherShows: [String: String] = [:]
         var linkedFrom: LinkedFromPlace?
         /// The row identifiers pinned under the title, in order, while pinned properties are on
         /// (`PageKey.pinsProperties`). Nil follows the default pins; an empty list is a choice, that nothing is pinned.
@@ -29,7 +32,9 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         /// row keeps it.
         var others: [String: StoredJSON] = [:]
 
-        var isEmpty: Bool { shows.isEmpty && linkedFrom == nil && pins == nil && rowOrder == nil && others.isEmpty }
+        var isEmpty: Bool {
+            shows.isEmpty && otherShows.isEmpty && linkedFrom == nil && pins == nil && rowOrder == nil && others.isEmpty
+        }
 
         init(shows: [String: RowShows] = [:], linkedFrom: LinkedFromPlace? = nil, pins: [String]? = nil, rowOrder: [String]? = nil) {
             self.shows = shows
@@ -41,11 +46,13 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         private static let known: Set<String> = ["shows", "rows", "linkedFrom", "pins", "rowOrder"]
 
         /// Every member is optional on reading, and `shows` is read first. A choice saved as shown or hidden (`rows`,
-        /// true or false) is read as When It Has a Value or Hidden. A word a later version adds to `shows` is skipped.
+        /// true or false) is read as When It Has a Value or Hidden. A word a later version adds to `shows` is kept apart
+        /// in `otherShows`, and the row follows the default while it is there.
         init(from decoder: any Decoder) throws {
             let container = try decoder.container(keyedBy: DynamicKey.self)
             if let words = try container.decodeIfPresent([String: String].self, forKey: DynamicKey("shows")) {
                 shows = words.compactMapValues(RowShows.init(rawValue:))
+                otherShows = words.filter { RowShows(rawValue: $0.value) == nil }
             } else if let rows = try container.decodeIfPresent([String: Bool].self, forKey: DynamicKey("rows")) {
                 shows = rows.mapValues { $0 ? .whenSet : .hidden }
             }
@@ -57,11 +64,14 @@ nonisolated struct PagePlacements: Equatable, Sendable {
 
         /// Writes `rows` (true unless hidden) beside `shows`, always, even with none placed. A copy from before `shows`
         /// requires `rows`, and one that does not find it sets the whole document aside, so a stored shape must never
-        /// lose a member an older copy requires. This version reads `shows` and ignores `rows` when both are there.
+        /// lose a member an older copy requires. This version reads `shows` and ignores `rows` when both are there. A row
+        /// whose word is another version's is written to `rows` as shown.
         func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: DynamicKey.self)
-            if !shows.isEmpty { try container.encode(shows, forKey: DynamicKey("shows")) }
-            try container.encode(shows.mapValues { $0 != .hidden }, forKey: DynamicKey("rows"))
+            let words = shows.mapValues(\.rawValue).merging(otherShows) { known, _ in known }
+            if !words.isEmpty { try container.encode(words, forKey: DynamicKey("shows")) }
+            let rows = shows.mapValues { $0 != .hidden }.merging(otherShows.mapValues { _ in true }) { known, _ in known }
+            try container.encode(rows, forKey: DynamicKey("rows"))
             try container.encodeIfPresent(linkedFrom, forKey: DynamicKey("linkedFrom"))
             try container.encodeIfPresent(pins, forKey: DynamicKey("pins"))
             try container.encodeIfPresent(rowOrder, forKey: DynamicKey("rowOrder"))
@@ -126,7 +136,10 @@ nonisolated struct PagePlacements: Equatable, Sendable {
 
     /// Chooses how a row shows on the type's pages.
     mutating func setShows(_ shows: RowShows, row: String, of type: TypeID) {
-        update(type) { $0.shows[row] = shows }
+        update(type) {
+            $0.shows[row] = shows
+            $0.otherShows[row] = nil
+        }
     }
 
     /// Chooses whether the page shows a row at all: showing a hidden row shows it when it has a value, and showing a
@@ -151,6 +164,24 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         order.swapAt(from, from + offset)
         moveRow(row, among: order, of: type)
         return true
+    }
+
+    /// Keeps a dragged row's new place: `order` is every row the page lists, folded ones too, in the order the drag
+    /// left them, and the type's order takes exactly that for the rows it names. A saved row `order` does not name
+    /// (a pinned row, or one this item lacks) keeps its place after the row that preceded it in the saved order, or
+    /// first where none did, for the items that have it.
+    mutating func setDraggedOrder(_ order: [String], of type: TypeID) {
+        var merged = PagePlacement.unique(order)
+        let named = Set(merged)
+        let saved = choices[type.rawValue]?.rowOrder ?? []
+        for (at, row) in saved.enumerated() where !named.contains(row) && !merged.contains(row) {
+            if at > 0, let after = merged.firstIndex(of: saved[at - 1]) {
+                merged.insert(row, at: after + 1)
+            } else {
+                merged.insert(row, at: 0)
+            }
+        }
+        setRowOrder(merged, of: type)
     }
 
     /// Keeps the move of `row` in the type's order. `visible` is the rows the page lists, in the order they are in after
