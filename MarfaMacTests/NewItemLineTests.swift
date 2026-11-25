@@ -427,9 +427,12 @@ struct NewItemLineTests {
 
     @Test func aRefusalThatComesAfterTheRowGivesTheDraftBack() async throws {
         let library = Self.library()
+        library.holdsCreations = true
         let browser = Self.line(in: library)
         Self.type("Shown then refused", into: browser, in: library)
         let id = try #require(await Self.add(browser, in: library))
+        // An offline create: the copy shows its row, waiting to be sent.
+        library.deliverCreated()
         let row = try #require(library.items.firstIndex { $0.id == id }, "the copy shows the row")
         library.items[row].sync = .waiting(writes: 1)
         browser.finishNewItems(in: library)
