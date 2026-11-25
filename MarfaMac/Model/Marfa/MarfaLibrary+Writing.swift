@@ -61,7 +61,8 @@ extension MarfaLibrary {
                 notices.tell(cantEdit, String(localized: "This item’s title is the first line of its text."))
                 return false
             }
-            guard let title = value?.string.map(NameText.trimmed), !title.isEmpty else { return false }
+            // A file's title can be a fact Marfa sets, such as its extracted text.
+            guard item.obstacle(toField: field) == nil, let title = value?.string.map(NameText.trimmed), !title.isEmpty else { return false }
             key = field
             return editProperty(id, key: key, to: .string(title), undoManager: undoManager)
         }
