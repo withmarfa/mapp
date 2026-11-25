@@ -85,6 +85,9 @@ private struct PlaceIndexTable: View {
     @State private var deletingTitle = ""
     @State private var renaming: IndexRow?
     @State private var newName = ""
+    /// The clock the date column reads, set when the table appears and again at a day or zone change, so a time today
+    /// moves to a day at midnight. Held, not read in the body: choosing a row then changes no cell.
+    @State private var now: Date?
 
     /// Each place's own order until the person chooses: types and sources by how much they hold, collections by their
     /// latest change.
@@ -107,7 +110,7 @@ private struct PlaceIndexTable: View {
 
     var body: some View {
         let ordered = ordered
-        table(ordered)
+        table(ordered, now: now ?? library.now())
             .tableStyle(.inset)
             .alternatingRowBackgrounds(.disabled)
             .softSelection(rows: ordered.map(\.id), hovers: true, selection: { chosen })
@@ -152,11 +155,13 @@ private struct PlaceIndexTable: View {
             }
             // A row that goes, deleted here or elsewhere, is no longer chosen.
             .onChange(of: rows) { if let chosen, !rows.contains(where: { $0.id == chosen }) { self.chosen = nil } }
+            .onAppear { now = library.now() }
+            .onClockChange { now = library.now() }
             .accessibilityIdentifier("PlaceIndexTable")
     }
 
     @ViewBuilder
-    private func table(_ ordered: [IndexRow]) -> some View {
+    private func table(_ ordered: [IndexRow], now: Date) -> some View {
         switch place {
         case .types:
             Table(ordered, selection: $chosen, sortOrder: sortBinding) {
@@ -174,7 +179,7 @@ private struct PlaceIndexTable: View {
                     .tableCellRoom()
                 }
                 .width(min: 80, ideal: 120, max: 160)
-                TableColumn("Latest", value: \.latestOrOldest) { row in PlaceIndexLatest(date: row.latest) }
+                TableColumn("Latest", value: \.latestOrOldest) { row in PlaceIndexLatest(date: row.latest, now: now) }
                     .width(min: 100, ideal: 140, max: 200)
             }
         case .collections:
@@ -190,7 +195,7 @@ private struct PlaceIndexTable: View {
                     Text(verbatim: row.sourceName).foregroundStyle(.secondary).lineLimit(1).tableCellRoom()
                 }
                 .width(min: 100, ideal: 200)
-                TableColumn("Edited", value: \.latestOrOldest) { row in PlaceIndexLatest(date: row.latest) }
+                TableColumn("Edited", value: \.latestOrOldest) { row in PlaceIndexLatest(date: row.latest, now: now) }
                     .width(min: 100, ideal: 140, max: 200)
             }
         default:
@@ -208,7 +213,7 @@ private struct PlaceIndexTable: View {
                 TableColumn("Items", value: \.count) { row in PlaceIndexCount(count: row.count) }
                     .width(min: 76, ideal: 96, max: 140)
                     .alignment(.numeric)
-                TableColumn("Latest", value: \.latestOrOldest) { row in PlaceIndexLatest(date: row.latest) }
+                TableColumn("Latest", value: \.latestOrOldest) { row in PlaceIndexLatest(date: row.latest, now: now) }
                     .width(min: 100, ideal: 140, max: 200)
             }
         }
@@ -377,22 +382,21 @@ private struct PlaceIndexCount: View {
 /// A latest change as every table's date column reads it (`DateDisplay.Place.table`), so the time of a change today moves
 /// to a day at midnight.
 private struct PlaceIndexLatest: View {
-    @CurrentLibrary private var library
     @AppStorage(DateFormat.key) private var format = DateFormat.standard
-    @State private var daysSeen = 0
     let date: Date?
+    /// The table's clock, passed in: a cell reads nothing from the environment but the format, as AppKit can draw a
+    /// cell where the window's library is not set.
+    let now: Date
 
     var body: some View {
-        let _ = daysSeen
         Group {
             if let date {
-                Text(verbatim: DateDisplay.text(of: date, hasTime: true, place: .table, format: format, now: library.now()))
+                Text(verbatim: DateDisplay.text(of: date, hasTime: true, place: .table, format: format, now: now))
                     .monospacedDigit()
             }
         }
         .foregroundStyle(.secondary)
         .tableCellRoom()
-        .onClockChange { daysSeen += 1 }
     }
 }
 
