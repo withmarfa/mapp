@@ -69,6 +69,12 @@ import Testing
         return (library, source)
     }
 
+    /// The engine has judged each delete and taken its write, so an Undo is not put back to wait for it.
+    private func judged(_ library: MarfaLibrary, _ source: FakeItemSource) async throws {
+        for submitted in source.submitted { source.send(.taken(submitted.id)) }
+        try #require(await eventually { library.stateJudging.isEmpty })
+    }
+
     private static func note(_ id: String) -> Item {
         let date = Date(timeIntervalSince1970: 1_000_000)
         return Item(
@@ -83,6 +89,7 @@ import Testing
         Browser.delete([ItemID("a")], in: library, undoManager: undo, toasts: toasts)
         #expect(toasts.current?.message == "Moved to Recently Deleted")
         #expect(toasts.current?.undo != nil)
+        try await judged(library, source)
 
         source.clearWrites()
         toasts.undo()
@@ -112,6 +119,7 @@ import Testing
         let undo = Self.manager()
         Browser.delete([ItemID("a")], in: library, undoManager: undo, toasts: toasts)
         Browser.delete([ItemID("b")], in: library, undoManager: undo, toasts: toasts)
+        try await judged(library, source)
         source.clearWrites()
         undo.undo()
         #expect(source.writes == [.restore(ItemID("b"))])
@@ -126,6 +134,7 @@ import Testing
         let toasts = ToastPresenter()
         let undo = Self.manager()
         Browser.delete([ItemID("a")], in: library, undoManager: undo, toasts: toasts)
+        try await judged(library, source)
         undo.undo()
         #expect(toasts.current == nil)
         undo.redo()
@@ -151,6 +160,7 @@ import Testing
         Browser.delete([ItemID("a")], in: library, undoManager: undo, toasts: toasts)
         #expect(undo.groupingLevel == 0)
         #expect(toasts.current?.undo != nil)
+        try await judged(library, source)
         source.clearWrites()
         toasts.undo()
         #expect(source.writes == [.restore(ItemID("a"))])
@@ -190,6 +200,7 @@ import Testing
         Browser.delete([ItemID("a")], in: library, undoManager: undo, toasts: toasts)
         Browser.delete([ItemID("b")], in: library, undoManager: undo, toasts: toasts)
         #expect(toasts.current?.undo != nil, "the second delete's step is the latest, though the first's claim ended")
+        try await judged(library, source)
         source.clearWrites()
         toasts.undo()
         #expect(source.writes == [.restore(ItemID("b"))])
