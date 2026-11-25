@@ -537,10 +537,14 @@ final class FakeItemLibrary: ItemLibrary {
     var extraReservedTags: Set<String> = []
     var reservedTags: Set<String> { extraReservedTags.union([ItemTag.favorite]) }
 
+    var knownTagCounts: [String: Int] {
+        items.filter { $0.state == .active }.flatMap(\.tags).filter { !reservedTags.contains($0) }
+            .reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+    }
+
     var knownTags: [String] {
-        let counts = items.filter { $0.state == .active }.flatMap(\.tags).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
-        return counts.keys.filter { !reservedTags.contains($0) }
-            .sorted { counts[$0]! != counts[$1]! ? counts[$0]! > counts[$1]! : $0 < $1 }
+        let counts = knownTagCounts
+        return counts.keys.sorted { counts[$0]! != counts[$1]! ? counts[$0]! > counts[$1]! : $0 < $1 }
     }
 
     /// The tag writes the fake was asked for, in order.

@@ -230,22 +230,35 @@ struct LocationPanelContent: View {
         }
     }
 
+    /// A conflict is a question, so it has no red: what happened and what it means, with Keep My Edit the main answer.
+    /// Anything else is one red line.
     private func noticeArea(_ notice: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(verbatim: notice)
+            if model.hasNameConflict {
+                VStack(alignment: .leading, spacing: 1 * scale) {
+                    Text(verbatim: ValueEditModel.conflictQuestion)
+                    Text(verbatim: ValueEditModel.conflictConsequence).foregroundStyle(.secondary)
+                }
                 .font(.system(size: 11 * scale))
-                .foregroundStyle(.red)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 3 * scale)
+                .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("LocationNotice")
-            if model.hasNameConflict {
-                HStack(spacing: 12 * scale) {
+                HStack(spacing: 6 * scale) {
                     Button("Keep My Edit") { model.keepName() }
+                        .appButton(.primary, size: .small)
                     Button("Use Current Name") { model.useHeldName() }
+                        .appButton(.secondary, size: .small)
                 }
-                .appButton(.secondary, size: .small)
                 .padding(.horizontal, 3 * scale)
-                .padding(.top, 2 * scale)
+                .padding(.top, 6 * scale)
+            } else {
+                Text(verbatim: notice)
+                    .font(.system(size: 11 * scale))
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 3 * scale)
+                    .accessibilityIdentifier("LocationNotice")
             }
         }
         .padding(.top, 6 * scale)

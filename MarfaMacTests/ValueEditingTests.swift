@@ -55,7 +55,8 @@ struct ValueEditingTests {
         #expect(ValueEditKind(field: Self.note) == .text(Self.note))
         #expect(ValueEditKind(field: Self.points)?.isNumber == true)
         #expect(ValueEditKind(field: Self.labels) == .words(Self.labels))
-        #expect(ValueEditKind(field: ItemTypeInfo.Field(key: "done", label: "Done", kind: .boolean, declaredBy: Self.task)) == nil)
+        let done = ItemTypeInfo.Field(key: "done", label: "Done", kind: .boolean, declaredBy: Self.task)
+        #expect(ValueEditKind(field: done) == .yesNo(done))
         #expect([ValueEditKind.tags, .parent, .text(Self.note)].map(\.rowID) == [PagePlacement.tags, PagePlacement.parent, "note"])
     }
 
@@ -623,6 +624,84 @@ struct ValueEditingTests {
         plain.timeDraft = "14:45"
         plain.commitTime()
         #expect(written.all.count == 1, "a field without times writes none")
+    }
+
+    @Test func aDayTypedAtTheTopSetsItKeepingTheTimeAndAnUntidyOneStaysWithItsReason() {
+        let written = Written()
+        let model = datePanel(Self.due, holding: "2026-11-07T09:30:00Z", written: written)
+        model.beginDay()
+        #expect(model.dayDraft == "7 Nov 2026 at \(model.timeText)")
+        model.dayDraft = "25 Nov 2026"
+        model.commitDay(closing: true)
+        #expect(written.all == [PropertyValue.string(ItemDate.instant(Self.moment(25, 9, 30)))])
+
+        let item = Self.item(["due": .string("2026-11-07T09:30:00Z")])
+        let library = Self.library([item])
+        var request = Self.request(.date(Self.due), item: item, in: library, write: { written.all.append($0); return true })
+        request.calendar = Self.utc
+        let untidy = ValueEditModel(request)
+        untidy.dayDraft = "sometime soon"
+        untidy.commitDay()
+        #expect(written.all.count == 1 && untidy.dayDraft == "sometime soon" && untidy.notice != nil)
+        untidy.finish(cancelled: false)
+        #expect(library.notices.waiting.first?.text == "Due: sometime soon")
+    }
+
+    @Test func aDayTypedForADateAndTimeKeepsTheWholeClockTheValueHolds() {
+        let written = Written()
+        let model = datePanel(Self.due, holding: "2026-11-07T09:30:42.123Z", written: written)
+        model.beginDay()
+        model.dayDraft = "25 Nov 2026"
+        model.commitDay()
+        #expect(written.all == [PropertyValue.string("2026-11-25T09:30:42.123Z")])
+        let quick = Written()
+        datePanel(Self.due, holding: "2026-11-07T09:30:42.123Z", written: quick).chooseDay(Self.moment(9, 0, 0))
+        #expect(quick.all == [PropertyValue.string("2026-11-09T09:30:42.123Z")])
+    }
+
+    @Test func aTypedDayIsTheDayItNamesAndNothingElse() {
+        #expect(TypedDay.parse("25 Nov 2026", calendar: Self.utc) == Self.moment(25, 0, 0))
+        #expect(TypedDay.parse("2026-11-25", calendar: Self.utc) == Self.moment(25, 0, 0))
+        #expect(TypedDay.parse("25 Nov 2026 and then some", calendar: Self.utc) == nil)
+        #expect(TypedDay.parse("Ines", calendar: Self.utc) == nil)
+        #expect(TypedDay.split("25 Nov 2026 at 9:30") == (day: "25 Nov 2026", time: "9:30"))
+    }
+
+    // MARK: Change Type and people
+
+    @Test func theTypePanelListsTheSidebarsTypesFirstAndTheRestUnderALine() {
+        func option(_ id: String, _ label: String) -> ItemTypeOption { ItemTypeOption(id: TypeID(id), label: label, icon: nil) }
+        let options = [option("a", "Article"), option("b", "Book"), option("t", "Task"), option("n", "Note")]
+        let rows = ValueEditModel.typeRows(of: options, shown: [TypeID("t"), TypeID("n"), TypeID("gone")])
+        #expect(rows.map(\.title) == ["Task", "Note", "", "Article", "Book"])
+        #expect(rows[2].role == .separator)
+        #expect(ValueEditModel.typeRows(of: options, shown: []).map(\.title) == ["Article", "Book", "Task", "Note"])
+    }
+
+    @Test func peopleTheLibraryHoldsAsItemsAreOfferedByNameAndAddedWithTheirAddress() {
+        let person = TypeID("core.entity.person")
+        let addresses = ListShape(members: [
+            .init(key: "value", label: "Email", kind: .text(.email), required: true), .init(key: "label", label: "Label", kind: .text(nil)),
+        ])
+        let field = ItemTypeInfo.Field(key: "emails", label: "Emails", kind: .list(addresses), declaredBy: person)
+        var ines = Item(
+            id: ItemID("10000000-0000-0000-0000-000000000200"), type: person, title: "Ines Reyes", titleRule: .property("title"),
+            properties: [Property(key: "emails", value: .array([.object(["value": .string("ines@example.com")])]))],
+            version: ItemVersion(1), created: .now, modified: .now)
+        ines.name = "Ines Reyes"
+        let task = Self.item()
+        let library = FakeItemLibrary(items: [task, ines])
+        library.catalogue = Catalogue(itemTypes: [
+            ItemTypeInfo(id: Self.task, label: "Task", fields: [Self.status], titleField: "title", bodyField: "body", parent: nil),
+            ItemTypeInfo(id: person, label: "Person", fields: [field], titleField: "title", bodyField: "body", parent: nil),
+        ])
+        let written = Written()
+        let model = ValueEditModel(Self.request(.people(Self.assignees, Self.people), item: task, in: library, write: { written.all.append($0); return true }))
+        model.query = "Ines"
+        let offered = model.rows.filter { $0.role == .option }
+        #expect(offered.map(\.title) == ["Ines Reyes"])
+        model.activate(offered[0].id)
+        #expect(written.all == [PropertyValue.array([Self.person("Ines Reyes", "ines@example.com")])])
     }
 
     // MARK: Rows

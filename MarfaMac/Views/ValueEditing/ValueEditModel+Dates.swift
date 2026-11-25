@@ -76,7 +76,12 @@ extension ValueEditModel {
             written = write(date, withTime: false)
         } else if let time {
             let day = storedDate?.date ?? library.now()
-            written = write(request.calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: day) ?? day, withTime: true)
+            guard let moment = TimeOfDay.moment(hour: time.hour, minute: time.minute, on: day, calendar: request.calendar) else {
+                // A time the day's clock does not have is never moved to one it has.
+                if isEnding { handBackUnsaved(reason: EventTime.Refusal.noSuchTime.message) } else { notice = EventTime.Refusal.noSuchTime.message }
+                return
+            }
+            written = write(moment, withTime: true)
         } else if isEnding {
             return handBackUnsaved(reason: String(localized: "“\(text)” isn’t a time, so the time wasn’t changed."))
         } else {
@@ -84,6 +89,76 @@ extension ValueEditModel {
             return
         }
         if written { unsaved = nil } else if isEnding { handBackUnsaved() }
+    }
+
+    // MARK: The typed day
+
+    /// The day, and the time where the value holds one, as the top field shows them: "25 Nov 2026 at 09:00".
+    var dayText: String { dayText(of: value) }
+
+    func dayText(of value: PropertyValue?) -> String {
+        guard let date = value?.string.flatMap({ ItemDate.parse($0) }) else { return "" }
+        let calendar = request.calendar
+        let day = date.date.formatted(Date.FormatStyle(locale: .current, calendar: calendar, timeZone: calendar.timeZone).day().month(.abbreviated).year())
+        let time = timeText(of: value)
+        return time.isEmpty ? day : String(localized: "\(day) at \(time)")
+    }
+
+    /// What the top field is showing while the person types in it, nil while it shows the value's own day.
+    var dayDraft: String? {
+        get { dayInput?.text }
+        set {
+            guard let newValue else { return dayInput = nil }
+            if dayInput == nil { dayInput = DayInput(text: newValue, base: value) } else { dayInput?.text = newValue }
+        }
+    }
+
+    /// The top field took focus: what it shows is what a conflict is judged against.
+    func beginDay() {
+        if dayInput == nil { dayInput = DayInput(text: dayText, base: value) }
+    }
+
+    /// Sets the day the person typed, and the time where they typed one with it. Nothing is written where it is what the
+    /// value holds, and nothing over a value that changed since the field showed it. A text that is no day stays in the
+    /// field with the reason while the panel is open, and is given back as the panel ends. A day set with Return (`closing`)
+    /// closes the panel, as a day picked does; one set as the field loses focus leaves it open for the time.
+    func commitDay(isEnding: Bool = false, closing: Bool = false) {
+        guard isDate, let input = dayInput else { return }
+        let text = input.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty || text == dayText || text == dayText(of: input.base) {
+            dayInput = nil
+            return
+        }
+        func refuse(_ reason: String) {
+            if isEnding { handBack(text, reason: reason) } else { notice = reason }
+        }
+        guard isEditable else { return handBack(text, reason: refusalReason(String(localized: "The value could not be saved."))) }
+        guard value == input.base else {
+            dayInput = nil
+            return handBack(text, reason: String(localized: "This value changed while you were editing. Your edit hasn’t been saved."))
+        }
+        let parts = TypedDay.split(text)
+        guard let day = TypedDay.parse(parts.day, calendar: request.calendar) else {
+            return refuse(String(localized: "“\(text)” isn’t a date, so the date wasn’t changed."))
+        }
+        let moment: Date
+        if let typedTime = parts.time {
+            guard allowsTime, let time = TimeOfDay.parse(typedTime) else {
+                return refuse(String(localized: "“\(text)” isn’t a date and time, so the date wasn’t changed."))
+            }
+            guard let set = TimeOfDay.moment(hour: time.hour, minute: time.minute, on: day, calendar: request.calendar) else {
+                return refuse(EventTime.Refusal.noSuchTime.message)
+            }
+            moment = set
+        } else {
+            moment = hasTime ? QuickDates.moment(on: day, keepingTimeOf: storedDate?.date, calendar: request.calendar) : day
+        }
+        guard write(moment, withTime: parts.time != nil || hasTime) else {
+            if isEnding { handBack(text) }
+            return
+        }
+        dayInput = nil
+        if closing, notice == nil { close() }
     }
 
     @discardableResult

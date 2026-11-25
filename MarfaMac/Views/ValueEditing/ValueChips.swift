@@ -73,7 +73,7 @@ struct ValueChipView: View {
         .font(.system(size: 12 * scale))
         .padding(.leading, 6 * scale)
         .padding(.trailing, (chip.isRemovable ? 6 : 8) * scale)
-        .frame(height: 20 * scale)
+        .frame(height: ValueEditMetrics.chipHeight * scale)
         .background(ChipLooks.current.chipWash(for: scheme), in: .rect(cornerRadius: ChipLooks.current.cornerRadius * scale, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(chip.isRemovable ? Text("\(chip.title), remove") : Text(verbatim: chip.title))

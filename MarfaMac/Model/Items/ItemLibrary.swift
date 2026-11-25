@@ -239,6 +239,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Every tag the active items carry, reserved ones left out, the most used first and then by name, for
     /// suggesting a tag the person has used.
     var knownTags: [String] { get }
+    /// How many active items carry each tag `knownTags` lists, for the count beside a tag in the tags panel. Worked out
+    /// from the copy, so it asks nothing of the server.
+    var knownTagCounts: [String: Int] { get }
     /// Tags `tag` to each of the items that can take it and do not hold it, in one undoable change, and answers nil.
     /// An item that can't be changed, or already has the most tags, is skipped and the library tells the person how
     /// many and why. Nothing is sent, and the refusal is given back, where `tag` is not a tag Marfa takes, is
