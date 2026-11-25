@@ -344,11 +344,9 @@ extension MarfaLibrary {
     /// Changes run one after another in the order they were made, each once the copy has taken the writes of the one
     /// before (see `relationshipChain`). Nothing is written until the core has answered.
     ///
-    /// The verdict is `taken` where the change is written or there was nothing to change; `refused` where the item, the
-    /// field or the core refuses it; `incomplete` while the copy is not whole; `unknown` for an item or field the
-    /// library does not hold, or a source that took nothing. Every verdict but `taken` and `unknown` is also told, and
-    /// leaves the field as it was. A change that asks nothing of the core, as a removal, answers only once the copy has
-    /// taken or refused its writes, and is `refused` where the copy skipped one, as a link already gone.
+    /// A removal-only change waits for the copy to queue or refuse its writes. A change that adds or moves a link
+    /// returns `taken` after the preflight and submission, before the copy judges those writes. The library reports
+    /// any later refusal in a notice.
     /// `finish` waits for a change in flight.
     @discardableResult
     func changeLinks(
@@ -514,14 +512,11 @@ extension MarfaLibrary {
         return .change(change, made: made)
     }
 
-    /// Where links are added or moved and others removed, as when one item is chosen in place of another in a field
-    /// that holds many, the new links go first and the old ones are removed only once the source has taken every new
-    /// one, so a refusal leaves the field as it was rather than with the old link gone and the new one missing.
-    /// Each new edge gets an id minted here, so its undo removes that edge and no other. Each edge to remove is named
-    /// now by the id and ends this Mac sees, so a removal sent later never takes a link made since in its place.
+    /// In a swap, the old links stay until the server accepts every addition and move.
+    /// Resolve removals before waiting for the server's answer to the new links. Undo also names each new edge by
+    /// its minted ID.
     ///
-    /// The step registered in return reverses only what the copy took of it (`LinkStep`), each write judged against the
-    /// copy as it is queued (`MarfaEngine.judge(edge:)`), so a link changed elsewhere since is left as it is.
+    /// Undo uses the writes recorded by `LinkStep`. The engine checks each write against the copy before queueing it.
     ///
     /// The step's `sent` are the writes sent now that the source took, which a following change waits for: the adds,
     /// the moves and any unlink sent at once. An unlink held back for the new links is not one of them, since it is
@@ -571,7 +566,7 @@ extension MarfaLibrary {
         return seen
     }
 
-    /// Removes each edge by the id and ends the draft names, which the engine judges against the copy as it is queued.
+    /// Submits each removal with the edge ID and ends recorded in the draft.
     @discardableResult
     func unlink(
         _ drafts: [EdgeDraft], failing title: String = String(localized: "Can’t Change This Relationship"), recordingIn step: LinkStep? = nil

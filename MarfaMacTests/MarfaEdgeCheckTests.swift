@@ -105,7 +105,7 @@ struct MarfaEdgeCheckTests {
         try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("a")] })
         try #require(await eventually { scene.library.linkSteps.values.allSatisfy { $0.judging.isEmpty } })
         undo.endUndoGrouping()
-        // Another device moves the child under `b`, and the copy shows it.
+        // Simulate a move already visible in the copy before Undo.
         let edge = try #require(try await scene.fake.copy.edges.from(scene.id("a").rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
         _ = try await scene.fake.copy.edges.update(edge.id, EdgeEdit(baseVersion: edge.version, move: .from(scene.id("b").rawValue)))
         try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("b")] })

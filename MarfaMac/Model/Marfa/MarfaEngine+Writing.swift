@@ -212,13 +212,8 @@ extension MarfaEngine {
         if let tier, (row.tier.map(MarfaMapping.tier) ?? .library) != tier { throw Self.skipped(.changedSince) }
     }
 
-    /// The one rule for every edge write, Undo and Redo among them, judged on the edges the copy shows as it is queued,
-    /// with the writes queued before it, never on the edges the engine last read: a link only while no edge of its
-    /// type joins its ends, an unlink only while the edge is there between the ends this Mac saw, and a move only while
-    /// the edge is still between the end it leaves and the end that stays. Marfa keeps an edge's id when another
-    /// device moves it, so the id alone is not enough. Otherwise it is skipped, so a link made, moved or removed
-    /// elsewhere is left as it is. The core judges the rest as the edge is queued. Answers the edge the copy holds for
-    /// an unlink or a move.
+    /// Reads the copy before queueing, including for Undo and Redo. An edge keeps its ID when it moves, so an unlink
+    /// or move checks both ends and returns the edge as read. An ID-only delete can race a change after this read.
     @discardableResult
     private func judge(edge write: ItemWrite) async throws -> Marfa.Edge? {
         switch write {

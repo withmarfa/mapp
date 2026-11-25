@@ -723,8 +723,7 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
-    /// A move to the end the edge already holds, as an undo after a refused move makes, queues nothing, since the server
-    /// refuses an update that changes nothing. It is skipped, never accepted, so a removal held back for it is not sent.
+    /// The copy queues nothing for a move to the end it already holds. The engine reports the move as skipped.
     @Test
     func aMoveToTheEndTheEdgeHoldsIsSkippedAndQueuesNothing() async throws {
         let root = scratch()

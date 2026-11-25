@@ -55,8 +55,8 @@ nonisolated enum ItemWrite: Hashable, Sendable {
     case tag(ItemID, String, on: Bool)
     /// Sent only while the copy shows no edge of its type between its ends (`MarfaEngine.judge(edge:)`).
     case link(EdgeDraft)
-    /// Removes the edge the draft's `id` names. Sent only while the copy shows that edge with the draft's type and
-    /// ends, since Marfa keeps an edge's id when another device moves it.
+    /// Removes the edge the draft's `id` names. The check before queueing compares the type and both ends because
+    /// Marfa keeps an edge's ID when another device moves it.
     case unlink(EdgeDraft)
     /// Replaces one end of an edge in one write, so the end that stays never holds no edge or two. Only an edge
     /// whose staying end holds one edge of its type can move. Sent only while the copy shows the edge between
