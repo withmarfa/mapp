@@ -43,8 +43,6 @@ import os
 
     nonisolated enum Problem: Error, Hashable, Sendable {
         case notAServer
-        /// The address names a server and more: a path, a query or a fragment.
-        case addressHasMore
         /// The app is not signed in to the address: it never was, or the sign-in ended.
         case notSignedIn
         /// Writes still wait in the copy being left, so the person chooses what becomes of them, and a choice
@@ -253,7 +251,7 @@ import os
     /// The server the app is set to read from: the one connected to, or the one saved by an earlier launch before
     /// its copy is opened, so a window can say it is opening a library rather than show another.
     var configuredConnection: MarfaConnection? {
-        connection ?? defaults.string(forKey: Self.addressKey).flatMap { try? MarfaConnection(address: $0) }
+        connection ?? defaults.string(forKey: Self.addressKey).flatMap { try? MarfaConnection(address: $0, completing: false) }
     }
 
     /// Writes in the copy that the server has not taken, problems included, as last reported, for showing; nil
@@ -272,14 +270,14 @@ import os
         // answer takes the record out before it is used, so a record names a server no step went on to open.
         if let recorded = defaults.string(forKey: Self.pendingSignInKey) {
             defaults.removeObject(forKey: Self.pendingSignInKey)
-            if recorded != defaults.string(forKey: Self.addressKey), let stale = try? MarfaConnection(address: recorded) {
+            if recorded != defaults.string(forKey: Self.addressKey), let stale = try? MarfaConnection(address: recorded, completing: false) {
                 await endSignIn(of: stale)
             }
         }
         guard !isBusy, source == nil, let saved = defaults.string(forKey: Self.addressKey) else { return }
         let connection: MarfaConnection
         do {
-            connection = try MarfaConnection(address: saved)
+            connection = try MarfaConnection(address: saved, completing: false)
         } catch {
             // Only an address with more after the server's is told: the app saves no other address that fails.
             if error == .hasMore { unusableAddress = saved }
@@ -535,12 +533,12 @@ import os
         isBusy = true
     }
 
-    /// The address the person typed, as entered: each spelling of an address is its own copy.
+    /// Completes a newly entered address before choosing its copy.
     private func typed(_ address: String) throws(Problem) -> MarfaConnection {
         do {
             return try MarfaConnection(address: address)
         } catch {
-            throw error == .hasMore ? .addressHasMore : .notAServer
+            throw .notAServer
         }
     }
 

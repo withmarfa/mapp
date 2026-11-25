@@ -61,7 +61,7 @@ struct MarfaConnectionTests {
 
     @Test(arguments: [
         "ftp://marfa.example", "http://", "https:/marfa.example", "https:443", "//marfa.example",
-        "/marfa.example", "marfa.example:", "marfa.example:65536", "::1", "marfa example",
+        "/marfa.example", "127.1", "2130706433", "0177.0.0.1", "marfa.example:", "marfa.example:65536", "marfa.example:99999999999999999999", "::1", "marfa example",
         "user:secret@marfa.example", "https://user:secret@marfa.example", "https://marfa.example\\other", "",
     ])
     func anAddressThatNamesNoServerIsRefused(_ text: String) {
@@ -73,7 +73,7 @@ struct MarfaConnectionTests {
         #expect(throws: MarfaConnection.Problem.notAServer) { try MarfaConnection(address: text) }
         let notice = try #require(MarfaSettingsModel.notice(for: .notAServer))
         #expect(!(notice.title + notice.message).localizedCaseInsensitiveContains("userinfo"))
-        #expect(notice.message == "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://.")
+        #expect(notice.message == "Enter a Marfa server address, such as marfa.example.")
     }
 
     @Test func eachServerKeepsItsOwnCopyInTheAppsStorage() throws {

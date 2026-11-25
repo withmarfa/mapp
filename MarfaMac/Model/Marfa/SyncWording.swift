@@ -199,11 +199,6 @@ nonisolated enum Words {
         String(localized: "The app can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit the app first, then move the folder “\(folder)” to the Trash. Anything in it that hasn’t reached the server is lost.")
     }
 
-    /// An address typed with a path, a query or a fragment.
-    static var addressHasMore: String {
-        String(localized: "Use only the server’s address, with nothing after it, such as https://marfa.example.")
-    }
-
     /// The address kept from an earlier version has a path. The copy made for it stays where it is, and a new address
     /// makes a new one, so what it never sent stays unsent.
     static func savedAddressHasMore(_ address: String) -> String {

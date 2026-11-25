@@ -334,9 +334,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .notAServer:
             Notice(
                 title: String(localized: "Check the Address"),
-                message: String(localized: "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://."))
-        case .addressHasMore:
-            Notice(title: String(localized: "Check the Address"), message: Words.addressHasMore)
+                message: String(localized: "Enter a Marfa server address, such as marfa.example."))
         case .notSignedIn:
             Notice(title: String(localized: "Sign In First"), message: String(localized: "The app isn’t signed in to this server. Sign in below."))
         case .unavailable(let message):

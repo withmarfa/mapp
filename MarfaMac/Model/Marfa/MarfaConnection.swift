@@ -5,30 +5,55 @@ import Marfa
 /// The Marfa server a library reads from, by its address.
 nonisolated struct MarfaConnection: Hashable, Sendable {
     enum Problem: Error, Hashable, Sendable {
-        /// Not an http or https address with a host, or one carrying a user or password.
         case notAServer
-        /// A server's address and more: a path beyond a lone `/`, a query or a fragment. The package keeps one sign-in
-        /// for each origin, so nothing after the origin can name another server.
+        /// A stored address with a suffix may have a copy of its own.
         case hasMore
     }
 
-    /// Scheme and host in lower case and no trailing slash, otherwise the address as it was entered: the copy and the
-    /// discard marks are named by this exact text, so `https://host` and `https://host:443` are two copies. Compare
-    /// connections with `sameServer(as:)`, never `==`, where the question is whether two addresses are one server.
+    /// The completed server address. An explicit default port still names its own copy and discard marks.
     let address: URL
 
-    init(address text: String) throws(Problem) {
+    init(address text: String, completing: Bool = true) throws(Problem) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard var components = URLComponents(string: trimmed),
-            let scheme = components.scheme?.lowercased(), ["http", "https"].contains(scheme),
-            let host = components.host, !host.isEmpty,
-            components.user == nil, components.password == nil
+        let lowercased = trimmed.lowercased()
+        let explicit = lowercased.hasPrefix("http://") || lowercased.hasPrefix("https://")
+        guard explicit || (completing && !lowercased.hasPrefix("http:") && !lowercased.hasPrefix("https:")),
+            !trimmed.contains("\\"), trimmed.rangeOfCharacter(from: .controlCharacters) == nil
         else { throw .notAServer }
-        // The encoded path, since `path` decodes `%2F` to a slash that would pass for the lone one.
-        guard ["", "/"].contains(components.percentEncodedPath), components.query == nil, components.fragment == nil else { throw .hasMore }
-        components.scheme = scheme
-        components.host = host.lowercased()
+
+        let candidate = explicit ? trimmed : "https://" + trimmed
+        let authority = candidate.dropFirst(lowercased.hasPrefix("http://") ? 7 : 8)
+            .prefix { !"/?#".contains($0) }
+        guard let match = authority.wholeMatch(of: #/(?:\[[0-9A-Fa-f:.]+\]|[\p{L}\p{M}\p{N}._-]+)(?::([0-9]+))?/#),
+            var components = URLComponents(string: candidate),
+            let host = components.host?.lowercased(), let scheme = components.scheme?.lowercased()
+        else { throw .notAServer }
+        if let port = match.output.1 {
+            guard let number = Int(port), (1...65535).contains(number), components.port == number else { throw .notAServer }
+        }
+
+        if host.hasPrefix("[") {
+            guard IPAddress(literal: host)?.bytes.count == 16 else { throw .notAServer }
+        } else {
+            let name = host.hasSuffix(".") ? host.dropLast() : host[...]
+            guard !name.split(separator: ".", omittingEmptySubsequences: false).contains(where: { $0.isEmpty }) else { throw .notAServer }
+            if !explicit, IPAddress(literal: host) != nil {
+                let octets = host.split(separator: ".", omittingEmptySubsequences: false)
+                guard octets.count == 4,
+                    octets.allSatisfy({ octet in UInt8(octet).map { String($0) == octet } == true })
+                else { throw .notAServer }
+            }
+        }
+
+        if !completing {
+            guard ["", "/"].contains(components.percentEncodedPath), components.query == nil, components.fragment == nil
+            else { throw .hasMore }
+        }
+        components.scheme = !explicit && Self.isLoopback(host) ? "http" : scheme
+        components.host = host
         components.path = ""
+        components.query = nil
+        components.fragment = nil
         guard let address = components.url else { throw .notAServer }
         self.address = address
     }
@@ -50,7 +75,11 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
     /// Whether the server runs on this Mac: an address that names the loopback, as `localhost`, an IPv4 address in `127.0.0.0/8` and `::1` do.
     var isOnThisMac: Bool {
         guard let host = address.host(percentEncoded: false)?.lowercased() else { return false }
-        return host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host == "[::1]" || Self.isLoopbackIPv4(host)
+        return Self.isLoopback(host)
+    }
+
+    private static func isLoopback(_ host: String) -> Bool {
+        host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host == "[::1]" || Self.isLoopbackIPv4(host)
     }
 
     private static func isLoopbackIPv4(_ host: String) -> Bool {

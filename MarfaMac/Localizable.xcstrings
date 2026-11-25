@@ -4612,6 +4612,9 @@
     "Enter Full Screen" : {
 
     },
+    "Enter a Marfa server address, such as marfa.example." : {
+
+    },
     "Enter a name." : {
 
     },
@@ -9741,9 +9744,6 @@
     "That didn’t work. Try again in a moment." : {
       "extractionState" : "manual"
     },
-    "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://." : {
-      "extractionState" : "manual"
-    },
     "That file couldn’t be opened." : {
 
     },
@@ -11708,9 +11708,6 @@
       "extractionState" : "manual"
     },
     "Use letters, numbers and punctuation." : {
-
-    },
-    "Use only the server’s address, with nothing after it, such as https://marfa.example." : {
 
     },
     "Used %@" : {
