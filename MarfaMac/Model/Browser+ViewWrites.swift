@@ -242,7 +242,7 @@ extension Browser {
     private func keepOffline(_ id: ItemID) {
         guard let library, !library.reachesServer, shown.isSame(.saved(id)),
               let update = viewUpdate(SavedViews.window(self, in: library), in: library) else { return }
-        PendingViewChanges.keep(update.change, baseVersion: update.baseVersion, for: id, in: defaults)
+        PendingViewChanges.keep(update.change, baseVersion: update.baseVersion, for: id, by: pendingOwner, in: defaults)
     }
 
     /// Writes the window's choices to the view, one write at a time, and again if they changed while one was under way.
@@ -311,13 +311,13 @@ extension Browser {
         }
         guard let update = viewUpdate(SavedViews.window(self, in: library), in: library) else { return }
         if update.change.isEmpty {
-            PendingViewChanges.forget(id, in: defaults)
+            PendingViewChanges.forget(id, by: pendingOwner, in: defaults)
             // A change the view cannot hold is the person's to hear of, though there is nothing to write.
             tellUnkept(update.unkept, of: id, in: library)
             return
         }
         guard library.reachesServer else {
-            PendingViewChanges.keep(update.change, baseVersion: update.baseVersion, for: id, in: defaults)
+            PendingViewChanges.keep(update.change, baseVersion: update.baseVersion, for: id, by: pendingOwner, in: defaults)
             if toldOffline.insert(id).inserted {
                 library.notices.tell(
                     String(localized: "View Not Saved"),
@@ -329,7 +329,8 @@ extension Browser {
         let sent = choices(in: place)
         switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
         case .success(let view):
-            PendingViewChanges.forget(id, in: defaults)
+            PendingViewChanges.forget(id, by: pendingOwner, in: defaults)
+            sendOthersPending(of: id, in: library)
             if update.change.group != nil, let replaced = update.view.group { replacedGroups[id, default: [:]][replaced.field] = replaced }
             let changedSince = choices(in: place).parts(differingFrom: sent)
             if !changedSince.isEmpty { rewritingViews.insert(id) }
@@ -367,17 +368,32 @@ extension Browser {
             // leaves the window as the person chose.
             switch failure.kind {
             case .conflict:
-                PendingViewChanges.forget(id, in: defaults)
+                dropPending(of: id, view: update.view, failure: failure, in: library)
                 undoManager?.removeAllActions(withTarget: self)
                 viewRefused(id, in: library)
             case .offline:
                 // The library has told the person; the change is written once the server is back.
-                PendingViewChanges.keep(update.change, baseVersion: update.baseVersion, for: id, in: defaults)
+                PendingViewChanges.keep(update.change, baseVersion: update.baseVersion, for: id, by: pendingOwner, in: defaults)
                 toldOffline.insert(id)
             case .gone, .notPermitted, .refused:
-                PendingViewChanges.forget(id, in: defaults)
+                dropPending(of: id, view: update.view, failure: failure, in: library)
             }
         }
+    }
+
+    /// A change this window kept offline that Marfa refused is given back on the clipboard before it is dropped.
+    private func dropPending(of id: ItemID, view: LibraryView, failure: ViewWriteFailure, in library: any ItemLibrary) {
+        guard let own = PendingViewChanges.stored(in: defaults)[id]?.made(by: pendingOwner), !own.entries.isEmpty else { return }
+        PendingViewChanges.giveBack(own.change, of: view.title, failure: failure, in: library)
+        PendingViewChanges.forget(id, by: pendingOwner, in: defaults)
+        sendOthersPending(of: id, in: library)
+    }
+
+    /// Another window's change kept offline for this view is sent once this window's write is out of its way.
+    private func sendOthersPending(of id: ItemID, in library: any ItemLibrary) {
+        guard PendingViewChanges.holds(id, in: defaults) else { return }
+        let defaults = self.defaults
+        Task { await PendingViewChanges.send(in: library, defaults: defaults) }
     }
 
     /// Says once what a write left out of the view, as it did in the dialog before a Save.

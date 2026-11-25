@@ -573,6 +573,8 @@ final class Browser {
     @ObservationIgnored var viewWaiters: [ItemID: [CheckedContinuation<Void, Never>]] = [:]
     /// Views whose choices changed while the window showed another place, written when it shows them again.
     @ObservationIgnored var pendingViewWrites: Set<ItemID> = []
+    /// What names this window's own changes among those kept offline (`PendingViewChanges`).
+    @ObservationIgnored let pendingOwner = UUID().uuidString
     @ObservationIgnored var toldOffline: Set<ItemID> = []
     @ObservationIgnored var toldUnkept: [ItemID: Set<ViewDraft.Unkept>] = [:]
     /// Each view's groups this window replaced, by field, so grouping by that field again (an Undo, or a choice made

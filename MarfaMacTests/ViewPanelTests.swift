@@ -664,6 +664,59 @@ struct ViewPanelTests {
         #expect(Self.held(library)?.version == 1)
     }
 
+    /// Two windows that change different settings of a view offline both keep theirs, and both land once the server is back.
+    @Test func twoWindowsOfflineKeepEachTheirOwnSetting() async throws {
+        let (first, library, _) = Self.opened(reachesServer: false)
+        let second = Browser()
+        second.defaults = first.defaults
+        second.adopt(library, undoManager: nil)
+        second.showing = .saved(Self.id)
+        second.viewMode = .table
+        second.followView(in: library)
+        await Self.change(first) { first.tableOptions[first.shown, default: .init()].sort = Self.byTitle }
+        await Self.change(second) { second.setFilter(Self.status, values: ["todo"]) }
+        let pending = try #require(PendingViewChanges.stored(in: first.defaults)[Self.id])
+        #expect(pending.change.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(pending.change.query?.filter?.contains("todo") == true)
+
+        first.showing = .library
+        second.showing = .library
+        library.reachesServer = true
+        first.reachabilityChanged(in: library)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
+        #expect(Self.held(library)?.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(!PendingViewChanges.holds(Self.id, in: first.defaults))
+    }
+
+    /// A window still showing the view writes its offline change itself; when Marfa refuses it, the change goes to the
+    /// clipboard before it is dropped.
+    @Test func anOfflineChangeMarfaRefusesFromTheWindowGoesToTheClipboard() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        library.reachesServer = true
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "No")
+        browser.reachabilityChanged(in: library)
+        #expect(await eventually(within: .seconds(20)) {
+            library.notices.waiting.contains { $0.isNotKept && $0.title == "View Not Saved" && $0.text?.contains("todo") == true }
+        })
+        #expect(!PendingViewChanges.holds(Self.id, in: browser.defaults))
+    }
+
+    /// A From changed alone is said in full on the clipboard.
+    @Test func aRefusedFromChangedAloneIsGivenBackInWords() async throws {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].scope = .feed }
+        #expect(PendingViewChanges.stored(in: browser.defaults)[Self.id]?.change.query?.tier == .feed)
+        browser.showing = .library
+        library.reachesServer = true
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "No")
+        browser.reachabilityChanged(in: library)
+        #expect(await eventually(within: .seconds(20)) { library.notices.waiting.contains { $0.isNotKept } })
+        let text = try #require(library.notices.waiting.first { $0.isNotKept }?.text)
+        #expect(text.contains("View: Open Tasks"))
+        #expect(text.contains("From: Feed"))
+    }
+
     /// A grouping chosen in a list writes only the group, so a sort the Mac cannot show stays.
     @Test func aGroupingKeepsASortTheMacCannotShow() async {
         var custom = Self.view()
