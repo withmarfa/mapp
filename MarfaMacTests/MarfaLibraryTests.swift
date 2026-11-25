@@ -627,7 +627,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.clearWrites()
         #expect(await library.changeLinks(F.n1, field: "about", adding: [F.p2], removing: [F.p1], undoManager: nil) == .taken)
         #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", from: F.n1, to: F.p2))] })
-        // The old link goes once the source has taken the new one.
+        // The old link goes once the server accepts the new one.
         source.send(.answered(try #require(source.submitted.last?.id), .accepted))
         #expect(await eventually { source.writes.last == .unlink(EdgeID("a1")) })
     }

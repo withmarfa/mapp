@@ -191,9 +191,7 @@ extension MarfaLibrary {
         Cost.measure(.relationships) { readRelationFields(of: id) }
     }
 
-    /// Every field the item's type admits at either end of an edge type, and any it holds or is pointed at through
-    /// although its type is not admitted. A two-way relation is one field. Filled fields come first, then empty ones,
-    /// each its own before inverse, then by label and name, so a row keeps its place while its links change.
+    /// Filled fields come first. Within each group, sort own fields before inverses, then by label and field name.
     private func readRelationFields(of id: ItemID) -> [RelationField] {
         guard let item = headerItem(id) else { return [] }
         observeLinks(of: id)
