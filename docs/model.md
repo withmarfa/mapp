@@ -48,12 +48,12 @@ Two defaults name types: the sidebar's and toolbar's starting set for New, and t
 - **Read only locks the connector-managed title, text, properties, and type.** A natural-key upsert keeps the current tags and tier when the connector omits them (`items/natural-key-tags`, `items/tier-upsert`). A binned item stays in the bin (`items/natural-key-trashed`).
 - **Archived blocks nothing.** In Recently Deleted, everything is blocked but Recover and Delete Immediately.
 - **The tier and the state are separate.** Keep and Move to Feed send `ItemWrite.retier`. Archive, Unarchive, and Delete send `ItemWrite.transition` through `setStates`. Recover and undo or redo steps that take an item out of Recently Deleted use `ItemWrite.restore`.
-- **`MarfaEngine.judge` checks state and tier writes and relationship edits,** including Undo and Redo, against the copy and its queued writes.
+- **`MarfaEngine.judge` checks each state, tier and link write,** Undo and Redo too, against the copy.
 - **A move command's `CommandOutcome` counts what the copy queued,** given to `moved` once each write is judged.
 - **Undo records a state move or a link once its write is judged, and a tier move once the server answers.** Before that, Undo goes back on its stack and Redo says why it did not run (`waitForEarlier`).
 - **Known gaps:** a queued write can overwrite a change the copy has not yet learned of (withmarfa/marfa#3523, withmarfa/marfa#3528), including one the copy applies between `judge` and the queue, two package calls.
 - **Also open:** two notices when planner and queue skips coincide; one notice per failed rearchive in a bulk Undo of Delete; Delete's toast counts what it planned; Undo of New Item before the item shows.
-- **Links:** `ItemLibrary.relationFields(of:)` lists an item's edge fields, inverses too, and `changeLinks` answers a commit with an `EdgeVerdict`.
+- **A link is removed or moved only while the copy holds it between the ends seen,** as a move keeps its id.
 - **Archive with what is beneath takes every active item under the selection through `parent-of`** (`archivePlan`). Marfa's own archive reaches no child.
 
 ## Vocabulary

@@ -188,9 +188,9 @@ extension MarfaEngine {
             let between = edges.edges(touching: draft.from.rawValue)
                 .filter { $0.edgeType == draft.type && Set([$0.fromId, $0.toId]) == ends }
             stand.faces["links \(draft.type) \(draft.from.rawValue) \(draft.to.rawValue)"] = .links(between.map(\.id).sorted())
-        case .unlink(let id):
-            edge(id.rawValue)
-        case .moveEdge(let id, _, let to, _):
+        case .unlink(let draft):
+            if let id = draft.id { edge(id.rawValue) }
+        case .moveEdge(let id, _, let to, _, _):
             edge(id.rawValue)
             place(to.rawValue)
         case .create, .purge:

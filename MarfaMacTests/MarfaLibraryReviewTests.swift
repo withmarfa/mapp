@@ -80,7 +80,7 @@ import Testing
     @Test func aReplacementIsOneMoveRatherThanTwoWrites() async throws {
         let (library, source) = try await loaded()
         #expect(await library.changeLinks(F.e1, field: "child-of", adding: [F.p2], removing: [F.p1], undoManager: nil) == .taken)
-        #expect(await eventually { source.writes == [.moveEdge(EdgeID("c1"), end: .from, to: F.p2, from: F.p1)] }, "replacement sent as \(source.writes)")
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("c1"), end: .from, to: F.p2, from: F.p1, stays: F.e1)] }, "replacement sent as \(source.writes)")
         #expect(library.notices.waiting.last == nil)
     }
 
@@ -95,7 +95,7 @@ import Testing
         #expect(await eventually { library.notices.waiting.last != nil })
         // Time for an unlink the refusal should not set off.
         try await Task.sleep(for: .milliseconds(200))
-        #expect(!source.writes.contains(.unlink(EdgeID("a1"))), "sent \(source.writes)")
+        #expect(!source.writes.contains(.unlink(EdgeDraft(type: "about", from: F.n1, to: F.p1, id: EdgeID("a1")))), "sent \(source.writes)")
     }
 
     /// Queue-and-verdicts 43: text typed on version 1 but reported after the library took in another device's text

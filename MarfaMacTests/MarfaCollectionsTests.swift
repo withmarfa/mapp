@@ -88,7 +88,7 @@ import Testing
         #expect(await eventually { Set(library.items(in: .collection(Self.holiday)).map(\.id)).isSuperset(of: [F.e1, F.n2]) })
         source.clearWrites()
         undo.undo()
-        #expect(Set(source.writes) == Set(minted.map { .unlink($0.id) }))
+        #expect(Set(source.writes) == Set(minted.map { .unlink(EdgeDraft(type: "in-collection", from: $0.from, to: Self.holiday, id: $0.id)) }))
         #expect(!undo.canUndo)
     }
 
@@ -97,7 +97,10 @@ import Testing
         let undo = StepCountingUndoManager()
         #expect(library.removeFromCollection([F.n1, F.p1, F.e1], Self.holiday, undoManager: undo))
         #expect(undo.steps == 1)
-        #expect(Set(source.writes) == [.unlink(EdgeID("m1")), .unlink(EdgeID("m2"))], "e1 is in no collection, so nothing is sent for it")
+        #expect(Set(source.writes) == [
+            .unlink(EdgeDraft(type: "in-collection", from: F.n1, to: Self.holiday, id: EdgeID("m1"))),
+            .unlink(EdgeDraft(type: "in-collection", from: F.p1, to: Self.holiday, id: EdgeID("m2"))),
+        ], "e1 is in no collection, so nothing is sent for it")
         try await takeAll(library, source)
         source.clearWrites()
         undo.undo()
@@ -121,7 +124,7 @@ import Testing
         undo.beginUndoGrouping()
         #expect(library.removeFromCollection([F.n1, F.e1], Self.holiday, undoManager: undo))
         undo.endUndoGrouping()
-        #expect(source.writes == [.unlink(EdgeID("m1"))])
+        #expect(source.writes == [.unlink(EdgeDraft(type: "in-collection", from: F.n1, to: Self.holiday, id: EdgeID("m1")))])
         try await takeAll(library, source)
         source.clearWrites()
         undo.undo()

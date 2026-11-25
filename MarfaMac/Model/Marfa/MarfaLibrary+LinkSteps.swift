@@ -20,6 +20,21 @@ final class LinkStep {
     var made: Set<WriteID> = []
     /// The removals held back until the new links are answered (`MarfaLibrary.awaitLinks`).
     var heldBack: UUID?
+    /// The writes sent at once that the source took (`MarfaLibrary.relink`).
+    var sent: Set<WriteID> = []
+    /// The writes answered before the copy took them, as one the engine skipped, with why.
+    var refusals: [WriteID: SyncProblem] = [:]
+
+    /// What the writes sent at once came to, once each is taken or answered: `incomplete` where the copy refused one
+    /// for not being whole, `refused` where it refused or skipped one, and `taken` where it took them all.
+    var verdict: EdgeVerdict {
+        let refused = sent.compactMap { refusals[$0] }
+        if refused.contains(where: { MarfaEngine.isNotCurrent($0.code) }) { return .incomplete }
+        if let problem = refused.first {
+            return .refused(problem.message ?? String(localized: "The Marfa server refused this change."))
+        }
+        return .taken
+    }
 }
 
 extension MarfaLibrary {
@@ -41,6 +56,7 @@ extension MarfaLibrary {
     func linkWriteAnswered(_ write: WriteID, _ outcome: WriteOutcome) {
         guard let step = linkSteps[write] else { return }
         if step.judging.remove(write) != nil {
+            if case .refused(let problem) = outcome { step.refusals[write] = problem }
             linkSteps[write] = nil
             return
         }

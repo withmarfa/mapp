@@ -94,6 +94,29 @@ struct MarfaEdgeCheckTests {
         String(localized: "“\(name)” can hold only one link of this kind, and already holds it.")
     }
 
+    /// Marfa keeps an edge's id when another device moves it, so the undo of a new parent removes the edge only while
+    /// the copy shows it from the parent this Mac gave it. One moved elsewhere since is left where it is.
+    @Test func undoingAParentLeavesALinkAnotherDeviceMovedSince() async throws {
+        let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("child", "core.note")])
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
+        #expect(await scene.library.changeLinks(scene.id("child"), field: "child-of", adding: [scene.id("a")], removing: [], undoManager: undo) == .taken)
+        try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("a")] })
+        try #require(await eventually { scene.library.linkSteps.isEmpty })
+        undo.endUndoGrouping()
+        // Another device moves the child under `b`, and the copy shows it.
+        let edge = try #require(try await scene.fake.copy.edges.from(scene.id("a").rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
+        _ = try await scene.fake.copy.edges.update(edge.id, EdgeEdit(baseVersion: edge.version, move: .from(scene.id("b").rawValue)))
+        try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("b")] })
+        undo.undo()
+        try #require(await eventually { scene.library.linkSteps.isEmpty })
+        #expect(try await scene.fake.copy.queue.all().allSatisfy { $0.kind != .deleteEdge }, "the undo removed the moved link")
+        #expect(try await scene.fake.copy.edges.from(scene.id("b").rawValue).contains { $0.id == edge.id })
+        #expect(Self.holds("child", "child-of", in: scene) == [scene.id("b")])
+        await scene.source.close()
+    }
+
     @Test func aSecondParentIsRefusedByTheCoreAndAReplacementIsAMoveItTakes() async throws {
         let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("child", "core.note")])
         try await Self.file("child", under: "a", in: scene)

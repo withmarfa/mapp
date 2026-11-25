@@ -18,7 +18,7 @@ nonisolated struct EdgeDraft: Hashable, Sendable {
     var to: ItemID
     /// The edge's `position` property, so an undone removal puts a collection member back where it was.
     var position: Double? = nil
-    /// The edge's own id: minted for a new edge, and read for one to remove.
+    /// The edge's own id: minted for a new edge, and the one this Mac saw for an edge to remove.
     var id: EdgeID? = nil
 }
 
@@ -55,10 +55,11 @@ nonisolated enum ItemWrite: Hashable, Sendable {
     case tag(ItemID, String, on: Bool)
     /// Sent only while the copy shows no edge of its type between its ends (`MarfaEngine.judge(edge:)`).
     case link(EdgeDraft)
-    /// Sent only while the copy holds the edge.
-    case unlink(EdgeID)
+    /// Removes the edge the draft's `id` names. Sent only while the copy shows that edge with the draft's type and
+    /// ends, since Marfa keeps an edge's id when another device moves it.
+    case unlink(EdgeDraft)
     /// Replaces one end of an edge in one write, so the end that stays never holds no edge or two. Only an edge
-    /// whose staying end holds one edge of its type can move. Sent only while the copy shows the end at `from`, or
-    /// already at `to`.
-    case moveEdge(EdgeID, end: EdgeTypeInfo.End, to: ItemID, from: ItemID)
+    /// whose staying end holds one edge of its type can move. Sent only while the copy shows the edge between
+    /// `from` and `stays`; one already at `to` is skipped, since the package queues nothing for it.
+    case moveEdge(EdgeID, end: EdgeTypeInfo.End, to: ItemID, from: ItemID, stays: ItemID)
 }

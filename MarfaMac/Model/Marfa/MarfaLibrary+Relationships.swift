@@ -335,7 +335,9 @@ extension MarfaLibrary {
     ///
     /// The verdict is `taken` where the change is written or there was nothing to change; `refused` where the item, the
     /// field or the core refuses it; `incomplete` while the copy is not whole; `unknown` for an item or field the
-    /// library does not hold. Every verdict but `taken` and `unknown` is also told, and leaves the field as it was.
+    /// library does not hold, or a source that took nothing. Every verdict but `taken` and `unknown` is also told, and
+    /// leaves the field as it was. A change that asks nothing of the core, as a removal, answers only once the copy has
+    /// taken or refused its writes, and is `refused` where the copy skipped one, as a link already gone.
     /// `finish` waits for a change in flight.
     @discardableResult
     func changeLinks(
@@ -386,11 +388,16 @@ extension MarfaLibrary {
             let unasked = plan.made.filter { !asked.contains($0) }
             guard !unasked.isEmpty else {
                 let name = fieldEnd(field).map { String(localized: "Change \(label($0))") } ?? cantChange
-                var writes: Set<WriteID> = []
+                var made: LinkStep?
                 gatheringSkips(failing: cantChange) {
-                    writes = relink(plan.change, name: name, failing: cantChange, undoManager: undoManager)
+                    made = relink(plan.change, name: name, failing: cantChange, undoManager: undoManager)
                 }
-                return (.taken, writes)
+                guard let step = made else { return (.unknown, []) }
+                guard plan.made.isEmpty else { return (.taken, step.sent) }
+                // Nothing was asked of the core, as for a removal, so the copy's judgement of the writes is the verdict.
+                guard !step.sent.isEmpty else { return (.unknown, []) }
+                await untilSettled(step.sent)
+                return (step.verdict, step.sent)
             }
             for link in unasked {
                 switch await verdict(of: link) {
@@ -467,10 +474,10 @@ extension MarfaLibrary {
             // then the end that moves is the one on the far side of that edge.
             let replaced = replacingOwn ? unlinking.compactMap { old -> (ItemID, RelationshipChange.Move)? in
                 if let edge = held(by: id, end).first(where: { (farIsTo ? $0.to : $0.from) == old }) {
-                    return (old, .init(edge: edge.id, end: farIsTo ? .to : .from, to: other, from: old))
+                    return (old, .init(edge: edge.id, end: farIsTo ? .to : .from, to: other, from: old, stays: id))
                 }
                 if let edge = held(by: id, farEnd).first(where: { (farIsTo ? $0.from : $0.to) == old }) {
-                    return (old, .init(edge: edge.id, end: farIsTo ? .from : .to, to: other, from: old))
+                    return (old, .init(edge: edge.id, end: farIsTo ? .from : .to, to: other, from: old, stays: id))
                 }
                 return nil
             }.first : nil
@@ -480,7 +487,7 @@ extension MarfaLibrary {
                 made.append(.moved(move))
             } else if let theirs = taken.first {
                 let old = farIsTo ? theirs.from : theirs.to
-                let move = RelationshipChange.Move(edge: theirs.id, end: farIsTo ? .from : .to, to: id, from: old)
+                let move = RelationshipChange.Move(edge: theirs.id, end: farIsTo ? .from : .to, to: id, from: old, stays: other)
                 change.moving.append(move)
                 made.append(.moved(move))
             } else {
@@ -499,19 +506,20 @@ extension MarfaLibrary {
     /// Where links are added or moved and others removed, as when one item is chosen in place of another in a field
     /// that holds many, the new links go first and the old ones are removed only once the source has taken every new
     /// one, so a refusal leaves the field as it was rather than with the old link gone and the new one missing.
-    /// Each new edge gets an id minted here, so its undo removes that edge and no other.
+    /// Each new edge gets an id minted here, so its undo removes that edge and no other. Each edge to remove is named
+    /// now by the id and ends this Mac sees, so a removal sent later never takes a link made since in its place.
     ///
     /// The step registered in return reverses only what the copy took of it (`LinkStep`), each write judged against the
     /// copy as it is queued (`MarfaEngine.judge(edge:)`), so a link changed elsewhere since is left as it is.
     ///
-    /// Returns the writes sent now that the source took, which a following change waits for: the adds, the moves and
-    /// any unlink sent at once. An unlink held back for the new links is not one of them, since it is sent only after
-    /// the server answers them, which can be long, and a write the source refused to take is not either.
+    /// The step's `sent` are the writes sent now that the source took, which a following change waits for: the adds,
+    /// the moves and any unlink sent at once. An unlink held back for the new links is not one of them, since it is
+    /// sent only after the server answers them, which can be long, and a write the source refused to take is not either.
     @discardableResult
     func relink(
         _ change: RelationshipChange, name: String, failing title: String = String(localized: "Can’t Change This Relationship"),
         undoManager: UndoManager?
-    ) -> Set<WriteID> {
+    ) -> LinkStep {
         let step = LinkStep()
         var links: [WriteID] = []
         for var draft in change.adding {
@@ -521,38 +529,46 @@ extension MarfaLibrary {
             links.append(write)
         }
         for move in change.moving {
-            let write = submit(.moveEdge(move.edge, end: move.end, to: move.to, from: move.from), failing: title)
+            let write = submit(.moveEdge(move.edge, end: move.end, to: move.to, from: move.from, stays: move.stays), failing: title)
             follow(write, .moved(move), in: step)
             links.append(write)
         }
+        let removing = change.removing.compactMap(seen)
         var sent = Set(links)
         if links.isEmpty {
-            sent.formUnion(unlink(change.removing, failing: title, recordingIn: step))
-        } else if !change.removing.isEmpty {
-            awaitLinks(Set(links), thenUnlink: change.removing, failing: title, recordingIn: step)
+            sent.formUnion(unlink(removing, failing: title, recordingIn: step))
+        } else if !removing.isEmpty {
+            awaitLinks(Set(links), thenUnlink: removing, failing: title, recordingIn: step)
         }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             library.reverse(step, name: name, failing: title, undoManager: undoManager)
         }
         // A write that was not queued, as after the source closed, was told to the person and gets no answer.
-        sent = sent.filter { isFollowed($0) }
-        unsettled.formUnion(sent)
-        return sent
+        step.sent = sent.filter { isFollowed($0) }
+        unsettled.formUnion(step.sent)
+        return step
     }
 
-    /// Removes each edge: the one the draft names by id, or the one the copy holds between its ends.
+    /// The edge a removal names, by the id the draft carries or the one the library holds between its ends, with its
+    /// position, so an undo puts a collection member back where it was. Nil where no such edge is held.
+    private func seen(_ draft: EdgeDraft) -> EdgeDraft? {
+        if draft.id != nil { return draft }
+        guard let link = index.link(type: draft.type, from: draft.from, to: draft.to) else { return nil }
+        var seen = draft
+        seen.id = link.id
+        seen.position = draft.position ?? link.position
+        return seen
+    }
+
+    /// Removes each edge by the id and ends the draft names, which the engine judges against the copy as it is queued.
     @discardableResult
     func unlink(
         _ drafts: [EdgeDraft], failing title: String = String(localized: "Can’t Change This Relationship"), recordingIn step: LinkStep? = nil
     ) -> [WriteID] {
         drafts.compactMap { draft in
-            let link = draft.id == nil ? index.link(type: draft.type, from: draft.from, to: draft.to) : nil
-            guard let id = draft.id ?? link?.id else { return nil }
-            let write = submit(.unlink(id), failing: title)
-            var removed = draft
-            removed.id = id
-            removed.position = draft.position ?? link?.position
-            if let step { follow(write, .removed(removed), in: step) }
+            guard let id = draft.id else { return nil }
+            let write = submit(.unlink(EdgeDraft(type: draft.type, from: draft.from, to: draft.to, id: id)), failing: title)
+            if let step { follow(write, .removed(draft), in: step) }
             return write
         }
     }
