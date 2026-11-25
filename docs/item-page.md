@@ -28,7 +28,7 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 - **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset and hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
 - **A type that keeps no text shows its first six rows,** empty or not.
 - **Every link the type may hold is a row** (`RelationField`): the item's own with the other rows, the rest Empty under Show N More, so an item in no collection has an empty In Collection row. A link Marfa will not change (the text's `references`, a folder) is read only, its help tag saying why.
-- **A link that points at the item is a row like any other,** shown when it has a value. A parent's sub-items wait under Show N More, since the foot lists them. Values no field describes are the last rows there, read only, under Other.
+- **A link that points at the item is a row like any other,** shown when it has a value. A parent's sub-items and Referenced By wait under Show N More, since the foot lists them. Values no field describes are the last rows there, read only, under Other.
 - **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
 - **An event's time is one row, When,** always first, with how far off it is or All Day in grey.
 - **Long text stops after two lines;** an email, a phone and a number to call open.

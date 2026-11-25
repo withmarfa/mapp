@@ -121,16 +121,6 @@ private struct WhenLoaded<Content: View>: View {
     .frame(width: 330, height: 650)
 }
 
-#Preview("Relationship Selection") {
-    WhenLoaded(library: ItemPreviewFixtures.library) { library in
-        if let relationship = library.relationships(for: ItemPreviewFixtures.ticketID).first {
-            ItemRelationshipPicker(owner: ItemPreviewFixtures.ticketID, relationship: relationship,
-                                   candidates: library.relationshipCandidates(for: ItemPreviewFixtures.ticketID, field: relationship.field), onSave: { _, _ in true })
-                .environment(\.library, library)
-        }
-    }
-}
-
 #Preview("Complete Item Window") {
     let library = ItemPreviewFixtures.library
     MainView(browser: ItemPreviewFixtures.browser, details: ItemPreviewFixtures.details, restoresWindow: false)

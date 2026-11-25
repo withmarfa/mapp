@@ -273,6 +273,8 @@ nonisolated struct PagePlacement: Equatable, Sendable {
     static let linkedFrom = "#linked"
     /// The relationship a parent's sub-items are held in.
     static let subItems = RelationField.inversePrefix + MarfaMapping.parentEdge
+    /// The relationship the links in other items' text are held in, which Referenced By lists.
+    static let referencedBy = RelationField.inversePrefix + MarfaMapping.bodyLinkEdge
     /// The relationship the parent is held in.
     static let parent = "child-of"
     /// The most properties a page pins.
@@ -356,6 +358,8 @@ nonisolated struct PagePlacement: Equatable, Sendable {
     var defaultLinkedFromPlace: LinkedFromPlace { defaultLinkedFrom }
 
     /// Unless chosen, a row shows when it has a value, but for the type's connector link, a connector's bookkeeping and a
-    /// parent's sub-items, which the foot lists.
-    private func defaultShows(_ row: String) -> Bool { row != linkField && !bookkeeping.contains(row) && row != Self.subItems }
+    /// parent's sub-items and Referenced By, which the foot lists.
+    private func defaultShows(_ row: String) -> Bool {
+        row != linkField && !bookkeeping.contains(row) && row != Self.subItems && row != Self.referencedBy
+    }
 }

@@ -122,6 +122,7 @@ struct PageHeadTests {
             Self.link(MarfaMapping.collectionEdge, "In Collection"), Self.link("about", "About", ["a1"]),
             Self.link("references", "References", ["r1"], editability: .readOnly(reason)),
             Self.link("inverse:parent-of", "Children", ["c1"]), Self.link("inverse:about", "Subject of", ["s1"]),
+            Self.link("inverse:references", "Referenced By", ["r2"]),
         ])
         #expect(head.rows.first { $0.id == MarfaMapping.collectionEdge }?.value == .empty(symbol: "link"), "an item in no collection has the row")
         #expect(head.rows.first { $0.id == MarfaMapping.collectionEdge }?.editable == true)
@@ -131,6 +132,7 @@ struct PageHeadTests {
         #expect(references?.lock == reason)
         #expect(Self.shown(head) == ["about", "references", "inverse:about"], "a link shows when it has one, in either direction")
         #expect(head.rows.first { $0.id == "inverse:parent-of" }?.folded == true)
+        #expect(head.rows.first { $0.id == "inverse:references" }?.folded == true, "the foot lists Referenced By")
     }
 
     @Test func aValueNoFieldDescribesIsTheLastReadOnlyRowUnderOther() {
