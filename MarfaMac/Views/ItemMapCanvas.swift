@@ -295,7 +295,7 @@ final class MapController: NSObject, MKMapViewDelegate {
     /// Sets the image so the picture's tip, or a group's centre, stands on the item's point.
     private func place(_ drawn: MapArtist.Drawn, in view: MKAnnotationView) {
         view.image = drawn.image
-        view.centerOffset = CGPoint(x: 0, y: drawn.image.size.height / 2 - drawn.tipFromFoot)
+        view.centerOffset = CGPoint(x: 0, y: drawn.tipFromFoot - drawn.image.size.height / 2)
     }
 
     @objc private func opens(_ recognizer: NSClickGestureRecognizer) {
