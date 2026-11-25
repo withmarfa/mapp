@@ -35,7 +35,7 @@ enum AppButtonSize {
     fileprivate var cornerRadius: CGFloat { 7 }
 }
 
-/// The one button the app draws itself (`docs/components.md`): a capsule at 28 and 36 points, a rounded rectangle at 24,
+/// The one button the app draws itself (`docs/look.md`): a capsule at 28 and 36 points, a rounded rectangle at 24,
 /// and a circle for a button whose label is only a symbol, in the fills of the design system's `.m-b`. The toolbar's glass
 /// buttons and the system's menus, alerts and controls stay the system's.
 struct AppButtonStyle: ButtonStyle {

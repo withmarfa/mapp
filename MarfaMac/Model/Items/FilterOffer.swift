@@ -81,7 +81,7 @@ nonisolated struct FilterTarget: Hashable, Sendable, Identifiable {
 }
 
 /// What Filter By offers for a place, drawn alike wherever a filter is added: the fields of the types the place lists
-/// under their names, then what every item has ([docs/views-and-lists.md](../../../docs/views-and-lists.md)). The fields
+/// under their names, then what every item has ([docs/lists.md](../../../docs/lists.md#filters)). The fields
 /// come from the types the place lists, as Group by's do (`GroupOffer`), never only from the items on screen, so a field
 /// no item fills yet can still be chosen.
 nonisolated struct FilterOffer: Hashable, Sendable {

@@ -1,8 +1,7 @@
 name: Checks
 
 # A pull request runs no Mac job: GitHub lets the organization run only 5 macOS jobs at once, shared by three
-# repositories. The Unit tests and the Release compile run after a merge (main.yml), and the UI tests before a tag
-# publishes (release.yml). Sessions run the Mac builds and tests locally before an admin merge.
+# repositories. The Unit tests and the Release compile run after a merge (main.yml). CI runs no UI tests. Sessions run the Mac builds and tests locally before an admin merge.
 # Changes selects jobs by path. An unmatched path selects all of them.
 # On a pull request, a change to this workflow or to the change classifier selects every job.
 # Checks is the required roll-up. A superseded run reports cancellation unless a job failed.

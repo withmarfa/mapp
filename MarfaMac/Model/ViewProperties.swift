@@ -4,8 +4,8 @@ import Foundation
 /// the shown ones as columns; a list row, a board card, a gallery card and a timeline row say the first few as chips.
 ///
 /// An empty list is "As in Layouts": nothing is chosen, so each item shows its own type's look. The first change makes it
-/// the person's, "This Mac", and Use Layouts (`reset`) puts the fallback back. It is kept on this Mac only: in a saved
-/// view's Mac settings (`ViewMacSettings`) and a place's default view (`PlaceDefault`), never in Marfa.
+/// the person's, "This Mac", and Use Layouts (`reset`) puts the fallback back. It is one of the app's settings, which sync: in
+/// a saved view's (`ViewMacSettings`) and a place's default view (`PlaceDefault`), never in the view Marfa holds.
 nonisolated struct ViewProperties: Codable, Hashable, Sendable {
     /// The identifiers in the order the person gave. Empty follows the place's own order. A property not named
     /// follows those named.

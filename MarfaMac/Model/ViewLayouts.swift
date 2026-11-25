@@ -27,7 +27,7 @@ nonisolated struct ViewLayouts: Equatable, Sendable {
     }
 }
 
-/// One view's settings on this Mac.
+/// One view's settings in this app, which sync but for the table's widths.
 nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
     /// The layout the view opens in. Nil follows the window.
     var layout: ItemViewMode?

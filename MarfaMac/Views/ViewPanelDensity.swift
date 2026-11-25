@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// How much each row of the list says: Standard or Compact. It follows Settings until the view or place chooses; a saved
-/// view's choice is kept on this Mac as it is made, and a place's is kept for the place (`Browser.changeDensity`).
+/// view's choice is kept in the app's settings as it is made, and a place's is kept for the place (`Browser.changeDensity`).
 struct ViewPanelDensity: View {
     let browser: Browser
     let panel: ViewPanel

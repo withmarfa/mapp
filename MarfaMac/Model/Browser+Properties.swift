@@ -9,7 +9,8 @@ extension Browser {
         if case .view(let id) = item { macSettings(for: id).properties } else { placeProperties[item] ?? ViewProperties() }
     }
 
-    /// Changes the list. A saved view keeps it on this Mac as it is made, and a place in its default view. Undo takes either back.
+    /// Changes the list. A saved view's is kept in the app's settings as it is made, and a place's in its default
+    /// view. Undo takes either back.
     func changeProperties(_ change: (inout ViewProperties) -> Void) {
         if case .view(let id) = item {
             changeViewSettings(id) { change(&$0.properties) }

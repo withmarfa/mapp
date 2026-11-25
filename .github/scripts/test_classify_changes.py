@@ -6,7 +6,7 @@ from classify_changes import classify
 class ClassifyChangesTests(unittest.TestCase):
     def test_file_selects_its_checks(self):
         cases = {
-            "docs/glossary.md": {"instructions"},
+            "docs/model.md": {"instructions"},
             "MarfaMac/Model/AGENTS.md": {"instructions"},
             "MarfaMac/Localizable.xcstrings": set(),
             "MarfaMac/Assets.xcassets/AppIcon.appiconset/Contents.json": set(),
@@ -30,7 +30,7 @@ class ClassifyChangesTests(unittest.TestCase):
         expected = {"classifier", "editor", "instructions", "scripts", "workflows"}
         for path in ("Scripts/foo.sh", "new-folder/Source.swift"):
             with self.subTest(path=path):
-                self.assertEqual(classify(["docs/glossary.md", path]), expected)
+                self.assertEqual(classify(["docs/model.md", path]), expected)
 
     def test_checks_from_multiple_paths_are_combined(self):
         self.assertEqual(

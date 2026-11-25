@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A toast as the design system's `Toast` draws it: a solid, rounded bar 44 points tall with an optional symbol, the
-/// message, Undo where the action can be undone, and a close button (`docs/components.md`).
+/// message, Undo where the action can be undone, and a close button (`docs/look.md`).
 struct ToastView: View {
     let toast: ToastPresenter.Toast
     let presenter: ToastPresenter

@@ -57,7 +57,7 @@ nonisolated enum FilterOp: String, Codable, Hashable, Sendable, CaseIterable {
     case equal, notEqual, less, lessOrEqual, greater, greaterOrEqual
     case contains, startsWith
 
-    /// A date relative to the day it is worked out on, which only this Mac keeps (`FilterClause.isRelative`).
+    /// A date relative to the day it is worked out on, which only a place's default view keeps (`FilterClause.isRelative`).
     var isRelative: Bool {
         switch self {
         case .beforeToday, .afterToday, .inLast, .inNext: true
@@ -255,6 +255,6 @@ nonisolated struct FilterState: Hashable, Sendable {
         return FilterState(clauses: kept, matchesAny: matchesAny && kept.count > 1)
     }
 
-    /// The relative clauses, which only this Mac keeps.
+    /// The relative clauses, which only a place's default view keeps.
     var relative: [FilterClause] { complete.clauses.filter(\.isRelative) }
 }
