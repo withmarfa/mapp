@@ -319,23 +319,19 @@ struct NewItemLinePanel: View {
     private func matches(for draft: QuickAdd.Draft) -> [Match]? {
         guard let typing = NewItemText.typing(in: draft.title) else { return nil }
         let query = typing.query
-        func fits(_ text: String) -> Bool { query.isEmpty || text.localizedStandardContains(query) }
         switch typing.mark {
         case .tag:
             let recents = NewItemRecents.stored(for: library.serverKey, in: browser.defaults).tags
-            var tags = recents + library.knownTags.filter { !recents.contains($0) }
-            tags = tags.filter { fits($0) && !draft.tags.contains($0) && !library.reservedTags.contains($0) }
-            var found = tags.prefix(6).map { Match(id: "tag:" + $0, text: "#" + $0, icon: nil, detail: nil, choice: .tag($0), field: nil) }
-            if !query.isEmpty, !tags.contains(query) {
-                found.append(Match(id: "new:" + query, text: "#" + query, icon: nil, detail: String(localized: "New Tag"), choice: .tag(query), field: nil))
+            let offer = QuickAdd.tagOffers(query, draft: draft, recents: recents, in: library)
+            var found = offer.known.map { Match(id: "tag:" + $0, text: "#" + $0, icon: nil, detail: nil, choice: .tag($0), field: nil) }
+            if let new = offer.new {
+                found.append(Match(id: "new:" + new, text: "#" + new, icon: nil, detail: String(localized: "New Tag"), choice: .tag(new), field: nil))
             }
             return found
         case .parent:
             guard library.canHaveParent(typeID: draft.typeID) else { return [] }
             let recents = NewItemRecents.stored(for: library.serverKey, in: browser.defaults).parents
-            let candidates = library.creationParentCandidates(typeID: draft.typeID)
-            let ordered = recents.compactMap { id in candidates.first { $0.id == id } } + candidates.filter { !recents.contains($0.id) }
-            return ordered.filter { fits($0.displayTitle) }.prefix(6).map { item in
+            return library.creationParentMatches(typeID: draft.typeID, matching: query, first: recents, limit: 6).map { item in
                 Match(
                     id: "parent:" + item.id.rawValue, text: item.displayTitle, icon: library.catalogue.icon(for: item.type),
                     detail: library.catalogue.label(for: item.type), choice: .parent(item.id), field: nil)

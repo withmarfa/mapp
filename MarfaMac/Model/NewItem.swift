@@ -36,8 +36,6 @@ struct NewItem {
     var collection: ItemID?
     /// How the item opens, as Settings said when it was added; nil where it was added without opening.
     var opening: ItemOpening? = ItemOpening.standard
-    /// The window's, so the item's joining the collection is undone there.
-    weak var undoManager: UndoManager?
 }
 
 /// What the page writes at the end of a new item's text for the files its form attached to it.
@@ -53,12 +51,11 @@ extension Browser {
         newItems.contains { library.item($0.id) != nil || isRefused($0, in: library) }
     }
 
-    /// Refused once queued, so the refusal is in the problems the library shows, or refused before it was queued.
-    /// A create sent to another library counts as refused once this one has loaded without it, since it will not
-    /// come.
+    /// Refused for good, once queued or before it was, never only held up (`NewItemDrafts.answer`). A create sent
+    /// to another library counts as refused once this one has loaded without it, since it will not come.
     private func isRefused(_ entry: NewItem, in library: any ItemLibrary) -> Bool {
         if entry.library !== library { return library.isLoaded }
-        return library.wasRefused(creating: entry.id) || library.syncReport.problems.contains { $0.itemID == entry.id }
+        return NewItemDrafts.answer(creating: entry.id, in: library, madeHere: true) == .refused
     }
 
     /// Finishes each item the window made that the library now holds or refused. A create the library refused is
@@ -108,11 +105,14 @@ extension Browser {
 
     /// Files the new item in the collection whose place it was added in, through the edge queue as any link is
     /// added, and says whether it did. An item whose type can't be in a collection, such as another collection, is
-    /// left out of it; one the library refuses stays where it is, and the library tells the person why.
+    /// left out of it; one the library refuses stays where it is, and the library tells the person why. Joining is
+    /// part of the add, so it registers no step of its own: undoing the add moves the item, with its place in the
+    /// collection, to Recently Deleted. An item already moved there is left out.
     private func join(_ entry: NewItem, in library: any ItemLibrary) -> Bool {
-        guard let collection = entry.collection, let held = library.item(entry.id), library.canJoinCollection(held)
+        guard let collection = entry.collection, let held = library.item(entry.id), held.state == .active,
+              library.canJoinCollection(held)
         else { return false }
-        return library.addToCollection([entry.id], collection, undoManager: entry.undoManager)
+        return library.addToCollection([entry.id], collection, undoManager: nil)
     }
 
     /// Why the window stops waiting for the item it made.

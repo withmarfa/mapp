@@ -433,6 +433,7 @@ struct MainView: View {
                 #endif
                 isRestored = true
                 takeItemLink()
+                FrontBrowser.shared.takeHanded(into: browser, in: library)
             }
         }
         // A new item reaches a server's library when its source says so, which the window waits for to open it.

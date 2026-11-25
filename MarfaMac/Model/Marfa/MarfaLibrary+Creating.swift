@@ -5,6 +5,15 @@ extension MarfaLibrary {
         typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String], parentID: ItemID?,
         tier: Tier, undoManager: UndoManager?
     ) -> ItemID? {
+        createItem(
+            as: .mint(at: now()), typeID: typeID, title: title, body: body, properties: properties, tags: tags,
+            parentID: parentID, tier: tier, undoManager: undoManager)
+    }
+
+    func createItem(
+        as id: ItemID, typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String],
+        parentID: ItemID?, tier: Tier, undoManager: UndoManager?
+    ) -> ItemID? {
         let type = TypeID(typeID)
         let title = NameText.trimmed(title)
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : body
@@ -20,7 +29,6 @@ extension MarfaLibrary {
             notices.tell(cantCreate, String(localized: "Give the item a title."))
             return nil
         }
-        let id = ItemID.mint(at: now())
         let draft = ItemDraft(
             type: type, title: title, body: text, properties: properties, tags: Set(tags), tier: tier, parent: parentID)
         do {
@@ -30,13 +38,17 @@ extension MarfaLibrary {
             return nil
         }
         submitCreate(id, draft, failing: cantCreate)
+        registerNewItemUndo(id, undoManager: undoManager)
+        return id
+    }
+
+    func registerNewItemUndo(_ id: ItemID, undoManager: UndoManager?) {
         let name = String(localized: "New Item")
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             library.gatheringSkips(failing: name) {
                 library.setStates([id: (from: .active, to: .trashed)], name: name, undoManager: undoManager)
             }
         }
-        return id
     }
 
     func wasRefused(creating id: ItemID) -> Bool {

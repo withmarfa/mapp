@@ -86,6 +86,15 @@ extension MarfaLibrary {
         reindex()
         isLoaded = true
         LaunchTrace.shared.mark(.firstLoaded)
+        Task { await readServerKey() }
+    }
+
+    /// Keys what this Mac keeps for the library by the instance the copy holds, never by its address, which another
+    /// server can take over. Until the copy has read its instance, the key stays as it was.
+    func readServerKey() async {
+        guard let id = await instanceID(), !id.isEmpty else { return }
+        let key = "instance:" + id.lowercased()
+        if serverKey != key { serverKey = key }
     }
 
     /// One step of the source, taken in at once, so each revision moves at most once for it.

@@ -112,6 +112,11 @@ final class QuickAdd {
         var tier: Tier = .library
         /// The words naming a day that the person took back from the line, which stay text.
         var declinedDay: String?
+        /// Values typed for fields the kind now lacks, by key, kept and not sent, which come back when the kind
+        /// changes to one that has the field.
+        var setAside: [String: PropertyValue] = [:]
+        /// A parent the kind now cannot have, kept and not sent, which comes back for a kind that can.
+        var setAsideParent: ItemID?
 
         /// The values the person set or changed: every one but a value the kind gave and nobody touched.
         var typedProperties: [String: PropertyValue] {
@@ -122,7 +127,7 @@ final class QuickAdd {
         /// added.
         var hasContent: Bool {
             !NameText.trimmed(title).isEmpty || !isBlank(body) || !files.isEmpty || parentID != nil
-                || !typedProperties.isEmpty || !chips.isEmpty || !tags.isEmpty
+                || !typedProperties.isEmpty || !chips.isEmpty || !tags.isEmpty || !setAside.isEmpty || setAsideParent != nil
         }
 
         /// What the clipboard is given when the draft cannot be added: the title, then the body, then the values and
@@ -207,12 +212,17 @@ final class QuickAdd {
     /// made by `make`. Answers whether a kept draft came back.
     @discardableResult
     func begin(in library: any ItemLibrary, make: () -> Draft?) -> Bool {
+        drafts.notices = library.notices
         // A draft added in an earlier run that the library refused is offered again first.
         drafts.settle(in: library)
         if let kept = drafts.take(.line, in: library.serverKey) {
             entry = kept.id
             draft = kept.draft
-            if kept.returned { lastAdded = String(localized: "The item wasn’t added. What you typed is back.") }
+            if kept.interrupted {
+                lastAdded = String(localized: "The app quit while this file was being added. Check that it isn’t in the library before you add it again.")
+            } else if kept.returned {
+                lastAdded = String(localized: "The item wasn’t added. What you typed is back.")
+            }
             if !kept.missingFiles.isEmpty {
                 library.notices.tell(
                     String(localized: "File Not Found"),
@@ -224,6 +234,18 @@ final class QuickAdd {
         entry = drafts.make(.line, made, in: library.serverKey)
         draft = made
         return false
+    }
+
+    /// Takes the draft `id` another holder let go, as the line over another app hands its draft to a window's text
+    /// form. An empty draft this window held is let go first. Answers whether it was taken.
+    func take(_ id: UUID, in library: any ItemLibrary) -> Bool {
+        guard !holdsContent, let kept = drafts.take(id, in: library.serverKey) else { return false }
+        if let entry { drafts.drop(entry) }
+        drafts.notices = library.notices
+        entry = kept.id
+        draft = kept.draft
+        listDrafts = [:]
+        return true
     }
 
     /// Takes back a draft the library refused, where this window holds nothing typed, and says why it came back.
@@ -321,6 +343,8 @@ final class QuickAdd {
             kept.chips.removeAll { sending.chips.contains($0) }
             kept.tags.removeAll { sending.tags.contains($0) }
             drafts.update(entry, kept)
+            // What stays is no longer the file on its way.
+            drafts.notSent(entry)
         }
         if let entry { drafts.release(entry) }
         entry = nil
@@ -335,8 +359,40 @@ final class QuickAdd {
         notices.notKept(String(localized: "Entry Not Added"), text: lists.joined(separator: "\n"), reason: reason)
     }
 
-    fileprivate func saving(_ draft: Draft?) { sending = draft }
+    fileprivate func saving(_ draft: Draft?) {
+        sending = draft
+        guard let entry else { return }
+        if draft != nil { drafts.sendingFile(entry) }
+    }
+    /// The create about to be made from the draft, kept first (`NewItemDrafts.sending`). False where the draft is kept
+    /// nowhere, so nothing would follow the create.
+    fileprivate func willCreate(_ item: ItemID) -> Bool {
+        guard let entry else { return false }
+        return drafts.sending(entry, as: item)
+    }
+    /// The library made nothing, so the draft stays as typed.
+    fileprivate func notCreated() {
+        if let entry { drafts.notSent(entry) }
+    }
     fileprivate func checking(parent: Bool) { checkingParent = parent }
+
+    /// Tells the person what an added draft held for fields or a parent its kind lacks, which was not sent, with it
+    /// on the clipboard.
+    static func tellSetAside(_ draft: Draft, in library: any ItemLibrary) {
+        var lines: [String] = []
+        let fields = library.catalogue.itemTypes.values.flatMap(\.fields)
+        for (key, value) in draft.setAside.sorted(by: { $0.key < $1.key }) {
+            let field = fields.first { $0.key == key }
+            lines.append("\(field?.label ?? key): \(field.map { valueText(value, in: $0) } ?? ItemValueText.string(value))")
+        }
+        if let parent = draft.setAsideParent {
+            lines.append("\(String(localized: "Parent")): \(library.item(parent)?.displayTitle ?? parent.rawValue)")
+        }
+        guard !lines.isEmpty else { return }
+        library.notices.notKept(
+            String(localized: "Not Added to the Item"), text: lines.joined(separator: "\n"),
+            reason: String(localized: "The kind of item added can’t hold these, so they were left out."))
+    }
 
     // MARK: What is remembered
 
@@ -354,7 +410,8 @@ final class QuickAdd {
 
     /// Whether New Item can open the panel: the library is read and offers a kind to make.
     static func isAvailable(in library: any ItemLibrary) -> Bool {
-        guard library.isLoaded else { return false }
+        // A draft is kept for one instance, so none is begun before the library knows which it reads.
+        guard library.isLoaded, !library.serverKey.isEmpty else { return false }
         let catalogue = library.catalogue
         return catalogue.itemTypes[.file] != nil || catalogue.itemTypes.keys.contains(where: catalogue.isCreatable)
     }
@@ -575,26 +632,45 @@ extension Browser {
         quickAdd.isPresented = true
     }
 
+    /// Opens the draft `id` another holder let go in this window's text form, where this window holds nothing typed.
+    /// Answers whether it did.
+    func openHandedNewItem(_ id: UUID, in library: any ItemLibrary) -> Bool {
+        guard quickAdd.take(id, in: library) else { return false }
+        openNewItem(form: .text, in: library)
+        return true
+    }
+
     /// Moves the draft from the line to the text form, as Add Text does, with everything typed.
     func handOverToTextForm() {
         quickAdd.form = .text
         quickAdd.lastAdded = nil
     }
 
-    /// Changes the kind of item, keeping what was typed and the files given. A place, property or chip the new
-    /// kind cannot take is dropped.
+    /// Changes the kind of item, keeping what was typed and the files given. A value or parent the new kind cannot
+    /// take is set aside in the draft, not sent, and comes back when the kind changes to one that can; an Add that
+    /// leaves it behind says so (`QuickAdd.tellSetAside`).
     func chooseQuickAddType(_ typeID: String, in library: any ItemLibrary) {
         guard var draft = quickAdd.draft else { return }
         draft.typeID = typeID
         let keys = Set(QuickAdd.fields(of: typeID, in: library.catalogue).map(\.key))
         // What the last kind gave goes with it, unless the person changed it; then the new kind gives its own.
         for (key, value) in draft.prefilled where draft.properties[key] == value { draft.properties[key] = nil }
+        for (key, value) in draft.properties where !keys.contains(key) && value != .null { draft.setAside[key] = value }
         draft.properties = draft.properties.filter { keys.contains($0.key) }
+        for (key, value) in draft.setAside where keys.contains(key) && draft.properties[key] == nil {
+            draft.properties[key] = value
+            draft.add(.field(key))
+            draft.setAside[key] = nil
+        }
         draft.prefilled = draft.declinedPrefill
             ? [:] : QuickAdd.prefill(of: typeID, in: library.catalogue).filter { draft.properties[$0.key] == nil }
         draft.properties.merge(draft.prefilled) { current, _ in current }
-        if let parent = draft.parentID, !library.creationParentCandidates(typeID: typeID).contains(where: { $0.id == parent }) {
+        if let parent = draft.parentID, !library.admitsCreationParent(parent, typeID: typeID) {
+            draft.setAsideParent = parent
             draft.parentID = nil
+        } else if draft.parentID == nil, let parent = draft.setAsideParent, library.admitsCreationParent(parent, typeID: typeID) {
+            draft.setParent(parent)
+            draft.setAsideParent = nil
         }
         draft.chips = draft.chips.filter { chip in
             switch chip {
@@ -700,28 +776,47 @@ extension Browser {
         defer { interval.end() }
         let catalogue = library.catalogue
         let isFile = QuickAdd.isFile(draft.typeID, in: catalogue)
-        let startsGroup = undoManager?.groupingLevel == 0
+        var startsGroup = undoManager?.groupingLevel == 0
         let id: ItemID?
         if isFile, let file = draft.files.first {
             quickAdd.saving(draft)
             let title = NameText.trimmed(draft.title)
             id = await library.addFile(file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, tier: draft.tier)
             quickAdd.saving(nil)
-            guard let id else { return nil }
+            guard let id else {
+                quickAdd.notCreated()
+                return nil
+            }
+            // The file is a step of its own, as a created item is, so the toast's Undo takes back this file.
+            startsGroup = undoManager?.groupingLevel == 0
+            let opensGroup = startsGroup && undoManager?.groupsByEvent == false
+            if opensGroup { undoManager?.beginUndoGrouping() }
+            library.registerNewItemUndo(id, undoManager: undoManager)
+            if opensGroup { undoManager?.endUndoGrouping() }
             // The person may have changed the draft while the file was sent; only the file sent is taken from it.
             guard quickAdd.draft == draft else {
+                quickAdd.notCreated()
                 quickAdd.draft?.files.removeAll { $0 == file }
                 return id
             }
         } else {
+            // Kept as sent before it is made, so a crash or a held-up write never makes it twice.
+            let made = ItemID.mint(at: now)
+            guard quickAdd.willCreate(made) else { return nil }
             let opensGroup = startsGroup && undoManager?.groupsByEvent == false
             if opensGroup { undoManager?.beginUndoGrouping() }
             id = library.createItem(
-                typeID: draft.typeID, title: draft.title, body: draft.body, properties: draft.properties.filter { $0.value != .null },
-                tags: draft.tags, parentID: draft.parentID, tier: draft.tier, undoManager: undoManager)
+                as: made, typeID: draft.typeID, title: draft.title, body: draft.body,
+                properties: draft.properties.filter { $0.value != .null }, tags: draft.tags, parentID: draft.parentID,
+                tier: draft.tier, undoManager: undoManager)
             if opensGroup { undoManager?.endUndoGrouping() }
+            if id == nil { quickAdd.notCreated() }
         }
         guard let id else { return nil }
+        // This add's own step, which the create or the file registered just now in a group of its own, and never
+        // whatever was on top before it.
+        let step = startsGroup ? undoManager.map { StepUndo(undoManager: $0) } : nil
+        QuickAdd.tellSetAside(draft, in: library)
         NewItemRecents.remember(kind: draft.typeID, tags: draft.tags, parent: draft.parentID, for: library.serverKey, in: defaults)
         quickAdd.added(as: id)
         let keepsText = !isFile && QuickAdd.hasBody(draft.typeID, in: catalogue)
@@ -730,7 +825,7 @@ extension Browser {
         let entry = NewItem(
             id: id, typeID: draft.typeID, library: library, caret: keepsText ? draft.pageCaret : nil, isFile: isFile,
             attachments: isFile ? [] : draft.files, embedsInText: keepsText, collection: collection,
-            opening: opening ? ItemOpening.stored(in: defaults) : nil, undoManager: undoManager)
+            opening: opening ? ItemOpening.stored(in: defaults) : nil)
         newItems.append(entry)
         if opening {
             quickAdd.isPresented = false
@@ -744,7 +839,6 @@ extension Browser {
             if !restored { chooseQuickAddType(draft.typeID, in: library) }
             let name = NameText.trimmed(draft.title).isEmpty ? catalogue.label(for: TypeID(draft.typeID)) : NameText.trimmed(draft.title)
             let words = String(localized: "Added “\(name)”")
-            let step = startsGroup ? undoManager.flatMap { $0.canUndo ? StepUndo(undoManager: $0) : nil } : nil
             if let toasts {
                 var undo: (@MainActor () -> Void)?
                 if let step { undo = { step.perform() } }
@@ -760,4 +854,6 @@ extension Browser {
         finishNewItems(in: library)
         return id
     }
+
 }
+

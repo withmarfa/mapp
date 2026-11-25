@@ -720,7 +720,6 @@ import os
                 guard let self, self.connection == connection else { return }
                 readName(of: connection)
             })
-        library.serverKey = Libraries.libraryKey(for: connection.address)
         self.library = library
         libraryChanged(library)
         if let origin = (try? connection.server(key: ""))?.plainHTTPOrigin, Self.toldPlainHTTP.withLock({ $0.insert(origin).inserted }) {

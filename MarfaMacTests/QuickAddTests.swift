@@ -631,7 +631,7 @@ struct QuickAddTests {
         #expect(kind(remembered: "no.such") == "core.note")
     }
 
-    @Test func changingTheKindDropsWhatItCannotTake() {
+    @Test func changingTheKindSetsAsideWhatItCannotTakeUntilAKindCanAgain() {
         let library = FakeItemLibrary(now: start)
         let browser = Browser()
         browser.openNewItem(kind: "core.task", form: .text, in: library)
@@ -639,7 +639,23 @@ struct QuickAddTests {
         browser.quickAdd.draft?.properties = ["priority": .string("high")]
         browser.chooseQuickAddType("core.note", in: library)
         #expect(browser.quickAdd.draft?.title == "Kept")
-        #expect(browser.quickAdd.draft?.properties.isEmpty == true)
+        #expect(browser.quickAdd.draft?.properties.isEmpty == true, "not sent with a note")
+        #expect(browser.quickAdd.draft?.setAside == ["priority": .string("high")])
+
+        browser.chooseQuickAddType("core.task", in: library)
+        #expect(browser.quickAdd.draft?.properties["priority"] == .string("high"))
+        #expect(browser.quickAdd.draft?.setAside.isEmpty == true)
+    }
+
+    @Test func anAddThatLeavesASetAsideValueBehindSaysSoAndCopiesIt() async throws {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openNewItem(kind: "core.task", form: .text, in: library)
+        browser.quickAdd.draft?.title = "Kept"
+        browser.quickAdd.draft?.properties = ["priority": .string("high")]
+        browser.chooseQuickAddType("core.note", in: library)
+        _ = try #require(await browser.saveQuickAdd(in: library, undoManager: nil, opening: false))
+        #expect(library.notices.waiting.last?.title == "Not Added to the Item")
     }
 
     // MARK: Chips
@@ -735,6 +751,10 @@ struct QuickAddTests {
         browser.chooseQuickAddType("core.note", in: library)
         #expect(browser.quickAdd.draft?.chips.isEmpty == true)
         #expect(browser.quickAdd.draft?.parentID == nil)
+        #expect(browser.quickAdd.draft?.setAsideParent == project.id, "kept, not sent")
+
+        browser.chooseQuickAddType("core.task", in: library)
+        #expect(browser.quickAdd.draft?.parentID == project.id)
     }
 
     @Test func anItemIsMadeWithTheValuesAndParentOfItsChips() async throws {
@@ -879,7 +899,7 @@ struct QuickAddTests {
         #expect(QuickAdd.offeredChips(draft, in: Self.fileCatalogue, canHaveParent: true) == [.parent])
     }
 
-    @Test func changingTheKindToFileDropsTheFieldsAndKeepsTheParent() {
+    @Test func changingTheKindToFileSetsAsideTheFieldsAndKeepsTheParent() {
         let library = FakeItemLibrary(now: start)
         let project = project(in: library)
         library.parentCandidates["core.task"] = [project.id]
@@ -892,6 +912,7 @@ struct QuickAddTests {
 
         browser.chooseQuickAddType(TypeID.file.rawValue, in: library)
         #expect(browser.quickAdd.draft?.properties.isEmpty == true)
+        #expect(browser.quickAdd.draft?.setAside["priority"] == .string("high"))
         #expect(browser.quickAdd.draft?.chips == [.parent])
         #expect(browser.quickAdd.draft?.parentID == project.id)
     }

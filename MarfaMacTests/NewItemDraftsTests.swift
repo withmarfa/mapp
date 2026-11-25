@@ -154,13 +154,115 @@ struct NewItemDraftsTests {
         #expect(kept.missingFiles == ["Gone.pdf"])
     }
 
-    @Test func anUnreadableFileIsSetAsideNeverRemoved() throws {
+    @Test func everyUnreadableFileIsSetAsideUnderANameOfItsOwn() throws {
         let files = TestFiles()
         let file = files.directory.appending(path: "Drafts.json")
-        try Data("not json".utf8).write(to: file)
+        try Data("first".utf8).write(to: file)
+        #expect(!NewItemDrafts(file: file).holdsDraft(.line, in: "a"))
+        try Data("second".utf8).write(to: file)
+        _ = NewItemDrafts(file: file)
+
+        let aside = try FileManager.default.contentsOfDirectory(at: files.directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("Drafts unreadable ") }
+        #expect(Set(try aside.map { try String(contentsOf: $0, encoding: .utf8) }) == ["first", "second"])
+    }
+
+    // MARK: Marfa's answer
+
+    /// A draft added as `item` in library "a", the way an Add writes it before the create.
+    static func sent(_ title: String, as item: ItemID, in drafts: NewItemDrafts, files: [QuickAdd.File] = []) -> UUID {
+        let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.task"), in: "a")
+        var draft = typed(title)
+        draft.files = files
+        drafts.update(id, draft)
+        #expect(drafts.sending(id, as: item))
+        drafts.added(id, as: item)
+        return id
+    }
+
+    static func problem(_ kind: SyncProblemEntry.Kind, creating item: ItemID) -> SyncProblemEntry {
+        SyncProblemEntry(id: .write("w"), itemID: item, kind: kind, change: .create, content: SyncContent(title: "Held up"), actions: [])
+    }
+
+    @Test func theCopysOwnRowForACreateIsNoAnswer() throws {
+        let library = FakeItemLibrary()
+        library.serverKey = "a"
+        let drafts = NewItemDrafts(file: nil)
+        let item = try #require(library.createItem(
+            typeID: "core.task", title: "Offline", body: "", properties: [:], tags: [], parentID: nil, tier: .library, undoManager: nil))
+        let index = try #require(library.items.firstIndex { $0.id == item })
+        library.items[index].sync = .waiting
+        _ = Self.sent("Offline", as: item, in: drafts)
+
+        drafts.settle(in: library)
+        #expect(!drafts.holdsDraft(.line, in: "a"), "waiting to be sent, it is neither back nor gone")
+        library.items[index].sync = .settled
+        drafts.settle(in: library)
+        library.refusedCreations = [item]
+        drafts.settle(in: library)
+        #expect(drafts.takeReturned(.line, in: "a") == nil, "accepted, the draft is gone")
+    }
+
+    @Test func aHeldUpCreateStaysHiddenAndARefusedOneComesBackWithItsFiles() throws {
+        let disk = TestFiles()
+        let library = FakeItemLibrary()
+        library.serverKey = "a"
+        library.holdsCreations = true
+        let drafts = NewItemDrafts(file: nil)
+        let item = ItemID.mint()
+        let attached = try disk.file("Plan.pdf")
+        _ = Self.sent("Held up", as: item, in: drafts, files: [attached])
+        library.syncReport.problems = [Self.problem(.blocked(.failingAlone), creating: item)]
+        drafts.settle(in: library)
+        #expect(drafts.takeReturned(.line, in: "a") == nil, "a held-up create may still be made, so it is not given back")
+
+        library.syncReport.problems = [Self.problem(.refused, creating: item)]
+        drafts.settle(in: library)
+        let back = try #require(drafts.takeReturned(.line, in: "a"))
+        #expect(back.draft.files == [attached])
+    }
+
+    @Test func aCreateFromAnEarlierRunIsSettledByTheCopyOnLaunch() throws {
+        let disk = TestFiles()
+        let file = disk.directory.appending(path: "Drafts.json")
+        let queued = ItemID.mint()
+        let lost = ItemID.mint()
+        do {
+            let drafts = NewItemDrafts(file: file)
+            _ = Self.sent("Queued", as: queued, in: drafts)
+            // The app stopped after writing the draft and before the create was queued.
+            let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.task"), in: "a")
+            drafts.update(id, Self.typed("Never queued"))
+            #expect(drafts.sending(id, as: lost))
+        }
+        let library = FakeItemLibrary()
+        library.serverKey = "a"
+        library.items = [Item(
+            id: queued, type: TypeID("core.task"), title: "Queued", titleRule: .property("title"), version: ItemVersion(1),
+            created: .now, modified: .now, sync: .waiting)]
+        let reopened = NewItemDrafts(file: file)
+        reopened.settle(in: library)
+        let back = try #require(reopened.takeReturned(.line, in: "a"))
+        #expect(back.draft.title == "Never queued")
+        #expect(reopened.takeReturned(.line, in: "a") == nil, "the queued create stays hidden, so it is never made twice")
+    }
+
+    @Test func aDraftThatCantBeWrittenIsToldOnceAndWrittenOnceItCanBe() throws {
+        let disk = TestFiles()
+        let blocker = disk.url("Blocker")
+        let file = blocker.appending(path: "Drafts.json")
+        let notices = Notices()
         let drafts = NewItemDrafts(file: file)
-        #expect(!drafts.holdsDraft(.line, in: "a"))
-        let aside = files.directory.appending(path: "Drafts.unreadable.json")
-        #expect(try Data(contentsOf: aside) == Data("not json".utf8))
+        drafts.notices = notices
+        let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.task"), in: "a")
+        drafts.update(id, Self.typed("One"))
+        drafts.update(id, Self.typed("Two"))
+        #expect(notices.told == 1)
+
+        try FileManager.default.removeItem(at: blocker)
+        drafts.update(id, Self.typed("Three"))
+        drafts.release(id)
+        #expect(NewItemDrafts(file: file).take(.line, in: "a")?.draft.title == "Three")
+        #expect(notices.told == 1)
     }
 }

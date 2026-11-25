@@ -56,9 +56,13 @@ final class NewItemAnywhere {
         panel.makeKeyAndOrderFront(nil)
     }
 
-    /// Puts the line away. A draft with something typed stays kept for the next line; the other app has the keyboard back.
+    /// Puts the line away. A draft with something typed stays kept for the next line. The other app has the keyboard
+    /// back only where the line still had it and that app is still the one in front (`returnsFocus`).
     func close(returningFocus: Bool = true) {
         guard let panel else { return }
+        let returns = returningFocus && Self.returnsFocus(
+            panelIsKey: panel.isKeyWindow, previous: previous?.processIdentifier,
+            front: NSWorkspace.shared.frontmostApplication?.processIdentifier)
         if let browser, let library {
             browser.putAwayQuickAdd()
             browser.quickAdd.leave(because: .closed, telling: library.notices)
@@ -69,8 +73,16 @@ final class NewItemAnywhere {
         browser = nil
         library = nil
         undoManager.removeAllActions()
-        if returningFocus { previous?.activate() }
+        if returns { previous?.activate() }
         previous = nil
+    }
+
+    /// Whether putting the line away gives the keyboard back to the app it opened over: only while the line held the
+    /// keyboard, so never after the person went elsewhere, and only while that app is still the one in front, so
+    /// one they have since chosen is never pushed behind it.
+    nonisolated static func returnsFocus(panelIsKey: Bool, previous: pid_t?, front: pid_t?) -> Bool {
+        guard panelIsKey, let previous else { return false }
+        return front == previous
     }
 
     /// Add and Open: the item opens in the app's front window, as the person set Open Items.
@@ -84,11 +96,18 @@ final class NewItemAnywhere {
         window.finishNewItems(in: library)
     }
 
-    /// Add Text, or a value the line has no place for: the draft, kept as typed, opens in the front window's text form.
+    /// Add Text, or a value the line has no place for: this line's own draft, kept as typed, opens in a window's text
+    /// form (`FrontBrowser.hand`), never another draft a window holds.
     private func handOverToTextForm(in library: any ItemLibrary) {
+        let handed = browser?.quickAdd.holdsContent == true ? browser?.quickAdd.entry : nil
         close(returningFocus: false)
-        NSApp.activate()
-        FrontBrowser.shared.last?.openNewItem(form: .text, in: library)
+        if let handed {
+            FrontBrowser.shared.hand(handed, in: library)
+        } else {
+            // Nothing typed to hand over, so the window's text form opens as it would.
+            NSApp.activate()
+            FrontBrowser.shared.last?.openNewItem(form: .text, in: library)
+        }
     }
 
     /// In the upper third of the screen the pointer is on, centred across it.

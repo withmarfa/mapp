@@ -106,7 +106,8 @@ import Observation
     /// How the server stands, for the app to show beside the library. The library is the one subscriber to the
     /// source's states; the host reads this while the copy is open.
     private(set) var connection: MarfaConnectionState
-    /// Set by the host that opened the library for its server (`ItemLibrary.serverKey`).
+    /// Read from the copy each time it is read whole (`readServerKey`), so a server replaced at the same address finds
+    /// nothing the old one's library kept (`ItemLibrary.serverKey`).
     var serverKey = ""
     let now: () -> Date
 

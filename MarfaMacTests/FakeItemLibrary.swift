@@ -393,18 +393,17 @@ final class FakeItemLibrary: ItemLibrary {
     /// The tags each create was sent with, by item.
     private(set) var createdTags: [ItemID: [String]] = [:]
     /// The library a draft names, which a test sets to tell two apart.
-    var serverKey = ""
+    var serverKey = "fake"
 
     func createItem(
-        typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String], parentID: ItemID?,
-        tier: Tier, undoManager: UndoManager?
+        as id: ItemID, typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String],
+        parentID: ItemID?, tier: Tier, undoManager: UndoManager?
     ) -> ItemID? {
         guard !title.isEmpty || !properties.isEmpty || !body.isEmpty else { return nil }
         guard !refusesCreations else {
             notices.tell("Can’t Create Item", "Refused")
             return nil
         }
-        let id = ItemID.mint()
         let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", from: id, to: .item($0), origin: .property("child-of")) }
         let item = Item(
             id: id, type: TypeID(typeID), title: title, titleRule: .property("title"),
@@ -415,6 +414,7 @@ final class FakeItemLibrary: ItemLibrary {
         bodies[item.id] = body
         created.append(item)
         if !holdsCreations { deliverCreated() }
+        registerNewItemUndo(item.id, undoManager: undoManager)
         return item.id
     }
 
@@ -590,6 +590,11 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func moreItemsTaken(with ids: Set<ItemID>) async -> Int? { nil }
+
+    func registerNewItemUndo(_ id: ItemID, undoManager: UndoManager?) {
+        undoManager?.registerUndo(withTarget: self) { library in library.delete([id], undoManager: nil) }
+        undoManager?.setActionName("New Item")
+    }
 
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         let plan = deletePlan(ids)

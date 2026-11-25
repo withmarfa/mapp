@@ -254,6 +254,100 @@ struct NewItemLineTests {
         #expect(NewItemRecents.stored(for: "one", in: defaults) == NewItemRecents())
         #expect(defaults.array(forKey: NewItemRecents.setAsideKey) as? [Data] == [Data("not json".utf8)])
     }
+
+    // MARK: Kinds, tags, parents and the any-app line
+
+    @Test func aPastedAddressSetsAsideWhatTheTaskHeldUntilItIsATaskAgain() {
+        let library = Self.library()
+        let browser = Self.line(in: library)
+        browser.quickAdd.draft?.properties["status"] = .string("done")
+        Self.type("https://example.com/read", into: browser, in: library)
+        #expect(browser.quickAdd.draft?.typeID == MarfaMapping.bookmarkType.rawValue)
+        #expect(browser.quickAdd.draft?.setAside["status"] == .string("done"))
+
+        browser.chooseQuickAddType("core.task", in: library)
+        #expect(browser.quickAdd.draft?.properties["status"] == .string("done"))
+    }
+
+    @Test func aFilesUndoTakesBackThatFileAndNotTheItemBefore() async throws {
+        let disk = TestFiles()
+        let library = Self.library()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let browser = Self.line(in: library)
+        Self.type("First", into: browser, in: library)
+        let first = try #require(await Self.add(browser, in: library, undoManager: undo))
+        browser.chooseQuickAddType(TypeID.file.rawValue, in: library)
+        browser.quickAdd.draft?.files = [try disk.file("photo.png")]
+        let file = try #require(await Self.add(browser, in: library, undoManager: undo))
+
+        try #require(browser.quickAdd.lastUndo).perform()
+        #expect(library.item(file)?.state == .trashed)
+        #expect(library.item(first)?.state == .active)
+    }
+
+    @Test func favoriteIsNeverOfferedOrTakenAsANewTag() {
+        let library = Self.library()
+        let browser = Self.line(in: library)
+        let draft = browser.quickAdd.draft!
+        #expect(QuickAdd.tagOffers(ItemTag.favorite, draft: draft, recents: [], in: library).new == nil)
+        #expect(QuickAdd.tagOffers("work", draft: draft, recents: [], in: library).new == "work")
+        browser.chooseLineMatch(.tag(ItemTag.favorite), in: library)
+        Self.type("Star #\(ItemTag.favorite) ", into: browser, in: library)
+        #expect(browser.quickAdd.draft?.tags.isEmpty == true)
+    }
+
+    @Test func parentsAreTheBestSixByNameWithRecentsFirst() {
+        let names = ["Delta", "alpha", "Charlie", "Echo", "Bravo", "Golf", "Foxtrot", "Hotel", "Zulu"]
+        let items = names.map { name in
+            Item(id: .mint(), type: TypeID("test.project"), title: name, name: name, titleRule: .property("title"),
+                 version: ItemVersion(1), created: Self.start, modified: Self.start)
+        }
+        let zulu = items.last!.id
+        let best = QuickAdd.bestParents(items, matching: "", first: [zulu], limit: 6)
+        #expect(best.map(\.displayTitle) == ["Zulu", "alpha", "Bravo", "Charlie", "Delta", "Echo"])
+        #expect(QuickAdd.bestParents(items, matching: "o", first: [], limit: 6).map(\.displayTitle) == ["Bravo", "Echo", "Foxtrot", "Golf", "Hotel", "Zulu"])
+    }
+
+    @Test func parentsComeQuicklyFromFiftyThousandItems() {
+        let items = (0..<50_000).map { index in
+            Item(id: .mint(), type: TypeID("test.project"), title: "Project \(index)", name: "Project \(index)",
+                 titleRule: .property("title"), version: ItemVersion(1), created: Self.start, modified: Self.start)
+        }
+        let clock = ContinuousClock()
+        let took = clock.measure { _ = QuickAdd.bestParents(items, matching: "9", first: [], limit: 6) }
+        #expect(took < .milliseconds(500), "took \(took)")
+    }
+
+    @Test func theLineGivesTheKeyboardBackOnlyWhileItHadItAndTheAppIsStillInFront() {
+        #expect(NewItemAnywhere.returnsFocus(panelIsKey: true, previous: 10, front: 10))
+        #expect(!NewItemAnywhere.returnsFocus(panelIsKey: false, previous: 10, front: 10), "the person went elsewhere")
+        #expect(!NewItemAnywhere.returnsFocus(panelIsKey: true, previous: 10, front: 20), "another app is in front now")
+        #expect(!NewItemAnywhere.returnsFocus(panelIsKey: true, previous: nil, front: 20))
+    }
+
+    @Test func addTextOpensTheLinesOwnDraftAndLeavesAWindowsDraftAlone() throws {
+        let library = Self.library()
+        let drafts = NewItemDrafts(file: nil)
+        let window = Browser()
+        window.quickAdd.drafts = drafts
+        window.openNewItem(kind: "core.task", form: .text, in: library)
+        window.quickAdd.draft?.title = "The window's own"
+        let line = Browser()
+        line.quickAdd.drafts = drafts
+        line.openNewItem(kind: "core.task", form: .line, in: library)
+        line.quickAdd.draft?.title = "Typed over another app"
+        let handed = try #require(line.quickAdd.entry)
+        line.quickAdd.leave(because: .closed, telling: library.notices)
+
+        #expect(!window.openHandedNewItem(handed, in: library), "a window holding its own draft is left alone")
+        #expect(window.quickAdd.draft?.title == "The window's own")
+        let other = Browser()
+        other.quickAdd.drafts = drafts
+        #expect(other.openHandedNewItem(handed, in: library))
+        #expect(other.quickAdd.draft?.title == "Typed over another app")
+        #expect(other.quickAdd.form == .text)
+    }
 }
 
 /// The line's Add against the real library: one undo step named as every new item is, and the toast's words.
@@ -262,9 +356,10 @@ struct NewItemLineTests {
 struct NewItemLineUndoTests {
     @Test func eachAddIsOneNewItemStepThatItsUndoTakesBack() async throws {
         let source = FakeItemSource()
+        source.heldInstanceID.withLock { $0 = "Instance-A" }
         let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: [], catalogue: FakeItemLibrary.testCatalogue)))
-        try #require(await eventually { library.isLoaded })
+        try #require(await eventually { library.serverKey == "instance:instance-a" })
         let undo = UndoManager()
         undo.groupsByEvent = false
         let browser = Browser()
@@ -288,5 +383,31 @@ struct NewItemLineUndoTests {
         #expect(undo.undoActionName == "New Item")
         undo.undo()
         #expect(!undo.canUndo, "two adds were two steps")
+    }
+
+    @Test func draftsAreKeptForTheInstanceNotTheAddressSoAReplacementFindsNone() async throws {
+        let drafts = NewItemDrafts(file: nil)
+        let old = FakeItemSource()
+        old.heldInstanceID.withLock { $0 = "old" }
+        let first = MarfaLibrary(source: old, notices: Notices())
+        old.send(.loaded(SourceSnapshot(items: [], catalogue: FakeItemLibrary.testCatalogue)))
+        try #require(await eventually { !first.serverKey.isEmpty })
+        let browser = Browser()
+        browser.quickAdd.drafts = drafts
+        browser.adopt(first)
+        browser.openNewItem(kind: "core.note", form: .line, in: first)
+        browser.quickAdd.draft?.title = "For the old server"
+        browser.quickAdd.leave(because: .libraryChanged, telling: first.notices)
+
+        let replacement = FakeItemSource()
+        let second = MarfaLibrary(source: replacement, notices: Notices())
+        replacement.send(.loaded(SourceSnapshot(items: [], catalogue: FakeItemLibrary.testCatalogue)))
+        try #require(await eventually { second.isLoaded })
+        #expect(!QuickAdd.isAvailable(in: second), "no new item before the copy names its instance")
+        replacement.heldInstanceID.withLock { $0 = "new" }
+        await second.readServerKey()
+        #expect(QuickAdd.isAvailable(in: second))
+        #expect(!drafts.holdsDraft(.line, in: second.serverKey))
+        #expect(drafts.holdsDraft(.line, in: first.serverKey))
     }
 }

@@ -47,12 +47,51 @@ extension QuickAdd {
     /// Takes the finished tags out of the line's words into the draft's tags. `finishing` (Add) takes a tag at the
     /// very end too. A word the library would refuse as a tag stays text.
     static func takeTags(_ draft: inout Draft, finishing: Bool, in library: any ItemLibrary) {
-        let taken = NewItemText.takeTags(from: draft.title, finishing: finishing) { word in
-            word == ItemTag.favorite || library.reservedTags.contains(word)
-        }
+        let taken = NewItemText.takeTags(from: draft.title, finishing: finishing) { !takesTag($0, in: library) }
         guard !taken.tags.isEmpty else { return }
         draft.title = taken.text
         for tag in taken.tags where !draft.tags.contains(tag) { draft.tags.append(tag) }
+    }
+
+    /// Whether the line makes `word` a tag, as typed and as offered in its tag row: a tag as the line reads one that
+    /// is neither Favorite's nor one the library sets itself.
+    static func takesTag(_ word: String, in library: any ItemLibrary) -> Bool {
+        NewItemText.isTag(word) && word != ItemTag.favorite && !library.reservedTags.contains(word)
+    }
+
+    /// What the tag row offers for the word after `#`: up to six tags the library knows, the recent first, and the word
+    /// itself as a new tag, only where the line would take it.
+    static func tagOffers(
+        _ query: String, draft: Draft, recents: [String], in library: any ItemLibrary
+    ) -> (known: [String], new: String?) {
+        let all = recents + library.knownTags.filter { !recents.contains($0) }
+        let known = all.filter { tag in
+            (query.isEmpty || tag.localizedStandardContains(query)) && !draft.tags.contains(tag) && takesTag(tag, in: library)
+        }
+        let new = !query.isEmpty && !known.contains(query) && !draft.tags.contains(query) && takesTag(query, in: library) ? query : nil
+        return (Array(known.prefix(6)), new)
+    }
+
+    /// The best `limit` of `candidates` whose name holds `query`: those in `first` in its order, then the rest by name.
+    /// One pass that keeps only the best so far, so a library of any size is never sorted whole.
+    static func bestParents(_ candidates: some Sequence<Item>, matching query: String, first: [ItemID], limit: Int) -> [Item] {
+        guard limit > 0 else { return [] }
+        let rank = Dictionary(first.enumerated().map { ($1, $0) }) { earlier, _ in earlier }
+        var leading: [(rank: Int, item: Item)] = []
+        var rest: [Item] = []
+        for item in candidates {
+            let name = item.displayTitle
+            guard query.isEmpty || name.localizedStandardContains(query) else { continue }
+            if let place = rank[item.id] {
+                leading.append((place, item))
+                continue
+            }
+            if rest.count == limit, let last = rest.last, name.localizedStandardCompare(last.displayTitle) != .orderedAscending { continue }
+            let at = rest.firstIndex { name.localizedStandardCompare($0.displayTitle) == .orderedAscending } ?? rest.endIndex
+            rest.insert(item, at: at)
+            if rest.count > limit { rest.removeLast() }
+        }
+        return Array((leading.sorted { $0.rank < $1.rank }.map(\.item) + rest).prefix(limit))
     }
 
     /// The draft as the line's Add sends it: the last tag taken, and a day found written to its field with its words
@@ -61,7 +100,7 @@ extension QuickAdd {
         takeTags(&draft, finishing: true, in: library)
         if let found = foundDay(in: draft, catalogue: library.catalogue, now: now, calendar: calendar, locale: locale) {
             draft.properties[found.field.key] = NewItemText.value(of: found.day, in: found.field, calendar: calendar)
-            draft.title = NewItemText.removing(found.day.phrase, from: draft.title)
+            draft.title = NewItemText.removing(found.day, from: draft.title)
         }
         draft.title = NameText.trimmed(draft.title)
     }
@@ -115,7 +154,9 @@ extension Browser {
         guard var draft = quickAdd.draft else { return }
         if let typing = NewItemText.typing(in: draft.title) { draft.title = typing.before }
         switch choice {
-        case .tag(let tag): if !draft.tags.contains(tag) { draft.tags.append(tag) }
+        case .tag(let tag):
+            guard QuickAdd.takesTag(tag, in: library) else { return }
+            if !draft.tags.contains(tag) { draft.tags.append(tag) }
         case .parent(let id): draft.setParent(id)
         case .field(let key): draft.add(.field(key))
         case .kind(let typeID):
