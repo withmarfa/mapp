@@ -23,20 +23,19 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 
 ## The head
 
-- **One head, built once.** `PageHead` decides the kicker, pins and rows; `editor/src/header.ts` draws them on a page with text, `PageHeadView` on a saved web page. There the rows show values and open links, with no menu or drag, and only the kicker's type opens Change Type. A rule added in one drawing must be added in the other.
-- **The kicker** is the type's mark and name, then Read Only with a lock, Feed or Archived where true. It is a heading. The type's name opens Change Type where the item can change type.
+- **One head, built once.** `PageHead` decides the kicker, pins and rows; `editor/src/header.ts` draws them on a page with text, `PageHeadView` on a saved web page, which has no menu or drag. A rule added in one drawing must be added in the other.
+- **The kicker** is the type's mark and name, then Read Only, Feed or Archived where true. Its name opens Change Type where the item can change type.
 - **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset and hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
-- **A type that keeps no text shows its first six rows,** empty or not.
+- **A type that keeps no text shows its first six rows.**
 - **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
 - **An event's time is one row, When,** always first, with how far off it is or All Day in grey.
 - **Long text stops after two lines;** an email, a phone and a number to call open.
 - **A value is cut, never reworded,** and a linked item that cannot be read, is gone or is in the bin shows nothing, never an id.
-- **The head is never drawn again while the person types,** and a rebuild keeps the caret and the text's undo (`EditorController.showHeader`).
 - **Once the head is out of sight** the page says so with the item, title and mark (`DetailsPresentation.scrolledHead`).
 
 ## A row's menu
 
-`FieldMenu` is the rule; a row's name, or a right-click on the row, opens it: Show When It Has a Value, Always Show, Hide on <Type> Pages (and Pin Under the Title while pinned properties are on), then Move Up and Move Down, then the field's own entries. A field Marfa or a plugin provides says so last instead.
+`FieldMenu` is the rule, and a row's name or a right-click opens it.
 
 - **How a row shows belongs to the type** (`PagePlacements`, `RowShows`) and changes no item, so a read-only item can be arranged.
 - **Text is 15 points by default** (title 28 on 34), in steps of 13 to 24; a stored 11 or 12 reads as the nearest.
@@ -44,13 +43,13 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 
 ## The panel beside the page
 
-- **It is white behind a hairline and closed by default,** with a pill for each part the item has: Outline, Links, Info. One part has no pills.
-- **A type remembers its pill** (`PanelParts`). A part the item lacks is not shown. With none remembered, the part is chosen once when the item opens.
+- **It is white behind a hairline and closed by default,** with a pill for each of Outline, Links and Info the item has. One part has no pills.
+- **A type remembers its pill** (`PanelParts`). A part the item lacks is not shown. With none remembered, one is chosen when the item opens.
 - **Outline shows only for an item with headings, or a PDF.**
-- **Links asks the server for nothing.** It uses edges the copy holds. A child, a collection's member and a file are left out of Referenced By, because each has a place, so an item with only sub-items has no Links pill. A link follows Open Items (`Browser.follow(link:)`).
-- **In is the last fact in Info,** a menu that moves the item between Library and Feed as the Keep and Move to Feed commands do (`ItemLibrary.perform`), and plain where it may not move.
-- **Who keeps the item is said once at the top of Info.** A connector that only reads in, or an item whose fields are locked (`Item.obstacle(to:)`), gives the Read Only reason; one that carries changes both ways says Synced With its name (`GET /plugins`, read once for a library).
-- **History is asked for only while Info shows** (`PanelHistory`): one read for each version while the item is among the eight latest. The first row is the version held now.
+- **Links asks the server for nothing.** It uses edges the copy holds. A child, a collection's member and a file are left out of Referenced By, because each has a place. A link follows Open Items (`Browser.follow(link:)`).
+- **In is the last fact in Info,** a menu that moves the item between Library and Feed (`ItemLibrary.perform`), and plain where it may not move.
+- **Who keeps the item is said once at the top of Info:** the Read Only reason (`Item.obstacle(to:)`), or Synced With a connector's name (`GET /plugins`, read once for a library).
+- **History is asked for only while Info shows** (`PanelHistory`), one read for each version while the item is among the eight latest.
 - **Properties, Relationships and Tags and a sync problem stay in Info** until the page's rows and notices carry them.
 - **What has been typed and not saved is kept** when the item changes or the panel closes (`ItemPropertyDraft`).
 
@@ -66,11 +65,10 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 
 ## Customize Layout
 
-- **A layout belongs to a type.** Every item of the type follows it, at once, in every window, and a child type does not inherit it.
-- **It changes no item**, so a read-only item can be laid out, and a lock does not stop it.
+- **A layout belongs to a type.** Every item of the type follows it, and a child type has its own.
 - **Linked From has one place,** the page's foot or the panel's Links.
 - **A type nobody customized has no entry** (`PagePlacements`), so a better default reaches it. Use Defaults removes the entry.
-- **Escape ends it, and Focus waits for it**, because it arranges the header that Focus hides.
+- **Escape ends it, and Focus waits for it**, because Focus hides what it arranges.
 - **Trap:** `Choice.pins` of nil means the default pins and an empty list means no pins. Treating one as the other pins properties that a person removed. `PagePlacement` gives the defaults.
 
 ## The corner
