@@ -4,9 +4,11 @@ import UniformTypeIdentifiers
 
 /// ⌘N and every New, unless Settings > General > New Opens says Text Form: one line that makes an item. The kind is
 /// the capsule at its start, which Tab moves on; `#` adds a tag, `@` a parent and `/` a property of the kind, each
-/// from a list of matches; a day typed is the item's due or start date; a pasted web address makes a bookmark. Return
-/// adds it and leaves the line open, empty, with the same kind; ⌘Return adds it and opens it; ⇧Return hands everything
-/// typed to the text form. Escape or a click outside puts it away, keeping what was typed (`NewItemDrafts`).
+/// from a list of matches in its row under the line; a day typed is the item's due or start date; a pasted web address
+/// makes a bookmark. What the line reads leaves the words for a chip after them, in the order made, and Delete puts
+/// the words back. Return adds it and leaves the line open, empty, with the same kind; ⌘Return adds it and opens it;
+/// ⇧Return hands everything typed to the text form. Escape or a click outside puts it away, keeping what was typed
+/// (`NewItemDrafts`).
 ///
 /// The window shows it over its content, with the window's toast; over another app it stands in a panel of its own
 /// (`NewItemAnywhere`), with an Added message and Undo in the panel.
@@ -14,6 +16,7 @@ struct NewItemLinePanel: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     @Environment(\.undoManager) private var windowUndo
+    @Environment(\.colorScheme) private var scheme
     let browser: Browser
     @Bindable var quickAdd: QuickAdd
     /// The window's toast, or nil over another app.
@@ -24,7 +27,16 @@ struct NewItemLinePanel: View {
     var opensElsewhere: ((ItemID, String) -> Void)?
     let onClose: () -> Void
 
-    @FocusState private var isFieldFocused: Bool
+    /// What has the keyboard: the title, or a chip the person chose, which Delete puts back into the title.
+    private enum LineFocus: Hashable {
+        case title
+        case chip(QuickAdd.Chip)
+    }
+
+    @FocusState private var focus: LineFocus?
+    @State private var titleSelection: TextSelection?
+    /// How wide the title's words are, so the chips stand right after them.
+    @State private var titleWidth: CGFloat = 0
     /// The match the arrow keys are on.
     @State private var highlighted = 0
     /// The property, by key, whose value panel is open.
@@ -41,27 +53,20 @@ struct NewItemLinePanel: View {
     private var undo: UndoManager? { undoManager ?? windowUndo }
 
     private func content(_ draft: QuickAdd.Draft) -> some View {
-        let matches = matches(for: draft)
-        return VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             fieldRow(draft)
-                .frame(minHeight: 62)
-                .padding(.horizontal, 16)
-            Divider()
-            Group {
-                if let matches {
-                    matchList(matches)
-                } else {
-                    keyRows(draft)
-                }
-            }
-            .padding(.vertical, 8)
+            keyRows(draft)
+                .padding(.leading, 18)
+                .padding(.trailing, 8)
+                .padding(.bottom, 8)
             if let lastAdded = quickAdd.lastAdded {
                 addedLine(lastAdded)
             }
-            Divider()
             foot(draft)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .frame(height: 32)
+                .padding(.leading, 18)
+                .padding(.trailing, 10)
+                .padding(.bottom, 10)
         }
         .floatingPanelSurface(width: 680, cornerRadius: 22)
         .overlay {
@@ -85,7 +90,7 @@ struct NewItemLinePanel: View {
         .task {
             // Asked any sooner, the field is not yet in the window and the list keeps the keyboard.
             try? await Task.sleep(for: .milliseconds(50))
-            isFieldFocused = true
+            focus = .title
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("New Item")
@@ -94,53 +99,41 @@ struct NewItemLinePanel: View {
 
     // MARK: The line
 
+    /// The kind, then the title, then a chip for each part the line read or the person chose, in the order made.
     private func fieldRow(_ draft: QuickAdd.Draft) -> some View {
         let catalogue = library.catalogue
-        return HStack(spacing: 8) {
+        let chips = QuickAdd.lineChips(draft, in: catalogue)
+        let isFile = QuickAdd.isFile(draft.typeID, in: catalogue)
+        return HStack(spacing: 12) {
             kindPill(draft)
-            TagFlowLayout(spacing: 6) {
-                ForEach(draft.tags, id: \.self) { tag in
-                    LineToken(text: tag, mark: .symbol("number"), remove: String(localized: "Remove Tag “\(tag)”")) {
-                        quickAdd.draft?.tags.removeAll { $0 == tag }
-                    }
-                }
-                if let parent = draft.parentID {
-                    let title = library.item(parent)?.displayTitle ?? String(localized: "Item not found")
-                    LineToken(text: title, mark: .symbol("arrow.turn.left.up"), remove: String(localized: "Remove Parent")) {
-                        quickAdd.draft?.remove(.parent, in: catalogue)
-                    }
-                }
-                ForEach(propertyKeys(draft), id: \.self) { key in
-                    if let field = QuickAdd.fields(of: draft.typeID, in: catalogue).first(where: { $0.key == key }) {
-                        propertyToken(field, value: draft.properties[key], typeID: draft.typeID)
-                    }
-                }
-                if let found = QuickAdd.foundDay(in: draft, catalogue: catalogue, now: .now, calendar: .current, locale: .current) {
-                    LineToken(
-                        text: "\(found.field.label): \(found.day.date.formatted(found.day.hasTime ? .dateTime.weekday().day().month().hour().minute() : .dateTime.weekday().day().month()))",
-                        mark: .symbol("calendar"), remove: String(localized: "Keep “\(found.day.phrase)” as Text")
-                    ) {
-                        browser.declineLineDay(found.day.phrase)
-                    }
-                    .accessibilityIdentifier("NewItemLineDay")
-                }
-                if QuickAdd.isFile(draft.typeID, in: catalogue) { fileToken(draft) }
-                titleField(draft)
+            TagFlowLayout(spacing: 7) {
+                titleField(draft, fills: chips.isEmpty && !isFile)
+                ForEach(chips, id: \.self) { chip in lineChip(chip, in: draft) }
+                if isFile { fileToken(draft) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 14)
+            .contentShape(.rect)
+            .onTapGesture { focus = .title }
         }
-        .padding(.vertical, 14)
+        .padding(.leading, 12)
+        .padding(.trailing, 18)
+        .padding(.top, 4)
+        .frame(minHeight: 62)
     }
 
-    /// The kind, as a tinted capsule whose menu lists the kinds the line can make.
+    /// The kind, as a tinted capsule whose menu lists the kinds the line can make: the sidebar's and File, then the
+    /// rest after a divider (`QuickAdd.kindMenu`).
     private func kindPill(_ draft: QuickAdd.Draft) -> some View {
-        let kinds = lineKinds(draft)
-        let chosen = kinds.first { $0.id.rawValue == draft.typeID }
+        let menu = lineKindMenu(draft)
+        let chosen = (menu.first + menu.rest).first { $0.id.rawValue == draft.typeID }
         let label = chosen?.label ?? library.catalogue.label(for: TypeID(draft.typeID))
         return Menu {
             Picker("Kind", selection: Binding { draft.typeID } set: { browser.chooseQuickAddType($0, in: library) }) {
-                ForEach(kinds) { type in
-                    Label(type.label, typeIcon: library.catalogue.icon(for: type.id)).tag(type.id.rawValue)
+                ForEach(menu.first) { type in kindLabel(type).tag(type.id.rawValue) }
+                if !menu.rest.isEmpty {
+                    Divider()
+                    ForEach(menu.rest) { type in kindLabel(type).tag(type.id.rawValue) }
                 }
             }
             .pickerStyle(.inline)
@@ -159,19 +152,34 @@ struct NewItemLinePanel: View {
         .accessibilityIdentifier("NewItemLineKind")
     }
 
-    private func titleField(_ draft: QuickAdd.Draft) -> some View {
-        TextField(QuickAdd.linePlaceholder(draft, in: library.catalogue), text: Binding {
+    private func kindLabel(_ type: ItemTypeOption) -> some View {
+        Label(type.label, typeIcon: library.catalogue.icon(for: type.id))
+    }
+
+    /// The title, as wide as its words so the chips stand after them, or the whole line while there are none.
+    private func titleField(_ draft: QuickAdd.Draft, fills: Bool) -> some View {
+        let placeholder = QuickAdd.linePlaceholder(draft, in: library.catalogue)
+        let width = titleWidth + 6
+        return TextField(placeholder, text: Binding {
             quickAdd.draft?.title ?? ""
         } set: { text in
             let old = quickAdd.draft?.title ?? ""
             quickAdd.draft?.title = text
             browser.lineTextChanged(from: old, in: library)
             highlighted = 0
-        })
+        }, selection: $titleSelection)
         .textFieldStyle(.plain)
         .interfaceFont(.title3)
-        .frame(minWidth: 160)
-        .focused($isFieldFocused)
+        .frame(minWidth: 1, idealWidth: fills ? 560 : width, maxWidth: fills ? .infinity : width, minHeight: 26)
+        .background(alignment: .leading) {
+            // The words as the field draws them, measured for its width.
+            Text(verbatim: draft.title.isEmpty ? placeholder : draft.title)
+                .interfaceFont(.title3)
+                .fixedSize()
+                .hidden()
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { titleWidth = $0 }
+        }
+        .focused($focus, equals: .title)
         .onSubmit { returnPressed(shift: false) }
         .onKeyPress(keys: [.return]) { press in
             guard press.modifiers.contains(.shift) else { return .ignored }
@@ -186,130 +194,269 @@ struct NewItemLinePanel: View {
             highlighted = (highlighted + (press.key == .upArrow ? count - 1 : 1)) % count
             return .handled
         }
+        .onKeyPress(.delete) {
+            guard caretIsAtStart(of: draft.title) else { return .ignored }
+            return putBack(nil) ? .handled : .ignored
+        }
         .accessibilityIdentifier("NewItemLineTitle")
     }
 
-    /// The property keys shown as tokens: those the person chose, and any the line filled, such as a bookmark's address.
-    private func propertyKeys(_ draft: QuickAdd.Draft) -> [String] {
-        draft.chips.compactMap { chip in
-            if case .field(let key) = chip { key } else { nil }
+    /// Whether the caret stands before the first character with nothing selected, where Delete takes the last chip.
+    private func caretIsAtStart(of title: String) -> Bool {
+        if title.isEmpty { return true }
+        guard case .selection(let range)? = titleSelection?.indices else { return false }
+        return range.isEmpty && range.lowerBound == title.startIndex
+    }
+
+    /// One chip of the line: what it sets in secondary, its value in primary. Delete, or Keep as Text in its menu,
+    /// puts the words it was read from back into the title; a property's chip opens its value panel when clicked.
+    @ViewBuilder
+    private func lineChip(_ chip: QuickAdd.Chip, in draft: QuickAdd.Draft) -> some View {
+        let words = QuickAdd.lineChipWords(chip, in: draft, library: library, calendar: .current, locale: .current)
+        let source = draft.sources[chip]
+        let chipView = LineChip(name: words.name, value: words.value, isChosen: focus == .chip(chip))
+            .focusable()
+            .focused($focus, equals: .chip(chip))
+            .focusEffectDisabled()
+            .onKeyPress(keys: [.delete, .deleteForward]) { _ in
+                putBack(chip)
+                return .handled
+            }
+            .onTapGesture {
+                focus = .chip(chip)
+                if case .field(let key) = chip { editing = key }
+            }
+            .contextMenu {
+                if let source {
+                    Button("Keep “\(source.words)” as Text") { putBack(chip) }
+                } else if QuickAdd.isRemovable(chip, typeID: draft.typeID, in: library.catalogue) {
+                    Button("Remove") {
+                        if editing.map({ chip == .field($0) }) == true { editing = nil }
+                        quickAdd.draft?.remove(chip, in: library.catalogue)
+                        focus = .title
+                    }
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(words.value.map { "\(words.name) \($0)" } ?? words.name)
+            .accessibilityAction(named: source.map { "Keep “\($0.words)” as Text" } ?? String(localized: "Remove")) { putBack(chip) }
+        if case .field(let key) = chip, let field = QuickAdd.fields(of: draft.typeID, in: library.catalogue).first(where: { $0.key == key }) {
+            chipView
+                .popover(isPresented: Binding { editing == key } set: { if !$0, editing == key { editing = nil } }, arrowEdge: .bottom) {
+                    ItemPropertyRow(definition: field, value: draft.properties[key], isEditable: true, onChange: { newValue in
+                        quickAdd.draft?.properties[key] = newValue
+                        // A value set by hand is no longer the words it was read from.
+                        quickAdd.draft?.sources[chip] = nil
+                        return true
+                    }, retainedDraft: field.kind.isList ? quickAdd.listDraft(for: key) : nil, startsEditing: true,
+                       handsOffOnLeave: !field.kind.isList)
+                    .padding(14)
+                    .frame(width: 340)
+                }
+                .accessibilityIdentifier("NewItemLineProperty.\(key)")
+        } else {
+            chipView
         }
     }
 
-    private func propertyToken(_ field: ItemTypeInfo.Field, value: PropertyValue?, typeID: String) -> some View {
-        let shown = value.flatMap { $0 == .null ? nil : QuickAdd.valueText($0, in: field) }
-        let removable = QuickAdd.isRemovable(.field(field.key), typeID: typeID, in: library.catalogue)
-        return LineToken(
-            text: shown.map { "\(field.label): \($0)" } ?? String(localized: "Set \(field.label)"),
-            mark: nil, remove: removable ? String(localized: "Remove \(field.label)") : nil,
-            onTap: { editing = field.key }
-        ) {
-            if editing == field.key { editing = nil }
-            quickAdd.draft?.remove(.field(field.key), in: library.catalogue)
-        }
-        .popover(isPresented: Binding { editing == field.key } set: { if !$0, editing == field.key { editing = nil } }, arrowEdge: .bottom) {
-            ItemPropertyRow(definition: field, value: value, isEditable: true, onChange: { newValue in
-                quickAdd.draft?.properties[field.key] = newValue
-                return true
-            }, retainedDraft: field.kind.isList ? quickAdd.listDraft(for: field.key) : nil, startsEditing: true,
-               handsOffOnLeave: !field.kind.isList)
-            .padding(14)
-            .frame(width: 340)
-        }
-        .accessibilityIdentifier("NewItemLineProperty.\(field.key)")
+    /// Takes a chip out, or the last one where none is named, and gives the title the keyboard, its caret at the end.
+    @discardableResult
+    private func putBack(_ chip: QuickAdd.Chip?) -> Bool {
+        if let chip, case .field(let key) = chip, editing == key { editing = nil }
+        guard browser.putBackLineChip(chip, in: library) else { return false }
+        focus = .title
+        if let title = quickAdd.draft?.title { titleSelection = TextSelection(insertionPoint: title.endIndex) }
+        return true
     }
 
     /// A file item's file: the one chosen, or a button to choose one, which a drop on the panel also gives.
     private func fileToken(_ draft: QuickAdd.Draft) -> some View {
         Group {
             if let file = draft.files.first {
-                LineToken(text: file.name, mark: .symbol("doc"), remove: String(localized: "Remove “\(file.name)”")) {
-                    quickAdd.draft?.files = []
-                }
+                LineChip(name: String(localized: "File"), value: file.name, isChosen: false)
+                    .contextMenu {
+                        Button("Remove “\(file.name)”") { quickAdd.draft?.files = [] }
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(file.name)
+                    .accessibilityAction(named: String(localized: "Remove")) { quickAdd.draft?.files = [] }
             } else {
                 HStack(spacing: 6) {
                     Button("Choose a File…") { isChoosingFile = true }
                         .appButton(.secondary, size: .small)
                         .accessibilityIdentifier("NewItemLineChooseFile")
                     Text("or drop one here")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
                 }
+                .frame(minHeight: 26)
             }
         }
     }
 
     // MARK: Rows under the line
 
-    /// One thing the line can be given, with its key and what was used last, before anything is typed.
+    /// A row for each key the line reads: its key, what it sets, and offers from this library, the recent first. While
+    /// nothing is typed, the first row offers kinds; while a key's word is typed, its row lists the matches instead.
     private func keyRows(_ draft: QuickAdd.Draft) -> some View {
+        let typing = NewItemText.typing(in: draft.title)
+        let matches = matches(for: draft)
         let recents = NewItemRecents.stored(for: library.serverKey, in: browser.defaults)
-        let kinds = lineKinds(draft)
-        let recentKinds = recents.kinds.compactMap { id in kinds.first { $0.id.rawValue == id } }
         let canHaveParent = library.canHaveParent(typeID: draft.typeID)
-        let recentParents = canHaveParent ? recents.parents.compactMap { library.item($0) } : []
-        let fields = offeredFields(draft, query: "")
         return VStack(alignment: .leading, spacing: 0) {
-            keyRow("Kind", key: "⇥") {
-                ForEach(recentKinds.prefix(4)) { type in
-                    suggestion(type.label, icon: library.catalogue.icon(for: type.id)) { browser.chooseLineMatch(.kind(type.id.rawValue), in: library) }
-                }
+            if !draft.hasContent {
+                keyRow("Kind", key: "Tab") { kindOffers(draft, recents: recents) }
             }
             keyRow("Tag", key: "#") {
-                ForEach(recents.tags.prefix(4), id: \.self) { tag in
-                    suggestion("#\(tag)", icon: nil) { browser.chooseLineMatch(.tag(tag), in: library) }
-                }
+                if typing?.mark == .tag, let matches { matchList(matches, query: typing?.query ?? "") } else { tagOffers(draft, recents: recents) }
             }
             if canHaveParent {
                 keyRow("Parent", key: "@") {
-                    ForEach(recentParents.prefix(3)) { item in
-                        suggestion(item.displayTitle, icon: library.catalogue.icon(for: item.type)) { browser.chooseLineMatch(.parent(item.id), in: library) }
+                    if typing?.mark == .parent, let matches {
+                        matchList(matches, query: typing?.query ?? "")
+                    } else {
+                        parentOffers(draft, recents: recents)
                     }
                 }
             }
-            if !fields.isEmpty {
-                keyRow("Property", key: "/") {
-                    ForEach(fields.prefix(3), id: \.key) { field in
-                        suggestion(field.label, icon: nil) { chooseField(field.key) }
+            keyRow("Property", key: "/") {
+                if typing?.mark == .property, let matches {
+                    matchList(matches, query: typing?.query ?? "")
+                } else {
+                    propertyOffers(draft)
+                }
+            }
+        }
+    }
+
+    private func keyRow<Offers: View>(_ title: LocalizedStringKey, key: String, @ViewBuilder offers: () -> Offers) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            HStack(spacing: 0) {
+                KeyCap(key: key)
+                    .frame(width: 38, alignment: .leading)
+                Text(title)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+            }
+            .frame(width: 100, height: 34, alignment: .leading)
+            offers()
+                .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+        }
+    }
+
+    /// The kinds, the last used first, then as the kind menu orders them, with the rest under More.
+    private func kindOffers(_ draft: QuickAdd.Draft, recents: NewItemRecents) -> some View {
+        let menu = lineKindMenu(draft)
+        let kinds = QuickAdd.kindOffers(menu.first + menu.rest, recents: recents.kinds, chosen: draft.typeID, shown: 6)
+        return HStack(spacing: 2) {
+            ForEach(kinds.offered) { type in
+                offer(type.label, mark: .type(library.catalogue.icon(for: type.id)), isOn: type.id.rawValue == draft.typeID) {
+                    browser.chooseLineMatch(.kind(type.id.rawValue), in: library)
+                }
+            }
+            if !kinds.more.isEmpty {
+                moreOffers {
+                    ForEach(kinds.more) { type in
+                        Button { browser.chooseLineMatch(.kind(type.id.rawValue), in: library) } label: { kindLabel(type) }
                     }
                 }
             }
         }
-        .padding(.horizontal, 8)
     }
 
-    private func keyRow<Suggestions: View>(_ title: LocalizedStringKey, key: String, @ViewBuilder suggestions: () -> Suggestions) -> some View {
-        HStack(spacing: 10) {
-            Text(title)
-                .frame(width: 70, alignment: .leading)
-            KeyCap(key: key)
-                .frame(width: 26)
-            HStack(spacing: 6) { suggestions() }
-            Spacer(minLength: 0)
+    private func tagOffers(_ draft: QuickAdd.Draft, recents: NewItemRecents) -> some View {
+        let tags = QuickAdd.tagOffers("", draft: draft, recents: recents.tags, in: library).known.prefix(5)
+        return HStack(spacing: 2) {
+            ForEach(Array(tags), id: \.self) { tag in
+                offer(tag, mark: .tag, isOn: false) { browser.chooseLineMatch(.tag(tag), in: library) }
+            }
         }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
-        .frame(minHeight: 30)
     }
 
-    private func suggestion(_ text: String, icon: String?, action: @escaping () -> Void) -> some View {
+    private func parentOffers(_ draft: QuickAdd.Draft, recents: NewItemRecents) -> some View {
+        let parents = draft.parentID == nil
+            ? library.creationParentMatches(typeID: draft.typeID, matching: "", first: recents.parents, limit: 3, newest: true) : []
+        return HStack(spacing: 2) {
+            ForEach(parents) { item in
+                offer(item.displayTitle, mark: .type(library.catalogue.icon(for: item.type)), isOn: false) {
+                    browser.chooseLineMatch(.parent(item.id), in: library)
+                }
+            }
+        }
+    }
+
+    private func propertyOffers(_ draft: QuickAdd.Draft) -> some View {
+        let fields = offeredFields(draft, query: "")
+        return HStack(spacing: 2) {
+            ForEach(fields.prefix(4), id: \.key) { field in
+                offer(field.label, mark: nil, isOn: false) { chooseField(field.key) }
+            }
+            if fields.count > 4 {
+                moreOffers {
+                    ForEach(fields.dropFirst(4), id: \.key) { field in
+                        Button(field.label) { chooseField(field.key) }
+                    }
+                }
+            }
+        }
+    }
+
+    private enum OfferMark {
+        case type(String?)
+        case tag
+    }
+
+    /// One offer under the line, as a quiet capsule; the one in use stands on the gray wash.
+    private func offer(_ text: String, mark: OfferMark?, isOn: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 4) {
-                if let icon { TypeGlyph(id: icon) }
+            HStack(spacing: 5) {
+                switch mark {
+                case .type(let icon): TypeGlyph(id: icon).font(.system(size: 12))
+                case .tag: Text(verbatim: "#").foregroundStyle(.tertiary)
+                case nil: EmptyView()
+                }
                 Text(verbatim: text).lineLimit(1)
             }
-            .padding(.horizontal, 8)
-            .frame(height: 22)
-            .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 6))
+            .font(.system(size: 12, weight: isOn ? .medium : .regular))
+            .foregroundStyle(isOn ? .primary : .secondary)
+            .padding(.leading, 8)
+            .padding(.trailing, 9)
+            .frame(height: 26)
+            .background(isOn ? ChipLooks.current.chipWash(for: scheme) : .clear, in: .capsule)
+            .contentShape(.capsule)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(.primary)
+        .fixedSize()
+    }
+
+    /// More, at the end of a row: the rest of what the row offers, in a menu.
+    private func moreOffers<Items: View>(@ViewBuilder items: () -> Items) -> some View {
+        Menu {
+            items()
+        } label: {
+            HStack(spacing: 5) {
+                Text("More")
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .padding(.leading, 8)
+            .padding(.trailing, 9)
+            .frame(height: 26)
+            .contentShape(.capsule)
+        }
+        .menuStyle(.button)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .fixedSize()
     }
 
     /// One match for the marked word being typed.
     private struct Match: Identifiable {
         let id: String
         let text: String
-        let icon: String?
+        let mark: OfferMark
         let detail: String?
         let choice: Browser.LineChoice?
         let field: String?
@@ -323,52 +470,79 @@ struct NewItemLinePanel: View {
         case .tag:
             let recents = NewItemRecents.stored(for: library.serverKey, in: browser.defaults).tags
             let offer = QuickAdd.tagOffers(query, draft: draft, recents: recents, in: library)
-            var found = offer.known.map { Match(id: "tag:" + $0, text: "#" + $0, icon: nil, detail: nil, choice: .tag($0), field: nil) }
+            var found = offer.known.map { Match(id: "tag:" + $0, text: $0, mark: .tag, detail: nil, choice: .tag($0), field: nil) }
             if let new = offer.new {
-                found.append(Match(id: "new:" + new, text: "#" + new, icon: nil, detail: String(localized: "New Tag"), choice: .tag(new), field: nil))
+                found.append(Match(id: "new:" + new, text: new, mark: .tag, detail: String(localized: "New Tag"), choice: .tag(new), field: nil))
             }
             return found
         case .parent:
             guard library.canHaveParent(typeID: draft.typeID) else { return [] }
             let recents = NewItemRecents.stored(for: library.serverKey, in: browser.defaults).parents
-            return library.creationParentMatches(typeID: draft.typeID, matching: query, first: recents, limit: 6).map { item in
+            return library.creationParentMatches(typeID: draft.typeID, matching: query, first: recents, limit: 6, newest: false).map { item in
                 Match(
-                    id: "parent:" + item.id.rawValue, text: item.displayTitle, icon: library.catalogue.icon(for: item.type),
+                    id: "parent:" + item.id.rawValue, text: item.displayTitle, mark: .type(library.catalogue.icon(for: item.type)),
                     detail: library.catalogue.label(for: item.type), choice: .parent(item.id), field: nil)
             }
         case .property:
             return offeredFields(draft, query: query).map { field in
-                Match(id: "field:" + field.key, text: field.label, icon: nil, detail: nil, choice: nil, field: field.key)
+                Match(id: "field:" + field.key, text: field.label, mark: .type(nil), detail: nil, choice: nil, field: field.key)
             }
         }
     }
 
-    private func matchList(_ matches: [Match]) -> some View {
+    /// The matches one a line, what was typed in bold and the kind of item at the end; Return takes the gray one.
+    private func matchList(_ matches: [Match], query: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             if matches.isEmpty {
                 Text("No Matches")
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 30)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 8)
+                    .frame(height: 34)
             }
             ForEach(Array(matches.enumerated()), id: \.element.id) { index, match in
                 Button { choose(match) } label: {
                     HStack(spacing: 8) {
-                        if let icon = match.icon { TypeGlyph(id: icon) }
-                        Text(verbatim: match.text).lineLimit(1)
+                        Group {
+                            switch match.mark {
+                            case .type(let icon?): TypeGlyph(id: icon)
+                            case .type(nil): EmptyView()
+                            case .tag: Text(verbatim: "#").foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(width: 14)
+                        Text(Self.bold(query, in: match.text))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                         Spacer(minLength: 8)
-                        if let detail = match.detail { Text(verbatim: detail).foregroundStyle(.secondary) }
+                        if let detail = match.detail {
+                            Text(verbatim: detail)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
-                    .padding(.horizontal, 10)
-                    .frame(minHeight: 30)
-                    .background(index == highlighted ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.leading, 8)
+                    .padding(.trailing, 10)
+                    .frame(height: 32)
+                    .background(index == highlighted ? ChipLooks.current.chipWash(for: scheme) : .clear, in: .rect(cornerRadius: 9))
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("NewItemLineMatch")
             }
         }
-        .padding(.horizontal, 6)
+        .padding(.vertical, 1)
+    }
+
+    /// `text` with every place it holds `query` in bold, as the palette shows what was typed.
+    private static func bold(_ query: String, in text: String) -> AttributedString {
+        var out = AttributedString()
+        for run in NewItemText.matchRuns(of: query, in: text) {
+            var piece = AttributedString(run.text)
+            if run.matches { piece.inlinePresentationIntent = .stronglyEmphasized }
+            out += piece
+        }
+        return out
     }
 
     private func choose(_ match: Match) {
@@ -378,7 +552,7 @@ struct NewItemLinePanel: View {
             chooseField(key)
         }
         highlighted = 0
-        isFieldFocused = true
+        focus = .title
     }
 
     private func chooseField(_ key: String) {
@@ -386,12 +560,12 @@ struct NewItemLinePanel: View {
         Task { editing = key }
     }
 
-    /// The kind's fields the person can still add as a token, matching `query`.
+    /// The kind's fields the person can still add as a chip, matching `query`.
     private func offeredFields(_ draft: QuickAdd.Draft, query: String) -> [ItemTypeInfo.Field] {
         let fields = QuickAdd.fields(of: draft.typeID, in: library.catalogue)
-        return QuickAdd.offeredChips(draft, in: library.catalogue, canHaveParent: false).compactMap { chip in
-            guard case .field(let key) = chip, let field = fields.first(where: { $0.key == key }) else { return nil }
-            return query.isEmpty || field.label.localizedStandardContains(query) ? field : nil
+        let shown = Set(QuickAdd.lineChips(draft, in: library.catalogue))
+        return fields.filter { field in
+            !shown.contains(.field(field.key)) && (query.isEmpty || field.label.localizedStandardContains(query))
         }
     }
 
@@ -413,7 +587,7 @@ struct NewItemLinePanel: View {
                 .accessibilityIdentifier("NewItemLineUndo")
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 18)
         .frame(minHeight: 30)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("NewItemLineAdded")
@@ -421,54 +595,93 @@ struct NewItemLinePanel: View {
 
     // MARK: The foot
 
+    /// Where the item goes, as a quiet pop-up; Add Text; and, once the line can add, Add and Add and Open in one capsule.
     private func foot(_ draft: QuickAdd.Draft) -> some View {
         let canAdd = QuickAdd.canSave(lineFinished(draft), in: library) && !quickAdd.isSaving
             || !QuickAdd.missingRequired(draft, in: library.catalogue).isEmpty
-        return HStack(spacing: 8) {
-            Text("In")
-                .foregroundStyle(.secondary)
-            Picker("In", selection: Binding { draft.tier } set: { quickAdd.draft?.tier = $0 }) {
-                Text("Library").tag(Tier.library)
-                Text("Feed").tag(Tier.feed)
-            }
-            .labelsHidden()
-            .fixedSize()
-            .accessibilityIdentifier("NewItemLineIn")
-            Spacer(minLength: 12)
+        return HStack(spacing: 14) {
+            wherePicker(draft)
+            Spacer(minLength: 0)
             Button {
                 browser.handOverToTextForm()
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text("Add Text")
                     ShortcutKeys("⇧↩").accessibilityHidden(true)
                 }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .contentShape(.rect)
             }
-            .appButton(.plain)
+            .buttonStyle(.plain)
             .accessibilityIdentifier("NewItemLineAddText")
-            Button {
-                add(opening: false)
-            } label: {
-                HStack(spacing: 6) {
-                    Text("Add")
-                    ShortcutKeys("↩").accessibilityHidden(true)
+            if canAdd {
+                SegmentCapsule(fontSize: 13, weight: .medium) {
+                    Button {
+                        add(opening: false)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("Add")
+                            ShortcutKeys("↩").accessibilityHidden(true)
+                        }
+                    }
+                    .accessibilityIdentifier("NewItemLineAdd")
+                    Divider()
+                        .frame(height: 14)
+                    Button {
+                        add(opening: true)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("Add and Open")
+                            ShortcutKeys("⌘↩").accessibilityHidden(true)
+                        }
+                    }
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .accessibilityIdentifier("NewItemLineAddAndOpen")
                 }
             }
-            .appButton(.secondary)
-            .disabled(!canAdd)
-            .accessibilityIdentifier("NewItemLineAdd")
-            Button {
-                add(opening: true)
-            } label: {
-                HStack(spacing: 6) {
-                    Text("Add and Open")
-                    ShortcutKeys("⌘↩", onAccent: true).accessibilityHidden(true)
-                }
-            }
-            .appButton(.primary)
-            .keyboardShortcut(.return, modifiers: .command)
-            .disabled(!canAdd)
-            .accessibilityIdentifier("NewItemLineAddAndOpen")
         }
+    }
+
+    /// In, then the place's mark and name, as a pop-up that chooses the Library or the Feed.
+    private func wherePicker(_ draft: QuickAdd.Draft) -> some View {
+        let place: SidebarPlace = draft.tier == .feed ? .feed : .library
+        let name = library.name(of: draft.tier == .feed ? .feed : .library)
+        return HStack(spacing: 6) {
+            Text("In")
+                .foregroundStyle(.tertiary)
+            Menu {
+                Picker("In", selection: Binding { draft.tier } set: { quickAdd.draft?.tier = $0 }) {
+                    Label(library.name(of: .library), systemImage: SidebarPlace.library.symbol ?? "").tag(Tier.library)
+                    Label(library.name(of: .feed), systemImage: SidebarPlace.feed.symbol ?? "").tag(Tier.feed)
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } label: {
+                HStack(spacing: 6) {
+                    if let symbol = place.symbol {
+                        Image(systemName: symbol)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(verbatim: name)
+                        .fontWeight(.medium)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(.rect)
+            }
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+            .fixedSize()
+            .accessibilityLabel("In")
+            .accessibilityValue(name)
+            .accessibilityIdentifier("NewItemLineIn")
+        }
+        .font(.system(size: 12))
+        .foregroundStyle(.secondary)
     }
 
     /// The draft as Add would send it, so the buttons are on only when it can be added.
@@ -490,7 +703,7 @@ struct NewItemLinePanel: View {
             return
         }
         add(opening: false)
-        isFieldFocused = true
+        focus = .title
     }
 
     private func add(opening: Bool) {
@@ -517,8 +730,13 @@ struct NewItemLinePanel: View {
     }
 
     private func lineKinds(_ draft: QuickAdd.Draft) -> [ItemTypeOption] {
+        let menu = lineKindMenu(draft)
+        return menu.first + menu.rest
+    }
+
+    private func lineKindMenu(_ draft: QuickAdd.Draft) -> (first: [ItemTypeOption], rest: [ItemTypeOption]) {
         let shown = QuickAdd.typeIDs(of: SidebarPlan(library, layout: libraries.sidebarLayout).shownTypes)
-        return QuickAdd.lineKinds(QuickAdd.types(in: library), shown: shown, chosen: draft.typeID, in: library.catalogue)
+        return QuickAdd.lineKindMenu(QuickAdd.types(in: library), shown: shown, chosen: draft.typeID, in: library.catalogue)
     }
 
     private func putAway() {
@@ -560,57 +778,36 @@ struct NewItemLinePanel: View {
     }
 }
 
-/// A value on the new-item line: 26 points tall with corners of 8, its mark, its words and a button to take it out.
-struct LineToken: View {
-    enum Mark { case symbol(String) }
+/// A chip of the new-item line, 26 points tall with corners of 8 on the gray wash: what it sets in secondary, then its
+/// value in primary, as "Due Fri 27 Nov". A chip with no value yet shows only what it sets.
+struct LineChip: View {
+    let name: String
+    let value: String?
+    /// Whether the chip has the keyboard, so Delete would put it back.
+    let isChosen: Bool
 
-    let text: String
-    let mark: Mark?
-    let remove: String?
-    var onTap: (() -> Void)?
-    let onRemove: () -> Void
-
-    init(text: String, mark: Mark?, remove: String?, onTap: (() -> Void)? = nil, onRemove: @escaping () -> Void) {
-        self.text = text
-        self.mark = mark
-        self.remove = remove
-        self.onTap = onTap
-        self.onRemove = onRemove
-    }
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        HStack(spacing: 4) {
-            Button { onTap?() } label: {
-                HStack(spacing: 4) {
-                    if case .symbol(let name)? = mark {
-                        Image(systemName: name)
-                            .foregroundStyle(.secondary)
-                            .accessibilityHidden(true)
-                    }
-                    Text(verbatim: text)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(onTap == nil)
-            if let remove {
-                Button(action: onRemove) {
-                    Image(systemName: "xmark")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .help(remove)
-                .accessibilityLabel(remove)
+        HStack(spacing: 5) {
+            Text(verbatim: name)
+                .fontWeight(.regular)
+                .foregroundStyle(.secondary)
+            if let value {
+                Text(verbatim: value)
+                    .foregroundStyle(.primary)
+                    .truncationMode(.middle)
             }
         }
-        .padding(.horizontal, 8)
+        .font(.system(size: 13, weight: .medium))
+        .lineLimit(1)
+        .padding(.horizontal, 9)
         .frame(height: 26)
-        .frame(maxWidth: 240)
-        .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 8))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(text)
+        .frame(maxWidth: 300)
+        .background(ChipLooks.current.chipWash(for: scheme), in: .rect(cornerRadius: 8))
+        .overlay {
+            if isChosen { AppButtonStyle.focusRing(AnyShape(.rect(cornerRadius: 8))) }
+        }
+        .contentShape(.rect(cornerRadius: 8))
     }
 }

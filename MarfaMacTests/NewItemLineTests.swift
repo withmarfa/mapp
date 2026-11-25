@@ -47,7 +47,21 @@ struct NewItemLineTests {
     static func type(_ text: String, into browser: Browser, in library: any ItemLibrary) {
         let old = browser.quickAdd.draft?.title ?? ""
         browser.quickAdd.draft?.title = old + text
-        browser.lineTextChanged(from: old, in: library)
+        browser.lineTextChanged(from: old, in: library, now: start, calendar: calendar, locale: british)
+    }
+
+    /// Types `text` a word at a time, each with the space after it, as a person types a sentence.
+    static func typeWords(_ text: String, into browser: Browser, in library: any ItemLibrary) {
+        for word in text.split(separator: " ", omittingEmptySubsequences: false).map(String.init).enumerated() {
+            type((word.offset == 0 ? "" : " ") + word.element, into: browser, in: library)
+        }
+    }
+
+    /// Sets the title to `text` in one edit, as Select All and Delete, or a paste over a selection, does.
+    static func replace(with text: String, in browser: Browser, in library: any ItemLibrary) {
+        let old = browser.quickAdd.draft?.title ?? ""
+        browser.quickAdd.draft?.title = text
+        browser.lineTextChanged(from: old, in: library, now: start, calendar: calendar, locale: british)
     }
 
     static func add(_ browser: Browser, in library: any ItemLibrary, undoManager: UndoManager? = nil) async -> ItemID? {
@@ -111,12 +125,163 @@ struct NewItemLineTests {
     @Test func aDayTakenBackStaysText() async throws {
         let library = Self.library()
         let browser = Self.line(in: library)
-        Self.type("Read 27/11 report", into: browser, in: library)
-        browser.declineLineDay("27/11")
+        Self.typeWords("Read 27/11 report ", into: browser, in: library)
+        #expect(browser.quickAdd.draft?.title == "Read report ")
+        #expect(browser.putBackLineChip(.field(MarfaMapping.dueField), in: library))
+        #expect(browser.quickAdd.draft?.title == "Read 27/11 report ")
+        Self.type("now", into: browser, in: library)
         let id = try #require(await Self.add(browser, in: library))
         let item = try #require(library.item(id))
-        #expect(item.title == "Read 27/11 report")
+        #expect(item.title == "Read 27/11 report now")
         #expect(item.properties.first { $0.key == MarfaMapping.dueField } == nil)
+    }
+
+    @Test func whatTheLineReadsLeavesTheWordsForChipsInTheOrderTyped() throws {
+        let library = Self.library()
+        let browser = Self.line(in: library)
+        Self.typeWords("Send the second proofs to Calverts fri #print @lis", into: browser, in: library)
+        let draft = try #require(browser.quickAdd.draft)
+        #expect(draft.title == "Send the second proofs to Calverts @lis")
+        #expect(draft.properties[MarfaMapping.dueField] == .string("2026-11-27"))
+        #expect(draft.tags == ["print"])
+        #expect(QuickAdd.lineChips(draft, in: library.catalogue) == [.field(MarfaMapping.dueField), .tag("print")])
+    }
+
+    @Test func aDayStillBeingTypedWaitsForTheWordAfterIt() throws {
+        let library = Self.library()
+        let browser = Self.line(in: library)
+        Self.typeWords("Pay rent Fri 27 Nov ", into: browser, in: library)
+        #expect(browser.quickAdd.draft?.title == "Pay rent Fri 27 Nov ", "no word follows the day yet")
+        Self.type("today", into: browser, in: library)
+        #expect(browser.quickAdd.draft?.title == "Pay rent Fri 27 Nov today", "the word after it is not finished")
+        Self.type(" ", into: browser, in: library)
+        #expect(browser.quickAdd.draft?.title == "Pay rent today ")
+        #expect(browser.quickAdd.draft?.sources[.field(MarfaMapping.dueField)] == QuickAdd.Source(words: "Fri 27 Nov", offset: 9))
+    }
+
+    @Test func deleteAtTheStartPutsEachChipsWordsBackWhereTheyStood() throws {
+        let library = Self.library()
+        let browser = Self.line(in: library)
+        Self.typeWords("Send the proofs fri #print @lis", into: browser, in: library)
+        #expect(browser.quickAdd.draft?.title == "Send the proofs @lis")
+        #expect(browser.putBackLineChip(in: library), "the last chip first")
+        #expect(browser.quickAdd.draft?.title == "Send the proofs #print @lis")
+        #expect(browser.quickAdd.draft?.tags.isEmpty == true)
+        #expect(browser.putBackLineChip(in: library))
+        #expect(browser.quickAdd.draft?.title == "Send the proofs fri #print @lis")
+        #expect(browser.quickAdd.draft?.properties[MarfaMapping.dueField] == nil)
+        #expect(!browser.putBackLineChip(in: library), "no chip is left")
+
+        Self.type(" ", into: browser, in: library)
+        let draft = try #require(browser.quickAdd.draft)
+        #expect(draft.title == "Send the proofs fri #print @lis ", "words put back are text the line no longer reads")
+        #expect(draft.tags.isEmpty)
+        #expect(draft.properties[MarfaMapping.dueField] == nil)
+    }
+
+    @Test func aChosenChipGoesWithoutWordsUnlessItHoldsAValueSetByHand() throws {
+        let library = Self.library()
+        let browser = Self.line(in: library)
+        Self.type("Plan ", into: browser, in: library)
+        browser.chooseLineMatch(.tag("work"), in: library)
+        browser.chooseLineMatch(.field("status"), in: library)
+        browser.quickAdd.draft?.properties["status"] = .string("done")
+        #expect(!browser.putBackLineChip(.field("status"), in: library), "a value set in its panel stays")
+        #expect(browser.putBackLineChip(.tag("work"), in: library))
+        #expect(browser.quickAdd.draft?.title == "Plan ", "a chip chosen from a row gives no words back")
+        #expect(browser.quickAdd.draft?.tags.isEmpty == true)
+    }
+
+    @Test func emptyingTheTitleTakesOutTheChipsReadFromIt() throws {
+        let library = Self.library()
+        let browser = Self.line(in: library)
+        Self.typeWords("Call fri #zine about ", into: browser, in: library)
+        #expect(browser.quickAdd.draft?.title == "Call about ")
+        Self.replace(with: "", in: browser, in: library)
+        let draft = try #require(browser.quickAdd.draft)
+        #expect(draft.tags.isEmpty, "a tag read from the text goes with it")
+        #expect(draft.properties[MarfaMapping.dueField] == nil)
+        #expect(QuickAdd.lineChips(draft, in: library.catalogue).isEmpty)
+
+        Self.type("#zine ", into: browser, in: library)
+        Self.type("x", into: browser, in: library)
+        Self.replace(with: "", in: browser, in: library)
+        #expect(browser.quickAdd.draft?.tags == ["zine"], "one Delete that empties the title keeps the chips")
+    }
+
+    @Test func aPastedAddressIsAChipWhoseWordsDeleteGivesBack() throws {
+        let library = Self.library()
+        let browser = Self.line(in: library)
+        Self.type("https://finishingnotes.example/oil-finishes", into: browser, in: library)
+        let draft = try #require(browser.quickAdd.draft)
+        #expect(draft.title.isEmpty)
+        #expect(QuickAdd.lineChips(draft, in: library.catalogue) == [.field(MarfaMapping.urlField)])
+        let words = QuickAdd.lineChipWords(
+            .field(MarfaMapping.urlField), in: draft, library: library, calendar: Self.calendar, locale: Self.british)
+        #expect(words.name == "URL")
+        #expect(words.value == "finishingnotes.example/oil-finishes")
+
+        #expect(browser.putBackLineChip(in: library))
+        #expect(browser.quickAdd.draft?.title == "https://finishingnotes.example/oil-finishes")
+        #expect(browser.quickAdd.draft?.properties[MarfaMapping.urlField] == nil)
+        Self.type(" ", into: browser, in: library)
+        #expect(browser.quickAdd.draft?.properties[MarfaMapping.urlField] == nil)
+    }
+
+    @Test func aChipSaysWhatItSetsThenItsValueAndADayInShort() throws {
+        let library = Self.library()
+        let browser = Self.line(in: library)
+        Self.typeWords("Send proofs fri #print ", into: browser, in: library)
+        let draft = try #require(browser.quickAdd.draft)
+        let day = QuickAdd.lineChipWords(
+            .field(MarfaMapping.dueField), in: draft, library: library, calendar: Self.calendar, locale: Self.british)
+        #expect(day.name == "Due")
+        #expect(day.value == "Fri 27 Nov")
+        let tag = QuickAdd.lineChipWords(.tag("print"), in: draft, library: library, calendar: Self.calendar, locale: Self.british)
+        #expect(tag.name == "Tag")
+        #expect(tag.value == "print")
+        let unset = QuickAdd.lineChipWords(.field("status"), in: QuickAdd.Draft(typeID: "core.task"), library: library,
+                                           calendar: Self.calendar, locale: Self.british)
+        #expect(unset.value == nil)
+    }
+
+    @Test func theKindMenuListsTheSidebarsKindsThenFileThenTheRestByName() {
+        func option(_ id: String, _ label: String) -> ItemTypeOption { ItemTypeOption(id: TypeID(id), label: label, icon: nil) }
+        let types = [
+            option("core.note", "Note"), option("core.task", "Task"), option("test.project", "Project"), option("test.book", "Book"),
+            option("core.bookmark", "Bookmark"), option(TypeID.file.rawValue, "File"), option("test.article", "Article"),
+        ]
+        let menu = QuickAdd.kindMenu(types, shown: [.file, TypeID("core.note"), TypeID("core.task"), TypeID("core.bookmark")], chosen: "core.note")
+        #expect(menu.first.map(\.label) == ["Note", "Task", "Bookmark", "File"])
+        #expect(menu.rest.map(\.label) == ["Article", "Book", "Project"])
+    }
+
+    @Test func theKindRowOffersTheKindsLastUsedFirstAndTheRestUnderMore() {
+        func option(_ id: String) -> ItemTypeOption { ItemTypeOption(id: TypeID(id), label: id, icon: nil) }
+        let kinds = ["a", "b", "c", "d", "e", "f", "g", "h"].map(option)
+        let offers = QuickAdd.kindOffers(kinds, recents: ["g", "c"], chosen: "a", shown: 4)
+        #expect(offers.offered.map(\.id.rawValue) == ["g", "c", "a", "b"])
+        #expect(offers.more.map(\.id.rawValue) == ["d", "e", "f", "h"])
+        let late = QuickAdd.kindOffers(kinds, recents: [], chosen: "h", shown: 4)
+        #expect(late.offered.map(\.id.rawValue) == ["h", "a", "b", "c"], "the chosen kind is always offered")
+        let none = QuickAdd.kindOffers(kinds, recents: [], chosen: "a", shown: 6)
+        #expect(none.offered.count == 6, "with nothing used yet, the row still offers kinds")
+    }
+
+    @Test func beforeTypingTheParentRowOffersTheNewestFirst() {
+        let items = ["Old", "Newest", "Middle"].enumerated().map { index, name in
+            Item(id: .mint(), type: TypeID("test.project"), title: name, name: name, titleRule: .property("title"),
+                 version: ItemVersion(1), created: Self.start, modified: Self.start.addingTimeInterval(Double([0, 200, 100][index])))
+        }
+        #expect(QuickAdd.bestParents(items, matching: "", first: [], limit: 3, newest: true).map(\.displayTitle) == ["Newest", "Middle", "Old"])
+        #expect(QuickAdd.bestParents(items, matching: "", first: [items[0].id], limit: 2, newest: true).map(\.displayTitle) == ["Old", "Newest"])
+    }
+
+    @Test func aMatchIsCutWhereItHoldsWhatWasTyped() {
+        let runs = NewItemText.matchRuns(of: "lis", in: "Feira Gráfica, the Lisbon print fair")
+        #expect(runs.map(\.text) == ["Feira Gráfica, the ", "Lis", "bon print fair"])
+        #expect(runs.map(\.matches) == [false, true, false])
+        #expect(NewItemText.matchRuns(of: "", in: "Note").map(\.text) == ["Note"])
     }
 
     @Test func aKindWithNoDayKeepsTheDayAsText() async throws {

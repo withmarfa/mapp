@@ -31,6 +31,20 @@ nonisolated enum NewItemText {
         return Typing(mark: mark, query: query, before: String(text[..<start]))
     }
 
+    /// `text` cut where it holds `query`, ignoring case and accents, so a list can draw what was typed in bold.
+    static func matchRuns(of query: String, in text: String) -> [(text: String, matches: Bool)] {
+        guard !query.isEmpty else { return [(text, false)] }
+        var runs: [(text: String, matches: Bool)] = []
+        var from = text.startIndex
+        while let range = text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive], range: from..<text.endIndex), !range.isEmpty {
+            if range.lowerBound > from { runs.append((String(text[from..<range.lowerBound]), false)) }
+            runs.append((String(text[range]), true))
+            from = range.upperBound
+        }
+        if from < text.endIndex { runs.append((String(text[from...]), false)) }
+        return runs
+    }
+
     // MARK: Tags
 
     /// Takes the finished tags out of the text, in the order typed, and gives the text without them. A tag is `#`

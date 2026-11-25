@@ -115,9 +115,10 @@ struct NewItemDraftsTests {
         draft.tags = ["work", "q4"]
         draft.tier = .feed
         draft.properties = ["priority": .string("high")]
-        draft.chips = [.parent, .field("priority")]
+        draft.chips = [.parent, .field("priority"), .tag("work")]
         draft.files = [attached]
-        draft.declinedDay = "Fri 27 Nov"
+        draft.sources = [.tag("work"): QuickAdd.Source(words: "#work", offset: 7), .field("priority"): QuickAdd.Source(words: "p1", offset: 0)]
+        draft.declined = ["Fri 27 Nov", "#q3"]
         do {
             let drafts = NewItemDrafts(file: file)
             let id = drafts.make(.line, QuickAdd.Draft(typeID: "core.task"), in: "a")

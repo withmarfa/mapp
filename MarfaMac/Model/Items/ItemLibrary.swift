@@ -150,8 +150,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// view that is evaluated at every keystroke.
     func canHaveParent(typeID: String) -> Bool
     /// The best `limit` of `creationParentCandidates` whose name holds `query`: those in `first` in its order, then
-    /// the rest by name. Filters before it sorts, for the line's `@` row at every keystroke.
-    func creationParentMatches(typeID: String, matching query: String, first: [ItemID], limit: Int) -> [Item]
+    /// the rest by name, or with `newest` the most recently changed first. Filters before it sorts, for the line's
+    /// `@` row at every keystroke.
+    func creationParentMatches(typeID: String, matching query: String, first: [ItemID], limit: Int, newest: Bool) -> [Item]
     /// Whether a new item of `typeID` can be put under `parent`, as `creationParentCandidates` would list it.
     func admitsCreationParent(_ parent: ItemID, typeID: String) -> Bool
 
@@ -371,8 +372,8 @@ extension ItemLibrary {
     func tookPropertyWrite(_ mark: Int) -> Bool { false }
     var history: (any ItemHistorySource)? { nil }
     func newChildVerdict(under parent: ItemID) async -> EdgeVerdict { .taken }
-    func creationParentMatches(typeID: String, matching query: String, first: [ItemID], limit: Int) -> [Item] {
-        QuickAdd.bestParents(creationParentCandidates(typeID: typeID), matching: query, first: first, limit: limit)
+    func creationParentMatches(typeID: String, matching query: String, first: [ItemID], limit: Int, newest: Bool) -> [Item] {
+        QuickAdd.bestParents(creationParentCandidates(typeID: typeID), matching: query, first: first, limit: limit, newest: newest)
     }
     func admitsCreationParent(_ parent: ItemID, typeID: String) -> Bool {
         creationParentCandidates(typeID: typeID).contains { $0.id == parent }

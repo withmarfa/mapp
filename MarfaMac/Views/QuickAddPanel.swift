@@ -348,6 +348,9 @@ struct QuickAddPanel: View {
                         if let field = QuickAdd.fields(of: draft.typeID, in: catalogue).first(where: { $0.key == key }) {
                             propertyChip(field, value: draft.properties[key], typeID: draft.typeID)
                         }
+                    case .tag:
+                        // The tags lead the row, above.
+                        EmptyView()
                     }
                 }
                 ForEach(files) { file in attachmentChip(file) }
@@ -449,7 +452,7 @@ struct QuickAddPanel: View {
     }
 
     private func tagChip(_ tag: String) -> some View {
-        chipShell(remove: (String(localized: "Remove Tag “\(tag)”"), "QuickAddRemoveTag", { quickAdd.draft?.tags.removeAll { $0 == tag } })) {
+        chipShell(remove: (String(localized: "Remove Tag “\(tag)”"), "QuickAddRemoveTag", { quickAdd.draft?.remove(.tag(tag), in: library.catalogue) })) {
             chipFace(hasRemove: true) {
                 Text(verbatim: "#\(tag)")
             }
@@ -588,6 +591,8 @@ struct QuickAddPanel: View {
                         }
                         .accessibilityIdentifier("QuickAddMore.\(key)")
                     }
+                case .tag:
+                    EmptyView()
                 }
             }
         } label: {

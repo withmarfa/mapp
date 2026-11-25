@@ -81,10 +81,18 @@ final class QuickAdd {
         deinit { if scoped { url.stopAccessingSecurityScopedResource() } }
     }
 
-    /// A detail of the item the panel shows as a chip under its text: its parent, or one of its kind's fields.
+    /// A detail of the item the panel shows as a chip: its parent, one of its kind's fields, or, on the line, a tag.
     enum Chip: Hashable {
         case parent
         case field(String)
+        case tag(String)
+    }
+
+    /// The words on the line a chip was read from, and where they stood in the title, so Delete can put them back.
+    struct Source: Equatable {
+        let words: String
+        /// How many characters of the title stood before the words.
+        let offset: Int
     }
 
     struct Draft: Equatable {
@@ -110,8 +118,10 @@ final class QuickAdd {
         /// Where the item goes: the Library, or the Feed. It starts as the place the panel opened in says
         /// (`QuickAdd.startingTier`), and the In row changes it.
         var tier: Tier = .library
-        /// The words naming a day that the person took back from the line, which stay text.
-        var declinedDay: String?
+        /// The words each chip on the line was read from (`QuickAdd.Source`), which Delete puts back into the title.
+        var sources: [Chip: Source] = [:]
+        /// Words the person put back into the title from a chip, which the line no longer reads.
+        var declined: [String] = []
         /// Values typed for fields the kind now lacks, by key, kept and not sent, which come back when the kind
         /// changes to one that has the field.
         var setAside: [String: PropertyValue] = [:]
@@ -176,14 +186,64 @@ final class QuickAdd {
         /// without it.
         mutating func remove(_ chip: Chip, in catalogue: Catalogue) {
             guard QuickAdd.isRemovable(chip, typeID: typeID, in: catalogue) else { return }
+            takeOut(chip)
+        }
+
+        /// Gives the item a tag and shows its chip, after the ones already shown.
+        mutating func addTag(_ tag: String) {
+            if !tags.contains(tag) { tags.append(tag) }
+            add(.tag(tag))
+        }
+
+        /// Takes a chip and its value out, and the words it was read from.
+        private mutating func takeOut(_ chip: Chip) {
             chips.removeAll { $0 == chip }
+            sources[chip] = nil
             switch chip {
             case .parent: parentID = nil
             case .field(let key):
                 properties[key] = nil
                 if prefilled[key] != nil { declinedPrefill = true }
                 prefilled[key] = nil
+            case .tag(let tag): tags.removeAll { $0 == tag }
             }
+        }
+
+        /// Delete on a chip of the line. A chip read from words takes its value out and puts the words back in the
+        /// title where they stood, as text the line no longer reads, so nothing typed is lost. A chip chosen from a
+        /// row goes, unless it holds a value the person set in its panel, which stays. Returns whether it went.
+        @discardableResult
+        mutating func putBack(_ chip: Chip) -> Bool {
+            if let source = sources[chip] {
+                takeOut(chip)
+                insert(source.words, at: source.offset)
+                if !declined.contains(source.words) { declined.append(source.words) }
+                return true
+            }
+            if case .field(let key) = chip, typedProperties[key] != nil { return false }
+            takeOut(chip)
+            return true
+        }
+
+        /// Empties the line's chips read from words, as emptying the title does: their words went with the text.
+        mutating func dropReadChips() {
+            for chip in Array(sources.keys) { takeOut(chip) }
+            declined = []
+        }
+
+        /// Puts `words` into the title at `offset`, moved on to the end of any word it falls in, with a space either
+        /// side where the title has none.
+        private mutating func insert(_ words: String, at offset: Int) {
+            var at = title.index(title.startIndex, offsetBy: min(max(offset, 0), title.count))
+            while at > title.startIndex, at < title.endIndex, !title[at].isWhitespace, !title[title.index(before: at)].isWhitespace {
+                at = title.index(after: at)
+            }
+            let before = title[..<at]
+            let after = title[at...]
+            var piece = words
+            if let last = before.last, !last.isWhitespace { piece = " " + piece }
+            if let first = after.first, !first.isWhitespace { piece += " " }
+            title = String(before) + piece + after
         }
     }
 
@@ -505,6 +565,7 @@ final class QuickAdd {
             switch chip {
             case .parent: if draft.parentID != nil { shown.append(chip) }
             case .field(let key): if keys.contains(key) { shown.append(chip) }
+            case .tag: break
             }
         }
         if draft.parentID != nil, !shown.contains(.parent) { shown.append(.parent) }
@@ -527,7 +588,7 @@ final class QuickAdd {
     /// Whether the person can take a chip away: all but a required field.
     static func isRemovable(_ chip: Chip, typeID: String, in catalogue: Catalogue) -> Bool {
         switch chip {
-        case .parent: true
+        case .parent, .tag: true
         case .field(let key): fields(of: typeID, in: catalogue).first { $0.key == key }?.required != true
         }
     }
@@ -678,6 +739,7 @@ extension Browser {
             switch chip {
             case .parent: draft.parentID != nil
             case .field(let key): keys.contains(key)
+            case .tag(let tag): draft.tags.contains(tag)
             }
         }
         // A list field the new kind lacks gives back any entry still being typed into it.

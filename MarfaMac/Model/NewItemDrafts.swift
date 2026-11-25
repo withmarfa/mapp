@@ -323,7 +323,8 @@ private struct StoredEntry: Codable {
     var files: [String]
     var tags: [String]
     var feed: Bool
-    var declinedDay: String?
+    var sources: [String: StoredSource]
+    var declined: [String]
     var setAside: [String: StoredValue]
     var setAsideParent: ItemID?
     var addingFile: Bool
@@ -343,16 +344,12 @@ private struct StoredEntry: Codable {
         prefilled = draft.prefilled.mapValues(StoredValue.init)
         declinedPrefill = draft.declinedPrefill
         parentID = draft.parentID
-        chips = draft.chips.map { chip in
-            switch chip {
-            case .parent: "parent"
-            case .field(let key): "field:" + key
-            }
-        }
+        chips = draft.chips.map(\.stored)
+        sources = Dictionary(uniqueKeysWithValues: draft.sources.map { ($0.key.stored, StoredSource(words: $0.value.words, offset: $0.value.offset)) })
+        declined = draft.declined
         files = draft.files.map { $0.url.path(percentEncoded: false) }
         tags = draft.tags
         feed = draft.tier == .feed
-        declinedDay = draft.declinedDay
         setAside = draft.setAside.mapValues(StoredValue.init)
         setAsideParent = draft.setAsideParent
         addingFile = entry.addingFile
@@ -367,7 +364,11 @@ private struct StoredEntry: Codable {
         draft.prefilled = prefilled.mapValues(\.value)
         draft.declinedPrefill = declinedPrefill
         draft.parentID = parentID
-        draft.chips = chips.map { $0 == "parent" ? .parent : .field(String($0.dropFirst("field:".count))) }
+        draft.chips = chips.map(QuickAdd.Chip.init(stored:))
+        for (chip, source) in sources {
+            draft.sources[QuickAdd.Chip(stored: chip)] = QuickAdd.Source(words: source.words, offset: source.offset)
+        }
+        draft.declined = declined
         var missing: [String] = []
         for path in files {
             let url = URL(filePath: path)
@@ -375,12 +376,38 @@ private struct StoredEntry: Codable {
         }
         draft.tags = tags
         draft.tier = feed ? .feed : .library
-        draft.declinedDay = declinedDay
         draft.setAside = setAside.mapValues(\.value)
         draft.setAsideParent = setAsideParent
         return NewItemDrafts.Entry(
             id: id, slot: slot, library: library, draft: draft, sent: sent, updated: updated, missingFiles: missing,
             returned: addingFile, interrupted: addingFile)
+    }
+}
+
+/// The words a chip was read from, as the file holds them.
+private struct StoredSource: Codable {
+    var words: String
+    var offset: Int
+}
+
+extension QuickAdd.Chip {
+    /// The chip as the file holds it: `parent`, `field:<key>` or `tag:<tag>`.
+    fileprivate var stored: String {
+        switch self {
+        case .parent: "parent"
+        case .field(let key): "field:" + key
+        case .tag(let tag): "tag:" + tag
+        }
+    }
+
+    fileprivate init(stored: String) {
+        if stored.hasPrefix("tag:") {
+            self = .tag(String(stored.dropFirst("tag:".count)))
+        } else if stored == "parent" {
+            self = .parent
+        } else {
+            self = .field(String(stored.dropFirst("field:".count)))
+        }
     }
 }
 

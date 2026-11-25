@@ -11,7 +11,7 @@ paths:
 
 # Making and editing
 
-Every change a person makes to an item is an `ItemWrite` through `ItemLibrary`. `docs/value-panels.md` says how a value is edited in its panel. `docs/commands.md` says how a command is added, and `MarfaMac/Model/AGENTS.md` how a write is kept.
+Every change a person makes to an item is an `ItemWrite` through `ItemLibrary`. `docs/value-panels.md` says how a value is edited in its panel. `MarfaMac/Model/AGENTS.md` says how a write is kept.
 
 ## What an item allows
 
@@ -36,11 +36,12 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ### The line
 
-- **Keys:** Tab moves the kind, `#` a tag, `@` a parent, `/` a property. Before typing, each row offers the most recent (`NewItemRecents`).
-- **Add (↩) keeps the line open, empty, with the same kind,** and says "Added “name”" with an Undo of that add alone. ⌘↩ adds and opens; ⇧↩ moves this line's draft to the text form.
-- **A tag is `#` and a letter at a word's start** (`NewItemText.takeTags`), taken when a space or Add ends it. `Issue #12` and reserved tags stay text.
-- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), read in the person's locale: `27/11` in Britain, `11/27` in the United States, `Fri 27 Nov`. Its whole words leave the title. Removing its token keeps them as text.
-- **A web address pasted into an empty line makes a bookmark of it** (`QuickAdd.bookmarkKind`).
+- **Keys:** Tab moves the kind, `#` a tag, `@` a parent, `/` a property. Before typing, each row offers the most recent.
+- **Add (↩) keeps the line open with the same kind,** with an Undo. ⌘↩ adds and opens; ⇧↩ moves the draft to the text form.
+- **What the line reads becomes a chip after the title,** in typing order (`QuickAdd.lineChips`). Delete before the title or on a chip puts the words back as text (`QuickAdd.Draft.putBack`). Emptying the title drops them.
+- **A tag is `#` and a letter at a word's start** (`NewItemText.takeTags`). `Issue #12` and reserved tags stay text.
+- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), in the person's locale: `27/11` or `Fri 27 Nov` in Britain. It is read once a word follows it, or at Add.
+- **A web address pasted into an empty line makes a bookmark** (`QuickAdd.bookmarkKind`).
 - **A kind change sets aside values it cannot hold** (`QuickAdd.tellSetAside`).
 
 ### Typed text is never lost

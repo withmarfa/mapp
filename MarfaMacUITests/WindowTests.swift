@@ -169,7 +169,7 @@ nonisolated final class WindowTests: XCTestCase {
         let before = count(of: "Items")
         app.typeKey("n", modifierFlags: .command)
         XCTAssertTrue(window.descendants(matching: .any)["NewItemLineTitle"].waitForExistence(timeout: 3))
-        XCTAssertFalse(window.buttons["NewItemLineAddAndOpen"].isEnabled, "an empty draft cannot make an item")
+        XCTAssertFalse(window.buttons["NewItemLineAddAndOpen"].exists, "an empty draft offers no Add")
         XCTAssertEqual(count(of: "Items"), before)
         window.completeQuickAdd(type: "Note", title: "Shopping")
         XCTAssertTrue(row(titled: "Shopping").waitForExistence(timeout: 3))
