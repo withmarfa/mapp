@@ -263,6 +263,15 @@ import UniformTypeIdentifiers
         #expect(try await settled(table, in: library).rows.first?.item.title == "Aa searched")
     }
 
+    @Test func theListsDateGroupsAreWhatEachDateAloneGives() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/London")!
+        // Over three years, a clock change and the turn of a year among them, newest first as a list by date is.
+        let dates = (-40...(3 * 365 * 24 / 7)).map { Self.now.addingTimeInterval(Double(-$0) * 7 * 3600) }
+        var grouper = ItemGroup.Grouper(now: Self.now, calendar: calendar)
+        #expect(dates.map { grouper.group(for: $0) } == dates.map { ItemGroup.group(for: $0, now: Self.now, calendar: calendar) })
+    }
+
     // MARK: The library's listings
 
     @Test func aListingUpdatedByItsChangesListsWhatAFreshLibraryLists() async throws {

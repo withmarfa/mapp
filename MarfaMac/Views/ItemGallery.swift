@@ -47,9 +47,11 @@ struct ItemGallery: View {
         // does not say them again.
         let shape = CardShape(dropsOpening: browser.cards.preview == .pictureOrText || browser.cards.preview == .text)
         let list = RowList(date: .look, format: dateFormat, marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: library.now()))
-        let contents = cardContents.contents(of: sections.flatMap(\.items), in: library, looks: browser.propertyLooks(in: library), list: list, shape: shape)
-        let attachments = CardAttachments.of(sections.flatMap(\.items), in: library, showsPicture: browser.cards.preview.showsPicture)
-        keyboardCollection(sections, ids: ids, plan: plan(for: browser.cards, contents: contents, attachments: attachments))
+        // Only a page of a large place is drawn, and the next as its end comes into view (`Browser.listItemsDrawn`).
+        let (drawn, more) = arrangement.drawn(upTo: browser.listItemsDrawn)
+        let contents = cardContents.contents(of: drawn.flatMap(\.items), in: library, looks: browser.propertyLooks(in: library), list: list, shape: shape)
+        let attachments = CardAttachments.of(drawn.flatMap(\.items), in: library, showsPicture: browser.cards.preview.showsPicture)
+        keyboardCollection(sections, drawn: drawn, more: more, ids: ids, plan: plan(for: browser.cards, contents: contents, attachments: attachments))
         .searchStatus(browser)
         .accessibilityLabel(title)
         .onChange(of: browser.isSearchExpanded) {
@@ -58,6 +60,12 @@ struct ItemGallery: View {
         .onChange(of: ids) { _, new in
             if let cursor, !new.contains(cursor) { self.cursor = nil }
             if let anchor, !new.contains(anchor) { self.anchor = nil }
+        }
+        // An item chosen past what is drawn, as by Back, a link or the arrow keys, is drawn.
+        .onChange(of: browser.selection, initial: true) {
+            if browser.selection.count == 1, let id = browser.selection.first, let position = arrangement.positions[id] {
+                browser.drawList(through: position)
+            }
         }
         .overlay {
             if ids.isEmpty {
@@ -75,12 +83,16 @@ struct ItemGallery: View {
         .dragsSelection(of: browser)
     }
 
-    private func collection(_ sections: [ItemSection], ids: [ItemID], plan: Plan) -> some View {
+    private func collection(_ sections: [ItemSection], more: Bool, ids: [ItemID], plan: Plan) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
                     ForEach(sections) { section in
                         sectionGrid(section, ids: ids, plan: plan)
+                    }
+                    if more {
+                        // Drawn only to come into view, which draws the next page.
+                        Color.clear.frame(height: 1).accessibilityHidden(true).onAppear { browser.drawMoreOfList() }
                     }
                 }
                 .padding(Self.inset)
@@ -133,8 +145,8 @@ struct ItemGallery: View {
         }
     }
 
-    private func keyboardCollection(_ sections: [ItemSection], ids: [ItemID], plan: Plan) -> some View {
-        collection(sections, ids: ids, plan: plan)
+    private func keyboardCollection(_ sections: [ItemSection], drawn: [ItemSection], more: Bool, ids: [ItemID], plan: Plan) -> some View {
+        collection(drawn, more: more, ids: ids, plan: plan)
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow], phases: .down) { key in
             let current = cursor ?? ids.first(where: browser.selection.contains)
             let destination: ItemID?

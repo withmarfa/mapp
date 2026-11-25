@@ -56,7 +56,17 @@ extension MarfaLibrary {
 
     /// Keeps the records the views already observe, so a second load tells each of them what changed.
     private func load(_ snapshot: SourceSnapshot) {
-        catalogue = holdingChosenIcons(snapshot.catalogue)
+        let catalogue = holdingChosenIcons(snapshot.catalogue)
+        // The copy read whole again on the same catalogue is taken as what changed, so a place re-places only those items.
+        if isLoaded, catalogue == self.catalogue {
+            take(snapshot.views)
+            let present = Set(snapshot.items.map(\.id))
+            take(ItemChanges(
+                upserted: snapshot.items, removed: records.keys.filter { !present.contains($0) }, bodies: Array(snapshot.bodies.values)))
+            Task { await readServerKey() }
+            return
+        }
+        self.catalogue = catalogue
         take(snapshot.views)
         let present = Set(snapshot.items.map(\.id))
         var renamed = false

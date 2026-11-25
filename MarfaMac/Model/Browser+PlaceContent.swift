@@ -712,6 +712,25 @@ nonisolated struct ListArrangement: Sendable {
         types = Set(sections.lazy.flatMap(\.items).map(\.type))
     }
 
+    /// The sections up to `limit` items, the last of them cut short where it holds more, and whether any items are left,
+    /// for a layout that draws a page at a time (`Browser.listItemsDrawn`).
+    func drawn(upTo limit: Int) -> (sections: [ItemSection], more: Bool) {
+        var drawn: [ItemSection] = []
+        var left = limit
+        for section in sections {
+            guard left > 0 || section.items.isEmpty else { return (drawn, true) }
+            if section.items.count > left {
+                var cut = section
+                cut.items = Array(section.items.prefix(left))
+                drawn.append(cut)
+                return (drawn, true)
+            }
+            drawn.append(section)
+            left -= section.items.count
+        }
+        return (drawn, false)
+    }
+
     /// The same sections, as made at the library's revision `content`, which changed none of their items.
     func at(_ content: Int) -> ListArrangement {
         var moved = self
@@ -739,8 +758,9 @@ nonisolated struct TableSections: Sendable {
         // Days, Previous 30 Days, then months and years.
         if groupMode == .bucket(.day), [ItemTableColumn.created.id, ItemTableColumn.edited.id, ItemTableColumn.occurred.id].contains(column.id) {
             var sections: [ItemSection] = []
+            var grouper = ItemGroup.Grouper(now: now)
             for row in groups.flatMap(\.rows) {
-                let group = column.date(of: row, calendar: .current).map { ItemGroup.group(for: $0, now: now) }
+                let group = column.date(of: row, calendar: .current).map { grouper.group(for: $0) }
                 if let last = sections.last, last.group == group {
                     sections[sections.count - 1].items.append(row.item)
                 } else {
