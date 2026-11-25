@@ -108,14 +108,21 @@ extension MarfaLibrary {
             return write
         }
         movingTo[id] = StateMoving(write: write, sent: state, to: final)
+        stateWriteItems[write] = id
         stateAnswers[write] = answered
         return write
     }
 
     /// The copy shows the write, so the item stands where the copy says, unless a second write is still to follow.
     func stateWriteTaken(_ write: WriteID) {
-        guard let (id, moving) = movingTo.first(where: { $0.value.write == write }), !moving.awaitsArchive else { return }
+        guard let (id, moving) = movingWrite(write), !moving.awaitsArchive else { return }
         movingTo[id] = nil
+    }
+
+    /// The item `write` moves and its move on the way, while that write is still the item's latest.
+    private func movingWrite(_ write: WriteID) -> (ItemID, StateMoving)? {
+        guard let id = stateWriteItems[write], let moving = movingTo[id], moving.write == write else { return nil }
+        return (id, moving)
     }
 
     /// A restore that is blocked or dead may still be made once released, but the archive waiting for it is not sent
@@ -123,13 +130,14 @@ extension MarfaLibrary {
     /// in it, so those are counted and told once no restore waits any longer.
     func stateWriteAnswered(_ write: WriteID, _ outcome: WriteOutcome) {
         let answer = StateAnswer(outcome)
-        let moving = movingTo.first(where: { $0.value.write == write })
+        let moving = movingWrite(write)
         if let (id, moving) = moving, answer != .made || !moving.awaitsArchive {
             movingTo[id] = nil
         }
+        if answer != .mayBeMade { stateWriteItems[write] = nil }
         // A blocked or dead write may still be withdrawn, so it is followed to its next answer.
         if answer == .mayBeMade { stateAnswers[write]?(write, answer) } else { stateAnswers.removeValue(forKey: write)?(write, answer) }
-        if answer == .mayBeMade, moving?.value.awaitsArchive == true { archivesDropped += 1 }
+        if answer == .mayBeMade, moving?.1.awaitsArchive == true { archivesDropped += 1 }
         if archivesDropped > 0, !movingTo.values.contains(where: \.awaitsArchive) { tellArchivesDropped() }
     }
 

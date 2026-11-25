@@ -209,6 +209,8 @@ import Observation
     @ObservationIgnored var undoRuns: [WriteID: UndoRun] = [:]
     /// Where this Mac's state change on its way leaves each item, until the copy shows it (`setStates`).
     @ObservationIgnored var movingTo: [ItemID: StateMoving] = [:]
+    /// The item each state write moves, until its last answer, so settling a large change finds each write at once.
+    @ObservationIgnored var stateWriteItems: [WriteID: ItemID] = [:]
     /// What follows the answer to each write of a state change, told what the answer means for the move (`setStates`).
     @ObservationIgnored var stateAnswers: [WriteID: (WriteID, StateAnswer) -> Void] = [:]
     /// Restores answered blocked or dead whose archive will not follow, told together once no restore waits.
