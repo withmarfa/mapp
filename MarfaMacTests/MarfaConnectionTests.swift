@@ -20,11 +20,23 @@ struct MarfaConnectionTests {
     }
 
     @Test(arguments: [
-        "https://marfa.example/a", "https://marfa.example/a/", "https://marfa.example//", "https://marfa.example/%2F", "https://marfa.example/?x=1",
-        "https://marfa.example?x=1", "https://marfa.example/#f",
+        ("marfa-demo.cyzr.me", "https://marfa-demo.cyzr.me"),
+        (" MARFA.Example:443/a?x=1#f ", "https://marfa.example:443"),
+        ("https://marfa.example/%2F?x=1#f", "https://marfa.example"),
+        ("http://marfa.example:80//", "http://marfa.example:80"),
+        ("localhost:8210/path", "http://localhost:8210"),
+        ("notes.LOCALHOST?x=1", "http://notes.localhost"),
+        ("127.12.0.1#f", "http://127.12.0.1"),
+        ("[::1]:8210", "http://[::1]:8210"),
+        ("https://localhost:443/path", "https://localhost:443"),
     ])
-    func anAddressWithAPathAQueryOrAFragmentIsRefused(_ text: String) {
-        #expect(throws: MarfaConnection.Problem.hasMore) { try MarfaConnection(address: text) }
+    func aTypedAddressIsCompletedToItsOrigin(_ text: String, _ origin: String) throws {
+        let typed = try MarfaConnection(address: text)
+        let explicit = try MarfaConnection(address: origin)
+        #expect(typed.address.absoluteString == origin)
+        #expect(typed == explicit)
+        let stores = MarfaStoreLocation(root: URL.temporaryDirectory)
+        #expect(stores.store(for: typed) == stores.store(for: explicit))
     }
 
     /// An address names its copy and its discard marks as it was entered, so a port the scheme already means is kept.
@@ -47,7 +59,11 @@ struct MarfaConnectionTests {
         #expect(try MarfaConnection(address: one).sameServer(as: MarfaConnection(address: other)) == same)
     }
 
-    @Test(arguments: ["ftp://marfa.example", "marfa.example", "http://", "https://user:secret@marfa.example", ""])
+    @Test(arguments: [
+        "ftp://marfa.example", "http://", "https:/marfa.example", "https//marfa.example", "http/marfa.example", "https:443", "//marfa.example",
+        "/marfa.example", ".", "-marfa.example", "127.1", "2130706433", "0177.0.0.1", "marfa.example:", "marfa.example:65536", "marfa.example:99999999999999999999", "::1", "marfa example",
+        "user:secret@marfa.example", "https://user:secret@marfa.example", "https://marfa.example\\other", "",
+    ])
     func anAddressThatNamesNoServerIsRefused(_ text: String) {
         #expect(throws: MarfaConnection.Problem.notAServer) { try MarfaConnection(address: text) }
     }
@@ -57,7 +73,7 @@ struct MarfaConnectionTests {
         #expect(throws: MarfaConnection.Problem.notAServer) { try MarfaConnection(address: text) }
         let notice = try #require(MarfaSettingsModel.notice(for: .notAServer))
         #expect(!(notice.title + notice.message).localizedCaseInsensitiveContains("userinfo"))
-        #expect(notice.message == "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://.")
+        #expect(notice.message == "Enter a Marfa server address, such as marfa.example.")
     }
 
     @Test func eachServerKeepsItsOwnCopyInTheAppsStorage() throws {

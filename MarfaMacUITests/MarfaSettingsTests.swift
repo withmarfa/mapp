@@ -48,7 +48,10 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         XCTAssertFalse(connect.isEnabled)
         XCTAssertFalse(connectWithCode.isEnabled)
         address.click()
-        address.typeText("https://marfa.example.com")
+        address.typeText("https")
+        address.typeKey(";", modifierFlags: .shift)
+        address.typeText("//marfa.example")
+        XCTAssertEqual(address.value as? String, "https://marfa.example")
         XCTAssertTrue(connect.isEnabled)
         XCTAssertTrue(connectWithCode.isEnabled)
     }
@@ -57,12 +60,14 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         openLibraryPage()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         address.click()
-        address.typeText("marfa.example")
+        let invalidAddress = "marfa example"
+        address.typeText(invalidAddress)
+        XCTAssertEqual(address.value as? String, invalidAddress)
+        XCTAssertTrue(connect.isEnabled)
         connect.click()
-        let notice = app.descendants(matching: .any)["MarfaNotice"].firstMatch
-        XCTAssertTrue(notice.waitForExistence(timeout: 3))
-        let noticeText = notice.label + " " + (notice.value as? String ?? "")
-        XCTAssertTrue(noticeText.contains("Check the Address"), "the combined notice exposes its title: \(notice.debugDescription)")
+        let detail = app.descendants(matching: .any)["SettingsDetail"]
+        XCTAssertTrue(detail.staticTexts["Check the Address"].waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(detail.staticTexts["Enter a Marfa server address, such as marfa.example."].exists)
         XCTAssertFalse(app.buttons["MarfaDisconnect"].exists, "nothing was connected")
         attachScreenshot("SettingsMarfaNotAServer")
     }

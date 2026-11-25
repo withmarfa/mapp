@@ -147,6 +147,7 @@ import Testing
         let host = bench.host()
         await host.launch()
         #expect(host.connection == nil)
+        #expect(host.configuredConnection == nil)
         #expect(host.unusableAddress == "https://first.test/a")
         #expect(bench.servers.opened.isEmpty)
         #expect(bench.savedAddress == "https://first.test/a", "the saved address is left as it was")
@@ -332,7 +333,7 @@ import Testing
         let host = bench.host()
 
         await expect(.copyKept(.changed(now: 1), signIn: nil)) { () throws(MarfaHost.Problem) in
-            try await host.connect(address: "http://first.test:8210", key: "k")
+            try await host.connect(address: "http://first.test:8210/items?view=all#top", key: "k")
         }
         #expect(FileManager.default.fileExists(atPath: store.path))
         #expect(host.connection == nil)

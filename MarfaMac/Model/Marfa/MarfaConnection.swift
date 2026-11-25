@@ -5,32 +5,60 @@ import Marfa
 /// The Marfa server a library reads from, by its address.
 nonisolated struct MarfaConnection: Hashable, Sendable {
     enum Problem: Error, Hashable, Sendable {
-        /// Not an http or https address with a host, or one carrying a user or password.
         case notAServer
-        /// A server's address and more: a path beyond a lone `/`, a query or a fragment. The package keeps one sign-in
-        /// for each origin, so nothing after the origin can name another server.
+        /// A stored address with a suffix may have a copy of its own.
         case hasMore
     }
 
-    /// Scheme and host in lower case and no trailing slash, otherwise the address as it was entered: the copy and the
-    /// discard marks are named by this exact text, so `https://host` and `https://host:443` are two copies. Compare
-    /// connections with `sameServer(as:)`, never `==`, where the question is whether two addresses are one server.
+    /// The completed server address. An explicit default port still names its own copy and discard marks.
     let address: URL
 
-    init(address text: String) throws(Problem) {
+    init(address text: String, completing: Bool = true) throws(Problem) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard var components = URLComponents(string: trimmed),
-            let scheme = components.scheme?.lowercased(), ["http", "https"].contains(scheme),
-            let host = components.host, !host.isEmpty,
-            components.user == nil, components.password == nil
+        let lowercased = trimmed.lowercased()
+        let explicit = lowercased.hasPrefix("http://") || lowercased.hasPrefix("https://")
+        guard explicit || completing else { throw .notAServer }
+
+        let candidate = explicit ? trimmed : "https://" + trimmed
+        guard var components = URLComponents(string: candidate),
+            let host = components.host?.lowercased(), !host.isEmpty,
+            let scheme = components.scheme?.lowercased(), components.user == nil, components.password == nil
         else { throw .notAServer }
-        // The encoded path, since `path` decodes `%2F` to a slash that would pass for the lone one.
-        guard ["", "/"].contains(components.percentEncodedPath), components.query == nil, components.fragment == nil else { throw .hasMore }
-        components.scheme = scheme
-        components.host = host.lowercased()
+
+        if completing {
+            let authority = candidate.dropFirst(scheme == "http" ? 7 : 8).prefix { !"/?#".contains($0) }
+            guard !trimmed.contains("\\"), trimmed.rangeOfCharacter(from: .controlCharacters) == nil,
+                explicit || (host != "http" && host != "https"),
+                Self.isValidAuthority(authority, host: host, port: components.port, explicit: explicit)
+            else { throw .notAServer }
+        } else {
+            guard ["", "/"].contains(components.percentEncodedPath), components.query == nil, components.fragment == nil
+            else { throw .hasMore }
+        }
+        components.scheme = !explicit && Self.isLoopback(host) ? "http" : scheme
+        components.host = host
         components.path = ""
+        components.query = nil
+        components.fragment = nil
         guard let address = components.url else { throw .notAServer }
         self.address = address
+    }
+
+    private static func isValidAuthority(_ authority: Substring, host: String, port: Int?, explicit: Bool) -> Bool {
+        guard let match = authority.wholeMatch(of: #/(?:\[[0-9A-Fa-f:.]+\]|[\p{L}\p{M}\p{N}._-]+)(?::([0-9]+))?/#)
+        else { return false }
+        if let digits = match.output.1 {
+            guard let number = Int(digits), (1...65535).contains(number), port == number else { return false }
+        }
+        if host.hasPrefix("[") { return IPAddress(literal: host)?.bytes.count == 16 }
+
+        let name = host.hasSuffix(".") ? host.dropLast() : host[...]
+        let labels = name.split(separator: ".", omittingEmptySubsequences: false)
+        guard !name.isEmpty, labels.allSatisfy({ !$0.isEmpty && $0.first != "-" && $0.last != "-" }) else { return false }
+        guard !explicit, IPAddress(literal: host) != nil else { return true }
+
+        // A resolver can read shortened, octal and hexadecimal IPv4 spellings as a different host.
+        return labels.count == 4 && labels.allSatisfy { label in UInt8(label).map { String($0) == label } == true }
     }
 
     /// Whether `other` names the same server: the same address once a port the scheme already means is left out. The
@@ -50,7 +78,11 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
     /// Whether the server runs on this Mac: an address that names the loopback, as `localhost`, an IPv4 address in `127.0.0.0/8` and `::1` do.
     var isOnThisMac: Bool {
         guard let host = address.host(percentEncoded: false)?.lowercased() else { return false }
-        return host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host == "[::1]" || Self.isLoopbackIPv4(host)
+        return Self.isLoopback(host)
+    }
+
+    private static func isLoopback(_ host: String) -> Bool {
+        host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host == "[::1]" || Self.isLoopbackIPv4(host)
     }
 
     private static func isLoopbackIPv4(_ host: String) -> Bool {

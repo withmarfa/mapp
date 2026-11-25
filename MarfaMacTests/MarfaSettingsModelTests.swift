@@ -51,25 +51,20 @@ import Testing
         #expect(model.code == nil)
     }
 
-    @Test(arguments: ["https://marfa.example/a", "https://marfa.example/?x=1", "https://marfa.example/#f"])
-    func anAddressWithMoreThanTheServerIsToldInWordsWhereverItIsTyped(text: String) async throws {
+    @Test func connectingAndSwitchingSaveTheCompletedAddress() async throws {
         let bench = HostBench()
-        let (model, flushed) = model(bench)
-        await connect(model, to: text, key: "k")
-        let notice = try #require(model.notice)
-        #expect(notice.title == "Check the Address")
-        #expect(notice.message == "Use only the server’s address, with nothing after it, such as https://marfa.example.")
-        #expect(model.address == text, "what was typed is kept for another try")
-        #expect(!model.isConnected)
+        let (model, _) = model(bench)
+        await connect(model, to: "first.test:8210/a?x=1#f")
+        #expect(bench.savedAddress == "https://first.test:8210")
+        #expect(model.address.isEmpty)
+        #expect(model.notice == nil)
 
-        await connect(model, to: "http://first.test:8210")
-        model.otherAddress = text
+        model.otherAddress = "localhost:8210/a?x=1#f"
+        _ = model.host.scripted("key-2")
         await model.switchServer()
-        #expect(model.notice?.message == notice.message)
-        #expect(model.host.connection == first)
-        #expect(model.otherAddress == text)
-        #expect(bench.servers.opened.count == 1, "only the first server was opened")
-        _ = flushed
+        #expect(bench.savedAddress == "http://localhost:8210")
+        #expect(model.otherAddress.isEmpty)
+        #expect(model.notice == nil)
     }
 
     @Test func aFailureToOpenTheCopyIsToldWithoutRawErrorText() async throws {
