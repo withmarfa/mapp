@@ -2291,6 +2291,12 @@
     "Add to Sidebar" : {
 
     },
+    "Add to Sidebar: Off" : {
+
+    },
+    "Add to Sidebar: On" : {
+
+    },
     "Add “%@”" : {
 
     },
@@ -7981,6 +7987,12 @@
     "Quick Actions" : {
 
     },
+    "Quick Actions: Off" : {
+
+    },
+    "Quick Actions: On" : {
+
+    },
     "Quick Look" : {
       "extractionState" : "manual"
     },
@@ -8596,6 +8608,9 @@
 
     },
     "Saved as “%@”." : {
+
+    },
+    "Saved in Marfa for every app, except %@." : {
 
     },
     "Saved in Marfa for every app, except Hide Empty Groups." : {
@@ -12209,6 +12224,9 @@
     "a connector" : {
 
     },
+    "a filter Marfa refuses" : {
+
+    },
     "a folder" : {
 
     },
@@ -12287,6 +12305,9 @@
     "files" : {
 
     },
+    "filters joined by both “and” and “or”" : {
+
+    },
     "folders" : {
 
     },
@@ -12301,6 +12322,19 @@
     },
     "grouped by" : {
 
+    },
+    "grouping by %@" : {
+
+    },
+    "grouping by %@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "grouping by %1$@: %2$@"
+          }
+        }
+      }
     },
     "has any" : {
 
@@ -12449,6 +12483,9 @@
     "manage webhooks" : {
       "extractionState" : "manual"
     },
+    "more than %lld conditions" : {
+
+    },
     "no filter" : {
 
     },
@@ -12497,6 +12534,9 @@
     "sorted by" : {
 
     },
+    "sorting by %@" : {
+
+    },
     "starts with" : {
 
     },
@@ -12525,6 +12565,9 @@
 
     },
     "the Library" : {
+
+    },
+    "the filter on %@" : {
 
     },
     "the key %@" : {
@@ -12585,6 +12628,9 @@
 
     },
     "yesterday" : {
+
+    },
+    "“%@”" : {
 
     },
     "“%@” already holds this link to “%@”. Remove it there first." : {
