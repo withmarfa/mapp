@@ -17,8 +17,10 @@ struct TypeValuesSheet: View {
         let preview = library.typeChangePreview(for: request.ids, to: request.type)
         let label = library.catalogue.label(for: request.type)
         VStack(alignment: .leading, spacing: 12) {
-            Text("Change Type").interfaceFont(.title2.bold())
-            Text("\(label) needs these values:").foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Change Type").interfaceFont(.headline)
+                Text("\(label) needs these values:").interfaceFont(.callout).foregroundStyle(.secondary)
+            }
             ForEach(preview.missing, id: \.key) { field in
                 ItemPropertyRow(definition: field, value: values[field.key], isEditable: true, onChange: { value in
                     values[field.key] = value
@@ -42,8 +44,8 @@ struct TypeValuesSheet: View {
                     .accessibilityIdentifier("TypeChangeConfirm")
             }
         }
-        .padding(20)
-        .frame(width: 400)
+        .padding(22)
+        .frame(width: 420)
         .onAppear {
             drafts = Dictionary(uniqueKeysWithValues: preview.missing.map { ($0.key, ItemPropertyDraft()) })
         }

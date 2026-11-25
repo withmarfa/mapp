@@ -1,16 +1,15 @@
 ---
-summary: The rules for making an item, editing its values, changing its type and changing a field from its menu.
+summary: The rules for making an item, changing its type and changing a field from its menu.
 paths:
   - MarfaMac/Model/QuickAdd*.swift
   - MarfaMac/Views/QuickAdd*.swift
-  - MarfaMac/Views/ValueEditing/*.swift
   - MarfaMac/Model/Items/TypeChange*.swift
   - MarfaMac/Model/Items/ItemWrite*.swift
 ---
 
 # Making and editing
 
-Every change a person makes to an item is an `ItemWrite` through `ItemLibrary`. `docs/commands.md` says how a command is added, and `MarfaMac/Model/AGENTS.md` how a write is kept.
+Every change a person makes to an item is an `ItemWrite` through `ItemLibrary`. `docs/value-panels.md` says how a value is edited in its panel. `docs/commands.md` says how a command is added, and `MarfaMac/Model/AGENTS.md` how a write is kept.
 
 ## What an item allows
 
@@ -34,20 +33,11 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 - **What the chosen kind cannot keep stays in sight and holds the panel back**: text, more than one file, or a parent that is gone.
 - **A refused item keeps the panel and its text.**
 
-## Value panels
-
-- **A value is edited in a panel under itself** (`ValueEditPresenter`, `ValueEditModel`), the same one from a row, a cell, the right sidebar and a chip.
-- **A single choice closes the panel when picked; several choices keep it open.** Only a date's panel has a row for Not Set.
-- **A status panel lists the type's words under their four groups.** Edit Statuses… opens the type in Settings.
-- **Unsaved text is kept when a panel loses its place**, and the person is told where it is.
-- **A panel writes the one property it shows**, on the version it read, so it never writes over another app's change to another property.
-- **Change Type, Add Tag and Add to Collection are panels too** (`CommandValuePanels`), never sheets. They act on the whole selection as one undo.
-- **What a command cannot change is left alone and counted** (`BatchSkips`), never silently skipped.
-
 ## Changing type
 
 - **The title and text move to the new type's own keys in one edit** (`TypeChange`), because Marfa reads them from those keys. Marfa keeps every other value, as an unlisted property where the new type has no such field.
-- **A required field the items lack is asked for first** (`TypeValuesSheet`), once for the selection.
+- **The current type is a locked chip in the panel's field,** and the types follow in rows.
+- **A required field the items lack is asked for first** (`TypeValuesSheet`), once for the selection. It is the one sheet in editing: Change Type, "Task needs these values:", a field for each, then Cancel and Change Type.
 - **Some changes are never offered:** a file's type, a type with no text for an item that has some, and a type whose field cannot hold the value under its key.
 
 ## A field's menu
@@ -62,9 +52,3 @@ A right click on a property's name opens a menu with two parts (`FieldMenu`).
 - **A field's key never changes**, because items hold values under it. A rename changes its label.
 - **A removed choice stays on the items that have it**, and the last choice cannot be removed.
 - **Removing a field asks first and keeps the values** on the items, as unlisted properties. The title, text and source-link fields can be renamed and not removed.
-
-## Location
-
-- **The person places the pin.** Apple's license (Developer Program License Agreement, Attachment 6, section 2.5) forbids keeping what a map search returned. A search result only moves the map; what is written is the point the person chose (`LocationPanelModel`).
-- **One edit and one undo write both numbers** and the name the person typed. Clear Location keeps the name.
-- **A name that cannot be written goes to the clipboard**, and the person is told.

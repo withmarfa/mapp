@@ -2232,6 +2232,9 @@
     "All Data" : {
 
     },
+    "All Day" : {
+
+    },
     "All Deleted Items" : {
 
     },
@@ -3830,13 +3833,13 @@
     "Create Link Type" : {
 
     },
+    "Create Tag “%@”" : {
+
+    },
     "Create Type" : {
 
     },
     "Create Webhook" : {
-
-    },
-    "Create “%@”" : {
 
     },
     "Created" : {
@@ -4244,6 +4247,9 @@
     "Edit Statuses…" : {
 
     },
+    "Edit Time" : {
+
+    },
     "Edit Value" : {
 
     },
@@ -4287,6 +4293,12 @@
       "extractionState" : "manual"
     },
     "Empty…" : {
+
+    },
+    "End Day" : {
+
+    },
+    "End Time" : {
 
     },
     "Ends" : {
@@ -8975,6 +8987,12 @@
     "Start Again" : {
 
     },
+    "Start Day" : {
+
+    },
+    "Start Time" : {
+
+    },
     "Start With" : {
 
     },
@@ -9708,6 +9726,9 @@
     "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing." : {
 
     },
+    "The end can’t be before the start." : {
+
+    },
     "The entry changed or was removed while you were editing it." : {
       "extractionState" : "manual"
     },
@@ -10123,6 +10144,9 @@
 
     },
     "The tag could not be added." : {
+
+    },
+    "The time couldn’t be saved." : {
 
     },
     "The time in “%@” wasn’t cleared. %@" : {
@@ -10639,6 +10663,9 @@
     "This type no longer has that field." : {
 
     },
+    "This value changed while you were editing." : {
+
+    },
     "This value changed while you were editing. Your edit hasn’t been saved." : {
       "extractionState" : "manual"
     },
@@ -10697,6 +10724,9 @@
 
     },
     "Time Format" : {
+
+    },
+    "Time Zone" : {
 
     },
     "Time of %@" : {
@@ -11589,6 +11619,9 @@
       "extractionState" : "manual"
     },
     "Your earlier settings are back." : {
+
+    },
+    "Your edit hasn’t been saved." : {
 
     },
     "Your items are still loading." : {

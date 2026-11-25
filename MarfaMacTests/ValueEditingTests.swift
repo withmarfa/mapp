@@ -55,7 +55,8 @@ struct ValueEditingTests {
         #expect(ValueEditKind(field: Self.note) == .text(Self.note))
         #expect(ValueEditKind(field: Self.points)?.isNumber == true)
         #expect(ValueEditKind(field: Self.labels) == .words(Self.labels))
-        #expect(ValueEditKind(field: ItemTypeInfo.Field(key: "done", label: "Done", kind: .boolean, declaredBy: Self.task)) == nil)
+        let done = ItemTypeInfo.Field(key: "done", label: "Done", kind: .boolean, declaredBy: Self.task)
+        #expect(ValueEditKind(field: done) == .yesNo(done))
         #expect([ValueEditKind.tags, .parent, .text(Self.note)].map(\.rowID) == [PagePlacement.tags, PagePlacement.parent, "note"])
     }
 

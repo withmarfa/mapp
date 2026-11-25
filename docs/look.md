@@ -50,6 +50,8 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 | Chip text | Ink 72% | White 72% | Chips, a fact in a row |
 | Name on a tint | Tone toward black: 28% person, 46% type | Tone 50% toward white | `PersonCircle`, `TintedChip`, `NewTiles` |
 | Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Lists, panels, calendars (`SelectionLooks`) |
+| Chosen day | Ink 72% | White 72% | `ValueCalendar` |
+| Today | `#E5484D` | `#E5484D` | `ValueCalendar` |
 | Keycap edge | Ink 20% | White 20% | `KeyCap` |
 | Focus ring | Ink 26% | White 26% | Every keyboard control (`appFocusRing`) |
 
@@ -66,7 +68,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 - **A chosen card has a soft ring and no fill**, because a fill would cover its picture.
 - **A heading, a date line and a group's header get no hover mark**, because they cannot be clicked. A group's chevron is the only part of its header that reacts.
 - **A cell that can be edited keeps its own tint** over the row's.
-- **A chosen row in a value panel, a filter panel or a calendar is the same gray** (`SelectionLooks`), never the accent.
+- **A chosen row in a value panel, filter panel or calendar is the same gray** (`SelectionLooks`), never the accent.
 
 ## Buttons
 
