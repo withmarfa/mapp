@@ -49,15 +49,13 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 | Person fill | Purple 15% | Purple 26% | `PersonCircle` |
 | Chip text | Ink 72% | White 72% | Chips, a fact in a row |
 | Name on a tint | Tone toward black: 28% person, 46% type | Tone 50% toward white | `PersonCircle`, `TintedChip`, `NewTiles` |
-| Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Lists (`SoftSelection`), panels, calendars (`SelectionLooks`) |
-| Toast | Window fill, ink hairline 12% | Window fill and white 8%, hairline white 12% | `ToastView` |
+| Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Lists, panels, calendars (`SelectionLooks`) |
 | Keycap edge | Ink 20% | White 20% | `KeyCap` |
 | Focus ring | Ink 26% | White 26% | Every keyboard control (`appFocusRing`) |
 
 ## Status, priority and empty values
 
 - **`StatusSymbol` is the one map from a status's group to a symbol and a tint.** The words stay the type's own, so an app's "Closed" still reads Closed. A word that no group claims draws as not started.
-- **A status mark is one size and one tone everywhere** (`StatusMark`): a 15 point symbol, whose circle is about 14 points across, and the in-progress blue of 0, 122, 255 in light and 10, 132, 255 in dark. The item page's CSS holds the same blue.
 - **A task's priority takes its color from its rank**, never from its word (`OptionTone.prioritySteps`). Any other option takes one from its word.
 - **An empty value is the gray word Empty**, never a plus button.
 - **A favorite is a yellow star.** The tag behind it is never shown as a tag.
