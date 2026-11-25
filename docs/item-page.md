@@ -35,7 +35,7 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 - **An event's time is one row, When,** always first, with how far off it is or All Day in grey.
 - **Long text stops after two lines;** an email, a phone and a number to call open.
 - **A value is cut, never reworded,** and a linked item that cannot be read, is gone or is in the bin shows nothing, never an id.
-- **Once the head is out of sight** the page says so with the item, title and mark (`DetailsPresentation.scrolledHead`).
+- **Once the head is out of sight** the page says so with the item, title and mark (`DetailsPresentation.scrolledHead`). A head not yet sent or laid out, and a page at its start, is never out of sight (`ItemHeader.isAway`); only Focus, which draws no head, says so from the start.
 
 ## A row's menu
 

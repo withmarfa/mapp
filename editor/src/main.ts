@@ -193,11 +193,11 @@ window.addEventListener(
 )
 
 let generation = 0
-// The toolbar shows the title once the head has gone under it; the app hears only when that changes. A page with no
-// head to show, as in Focus, has its title there from the start.
+// The toolbar shows the title once the head has gone under it; the app hears only when that changes. A page in Focus
+// has its title there from the start; one whose head is not yet sent, or not yet laid out, has not scrolled it away.
 let headerScrolledAway = false
 function checkHeaderScrolledAway(): void {
-  const away = header.isHidden || window.scrollY >= header.bottom
+  const away = header.isAway(window.scrollY)
   if (away === headerScrolledAway) return
   headerScrolledAway = away
   postToHost({ type: 'headerScrolledAway', away, generation: editor.loadedGeneration })

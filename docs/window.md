@@ -81,6 +81,7 @@ paths:
 - **Beside the List is the standard:** a layout that spans the window shows the chosen item's page in a column of 372 (`BesideColumn`), and a new row replaces it once the selection rests (`BesideSettler`).
 - **A column, a modal and a full page show one item** with the window's one editor, one at a time. New Window takes several and asks first above a limit (`ItemWindows`).
 - **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`), Keep moves on once queued, and a followed link stays in it.
+- **Favorite in a toolbar or corner is the star itself:** outlined until the item is a favorite, filled after, never struck through (`FavoriteButton`). Menus name the action, so Remove from Favorites keeps its slash.
 - **An item's window has the modal's controls and the panel** (`ItemWindowToolbar`); Back and Forward walk its links (`ItemWindow.go`).
 - **A full page's Back returns to the layout**, and the list's view options are not offered.
 
