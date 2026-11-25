@@ -370,6 +370,8 @@ private struct ToolbarRoomProbe: NSViewRepresentable {
                 rects.append(view.convert(view.bounds, to: nil))
                 views.append(view)
             }
+            // Items whose view the toolbar does not hand over are found among the title bar's own views.
+            if rects.isEmpty, let frame = window.contentView?.superview { Self.collectViewers(in: frame, into: &rects) }
             for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
                 if let button = window.standardWindowButton(kind), !button.isHiddenOrHasHiddenAncestor {
                     rects.append(button.convert(button.bounds, to: nil))
@@ -387,6 +389,16 @@ private struct ToolbarRoomProbe: NSViewRepresentable {
             }
             let (leading, trailing) = Self.room(of: rects, in: column)
             report(TopRowRoom(leading: leading, trailing: trailing))
+        }
+
+        private static func collectViewers(in view: NSView, into rects: inout [NSRect]) {
+            for sub in view.subviews {
+                if String(describing: type(of: sub)).contains("ToolbarItemViewer") {
+                    if !sub.isHiddenOrHasHiddenAncestor, sub.bounds.width > 1 { rects.append(sub.convert(sub.bounds, to: nil)) }
+                } else {
+                    collectViewers(in: sub, into: &rects)
+                }
+            }
         }
 
         /// The items that stand in a row from each end of the column: each begins within a gap of the one before it, as the

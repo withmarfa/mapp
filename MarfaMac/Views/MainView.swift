@@ -549,7 +549,7 @@ private struct ItemInspectorColumn: ViewModifier {
                     guard details.isPresented, Self.isDraggingEdge(ofSidebarWidth: newWidth) else { return }
                     UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)
                 }
-                .inspectorColumnWidth(min: 260, ideal: width, max: 440)
+                .inspectorColumnWidth(min: 300, ideal: width, max: 440)
                 .toolbar { InspectorToolbar(details: details, editor: editor, browser: browser) }
         }
     }

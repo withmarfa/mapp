@@ -52,7 +52,7 @@ paths:
 ## Smallest window
 
 - **The main window goes down to 760 by 520.** The panel folds under 1000 wide, the sidebar under 900, then the control, the views and a table's columns. Only what the window folded opens again.
-- **The panel is 300 wide,** dragged within 260 to 440.
+- **The panel is 300 wide,** dragged wider, to 440.
 
 ## Corner
 
