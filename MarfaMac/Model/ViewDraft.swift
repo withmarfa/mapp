@@ -280,15 +280,29 @@ nonisolated enum ViewDraft {
     }
 
     /// The group a write sends in place of `held`, the view's own. Grouping by the same field keeps the groups `held`
-    /// orders and hides, which another app may have set: they name that field's values, whatever the span. Grouping by
-    /// another field drops them, since they name the old field's values, and orders the groups as the app lists them.
+    /// orders and hides, which another app may have set, where they can name a group of the new way of grouping: a
+    /// date's span keeps dates whatever the span, and Set or Not Set keeps only `true` and `false`. Grouping by another
+    /// field drops them, since they name the old field's values, and orders the groups as the app lists them.
     static func kept(_ group: LibraryViewGroup?, from held: LibraryViewGroup?) -> LibraryViewGroup? {
         guard var group else { return nil }
         if let held, held.field == group.field {
-            group.order = held.order
-            group.hidden = held.hidden
+            let sameWay = held.byPresence == group.byPresence && (held.bucket == nil) == (group.bucket == nil)
+            let fits = { (key: JSONValue) in sameWay || names(key, in: group) }
+            group.order = held.order.filter(fits)
+            group.hidden = held.hidden.filter(fits)
         }
         return group
+    }
+
+    /// Whether a key can name a group of `group`: Set or Not Set's are bools, a date span's dates or the null group.
+    private static func names(_ key: JSONValue, in group: LibraryViewGroup) -> Bool {
+        if group.byPresence { if case .bool = key { return true } else { return false } }
+        guard group.bucket != nil else { return true }
+        switch key {
+        case .null: return true
+        case .string(let text): return text.wholeMatch(of: /\d{4}-\d{2}-\d{2}/) != nil
+        default: return false
+        }
     }
 
     private static func label(of column: ItemTableColumn) -> String {
