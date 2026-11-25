@@ -67,6 +67,12 @@ struct NewViewTests {
 
     @Test func byStatusGroupsByStatusGroupOnABoardOverTheWire() async throws {
         let (browser, library) = Self.window()
+        let status = ItemTypeInfo.Field(key: "status", label: "Status", kind: .status([
+            StatusWord(value: "todo", group: .notStarted), StatusWord(value: "done", group: .completed),
+        ]), declaredBy: Self.task)
+        library.catalogue = MarfaMac.Catalogue(itemTypes: [
+            ItemTypeInfo(id: Self.task, label: "Task", fields: [status], titleField: "title", bodyField: "body", parent: nil),
+        ])
         let made = try await Self.make(.byStatus, in: browser, library)
         let read = try #require(Self.overTheWire(made))
         #expect(Self.sent(made).group?.by == ViewDraft.statusGroupField)
