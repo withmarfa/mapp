@@ -49,21 +49,20 @@ paths:
 
 - **The top row is drawn in the content under a title the window hides** (`TopRowFrame`); a plain `toolbar` holds only the buttons.
 - **The views are a radio group;** VoiceOver reads every view, whatever has folded.
-- **The row folds by the room it has** (`ToolbarRoomProbe`) and holds no width.
-- **An on button is gray, never the accent.** The system toggle cannot draw that, so the panel and Filter buttons draw their own glass (`ToolbarOnOffStyle`). An item that cannot act dims.
-- **The title is level with the traffic lights.** It stands 40 in from a column that spans the window, at the rows' text in a list column beside a page, and 20 after the last control over its column.
-- **The line between the page and the panel runs the window's full height** (`PanelEdgeThroughToolbar`).
+- **An on button is gray, never the accent.** The panel button draws its own glass for it (`ToolbarOnOffStyle`), selected to VoiceOver.
+- **The count follows its title,** which takes the room it needs up to 340 and shortens only when the row has less (`CappedWidth`).
+- **The title is level with the traffic lights.** It stands 40 in from a column that spans the window, at the rows' text in a list column, and 20 after the last control.
+- **The line between the page and the panel runs the window's full height** in every window, but not in full screen, where the system's own reaches the top (`panelEdgeThroughToolbar`).
 
 ## Sidebar closed
 
 - **The title opens the sidebar's rows as a menu** (`PlacesMenu`); over a column that spans the window, place, views and buttons share one row.
-- **Beside a page the first line holds the controls only.** The title, the scope and the views have the row below, which scrolls away.
+- **Beside a page the first line holds the controls only;** the title, scope and views have the row below.
 
 ## Smallest window
 
 - **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900, and under 800 the views are one pill beside the title.
 - **Only what the window folded opens again,** also after a quit.
-- **The panel is 300 wide** in every window (`PanelWidth`).
 
 ## Corner
 
