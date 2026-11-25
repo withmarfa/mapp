@@ -102,7 +102,7 @@ struct SidebarTypeRow: View {
                     .opacity(isHovering && add != nil ? 0 : 1)
                 if isHovering, let add {
                     SidebarPlus(name: addName) {
-                        // The quick add's window takes the pointer, which then never leaves the row.
+                        // The new item's panel takes the pointer, which then never leaves the row.
                         isHovering = false
                         add()
                     }

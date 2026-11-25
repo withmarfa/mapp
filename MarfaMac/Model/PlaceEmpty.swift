@@ -5,7 +5,7 @@ import Foundation
 nonisolated struct PlaceEmpty: Equatable {
     let title: String
     let line: String?
-    /// The type the button makes, held by quick add; nil where there is no button.
+    /// The type the button makes, held by the new item; nil where there is no button.
     let makes: String?
     /// The button's name, such as New Project, with `makes`.
     let buttonTitle: String?

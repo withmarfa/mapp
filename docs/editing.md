@@ -2,7 +2,9 @@
 summary: The rules for making an item, changing its type and changing a field from its menu.
 paths:
   - MarfaMac/Model/QuickAdd*.swift
+  - MarfaMac/Model/NewItem*.swift
   - MarfaMac/Views/QuickAdd*.swift
+  - MarfaMac/Views/NewItem*.swift
   - MarfaMac/Model/Items/TypeChange*.swift
   - MarfaMac/Model/Items/ItemWrite*.swift
 ---
@@ -25,13 +27,33 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ## Making an item
 
-- **Quick add is the one way to make an item** (`QuickAdd`): every plus, command and any-app shortcut opens the same panel, so a person learns one.
-- **The type to start with:** a type's own place starts with that type. Anywhere else starts with the last one used, or a note (`QuickAdd.startingType`).
-- **A type gives a new item only its first status that has not started** (`QuickAdd.prefill`), so no item arrives done. A change of kind takes back what the last kind gave and keeps what the person changed.
-- **A required field the panel cannot set is named at once** (`QuickAdd.unsettableRequired`), not after the person has typed.
-- **What the type gave is not content** (`holdsContent`). A panel that holds only that closes without asking.
-- **What the chosen kind cannot keep stays in sight and holds the panel back**: text, more than one file, or a parent that is gone.
-- **A refused item keeps the panel and its text.**
+- **`Browser.openNewItem` is every New's one way in,** the any-app shortcut and the search's New Item among them. It opens the new-item line, or the text form where New Opens says so (`NewOpens`) or the line cannot make the kind (`QuickAdd.lineOffers`).
+- **The kind to start with:** a type's own place starts with that type; anywhere else, New Items Are, then the last kind used, then a note (`QuickAdd.startingType`).
+- **One create holds the properties, tags and tier** (`Browser.saveQuickAdd`). The parent is a second write, and a refused parent is told. The In row sets the tier, starting from the place.
+- **A type gives a new item only its first status that has not started** (`QuickAdd.prefill`).
+- **A required field the form cannot set is named at once** (`QuickAdd.unsettableRequired`). The line hands a draft missing a required value to the text form.
+- **The title may be left out** where the kind does not require it and the draft holds something else.
+
+### The line
+
+- **Keys:** Tab moves the kind, `#` a tag, `@` a parent, `/` a property. Before typing, each row offers the most recent (`NewItemRecents`).
+- **Add (↩) keeps the line open, empty, with the same kind,** and says "Added “name”" with an Undo of that add alone. ⌘↩ adds and opens; ⇧↩ moves the draft to the text form.
+- **A tag is `#` and a letter at a word's start** (`NewItemText.takeTags`), taken when a space or Add ends it. `Issue #12` and a reserved tag stay text.
+- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), read in the person's locale: `27/11` in Britain, `11/27` in the United States, `Fri 27 Nov`. Its words leave the title. Removing its token keeps them as text.
+- **A web address pasted into an empty line makes a bookmark of it** (`QuickAdd.bookmarkKind`).
+
+### Typed text is never lost
+
+`NewItemDrafts` keeps each new item typed and not added, through a closed window, a quit and a refused write. A slot is `Slot.line` or `Slot.inPlace(_:)`; a library is its `serverKey`.
+
+| Call | Does |
+| --- | --- |
+| `make(_:_:in:)`, `take(_:in:)` | Start a draft, or claim the latest kept one. Two holders never share one |
+| `update(_:_:)`, `escape(_:)` | Keep what was typed, and drop a draft that is empty |
+| `added(_:as:)`, `settle(in:)` | Hold the draft until the library holds the item; give back one it refused (`takeReturned(_:in:)`) |
+| `release(_:)`, `drop(_:)` | The holder went, or the person cleared it |
+
+A kept file no longer on disk is named when its draft comes back.
 
 ## Changing type
 

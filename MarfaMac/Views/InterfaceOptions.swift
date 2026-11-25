@@ -13,7 +13,7 @@ enum InterfaceKey {
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
     /// Whether the panels that edit a value are glass or a solid color.
     static let valuePanelStyle = "valuePanelStyle"
-    /// What the command palette, Search Items and quick add stand on.
+    /// What the command palette, Search Items and the new item stand on.
     static let paletteMaterial = "paletteMaterial"
     static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, showsScrolledTitle, showsSidebarHistory, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
@@ -32,7 +32,7 @@ enum ValuePanelStyle: String, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
-/// What the floating panels (the command palette, Search Items and quick add) are made of. Glass is the system's
+/// What the floating panels (the command palette, Search Items and the new item) are made of. Glass is the system's
 /// Liquid Glass; Translucent is the material the system gives popovers; Solid is the window's own color.
 enum PaletteMaterial: String, CaseIterable, Identifiable {
     case glass

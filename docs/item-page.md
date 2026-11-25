@@ -119,7 +119,7 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 - **Zoom keys size the file or the text, never both** (`FileViewCommands`, `TextZoomCommands`).
 - **A size belongs to one file.** Another item's page opens fitted.
 - **Focus belongs to one window and one item.** It hides the head only, so Linked From stays.
-- **Escape closes the formats bar first, then leaves Focus.** A sheet, the palette and quick add keep Escape for themselves.
+- **Escape closes the formats bar first, then leaves Focus.** A sheet, the palette and the new-item line keep Escape for themselves.
 
 ## Text and links
 

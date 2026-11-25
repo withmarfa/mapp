@@ -50,7 +50,7 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 
 - **Only a person's choices are stored** (`ShortcutBindings`), and a stored command this build does not know is kept.
 - **A menu shortcut needs ⌘, ⌃ or ⌥.** A shortcut that a command already has asks to replace it, and one of the system's (`SystemShortcuts`) is refused.
-- **Any-app shortcuts are off until set** and stay on the Mac they were set on (`AnyAppShortcuts`). They need ⌘ or ⌃, and work only while the app runs.
+- **Any-app shortcuts are off until set** and stay on their Mac (`AnyAppShortcuts`). They need ⌘ or ⌃, and work while the app runs. New Item opens the line over the app in front (`NewItemAnywhere`), which gives the keyboard back.
 - **While the page has the keyboard, Back and Forward give up their keys,** because the page indents lists with them.
 - **While an image or a PDF is open, the text-size keys size the file** (`FileViewCommand`).
 
@@ -103,4 +103,4 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | Format | Heading 4, 5, 6, Highlight, Code, Table's rows, columns and alignment | – | Yes |
 | Go | Each place, view and type | – | Yes |
 | Help | Marfa Help, Keyboard Shortcuts, and links | – | Yes |
-| Any app | Show Command Palette, Search Items, Quick Add | Off until set | Yes |
+| Any app | Show Command Palette, Search Items, New Item | Off until set | Yes |

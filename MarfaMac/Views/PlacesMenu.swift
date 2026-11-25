@@ -40,14 +40,13 @@ struct PlacesMenu {
 /// The menu's rows. Choosing one shows its place, as a row of the sidebar does.
 struct PlacesMenuView: View {
     @CurrentLibrary private var library
-    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     let menu: PlacesMenu
     let browser: Browser
     let order: ItemOrder
 
     var body: some View {
         Button("Search", systemImage: "magnifyingglass") { browser.palette = .search }
-        Button("New", systemImage: "square.and.pencil") { browser.openQuickAdd(remembered: lastType, in: library) }
+        Button("New", systemImage: "square.and.pencil") { browser.openNewItem(in: library) }
         Divider()
         rows(menu.places)
         if !menu.pinned.isEmpty {

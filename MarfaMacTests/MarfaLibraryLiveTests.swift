@@ -41,10 +41,10 @@ extension LiveMarfaTests {
         func browsesEveryPlaceAndFollowsEdgesBothWays() async throws {
             try await withLibrary { library, source, made in
                 let token = "zb" + UUID().uuidString.prefix(8).lowercased()
-                @MainActor func make(_ title: String, under parent: ItemID? = nil, in place: Place = .library) throws -> ItemID {
+                @MainActor func make(_ title: String, under parent: ItemID? = nil, in place: MarfaMac.Tier = .library) throws -> ItemID {
                     let id = library.createItem(
                         typeID: "core.note", title: "MARFAMACTEST \(title) \(token)", body: "Made by the app tests.",
-                        parentID: parent, in: place, undoManager: nil)
+                        parentID: parent, tier: place, undoManager: nil)
                     if let id { made.add(id) }
                     return try #require(id)
                 }
@@ -106,7 +106,7 @@ extension LiveMarfaTests {
                 @MainActor func make(_ title: String, type: String) throws -> ItemID {
                     let id = library.createItem(
                         typeID: type, title: "MARFAMACTEST \(title) \(token)", body: "", properties: [:], parentID: nil,
-                        in: .library, undoManager: nil)
+                        tier: .library, undoManager: nil)
                     if let id { made.add(id) }
                     return try #require(id)
                 }
@@ -156,7 +156,7 @@ extension LiveMarfaTests {
                 @MainActor func make(_ title: String, under parent: ItemID? = nil) throws -> ItemID {
                     let id = library.createItem(
                         typeID: "core.note", title: "MARFAMACTEST \(title) \(token)", body: "Made by the app tests.",
-                        parentID: parent, in: .library, undoManager: nil)
+                        parentID: parent, tier: .library, undoManager: nil)
                     if let id { made.add(id) }
                     return try #require(id)
                 }
@@ -287,10 +287,10 @@ extension LiveMarfaTests {
             try await withLibrary { library, source, made in
                 let token = "zq" + UUID().uuidString.prefix(8).lowercased()
                 let kept = try #require(library.createItem(
-                    typeID: "core.note", title: "MARFAMACTEST bin kept \(token)", body: "Kept.", parentID: nil, in: .library,
+                    typeID: "core.note", title: "MARFAMACTEST bin kept \(token)", body: "Kept.", parentID: nil, tier: .library,
                     undoManager: nil))
                 let purged = try #require(library.createItem(
-                    typeID: "core.note", title: "MARFAMACTEST bin purged \(token)", body: "Purged.", parentID: nil, in: .library,
+                    typeID: "core.note", title: "MARFAMACTEST bin purged \(token)", body: "Purged.", parentID: nil, tier: .library,
                     undoManager: nil))
                 made.add(kept)
                 made.add(purged)
@@ -327,10 +327,10 @@ extension LiveMarfaTests {
                 let token = "zq" + UUID().uuidString.prefix(8).lowercased()
                 let targetTitle = "MARFAMACTEST link target \(token)"
                 let target = try #require(library.createItem(
-                    typeID: "core.note", title: targetTitle, body: "Linked.", parentID: nil, in: .library, undoManager: nil))
+                    typeID: "core.note", title: targetTitle, body: "Linked.", parentID: nil, tier: .library, undoManager: nil))
                 let host = try #require(library.createItem(
                     typeID: "core.note", title: "MARFAMACTEST link host \(token)", body: "Nothing yet.", parentID: nil,
-                    in: .library, undoManager: nil))
+                    tier: .library, undoManager: nil))
                 made.add(target)
                 made.add(host)
                 try #require(await eventually { library.item(target) != nil && library.item(host) != nil })
@@ -396,7 +396,7 @@ extension LiveMarfaTests {
                 let token = "zv" + UUID().uuidString.prefix(8).lowercased()
                 let title = "MARFAMACTEST view note \(token)"
                 let id = try #require(library.createItem(
-                    typeID: "core.note", title: title, body: "Made by the app tests.", parentID: nil, in: .library,
+                    typeID: "core.note", title: title, body: "Made by the app tests.", parentID: nil, tier: .library,
                     undoManager: nil))
                 made.add(id)
                 await source.flush()
@@ -435,10 +435,10 @@ extension LiveMarfaTests {
         @Test(.timeLimit(.minutes(2)))
         func textTypedOnAnItemJustMadeIsKeptSaveAfterSave() async throws {
             try await withLibrary { library, source, made in
-                let title = "MARFAMACTEST typed after quick add " + UUID().uuidString.prefix(8).lowercased()
+                let title = "MARFAMACTEST typed after a new item " + UUID().uuidString.prefix(8).lowercased()
                 let id = try #require(library.createItem(
                     typeID: "core.note", title: title, body: "Ask about the leak under the sink.", parentID: nil,
-                    in: .library, undoManager: nil))
+                    tier: .library, undoManager: nil))
                 made.add(id)
                 // The page opens the item as soon as it is made, so it reads the text of the create before the server
                 // answers it, at version 0.

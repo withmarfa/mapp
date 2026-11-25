@@ -15,7 +15,6 @@ struct AppCommands: Commands {
     @FocusedValue(\.settingsNavigation) private var settingsNavigation
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
-    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
 
     var body: some Commands {
         SidebarCommands()
@@ -38,7 +37,7 @@ struct AppCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Group {
                 Button("New Item", systemImage: "plus") {
-                    if let library { browser?.openQuickAdd(remembered: lastType, in: library) }
+                    if let library { browser?.openNewItem(in: library) }
                 }
                     .shortcut(.newItem, shortcuts)
                     .disabled(browser == nil || library?.isLoaded != true)

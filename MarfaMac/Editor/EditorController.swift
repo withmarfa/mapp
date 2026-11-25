@@ -103,7 +103,7 @@ final class EditorController: NSObject {
     @ObservationIgnored var onChooseAmbiguousLink: (([ItemID], @escaping (ItemID) -> Void) -> Void)?
     /// The heading a link asked for in the item it is opening, scrolled to once that item is on the page.
     @ObservationIgnored var pendingHeading: (itemID: ItemID, text: String)?
-    /// What the page writes for files quick add attached to a new item, put at the end of its text once the page
+    /// What the page writes for files the new-item form attached to a new item, put at the end of its text once the page
     /// shows that item (`append(_:to:)`).
     @ObservationIgnored var pendingEmbeds: [ItemID: [Embed]] = [:]
     /// Whether the page is writing some of them now, and whether to send what still waits once it has answered.
@@ -561,7 +561,7 @@ final class EditorController: NSObject {
 
     /// Gives the page the keyboard, in the item's text or, with `onTitle`, in its title with the title selected:
     /// now if the page is ready and in a window, otherwise once it is, as when the page comes back after the
-    /// gallery. One request, never repeated. With `caret`, from quick add, the caret goes after the same text in the
+    /// gallery. One request, never repeated. With `caret`, from the new-item form, the caret goes after the same text in the
     /// page, or to its end.
     func focus(_ itemID: ItemID? = nil, onTitle: Bool = false, caret: PageCaret? = nil) {
         guard let requested = itemID ?? pageItemID else { return }

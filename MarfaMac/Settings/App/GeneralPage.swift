@@ -9,6 +9,7 @@ struct GeneralPage: View {
     @AppStorage(ReopenWindows.key) private var reopensWindows = ReopenWindows.standard
     @AppStorage(ListKey.openItemsIn) private var openItemsIn = ItemOpening.standard
     @AppStorage(NewItemType.key) private var newItemType = ""
+    @AppStorage(NewOpens.key) private var newOpens = NewOpens.line
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @AppStorage(WeekStart.key) private var weekStart = 0
     @AppStorage(RemotePictureSetting.key) private var pictures = RemotePictureSetting.standard
@@ -95,6 +96,12 @@ struct GeneralPage: View {
 
     private var newItems: some View {
         SettingsSection("New Items") {
+            SettingsRow("New Opens", line: "One line, or a form that also takes text and files.") {
+                SettingsPopUp(title: "New Opens", selection: $newOpens) {
+                    ForEach(NewOpens.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .accessibilityIdentifier("NewOpens")
+            }
             SettingsRow("New Items Are", line: "Outside a type’s own list.") {
                 SettingsPopUp(title: "New Items Are", selection: $newItemType) {
                     Text("Last Used").tag("")

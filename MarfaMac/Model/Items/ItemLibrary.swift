@@ -47,6 +47,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// this and `membershipRevision` rather than `contentRevision`, which a published keystroke moves. A library that
     /// bumps `membershipRevision` for every item change may leave this as that.
     var namesRevision: Int { get }
+    /// Names the server the library reads (`Libraries.libraryKey`), so what this Mac keeps for it, such as an item
+    /// typed and not yet added, waits for it and goes to no other. Empty where there is no server.
+    var serverKey: String { get }
     func item(_ id: ItemID) -> Item?
     /// The instance id of the Marfa the library's copy holds, as its `GET /` names it, which an item's `marfa://` link
     /// is checked against; nil until the copy has read it. Reads only the copy.
@@ -181,16 +184,18 @@ protocol ItemLibrary: AnyObject, Observable {
 
     // MARK: Writing
 
-    /// Nil when the item cannot be made, and the library tells the person why. The properties go in the create
-    /// itself, so a type whose fields are required is made whole in one write.
+    /// Nil when the item cannot be made, and the library tells the person why. The properties, tags and tier go in
+    /// the create itself, so a type whose fields are required is made whole in one write; the parent is linked after
+    /// it, and a parent that cannot be linked is told apart. The title may be empty only for a type whose title is
+    /// not required, where the item holds something else.
     func createItem(
-        typeID: String, title: String, body: String, properties: [String: PropertyValue], parentID: ItemID?,
-        in place: Place, undoManager: UndoManager?
+        typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String], parentID: ItemID?,
+        tier: Tier, undoManager: UndoManager?
     ) -> ItemID?
     /// Adds the file at `file` as an item of its own, of the file type its media type calls for, titled `title` or by its name, under `parentID`
     /// where one is given. The file is read where it is while this runs. Nil when it could not be added, and the
     /// library tells the person why.
-    func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: Place) async -> ItemID?
+    func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier) async -> ItemID?
     /// Text typed on the page, over the text `body(of:)` gave at `readAt`. An edit typed on text older than the
     /// library now holds was made without seeing what replaced it, so it never silently overwrites that. Typing is
     /// undone by the page that holds it, so this registers nothing.
@@ -328,6 +333,7 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     var namesRevision: Int { membershipRevision }
+    var serverKey: String { "" }
     func headerItem(_ id: ItemID) -> Item? { item(id) }
     func itemVersion(_ id: ItemID) -> ItemVersion? { item(id)?.version }
     func textIsEmpty(_ id: ItemID) -> Bool { body(of: id)?.text.isEmpty ?? true }
@@ -352,9 +358,12 @@ extension ItemLibrary {
     func newChildVerdict(under parent: ItemID) async -> EdgeVerdict { .taken }
 
     func createItem(
-        typeID: String, title: String, body: String, parentID: ItemID?, in place: Place, undoManager: UndoManager?
+        typeID: String, title: String, body: String, properties: [String: PropertyValue] = [:], parentID: ItemID?, tier: Tier,
+        undoManager: UndoManager?
     ) -> ItemID? {
-        createItem(typeID: typeID, title: title, body: body, properties: [:], parentID: parentID, in: place, undoManager: undoManager)
+        createItem(
+            typeID: typeID, title: title, body: body, properties: properties, tags: [], parentID: parentID, tier: tier,
+            undoManager: undoManager)
     }
     func hiddenPropertyKeys(of item: Item) -> Set<String> { catalogue.pageKeys(of: item) }
 

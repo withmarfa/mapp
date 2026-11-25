@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A panel the window shows over everything, as the command palette, the search palette and quick add are: one
+/// A panel the window shows over everything, as the command palette, the search palette and the new item are: one
 /// shape, material, edge and shadow, and a click anywhere outside puts it away, as it does a menu. Every panel
 /// starts at the same height, its top about an eighth of the way down the window and centred over it, so what
 /// grows grows downward.
@@ -28,10 +28,10 @@ struct FloatingPanel<Content: View>: View {
 extension View {
     /// The surface a floating panel's content sits on, `width` wide and as tall as the content, in the material the
     /// person chose in Settings (`PaletteMaterial`), with its own edge and a shadow that lifts it off the window.
-    func floatingPanelSurface(width: CGFloat) -> some View {
+    func floatingPanelSurface(width: CGFloat, cornerRadius: CGFloat = FloatingPanelMetrics.cornerRadius) -> some View {
         frame(width: width)
             .fixedSize(horizontal: false, vertical: true)
-            .modifier(FloatingPanelSurface(cornerRadius: FloatingPanelMetrics.cornerRadius, isNested: false))
+            .modifier(FloatingPanelSurface(cornerRadius: cornerRadius, isNested: false))
     }
 
     /// The same surface for a panel inside a floating panel, as Actions is in the palette: its own corners, and a

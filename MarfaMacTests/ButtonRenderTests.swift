@@ -93,15 +93,15 @@ import Testing
         }
     }
 
-    // MARK: Quick add
+    // MARK: The new item
 
     @Test func quickAdd() async throws {
         let libraries = ItemPreviewFixtures.libraries(named: "MarfaMac.ButtonRender")
         let library = try await sampleLibrary()
         let browser = Browser()
-        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.openNewItem(kind: "core.note", form: .text, in: library)
         let editor = EditorController(library: FakeItemLibrary())
-        try await draw("Quick add", size: CGSize(width: 720, height: 420)) {
+        try await draw("New item form", size: CGSize(width: 720, height: 420)) {
             QuickAddPanel(browser: browser, quickAdd: browser.quickAdd, editor: editor)
                 .environment(\.library, library).environment(libraries).padding(24)
         }

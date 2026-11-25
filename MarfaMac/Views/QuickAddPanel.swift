@@ -2,15 +2,15 @@ import MarfaIcons
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// ⌘N, the sidebar's New, Items' New Item and the palette's New commands: a panel near the top of the window for making one
-/// item. What it holds comes first (a title and text, a file, or a title alone); above the footer, chips show the
-/// details the person added, its properties and parent, and the files to attach to it. The footer chooses the
-/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it the way Settings > General > Open Items says. Escape, Cancel or a click outside puts it away, keeping what was typed and given for the window; an empty panel also goes when the window stops being in front.
+/// The text form of a new item, which every New opens where Settings > General > New Opens says Text Form, and which
+/// the line hands its draft to (Add Text, a file, or a value the line cannot take): a panel near the top of the window
+/// for making one item. What it holds comes first (a title and text, a file, or a title alone); above the footer, tokens show the
+/// details the person added, its tags, properties and parent, and the files to attach to it. In says where it goes. The footer chooses the
+/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it the way Settings > General > Open Items says. Escape, Cancel or a click outside puts it away, keeping what was typed and given on this Mac (`NewItemDrafts`); an empty panel also goes when the window stops being in front.
 struct QuickAddPanel: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     @Environment(\.undoManager) private var undoManager
-    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     let browser: Browser
     @Bindable var quickAdd: QuickAdd
     let editor: EditorController
@@ -323,7 +323,7 @@ struct QuickAddPanel: View {
     // MARK: Properties
 
     /// A chip's height. The text inside is the interface's body size, so a larger base text size grows it.
-    private static let chipHeight: CGFloat = 28
+    private static let chipHeight: CGFloat = 26
     private static let chipMaxWidth: CGFloat = 260
 
     /// The chips the person added and the files to attach, left to right and wrapping, at the foot of the text.
@@ -331,8 +331,9 @@ struct QuickAddPanel: View {
     private func chipRow(_ draft: QuickAdd.Draft, files: [QuickAdd.File]) -> some View {
         let catalogue = library.catalogue
         let chips = QuickAdd.shownChips(draft, in: catalogue)
-        if !chips.isEmpty || !files.isEmpty {
+        if !chips.isEmpty || !files.isEmpty || !draft.tags.isEmpty {
             TagFlowLayout(spacing: 8) {
+                ForEach(draft.tags, id: \.self) { tag in tagChip(tag) }
                 ForEach(chips, id: \.self) { chip in
                     switch chip {
                     case .parent:
@@ -354,9 +355,9 @@ struct QuickAddPanel: View {
         }
     }
 
-    /// A chip's capsule, with its remove button inside the trailing end unless `remove` is nil. It is drawn here,
+    /// A token's shape, with its remove button inside the trailing end unless `remove` is nil. It is drawn here,
     /// not by a bordered button, since a system button cannot hold a second button; its fill and edge are the
-    /// system's. It is as wide as what it says, up to `chipMaxWidth` and the row, and cuts the text to that.
+    /// system's, as the new-item line's tokens are. It is as wide as what it says, up to `chipMaxWidth` and the row, and cuts the text to that.
     private func chipShell<Main: View>(
         remove: (label: String, identifier: String, action: () -> Void)?, @ViewBuilder main: () -> Main
     ) -> some View {
@@ -367,8 +368,7 @@ struct QuickAddPanel: View {
             }
         }
         .interfaceFont(.body)
-        .background(.fill.quaternary, in: .capsule)
-        .overlay(Capsule().strokeBorder(Color(nsColor: .separatorColor).opacity(0.6)))
+        .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 8))
         .frame(maxWidth: Self.chipMaxWidth)
     }
 
@@ -424,7 +424,7 @@ struct QuickAddPanel: View {
             }
             .buttonStyle(.plain)
             .popover(isPresented: Binding { editing == field.key } set: { if !$0, editing == field.key { editing = nil } }, arrowEdge: .top) {
-                // A list's entry being added outlives the popover, in the window's quick add.
+                // A list's entry being added outlives the popover, in the window's new item.
                 let listDraft = field.kind.isList ? quickAdd.listDraft(for: field.key) : nil
                 ItemPropertyRow(definition: field, value: value, isEditable: true, onChange: { newValue in
                     quickAdd.draft?.properties[field.key] = newValue
@@ -440,6 +440,17 @@ struct QuickAddPanel: View {
         .contextMenu {
             if isRemovable { Button("Remove", action: remove) }
         }
+    }
+
+    private func tagChip(_ tag: String) -> some View {
+        chipShell(remove: (String(localized: "Remove Tag “\(tag)”"), "QuickAddRemoveTag", { quickAdd.draft?.tags.removeAll { $0 == tag } })) {
+            chipFace(hasRemove: true) {
+                Text(verbatim: "#\(tag)")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(tag)
+        .accessibilityIdentifier("QuickAddTag")
     }
 
     /// What `editing` holds while the parent's list is open; no field key can be this, since keys have no spaces.
@@ -519,6 +530,13 @@ struct QuickAddPanel: View {
         HStack(spacing: 8) {
             typePicker(draft)
             moreMenu(draft, isFile: isFile)
+            Picker("In", selection: Binding { draft.tier } set: { quickAdd.draft?.tier = $0 }) {
+                Text("Library").tag(Tier.library)
+                Text("Feed").tag(Tier.feed)
+            }
+            .fixedSize()
+            .help("Where the Item Goes")
+            .accessibilityIdentifier("QuickAddIn")
             Spacer(minLength: 12)
             Button("Cancel") { putAway() }
                 .appButton(.secondary)
@@ -596,11 +614,7 @@ struct QuickAddPanel: View {
     }
 
     private func save() {
-        guard let typeID = quickAdd.draft?.typeID else { return }
-        Task {
-            guard await browser.saveQuickAdd(in: library, undoManager: undoManager) != nil else { return }
-            lastType = typeID
-        }
+        Task { await browser.saveQuickAdd(in: library, undoManager: undoManager) }
     }
 
     private func putAway() {

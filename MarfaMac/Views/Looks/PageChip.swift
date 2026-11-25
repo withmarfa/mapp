@@ -124,6 +124,8 @@ struct TintedChip: View {
     var scale: CGFloat?
     /// Set by a menu that holds the chip as its label, where the label does not see its menu's keyboard focus.
     var isFocused = false
+    /// The new-item line's kind: a capsule 30 points tall at the standard text size.
+    var isPill = false
 
     @Environment(\.colorScheme) private var scheme
     @Environment(\.isFocused) private var isInFocus
@@ -147,16 +149,22 @@ struct TintedChip: View {
         }
         .font(looks.chipFont(for: .page, textSize: scale * 13))
         .foregroundStyle(tinted ? tone.nameInk(looks, for: scheme) : looks.chipText(for: scheme))
-        .padding(.leading, looks.typePaddingStart * scale)
-        .padding(.trailing, looks.padding * scale)
-        .frame(height: looks.height * scale)
+        .padding(.leading, (isPill ? 12 : looks.typePaddingStart) * scale)
+        .padding(.trailing, (isPill ? 12 : looks.padding) * scale)
+        .frame(height: (isPill ? 30 : looks.height) * scale)
         .background(
             tinted ? tone.fill(scheme == .dark ? looks.typeTintOpacityDark : looks.typeTintOpacity, for: scheme) : looks.chipWash(for: scheme),
-            in: RoundedRectangle(cornerRadius: looks.cornerRadius * scale)
+            in: shape(scale: scale)
         )
         .overlay {
-            if isFocused || isInFocus { AppButtonStyle.focusRing(AnyShape(.rect(cornerRadius: looks.cornerRadius * scale))) }
+            if isFocused || isInFocus { AppButtonStyle.focusRing(shape(scale: scale)) }
         }
+    }
+}
+
+extension TintedChip {
+    fileprivate func shape(scale: CGFloat) -> AnyShape {
+        isPill ? AnyShape(Capsule()) : AnyShape(.rect(cornerRadius: ChipLooks.current.cornerRadius * scale))
     }
 }
 

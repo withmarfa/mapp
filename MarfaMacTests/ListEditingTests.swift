@@ -587,7 +587,7 @@ import Testing
         #expect(notices.waiting.first?.text == "Emails: Tag: work")
     }
 
-    // MARK: Quick add
+    // MARK: The new item
 
     @Test func quickAddKeepsAnUnfinishedEntryAndGivesItBackWhenItCloses() throws {
         let field = try Self.field(Self.emailsField)
@@ -598,13 +598,13 @@ import Testing
         list.list.startEntry()
         list.list.type("work", into: ListEditing.Slot(entry: list.list.pendingID, member: "label"), in: nil)
 
-        // The popover closing does not drop it: the window's quick add holds it, and it holds the draft back.
+        // The popover closing does not drop it: the window's new item holds it, and it holds the draft back.
         #expect(quickAdd.listDraft(for: "emails") === list)
         #expect(quickAdd.unfinishedLists.map(\.key) == ["emails"])
         #expect(quickAdd.holdsContent)
 
         let notices = Notices()
-        quickAdd.handOff(to: notices, because: .closed, in: nil)
+        quickAdd.leave(because: .closed, telling: notices)
         #expect(notices.waiting.first?.text == "Emails: New entry: Tag: work")
         #expect(quickAdd.listDrafts.isEmpty)
     }

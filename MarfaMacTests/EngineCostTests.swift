@@ -362,7 +362,7 @@ struct EngineCostTests {
             let opened = try await openWhole(bench)
             let library = opened.library
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MARFAMACTEST change 0", body: "", properties: [:], parentID: nil, in: .library, undoManager: nil))
+                typeID: "core.note", title: "MARFAMACTEST change 0", body: "", properties: [:], parentID: nil, tier: .library, undoManager: nil))
             bench.made.add(id)
             try #require(await eventually { library.item(id)?.sync == .settled })
 
@@ -409,7 +409,7 @@ struct EngineCostTests {
             let opened = try await openWhole(bench)
             let library = opened.library, source = opened.source
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MARFAMACTEST write", body: "First", properties: [:], parentID: nil, in: .library, undoManager: nil))
+                typeID: "core.note", title: "MARFAMACTEST write", body: "First", properties: [:], parentID: nil, tier: .library, undoManager: nil))
             bench.made.add(id)
             try #require(await eventually { library.item(id)?.sync == .settled })
             await source.engineTook()
