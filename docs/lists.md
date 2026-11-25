@@ -6,6 +6,7 @@ paths:
   - MarfaMac/Model/View*.swift
   - MarfaMac/Model/ItemViewMode.swift
   - MarfaMac/Model/Items/Filter*.swift
+  - MarfaMac/Model/Items/Search*.swift
   - MarfaMac/Model/Items/*Group*.swift
   - MarfaMac/Model/Items/ItemPlacement.swift
   - MarfaMac/Views/Filter*.swift
@@ -15,6 +16,7 @@ paths:
   - MarfaMac/Views/ItemCalendar*.swift
   - MarfaMac/Views/PlaceIndex.swift
   - MarfaMac/Model/Items/IndexRow.swift
+  - MarfaMac/Views/ColumnSearch*.swift
 ---
 
 # Views and lists
@@ -108,4 +110,8 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 - **A search is narrowed in the query, never after it** (`SearchNarrowing`), because Marfa limits how many it answers, and a limit counted first would hide matches. More conditions than a query takes are refused and named.
 - **What a search leaves out is said** (`SearchLeaveOuts`), with a way to include it.
+- **The list's search is a field of tokens and words** (`ColumnSearch`). Typing offers, under the field, the fields and values that match (`SearchOffers`): Status Not Started, Tag zine, From Feed, a type, a source, a day such as Due before 4 Mar. The last offer is the words themselves. Return on an offer makes a token, Delete at the start of the field takes the last away, and the arrow keys move between offers. Nothing in the field is saved, and a change of place puts the words and the tokens away.
+- **A token is one filter clause** (`FilterClause`), joined to the others by and and applied beside the place's own filter, never in place of it. The words search within them. A token that Marfa can say goes into the search itself (`Browser.searchScope`), so the limit is counted after it; the rest narrow what the search lists (`ItemTableContent`), and the line that says a search was cut still counts the cut.
+- **Offers take dates from the person's locale.** A day or a month is read and worded with the system's formatters for the calendar's locale, never a fixed one (`SearchDates`).
+- **In Archive the search is of archived items,** and one type's archive is the Archive with a Type token.
 - **A search in the list is sorted by relevance until the person sorts it.** The gallery and the table keep their own sorts until relevance is picked (`Browser.ordersByRelevance`).

@@ -74,7 +74,8 @@ paths:
 ## Menus and palettes
 
 - **Every menu of items is one menu** (`ItemRowMenu`), in every layout.
-- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`).
+- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`). Search Items is the same panel searching titles and text. Marks are plain gray, a Feed or archived item says so at the row's end, and with nothing typed Settings… is the one Settings row.
+- **Search Items' filters are tokens** of the same model as the list's search (`PaletteTokens`): offers for what is typed come after the results, and Return on one makes the token. Where nothing matches, the field's line says so and offers New Item, which Return runs through quick add.
 - **Trap:** Actions grows out of the palette's bar with an ordinary transition: a Liquid Glass morph hung the app.
 - **A command that takes the keyboard says so** (`takesFocus`), so the palette does not take it back.
 
