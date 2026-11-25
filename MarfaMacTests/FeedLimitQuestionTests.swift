@@ -133,7 +133,7 @@ import Testing
             item("c", F.task, daysOld: 5, state: .archived, tier: .feed), item("d", F.task, daysOld: 99, state: .archived),
             item("e", F.task, daysOld: 99, tier: .feed),
         ])
-        let ids = Set(["a", "b", "c", "d", "e"].map(ItemID.init))
+        let ids = Set(["a", "b", "c", "d", "e"].map { ItemID($0) })
         #expect(library.feedLimitQuestion(.unarchive, for: ids, now: Self.now) == FeedLimitQuestion(pastWindow: 2, window: nil))
         #expect(library.feedLimitQuestion(.unarchive, for: [ItemID("a"), ItemID("c"), ItemID("d"), ItemID("e")], now: Self.now)
             == FeedLimitQuestion(pastWindow: 1, window: .init(typePlural: "Tasks", days: 30)))
