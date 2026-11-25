@@ -117,10 +117,12 @@ private func loaded(
     _ items: [Item] = LibraryFixture.items, catalogue: Catalogue = LibraryFixture.catalogue
 ) async throws -> (MarfaLibrary, FakeItemSource) {
     let source = FakeItemSource()
+    source.heldInstanceID.withLock { $0 = "library-tests" }
     for (id, text) in LibraryFixture.texts { source.setBody(text, of: id) }
     let library = MarfaLibrary(source: source, notices: Notices())
     source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
-    try #require(await eventually { library.isLoaded })
+    // A new item waits for the copy to name its instance (`QuickAdd.isAvailable`).
+    try #require(await eventually { library.isLoaded && !library.serverKey.isEmpty })
     return (library, source)
 }
 

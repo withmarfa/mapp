@@ -287,9 +287,9 @@ struct NewItemLineTests {
     @Test func aKindChangeKeepsTheWordsAndAKindWithoutTheFieldKeepsThemInTheTitle() async throws {
         let library = Self.library()
         let browser = Self.line(in: library)
-        Self.typeWords("Plan fri #home", into: browser, in: library)
+        Self.typeWords("Plan fri #home ", into: browser, in: library)
         browser.chooseQuickAddType("core.note", in: library)
-        #expect(browser.quickAdd.draft?.title == "Plan fri #home")
+        #expect(browser.quickAdd.draft?.title == "Plan fri #home ")
         #expect(Self.chips(browser, in: library) == [.tag("home")], "a note has no day")
         let id = try #require(await Self.add(browser, in: library))
         #expect(library.item(id)?.title == "Plan fri")
@@ -430,7 +430,8 @@ struct NewItemLineTests {
         let browser = Self.line(in: library)
         Self.type("Shown then refused", into: browser, in: library)
         let id = try #require(await Self.add(browser, in: library))
-        #expect(library.item(id) != nil, "the copy shows the row")
+        let row = try #require(library.items.firstIndex { $0.id == id }, "the copy shows the row")
+        library.items[row].sync = .waiting(writes: 1)
         browser.finishNewItems(in: library)
         #expect(browser.newItems.isEmpty)
 

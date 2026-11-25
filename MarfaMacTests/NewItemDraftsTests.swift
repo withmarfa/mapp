@@ -266,6 +266,7 @@ struct NewItemDraftsTests {
         #expect(!drafts.sending(id, as: .mint()))
 
         try FileManager.default.removeItem(at: blocker)
+        drafts.update(id, Self.typed("Typed more"))
         drafts.release(id)
         let kept = try #require(NewItemDrafts(file: file).take(.line, in: "a"), "still a draft to type into, not one on its way")
         #expect(kept.sent == nil)

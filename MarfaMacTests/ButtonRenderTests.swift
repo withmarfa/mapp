@@ -25,7 +25,7 @@ import Testing
 
     private func sampleLibrary() async throws -> MarfaLibrary {
         let library = MarfaLibrary(source: SampleLibrary.open(SampleLibrary.connection), notices: Notices())
-        #expect(await eventually { library.isLoaded })
+        #expect(await eventually { library.isLoaded && !library.serverKey.isEmpty })
         return library
     }
 

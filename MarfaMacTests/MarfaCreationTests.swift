@@ -17,9 +17,10 @@ struct MarfaCreationTests {
                 TypeField(name: bodyKey, type: "string", required: true, declaredBy: "test.parent"),
             ], titleField: titleKey, bodyField: bodyKey)], edgeTypes: [])
         let source = FakeItemSource()
+        source.heldInstanceID.withLock { $0 = "creation-tests" }
         let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: [], catalogue: catalogue)))
-        try #require(await eventually { library.isLoaded })
+        try #require(await eventually { library.isLoaded && !library.serverKey.isEmpty })
         let browser = Browser()
         browser.adopt(library)
         let id = try #require(await browser.quickAdded("Untitled", typeID: typeID, in: library))
