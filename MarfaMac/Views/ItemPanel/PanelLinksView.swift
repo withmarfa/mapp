@@ -71,7 +71,9 @@ private struct PanelLinkHeading: View {
 }
 
 /// One linked item: its mark (a task's status in place of its type's), its name, and when it last changed. In a group
-/// that takes a change, a menu with Open and Remove replaces the date while the pointer is over the row.
+/// that takes a change, a menu with Open and Remove replaces the date while the pointer is over the row or the menu has
+/// the keyboard. The menu stays in the view, drawn clear otherwise, so the keyboard and VoiceOver reach it, and the row
+/// offers Remove as an accessibility action.
 private struct PanelLinkRow: View {
     @Environment(\.interfaceTextSize) private var textSize
     let group: PanelLinkGroup
@@ -80,9 +82,11 @@ private struct PanelLinkRow: View {
     /// Removes the link from the field it is in.
     let onRemove: (String) -> Void
     @State private var hovering = false
+    @FocusState private var menuFocused: Bool
 
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
+        let showsMenu = hovering || menuFocused
         Button { onOpen(link.item) } label: {
             HStack(spacing: 8) {
                 Group {
@@ -94,7 +98,7 @@ private struct PanelLinkRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 6)
-                if !link.detail.isEmpty, !(hovering && group.editableField != nil) {
+                if !link.detail.isEmpty, !(showsMenu && group.editableField != nil) {
                     Text(verbatim: link.detail).interfaceFont(.callout).foregroundStyle(.tertiary).lineLimit(1).fixedSize()
                 }
             }
@@ -104,13 +108,15 @@ private struct PanelLinkRow: View {
         }
         .buttonStyle(.plain)
         .overlay(alignment: .trailing) {
-            if let field = group.editableField, hovering {
+            if let field = group.editableField {
                 Menu { actions(field) } label: {
                     Label("Link Actions", systemImage: "ellipsis").labelStyle(.iconOnly).frame(width: 24, height: 24)
+                        .foregroundStyle(showsMenu ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.clear))
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .focused($menuFocused)
                 .accessibilityIdentifier("PanelLinkActions.\(group.kind.rawValue).\(link.item.rawValue)")
             }
         }
@@ -119,10 +125,25 @@ private struct PanelLinkRow: View {
             if let field = group.editableField { actions(field) }
         }
         .accessibilityIdentifier("PanelLink.\(group.kind.rawValue).\(link.item.rawValue)")
+        .modifier(RemoveAction(field: group.editableField, remove: onRemove))
     }
 
     @ViewBuilder private func actions(_ field: String) -> some View {
         Button("Open Item") { onOpen(link.item) }
         Button("Remove", role: .destructive) { onRemove(field) }
+    }
+}
+
+/// Remove as an accessibility action, for a row whose group takes a change.
+private struct RemoveAction: ViewModifier {
+    let field: String?
+    let remove: (String) -> Void
+
+    func body(content: Content) -> some View {
+        if let field {
+            content.accessibilityAction(named: Text("Remove")) { remove(field) }
+        } else {
+            content
+        }
     }
 }
