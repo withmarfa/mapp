@@ -38,7 +38,7 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
     var leaveOut = SearchLeaveOut()
     /// Whether archived items are searched (Include Archived Items).
     var includesArchived = true
-    /// Whether Inbox items, the feed tier, are searched (Include Inbox Items).
+    /// Whether search includes Feed items.
     var includesInbox = true
 
     static let none = SearchNarrowing()
@@ -151,14 +151,14 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
 
     // MARK: Judging an item
 
-    /// Whether the search keeps `item`: its type is chosen, it is not left out, and it is not archived or in the Inbox
+    /// Whether the search keeps `item`: its type is chosen, it is not left out, and it is not archived or in the Feed
     /// where those are turned off. The copy decides the same inside its call; this is for a list held locally.
     func admits(_ item: Item, in catalogue: Catalogue) -> Bool {
         admitsType(item.type, in: catalogue) && leftOutBy(item, in: catalogue) == nil && admitsOptions(item)
     }
 
     /// `items` as a typed search over the whole library keeps and leaves out: the items it keeps, and those the person's
-    /// leave-out holds that an archived or Inbox choice does not already take away. An item of a type the chosen types
+    /// leave-out holds that an archived or Feed choice does not already take away. An item of a type the chosen types
     /// do not take is in neither.
     func split(_ items: [Item], in catalogue: Catalogue) -> (kept: [Item], leftOut: [Item]) {
         var kept: [Item] = []
@@ -169,7 +169,7 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
         return (kept, out)
     }
 
-    /// Whether `item` is one Include Archived Items and Include Inbox Items let through.
+    /// Whether the archived and Feed choices allow `item`.
     func admitsOptions(_ item: Item) -> Bool {
         (includesArchived || item.state != .archived) && (includesInbox || item.tier != .feed)
     }

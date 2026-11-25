@@ -4,8 +4,7 @@ import SwiftUI
 /// duplicating and deleting a view need the server, so they are offered only while the library can reach it
 /// (`ItemLibrary.reachesServer`); editing one in the panel is not, nor is a change of its layout, columns or cards.
 enum SavedViews {
-    /// Whether the window's place can be saved as a view: Recents, the indexes, a single favorite
-    /// and a collection cannot.
+    /// Whether the window shows a list that can be saved as a view.
     static func canSave(_ browser: Browser, in library: any ItemLibrary) -> Bool {
         library.isLoaded && library.reachesServer && !browser.showsSidebarIndex
             && ViewDraft.query(for: browser.shown, catalogue: library.catalogue, views: library.views) != nil

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Search page: what this server leaves out of search, whether archived and Inbox items are searched, and how the
+/// The Search page: what this server leaves out of search, whether archived and Feed items are searched, and how the
 /// results are ordered and shown. The leave-out is the app's own setting for this server (`SearchLeaveOuts`); the rest are
 /// the Mac's (`SearchOptions`). A search inside one place or list leaves nothing out, since the person chose that place.
 struct SearchPage: View {

@@ -255,11 +255,9 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
 /// sidebar, in order, hidden places included so Settings can offer them back.
 @MainActor
 struct SidebarPlan {
-    /// The places in the Library group: every item, the sources they came from, and the collections they are filed
-    /// under. Files are included in Items.
+    /// The Library and the indexes of sources and collections.
     let destinations: [SidebarPlace]
-    /// The rows at the top of the Pinned block: the Feed and the Library's Favorites. They are places, not saved
-    /// views, and no data model sits behind the grouping.
+    /// The Feed and Favorites rows at the top of the Views section by default.
     let builtInViews: [SidebarPlace]
     /// The saved views in the Views block, where the server has saved any views the library can read, then the Types
     /// block, where the library holds any types.

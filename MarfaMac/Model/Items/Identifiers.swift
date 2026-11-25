@@ -28,8 +28,7 @@ nonisolated struct TypeID: RawRepresentable, Hashable, Codable, Sendable {
     init(rawValue: String) { self.rawValue = rawValue }
     init(_ rawValue: String) { self.rawValue = rawValue }
 
-    /// The root of the file types: a file and every kind of file below it, which the sidebar reaches through All
-    /// Items and search rather than as a type.
+    /// The root of the file types, including every kind of file below it.
     static let file = TypeID("core.file")
 
     /// Marfa's bookkeeping (`system.*`) and what apps keep for themselves (`app.*`, the app's own settings among them):

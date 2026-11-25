@@ -131,7 +131,7 @@ struct ItemInspector: View {
     let item: Item
     /// Nil for a type the catalogue does not hold, which is shown with no fields.
     let type: ItemTypeInfo?
-    /// The Inbox or the Library, by the item's tier.
+    /// The Feed or the Library, by the item's tier.
     var place: String? = nil
     /// The source that made the item, as the server names it; the code stands in until it has.
     var source: SourceInfo? = nil

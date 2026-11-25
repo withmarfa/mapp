@@ -44,6 +44,8 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Feed | No count on its row, no words of waiting. Its first view is named All. | `SidebarGroups.swift`, `Browser` | `Rethink-Inbox`, `Rethink-Inbox-View`, `Rethink-Inbox-Page`, `Rethink-Inbox-Modal` |
+| Library or Feed control | After the count on a type, collection, or source with Feed items, offer All Items, Library, and Feed with their counts. Keep it quiet on the default and hide it first when space runs out. The title counts what is listed. The sidebar count stays the same. | `ListToolbar.swift`, `ListScope` | `Rethink-Scope-Menu`, `Rethink-Type-Inbox` |
+| Default From | Settings > Lists offers All Items (the default) and Library. | `PreferencesMap`, Settings > Lists | `Rethink-Scope-Menu` |
 | Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. | `ItemRow.swift`, `ItemTableCells.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
 | Keep and Move to Feed | Commands on one item or several, with a toast that names the item or the count (`ItemLibrary.movedMessage`). Views and tables have neither. | `ItemActions.swift`, `ItemRowMenu.swift` | `Rethink-Keep-Toast`, `Rethink-Item-Menu`, `Rethink-Item-Menus` |
 | A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. **Waits for the package:** its catalogue does not say which types hold a table, and the app names no type (marfa-swift#561). | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |

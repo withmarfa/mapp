@@ -22,7 +22,7 @@ paths:
 - **A shortcut acts, or goes somewhere, and is not a place** (`SidebarShortcut`). Search and New are shortcuts.
 - **A row's menu is AppKit's** (`SidebarPlaceMenu`), because SwiftUI menus cannot hold the color swatches.
 - **Go lists the same places, views and types** (`GoMenu`), hidden types too, so a window without its sidebar reaches them.
-- **A sidebar row opens a place or a view of one** (`SidebarPlace.opens`): the Library, the Feed, Favorites, a type, a collection, a source, a saved view, or an item, which opens itself. `docs/model.md` says what each place is.
+- **A sidebar row opens a place or one of its views.** A saved view opens at its home. See [Places and views](model.md#places-and-views).
 - **The Library and the Feed keep the keys earlier copies gave All Items and Inbox** (`all`, `inbox`), so an arranged sidebar reads unchanged. A Recents row reads as nothing and stays stored.
 - **Recently Deleted is a page of Settings**, never a row.
 
