@@ -109,6 +109,8 @@ struct SoftSelection: NSViewRepresentable {
             table.selectionHighlightStyle = .none
             let marks = Marks(table: table, hovers: hovers)
             marks.inert = inert
+            // One set of marks to a table: a second would draw the chosen gray twice over.
+            table.subviews.compactMap { $0 as? Marks }.forEach { $0.detach(); $0.removeFromSuperview() }
             table.addSubview(marks, positioned: .below, relativeTo: nil)
             self.marks = marks
         }
@@ -276,10 +278,7 @@ struct SoftSelection: NSViewRepresentable {
             if row >= 0, table.isRowSelected(row) || table.rowView(atRow: row, makeIfNecessary: false)?.isSelected == true { row = -1 }
             if inert.contains(row) { row = -1 }
             let frame = row >= 0 ? Self.rect(ofRow: row, in: table) : nil
-            var color = CGColor.clear
-            effectiveAppearance.performAsCurrentDrawingAppearance {
-                color = NSColor.labelColor.withAlphaComponent(0.047).cgColor
-            }
+            let color = SelectionLooks.layerColor(SelectionLooks.hoverOpacity, in: effectiveAppearance)
             if let placedHover, placedHover.frame == frame, placedHover.color == color { return }
             placedHover = (frame, color)
             CATransaction.begin()
@@ -309,10 +308,7 @@ struct SoftSelection: NSViewRepresentable {
 
         func update() {
             guard let table, let layer else { return }
-            var color = CGColor.clear
-            effectiveAppearance.performAsCurrentDrawingAppearance {
-                color = NSColor.labelColor.withAlphaComponent(0.08).cgColor
-            }
+            let color = SelectionLooks.layerColor(SelectionLooks.chosenOpacity, in: effectiveAppearance)
             // The table's selection, and any row view it marks as selected, since SwiftUI can set either first.
             updateHover(forced: true)
             var rows = table.selectedRowIndexes

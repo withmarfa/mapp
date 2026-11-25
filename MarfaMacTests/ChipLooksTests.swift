@@ -52,6 +52,13 @@ struct ChipLooksTests {
         #expect(ChipLooks.defaults.rowTextSize == 11.5 && ChipLooks.defaults.rowFactSize == 12 && ChipLooks.defaults.rowWeight == 400)
     }
 
+    @Test func theStatusBlueIsTheSameInTheAppAndOnThePage() throws {
+        let css = try Self.matches(#"--status-blue: rgb\(([0-9]+) ([0-9]+) ([0-9]+)\)"#, in: Self.stylesheet()).map { $0[1...3].map { Int($0)! } }
+        #expect(css.count == 2)
+        let (light, dark) = StatusMark.blue
+        #expect(css.first == [light.0, light.1, light.2] && css.last == [dark.0, dark.1, dark.2])
+    }
+
     @Test func theFocusRingIsTheSamePercentageInTheAppAndOnThePage() throws {
         let percent = try Self.matches(#"--focus-ring: color-mix\(in srgb, var\(--label-primary\) ([0-9]+)%"#, in: Self.stylesheet())
         #expect(percent.first?[1] == String(Int((ChipLooks.defaults.focusRingOpacity * 100).rounded())))

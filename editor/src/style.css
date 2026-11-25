@@ -457,7 +457,7 @@ body[data-text='none'] #editor {
   --c-text: calc(var(--chip-text-size, 12px) * var(--chip-scale));
   --c-padding: calc(var(--chip-padding, 8px) * var(--chip-scale));
   --c-gap: calc(var(--chip-gap, 5px) * var(--chip-scale));
-  --c-status-start: calc(var(--chip-status-padding-start, 7px) * var(--chip-scale));
+  --c-status-start: calc(var(--chip-status-padding-start, 6px) * var(--chip-scale));
   --c-tag-start: calc(var(--chip-tag-padding-start, 7px) * var(--chip-scale));
   --c-mark: calc(var(--chip-mark-size, 14px) * var(--chip-scale));
   --c-person: calc(var(--chip-person-circle, 18px) * var(--chip-scale));

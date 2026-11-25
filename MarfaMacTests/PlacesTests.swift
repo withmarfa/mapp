@@ -262,4 +262,18 @@ struct PlacesTests {
         #expect(!ListScope.showsScopeControl(place: .type(F.task), counts: library.scopeCounts(in: .type(F.task))))
         #expect(!ListScope.showsScopeControl(place: .library, counts: ScopeCounts(library: 2, feed: 1)))
     }
+
+    @Test func aTypeWithNoItemsOfItsOwnIsListedWithItsKindsItems() async throws {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: [
+            F.item(Self.taskHere, F.task, "Task", age: 1),
+            F.item(Self.bugFed, F.bug, "Bug", age: 2),
+        ], catalogue: F.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        let ticket = try #require(library.itemTypeCounts.first { $0.id == F.ticket })
+        #expect(ticket.count == 2 && ticket.own == 0)
+        let node = try #require(library.typeTree.first { $0.type == F.ticket })
+        #expect(node.count == 2 && node.opens)
+    }
 }

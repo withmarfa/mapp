@@ -49,7 +49,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 | Person fill | Purple 15% | Purple 26% | `PersonCircle` |
 | Chip text | Ink 72% | White 72% | Chips, a fact in a row |
 | Name on a tint | Tone toward black: 28% person, 46% type | Tone 50% toward white | `PersonCircle`, `TintedChip`, `NewTiles` |
-| Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Panels, calendars (`SelectionLooks`) |
+| Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Lists, panels, calendars (`SelectionLooks`) |
 | Keycap edge | Ink 20% | White 20% | `KeyCap` |
 | Focus ring | Ink 26% | White 26% | Every keyboard control (`appFocusRing`) |
 

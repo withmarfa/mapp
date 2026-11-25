@@ -112,7 +112,7 @@ nonisolated enum SampleLibrary {
                     ]]),
                 TypeField(
                     name: "priority", type: "enum", declaredBy: "core.task",
-                    definition: ["enum_values": ["low", "medium", "high"]]),
+                    definition: ["enum_values": ["low", "medium", "high", "urgent"]]),
                 TypeField(name: "due_at", type: "datetime", declaredBy: "core.task"),
                 TypeField(
                     name: "assignees", type: "array", declaredBy: "core.task",
@@ -136,7 +136,12 @@ nonisolated enum SampleLibrary {
                     ]]),
             ], titleField: "title", bodyField: "body", icon: "lucide:calendar"),
         ItemType(
-            id: "core.entity.person", label: "Person", plural: "People", description: "Someone you know.",
+            id: "core.entity", label: "Entity", plural: "Entities", description: "Someone or something with a name.",
+            fields: [
+                TypeField(name: "title", type: "string", required: true, declaredBy: "core.entity"),
+            ], titleField: "title", icon: "lucide:shapes"),
+        ItemType(
+            id: "core.entity.person", label: "Person", plural: "People", description: "Someone you know.", parent: "core.entity",
             fields: [
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.entity"),
                 TypeField(name: "job_title", type: "string", declaredBy: "core.entity.person"),

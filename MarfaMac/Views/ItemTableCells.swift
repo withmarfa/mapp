@@ -385,7 +385,7 @@ struct ItemTableCategory: View {
             Label {
                 Text(title)
             } icon: {
-                StatusMark(group: statusGroup, size: 12)
+                StatusMark(group: statusGroup)
             }
             .labelStyle(ItemTableLabelStyle())
         case .priority:
@@ -422,7 +422,7 @@ struct ItemTableMenuLabel: View {
     }
 
     private static func symbol(for group: StatusGroup?) -> Image {
-        let renderer = ImageRenderer(content: StatusMark(group: group, size: 12).padding(1))
+        let renderer = ImageRenderer(content: StatusMark(group: group).padding(1))
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
         return renderer.nsImage.map { Image(nsImage: $0) } ?? Image(systemName: "circle")
     }

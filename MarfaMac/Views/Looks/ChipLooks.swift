@@ -30,7 +30,7 @@ struct ChipLooks: Equatable, Sendable {
     var padding = 8.0
     var gap = 5.0
     var typePaddingStart = 6.0
-    var statusPaddingStart = 7.0
+    var statusPaddingStart = 6.0
     var tagPaddingStart = 7.0
     /// A person's initials circle, and its text and the gap to the name. The circle is the same in a row.
     var personCircle = 18.0
@@ -56,9 +56,8 @@ struct ChipLooks: Equatable, Sendable {
     var personInkDepth = 0.28
     /// The pale square behind a type mark, as the tone's opacity.
     var markOpacity = 0.17
-    /// The type mark beside a name that is shown as a fact, and a status symbol's font size at the page size.
+    /// The type mark beside a name that is shown as a fact.
     var chipMarkSize = 14.0
-    var statusSymbolSize = 12.5
     /// The one wash of an option, a status and a tag chip, as black over light and white over dark at the same strength.
     var chipWashOpacity = 0.035
     /// The app's keyboard focus ring: this opacity of the ink in light and of white in dark, 3 points wide

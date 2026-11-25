@@ -155,7 +155,6 @@ extension Tuning {
             size("Type mark", \.chipMarkSize, in: 8...20),
             size("Person circle", \.personCircle, in: 10...26),
             size("Person initials", \.personInitialsSize, in: 6...12, step: 0.5),
-            size("Status symbol", \.statusSymbolSize, in: 10...20, step: 0.5),
             opacity("Tinted chip", \.typeTintOpacity),
             opacity("Tinted chip dark", \.typeTintOpacityDark),
             opacity("Tinted name depth", \.tintedInkDepth),

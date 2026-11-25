@@ -281,7 +281,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         symbols[Self.closeSymbol] = Self.symbol(Self.closeSymbol, size: size * 9 / 13, weight: .bold)
         // A status's four symbols at the size a status chip draws them, which the page uses as they come.
         for name in StatusSymbol.systemNames {
-            symbols[name] = Self.symbol(name, size: ChipLooks.current.statusSymbolSize * InterfaceStyle.scale(for: textSize), weight: .regular)
+            symbols[name] = Self.symbol(name, size: StatusMark.size * InterfaceStyle.scale(for: textSize), weight: .regular)
         }
         for name in typeIcons {
             if Self.drawn.types[name] == nil { Self.drawn.types[name] = Self.typeIcon(name, size: size) }
