@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// The measures the right sidebar's parts share at the default text size, which scale with the interface text: the
-/// item's Properties and Relationships, the view panel and Version History.
+/// panel's plus, the properties and the view panel.
 enum InspectorMetrics {
     /// The name column of a row. It never takes more than `maxNameShare` of the width, so a large text size leaves
     /// the value room.
@@ -13,8 +13,6 @@ enum InspectorMetrics {
     static let sectionGap: CGFloat = 20
     /// The space between a section's heading and its box.
     static let headingGap: CGFloat = 6
-    /// The space between the groups of a section that has several, each a small heading above a box of its own.
-    static let groupGap: CGFloat = 14
     /// A heading's inset from the box's edges.
     static let headingInset: CGFloat = 4
     /// A section's box: its side padding, which is also how far a divider stops short of both edges, the height of
@@ -24,129 +22,9 @@ enum InspectorMetrics {
     static let boxRowPadding: CGFloat = 6
     static let boxRadius: CGFloat = 10
     static let boxStroke: CGFloat = 0.5
-    /// The room between a link row's mark and its title, and between its title and its date.
-    static let markGap: CGFloat = 8
-    /// How far a row's hover fill reaches past its content, so the content stays level with the headings.
-    static let rowInset: CGFloat = 6
-    static let rowRadius: CGFloat = 6
     /// The column at the trailing end of the inspector that holds every add plus and every row menu, so they line up
-    /// down the inspector. The fold chevron sits beyond it, in `foldColumn`.
+    /// down the inspector.
     static let trailingColumn: CGFloat = 20
-    static let foldColumn: CGFloat = 14
-    /// The space between a heading's plus and the fold chevron.
-    static let foldGap: CGFloat = 4
-
-    /// The width of the name column: the longest name shown, or `fallback` until one is measured, and never more
-    /// than `maxNameShare` of the `available` width.
-    static func nameColumn(longest: CGFloat?, fallback: CGFloat, available: CGFloat) -> CGFloat {
-        min(longest ?? fallback, available * maxNameShare)
-    }
-}
-
-extension EnvironmentValues {
-    /// The widest name among the rows of the inspector, which every row's name column takes, so the
-    /// rows line up. Nil until the rows have measured their names.
-    @Entry var inspectorNameWidth: CGFloat?
-}
-
-/// The natural width of a row's name, which the inspector gathers as the widest.
-private struct InspectorNameWidthKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
-extension View {
-    /// Gives the rows below one name column, as wide as their longest name.
-    func sharesInspectorNameColumn() -> some View { modifier(SharedNameColumn()) }
-}
-
-private struct SharedNameColumn: ViewModifier {
-    @State private var width: CGFloat?
-
-    func body(content: Content) -> some View {
-        content
-            .environment(\.inspectorNameWidth, width)
-            .onPreferenceChange(InspectorNameWidthKey.self) { width = $0 > 0 ? $0 : nil }
-    }
-}
-
-/// A section of the inspector: a heading above a grouped box, with the section's name, then its count, and a chevron at
-/// the end that folds the box. The heading is one button, so VoiceOver and the keyboard reach the chevron by it. A
-/// section that can take something new has a small plus on its heading, beside the chevron.
-///
-/// The box takes each view of `content` as a row, with a divider between rows, so a row is a view of its own, never a
-/// stack of several. A section with nothing in it shows `placeholder` as its one row.
-struct InspectorSection<Content: View, Add: View>: View {
-    let title: LocalizedStringKey
-    var count: Int?
-    @Binding var isOpen: Bool
-    let identifier: String
-    var placeholder: LocalizedStringKey?
-    /// The plus control, given whether the heading is hovered.
-    let add: (Bool) -> Add
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
-            InspectorFoldHeading(title: title, count: count, isOpen: $isOpen, identifier: identifier, add: add)
-            if isOpen {
-                if let placeholder {
-                    InspectorBox { Text(placeholder).foregroundStyle(.secondary) }
-                } else {
-                    InspectorBox { content }
-                }
-            }
-        }
-    }
-}
-
-/// A section's heading: the system's title, the count, and the disclosure at the end, and the plus, in the trailing
-/// column, where the section takes something new.
-struct InspectorFoldHeading<Add: View>: View {
-    @Environment(\.interfaceTextSize) private var textSize
-    let title: LocalizedStringKey
-    var count: Int?
-    @Binding var isOpen: Bool
-    let identifier: String
-    let add: (Bool) -> Add
-    @State private var hovering = false
-
-    var body: some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        Button {
-            withAnimation(.snappy(duration: 0.2)) { isOpen.toggle() }
-        } label: {
-            HStack(spacing: 6) {
-                HStack(spacing: 4) {
-                    Text(title)
-                    if let count, count > 0 {
-                        Text(count, format: .number).monospacedDigit().fontWeight(.regular).foregroundStyle(.secondary)
-                    }
-                }
-                .lineLimit(1)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10 * scale, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(isOpen ? 90 : 0))
-                    .frame(width: InspectorMetrics.foldColumn * scale)
-                    .accessibilityHidden(true)
-            }
-            .interfaceFont(.body.weight(.semibold))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, InspectorMetrics.headingInset)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityValue(isOpen ? Text("Expanded") : Text("Collapsed"))
-        .accessibilityHint(isOpen ? Text("Collapses the section") : Text("Expands the section"))
-        .accessibilityIdentifier(identifier)
-        .overlay(alignment: .trailing) {
-            add(hovering).inspectorTrailingColumn()
-        }
-        .onHover { hovering = $0 }
-    }
 }
 
 /// The grouped box of a section: each view of its content is a row at least `boxRowHeight` high, inset by `boxInset`,
@@ -199,10 +77,8 @@ private struct InspectorSurface: ViewModifier {
 
 /// A name in the secondary color in a column of its own, with its value beside it. Names and values start on one
 /// baseline, whatever the value holds, and a name that does not fit its column wraps to a second line.
-/// The inspector's rows, cells, and sections stay together because they share measurements and alignment.
 struct InspectorRow<Value: View>: View {
     @Environment(\.interfaceTextSize) private var textSize
-    @Environment(\.inspectorNameWidth) private var sharedNameWidth
     let name: Text
     let help: String
     @ViewBuilder let value: Value
@@ -214,19 +90,6 @@ struct InspectorRow<Value: View>: View {
         var row = self
         row.nameAction = action
         return row
-    }
-
-    init(name: LocalizedStringResource, @ViewBuilder value: () -> Value) {
-        self.name = Text(name)
-        help = String(localized: name)
-        self.value = value()
-    }
-
-    /// A name that comes from Marfa, shown as it is.
-    init(verbatimName: String, @ViewBuilder value: () -> Value) {
-        name = Text(verbatim: verbatimName)
-        help = verbatimName
-        self.value = value()
     }
 
     /// A field's label, which the app may have a translation for.
@@ -247,13 +110,7 @@ struct InspectorRow<Value: View>: View {
                 .help(help)
                 .onTapGesture { nameAction?() }
                 .containerRelativeFrame(.horizontal, alignment: .leading) { width, _ in
-                    InspectorMetrics.nameColumn(longest: sharedNameWidth, fallback: InspectorMetrics.nameWidth * scale, available: width)
-                }
-                .background {
-                    // Measured on one line, so the column fits the whole name.
-                    name.lineLimit(1).fixedSize().hidden().background {
-                        GeometryReader { Color.clear.preference(key: InspectorNameWidthKey.self, value: ceil($0.size.width)) }
-                    }
+                    min(InspectorMetrics.nameWidth * scale, width * InspectorMetrics.maxNameShare)
                 }
             value
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -313,56 +170,6 @@ enum InspectorPasteboard {
     }
 }
 
-/// A row of a list in the inspector: it fills lightly under the pointer and when pressed, and reaches past its
-/// content by `rowInset` so its content stays level with the rows above it.
-struct InspectorRowButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        RowBody(configuration: configuration)
-    }
-
-    private struct RowBody: View {
-        let configuration: ButtonStyle.Configuration
-        @State private var hovering = false
-
-        var body: some View {
-            configuration.label
-                .padding(.horizontal, InspectorMetrics.rowInset)
-                .padding(.vertical, 4)
-                .background(
-                    configuration.isPressed ? AnyShapeStyle(.quaternary) : hovering ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear),
-                    in: .rect(cornerRadius: InspectorMetrics.rowRadius, style: .continuous)
-                )
-                .contentShape(.rect(cornerRadius: InspectorMetrics.rowRadius, style: .continuous))
-                .padding(.horizontal, -InspectorMetrics.rowInset)
-                // The box sets a row's height, so the fill's room above and below does not add to it.
-                .padding(.vertical, -4)
-                .onHover { hovering = $0 }
-        }
-    }
-}
-
-/// The context menu a row of the inspector offers: whether the page shows it too.
-struct ShowOnPageMenu: View {
-    let isShown: Bool
-    let onChange: (Bool) -> Void
-
-    var body: some View {
-        Toggle("Show on Page", isOn: Binding(get: { isShown }, set: { onChange($0) }))
-            .accessibilityIdentifier("ShowOnPage")
-    }
-}
-
-extension View {
-    /// Offers Show on Page on the view, where the inspector can change it.
-    @ViewBuilder func showOnPageMenu(isShown: Bool, onChange: ((Bool) -> Void)?) -> some View {
-        if let onChange {
-            contextMenu { ShowOnPageMenu(isShown: isShown, onChange: onChange) }
-        } else {
-            self
-        }
-    }
-}
-
 /// The mark of a small plus: drawn in the clear color rather than faded to nothing while hidden, so its button stays
 /// in the accessibility tree and VoiceOver reaches it always.
 private struct InspectorPlusMark: View {
@@ -399,49 +206,4 @@ struct InspectorPlusButton: View {
             .accessibilityLabel(accessibilityLabel)
             .accessibilityIdentifier(identifier)
     }
-}
-
-/// The same plus where there is a choice of what to add, from a menu.
-struct InspectorPlusMenu<Content: View>: View {
-    let accessibilityLabel: LocalizedStringKey
-    let identifier: String
-    let isRowHovered: Bool
-    @ViewBuilder let content: Content
-    @FocusState private var isFocused: Bool
-
-    var body: some View {
-        Menu {
-            content
-        } label: {
-            InspectorPlusMark(isVisible: isRowHovered || isFocused, name: accessibilityLabel)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        // A menu button draws its label in the system's color whatever the label's style says, so it is hidden by
-        // opacity. Fully transparent, a view leaves the accessibility tree; this faint, it stays in it and shows nothing.
-        .opacity(isRowHovered || isFocused ? 1 : 0.002)
-        .focused($isFocused)
-        .help(accessibilityLabel)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityIdentifier(identifier)
-    }
-}
-
-private struct InspectorTrailingColumn: ViewModifier {
-    @Environment(\.interfaceTextSize) private var textSize
-    let clearsFold: Bool
-
-    func body(content: Content) -> some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        content
-            .frame(width: InspectorMetrics.trailingColumn * scale)
-            .padding(.trailing, clearsFold ? (InspectorMetrics.foldColumn + InspectorMetrics.foldGap) * scale : 0)
-    }
-}
-
-extension View {
-    /// Puts the view in the inspector's trailing column, where every add plus and row menu lines up. A heading's plus
-    /// clears the chevron's column; a row in a box ends at the box's inset instead.
-    func inspectorTrailingColumn(clearsFold: Bool = true) -> some View { modifier(InspectorTrailingColumn(clearsFold: clearsFold)) }
 }

@@ -65,7 +65,6 @@ struct ItemCorner: View {
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(CornerButtonStyle(isOn: isFocused))
-                    .disabled(details.isCustomizingLayout)
                     .help(isFocused ? "Leave Focus" : "Focus")
                     .accessibilityIdentifier("PageFocus")
                 }

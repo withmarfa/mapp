@@ -70,7 +70,7 @@ extension MarfaLibrary {
         return record.embedSnapshot
     }
 
-    /// A file's bytes are named by facts the server sets, which the inspector shows as its kind and size.
+    /// A file's bytes are named by facts the server sets, which the panel shows as its kind and size.
     func hiddenPropertyKeys(of item: Item) -> Set<String> {
         let keys = catalogue.pageKeys(of: item)
         return item.isFile ? keys.union(MarfaMapping.fileFacts) : keys

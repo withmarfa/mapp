@@ -87,17 +87,6 @@ nonisolated struct ItemLocation: Hashable, Sendable {
         return keys
     }
 
-    /// Whether the item holds anything Location draws: a number or a typed name.
-    func hasValue(in item: Item) -> Bool {
-        keys.contains { InspectorFields.hasValue(item.value(of: $0)) }
-    }
-
-    /// Whether a list of the item's properties shows its Location: the item holds something it draws, or the person
-    /// just added it (`revealed` holds `rowID`).
-    func isListed(in item: Item, revealed: Set<String> = []) -> Bool {
-        hasValue(in: item) || (item.allows(.fields) && revealed.contains(Self.rowID))
-    }
-
     // MARK: Reading
 
     /// What the item's two numbers say.
@@ -218,43 +207,6 @@ nonisolated struct ItemLocation: Hashable, Sendable {
             changes.updateValue(nil, forKey: field.key)
         }
         return changes
-    }
-
-    // MARK: Listing
-
-    /// One entry of a list of an item's fields, where Location stands in for some of them.
-    enum Entry: Identifiable, Hashable, Sendable {
-        case field(ItemTypeInfo.Field)
-        case location(ItemLocation)
-
-        var id: String {
-            switch self {
-            case .field(let field): field.key
-            case .location: ItemLocation.rowID
-            }
-        }
-    }
-
-    /// `fields` with the ones Location owns taken out and Location put where the first of them was, or at the end where
-    /// none was. Nothing is added where `listsLocation` is false.
-    func folding(_ fields: [ItemTypeInfo.Field], showingCoordinates: Bool, listsLocation: Bool) -> [Entry] {
-        let owned = ownedKeys(showingCoordinates: showingCoordinates)
-        let own = keys
-        var entries: [Entry] = []
-        var placed = false
-        for field in fields {
-            if own.contains(field.key) {
-                if listsLocation, !placed {
-                    entries.append(.location(self))
-                    placed = true
-                }
-                if !owned.contains(field.key) { entries.append(.field(field)) }
-            } else {
-                entries.append(.field(field))
-            }
-        }
-        if listsLocation, !placed { entries.append(.location(self)) }
-        return entries
     }
 
     /// The key of the field the name is typed in.

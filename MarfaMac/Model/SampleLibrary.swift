@@ -50,7 +50,8 @@ nonisolated enum SampleLibrary {
         }
     }()
 
-    static let name = "Sample Library"
+    /// The studio the design boards draw, when the launch asked for it.
+    static var name: String { SampleCastell.requested == nil ? "Sample Library" : "Castell Studio" }
 
     /// Opens the sample in place of a server's copy: its own items and edges, or those given, as for a preview.
     static func open(

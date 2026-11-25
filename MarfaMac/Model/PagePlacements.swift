@@ -6,8 +6,8 @@ nonisolated enum LinkedFromPlace: String, Codable, Sendable {
 }
 
 /// Where an item's properties show, for each type: the app's own setting, kept as one value in the defaults and synced
-/// through the Marfa (`PreferencesMap`). The inspector always lists every property of an item. This says which of them
-/// the page shows too, which are pinned under its title (at most four, in order), and where Linked From goes. A type the
+/// through the Marfa (`PreferencesMap`). The page lists every property of an item behind Show More. This says which of them
+/// show, which are pinned under its title (at most four, in order), and where Linked From goes. A type the
 /// person has never customized has no entry and follows the defaults in `PagePlacement`.
 nonisolated struct PagePlacements: Equatable, Sendable {
     static let key = "pagePlacements"
@@ -143,7 +143,7 @@ nonisolated struct PagePlacements: Equatable, Sendable {
     }
 
     /// Chooses whether the page shows a row at all: showing a hidden row shows it when it has a value, and showing a
-    /// row that shows already leaves it as it is. Linked From is either on the page or in the inspector, so showing it
+    /// row that shows already leaves it as it is. Linked From is either on the page or in the panel, so showing it
     /// moves it.
     mutating func set(_ shown: Bool, row: String, of type: TypeID, in catalogue: Catalogue) {
         if row == PagePlacement.linkedFrom {
@@ -307,7 +307,7 @@ nonisolated struct PagePlacement: Equatable, Sendable {
 
     init(type: TypeID, catalogue: Catalogue, choice: PagePlacements.Choice) {
         // A person's page lists who they have been with, and a collection's lists what it holds, so each keeps its
-        // links on the page. Every other item's links are for looking up, which the inspector is for.
+        // links on the page. Every other item's links are for looking up, which the panel is for.
         let kind = PageHeaderKind.of(type, in: catalogue)
         let info = catalogue.itemTypes[type]
         let defaults: [String] = [info?.statusField?.key, Self.parent].compactMap { $0 }.filter { choice.shows[$0] != .hidden }

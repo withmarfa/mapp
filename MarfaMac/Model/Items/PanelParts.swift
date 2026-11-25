@@ -133,6 +133,10 @@ nonisolated struct PanelLinkGroup: Identifiable, Equatable, Sendable {
 
     let kind: Kind
     let links: [PanelLink]
+    /// The edge field the group lists, where it takes a change: it then has a plus on its heading and Remove in each
+    /// link's menu. Nil where the group is only read, because it gathers several fields, comes from the text or lists
+    /// what another item holds, or because the item does not allow the change (`RelationField.editability`).
+    var editableField: String?
     var id: String { kind.rawValue }
 
     var title: String {

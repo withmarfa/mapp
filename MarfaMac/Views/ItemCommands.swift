@@ -182,7 +182,7 @@ enum ItemCommand: CaseIterable {
         case .toggleSource, .print, .exportPDF: context.visibleItem != nil
         case .toggleReader: context.pageLook != nil
         case .toggleFormats: context.editableItem != nil && context.details != nil && !context.hidesCorner
-        case .toggleFocus: context.focusItem != nil && context.details?.isCustomizingLayout == false && !context.hidesCorner
+        case .toggleFocus: context.focusItem != nil && !context.hidesCorner
         }
     }
 

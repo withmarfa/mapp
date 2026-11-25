@@ -44,7 +44,7 @@ One window holds the app's pages and, under them, the Marfa's, which `docs/owner
 | Keyboard | Every menu command with its shortcut, and the any-app ones (`docs/commands.md`) |
 | Editor | Each change reaches an open page. Inkkit's options go as one set (`EditorOptions`), because each of its calls replaces the whole set. Edit Pages As applies to items opened next, never to the page shown |
 | Lists | The starting density, sort and group of a place, until a view or the place chooses its own |
-| Layouts | How each type looks, through the stores of `docs/type-looks.md`. Only what differs from the type's preset is kept, so a better preset still reaches it |
+| Layouts | How each type looks, through the stores of `docs/type-looks.md`. Only what differs from the type's preset is kept, so a better preset still reaches it. Page pins properties and holds the one Linked From row, which reads and writes the type's stored choice (`PagePlacements.linkedFrom`) |
 | Search | What searches of the whole library leave out (`SearchLeaveOuts`). A search in one place leaves nothing out. A type or source that would pass a query's ten conditions is dimmed, with the reason |
 | On This Mac | The copy, downloaded files and exports, below |
 | Connection | Sign-in, other Marfas and Disconnect, which reads the queue in the same step and asks about changes that wait |

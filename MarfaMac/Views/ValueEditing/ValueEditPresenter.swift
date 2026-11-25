@@ -9,7 +9,7 @@ protocol ValueEditSession: PanelSession {
     func valueMoved(to rect: NSRect)
 }
 
-/// Opens a value in an editor under it, for the inspector's rows and the page's property rows alike: each gives what is
+/// Opens a value in an editor under it, for a form's rows and the page's property rows alike: each gives what is
 /// edited, a view and a rectangle in it. Nothing differs by caller.
 @MainActor
 final class ValueEditPresenter {

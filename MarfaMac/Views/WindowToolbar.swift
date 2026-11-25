@@ -68,7 +68,6 @@ struct WindowToolbar: ToolbarContent {
         if showsActions || (showsDetails && (listsHere || isIndex)) { ToolbarSpacer(.fixed) }
         if showsDetails {
             ToolbarItem { tools.detailsButton }
-                .sharedBackgroundVisibility(.hidden)
         }
     }
 }
@@ -157,97 +156,23 @@ struct InspectorToolbar: ToolbarContent {
                 ViewPanelToolbar(browser: browser, panel: panel, editor: editor)
             } else {
                 ToolbarItem {
-                    DetailsToggle(details: details, editor: editor)
+                    DetailsToggle(details: details)
                 }
-                .sharedBackgroundVisibility(.hidden)
             }
         }
     }
 }
 
-/// The Details button: on while the panel is open. Gray when on, as every on button is, which the system's own toggle
-/// cannot draw: it fills an on button with its tint and a white symbol, and with the gray a dark fill.
+/// The Details button of a toolbar above the inspector: on, because the inspector is open.
 struct DetailsToggle: View {
     let details: DetailsPresentation
-    let editor: EditorController?
-    var isDisabled = false
 
     var body: some View {
-        if details.isCustomizingLayout {
-            LayoutDoneButton(details: details, editor: editor)
-        } else {
-            Toggle(isOn: Binding { details.isPresented } set: { details.isPresented = $0 }) {
-                Label("Details", systemImage: "sidebar.right")
-            }
-            .toggleStyle(ToolbarOnOffStyle())
-            .help(details.isPresented ? "Hide Details" : "Show Details")
-            .disabled(isDisabled)
+        Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
+            // Gray while on, as every on button is, rather than the accent color.
+            .tint(.secondary)
+            .help("Hide Details")
             .accessibilityIdentifier("DetailsToggle")
-        }
-    }
-}
-
-/// A toolbar button that is on or off, with the glass of its own that Back and Forward draw. Gray while on, never the
-/// accent color, and its symbol stays as an off button's. The system's own toggle fills an on button with its tint and
-/// a white symbol, which no tint here turns gray.
-struct ToolbarOnOffStyle: ToggleStyle {
-    /// The height of the toolbar's own glass.
-    static let height: CGFloat = 36
-
-    func makeBody(configuration: Configuration) -> some View {
-        Button { configuration.isOn.toggle() } label: {
-            configuration.label
-                .labelStyle(.iconOnly)
-                .font(.system(size: 15))
-                .frame(width: Self.height, height: Self.height)
-        }
-        .buttonStyle(OnOffGlass(isOn: configuration.isOn))
-        .accessibilityAddTraits(configuration.isOn ? .isSelected : [])
-    }
-}
-
-/// The glass of `ToolbarOnOffStyle`, dimmed while disabled, with a keyboard focus ring that follows the circle.
-private struct OnOffGlass: ButtonStyle {
-    let isOn: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        Content(label: configuration.label, isOn: isOn)
-    }
-
-    private struct Content<Label: View>: View {
-        let label: Label
-        let isOn: Bool
-        @Environment(\.isEnabled) private var isEnabled
-        @Environment(\.isFocused) private var isFocused
-
-        var body: some View {
-            label
-                .foregroundStyle(.primary)
-                .contentShape(.circle)
-                .glassEffect(isOn ? .regular.tint(CornerMetrics.onTint).interactive() : .regular.interactive(), in: .circle)
-                .overlay { if isFocused { AppButtonStyle.focusRing(AnyShape(Circle())) } }
-                .opacity(isEnabled ? 1 : 0.4)
-        }
-    }
-}
-
-/// Stands in for the Details button while Customize Layout has the right sidebar: the system's prominent button, which
-/// finishes the mode, as Escape does and Return does unless the page has the keyboard: the page can still be typed in.
-struct LayoutDoneButton: View {
-    let details: DetailsPresentation
-    let editor: EditorController?
-
-    var body: some View {
-        Button("Done") { details.endLayout() }
-            .buttonStyle(.borderedProminent)
-            .keyboardShortcut(editor?.isFocused == true ? nil : .defaultAction)
-            .background {
-                Button("Finish Customizing") { details.endLayout() }
-                    .keyboardShortcut(.cancelAction)
-                    .hidden()
-            }
-            .help("Finish Customizing")
-            .accessibilityIdentifier("LayoutDone")
     }
 }
 
@@ -356,7 +281,10 @@ struct ItemToolbarActions {
     }
 
     @ViewBuilder var detailsButton: some View {
-        DetailsToggle(details: details, editor: editor, isDisabled: (browser?.selection.count ?? items.count) != 1)
+        Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
+            .help(details.isPresented ? "Hide Details" : "Show Details")
+            .disabled((browser?.selection.count ?? items.count) != 1)
+            .accessibilityIdentifier("DetailsToggle")
     }
 
     var ids: Set<ItemID> { browser.map(\.selection) ?? Set(items.map(\.id)) }

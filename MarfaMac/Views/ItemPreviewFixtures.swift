@@ -106,21 +106,6 @@ private struct WhenLoaded<Content: View>: View {
         .frame(width: 330, height: 600)
 }
 
-#Preview("Missing and Unfamiliar Values") {
-    WhenLoaded(library: ItemPreviewFixtures.library) { library in
-        if let item = library.item(ItemPreviewFixtures.unfamiliarID) {
-            ItemInspector(item: item,
-                          type: library.catalogue.itemTypes[item.type],
-                          catalogue: library.catalogue,
-                          hiddenKeys: library.hiddenPropertyKeys(of: item),
-                          relationships: [.init(field: "child-of", label: library.catalogue.edgeTypes[MarfaMapping.parentEdge]?.reverseLabel ?? "", targets: [.init(title: "Missing project", itemID: nil, resolution: .missing)], isEditable: true)],
-                          onProperty: { _, _ in true }, onOpen: { _ in }, onRemove: { _, _ in true })
-        }
-    }
-    .interfaceTextStyle()
-    .frame(width: 330, height: 650)
-}
-
 #Preview("Complete Item Window") {
     let library = ItemPreviewFixtures.library
     MainView(browser: ItemPreviewFixtures.browser, details: ItemPreviewFixtures.details, restoresWindow: false)

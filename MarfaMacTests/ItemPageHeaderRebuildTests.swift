@@ -29,7 +29,7 @@ import Testing
             try #require(await eventually { library.isLoaded })
             let page = Page(source: source, library: library)
             let drafts = DetailsPresentation()
-            // Linked From is on the inspector unless the person puts it on the page; these tests are about the page's list.
+            // Linked From is in the panel unless the person puts it on the page; these tests are about the page's list.
             var placements = PagePlacements()
             placements.setLinkedFrom(.page, of: try #require(library.item(id)).type, in: library.catalogue)
             page.editor.showHeader { [unowned page] in

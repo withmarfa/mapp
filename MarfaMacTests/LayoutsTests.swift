@@ -61,24 +61,6 @@ struct LayoutsTests {
 
     // MARK: The page
 
-    @Test func aPinFromLayoutsIsTheSameChoiceCustomizeLayoutOnAnItemReads() {
-        var placements = PagePlacements()
-        let rows = PageLayout.rows(ofType: task, catalogue: catalogue)
-        // As the Layouts page writes it.
-        placements.setPins(["due_at", "status"], of: task)
-        let pinned = placements.pin("priority", of: task, in: catalogue)
-        #expect(pinned)
-        // As Customize Layout reads it, through the same store.
-        let layout = PageLayout(rows: rows, placement: placements.placement(of: task, in: catalogue))
-        #expect(layout.pinned.map(\.id) == ["due_at", "status", "priority"])
-        // And as Customize Layout writes it, which the Layouts page then reads.
-        var moved = layout.moving("priority", to: .page)!
-        placements.apply(moved, of: task, in: catalogue)
-        #expect(placements.pins(of: task, in: catalogue) == ["due_at", "status"])
-        moved = PageLayout(rows: rows, placement: placements.placement(of: task, in: catalogue))
-        #expect(moved.pinned.map(\.id) == ["due_at", "status"])
-    }
-
     @Test func aPageHoldsNoMoreThanFourPins() {
         var placements = PagePlacements()
         placements.setPins(["status", "due_at", "priority", "assignees"], of: task)

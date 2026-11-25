@@ -31,26 +31,6 @@ extension ItemLibrary {
     }
 }
 
-/// One tag as the page draws it, with the button that removes it.
-struct TagChip: View {
-    let tag: String
-    /// Nil for a tag that can't be removed.
-    let onRemove: (() -> Void)?
-
-    var body: some View {
-        PageChip(
-            text: tag, kind: .tag,
-            removal: onRemove.map {
-                PageChip.Removal(help: "Remove Tag", label: "Remove Tag \(tag)", identifier: "ItemTagRemove.\(tag)", action: $0)
-            }
-        )
-        .help(tag)
-        .textSelection(.enabled)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("ItemTag.\(tag)")
-    }
-}
-
 /// Rows of views that wrap to the width given, as a list of tags does. A view wider than the width takes a row to
 /// itself, and is cut to it. With `maxRows` it reports the height of that many rows; the views after them are placed
 /// below, for the caller to clip.

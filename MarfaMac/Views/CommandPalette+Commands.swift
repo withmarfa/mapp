@@ -145,11 +145,6 @@ extension CommandPalette {
                 details.showHistory(of: only.id, in: library)
             }
         }
-        if let details, details.isCustomizingLayout {
-            add(String(localized: "Finish Customizing"), "slider.horizontal.3", in: .view) { details.endLayout() }
-        } else if let details, let only = one, details.canBeginLayout(for: only) {
-            add(String(localized: "Customize Layout…"), "slider.horizontal.3", in: .view) { details.beginLayout() }
-        }
         // These act on the whole selection, files too; what an item can't take is left alone and the person is told.
         let ids = Set(everything.map(\.id))
         let active = everything.filter { $0.state == .active }

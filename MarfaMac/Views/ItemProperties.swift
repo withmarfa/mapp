@@ -1,33 +1,25 @@
 import Marfa
 import SwiftUI
 
-/// One property of an item as a row of the inspector. The value of an item's property opens in a panel under it
-/// (`ValueEditPresenter`), as it does on the page: a text, a number, a choice, a status, a date, a list of words and a
-/// list of people. A yes/no is a checkbox. A row for a value no item holds yet (a form's) types a text or a number into
-/// a borderless field that looks like plain text until it is used; it keeps unfinished input until it is committed, and
-/// a change made elsewhere meanwhile is never written over silently.
+/// One property as a row of a form that holds a value no item has yet (quick add's, a change of type's). The value
+/// opens in a panel under it (`ValueEditPresenter`), as it does on the page: a choice, a status, a date, a list of words
+/// and a list of people. A yes/no is a checkbox. A text or a number is typed into a borderless field that looks like
+/// plain text until it is used; the row keeps unfinished input until it is committed, and a change made elsewhere
+/// meanwhile is never written over silently.
 struct ItemPropertyRow: View {
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     let definition: ItemTypeInfo.Field
     let value: PropertyValue?
     let isEditable: Bool
     let onChange: (PropertyValue?) -> Bool
-    /// The item the value belongs to, which the panel under it reads the value from and closes with. A row for a value
-    /// no item holds yet (quick add's, a change of type's) has none.
-    var item: ItemID? = nil
     var retainedDraft: ItemPropertyDraft? = nil
     /// A row the person has just added opens ready to edit: a text or number field takes the keyboard and a value
     /// that opens a panel shows it. A yes/no waits for a click.
     var startsEditing = false
     /// Whether the row writes or hands back what was typed when it leaves the screen. A row whose draft belongs to a
-    /// window (the inspector's) or to a sheet that may be cancelled leaves that to its owner: a pill changed, or a
-    /// sheet closed, must not raise "Property Not Saved" or put text on the clipboard.
+    /// window or to a sheet that may be cancelled leaves that to its owner: a sheet closed must not raise "Property
+    /// Not Saved" or put text on the clipboard.
     var handsOffOnLeave = true
-    /// Whether the page shows this property too, and what changes it; nil offers no choice.
-    var shownOnPage = true
-    var onShowOnPage: ((Bool) -> Void)?
-    /// Whether the library still has a write of the item's properties on its way, which a list of entries waits for.
-    var isWriting = false
     @Environment(\.interfaceTextSize) private var textSize
     @Environment(\.openURL) private var openURL
     @Environment(\.library) private var library
@@ -92,7 +84,7 @@ struct ItemPropertyRow: View {
             VStack(alignment: .leading, spacing: 8) {
                 EntriesEditor(
                     shape: shape, label: definition.label, key: definition.key, value: value, isEditable: isEditable,
-                    editing: input.list, isWriting: isWriting, onChange: onChange)
+                    editing: input.list, isWriting: false, onChange: onChange)
                 if isEditable, case .people? = editKind {
                     Button { openEditor() } label: { Label("Add Person…", systemImage: "person.badge.plus") }
                         .appButton(.secondary, size: .small)
@@ -224,9 +216,8 @@ struct ItemPropertyRow: View {
         if isEditable, link != nil {
             Button("Edit") { panelKind == nil ? beginTextEdit() : openEditor() }.accessibilityIdentifier("ItemPropertyEdit.\(definition.key)")
         }
-        if onShowOnPage != nil || canClear { Divider() }
-        if let onShowOnPage { ShowOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage) }
         if canClear {
+            Divider()
             Button("Clear") { clear() }.accessibilityIdentifier("ItemPropertyClear")
         }
     }
@@ -332,14 +323,14 @@ struct ItemPropertyRow: View {
             switch kind {
             // A form edits a yes or no with its checkbox and a list of entries in its own blocks.
             case .yesNo, .entries: nil
-            default: item == nil && kind.isTyped ? nil : kind
+            default: kind.isTyped ? nil : kind
             }
         }
     }
 
     private func openEditor() {
         guard isEditable, let kind = panelKind, let library, let view = anchor.view else { return }
-        let request = ValueEditRequest(kind: kind, library: library, item: item, heldValue: value, undoManager: undoManager, write: onChange)
+        let request = ValueEditRequest(kind: kind, library: library, item: nil, heldValue: value, undoManager: undoManager, write: onChange)
         ValueEditPresenter.shared.present(request, anchor: view)
     }
 

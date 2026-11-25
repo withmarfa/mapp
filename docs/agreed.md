@@ -18,7 +18,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The Marfa's panel | The foot opens a panel: the Marfa's name and count, its latest sources, and the Marfas the app has signed in to, with a tick and a plus on the heading. Switching signs out of nothing. Pages flush first, and changes that were not sent stay queued. | `SidebarFoot.swift`, `MarfaHost` | `Rethink-Marfa` |
 
 ## Feed, and moving between the two
 
@@ -103,23 +102,15 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Customize Layout | It goes, since a row's menu holds what it placed. | `CustomizeLayout.swift` | `Rethink-Item-Menus` |
 | Stored `rows` | A page placement is stored with `rows` beside `shows`, because a copy from before `shows` sets the whole map aside without `rows`. Removed after the first v0.1 release: write `shows` only and keep reading an old `rows` once. | `PagePlacements.swift` | – |
 | Scrolled | The title sits in the toolbar on one line. | `ItemDetail.swift`, `WindowToolbar.swift` | `Rethink-Page-Scrolled`, `Rethink-White-Page` |
 | Foot | Sub-Items with nesting on any item that has them; a Timeline of mentions on a person and a place; more after 30. | `LinkedFromPlace`, `editor/src/header.ts` | `Rethink-Sub-Items`, `Rethink-Person`, `Rethink-Place` |
 | Blocks | A callout as a tinted block without a rail. A code block's actions in its corner; the place of its language is open. | `editor/src/style.css` | `Rethink-Blocks`, `Rethink-Blocks-Code` |
 
-## The panel beside it
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-| What goes | Properties, Tags and Relationships in Info, and the sync problem, once the page's rows carry them. Fields the type does not declare are the last rows, under Other. | `ItemInspector.swift`, `ItemProperties.swift`, `ItemTags.swift` | `Rethink-Properties-Rule` |
-
 ## Editing and links
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Links in the panel | A plus on the heading of a group of links whose field takes a change, which opens the field's panel, and Remove in a link's menu. The panel's Relationships section, which the Inspector lists today, goes with the Inspector. | `ItemRelationships.swift`, the panel's Links | `Rethink-Properties-Rule` |
 | Undo of a link in one call | Undo checks a link's id, type and ends, then deletes it by id in a second package call, so a move synced between the two is lost, as with state moves. **Waits for Marfa:** one package call that checks and deletes. | `MarfaEngine+Writing.swift` | – |
 | Conflict | A calm line with Keep My Edit and Use Current Value. | `ValueEditModel` | `Rethink-Edit-Conflict` |
 | Status where it is seen | A click on a status in a row or a lane opens its panel; the row stays until it is left. | `StatusSymbol`, `ItemRow.swift` | `Rethink-Status-In-List` |
@@ -146,7 +137,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The sync line | A warning mark on the two states that ask for action; the whole foot is one button. | `SidebarFoot.swift` | `Rethink-Sync-Lines`, `Rethink-Offline` |
 | Settings the design adds | Each goes through `PreferencesMap`, optional when read, so an older copy of the app loses none. | `PreferencesMap` | – |
 
 ## Looks

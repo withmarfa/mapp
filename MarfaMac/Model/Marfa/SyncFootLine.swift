@@ -8,6 +8,8 @@ nonisolated struct SyncFootLine: Hashable, Sendable {
         case syncing
         /// The last sync finished without an error, and nothing waits.
         case updated
+        /// The Marfa is on this Mac, so when it last updated is not worth saying.
+        case onThisMac
         /// Changes made here are waiting to go to the server, which can be reached.
         case waiting
         case offline
@@ -25,14 +27,23 @@ nonisolated struct SyncFootLine: Hashable, Sendable {
     let showsFill: Bool
 
     var showsSpinner: Bool { kind == .syncing }
+    /// The person has to act, so the line is as strong as the name and a warning mark comes before it.
+    var asksForAction: Bool { kind == .failed || kind == .needsAttention }
+
+    /// A Marfa with no server to sync with, which the Mac keeps itself.
+    static var onThisMac: SyncFootLine {
+        SyncFootLine(.onThisMac, String(localized: "On this Mac"), help: nil, showsFill: false)
+    }
 
     /// Nil where there is nothing to say: no library, or one that is online and has not synced yet and is not
     /// being synced either, which a moment's wait settles.
     ///
     /// A sync is the copy finishing a pull from the server without an error (`lastSynced`), as against any contact.
-    /// A server that cannot be reached, or one that refuses a key, leaves it where it was.
+    /// A server that cannot be reached, or one that refuses a key, leaves it where it was. `onThisMac` says the server
+    /// runs on this Mac (`MarfaConnection.isOnThisMac`); its line then replaces only "Updated", since a trouble
+    /// is still a trouble.
     init?(
-        state: MarfaConnectionState, report: SyncReport, lastSynced: Date?, now: Date, locale: Locale = .current
+        state: MarfaConnectionState, report: SyncReport, lastSynced: Date?, now: Date, onThisMac: Bool = false, locale: Locale = .current
     ) {
         let status = SyncStatus(state: state, report: report, now: now)
         let showsFill = FillWording.shows(report.fill, in: state)
@@ -54,6 +65,8 @@ nonisolated struct SyncFootLine: Hashable, Sendable {
                 self.init(.offline, line, help: status.notices.first { $0.kind == .offline }?.detail, showsFill: showsFill)
             } else if status.primary?.kind == .sending {
                 self.init(.waiting, Words.waitingToSend(report.waiting), help: status.primary?.detail, showsFill: showsFill)
+            } else if onThisMac {
+                self.init(.onThisMac, String(localized: "On this Mac"), help: nil, showsFill: showsFill)
             } else if let lastSynced {
                 self.init(.updated, Self.updated(since: lastSynced, now: now, locale: locale), help: nil, showsFill: showsFill)
             } else {
