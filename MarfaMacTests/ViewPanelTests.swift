@@ -608,7 +608,7 @@ struct ViewPanelTests {
     /// Revert View puts back the sort this Mac changed and leaves the grouping another app cleared, whether that change
     /// came merged into this Mac's write or arrived after it.
     @Test(arguments: [true, false]) func revertPutsBackOnlyWhatThisMacChanged(mergedIntoTheWrite: Bool) async {
-        let (browser, library, _) = Self.opened()
+        let (browser, library, undo) = Self.opened()
         if mergedIntoTheWrite { library.changedElsewhere = { $0.group = nil } }
         await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].sort = Self.byTitle }
         if !mergedIntoTheWrite, var changed = Self.held(library) {
@@ -618,7 +618,9 @@ struct ViewPanelTests {
             browser.followView(in: library)
         }
         #expect(Self.held(library)?.group == nil)
+        undo.beginUndoGrouping()
         browser.revertView(in: library)
+        Self.close(undo)
         #expect(await eventually(within: .seconds(20)) { Self.held(library)?.sort == Self.view().sort })
         #expect(Self.held(library)?.group == nil)
     }
@@ -667,15 +669,18 @@ struct ViewPanelTests {
         var custom = Self.view()
         custom.sort = [LibraryViewSort(field: "source", ascending: true)]
         custom.group = nil
-        let (browser, library, _) = Self.opened(view: custom)
+        let (browser, library, undo) = Self.opened(view: custom)
+        undo.beginUndoGrouping()
         browser.viewMode = .list
+        Self.close(undo)
         await Self.change(browser) { browser.chooseGrouping(.column(Self.status, by: .value)) }
         #expect(Self.held(library)?.group?.field == "properties.status")
         #expect(Self.held(library)?.sort == custom.sort)
     }
 
     @Test func createViewKeepsOpenItemsAndQuickActions() async throws {
-        let (browser, library, _) = Self.opened()
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
         browser.setOpening(.modal)
         browser.setShowsQuickActions(false)
         browser.openNewViewPanel(in: library)

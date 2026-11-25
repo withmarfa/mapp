@@ -410,7 +410,8 @@ struct FilterClauseTests {
 
     /// The Filter page counts a view's conditions it cannot show, and offers Match Any only where the view can hold it.
     @Test func theFilterPageCountsLockedConditionsAndOffersAnyOnlyWhereItHolds() {
-        let locked = LibraryViewQuery(types: [Self.task], filter: (1...9).map { #"tags contains "t\#($0)""# }.joined(separator: " AND "))
+        // Conditions on a field no type here declares, which the row cannot show.
+        let locked = LibraryViewQuery(types: [Self.task], filter: (1...9).map { #"properties.mood\#($0) eq "calm""# }.joined(separator: " AND "))
         let one = FilterState(clauses: [Self.clause("field.priority", .is, ["high"])])
         let two = FilterState(clauses: [Self.clause("field.priority", .is, ["high"]), Self.clause("field.status", .is, ["done"])])
         let held = ViewDraft.holdability(of: one, beside: locked, targets: Self.targets, catalogue: Self.catalogue, calendar: Self.london())
