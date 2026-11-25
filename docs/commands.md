@@ -42,8 +42,8 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 - **Archive and Unarchive are one command, ⌃⌘A,** which toggles by state and archives a mixed selection.
 - **A toast follows each move** (`Browser.move`): "Kept “x” in the Library", "Moved “x” to the Feed", "Archived “x”" or "Unarchived “x”", or the count. It shows only what the copy queued. Its Undo is the step the move registered, and the library says so if it puts the step back.
 - **Archive asks when items are under the selection:** Archive All, Archive Only This Item or Cancel, with the count `archivePlan` puts beneath (`ArchiveRequest`).
-- **Move to Feed asks when the Feed would let the items go** (`FeedLimitRequest`, worked out by `feedLimitQuestion` from the type's `feedDays` and each item's `created`). For several items it counts those past their window and names the type and days only where they share one type.
-- **A collection can be archived and is never moved to the Feed.** A table gets no Move to Feed once the package says which types hold one (withmarfa/marfa-swift#561).
+- **Move to Feed and Unarchive ask when the Feed would let the items go** (`FeedLimitRequest`, worked out by `feedLimitQuestion` from the type's `feedDays` and each item's `created`). It counts only the items the move would leave active in the Feed past their window, and names the type and days where they share one type.
+- **A collection can be archived and is never moved to the Feed.** A table is not yet kept out of the Feed: the package now says which types hold one, and the app does not use that yet.
 - **These queue offline,** so none waits on `reachesServer`.
 
 ## Shortcuts
