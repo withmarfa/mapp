@@ -245,7 +245,7 @@ private struct SidebarList: View {
             if content.customizing {
                 SidebarDoneBar(browser: browser)
             } else {
-                SidebarFoot(browser: browser)
+                SidebarFoot(browser: browser, order: order)
             }
         }
         // The window mounts this list afresh when its presentation changes, so it starts where the last one was.

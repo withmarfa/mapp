@@ -47,6 +47,12 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         return components.url ?? address
     }
 
+    /// Whether the server runs on this Mac: an address that names the loopback, as `localhost`, `127.0.0.1` and `::1` do.
+    var isOnThisMac: Bool {
+        guard let host = address.host(percentEncoded: false)?.lowercased() else { return false }
+        return host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host == "[::1]" || host.hasPrefix("127.")
+    }
+
     /// Throws only for an address holding a user or password, which `init(address:)` already refuses.
     func server(key: String) throws -> Server {
         try Server(url: address, key: key)
