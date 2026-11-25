@@ -356,7 +356,7 @@ final class ValueEditModel {
         narrowed(Self.typeRows(of: library.typeChangeOptions(for: request.targets), shown: ValueEditPresenter.shared.sidebarTypes(library)))
     }
 
-    /// The types the items can become: the sidebar's own first, in its order, then the rest by name under a line.
+    /// The types the items can become: those of `shown` first, in its order, then the rest by name under a line.
     static func typeRows(of options: [ItemTypeOption], shown: [TypeID]) -> [ValueListRow] {
         func row(_ option: ItemTypeOption) -> ValueListRow {
             ValueListRow(id: typePrefix + option.id.rawValue, role: .option, title: option.label, mark: .type(icon: option.icon))

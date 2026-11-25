@@ -165,7 +165,6 @@ struct ChipLooks: Equatable, Sendable {
             "--chip-wash": neutral(looks.chipWashOpacity),
             "--chip-person-fill": TypeTone.purple.cssRGBA(looks.personFill(dark: dark), dark: dark),
             "--chip-person-ink": TypeTone.cssRGB(of: looks.personInk(dark: dark)),
-            "--chip-chevron-opacity": alpha(looks.chevronOpacity),
         ]
     }
 }

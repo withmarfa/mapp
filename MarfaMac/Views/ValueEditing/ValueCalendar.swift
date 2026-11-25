@@ -43,16 +43,19 @@ struct ValueCalendar: View {
 
     var body: some View {
         VStack(spacing: 4 * scale) {
-            HStack(spacing: 2 * scale) {
+            HStack(spacing: 0) {
+                // The month is never cut: the arrows give way to it.
                 Text(monthStart, format: .dateTime.month(.wide).year())
                     .font(.system(size: 13 * scale, weight: .semibold))
-                Spacer()
+                    .lineLimit(1)
+                    .fixedSize()
+                Spacer(minLength: 4 * scale)
                 nav("chevron.left", "Previous Month") { step(-1) }
-                nav("circle.fill", "This Month") { shown = today }
-                    .font(.system(size: 6 * scale))
+                nav("circle.fill", "This Month", size: 6) { shown = today }
                 nav("chevron.right", "Next Month") { step(1) }
             }
-            .padding(.horizontal, 8 * scale)
+            .padding(.leading, 8 * scale)
+            .padding(.trailing, 2 * scale)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2 * scale), count: 7), spacing: 2 * scale) {
                 ForEach(Array(weekdays.enumerated()), id: \.offset) { _, symbol in
                     Text(verbatim: symbol)
@@ -71,11 +74,11 @@ struct ValueCalendar: View {
         .onChange(of: selected) { if let selected { shown = selected } }
     }
 
-    private func nav(_ symbol: String, _ label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+    private func nav(_ symbol: String, _ label: LocalizedStringKey, size: CGFloat = 11, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 11 * scale, weight: .semibold))
-                .frame(width: 24 * scale, height: 24 * scale)
+                .font(.system(size: size * scale, weight: .semibold))
+                .frame(width: 18 * scale, height: 24 * scale)
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)

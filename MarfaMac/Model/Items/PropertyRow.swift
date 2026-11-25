@@ -132,10 +132,10 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     static let otherPrefix = "other:"
 
     /// Every row the item could show, whatever the person chose, in the order a person reads them: the type's fields as
-    /// the catalogue orders them, with the parent after the status (or first, where the type has no status), and one
-    /// Location for the latitude, the longitude and a name for the place; then every link the item's type may hold
-    /// (`links`), the ones it has first; then its tags; then the values no field describes, read only, under their own
-    /// heading. A field, a link or the tags with no value is a row too, read as Empty, which opens its editor where the
+    /// the catalogue orders them, with the parent after the status and the choices and dates that follow it (or first,
+    /// where the type has no status), and one Location for the latitude, the longitude and a name for the place; then
+    /// every link the item's type may hold (`links`), the ones it has first; then its tags; then the values no field
+    /// describes, read only, under their own heading. A field, a link or the tags with no value is a row too, read as Empty, which opens its editor where the
     /// item can take the edit. The keys in `hidden` are what the page shows another way, such as the title and the
     /// text. With `showsCoordinates`, the latitude and longitude are rows of their own beside the Location that stands
     /// for them.
@@ -164,7 +164,6 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 fields.append(set
                     ? PropertyRow(id: field.key, label: field.label, value: .status)
                     : PropertyRow(id: field.key, label: field.label, value: .empty(symbol: Value.status.symbol), editable: edits && field.isPicked))
-                if let parentRow { fields.append(parentRow) }
             } else if let value = value(of: field, in: item, format: format, long: true) {
                 var row = PropertyRow(
                     id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item), editable: edits,
@@ -177,13 +176,27 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 fields.append(PropertyRow(id: field.key, label: field.label, value: .empty(symbol: symbol(of: field)), editable: edits))
             }
         }
-        if let parentRow, !fields.contains(where: { $0.id == parentField }) { fields.insert(parentRow, at: 0) }
+        if let parentRow { fields.insert(parentRow, at: parentPlace(among: fields, of: type)) }
         var rows = fields
         for link in links where link.field != parentField { rows.append(edgeRow(link, icon: icon, isPerson: isPerson)) }
         rows.append(tags.isEmpty
             ? PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .empty(symbol: "tag"), editable: item.allows(.tags))
             : PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags), editable: item.allows(.tags)))
         return rows + otherRows(of: item, type: type, hidden: hidden, links: links, format: format, label: label)
+    }
+
+    /// Where the parent goes among the rows of the type's fields: after the status and the choices and dates that follow
+    /// it, which say how the item stands, or first where no row is the status.
+    private static func parentPlace(among rows: [PropertyRow], of type: ItemTypeInfo?) -> Int {
+        guard let status = type?.statusField?.key, var place = rows.firstIndex(where: { $0.id == status }) else { return 0 }
+        let following = Set((type?.fields ?? []).filter { field in
+            switch field.kind {
+            case .choice, .date: true
+            default: false
+            }
+        }.map(\.key))
+        repeat { place += 1 } while place < rows.count && following.contains(rows[place].id)
+        return place
     }
 
     /// The row of one link the item's type may hold: the items it reaches, or Empty. It opens its editor where the item

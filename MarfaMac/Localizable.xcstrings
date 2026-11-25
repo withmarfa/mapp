@@ -7877,10 +7877,10 @@
     "Read and Edit" : {
 
     },
-    "Read only. %@ keeps this item, so an edit here would be overwritten." : {
+    "Read only. %@ keeps this item, so a change made here would be overwritten." : {
 
     },
-    "Read only. A connector keeps this item, so an edit here would be overwritten." : {
+    "Read only. A connector keeps this item, so a change made here would be overwritten." : {
 
     },
     "Read the Audit Log" : {

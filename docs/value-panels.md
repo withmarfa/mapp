@@ -17,7 +17,7 @@ paths:
 - **A single choice closes the panel when picked; several keep it open.** Only a date's panel has a row for Not Set. A yes or no is two rows, Yes and No.
 - **A chosen or pointed-at row is gray, never the accent.** In a calendar the chosen day is a dark gray circle and today's number is red (`ValueCalendar`).
 - **A value that holds several shows what is chosen as chips in the find field,** each with a remove mark. The field is a bare caret, not a box; the keyboard ring stays on every other control.
-- **A date panel starts with the day typed.** Return sets it; text that is no date stays in the field with the reason, and goes back to the person as the panel ends.
+- **A date panel starts with the day typed,** the caret after it. Return sets it; text that is no date stays in the field with the reason, and goes back to the person as the panel ends.
 - **Tags, words and collections show a count beside each row.** A collection's is asked of Marfa (`ItemCounts`) when the rows appear, never while they draw.
 - **The last row makes what was typed:** Add “letterpress” for a word, Create Tag “pap” for a tag.
 - **A status panel lists the type's words under their four groups.** Edit Statuses… opens the type in Settings.

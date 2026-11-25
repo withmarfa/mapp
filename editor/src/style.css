@@ -30,7 +30,8 @@
      Both are translucent, so the text keeps its contrast on the page in light and dark. */
   --inkkit-selection-background: color-mix(in srgb, var(--inkkit-accent-color) 30%, transparent);
   --inkkit-inactive-selection-background: color-mix(in srgb, CanvasText 15%, transparent);
-  --reading-width: 54rem;
+  /* The app's default, 680px at 15px text (`PageStyle.readingEms`). */
+  --reading-width: 45.3333rem;
   --page-width: var(--reading-width);
   color-scheme: light dark;
 }
@@ -616,20 +617,6 @@ button.item-kicker-type:focus-visible {
   mask: center / contain no-repeat;
 }
 
-/* The chevron of a chip that opens a menu. A chip the person cannot change has none. */
-.item-icon-indicator {
-  width: var(--icon-indicator-width, 0.6em);
-  height: var(--icon-indicator-height, 0.6em);
-  opacity: var(--chip-chevron-opacity, 0.5);
-  -webkit-mask-image: var(--icon-indicator);
-  mask-image: var(--icon-indicator);
-}
-
-.item-menu-pin:disabled .item-icon-indicator,
-.item-menu-pin[data-kind='link'] .item-icon-indicator {
-  display: none;
-}
-
 /* The status mark: the group's SF Symbol, which the app draws, as a mask in its tint. It takes the symbol's own size,
    which the app sends already scaled to the interface's text size. */
 .item-status-mark {
@@ -817,8 +804,8 @@ button.item-kicker-type:focus-visible {
   flex-wrap: wrap;
   column-gap: 0;
   align-items: flex-start;
-  min-height: calc(var(--interface-text-size) * 28 / 13);
-  padding-block: calc(var(--interface-text-size) * 4 / 13);
+  min-height: calc(var(--interface-text-size) * 32 / 13);
+  padding-block: calc(var(--interface-text-size) * 5 / 13);
   box-sizing: border-box;
 }
 

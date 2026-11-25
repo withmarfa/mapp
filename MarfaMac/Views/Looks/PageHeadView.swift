@@ -69,7 +69,7 @@ struct PageHeadView<Title: View>: View {
                             value(of: row, step: step)
                                 .help(row.wholeValue)
                         }
-                        .frame(minHeight: size * 30 / 13)
+                        .frame(minHeight: size * 32 / 13)
                         .opacity(row.muted ? 0.45 : 1)
                         .accessibilityElement(children: .contain)
                     }
@@ -177,7 +177,7 @@ struct PageHeadView<Title: View>: View {
 
 /// The status pin: its group's mark and the status in a chip. Where the item can be changed it is a native menu of the
 /// type's statuses, which writes the choice as the item page's does and says so when the library refuses; where it
-/// cannot, the chip has no chevron and no menu.
+/// cannot, it is the chip alone.
 private struct StatusPin: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
@@ -203,7 +203,7 @@ private struct StatusPin: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
             } label: {
-                PageChip(text: label, kind: .status(mark, chevron: true))
+                PageChip(text: label, kind: .status(mark, chevron: false))
             }
             .menuStyle(.button)
             .buttonStyle(.plain)

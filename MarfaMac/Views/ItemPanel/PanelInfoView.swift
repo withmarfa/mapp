@@ -76,7 +76,9 @@ struct PanelInfoView: View {
                     Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary)
                 }
             }
-            .menuStyle(.borderlessButton)
+            // A borderless menu draws its label's picture first; as a plain button it is drawn as written.
+            .menuStyle(.button)
+            .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
             .accessibilityLabel("In")

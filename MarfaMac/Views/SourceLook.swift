@@ -34,7 +34,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
     var mode: SourceViewMode
     var isMail: Bool
     var textSize: Int
-    var readingWidth: Int
+    var readingEms: Double
     /// The text runs the window's width, as the page's setting says.
     var wide: Bool
 
@@ -42,7 +42,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
         self.mode = mode
         self.isMail = isMail && mode == .original
         textSize = page.textSize
-        readingWidth = page.readingWidth
+        readingEms = page.readingEms
         wide = page.fullWidth
     }
 
@@ -57,7 +57,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
     var inset: String {
         let minimum = textSize * 3
         guard !wide else { return "\(minimum)px" }
-        return "max(\(minimum)px, calc((100vw - \(readingWidth * textSize)px) / 2))"
+        return "max(\(minimum)px, calc((100vw - \(readingEms * Double(textSize))px) / 2))"
     }
 
     /// The style sheet to add to the document.
