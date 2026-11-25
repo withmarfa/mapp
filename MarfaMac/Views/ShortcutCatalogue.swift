@@ -65,7 +65,6 @@ nonisolated extension ShortcutCommand {
     static let editView = ShortcutCommand("editView", in: .view, String(localized: "View…"))
     static let revertView = ShortcutCommand("revertView", in: .view, String(localized: "Revert View"))
     static let resetView = ShortcutCommand("resetView", in: .view, String(localized: "Reset View"))
-    static let duplicateView = ShortcutCommand("duplicateView", in: .view, String(localized: "Duplicate View"))
     static let toggleDetails = ShortcutCommand("toggleDetails", in: .view, String(localized: "Show or Hide Details"), "i", [.command, .option])
     static let customizeSidebar = ShortcutCommand("customizeSidebar", in: .view, String(localized: "Customize Sidebar…"))
     static let back = ShortcutCommand("back", in: .view, String(localized: "Back"), "[")
@@ -96,7 +95,7 @@ nonisolated extension ShortcutCommand {
             copyLink, addAttachment, searchItems, commandPalette, paletteActions, searchList, find, findNext, findPrevious, useSelectionForFind,
             toggleSource, toggleReader, toggleFormats, focus, viewAsList, viewAsGallery, viewAsTable, viewAsBoard, viewAsTimeline, viewAsCalendar,
             toggleFilters, clearFilters, today, previousPeriod, nextPeriod, showWeek, showMonthScale, toggleMonth,
-            editView, newView, revertView, resetView, duplicateView, toggleDetails, customizeSidebar, back, forward, previousItem, nextItem,
+            editView, newView, revertView, resetView, toggleDetails, customizeSidebar, back, forward, previousItem, nextItem,
             makeTextBigger, makeTextSmaller, actualSize, zoomToFit, nextPage, previousPage,
         ]
         return commands + Format.allCases.map { format($0) }

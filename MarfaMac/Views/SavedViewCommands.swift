@@ -6,7 +6,7 @@ struct SavedViewCommand {
     let systemImage: String
     let action: () -> Void
 
-    static func commands(for browser: Browser, in library: any ItemLibrary, order: ItemOrder) -> [SavedViewCommand] {
+    static func commands(for browser: Browser, in library: any ItemLibrary) -> [SavedViewCommand] {
         var commands: [SavedViewCommand] = []
         let shown = SavedViews.shown(browser, in: library)
         if browser.offersViewOptions, library.isLoaded, !browser.showsPlaceIndex {
@@ -14,9 +14,8 @@ struct SavedViewCommand {
                 browser.openViewPanel(in: library)
             })
         }
-        // Making, copying and deleting a view need the server. Save View is for a change the server did not take, which
-        // the window keeps.
-        let reachesServer = library.reachesServer
+        // Save View is for a change the server did not take, which the window keeps. A pill's menu renames, copies,
+        // hides and deletes a view.
         if SavedViews.canSave(browser, in: library) {
             commands.append(SavedViewCommand(title: String(localized: "New View…"), systemImage: "plus.rectangle.on.rectangle") {
                 browser.openNewViewPanel(in: library)
@@ -27,7 +26,7 @@ struct SavedViewCommand {
                 browser.resetView(in: library)
             })
         }
-        if let view = shown {
+        if shown != nil {
             if browser.isViewChanged {
                 commands.append(SavedViewCommand(title: String(localized: "Revert View"), systemImage: "arrow.uturn.backward") {
                     browser.revertView(in: library)
@@ -38,26 +37,17 @@ struct SavedViewCommand {
                     browser.writeViewAgain()
                 })
             }
-            if reachesServer {
-                commands.append(SavedViewCommand(title: String(localized: "Duplicate View"), systemImage: "plus.square.on.square") {
-                    Task { await browser.duplicateView(view.id, in: library, order: order) }
-                })
-                commands.append(SavedViewCommand(title: String(localized: "Delete View…"), systemImage: "trash") {
-                    browser.deletingView = view.id
-                })
-            }
         }
         return commands
     }
 }
 
-/// The view commands in the View menu: the View panel, New View and Revert View, then the rest of what the panel's More
-/// holds, so a hidden toolbar leaves every one in reach.
+/// The view commands in the View menu: the View panel, New View and Revert View, then Reset View and Save View, so a
+/// hidden toolbar leaves each in reach. A pill's menu, in the content, holds the rest (`TopRowPillMenu`).
 struct SavedViewMenu: View {
     let browser: Browser?
     let library: (any ItemLibrary)?
     var shortcuts: ShortcutBindings?
-    @StoredOrder private var order
     // Read by `offersResetView`, so a change of the default view draws the menu again.
     @AppStorage(PlaceDefaults.key) private var storedDefaults = Data()
     @AppStorage(PlaceDensities.key) private var storedDensities = Data()
@@ -66,7 +56,6 @@ struct SavedViewMenu: View {
     var body: some View {
         let _ = (storedDefaults, storedDensities, storedColumns)
         let shown = browser.flatMap { browser in library.flatMap { SavedViews.shown(browser, in: $0) } }
-        let reachesServer = library?.reachesServer == true
         let canSave = browser.flatMap { browser in library.map { SavedViews.canSave(browser, in: $0) } } ?? false
         let opens = browser.flatMap { browser in library.map { browser.offersViewOptions && $0.isLoaded && !browser.showsPlaceIndex } } ?? false
         Button("View…", systemImage: "slider.horizontal.3") {
@@ -93,15 +82,6 @@ struct SavedViewMenu: View {
             browser?.writeViewAgain()
         }
         .disabled(shown == nil || browser?.hasViewChanges != true)
-        Button("Duplicate View", systemImage: "plus.square.on.square") {
-            if let browser, let library, let shown { Task { await browser.duplicateView(shown.id, in: library, order: order) } }
-        }
-        .shortcut(.duplicateView, shortcuts)
-        .disabled(!reachesServer || shown == nil)
-        Button("Delete View…", systemImage: "trash") {
-            if let shown { browser?.deletingView = shown.id }
-        }
-        .disabled(!reachesServer || shown == nil)
     }
 }
 

@@ -37,7 +37,13 @@ extension Browser {
     /// changes, unless the window holds choices Marfa has not taken (a write that failed): those stay, and the next
     /// write carries them. Every layout shows them, and the view opens in the layout this Mac keeps for it.
     func followView(in library: any ItemLibrary) {
-        guard let id = shown.savedView, let view = library.views.first(where: { $0.id == id }) else { return }
+        guard let id = shown.savedView else { return }
+        guard let view = library.views.first(where: { $0.id == id }) else {
+            // A view deleted elsewhere falls to the first view of its row. An empty list proves nothing, since a read
+            // that failed publishes one.
+            if !library.views.isEmpty, !viewsBeingDeleted.contains(id) { showing = firstView(of: shown.place, in: library) }
+            return
+        }
         // A change of the view's filters can move it to another home, and the window goes with it.
         let home = PlaceView(Place.home(of: view.query, catalogue: library.catalogue), .saved(id))
         if showing != home { showing = home }
@@ -522,5 +528,6 @@ extension Browser {
         guard await library.deleteView(id) else { return }
         if viewPanel?.viewID == id { viewPanel = nil }
         forgetView(id)
+        if shown.savedView == id { showing = firstView(of: shown.place, in: library) }
     }
 }

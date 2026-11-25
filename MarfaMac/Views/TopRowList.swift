@@ -20,6 +20,8 @@ extension View {
 private struct TopRowOverList: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.interfaceTextSize) private var textSize
+    /// Only watched: the row's order and hidden views are read through `Browser.viewChoices`.
+    @AppStorage(ViewOrders.key) private var orders = Data()
     let browser: Browser
     let scroll: TopRowScroll
     let opensPlaces: Bool
@@ -32,6 +34,7 @@ private struct TopRowOverList: ViewModifier {
     private var isAlwaysBeside: Bool { !browser.showsPlaceIndex && (browser.viewMode == .calendar || browser.viewMode == .board) }
 
     func body(content: Content) -> some View {
+        let _ = orders
         let row = TopRowContent.make(browser: browser, library: library)
         // With the sidebar closed the place, its views and the buttons share one row, and so they do at the smallest window.
         // Except in a list column beside a page: there the traffic lights, the sidebar's button and Back and Forward leave

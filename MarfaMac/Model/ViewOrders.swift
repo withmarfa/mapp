@@ -1,8 +1,8 @@
 import Foundation
 
 /// The order of each place's views as the person arranged them, kept by the place's word (`Place.word`) as a list of
-/// view words (`ViewChoice.word`): the place's own view, the Library's Favorites and its saved views. A view with no
-/// stored position follows the placed ones, by title (`ItemLibrary.views(in:order:)`).
+/// view words (`ViewChoice.word`): the place's own view, the Library's Favorites and its saved views, and the views the
+/// person hid from the row. A view with no stored position follows the placed ones, by title (`ItemLibrary.views(in:order:)`).
 nonisolated struct ViewOrders: Equatable, Sendable {
     static let key = "viewOrders"
     /// Each entry is stored data that could not be read, in the order it was found.
@@ -30,6 +30,42 @@ nonisolated struct ViewOrders: Equatable, Sendable {
         for (index, word) in (places[place.word] ?? []).enumerated() where ViewChoice(knownWord: word) == nil {
             words.insert(word, at: min(index, words.count))
         }
+        places[place.word] = words.isEmpty ? nil : words
+    }
+
+    /// `views` in the person's order: the placed ones first, then the rest as given, so a view made elsewhere after the
+    /// person arranged the row comes last, and a view that is gone leaves no gap.
+    func arranged(_ views: [ViewChoice], in place: Place) -> [ViewChoice] {
+        let rank = Dictionary(order(in: place).enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        return views.enumerated().sorted { a, b in
+            switch (rank[a.element], rank[b.element]) {
+            case let (x?, y?): x < y
+            case (.some, nil): true
+            case (nil, .some): false
+            case (nil, nil): a.offset < b.offset
+            }
+        }.map(\.element)
+    }
+
+    // MARK: Hidden views
+
+    /// A hidden view is kept in its place's list as this prefix and its word, which an earlier copy does not know and
+    /// so leaves alone.
+    private static let hiddenPrefix = "hidden:"
+
+    /// The views of `place` the person hid from the row.
+    func hidden(in place: Place) -> Set<ViewChoice> {
+        Set((places[place.word] ?? []).compactMap { word in
+            word.hasPrefix(Self.hiddenPrefix) ? ViewChoice(knownWord: String(word.dropFirst(Self.hiddenPrefix.count))) : nil
+        })
+    }
+
+    /// Hides `view` from the row of `place`, or shows it again. Hiding never deletes the view.
+    mutating func setHidden(_ view: ViewChoice, _ isHidden: Bool, in place: Place) {
+        let word = Self.hiddenPrefix + view.word
+        var words = places[place.word] ?? []
+        words.removeAll { $0 == word }
+        if isHidden { words.append(word) }
         places[place.word] = words.isEmpty ? nil : words
     }
 

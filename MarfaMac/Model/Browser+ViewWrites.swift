@@ -450,9 +450,36 @@ extension Browser {
         if outcome == .renamedElsewhere, let now = library.views.first(where: { $0.id == id }) { panel.restartRename(from: now) }
     }
 
+    /// Renames a view from its pill, against the name and version it had when Rename… began. A name the view does not
+    /// take is given back on the clipboard, since nothing else holds it.
+    @discardableResult
+    func renameView(_ id: ItemID, to typed: String, from base: ViewPanel.RenameBase, in library: any ItemLibrary) async -> Bool {
+        let name = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard library.views.contains(where: { $0.id == id }), !name.isEmpty, name != base.title else { return false }
+        guard library.reachesServer else {
+            library.notices.notKept(
+                String(localized: "View Not Renamed"), text: name,
+                reason: String(localized: "Your Marfa server can’t be reached, so the view keeps its name."))
+            return false
+        }
+        let outcome = await writeName(
+            name, of: id, expecting: [base.title], baseVersion: base.version, in: library, tellsOffline: false, tellsRenamed: false)
+        switch outcome {
+        case .kept:
+            registerNameUndo(of: id, restoring: base.title, from: name)
+        case .renamedElsewhere:
+            library.notices.notKept(
+                String(localized: "View Not Renamed"), text: name,
+                reason: String(localized: "This view was renamed in another app, so your name wasn’t written."))
+        case .notWritten:
+            library.notices.notKept(String(localized: "View Not Renamed"), text: name, reason: String(localized: "The view keeps its name."))
+        }
+        return outcome == .kept
+    }
+
     private func registerNameUndo(of id: ItemID, restoring old: String, from new: String) {
         registerUndo(String(localized: "Rename View")) { browser in
-            browser.viewPanel?.name = old
+            if browser.viewPanel?.viewID == id { browser.viewPanel?.name = old }
             browser.registerNameUndo(of: id, restoring: new, from: old)
             guard let library = browser.library else { return }
             Task { await browser.writeName(old, of: id, expecting: [new], in: library) }
@@ -483,7 +510,9 @@ extension Browser {
         _ name: String, of id: ItemID, expecting titles: Set<String>, baseVersion: Int64?, in library: any ItemLibrary,
         tellsOffline: Bool, tellsRenamed: Bool
     ) async -> NameOutcome {
-        guard let view = library.views.first(where: { $0.id == id }), let seed = viewSeeds[id] else { return .notWritten }
+        guard let view = library.views.first(where: { $0.id == id }) else { return .notWritten }
+        // A view the window has not opened is renamed on the version the library holds.
+        let seed = viewSeeds[id]
         guard titles.contains(view.title) else {
             if tellsRenamed { tellRenamedElsewhere(in: library) }
             return .renamedElsewhere
@@ -495,11 +524,13 @@ extension Browser {
         }
         var change = LibraryViewChange()
         change.title = name
-        switch await library.changeView(id, change, baseVersion: baseVersion ?? seed.version) {
+        switch await library.changeView(id, change, baseVersion: baseVersion ?? seed?.version ?? view.version) {
         case .success(let changed):
-            self.seed(changed, catalogue: library.catalogue, keepingWindow: true)
-            viewPanel?.knownTitle = changed.title
-            viewPanel?.knownVersion = changed.version
+            if seed != nil { self.seed(changed, catalogue: library.catalogue, keepingWindow: true) }
+            if viewPanel?.viewID == id {
+                viewPanel?.knownTitle = changed.title
+                viewPanel?.knownVersion = changed.version
+            }
             return .kept
         case .failure(let failure) where failure.kind == .conflict:
             // A name is the one setting this write sends, so the conflict is another app's rename.

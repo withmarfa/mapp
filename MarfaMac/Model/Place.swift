@@ -259,6 +259,10 @@ nonisolated extension Place {
         if collections.count == 1, sources.isEmpty, let only = collections.first, only.required { return .collection(only.id) }
         if sources.count == 1, collections.isEmpty, let only = sources.first, only.required { return .source(only.code) }
         if query.tier == .feed, query.types.isEmpty, collections.isEmpty, sources.isEmpty { return .feed }
+        // An inbox of several of the Feed's sources, and nothing else, is still the Feed's.
+        if query.tier == .feed, query.types.isEmpty, collections.isEmpty, sources.count > 1, sources.count == parsed.terms.count {
+            return .feed
+        }
         return .library
     }
 }

@@ -199,7 +199,7 @@ extension CommandPalette {
                     browser.showLayouts(of: type)
                 }
             }
-            for command in SavedViewCommand.commands(for: browser, in: library, order: order) {
+            for command in SavedViewCommand.commands(for: browser, in: library) {
                 add(command.title, command.systemImage, in: .view, action: command.action)
             }
             if browser.customizesSidebar {

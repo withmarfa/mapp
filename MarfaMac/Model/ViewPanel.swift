@@ -75,6 +75,38 @@ final class ViewPanel {
     private(set) var form: ViewTitleForm?
     private(set) var snapshot: Snapshot?
 
+    // MARK: A new view
+
+    /// Why Create View made nothing yet. Everything the person chose stays in the panel and the window.
+    enum Problem: Equatable {
+        /// The server can't be reached; a view is never queued, so Create View is chosen again once it is back.
+        case offline
+        /// Another view has this name.
+        case clash(String)
+        /// The server refused the view and has told the person why.
+        case refused
+    }
+
+    /// The starting point the person chose, which the window shows.
+    var start: NewViewStart?
+    /// Whether the view is kept in the sidebar's Pinned, where a saved view goes unless taken out.
+    var addsToSidebar = true
+    /// The new view's Quick Actions on this Mac; nil follows the place.
+    var quickActions: Bool?
+    var problem: Problem?
+    /// The name the panel last suggested, which follows the view's settings until the person types their own.
+    private(set) var suggestedName = ""
+
+    /// Puts `name` in the field unless the person typed a name of their own.
+    func suggest(_ name: String) {
+        guard let form, name != suggestedName else { return }
+        if form.trimmedTitle.isEmpty || form.title == suggestedName { form.title = name }
+        suggestedName = name
+    }
+
+    /// Whether the panel holds something a click outside it must not throw away: a view Create View could not make yet.
+    var holdsUnmadeView: Bool { isNew && problem != nil }
+
     init(editing view: LibraryView, notices: Notices) {
         purpose = .edit(view.id)
         name = view.title
