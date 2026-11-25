@@ -52,6 +52,11 @@ extension MarfaEngine {
         }
         for failure in failures { hub.publish(.unavailable(failure)) }
         failures = []
+        for refusal in refusedParentLinks {
+            hub.publish(.unavailable(notice(for: refusal)))
+            if let write = refusal.write { parentLinks.remove(write) }
+        }
+        refusedParentLinks = []
         publishReport(copies)
     }
 

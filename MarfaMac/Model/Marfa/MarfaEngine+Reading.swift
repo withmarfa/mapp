@@ -304,6 +304,7 @@ extension MarfaEngine {
             readFailed(error)
             return
         }
+        if !readQueueOnce { refusedParentLinks += parentLinks.untold(queued: Set(queue.map(\.id))) }
         queue = await libraryWrites(queue)
         let held = Set(queue.map(\.id)).union(answeredHeld.keys)
         counted.formIntersection(held)

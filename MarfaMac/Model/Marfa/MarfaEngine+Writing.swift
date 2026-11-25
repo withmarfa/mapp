@@ -271,20 +271,39 @@ extension MarfaEngine {
     }
 
     /// The create is already queued and answered on its own, so a parent that cannot be linked is told apart and
-    /// trying the create again makes no second item. The edge is judged like every other (`judge(edge:)`).
+    /// trying the create again makes no second item. The edge is judged like every other (`judge(edge:)`), and
+    /// followed to the server's answer, which tells a later refusal too (`answer(_:)`).
     func place(_ child: ItemID, under parent: ItemID) async {
         let draft = EdgeDraft(type: MarfaMapping.parentEdge, from: parent, to: child)
+        let link = ParentLink(child: child, parent: parent)
         do {
-            _ = try await Self.asking {
+            let queued = try await Self.asking {
                 try await judge(edge: .link(draft))
                 return try await copy.edges.create(from: parent.rawValue, to: child.rawValue, type: draft.type)
             }
+            parentLinks.keep(link, for: queued.id)
         } catch {
             let reason = (error as? Refused)?.problem.message ?? Self.failure(error).message
-            failures.append(SourceFailure(
-                kind: .failed, message: String(localized: "The item was made, but it couldn’t be put under its parent: \(reason)"),
-                title: String(localized: "Can’t Put Item Under Its Parent")))
+            refusedParentLinks.append(ParentRefusal(link: link, reason: reason, listed: false))
         }
+    }
+
+    /// What the person is told of a refused parent link: the item and its parent, by the names last published, and
+    /// why.
+    func notice(for refusal: ParentRefusal) -> SourceFailure {
+        let told = hub.told([refusal.link.child, refusal.link.parent])
+        let item = told[refusal.link.child].map { "“\($0.item.displayTitle)”" } ?? String(localized: "The new item")
+        let parent = told[refusal.link.parent].map { "“\($0.item.displayTitle)”" } ?? String(localized: "its parent")
+        guard let reason = refusal.reason else {
+            return SourceFailure(
+                kind: .failed,
+                message: String(localized: "\(item) was added. Its parent link may not have been made, so check that it’s under \(parent)."),
+                title: String(localized: "Item May Not Be Under Its Parent"))
+        }
+        let message = refusal.listed
+            ? String(localized: "\(item) was added, but Marfa refused to put it under \(parent): \(reason) The link is also listed in Settings.")
+            : String(localized: "\(item) was added, but it couldn’t be put under \(parent): \(reason)")
+        return SourceFailure(kind: .failed, message: message, title: String(localized: "Can’t Put Item Under Its Parent"))
     }
 
     /// Destroys an item in the bin at the server, which the package does only at once and only for an item whose

@@ -7,7 +7,8 @@ import os
 ///
 /// Each draft is written to disk at once, whole, as it changes. A window holding a draft claims it, so two windows
 /// never edit one draft; a window that closes lets it go, and the next to open the same slot in the same library
-/// takes it back. A draft that was added waits, still kept, until its library holds the item or refuses it.
+/// takes it back. A draft that was added, or whose file is on its way, is frozen as it was sent and waits, still kept,
+/// until its library holds the item or refuses it; what the holder types after that is a new draft.
 final class NewItemDrafts {
     /// Which kind of new item a draft is for, so each place that makes items finds only its own.
     struct Slot: RawRepresentable, Hashable, Codable, Sendable {
@@ -34,16 +35,21 @@ final class NewItemDrafts {
         var missingFiles: [String] = []
         /// Given back because the library refused it, and not yet taken since.
         var returned = false
-        /// Its file was being added, which the library names only once it is queued.
+        /// Its file is being added, which the library names only once it is queued, so no holder may take it.
         var addingFile = false
-        /// The app stopped while its file was being added, so the file may be in the library already.
+        /// The app stopped while it was being added, so it may be in Marfa already, and it is offered again with a
+        /// notice. Kept until an Add is asked again.
         var interrupted = false
+        /// Added in this run, or its file on the way, so it waits for Marfa's answer and is never changed or deleted.
+        var isSubmitted: Bool { (sent != nil && !interrupted) || addingFile }
     }
 
     private let file: URL?
     private var entries: [UUID: Entry]
     /// The drafts a holder has open, which no other may take.
     private var claimed: Set<UUID> = []
+    /// The drafts read back already sent, whose create an earlier run made with no answer the app knows.
+    private var sentBefore: Set<UUID>
     private let now: () -> Date
     /// Where a draft that cannot be written to disk is told, once until a write works again.
     weak var notices: Notices?
@@ -55,6 +61,7 @@ final class NewItemDrafts {
         let read = file.map(Self.read) ?? (entries: [:], blocked: false)
         entries = read.entries
         blocked = read.blocked
+        sentBefore = Set(read.entries.values.filter { $0.sent != nil }.map(\.id))
     }
 
     /// The app's own drafts. A unit test's host gets a store in memory for each holder, so no test reads another's
@@ -71,30 +78,33 @@ final class NewItemDrafts {
     // MARK: The holder's calls
 
     /// Claims the slot's most recently typed draft in `library` that nobody holds, or nil where there is none. A
-    /// draft added and still waiting is not offered.
+    /// draft added or with its file on the way, and still waiting, is not offered.
     func take(_ slot: Slot, in library: String) -> Entry? {
-        let open = entries.values.filter { $0.slot == slot && $0.library == library && $0.sent == nil && !claimed.contains($0.id) }
+        let open = entries.values.filter { $0.slot == slot && $0.library == library && isFree($0) }
         return open.max(by: { $0.updated < $1.updated }).map(take)
     }
 
     /// Claims the draft `id`, as one holder hands it to another, or nil where it is held, waiting or gone.
     func take(_ id: UUID, in library: String) -> Entry? {
-        guard let entry = entries[id], entry.library == library, entry.sent == nil, !claimed.contains(id) else { return nil }
+        guard let entry = entries[id], entry.library == library, isFree(entry) else { return nil }
         return take(entry)
+    }
+
+    private func isFree(_ entry: Entry) -> Bool {
+        !entry.isSubmitted && !claimed.contains(entry.id)
     }
 
     /// Claims the slot's most recent draft in `library` that the library refused and nobody has taken since.
     func takeReturned(_ slot: Slot, in library: String) -> Entry? {
-        let returned = entries.values.filter { $0.slot == slot && $0.library == library && $0.returned && !claimed.contains($0.id) }
+        let returned = entries.values.filter { $0.slot == slot && $0.library == library && $0.returned && isFree($0) }
         guard let entry = returned.max(by: { $0.updated < $1.updated }) else { return nil }
         return take(entry)
     }
 
     private func take(_ entry: Entry) -> Entry {
         claimed.insert(entry.id)
-        if entry.returned || entry.interrupted {
+        if entry.returned {
             entries[entry.id]?.returned = false
-            entries[entry.id]?.interrupted = false
             save()
         }
         return entry
@@ -108,20 +118,35 @@ final class NewItemDrafts {
         return id
     }
 
-    /// What was typed: kept where it holds something, and dropped where it is empty again.
-    func update(_ id: UUID, _ draft: QuickAdd.Draft) {
-        if entries[id] != nil {
-            guard draft.hasContent else { return remove(id, keepingClaim: true) }
+    /// What was typed: kept where it holds something, and dropped where it is empty again. A submitted draft is never
+    /// written: any change to it goes to the new draft this returns, which the holder goes on in. A draft read back
+    /// sent, once changed, is no longer what was sent, so it no longer closes when its item arrives.
+    @discardableResult
+    func update(_ id: UUID, _ draft: QuickAdd.Draft) -> UUID {
+        if let entry = entries[id] {
+            var moved = draft
+            moved.caret = entry.draft.caret
+            if entry.isSubmitted {
+                guard moved != entry.draft else { return id }
+                claimed.remove(id)
+                return update(make(entry.slot, draft, in: entry.library), draft)
+            }
+            if entry.sent != nil, moved != entry.draft {
+                entries[id]?.sent = nil
+                sentBefore.remove(id)
+            }
+            guard draft.hasContent else { remove(id, keepingClaim: true); return id }
             entries[id]?.draft = draft
             entries[id]?.updated = now()
         } else if let start = pending[id] {
             pending[id] = (start.slot, start.library, draft)
-            guard draft.hasContent else { return }
+            guard draft.hasContent else { return id }
             entries[id] = Entry(id: id, slot: start.slot, library: start.library, draft: draft, updated: now())
         } else {
-            return
+            return id
         }
         save()
+        return id
     }
 
     /// The holder stepped away, as Escape does: an empty draft is dropped and a typed one kept. Returns whether it
@@ -141,19 +166,29 @@ final class NewItemDrafts {
     func sending(_ id: UUID, as item: ItemID) -> Bool {
         guard let entry = entries[id], !entry.library.isEmpty else { return false }
         entries[id]?.sent = item
+        entries[id]?.interrupted = false
+        sentBefore.remove(id)
         guard save() else {
             entries[id]?.sent = nil
+            entries[id]?.interrupted = entry.interrupted
             return false
         }
         return true
     }
 
     /// The draft's file is about to be added. The library names the file's item only once it is queued, so a draft
-    /// read back with this still set comes back saying the file may be in the library already.
-    func sendingFile(_ id: UUID) {
-        guard entries[id] != nil else { return }
+    /// read back with this still set comes back saying the file may be in the library already. Answers whether it
+    /// was written, so a file is sent only from a draft the store can follow after a crash.
+    func sendingFile(_ id: UUID) -> Bool {
+        guard let entry = entries[id], !entry.library.isEmpty else { return false }
         entries[id]?.addingFile = true
-        save()
+        entries[id]?.interrupted = false
+        guard save() else {
+            entries[id]?.addingFile = false
+            entries[id]?.interrupted = entry.interrupted
+            return false
+        }
+        return true
     }
 
     /// The library made nothing from the draft, so it stays the holder's as typed.
@@ -169,9 +204,20 @@ final class NewItemDrafts {
     func added(_ id: UUID, as item: ItemID) {
         pending[id] = nil
         claimed.remove(id)
+        sentBefore.remove(id)
         guard entries[id] != nil else { return }
         entries[id]?.sent = item
         entries[id]?.addingFile = false
+        save()
+    }
+
+    /// The library made nothing from a draft no holder has, so it is offered again, marked returned.
+    func giveBack(_ id: UUID) {
+        guard entries[id] != nil else { return }
+        entries[id]?.sent = nil
+        entries[id]?.addingFile = false
+        entries[id]?.returned = true
+        entries[id]?.updated = now()
         save()
     }
 
@@ -188,9 +234,12 @@ final class NewItemDrafts {
     }
 
     /// Settles the drafts added in `library`, once it has read its copy and what waits to be sent. One whose create
-    /// Marfa accepted is dropped. One whose create Marfa refused for good is offered again, as typed, and marked
-    /// returned (`takeReturned`) until a holder takes it. Every other stays hidden, since it may yet be accepted: a
-    /// create that waits, is held up, or is not in the copy yet.
+    /// Marfa accepted is dropped, once no holder has it. One whose create Marfa refused for good is offered again, as
+    /// typed, and marked returned (`takeReturned`) until a holder takes it. One added in this run stays hidden until
+    /// one of those answers.
+    ///
+    /// One sent in an earlier run whose item is not in the copy, with no answer known, is offered again marked
+    /// `interrupted`, since it may or may not be in Marfa; it closes once its item is in the copy.
     func settle(in library: any ItemLibrary) {
         if failing { save() }
         guard library.isLoaded, library.syncReport.queueRead else { return }
@@ -199,22 +248,66 @@ final class NewItemDrafts {
             guard let item = entry.sent else { continue }
             switch Self.answer(creating: item, in: library) {
             case .accepted:
+                guard !claimed.contains(entry.id) else { break }
                 entries[entry.id] = nil
                 changed = true
             case .refused:
                 entries[entry.id]?.sent = nil
                 entries[entry.id]?.returned = true
+                entries[entry.id]?.interrupted = false
                 changed = true
+                if QuickAdd.isFile(entry.draft.typeID, in: library.catalogue) { tellFileRefused(entry, reason: library.refusalReason(creating: item)) }
             case .waiting:
-                break
+                let unknown = library.item(item) == nil
+                guard sentBefore.contains(entry.id), entry.interrupted != unknown else { break }
+                entries[entry.id]?.interrupted = unknown
+                changed = true
             }
         }
         if changed { save() }
     }
 
+    /// A file Marfa refused after its window let it go, told once, with the server's reason.
+    private func tellFileRefused(_ entry: Entry, reason: String?) {
+        let names = QuickAdd.File.names(Array(entry.draft.files.prefix(1)))
+        let file = names.isEmpty ? String(localized: "The file") : names
+        let message = reason.map { String(localized: "\(file) wasn’t added: \($0) What you typed for it is kept. It comes back the next time you make a new item.") }
+            ?? String(localized: "\(file) wasn’t added, so what you typed for it is kept. It comes back the next time you make a new item.")
+        notices?.tell(String(localized: "File Not Added"), message)
+    }
+
+    /// Settles `library`'s drafts each time Marfa refuses a create there, so the refusal is written with its draft at
+    /// once, with no new item open, and outlives a quit.
+    /// It follows what `settle` waits on too: the library's key, which it learns after a refusal can arrive, and its
+    /// copy being read. It holds the library weakly, and ends once the library goes.
+    func follow(_ library: any ItemLibrary) -> Task<Void, Never> {
+        Task { [weak self, weak library] in
+            let changes = Observations { () -> SettleState? in library.map(SettleState.init) }
+            for await state in changes {
+                guard state != nil, let library else { return }
+                self?.settle(in: library)
+            }
+        }
+    }
+
+    /// What `settle` reads of a library, so the watcher runs it again when any of it changes.
+    private struct SettleState: Equatable {
+        let key: String
+        let ready: Bool
+        let report: SyncReport
+        let refused: Set<ItemID>
+
+        init(_ library: any ItemLibrary) {
+            key = library.serverKey
+            ready = library.isLoaded
+            report = library.syncReport
+            refused = library.refusedCreates
+        }
+    }
+
     /// Whether a draft is kept for `slot` in `library` that a holder could take.
     func holdsDraft(_ slot: Slot, in library: String) -> Bool {
-        entries.values.contains { $0.slot == slot && $0.library == library && $0.sent == nil && !claimed.contains($0.id) }
+        entries.values.contains { $0.slot == slot && $0.library == library && isFree($0) }
     }
 
     /// What Marfa has said of a create: its final answer, never only the copy's own row for it.
@@ -242,6 +335,11 @@ final class NewItemDrafts {
     private var blocked: Bool
 
     private func remove(_ id: UUID, keepingClaim: Bool) {
+        if entries[id]?.isSubmitted == true {
+            pending[id] = nil
+            claimed.remove(id)
+            return
+        }
         if !keepingClaim { claimed.remove(id) }
         if keepingClaim, let entry = entries[id] { pending[id] = (entry.slot, entry.library, entry.draft) }
         guard entries.removeValue(forKey: id) != nil else { return }
@@ -321,6 +419,10 @@ private struct StoredEntry: Codable {
     var setAside: [String: StoredValue]
     var setAsideParent: ItemID?
     var addingFile: Bool
+    /// Present, and true, only for a draft Marfa refused that no holder has taken since.
+    var returned: Bool?
+    /// Present, and true, only for a draft that may be in Marfa already (`Entry.interrupted`).
+    var interrupted: Bool?
 
     init(_ entry: NewItemDrafts.Entry) {
         let draft = entry.draft
@@ -346,6 +448,8 @@ private struct StoredEntry: Codable {
         setAside = draft.setAside.mapValues(StoredValue.init)
         setAsideParent = draft.setAsideParent
         addingFile = entry.addingFile
+        returned = entry.returned ? true : nil
+        interrupted = entry.interrupted ? true : nil
     }
 
     var entry: NewItemDrafts.Entry {
@@ -373,9 +477,10 @@ private struct StoredEntry: Codable {
         draft.tier = feed ? .feed : .library
         draft.setAside = setAside.mapValues(\.value)
         draft.setAsideParent = setAsideParent
+        // A sent one is offered again only once `settle` finds its item is not in the copy.
         return NewItemDrafts.Entry(
             id: id, slot: slot, library: library, draft: draft, sent: sent, updated: updated, missingFiles: missing,
-            returned: addingFile, interrupted: addingFile)
+            returned: addingFile || returned == true, interrupted: addingFile || (sent == nil && interrupted == true))
     }
 }
 

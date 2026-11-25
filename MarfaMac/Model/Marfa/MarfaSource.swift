@@ -72,8 +72,9 @@ nonisolated final class MarfaSource: ItemSource {
     let preferenceAnswers = PreferenceAnswers()
     private let counting: MarfaCounts
 
+    /// `parentLinks` is where the engine keeps its new items' parent links across a relaunch, or nil for memory.
     init(copy: WorkingCopy, connection: MarfaConnection,
-         reading: (any MarfaReading)? = nil, refreshing: (any MarfaRefreshing)? = nil) {
+         reading: (any MarfaReading)? = nil, refreshing: (any MarfaRefreshing)? = nil, parentLinks: URL? = nil) {
         self.copy = copy
         counting = MarfaCounts(copy: copy)
         let downloads = MarfaDownloads(copy: copy)
@@ -84,7 +85,8 @@ nonisolated final class MarfaSource: ItemSource {
         self.events = events
         embeds = MarfaEmbeds(events: events)
         engine = MarfaEngine(
-            copy: copy, hub: hub, reading: reading, refreshing: refreshing, preferenceAnswers: preferenceAnswers, tell: { event in
+            copy: copy, hub: hub, reading: reading, refreshing: refreshing, preferenceAnswers: preferenceAnswers,
+            parentLinks: parentLinks, tell: { event in
             if case .terminated = events.yield(event) { false } else { true }
         })
         Task { [engine] in await engine.run(stream) }
@@ -120,7 +122,9 @@ nonisolated final class MarfaSource: ItemSource {
             throw SourceFailure(kind: .inUse, message: Words.inUse)
         }
         let refreshing = MarfaRefresh(copy: copy, scopes: { try? signIns.scopes(for: connection) })
-        let source = MarfaSource(copy: copy, connection: connection, refreshing: refreshing)
+        let source = MarfaSource(
+            copy: copy, connection: connection, refreshing: refreshing,
+            parentLinks: location.directory(for: connection).appending(path: "New Item Parent Links.json"))
         source.events.yield(.paint)
         return source
     }
