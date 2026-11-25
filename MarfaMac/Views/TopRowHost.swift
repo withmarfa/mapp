@@ -433,11 +433,10 @@ private struct ToolbarRevealProbe: NSViewRepresentable {
             barObservers = []
             if let bar {
                 hideBackstop(of: bar)
-                for delay in [0.1, 0.5] {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                        if let bar = self?.bar { self?.hideBackstop(of: bar) }
-                    }
-                }
+                // The window lays the layer out again with the panel and the first time it shows, after the last event.
+                barObservers.append(NotificationCenter.default.addObserver(forName: NSWindow.didUpdateNotification, object: bar, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { if let bar = self?.bar { self?.hideBackstop(of: bar) } }
+                })
                 barObservers.append(NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: bar, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.measure() }
                 })
