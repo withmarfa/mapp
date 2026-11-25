@@ -146,13 +146,10 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Value panels | Gray highlight, chips in the field, counts beside tags and choices, Add for a new word. A parent shows its mark and its status. | `MarfaMac/Views/ValueEditing/` | `Rethink-Edit-Values`, `Rethink-Edit-Status`, `Rethink-Edit-Tags`, `Rethink-Edit-Text`, `Rethink-Edit-Location` |
-| Lists with labels | Email and phone entries are edited in one panel, with a label column. | `ListEditing.swift` | `Rethink-Edit-Lists` |
-| An event's time | One panel: start, end, all day and zone, one write. | `EventHeader`, `ValueEditKind` | `Rethink-Edit-Event` |
 | Edges as rows | Each edge field a type may hold gets a row and a value panel: filled ones in place, the rest under Show More, and inverses where Marfa allows. The panel obeys Marfa's answer. One commit is one undo. Only a reference in the text is not editable. An item in no collection has an empty In Collection row. | `ValueEditKind`, `ItemRelationshipPicker`, `PropertyRow` | `Rethink-Properties-Rule`, `Rethink-Edit-Values` |
+| Undo of a link in one call | Undo checks a link's id, type and ends, then deletes it by id in a second package call, so a move synced between the two is lost, as with state moves. **Waits for Marfa:** one package call that checks and deletes. | `MarfaEngine+Writing.swift` | – |
 | Conflict | A calm line with Keep My Edit and Use Current Value. | `ValueEditModel` | `Rethink-Edit-Conflict` |
 | Status where it is seen | A click on a status in a row or a lane opens its panel; the row stays until it is left. | `StatusSymbol`, `ItemRow.swift` | `Rethink-Status-In-List` |
-| Change Type | From the page's head, the same panel, with what each type asks for. | `CommandValuePanels.swift`, `TypeValuesSheet` | `Rethink-Change-Type`, `Rethink-Change-Type-Values` |
 | Every link follows Open Items | In the text, rows, foot and panel, through one function of the browser. A picture in the text has Open Item and Copy Link on its menu. | `Browser`, `EditorController` | – |
 | Link card | After a pause on a linked item, a small card with its type, name and two lines. No keyboard focus, no server call. | new files in `MarfaMac/Views/`, `editor/src/` | `Rethink-Link-Card` |
 

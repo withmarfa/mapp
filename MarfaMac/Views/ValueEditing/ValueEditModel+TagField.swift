@@ -5,13 +5,14 @@ extension ValueEditModel {
     var tagRows: [ValueListRow] {
         let held = heldTokens
         let matching = library.tagSuggestions(matching: query, excluding: held)
-        var rows: [ValueListRow] = []
-        if !matching.isEmpty {
-            rows += matching.prefix(30).map { ValueListRow(id: "tag:" + $0, role: .option, title: $0, mark: .tag) }
+        let counts = library.knownTagCounts
+        var rows: [ValueListRow] = matching.prefix(30).map {
+            ValueListRow(id: "tag:" + $0, role: .option, title: $0, detail: counts[$0]?.formatted(), mark: .tag)
         }
         let typed = ItemTag.normalized(query)
-        if !typed.isEmpty, !held.contains(typed), !library.knownTags.contains(typed) {
-            rows.append(ValueListRow(id: "create", role: .create, title: String(localized: "Create “\(typed)”"), detail: "↩", mark: .symbol("plus")))
+        if !typed.isEmpty, !held.contains(typed), counts[typed] == nil {
+            if !rows.isEmpty { rows.append(.separator) }
+            rows.append(ValueListRow(id: "create", role: .create, title: String(localized: "Create Tag “\(typed)”")))
         }
         return rows
     }

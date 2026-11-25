@@ -104,8 +104,10 @@ extension MarfaLibrary {
     /// stays until the person keeps or bins the copy.
     var reservedTags: Set<String> { [ItemTag.favorite, MarfaProblems.conflictedCopyTag] }
 
+    var knownTagCounts: [String: Int] { index.tagCounts.filter { !reservedTags.contains($0.key) } }
+
     var knownTags: [String] {
-        index.tagCounts.filter { !reservedTags.contains($0.key) }
+        knownTagCounts
             .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key.localizedStandardCompare($1.key) == .orderedAscending }
             .map(\.key)
     }

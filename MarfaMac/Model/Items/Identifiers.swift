@@ -42,6 +42,10 @@ nonisolated struct EdgeID: RawRepresentable, Hashable, Codable, Sendable {
     let rawValue: String
     init(rawValue: String) { self.rawValue = rawValue }
     init(_ rawValue: String) { self.rawValue = rawValue }
+
+    /// Marfa keeps an edge id its client mints under the same rule as an item's (`edges/create`), so an undo removes
+    /// the edge this Mac made and never one made elsewhere between the same items.
+    static func mint(at date: Date = .now) -> EdgeID { EdgeID(ItemID.mint(at: date).rawValue) }
 }
 
 /// The version of an item a reader holds, as the server counts it.

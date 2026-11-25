@@ -10,6 +10,12 @@ import Testing
 
     static let holiday = ItemID("al1"), archive = ItemID("al2"), oldAlbum = ItemID("al3")
 
+    /// The copy takes every write sent so far, as the engine does once it has judged and queued each.
+    private func takeAll(_ library: MarfaLibrary, _ source: FakeItemSource) async throws {
+        for write in source.submitted { source.send(.taken(write.id)) }
+        try #require(await eventually { library.linkSteps.values.allSatisfy { $0.judging.isEmpty } })
+    }
+
     static func member(_ edge: String, _ member: ItemID, of collection: ItemID, at position: Double? = nil) -> Edge {
         Edge(
             id: EdgeID(edge), type: "in-collection", from: member, to: .item(collection),
@@ -68,16 +74,21 @@ import Testing
         #expect(undo.steps == 1)
         let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft) = write { draft.from } else { nil } }
         #expect(Set(joined) == [F.e1, F.n2])
-        // The source answers with the edges it made, which the undo then removes.
-        for id in joined {
-            var item = try #require(library.item(id))
-            item.edgesOut.append(Self.member("new-\(id.rawValue)", id, of: Self.holiday))
+        // Each new edge carries the id the library gave it, which the source keeps and the undo then removes.
+        let minted = source.submitted.compactMap { sent -> Edge? in
+            guard case .link(let draft) = sent.write, let id = draft.id else { return nil }
+            return Self.member(id.rawValue, draft.from, of: Self.holiday)
+        }
+        try await takeAll(library, source)
+        for edge in minted {
+            var item = try #require(library.item(edge.from))
+            item.edgesOut.append(edge)
             source.send(.upserted([item]))
         }
         #expect(await eventually { Set(library.items(in: .collection(Self.holiday)).map(\.id)).isSuperset(of: [F.e1, F.n2]) })
         source.clearWrites()
         undo.undo()
-        #expect(Set(source.writes) == [.unlink(EdgeID("new-\(F.e1.rawValue)")), .unlink(EdgeID("new-\(F.n2.rawValue)"))])
+        #expect(Set(source.writes) == Set(minted.map { .unlink(EdgeDraft(type: "in-collection", from: $0.from, to: Self.holiday, id: $0.id)) }))
         #expect(!undo.canUndo)
     }
 
@@ -86,7 +97,11 @@ import Testing
         let undo = StepCountingUndoManager()
         #expect(library.removeFromCollection([F.n1, F.p1, F.e1], Self.holiday, undoManager: undo))
         #expect(undo.steps == 1)
-        #expect(Set(source.writes) == [.unlink(EdgeID("m1")), .unlink(EdgeID("m2"))], "e1 is in no collection, so nothing is sent for it")
+        #expect(Set(source.writes) == [
+            .unlink(EdgeDraft(type: "in-collection", from: F.n1, to: Self.holiday, id: EdgeID("m1"))),
+            .unlink(EdgeDraft(type: "in-collection", from: F.p1, to: Self.holiday, id: EdgeID("m2"))),
+        ], "e1 is in no collection, so nothing is sent for it")
+        try await takeAll(library, source)
         source.clearWrites()
         undo.undo()
         #expect(Set(source.writes) == [
@@ -109,7 +124,8 @@ import Testing
         undo.beginUndoGrouping()
         #expect(library.removeFromCollection([F.n1, F.e1], Self.holiday, undoManager: undo))
         undo.endUndoGrouping()
-        #expect(source.writes == [.unlink(EdgeID("m1"))])
+        #expect(source.writes == [.unlink(EdgeDraft(type: "in-collection", from: F.n1, to: Self.holiday, id: EdgeID("m1")))])
+        try await takeAll(library, source)
         source.clearWrites()
         undo.undo()
         #expect(source.writes == [
@@ -145,6 +161,19 @@ import Testing
         #expect(!library.addToCollection([F.e1], Self.oldAlbum, undoManager: nil))
         #expect(source.writes.isEmpty)
         #expect(library.notices.waiting.last?.message == String(localized: "This collection isn’t in the library."))
+    }
+
+    /// An archived collection takes members and is offered for one, since Marfa links an archived item as any other.
+    /// One in the bin is neither.
+    @Test func anArchivedCollectionTakesMembersAndIsOffered() async throws {
+        let (library, source) = try await loaded()
+        source.send(.upserted([F.item(Self.holiday, F.album, "Holiday", age: 0, state: .archived)]))
+        try #require(await eventually { library.item(Self.holiday)?.state == .archived })
+        #expect(Set(library.relationshipCandidates(for: F.e1, field: "in-collection").map(\.id)) == [Self.holiday, Self.archive])
+        #expect(library.joinableCollections.map(\.id).contains(Self.holiday))
+        #expect(!library.collections.map(\.id).contains(Self.holiday))
+        #expect(library.addToCollection([F.e1], Self.holiday, undoManager: nil))
+        #expect(source.writes == [.link(EdgeDraft(type: "in-collection", from: F.e1, to: Self.holiday, position: 3))])
     }
 
     /// The collection commands take the whole selection, files too, never only its notes, and leave out what

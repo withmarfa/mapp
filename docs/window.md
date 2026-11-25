@@ -25,20 +25,19 @@ paths:
 
 ## Sidebar
 
-- **Search and New, the Library and the Feed, then Pinned, Types and the person's sections** (`SidebarLayout`). Only the Library has a count; Search opens the palette.
-- **Pinned holds views, collections and items.** A saved view stays pinned until taken out.
-- **A type counts its items and its kinds'.** Five show, then "N More".
-- **Under the pointer** a type, a kind and a collection show a plus for the count, and a heading Add and More. Sections never fold.
-- **Appearance can draw the sidebar white** (`SidebarColor`).
-- **Customize Sidebar works in place:** each faint place opens a menu of what can go there.
-- **A row whose thing is gone keeps its place.**
-- **Go lists the same places, views and types** (`GoMenu`), and the Archive, which no row opens.
+- **Search and New, the Library and the Feed, then Pinned, Types and the person's sections** (`SidebarLayout`). A row whose thing is gone keeps its place.
+- **Pinned holds views, collections and items;** a saved view until taken out.
+- **Five types show, then "N More",** each counting its kinds' items too.
+- **Under the pointer** a row has a ground, a type, kind or collection a plus for its count, and a heading Add and More. Sections never fold.
+- **Customize Sidebar works in place:** each faint place is a menu of what fits.
+- **Go lists the same places, views and types** (`GoMenu`), and the Archive.
 
 ### A layout an earlier copy stored
 
-- **What this copy cannot read is written back as it was.**
-- **An earlier Library or Views section is kept and drawn as nothing.** This copy adds `places` and `pinned` where they stood; Pinned keeps the Views section's name and hidden state.
-- **What the person put under Library or Views is read under Pinned;** their own sections keep theirs. `views` in `hidden` hides every saved view.
+- **An earlier Library or Views section is kept, drawn as nothing;** `places` and `pinned` stand there instead.
+- **What was put under them is pinned; what a hidden one held stays hidden, row by row.** `views` in `hidden` hides every saved view; one shown again goes in `shown`. The Library and the Feed are fixed, whatever was stored.
+- **A row whose section is gone shows under Pinned,** its stored home kept.
+- **Accepted:** an older copy draws it its own way, and its Views edits miss Pinned, until Sparkle updates it.
 - **Recently Deleted is a page of Settings**, never a row.
 
 ## Toolbar

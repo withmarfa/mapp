@@ -492,6 +492,9 @@ struct QuickAddPanel: View {
                             Label { Text(candidate.displayTitle) } icon: { TypeGlyph(id: library.catalogue.icon(for: candidate.type)) }
                                 .lineLimit(1)
                             Spacer(minLength: 8)
+                            if candidate.state == .archived {
+                                Text("Archived").foregroundStyle(.secondary)
+                            }
                             if candidate.id == draft.parentID {
                                 Image(systemName: "checkmark")
                             }

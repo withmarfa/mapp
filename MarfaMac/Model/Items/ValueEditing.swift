@@ -2,13 +2,17 @@ import Foundation
 import Marfa
 
 /// The values that open in a panel under them, in the inspector and on the page: what the field is, whatever it is
-/// called. A yes or no is a checkbox in both places, and a list of anything but people or words stays in the inspector's
-/// own list editor.
+/// called. A yes or no is two rows, a list of people or words adds and takes away, and any other list of entries is
+/// edited member by member in the same panel.
 nonisolated enum ValueEditKind: Hashable, Sendable {
     case status(ItemTypeInfo.Field)
     case choice(ItemTypeInfo.Field)
     case date(ItemTypeInfo.Field)
     case people(ItemTypeInfo.Field, ListShape)
+    /// A yes or no, chosen from two rows.
+    case yesNo(ItemTypeInfo.Field)
+    /// A list of entries with members, such as emails and phone numbers with their labels: one block for each entry.
+    case entries(ItemTypeInfo.Field, ListShape)
     /// A text of any format, which may run to many lines.
     case text(ItemTypeInfo.Field)
     case number(ItemTypeInfo.Field)
@@ -25,6 +29,8 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     /// The item's Location: a point on a map and, where the type has one, a name for the place. It is made of fields, so
     /// it has none of its own, and it is set by clicking a map, not by choosing from a list.
     case location(ItemLocation)
+    /// An event's start, end, All Day and zone, which the type declares as fields and the panel writes together.
+    case eventTime(EventTime)
 
     /// How the field is edited in a panel, or nil where it is not.
     init?(field: ItemTypeInfo.Field) {
@@ -33,6 +39,8 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         case .choice where field.isPicked: self = .choice(field)
         case .date: self = .date(field)
         case .list(let shape) where shape.holdsPeople: self = .people(field, shape)
+        case .list(let shape): self = .entries(field, shape)
+        case .boolean: self = .yesNo(field)
         case .text: self = .text(field)
         case .number: self = .number(field)
         case .words: self = .words(field)
@@ -43,9 +51,9 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     var field: ItemTypeInfo.Field? {
         switch self {
         case .status(let field), .choice(let field), .date(let field), .people(let field, _), .text(let field), .number(let field),
-             .words(let field):
+             .words(let field), .yesNo(let field), .entries(let field, _):
             field
-        case .tags, .collections, .parent, .type, .location: nil
+        case .tags, .collections, .parent, .type, .location, .eventTime: nil
         }
     }
 
@@ -68,6 +76,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         case .parent: PagePlacement.parent
         case .type: PagePlacement.type
         case .location: ItemLocation.rowID
+        case .eventTime: EventTime.rowID
         default: field?.key ?? ""
         }
     }
@@ -89,8 +98,8 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     /// chip in the search field; a value that holds several shows one chip each, and the panel stays open.
     var closesOnChoice: Bool {
         switch self {
-        case .status, .choice, .parent, .type: true
-        case .date, .people, .tags, .collections, .text, .number, .words, .location: false
+        case .status, .choice, .parent, .type, .yesNo: true
+        case .date, .people, .tags, .collections, .text, .number, .words, .location, .eventTime, .entries: false
         }
     }
 }
@@ -170,6 +179,18 @@ nonisolated enum ValueEditOptions {
         return rows
     }
 
+    static let yesWord = "yes"
+    static let noWord = "no"
+
+    /// The two rows of a yes or no, the one it holds marked. A value that is not set reads as no.
+    static func yesNoRows(current: PropertyValue?) -> [ValueListRow] {
+        let isYes = InspectorFields.isYes(current)
+        return [
+            ValueListRow(id: optionID(yesWord), role: .option, title: String(localized: "Yes"), isCurrent: isYes),
+            ValueListRow(id: optionID(noWord), role: .option, title: String(localized: "No"), isCurrent: !isYes),
+        ]
+    }
+
     /// A choice's options in the catalogue's order. The item's own
     /// word is listed last where the catalogue does not declare it.
     static func choiceRows(field: ItemTypeInfo.Field, current: String?, isPriority: Bool) -> [ValueListRow] {
@@ -195,6 +216,50 @@ nonisolated enum TimeOfDay {
             if suffix.hasPrefix("a") { hour = hour == 12 ? 0 : hour } else { hour = hour == 12 ? 12 : hour + 12 }
         }
         return hour < 24 ? (hour, minute) : nil
+    }
+
+    /// `day` with the whole clock time of `basis` in `calendar`, seconds and fractions included, so a time the person did
+    /// not touch is never rounded. A clock time that the day does not have goes to the next one that it does, as a
+    /// calendar moves an event onto such a day.
+    static func keeping(clockOf basis: Date, on day: Date, calendar: Calendar) -> Date {
+        let start = calendar.startOfDay(for: day)
+        var parts = calendar.dateComponents([.year, .month, .day], from: start)
+        let time = calendar.dateComponents([.hour, .minute, .second, .nanosecond], from: basis)
+        (parts.hour, parts.minute, parts.second, parts.nanosecond) = (time.hour, time.minute, time.second, time.nanosecond)
+        return calendar.date(from: parts) ?? start
+    }
+
+    /// `hour` and `minute` on the day of `day` in `calendar`, or nil where that day's clock has no such time (a clock put
+    /// forward). The next time that does exist is never taken for it.
+    static func moment(hour: Int, minute: Int, on day: Date, calendar: Calendar) -> Date? {
+        var parts = calendar.dateComponents([.year, .month, .day], from: day)
+        (parts.hour, parts.minute, parts.second) = (hour, minute, 0)
+        guard let moment = calendar.date(from: parts) else { return nil }
+        let kept = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: moment)
+        return kept.year == parts.year && kept.month == parts.month && kept.day == parts.day && kept.hour == hour && kept.minute == minute ? moment : nil
+    }
+}
+
+/// A day typed into a date panel's field: "25 Nov 2026", "2026-11-25", "tomorrow". The system's date reader takes it,
+/// so it follows the person's language and order; only a text that is wholly one day is taken.
+nonisolated enum TypedDay {
+    /// The start of the day `text` names, in `calendar`, or nil where it names none or more than one.
+    static func parse(_ text: String, calendar: Calendar) -> Date? {
+        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty, let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue) else { return nil }
+        let whole = NSRange(typed.startIndex..., in: typed)
+        let matches = detector.matches(in: typed, options: [], range: whole)
+        guard matches.count == 1, let match = matches.first, match.range == whole, let date = match.date else { return nil }
+        // The reader places the day in the system's zone; the day is what it names, whatever zone the panel reads in.
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return calendar.date(from: parts).map { calendar.startOfDay(for: $0) }
+    }
+
+    /// A day and a time typed together, "25 Nov 2026 at 09:00": the two parts, the time nil where there is none.
+    static func split(_ text: String) -> (day: String, time: String?) {
+        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let match = typed.wholeMatch(of: /(.+?)\s+(?:at|@)\s+(.+)/.ignoresCase()) else { return (typed, nil) }
+        return (String(match.1), String(match.2))
     }
 }
 
@@ -239,12 +304,11 @@ nonisolated enum QuickDates {
         return formatter.string(from: entry.date)
     }
 
-    /// The date to store for choosing `day`: with a time, the day at the time the item already holds, else at the
+    /// The date to store for choosing `day`: with a time, the day at the whole time the item already holds, else at the
     /// start of the day.
     static func moment(on day: Date, keepingTimeOf current: Date?, calendar: Calendar) -> Date {
         guard let current else { return calendar.startOfDay(for: day) }
-        let time = calendar.dateComponents([.hour, .minute], from: current)
-        return calendar.date(bySettingHour: time.hour ?? 0, minute: time.minute ?? 0, second: 0, of: day) ?? day
+        return TimeOfDay.keeping(clockOf: current, on: day, calendar: calendar)
     }
 }
 
@@ -297,6 +361,39 @@ nonisolated enum PeopleSuggestions {
             .map(\.person)
     }
 
+    /// The people the library holds as items of its own, as entries of `shape`: the name in the first member and, where the
+    /// second takes an address and the person's type has a list that starts with one, the first address in it. Those the
+    /// lists already name (`known`) are left out, so nobody is offered twice.
+    static func pool(of items: [Item], catalogue: Catalogue, shape: ListShape, excluding known: [Person]) -> [Person] {
+        guard let nameMember = shape.members.first else { return [] }
+        let addressMember = shape.members.dropFirst().first.flatMap { member -> ListShape.Member? in
+            if case .text(.email) = member.kind { member } else { nil }
+        }
+        var taken = Set(known.map(\.identity))
+        var people: [Person] = []
+        var personTypes: [TypeID: Bool] = [:]
+        for item in items {
+            let isPerson = personTypes[item.type] ?? (PageHeaderKind.of(item.type, in: catalogue) == .person)
+            personTypes[item.type] = isPerson
+            guard isPerson, let name = item.name, !name.isEmpty else { continue }
+            var entry: ListEntries.Entry = [nameMember.key: .string(name)]
+            if let addressMember, let address = firstAddress(of: item, catalogue: catalogue) { entry[addressMember.key] = .string(address) }
+            guard let person = Person(entry: entry, shape: shape), taken.insert(person.identity).inserted else { continue }
+            people.append(person)
+        }
+        return people.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private static func firstAddress(of item: Item, catalogue: Catalogue) -> String? {
+        for field in catalogue.itemTypes[item.type]?.fields ?? [] {
+            guard case .list(let shape) = field.kind, let first = shape.members.first, case .text(.email) = first.kind else { continue }
+            for case let entry? in ListEntries.entries(of: item.value(of: field.key)).map(ListEntries.object) {
+                if let text = shape.text(of: first, in: entry) { return text }
+            }
+        }
+        return nil
+    }
+
     /// The people to offer for what is typed: those whose name or any member contains it, less those already held.
     static func matching(_ typed: String, in pool: [Person], excluding held: [Held]) -> [Person] {
         let typed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -339,7 +436,13 @@ nonisolated enum PeopleSuggestions {
 
 /// The words a list of words can offer: those other items hold in the same field, most often held first.
 nonisolated enum WordSuggestions {
-    static func pool(from lists: [PropertyValue?]) -> [String] {
+    /// One word, as the first item that holds it spells it, with how many items hold it.
+    struct Entry: Hashable, Sendable {
+        let word: String
+        let count: Int
+    }
+
+    static func pool(from lists: [PropertyValue?]) -> [Entry] {
         var counts: [String: (word: String, count: Int)] = [:]
         for list in lists {
             for word in ListEntries.entries(of: list).compactMap(\.string) where !word.isEmpty {
@@ -348,7 +451,7 @@ nonisolated enum WordSuggestions {
         }
         return counts.values
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.word.localizedStandardCompare($1.word) == .orderedAscending }
-            .map(\.word)
+            .map { Entry(word: $0.word, count: $0.count) }
     }
 }
 

@@ -61,7 +61,7 @@ final class FakeItemLibrary: ItemLibrary {
     var trashDays: Int?
     /// What `relationships(for:)` answers, by item.
     var relationshipsByItem: [ItemID: [ItemRelationship]] = [:]
-    /// Whether `changeItemRelationship` takes a write, and the writes it was asked for.
+    /// Whether `changeLinks` takes a write, and the writes it was asked for.
     var acceptsRelationships = false
     /// The items whose property writes are still on their way, as a library that queues a write reports them.
     var writingProperties: Set<ItemID> = []
@@ -269,6 +269,9 @@ final class FakeItemLibrary: ItemLibrary {
         }
     }
     func relationships(for id: ItemID) -> [ItemRelationship] { relationshipsByItem[id] ?? [] }
+    /// What `relationFields(of:)` answers, by item.
+    var relationFieldsByItem: [ItemID: [RelationField]] = [:]
+    func relationFields(of id: ItemID) -> [RelationField] { relationFieldsByItem[id] ?? [] }
     func childIDs(of id: ItemID) -> [ItemID] { items.filter { $0.parentID == id }.map(\.id) }
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] { [] }
     /// The refusal for each (item, other) a test sets; any other link is taken.
@@ -486,9 +489,9 @@ final class FakeItemLibrary: ItemLibrary {
 
     func isWritingProperties(of id: ItemID) -> Bool { writingProperties.contains(id) }
     func tookPropertyWrite(_ mark: Int) -> Bool { false }
-    func changeItemRelationship(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> Bool {
+    func changeLinks(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> EdgeVerdict {
         relationshipWrites.append((id, field, adding, removing))
-        return acceptsRelationships
+        return acceptsRelationships ? .taken : .refused("Refused.")
     }
 
     /// Every change of type asked for.
@@ -537,10 +540,14 @@ final class FakeItemLibrary: ItemLibrary {
     var extraReservedTags: Set<String> = []
     var reservedTags: Set<String> { extraReservedTags.union([ItemTag.favorite]) }
 
+    var knownTagCounts: [String: Int] {
+        items.filter { $0.state == .active }.flatMap(\.tags).filter { !reservedTags.contains($0) }
+            .reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+    }
+
     var knownTags: [String] {
-        let counts = items.filter { $0.state == .active }.flatMap(\.tags).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
-        return counts.keys.filter { !reservedTags.contains($0) }
-            .sorted { counts[$0]! != counts[$1]! ? counts[$0]! > counts[$1]! : $0 < $1 }
+        let counts = knownTagCounts
+        return counts.keys.sorted { counts[$0]! != counts[$1]! ? counts[$0]! > counts[$1]! : $0 < $1 }
     }
 
     /// The tag writes the fake was asked for, in order.
@@ -781,8 +788,13 @@ final class FakeItemLibrary: ItemLibrary {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
+    var joinableCollections: [Item] {
+        items.filter { $0.state != .trashed && catalogue.isCollection($0.type) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
     func addToCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
-        guard collections.contains(where: { $0.id == collection }) else {
+        guard joinableCollections.contains(where: { $0.id == collection }) else {
             notices.tell("Can’t Add to Collection", "Refused")
             return false
         }

@@ -19,7 +19,7 @@ extension ValueEditModel {
         let matching = parentCandidates.filter { $0.id != currentID && (typed.isEmpty || $0.title.localizedStandardContains(typed)) }
         if !matching.isEmpty {
             rows += matching.prefix(Self.parentLimit).map {
-                ValueListRow(id: "parent:" + $0.id.rawValue, role: .option, title: $0.displayTitle, detail: library.catalogue.label(for: $0.type))
+                ValueListRow(id: "parent:" + $0.id.rawValue, role: .option, title: $0.displayTitle, detail: detail(for: $0))
             }
             if matching.count > Self.parentLimit {
                 rows.append(.header(String(localized: "Type to narrow the list"), id: "header:more"))
@@ -30,6 +30,12 @@ extension ValueEditModel {
             rows.append(ValueListRow(id: Self.openID, role: .option, title: String(localized: "Open “\(current.displayTitle)”"), mark: .symbol("arrow.up.right")))
         }
         return rows
+    }
+
+    /// The candidate's type, and that it is archived where it is, since a link may reach an archived item.
+    private func detail(for candidate: Item) -> String {
+        let type = library.catalogue.label(for: candidate.type)
+        return candidate.state == .archived ? String(localized: "\(type), Archived") : type
     }
 
     func activateParent(_ id: String) {
@@ -58,12 +64,12 @@ extension ValueEditModel {
             if let adding, case .refused(let message) = await library.relationshipVerdict(for: item, field: PagePlacement.parent, to: adding) {
                 refusal = message
             }
-            let taken: Bool
+            var taken = false
             if refusal == nil {
-                taken = await library.changeItemRelationship(
+                let verdict = await library.changeLinks(
                     item, field: PagePlacement.parent, adding: adding.map { [$0] } ?? [], removing: removing.map { [$0] } ?? [], undoManager: undoManager)
-            } else {
-                taken = false
+                taken = verdict == .taken
+                refusal = verdict.reason
             }
             guard let self else {
                 if !taken { library.notices.notKept(String(localized: "Parent Not Saved"), text: label, reason: refusal ?? String(localized: "The parent could not be saved.")) }

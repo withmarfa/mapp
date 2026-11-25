@@ -20,6 +20,9 @@ final class ValueEditPresenter {
     /// Opens a type's page in Settings > Types, which a status panel's Edit Statuses asks for. The app sets it once.
     var editType: ((TypeID) -> Void)?
 
+    /// The types the sidebar lists, in its order, which the type panel offers first. The app sets it once.
+    var sidebarTypes: (any ItemLibrary) -> [TypeID] = { _ in [] }
+
     private let panels = PanelPresenter()
     private let makeSession: Factory
 
@@ -86,8 +89,12 @@ extension ValueEditSession {
 
     /// Whether the editor took the key, which then goes no further.
     func handleKey(_ event: NSEvent) -> Bool {
-        // The search and the name field take every other key, and the map none.
-        if case .location = model.kind { return false }
+        // The search and the name field take every other key, and the map none; an event's time and a list's members
+        // are fields that take their own.
+        switch model.kind {
+        case .location, .eventTime, .entries: return false
+        default: break
+        }
         if let text = window?.firstResponder as? NSTextView, text.hasMarkedText() { return false }
         let isReturn = event.keyCode == 36 || event.keyCode == 76
         if model.kind.isTyped {

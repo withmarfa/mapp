@@ -123,9 +123,15 @@ protocol ItemLibrary: AnyObject, Observable {
     /// members, a table's rows. Reading an answer is observed, so a view is drawn again when one comes or changes.
     var counts: ItemCounts { get }
     func relationships(for id: ItemID) -> [ItemRelationship]
+    /// Every edge field the item's type may hold, inverses too, each with Marfa's label, how many it holds, the types
+    /// its far end admits, its links and whether it takes a change: filled fields first, then empty ones, in a steady
+    /// order. Only the text's own links, a link only Marfa keeps (`in-folder`) and what `Item.obstacle(to: .links)`
+    /// refuses are read only. Observed like `relationships(for:)`.
+    func relationFields(of id: ItemID) -> [RelationField]
     /// The items filed directly under `id` (`parent-of`), in no order, held or not. Observed, so a view that works
     /// something out from them is told when one comes or goes.
     func childIDs(of id: ItemID) -> [ItemID]
+    /// The active and archived items `field` may link `id` to; an item in the bin is never one.
     func relationshipCandidates(for id: ItemID, field: String) -> [Item]
     /// What the core says of linking `id` through `field` to `other`, judged on what is held, with nothing queued and
     /// no server: taken, refused in its words, or unknown where it could not be asked.
@@ -150,6 +156,9 @@ protocol ItemLibrary: AnyObject, Observable {
 
     /// The active collections, by title: items whose type plays Marfa's `container` role (`Catalogue.isCollection`).
     var collections: [Item] { get }
+    /// The collections an item may join, by title: the active ones and the archived ones, since Marfa links an archived
+    /// item as any other.
+    var joinableCollections: [Item] { get }
     /// Files each item in the collection with one `in-collection` edge, in one undoable change, leaving out those
     /// already in it. An item that can't be a member, as a collection can't, or can't be changed, is skipped and the
     /// library tells the person how many and why. False where nothing was filed because every item was skipped.
@@ -212,12 +221,15 @@ protocol ItemLibrary: AnyObject, Observable {
     /// editor can tell a write that landed and was changed again before it drew, as by Undo, from one refused.
     var lastPropertyWrite: Int? { get }
     func tookPropertyWrite(_ mark: Int) -> Bool
-    /// Links `adding` to `id` and unlinks `removing` in the field, once the library has judged the change. A caller
-    /// sends what the person changed, never the list the screen showed, so a change made since is not undone. True
-    /// means the library accepted it and holds it, or there was nothing to change; false means it refused, told the
-    /// person, and left the field as it was.
+    /// Links `adding` to `id` and unlinks `removing` in the field, once the core has judged every link it makes
+    /// (`Edges.check`), in one undo step. A caller sends what the person changed, never the list the screen showed, so
+    /// a change made since is not undone. `taken` means the copy took every write the change sent at once, or there was
+    /// nothing to change; `refused` (as by the source closing before it answered) and `incomplete` (the copy not yet
+    /// whole) are told to the person, and leave in place any write of the change the copy already took, which Undo
+    /// reverses; `unknown` is an item or field the library does not hold. Undo removes only the links the change added
+    /// and puts back only the ones it removed, and leaves one changed elsewhere since, which it tells once.
     @discardableResult
-    func changeItemRelationship(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> Bool
+    func changeLinks(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> EdgeVerdict
     /// Moves each item to `type`, its title and text to the new type's keys in the same edit, with `filling` for
     /// the required fields an item lacks (`TypeChange`). Fields the new type does not use stay on the item. An item
     /// that cannot become `type`, or cannot be changed, is skipped and the library tells the person how many and why;
@@ -239,6 +251,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Every tag the active items carry, reserved ones left out, the most used first and then by name, for
     /// suggesting a tag the person has used.
     var knownTags: [String] { get }
+    /// How many active items carry each tag `knownTags` lists, for the count beside a tag in the tags panel. Worked out
+    /// from the copy, so it asks nothing of the server.
+    var knownTagCounts: [String: Int] { get }
     /// Tags `tag` to each of the items that can take it and do not hold it, in one undoable change, and answers nil.
     /// An item that can't be changed, or already has the most tags, is skipped and the library tells the person how
     /// many and why. Nothing is sent, and the refusal is given back, where `tag` is not a tag Marfa takes, is
@@ -451,7 +466,7 @@ extension ItemLibrary {
     /// The collections any of the items is in, by title.
     func collections(holding ids: Set<ItemID>) -> [Item] {
         let held = Set(ids.compactMap { item($0) }.flatMap(\.collectionIDs))
-        return collections.filter { held.contains($0.id) }
+        return joinableCollections.filter { held.contains($0.id) }
     }
 
     /// The active items `place` lists in both tiers, a type's kinds included.

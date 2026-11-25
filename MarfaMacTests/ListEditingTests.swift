@@ -110,6 +110,25 @@ import Testing
         #expect(editing.rows(of: store.value).map(\.id) == [pendingID])
     }
 
+    @Test func addWritesTheNewEntryWithTheLabelTypedBesideItAndNeedsTheRequiredValue() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let store = Store(nil)
+        let editing = ListEditing()
+        editing.startEntry()
+        let id = editing.pendingID
+        editing.type("work", into: ListEditing.Slot(entry: id, member: "label"), in: store.value)
+        #expect(!editing.canAdd(in: shape, value: store.value))
+        #expect(!editing.addEntry(in: shape, value: store.value, write: store.write))
+        #expect(store.writes.isEmpty && editing.pending != nil)
+        #expect(editing.text(ListEditing.Slot(entry: id, member: "label"), in: store.value) == "work")
+
+        editing.type("a@example.com", into: ListEditing.Slot(entry: id, member: "value"), in: store.value)
+        #expect(editing.canAdd(in: shape, value: store.value))
+        #expect(editing.addEntry(in: shape, value: store.value, write: store.write))
+        #expect(store.value == .array([Self.email("a@example.com", "work")]) && store.writes.count == 1)
+        #expect(editing.pending == nil)
+    }
+
     @Test func aNewEntryWithABadValueSaysWhyAndKeepsTheText() throws {
         let shape = try Self.shape(Self.scoresField)
         let editing = ListEditing()
@@ -485,6 +504,75 @@ import Testing
         #expect(notice.text == "Emails: New entry: Tag: home")
         #expect(notice.message.hasPrefix("The new entry wasn’t finished"))
         #expect(!editing.holdsUnsavedWork)
+    }
+
+    @Test func leavingWithANewEntryTypedWritesItWholeInOneWrite() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let store = Store(nil)
+        let editing = ListEditing()
+        editing.startEntry()
+        let id = editing.pendingID
+        editing.type("a@example.com", into: ListEditing.Slot(entry: id, member: "value"), in: store.value)
+        editing.type("work", into: ListEditing.Slot(entry: id, member: "label"), in: store.value)
+
+        let notices = Notices()
+        editing.leave(shape, label: "Emails", value: store.value, isEditable: true, write: store.write, to: notices)
+        #expect(store.writes == [.array([Self.email("a@example.com", "work")])])
+        #expect(notices.waiting.isEmpty)
+    }
+
+    @Test func leavingWithANewEntryTheLibraryRefusesWritesNothingAndGivesBackBothValues() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let store = Store(nil)
+        store.refuses = true
+        let editing = ListEditing()
+        editing.startEntry()
+        let id = editing.pendingID
+        editing.type("a@example.com", into: ListEditing.Slot(entry: id, member: "value"), in: store.value)
+        editing.type("work", into: ListEditing.Slot(entry: id, member: "label"), in: store.value)
+
+        let notices = Notices()
+        editing.leave(shape, label: "Emails", value: store.value, isEditable: true, write: store.write, to: notices)
+        #expect(store.writes.isEmpty)
+        let text = try #require(notices.waiting.first?.text)
+        #expect(text.contains("a@example.com") && text.contains("work"))
+    }
+
+    @Test func leavingWithAnEntryHeldBackByARefusalWritesItOnceTheLibraryTakesIt() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let store = Store(nil)
+        store.refuses = true
+        let editing = ListEditing()
+        editing.startEntry()
+        let id = editing.pendingID
+        editing.type("a@example.com", into: ListEditing.Slot(entry: id, member: "value"), in: store.value)
+        editing.type("work", into: ListEditing.Slot(entry: id, member: "label"), in: store.value)
+        #expect(!editing.addEntry(in: shape, value: store.value, write: store.write))
+
+        // The refused Add settled nothing, so a retry writes the entry rather than finding nothing to write.
+        store.refuses = false
+        #expect(editing.addEntry(in: shape, value: store.value, write: store.write))
+        #expect(store.writes == [.array([Self.email("a@example.com", "work")])])
+        #expect(editing.pending == nil)
+    }
+
+    @Test func aRefusedAddKeepsTheTypedTextAsUnwrittenUntilTheLibraryTakesIt() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let store = Store(nil)
+        store.refuses = true
+        let editing = ListEditing()
+        editing.startEntry()
+        let value = ListEditing.Slot(entry: editing.pendingID, member: "value")
+        editing.type("a@example.com", into: value, in: store.value)
+        editing.type("work", into: ListEditing.Slot(entry: editing.pendingID, member: "label"), in: store.value)
+        editing.addEntry(in: shape, value: store.value, write: store.write)
+        #expect(editing.draft(value).isDirty)
+        #expect(editing.draft(ListEditing.Slot(entry: editing.pendingID, member: "label")).isDirty)
+
+        store.refuses = false
+        // A single member's own commit is an Add of the whole entry, so it writes what was typed beside it as well.
+        #expect(editing.commit(try Self.member(shape, "value"), of: editing.pendingID, in: shape, value: store.value, write: store.write))
+        #expect(store.value == .array([Self.email("a@example.com", "work")]) && store.writes.count == 1)
     }
 
     @Test func leavingAnItemThatCanNoLongerBeEditedGivesBackEverything() throws {

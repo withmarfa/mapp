@@ -511,6 +511,9 @@
         }
       }
     },
+    "%@, Archived" : {
+
+    },
     "%@, edited" : {
       "extractionState" : "manual"
     },
@@ -2232,6 +2235,9 @@
     "All Data" : {
 
     },
+    "All Day" : {
+
+    },
     "All Deleted Items" : {
 
     },
@@ -2501,6 +2507,9 @@
           }
         }
       }
+    },
+    "Archived" : {
+
     },
     "Archived Items" : {
 
@@ -3842,13 +3851,13 @@
     "Create Link Type" : {
 
     },
+    "Create Tag “%@”" : {
+
+    },
     "Create Type" : {
 
     },
     "Create Webhook" : {
-
-    },
-    "Create “%@”" : {
 
     },
     "Created" : {
@@ -4250,10 +4259,10 @@
     "Edit Property" : {
       "extractionState" : "manual"
     },
-    "Edit Relationship" : {
-      "extractionState" : "manual"
-    },
     "Edit Statuses…" : {
+
+    },
+    "Edit Time" : {
 
     },
     "Edit Value" : {
@@ -4299,6 +4308,12 @@
       "extractionState" : "manual"
     },
     "Empty…" : {
+
+    },
+    "End Day" : {
+
+    },
+    "End Time" : {
 
     },
     "Ends" : {
@@ -6219,6 +6234,9 @@
 
     },
     "Marfa for Mac couldn’t check this link in time. Try opening it again." : {
+
+    },
+    "Marfa keeps this link itself." : {
 
     },
     "Marfa’s" : {
@@ -8978,6 +8996,12 @@
     "Start Again" : {
 
     },
+    "Start Day" : {
+
+    },
+    "Start Time" : {
+
+    },
     "Start With" : {
 
     },
@@ -9229,6 +9253,9 @@
 
     },
     "That restore point can’t be read. No settings were changed." : {
+
+    },
+    "That time doesn’t exist on that day in this time zone." : {
 
     },
     "The %@ aren’t public. Change them first, then turn this off." : {
@@ -9711,6 +9738,9 @@
     "The editor stopped unexpectedly, so the last thing you typed in this item might not be saved. When the item shows again, check it and add anything that’s missing." : {
 
     },
+    "The end can’t be before the start." : {
+
+    },
     "The entry changed or was removed while you were editing it." : {
       "extractionState" : "manual"
     },
@@ -10126,6 +10156,9 @@
 
     },
     "The tag could not be added." : {
+
+    },
+    "The time couldn’t be saved." : {
 
     },
     "The time in “%@” wasn’t cleared. %@" : {
@@ -10639,6 +10672,9 @@
     "This type no longer has that field." : {
 
     },
+    "This value changed while you were editing." : {
+
+    },
     "This value changed while you were editing. Your edit hasn’t been saved." : {
       "extractionState" : "manual"
     },
@@ -10697,6 +10733,9 @@
 
     },
     "Time Format" : {
+
+    },
+    "Time Zone" : {
 
     },
     "Time of %@" : {
@@ -11600,6 +11639,9 @@
     "Your earlier settings are back." : {
 
     },
+    "Your edit hasn’t been saved." : {
+
+    },
     "Your items are still loading." : {
 
     },
@@ -12104,6 +12146,12 @@
 
     },
     "“%@” is not a shortcuts file that the app can read. No shortcuts were changed." : {
+
+    },
+    "“%@” isn’t a date and time, so the date wasn’t changed." : {
+
+    },
+    "“%@” isn’t a date, so the date wasn’t changed." : {
 
     },
     "“%@” isn’t a time, so the time wasn’t changed." : {
