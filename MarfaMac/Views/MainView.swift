@@ -98,7 +98,7 @@ struct MainView: View {
             if browser.showsCollection { editor.releaseFocus(); editor.flush() }
         }
         // Another place, or the index of one, is somewhere else to go: Version History is of the item it was opened for.
-        .onChange(of: browser.showing) { details.leaveHistory() }
+        .onChange(of: browser.showing?.memoryKey) { details.leaveHistory() }
         .onChange(of: browser.showsSidebarIndex) { details.leaveHistory() }
     }
 

@@ -160,7 +160,7 @@ extension Browser {
 
     private func registerResetUndo(restoring snapshot: ViewPanel.Snapshot) {
         registerUndo(String(localized: "Reset View")) { browser in
-            guard browser.shown == snapshot.place else { return }
+            guard browser.shown.isSame(snapshot.place) else { return }
             let current = browser.viewSnapshot()
             browser.restore(snapshot)
             browser.registerResetUndo(restoring: current)

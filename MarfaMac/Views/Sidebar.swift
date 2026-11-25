@@ -212,11 +212,12 @@ private struct SidebarList: View {
 
     /// Empty clicks leave the destination intact. While customizing, a click chooses nothing.
     private var selection: Binding<PlaceView?> {
+        // A row names a saved view at the Library (`PlaceView.memoryKey`), wherever its home is.
         Binding {
-            browser.showing
+            browser.showing?.memoryKey
         } set: { item in
             guard let item, !browser.customizesSidebar else { return }
-            if item != browser.showing { browser.show(item, in: library, order: order) }
+            if !item.isSame(browser.showing) { browser.show(item, in: library, order: order) }
         }
     }
 
@@ -259,7 +260,7 @@ private struct SidebarList: View {
         }
         // The window mounts this list afresh when its presentation changes, so it starts where the last one was.
         .remembersScroll(in: browser.sidebarMemory)
-        .softSelection(rows: [content.marksSignature, browser.sidebarShowsAllTypes ? 1 : 0], selection: { browser.showing })
+        .softSelection(rows: [content.marksSignature, browser.sidebarShowsAllTypes ? 1 : 0], selection: { browser.showing?.memoryKey })
         .contextMenu { if !content.customizing { SidebarCustomizeButton(browser: browser) } }
         .accessibilityIdentifier("Sidebar")
         // The right and left arrows open and close the selected type, as the system's outline does for its own rows.

@@ -157,7 +157,7 @@ private struct SavedViewDialogs: ViewModifier {
             } message: {
                 Text("The view is deleted for every app connected to your Marfa server. You can’t undo this action.")
             }
-            .onChange(of: browser.shown, initial: true) {
+            .onChange(of: browser.shown.memoryKey, initial: true) {
                 browser.placeChanged()
                 browser.followView(in: library)
                 browser.followPlaceDefault(in: library)

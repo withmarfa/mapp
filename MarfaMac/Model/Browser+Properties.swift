@@ -28,7 +28,7 @@ extension Browser {
         placeProperties[place] = next.isChanged ? next : nil
         updatePlaceDefault(place) { $0.properties = next }
         registerUndo(String(localized: "Change Properties")) { browser in
-            guard browser.shown == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.setPlaceProperties(before, before: next, in: place)
         }
     }

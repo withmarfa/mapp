@@ -38,6 +38,9 @@ extension Browser {
     /// write carries them. Every layout shows them, and the view opens in the layout this Mac keeps for it.
     func followView(in library: any ItemLibrary) {
         guard let id = shown.savedView, let view = library.views.first(where: { $0.id == id }) else { return }
+        // A change of the view's filters can move it to another home, and the window goes with it.
+        let home = PlaceView(Place.home(of: view.query, catalogue: library.catalogue), .saved(id))
+        if showing != home { showing = home }
         if pendingViewWrites.remove(id) != nil { scheduleWrite(of: id) }
         guard let seed = viewSeeds[id] else {
             apply(layout: ViewLayouts.stored(in: defaults).settings(for: id)?.layout, in: library)
@@ -79,7 +82,7 @@ extension Browser {
     /// send the window's older value back over it. A setting the person changed stays as they chose it, and is written.
     private func follow(_ returned: ViewChoices, in place: PlaceView, over earlier: ViewSeed, sent: LibraryViewChange) {
         let held = ViewChoices(options: earlier.options, timelineDate: earlier.timelineDate)
-        let dated = shown == place ? datedList : nil
+        let dated = shown.isSame(place) ? datedList : nil
         var parts = Set(ViewChoices.Part.allCases).subtracting(choices(in: place).parts(differingFrom: held, dated: dated))
         if sent.sort != nil { parts.remove(.sort) }
         if sent.group != nil { parts.remove(.grouping) }
@@ -173,7 +176,7 @@ extension Browser {
         placeHidesEmptyGroups[place] = hides ? true : nil
         updatePlaceDefault(place) { $0.hidesEmptyGroups = hides }
         registerUndo(String(localized: "Change View")) { browser in
-            guard browser.shown == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.setHidesEmptyGroups(before)
         }
     }
@@ -204,7 +207,7 @@ extension Browser {
         placeCalendarScales[place] = scale
         updatePlaceDefault(place) { $0.calendarScale = scale }
         registerUndo(String(localized: "Change Calendar")) { browser in
-            guard browser.shown == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.changeCalendarScale(before)
         }
     }
@@ -248,7 +251,7 @@ extension Browser {
         guard density != before else { return }
         store(density, for: place)
         registerUndo(String(localized: "Change Density")) { browser in
-            guard browser.shown == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.changeDensity(before)
         }
     }
@@ -277,7 +280,7 @@ extension Browser {
         placeCards[place] = cards == ViewCards() ? nil : cards
         updatePlaceDefault(place) { $0.cards = cards }
         registerUndo(String(localized: "Change Cards")) { browser in
-            guard browser.shown == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.setPlaceCards(before, before: cards, in: place)
         }
     }
@@ -290,7 +293,7 @@ extension Browser {
         guard !settings.sameChoices(as: before) else { return }
         keep(settings, for: id)
         registerUndo(String(localized: "Change View")) { browser in
-            guard browser.shown == .saved(id) else { return }
+            guard browser.shown.isSame(.saved(id)) else { return }
             browser.changeViewSettings(id) { $0.take(choicesOf: before) }
         }
     }
@@ -326,7 +329,7 @@ extension Browser {
     /// A place that is not a view keeps its layout in its default view, and Undo puts the earlier one back.
     private func registerPlaceLayoutUndo(in place: PlaceView, from old: ItemViewMode, to new: ItemViewMode) {
         registerUndo(String(localized: "Change Layout")) { browser in
-            guard browser.shown == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.set(layout: old)
             browser.updatePlaceDefault(place) { $0.layout = old }
             browser.registerPlaceLayoutUndo(in: place, from: new, to: old)
@@ -335,7 +338,7 @@ extension Browser {
 
     private func registerLayoutUndo(of id: ItemID, from old: ItemViewMode, to new: ItemViewMode, mac before: ViewMacSettings) {
         registerUndo(String(localized: "Change Layout")) { browser in
-            guard browser.shown == .saved(id) else { return }
+            guard browser.shown.isSame(.saved(id)) else { return }
             let after = browser.macSettings(for: id)
             browser.set(layout: old)
             browser.keep(before, for: id)

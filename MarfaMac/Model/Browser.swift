@@ -8,7 +8,8 @@ final class Browser {
     var showing: PlaceView? = .library {
         // A scroll position belongs to the place and layout it was made in.
         didSet {
-            guard showing != oldValue else { return }
+            // A saved view that moves to another home is still what the window shows.
+            guard !(showing.map { $0.isSame(oldValue) } ?? (oldValue == nil)) else { return }
             modalItem = nil
             listMemory.scrollOffset = nil
             viewPanelPlaceChanged()
@@ -154,7 +155,7 @@ final class Browser {
     }
     /// How each place's table is grouped, sorted and filtered, as the person left it. A place that is not a saved view
     /// keeps them in its default view too (`Browser+PlaceDefaults`).
-    var tableOptions: [PlaceView: ItemTableOptions] = [:]
+    var tableOptions: PlaceMemory<ItemTableOptions> = [:]
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
@@ -173,10 +174,10 @@ final class Browser {
     @ObservationIgnored var looksMemo: (key: LooksKey, looks: [TypeID: TypeLook])?
     /// Held by `paletteIndex(in:)`.
     @ObservationIgnored var paletteMemo: (key: PaletteIndexKey, index: PaletteIndex)?
-    var compactBoards: [PlaceView: Bool] = [:]
+    var compactBoards: PlaceMemory<Bool> = [:]
     /// The date field each place's timeline shows its items by, where the person chose one. A view's own comes from
     /// its day grouping (`followView`).
-    var timelineFields: [PlaceView: String] = [:]
+    var timelineFields: PlaceMemory<String> = [:]
     /// Opens the Settings window at a page, or where it was left when none is given. Settings is a window of its own, so
     /// the browser keeps nothing of it; the window's views set this to the app's launcher.
     @ObservationIgnored var openSettings: (SettingsPage?, SettingsSubpage?) -> Void = { _, _ in }
@@ -368,10 +369,10 @@ final class Browser {
         defer { isMovingThroughHistory = false }
         isCollectionItemPresented = false
         modalItem = nil
-        if isSearching || showing != entry.place {
+        if isSearching || !entry.place.isSame(showing) {
             searchText = ""
             isSearchExpanded = false
-            showing = entry.place
+            showing = entry.place.savedView.map { PlaceView.saved($0, in: library) } ?? entry.place
         }
         if !items(in: library).contains(where: { $0.id == entry.id }) { showing = .library }
         selection = [entry.id]
@@ -504,7 +505,7 @@ final class Browser {
     @ObservationIgnored var library: (any ItemLibrary)?
 
     /// What each place's choices were when last looked at, so a change of them is the person's (`Browser+ViewWrites`).
-    @ObservationIgnored var observedChoices: [PlaceView: ViewChoices] = [:]
+    @ObservationIgnored var observedChoices: PlaceMemory<ViewChoices> = [:]
 
     /// The views this window is writing, and those that changed again meanwhile (`Browser+ViewWrites`).
     @ObservationIgnored var writingViews: Set<ItemID> = []
@@ -521,7 +522,7 @@ final class Browser {
 
     /// Whether the row of filters above the list shows in a place the person chose, which is window state and never
     /// saved (`Browser+FilterRow`). A place the person did not choose for shows it by what it holds.
-    var filterRowChoice: [PlaceView: Bool] = [:]
+    var filterRowChoice: PlaceMemory<Bool> = [:]
 
     /// Whether Add Filter… asked for its panel, which the row opens and then clears (`Browser+FilterRow`).
     var isAddFilterRequested = false
@@ -538,13 +539,13 @@ final class Browser {
 
     /// What the gallery draws on each card in a place that is not a saved view, as its default view keeps it
     /// (`Browser+PlaceDefaults`).
-    var placeCards: [PlaceView: ViewCards] = [:]
+    var placeCards: PlaceMemory<ViewCards> = [:]
     /// The scale of each place's calendar that is not a saved view, as its default view keeps it (`calendarScale`).
-    var placeCalendarScales: [PlaceView: CalendarScale] = [:]
+    var placeCalendarScales: PlaceMemory<CalendarScale> = [:]
     /// The places whose default view leaves out the groups with no items.
-    var placeHidesEmptyGroups: [PlaceView: Bool] = [:]
+    var placeHidesEmptyGroups: PlaceMemory<Bool> = [:]
     /// The Properties list of each place that is not a saved view, as its default view keeps it (`properties`).
-    var placeProperties: [PlaceView: ViewProperties] = [:]
+    var placeProperties: PlaceMemory<ViewProperties> = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.
     var calendarDay: Date?
     /// Counts the moves of the calendar by its buttons, menu or keys, so the month card can follow one that leaves the day as it was.

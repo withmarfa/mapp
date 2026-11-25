@@ -37,7 +37,7 @@ struct CalendarCornerView: View {
         } card: {
             CalendarMonthCard(browser: browser)
         }
-        .onChange(of: browser.shown) { browser.showsCalendarMonth = false }
+        .onChange(of: browser.shown.memoryKey) { browser.showsCalendarMonth = false }
         .onDisappear { browser.showsCalendarMonth = false }
     }
 

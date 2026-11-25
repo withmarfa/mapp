@@ -40,7 +40,7 @@ struct FilterRow: View {
                 // The row is laid out first, so the + has a view to open under.
                 DispatchQueue.main.async { openFields() }
             }
-            .onChange(of: browser.shown) { FilterPanelPresenter.shared.dismiss(restoringFocus: false) }
+            .onChange(of: browser.shown.memoryKey) { FilterPanelPresenter.shared.dismiss(restoringFocus: false) }
         }
     }
 

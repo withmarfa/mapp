@@ -37,6 +37,18 @@ struct BrowserViewSeedTests {
         browser.viewSeeds[id] = seed
     }
 
+    @Test func aViewWhoseQueryMovesItTakesTheWindowToItsNewHome() {
+        let (browser, library) = Self.opened()
+        #expect(browser.shown == PlaceView(.type(TypeID("core.task")), .saved(Self.view().id)))
+        browser.tableOptions[browser.shown]?.grouping = .none
+        var moved = Self.view(version: 2)
+        moved.query.types = []
+        library.views = [moved]
+        browser.followView(in: library)
+        #expect(browser.shown == PlaceView(.library, .saved(moved.id)))
+        #expect(browser.tableOptions[browser.shown]?.grouping == ItemTableOptions.Grouping.none, "what the window keeps for the view goes with it")
+    }
+
     @Test func aChangedGroupingOffersASave() {
         let (browser, library) = Self.opened()
         browser.tableOptions[browser.shown]?.grouping = .none

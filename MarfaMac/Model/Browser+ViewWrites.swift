@@ -162,7 +162,7 @@ extension Browser {
     private func registerChoiceUndo(in place: PlaceView, from before: ViewChoices, to after: ViewChoices) {
         let parts = after.parts(differingFrom: before)
         registerUndo(String(localized: "Change View")) { browser in
-            guard browser.shown == place, browser.liveChoices.parts(differingFrom: after).isDisjoint(with: parts) else {
+            guard browser.shown.isSame(place), browser.liveChoices.parts(differingFrom: after).isDisjoint(with: parts) else {
                 browser.library?.notices.tell(
                     String(localized: "Can’t Undo"),
                     String(localized: "This view has changed since, so that change was left as it is."))
@@ -251,7 +251,7 @@ extension Browser {
     private func writeOnce(_ id: ItemID, in library: any ItemLibrary) async {
         guard viewPanel?.isNew != true else { return }
         // The window's choices are the open place's: a view that is not open writes them when it is shown again.
-        guard shown == .saved(id) else {
+        guard shown.isSame(.saved(id)) else {
             pendingViewWrites.insert(id)
             return
         }

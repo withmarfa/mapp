@@ -172,21 +172,12 @@ nonisolated struct PlaceView: Hashable, Codable, Sendable {
     /// The saved view the window shows, if it shows one.
     var savedView: ItemID? { view.savedView }
 
-    /// A saved view is the same view wherever its home is, so what is kept for it outlasts a change of its filters
-    /// that moves it to another place.
-    static func == (lhs: PlaceView, rhs: PlaceView) -> Bool {
-        if let id = lhs.savedView { return rhs.savedView == id }
-        return lhs.place == rhs.place && lhs.view == rhs.view
-    }
+    /// What a window keeps for this under (`PlaceMemory`): a saved view at the Library, since it is the same view
+    /// wherever its home is, so what is kept for it outlasts a change of its filters that moves it to another place.
+    var memoryKey: PlaceView { savedView.map(PlaceView.saved) ?? self }
 
-    func hash(into hasher: inout Hasher) {
-        if let id = savedView {
-            hasher.combine(id)
-        } else {
-            hasher.combine(place)
-            hasher.combine(view)
-        }
-    }
+    /// Whether the two are the same thing shown: the same place and view, or the same saved view at any home.
+    func isSame(_ other: PlaceView?) -> Bool { other.map { memoryKey == $0.memoryKey } ?? false }
 
     /// The key the defaults keep this under: the place's word for its own view, `library|favorites` for the
     /// Favorites view, and `saved:<id>` for a saved view, whose home can change as its filters do. None starts with
@@ -220,25 +211,53 @@ nonisolated struct PlaceView: Hashable, Codable, Sendable {
     var listsItems: Bool { place.listsItems || view != .own }
 }
 
+/// What a window keeps for each place it showed, by `PlaceView.memoryKey`.
+nonisolated struct PlaceMemory<Value>: ExpressibleByDictionaryLiteral {
+    private var values: [PlaceView: Value] = [:]
+
+    init(dictionaryLiteral elements: (PlaceView, Value)...) {
+        for (place, value) in elements { values[place.memoryKey] = value }
+    }
+
+    subscript(place: PlaceView) -> Value? {
+        get { values[place.memoryKey] }
+        set { values[place.memoryKey] = newValue }
+    }
+
+    subscript(place: PlaceView, default value: @autoclosure () -> Value) -> Value {
+        get { values[place.memoryKey] ?? value() }
+        set { values[place.memoryKey] = newValue }
+    }
+
+    var isEmpty: Bool { values.isEmpty }
+}
+
+extension PlaceMemory: Equatable where Value: Equatable {}
+extension PlaceMemory: Sendable where Value: Sendable {}
+
 nonisolated extension Place {
-    /// The place a saved view belongs to: the one type it lists; else the one collection its filter names through
-    /// `in-collection`; else the one source it names; else the Feed, when it lists the feed tier and nothing else
-    /// narrows it; else the Library.
+    /// The place a saved view belongs to: the one type it lists; else the one collection its filter requires through
+    /// `in-collection`, naming no other collection or source; else the one source it requires, naming no other source
+    /// or collection; else the Feed, when it lists the feed tier and names no collection or source; else the Library.
     static func home(of query: LibraryViewQuery, catalogue: Catalogue) -> Place {
         if query.types.count == 1, let type = query.types.first { return .type(type) }
-        let conditions = (try? ViewDraft.terms(of: query.filter).terms) ?? []
-        let collections = conditions.compactMap { condition -> ItemID? in
-            guard condition.operator == .eq, case .edge(let type, _) = condition.field,
-                  (catalogue.edgeType(named: type)?.info.id ?? type) == MarfaMapping.collectionEdge,
-                  case .text(let id)? = condition.value else { return nil }
-            return ItemID(id)
+        let parsed = (try? ViewDraft.terms(of: query.filter)) ?? ViewDraft.Parsed(terms: [], join: .all)
+        // A condition narrows the list only where every condition must hold.
+        let required = parsed.join == .all || parsed.terms.count == 1
+        var collections: [(id: ItemID, required: Bool)] = []
+        var sources: [(code: String, required: Bool)] = []
+        for condition in parsed.terms where condition.operator == .eq {
+            guard case .text(let value)? = condition.value else { continue }
+            // Membership is the item's own edge to the collection; the reverse edge is another condition.
+            if case .edge(let type, .outbound) = condition.field,
+               (catalogue.edgeType(named: type)?.info.id ?? type) == MarfaMapping.collectionEdge {
+                collections.append((ItemID(value), required))
+            } else if condition.field == .system(.source) {
+                sources.append((value, required))
+            }
         }
-        if collections.count == 1, let id = collections.first { return .collection(id) }
-        let sources = conditions.compactMap { condition -> String? in
-            guard condition.operator == .eq, condition.field == .system(.source), case .text(let code)? = condition.value else { return nil }
-            return code
-        }
-        if sources.count == 1, let code = sources.first { return .source(code) }
+        if collections.count == 1, sources.isEmpty, let only = collections.first, only.required { return .collection(only.id) }
+        if sources.count == 1, collections.isEmpty, let only = sources.first, only.required { return .source(only.code) }
         if query.tier == .feed, query.types.isEmpty, collections.isEmpty, sources.isEmpty { return .feed }
         return .library
     }

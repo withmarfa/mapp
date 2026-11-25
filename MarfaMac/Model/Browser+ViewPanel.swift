@@ -23,9 +23,9 @@ extension Browser {
     /// Edit View on a row of the sidebar's Views, which opens the view first.
     func editView(_ id: ItemID, in library: any ItemLibrary, order: ItemOrder) {
         guard library.views.contains(where: { $0.id == id }) else { return }
-        if viewPanel?.viewID == id, shown == .saved(id) { return openViewPanel(in: library) }
+        if viewPanel?.viewID == id, shown.isSame(.saved(id)) { return openViewPanel(in: library) }
         closeViewPanel(in: library)
-        if shown != .saved(id) {
+        if !shown.isSame(.saved(id)) {
             show(.saved(id), in: library, order: order)
             followView(in: library)
         }

@@ -49,13 +49,13 @@ extension Browser {
             await library.waitUntilHolding(added)
             joined = library.addToCollection(Set(added.filter { library.item($0) != nil }), target, undoManager: undoManager)
         }
-        guard isShowing(library), shown == destination.place else { return added }
+        guard isShowing(library), shown.isSame(destination.place) else { return added }
         let listed = Set(placeItems(in: library).map(\.id))
         if (joined && destination.collection == shownCollection) || added.allSatisfy(listed.contains) {
             selection = Set(added)
         } else if !destination.isOnCollection {
             await library.waitUntilHolding(added)
-            if isShowing(library), shown == destination.place, let first = library.item(added[0]) {
+            if isShowing(library), shown.isSame(destination.place), let first = library.item(added[0]) {
                 reveal(first, in: library, order: order)
             }
         }

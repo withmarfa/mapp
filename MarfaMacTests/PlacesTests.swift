@@ -31,6 +31,20 @@ struct PlacesTests {
         #expect(Self.home(LibraryViewQuery(tier: .feed, filter: #"properties.status eq "done""#)) == .feed)
         #expect(Self.home(LibraryViewQuery(types: [F.task, F.bug], tier: .feed)) == .library, "types narrow it past the Feed")
         #expect(Self.home(LibraryViewQuery()) == .library)
+        // Only a condition every item must meet places the view, and only the collection's own edge is membership.
+        #expect(Self.home(LibraryViewQuery(filter: #"backref[in-collection] eq "c1""#)) == .library)
+        #expect(Self.home(LibraryViewQuery(filter: #"edge[in-collection] eq "c1" OR properties.status eq "done""#)) == .library)
+        #expect(Self.home(LibraryViewQuery(filter: #"source eq "mail" OR source eq "web""#)) == .library)
+        #expect(Self.home(LibraryViewQuery(filter: #"edge[in-collection] eq "c1" AND source eq "mail""#)) == .library)
+        #expect(Self.home(LibraryViewQuery(tier: .feed, filter: #"source eq "mail" OR properties.status eq "done""#)) == .library)
+        #expect(Self.home(LibraryViewQuery(filter: #"edge[in-collection] eq "c1" AND properties.status eq "done""#)) == .collection(ItemID("c1")))
+        // A saved view at another home is another place shown, and the same view kept.
+        let moved = PlaceView(.type(F.task), .saved(ItemID("v1")))
+        #expect(moved != .saved(ItemID("v1")) && moved.isSame(.saved(ItemID("v1"))))
+        var memory: PlaceMemory<Int> = [.saved(ItemID("v1")): 1]
+        #expect(memory[moved] == 1)
+        memory[moved] = 2
+        #expect(memory[.saved(ItemID("v1"))] == 2)
     }
 
     // MARK: Reading what is stored
