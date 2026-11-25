@@ -173,7 +173,7 @@ struct ViewPanelFilter: View {
                 .help("This view’s filter holds a condition that can’t be changed here. It is kept.")
                 .accessibilityIdentifier("ViewPanelLockedCondition")
         }
-        addCondition(offer: offer)
+        addCondition(offer: offer, room: isView ? ViewDraft.maxConditions - held.count : nil)
             .disabled(isFull)
         if let note = holdingNote(held: held, isView: isView, relative: relative.map(\.clause), offer: offer) {
             Text(verbatim: note)
@@ -263,16 +263,18 @@ struct ViewPanelFilter: View {
         browser.dropUnfinishedFilters()
     }
 
-    private func addCondition(offer: FilterOffer) -> some View {
+    /// A target is offered with the first operator that fits in the `room` a saved view has left, and not where none does.
+    private func addCondition(offer: FilterOffer, room: Int?) -> some View {
         Menu {
-            let place = offer.placeFields.filter { $0.id != ViewDraft.typeFieldID }
+            let fits = { (target: FilterTarget) in target.id != ViewDraft.typeFieldID && starting(target, room: room) != nil }
+            let place = offer.placeFields.filter(fits)
             if !place.isEmpty {
                 Section(offer.placeTitle) {
-                    ForEach(place, id: \.id) { target in option(target) }
+                    ForEach(place, id: \.id) { target in option(target, room: room) }
                 }
             }
             Section("Every Item") {
-                ForEach(offer.everyItem.filter { $0.id != ViewDraft.typeFieldID }, id: \.id) { target in option(target) }
+                ForEach(offer.everyItem.filter(fits), id: \.id) { target in option(target, room: room) }
             }
         } label: {
             ViewPanelRowLabel(symbol: "plus", label: String(localized: "Add Condition"))
@@ -284,9 +286,14 @@ struct ViewPanelFilter: View {
         .accessibilityIdentifier("ViewPanelAddCondition")
     }
 
-    private func option(_ target: FilterTarget) -> some View {
+    private func starting(_ target: FilterTarget, room: Int?) -> FilterOp? {
+        guard let room else { return target.kind.startingOperator }
+        return ViewDraft.startingOperator(for: target.kind, room: room)
+    }
+
+    private func option(_ target: FilterTarget, room: Int?) -> some View {
         Button {
-            editing = browser.addFilter(on: target)
+            editing = browser.addFilter(on: target, op: starting(target, room: room))
         } label: {
             Label(target.label, systemImage: target.symbol)
         }

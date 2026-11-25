@@ -408,6 +408,29 @@ struct FilterClauseTests {
         #expect(Self.filter([Self.clause("field.priority", .is, ["high"]), Self.clause("field.status", .is, ["done"])], base: held).unkept == [.tooManyFilters])
     }
 
+    /// At nine conditions a new one or a changed one is offered only with an operator that takes one more: a date starts
+    /// before a day, since On takes two, and the menu offers neither On nor Between.
+    @Test func atNineConditionsOnlyAnOperatorThatFitsIsOffered() {
+        let nine = FilterState(clauses: [
+            Self.clause("field.assignees", .includes, (1...9).map { "p\($0)" }), Self.clause("field.due_at", .before, ["2026-11-01"]),
+        ])
+        let room = ViewDraft.room(for: nil, in: nine, beside: nil, targets: Self.targets, catalogue: Self.catalogue, calendar: Self.london())
+        #expect(room == 0, "nine values and a bound are ten")
+        let atNine = FilterState(clauses: [Self.clause("field.assignees", .includes, (1...9).map { "p\($0)" })])
+        let left = ViewDraft.room(for: nil, in: atNine, beside: nil, targets: Self.targets, catalogue: Self.catalogue, calendar: Self.london())
+        #expect(left == 1)
+        #expect(ViewDraft.startingOperator(for: .date, room: left) == .before)
+        #expect(ViewDraft.startingOperator(for: .status, room: left) == .is)
+        #expect(ViewDraft.startingOperator(for: .date, room: 0) == nil)
+        // The date clause itself: the others leave it one, so On and Between go from its menu.
+        let own = ViewDraft.room(for: 1, in: nine, beside: nil, targets: Self.targets, catalogue: Self.catalogue, calendar: Self.london())
+        #expect(own == 1)
+        let offered = FilterOperatorMenu.sections(for: .date, relative: false, room: own, current: .before).flatMap(\.ops)
+        #expect(!offered.contains(.on) && !offered.contains(.between))
+        #expect(offered.contains(.before) && offered.contains(.after))
+        #expect(FilterOperatorMenu.sections(for: .date, relative: false).flatMap(\.ops).contains(.on))
+    }
+
     /// The Filter page counts a view's conditions it cannot show, and offers Match Any only where the view can hold it.
     @Test func theFilterPageCountsLockedConditionsAndOffersAnyOnlyWhereItHolds() {
         // Conditions on a field no type here declares, which the row cannot show.

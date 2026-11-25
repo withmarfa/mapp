@@ -16,6 +16,7 @@ struct FilterConditionEditor: View {
             let clause = state.clauses[index]
             FilterClausePanel(
                 field: target.label, kind: target.kind, op: clause.op, offersRelative: offersRelative,
+                room: browser.conditionRoom(for: index, in: library),
                 setOperator: { browser.setFilterOperator(at: index, to: $0, kind: target.kind) }
             ) {
                 valueControl(clause, target: target, content: content)

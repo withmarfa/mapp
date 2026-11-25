@@ -8,13 +8,23 @@ extension Browser {
         tableOptions[shown]?.filter.complete.clauses.count ?? 0
     }
 
-    /// Adds a filter on a field with the operator the field starts with, and returns its place among the conditions. With
-    /// no `values` it says too little to filter by until the person gives it one, so it hides nothing and is dropped if
-    /// they leave it so (`dropUnfinishedFilters`).
+    /// How many of a saved view's conditions are left for the clause at `index`, or a new one where it is nil, in a place
+    /// that is a view or could be one; nil elsewhere, where no limit applies (`ViewDraft.room`).
+    func conditionRoom(for index: Int?, in library: any ItemLibrary) -> Int? {
+        guard ViewDraft.query(for: shown, catalogue: library.catalogue, views: library.views) != nil else { return nil }
+        let state = tableOptions[shown]?.filter ?? FilterState()
+        let saved = shown.savedView.flatMap { id in library.views.first { $0.id == id } }?.query
+        return ViewDraft.room(
+            for: index, in: state, beside: saved, targets: tableContent(in: library).filterOffer.targets, catalogue: library.catalogue)
+    }
+
+    /// Adds a filter on a field with `op`, or the operator the field starts with, and returns its place among the
+    /// conditions. With no `values` it says too little to filter by until the person gives it one, so it hides nothing and
+    /// is dropped if they leave it so (`dropUnfinishedFilters`).
     @discardableResult
-    func addFilter(on target: FilterTarget, values: [String] = []) -> Int {
+    func addFilter(on target: FilterTarget, op: FilterOp? = nil, values: [String] = []) -> Int {
         var options = tableOptions[shown] ?? ItemTableOptions()
-        options.filter.clauses.append(FilterClause(field: target.id, op: target.kind.startingOperator, values: values))
+        options.filter.clauses.append(FilterClause(field: target.id, op: op ?? target.kind.startingOperator, values: values))
         tableOptions[shown] = options
         return options.filter.clauses.count - 1
     }

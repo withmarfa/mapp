@@ -258,6 +258,36 @@ nonisolated extension ViewDraft {
             keeping: nil)
     }
 
+    /// The fewest of a Marfa filter's conditions an operator takes: a day's two bounds for On and Between, and one for
+    /// the rest. A set takes one more for each further value. One relative to today takes none, since a view never keeps it.
+    static func terms(of op: FilterOp) -> Int {
+        switch op {
+        case .on, .between: 2
+        case .beforeToday, .afterToday, .inLast, .inNext: 0
+        default: 1
+        }
+    }
+
+    /// How many conditions one clause has left within `maxConditions`, beside every other condition the view keeps: the
+    /// clause at `index`, or a new one where `index` is nil.
+    static func room(
+        for index: Int?, in state: FilterState, beside query: LibraryViewQuery?, targets: [String: FilterTarget], catalogue: Catalogue,
+        calendar: Calendar = .current
+    ) -> Int {
+        var others = state
+        if let index, others.clauses.indices.contains(index) { others.clauses.remove(at: index) }
+        let held = query.map { holdability(of: others, beside: $0, targets: targets, catalogue: catalogue, calendar: calendar) }
+            ?? holdability(of: others, targets: targets, catalogue: catalogue, calendar: calendar)
+        return maxConditions - held.count
+    }
+
+    /// The operator a new condition on `kind` starts with where `room` conditions are left: the kind's own where it fits,
+    /// else the first offered that does, or nil where none does.
+    static func startingOperator(for kind: FilterKind, room: Int) -> FilterOp? {
+        if terms(of: kind.startingOperator) <= room { return kind.startingOperator }
+        return FilterOp.offered(for: kind).map(\.op).first { !$0.isRelative && terms(of: $0) <= room }
+    }
+
     /// Whether the clauses can be saved as Match Any: none needs AND within it (a date range) and no condition of the
     /// view's own stands beside them.
     static func canMatchAny(

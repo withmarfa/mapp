@@ -19,17 +19,21 @@ struct FilterValueOption: Identifiable, Hashable {
 }
 
 /// The operators a field takes, as a pop-up: the fixed ones first, then presence, then dates relative to today under their own
-/// heading.
+/// heading. Where a saved view has `room` conditions left for the clause, an operator that needs more is not offered.
 struct FilterOperatorMenu: View {
     let kind: FilterKind
     let op: FilterOp
     /// Whether the dates relative to today are offered.
     var offersRelative = true
+    var room: Int?
     let choose: (FilterOp) -> Void
 
-    static func sections(for kind: FilterKind, relative: Bool = true) -> [(title: String?, ops: [FilterOp])] {
+    static func sections(
+        for kind: FilterKind, relative: Bool = true, room: Int? = nil, current: FilterOp? = nil
+    ) -> [(title: String?, ops: [FilterOp])] {
         var result: [(title: String?, ops: [FilterOp])] = []
-        for entry in FilterOp.offered(for: kind) where relative || !entry.op.isRelative {
+        let fits = { (op: FilterOp) in op == current || room.map { ViewDraft.terms(of: op) <= $0 } ?? true }
+        for entry in FilterOp.offered(for: kind) where (relative || !entry.op.isRelative) && fits(entry.op) {
             if entry.startsSection || result.isEmpty {
                 result.append((entry.op.isRelative ? String(localized: "Relative to Today") : nil, []))
             }
@@ -39,7 +43,7 @@ struct FilterOperatorMenu: View {
     }
 
     var body: some View {
-        let sections = Self.sections(for: kind, relative: offersRelative)
+        let sections = Self.sections(for: kind, relative: offersRelative, room: room, current: op)
         Menu {
             ForEach(sections.indices, id: \.self) { index in
                 if let title = sections[index].title {
@@ -72,6 +76,7 @@ struct FilterClausePanel<Content: View>: View {
     let kind: FilterKind
     let op: FilterOp
     var offersRelative = true
+    var room: Int?
     let setOperator: (FilterOp) -> Void
     @ViewBuilder let content: Content
     @Environment(\.interfaceTextSize) private var textSize
@@ -81,7 +86,7 @@ struct FilterClausePanel<Content: View>: View {
         VStack(alignment: .leading, spacing: 6 * scale) {
             HStack(spacing: 6 * scale) {
                 Text(verbatim: field).fontWeight(.semibold)
-                FilterOperatorMenu(kind: kind, op: op, offersRelative: offersRelative, choose: setOperator)
+                FilterOperatorMenu(kind: kind, op: op, offersRelative: offersRelative, room: room, choose: setOperator)
                 Spacer(minLength: 0)
             }
             .font(.system(size: ValueEditMetrics.textSize * scale))
