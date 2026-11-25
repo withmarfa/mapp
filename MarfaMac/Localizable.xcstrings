@@ -955,6 +955,9 @@
         }
       }
     },
+    "%lld items are collections, which stay in the Library." : {
+
+    },
     "%lld items are files, which can’t be moved between lanes." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2407,7 +2410,13 @@
     "Apps you sign in show here." : {
 
     },
+    "Archive" : {
+
+    },
     "Archived Items" : {
+
+    },
+    "Archived “%@”" : {
 
     },
     "Archived, unarchived or moved to or from another state." : {
@@ -2751,6 +2760,9 @@
     "Can’t Add to Favorites" : {
 
     },
+    "Can’t Archive" : {
+
+    },
     "Can’t Attach Images" : {
 
     },
@@ -2796,11 +2808,17 @@
     "Can’t Get This File" : {
       "extractionState" : "manual"
     },
+    "Can’t Keep in Library" : {
+
+    },
     "Can’t Keep the Sign-In" : {
       "extractionState" : "manual"
     },
     "Can’t Move Items" : {
       "extractionState" : "manual"
+    },
+    "Can’t Move to Feed" : {
+
     },
     "Can’t Open Link" : {
 
@@ -2870,6 +2888,9 @@
     },
     "Can’t Show This View" : {
       "extractionState" : "manual"
+    },
+    "Can’t Unarchive" : {
+
     },
     "Can’t Undo" : {
 
@@ -5590,6 +5611,9 @@
         }
       }
     },
+    "Keep in Library" : {
+
+    },
     "Keep in Marfa Again" : {
 
     },
@@ -5625,6 +5649,9 @@
 
     },
     "Kept on This Mac Only" : {
+
+    },
+    "Kept “%@” in the Library" : {
 
     },
     "Key" : {
@@ -6204,6 +6231,9 @@
     "Move Up" : {
 
     },
+    "Move to Feed" : {
+
+    },
     "Move to Recently Deleted" : {
       "extractionState" : "manual"
     },
@@ -6229,6 +6259,9 @@
 
     },
     "Moved “%@” to Recently Deleted" : {
+
+    },
+    "Moved “%@” to the Feed" : {
 
     },
     "Moving %@ to %@…" : {
@@ -10780,6 +10813,12 @@
     "Typing in “%@” Might Be Missing" : {
 
     },
+    "Unarchive" : {
+
+    },
+    "Unarchived “%@”" : {
+
+    },
     "Unavailable" : {
       "extractionState" : "manual"
     },
@@ -11567,14 +11606,26 @@
     "^[%lld version](inflect: true)" : {
 
     },
+    "^[Archived %lld item](inflect: true)" : {
+
+    },
     "^[Delete %lld item](inflect: true) immediately?" : {
       "extractionState" : "manual"
+    },
+    "^[Kept %lld item](inflect: true) in the Library" : {
+
     },
     "^[Move %lld item](inflect: true) to Recently Deleted?" : {
       "extractionState" : "manual"
     },
     "^[Moved %lld item](inflect: true) to Recently Deleted" : {
       "extractionState" : "manual"
+    },
+    "^[Moved %lld item](inflect: true) to the Feed" : {
+
+    },
+    "^[Unarchived %lld item](inflect: true)" : {
+
     },
     "a connector" : {
 
