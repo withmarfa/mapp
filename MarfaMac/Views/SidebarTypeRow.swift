@@ -57,8 +57,8 @@ struct SidebarTypeRow: View {
     let toggle: () -> Void
     @State private var isHovering = false
 
-    /// The padding above and below the content. The list's own row inset is set to zero (`listRowInsets`) so the
-    /// guide runs unbroken from one row to the next, and this puts the space back inside the row.
+    /// The padding above and below the content, in place of the list's own row inset, which is set to zero
+    /// (`listRowInsets`).
     private static let verticalInset: CGFloat = 4
 
     /// Measured so that a count here ends where the system's count on the rows above does.

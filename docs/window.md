@@ -29,7 +29,8 @@ paths:
 - **Pinned holds views, collections and items.** A saved view stays pinned until taken out.
 - **A type counts its items and its kinds'.** Five show, then "N More".
 - **Under the pointer** a type, a kind and a collection show a plus for the count, and a heading Add and More. Sections never fold.
-- **Customize Sidebar works in place:** each faint place opens a menu of what can go there (`SidebarAddPlace`).
+- **Appearance can draw the sidebar white** (`SidebarColor`).
+- **Customize Sidebar works in place:** each faint place opens a menu of what can go there.
 - **A row whose thing is gone keeps its place.**
 - **Go lists the same places, views and types** (`GoMenu`), and the Archive, which no row opens.
 
@@ -37,7 +38,7 @@ paths:
 
 - **What this copy cannot read is written back as it was.**
 - **An earlier Library or Views section is kept and drawn as nothing.** This copy adds `places` and `pinned` where they stood; Pinned keeps the Views section's name and hidden state.
-- **What the person put under Library or Views is read under Pinned;** their own sections keep theirs. Hidden stays hidden; `views` in `hidden` hides every saved view.
+- **What the person put under Library or Views is read under Pinned;** their own sections keep theirs. `views` in `hidden` hides every saved view.
 - **Recently Deleted is a page of Settings**, never a row.
 
 ## Toolbar
