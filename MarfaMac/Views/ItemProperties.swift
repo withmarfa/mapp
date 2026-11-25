@@ -162,7 +162,7 @@ struct ItemPropertyRow: View {
     /// where it does not fit, with the whole word in its help.
     @ViewBuilder private func statusLabel(_ text: String?) -> some View {
         if let text {
-            PageChip(text: text, kind: .status(statusSymbol, chevron: false))
+            PageChip(text: text, kind: .status(statusSymbol))
                 .help(text)
         } else {
             InspectorPlaceholder(text: "Empty")

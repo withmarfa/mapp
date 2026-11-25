@@ -8,8 +8,8 @@ import SwiftUI
 /// `.row` size, a list row. A chip is as tall as its size says whatever it holds, so chips side by side line up.
 struct PageChip: View {
     enum Kind {
-        /// A status: its group's symbol, and a chevron where it opens a menu.
-        case status(StatusSymbol, chevron: Bool)
+        /// A status: its group's symbol.
+        case status(StatusSymbol)
         /// A choice or a word of a list: a dot in its own color.
         case option(TypeTone)
         /// One of the item's tags, after a number sign.
@@ -39,13 +39,6 @@ struct PageChip: View {
             Text(verbatim: text)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            if case .status(_, true) = kind {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: looks.textSize(for: size) * CGFloat(textSize) / 13 * 0.6, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .opacity(looks.chevronOpacity)
-                    .accessibilityHidden(true)
-            }
         }
         .font(looks.chipFont(for: size, textSize: CGFloat(textSize)))
         .foregroundStyle(looks.chipText(for: scheme))
@@ -65,7 +58,7 @@ struct PageChip: View {
 
     @ViewBuilder private func leading(looks: ChipLooks, scale: CGFloat) -> some View {
         switch kind {
-        case .status(let symbol, _):
+        case .status(let symbol):
             StatusMark(symbol, scale: scale)
         case .option(let tone):
             Circle()

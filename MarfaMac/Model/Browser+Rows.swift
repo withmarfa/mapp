@@ -18,6 +18,6 @@ extension Browser {
             date: RowDateSource.of(
                 sort: arranged ? tableContent(in: library).sort.first : nil, order: order,
                 ordersItself: keepsPlaceOrder || ordersByRelevance),
-            format: format, showsPictures: density == .standard, day: calendar.startOfDay(for: now))
+            format: format, showsPictures: density == .standard, marksFeed: listing.scope == .all, day: calendar.startOfDay(for: now))
     }
 }

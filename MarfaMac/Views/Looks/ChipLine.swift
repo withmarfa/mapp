@@ -5,16 +5,20 @@ import SwiftUI
 struct ChipLine: View {
     let chips: [RowContent.Chip]
     let more: Int
+    /// The item whose status chip opens its panel, where the row's item takes a change to its status.
+    var statusItem: ItemID?
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
 
-    init(content: RowContent) {
+    init(content: RowContent, statusItem: ItemID? = nil) {
         chips = content.chips
         more = content.more
+        self.statusItem = content.editsStatus ? statusItem : nil
     }
 
-    init(chips: [RowContent.Chip], more: Int) {
+    init(chips: [RowContent.Chip], more: Int, statusItem: ItemID? = nil) {
         self.chips = chips
         self.more = more
+        self.statusItem = statusItem
     }
 
     var body: some View {
@@ -25,7 +29,11 @@ struct ChipLine: View {
                 case .type(let icon, let label):
                     MarkedName(text: label, icon: icon, size: .row)
                 case .status(let symbol, let label):
-                    PageChip(text: label, kind: .status(symbol, chevron: false), size: .row)
+                    if let statusItem {
+                        StatusChipButton(id: statusItem, symbol: symbol, label: label)
+                    } else {
+                        PageChip(text: label, kind: .status(symbol), size: .row)
+                    }
                 case .option(let label, let tone):
                     PageChip(text: label, kind: .option(tone), size: .row)
                 case .person(let initials, let name):

@@ -21,7 +21,7 @@ nonisolated enum TypeChangeFixture {
             id: task, label: "Task",
             fields: [
                 field("title", required: true, in: task), field("body", in: task),
-                field("status", .choice(["pending", "done"]), in: task), field("priority", .number, in: task),
+                field("status", .choice(["not_started", "completed"]), in: task), field("priority", .number, in: task),
             ],
             titleField: "title", bodyField: "body", parent: nil),
         ItemTypeInfo(
@@ -68,7 +68,7 @@ nonisolated enum TypeChangeFixture {
     }
 
     @Test func fieldsTheNewTypeDoesNotUseStayAndAreNamed() throws {
-        let values: [String: PropertyValue] = ["title": .string("Plan"), "body": .string("Text"), "status": .string("done"), "priority": .number(2)]
+        let values: [String: PropertyValue] = ["title": .string("Plan"), "body": .string("Text"), "status": .string("completed"), "priority": .number(2)]
         let plan = try F.plan(values, F.task, F.note).get()
         #expect(plan.changes.isEmpty)
         #expect(plan.unused == ["priority", "status"])

@@ -73,11 +73,7 @@ struct ItemList: View, Equatable {
                 browser: browser, columnWidth: width - (isSidebarHidden ? ColumnSearchMetrics.sidebarButtonRoom : 0),
                 leadsWithHistory: isSidebarHidden && showsSidebarHistory)
         }
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
-                daysSeen += 1
-            }
-        }
+        .onClockChange { daysSeen += 1 }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
         .onChange(of: ids) { old, new in
@@ -185,7 +181,7 @@ private struct ListLineRow: View {
             .padding(.top, isFirst ? 0 : 10)
         case .item:
             if let content {
-                ItemRow(content: content, density: density, excerpt: excerpt)
+                ItemRow(content: content, density: density, excerpt: excerpt, itemID: line.id)
                     .wantsCounts(of: line.id, content.countQueries, in: library.counts)
             }
         }

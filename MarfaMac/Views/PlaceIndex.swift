@@ -374,16 +374,25 @@ private struct PlaceIndexCount: View {
     }
 }
 
-/// The system schedules updates to the date label without the table tracking the clock.
+/// A latest change as every table's date column reads it (`DateDisplay.Place.table`), so the time of a change today moves
+/// to a day at midnight.
 private struct PlaceIndexLatest: View {
+    @CurrentLibrary private var library
+    @AppStorage(DateFormat.key) private var format = DateFormat.standard
+    @State private var daysSeen = 0
     let date: Date?
 
     var body: some View {
+        let _ = daysSeen
         Group {
-            if let date { Text(.currentDate, format: .reference(to: date)) }
+            if let date {
+                Text(verbatim: DateDisplay.text(of: date, hasTime: true, place: .table, format: format, now: library.now()))
+                    .monospacedDigit()
+            }
         }
         .foregroundStyle(.secondary)
         .tableCellRoom()
+        .onClockChange { daysSeen += 1 }
     }
 }
 

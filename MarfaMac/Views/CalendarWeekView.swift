@@ -259,14 +259,18 @@ struct CalendarWeekView: View {
         VStack(spacing: 2) {
             ForEach(day.allDay) { entry in
                 CalendarCell(browser: browser, entry: entry, day: day.date, calendar: calendar, format: format, choose: choose, open: open) { isSelected in
-                    Text(verbatim: entry.title)
-                        .interfaceFont(.system(size: 11.5, weight: .medium))
-                        .lineLimit(1)
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .calendarFill(isSelected, radius: 5)
+                    HStack(spacing: 4) {
+                        Text(verbatim: entry.title)
+                            .interfaceFont(.system(size: 11.5, weight: .medium))
+                            .lineLimit(1)
+                            .foregroundStyle(.primary)
+                        if entry.inFeed { FeedMark() }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .calendarFill(isSelected, radius: 5)
                 }
             }
         }
@@ -428,12 +432,16 @@ private struct CalendarBlockLabel: View {
         ) { ($0 as NSString).size(withAttributes: [.font: font]).width }
         VStack(alignment: .leading, spacing: 1) {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                    Text(verbatim: line)
-                        .interfaceFont(.system(size: 11.5, weight: .medium))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .foregroundStyle(.primary)
+                ForEach(Array(lines.enumerated()), id: \.offset) { offset, line in
+                    HStack(spacing: 3) {
+                        Text(verbatim: line)
+                            .interfaceFont(.system(size: 11.5, weight: .medium))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(.primary)
+                        // The mark follows the last line, which the title shortens to make room for.
+                        if entry.inFeed, offset == lines.count - 1 { FeedMark() }
+                    }
                 }
             }
             if showsTime {

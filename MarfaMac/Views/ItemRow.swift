@@ -16,6 +16,8 @@ struct ItemRow: View {
     var density = Density.standard
     /// The words a search found in the item, in place of the line under its title.
     var excerpt: SearchExcerpt?
+    /// The item the row is for, which its status chip changes by a click. Nil for a row with no item behind it.
+    var itemID: ItemID?
     /// Whether the row draws a sample picture, for a preview with no item behind it (`SamplePicture`).
     var showsSample = false
 
@@ -37,6 +39,7 @@ struct ItemRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(content.spoken)
         .accessibilityAddTraits(.isStaticText)
+        .changesStatus(of: content.editsStatus ? itemID : nil)
     }
 
     private var compact: some View {
@@ -45,6 +48,7 @@ struct ItemRow: View {
             Text(content.title)
                 .interfaceFont(.body)
                 .lineLimit(1)
+            if content.inFeed { FeedMark() }
             Spacer(minLength: 8)
             dateText
         }
@@ -58,6 +62,7 @@ struct ItemRow: View {
                 }
                 .interfaceFont(.body.weight(.semibold))
                 .lineLimit(1)
+                if content.inFeed { FeedMark() }
                 Spacer(minLength: 8)
                 dateText
             }
@@ -93,7 +98,7 @@ struct ItemRow: View {
                     .lineLimit(1)
             }
             if !content.chips.isEmpty || content.more > 0 {
-                ChipLine(content: content)
+                ChipLine(content: content, statusItem: itemID)
                     .padding(.top, 1)
             }
         }

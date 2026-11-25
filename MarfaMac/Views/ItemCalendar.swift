@@ -21,7 +21,8 @@ struct ItemCalendar: View {
         let now = library.now()
         let anchor = browser.calendarDay ?? now
         let firstShown = CalendarLayout.firstDayShown(browser.calendarDay, now: now, calendar: calendar)
-        let placed = CalendarLayout.entries(for: items, looks: browser.looks(in: library), catalogue: library.catalogue, calendar: calendar)
+        let placed = CalendarLayout.entries(for: items, looks: browser.looks(in: library), catalogue: library.catalogue, calendar: calendar,
+            marksFeed: browser.listing.scope == .all)
         let scale = browser.calendarScale
         let visible = scale == .week
             ? DateInterval(start: firstShown, end: calendar.date(byAdding: .day, value: 7, to: firstShown) ?? firstShown)
@@ -80,9 +81,7 @@ struct ItemCalendar: View {
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
         }
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
-        }
+        .onClockChange { daysSeen += 1 }
     }
 
     /// Chooses an event on one of its days, which is where the arrow keys go on from.
@@ -156,7 +155,7 @@ struct CalendarCell<Label: View>: View {
             ItemRowMenu(browser: browser, ids: browser.selection.contains(id) ? browser.selection : [id], undoManager: undoManager)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: entry.title))
+        .accessibilityLabel(entry.inFeed ? Text("\(entry.title), Feed") : Text(verbatim: entry.title))
         .accessibilityValue(Text(verbatim: entry.spoken(calendar: calendar, format: format)))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityAction(named: Text("Open")) { open(id) }
@@ -247,14 +246,18 @@ private struct CalendarMonthView: View {
                 .background { if day.isToday { Capsule().fill(Color.calendarToday) } }
             ForEach(fitting.shown) { entry in
                 CalendarCell(browser: browser, entry: entry, day: day.date, calendar: calendar, format: format, choose: choose, open: open) { isSelected in
-                    Text(verbatim: entry.title)
-                        .interfaceFont(.system(size: 11))
-                        .lineLimit(1)
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .calendarFill(isSelected, radius: 4)
+                    HStack(spacing: 4) {
+                        Text(verbatim: entry.title)
+                            .interfaceFont(.system(size: 11))
+                            .lineLimit(1)
+                            .foregroundStyle(.primary)
+                        if entry.inFeed { FeedMark() }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .calendarFill(isSelected, radius: 4)
                 }
             }
             if fitting.more > 0 {

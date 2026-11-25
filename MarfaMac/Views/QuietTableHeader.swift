@@ -8,8 +8,7 @@ extension View {
     /// and sort by a click. SwiftUI cannot style the header the `NSTableView` behind a `Table` draws, so this gives the
     /// table a header view that draws every column's heading itself. The headings are drawn over the table's own
     /// background, or over `backdrop` where the table has none, so rows that scroll under them do not show through. The
-    /// same view keeps the table as wide as its page (see `Probe.fit`), or, for a table whose column widths a person
-    /// sets and keeps, leaves every width to the person's drags (`resizing`).
+    /// same view fits the table to its page, respecting any widths the person set (`Probe.fit`).
     func quietTableHeader(backdrop: NSColor = .windowBackgroundColor, resizing: ColumnResizing? = nil) -> some View {
         background(QuietTableHeader(backdrop: backdrop, resizing: resizing))
     }
@@ -29,6 +28,11 @@ final class ColumnResizing {
         didSet { if widths != oldValue { widthsChanged?() } }
     }
 
+    /// Which shown column takes what the others leave of the table's width, nil where none does: the name, until a person
+    /// drags its divider. It never goes under `flexibleMinimum`, and the table scrolls sideways only past that.
+    var flexible: Int?
+    var flexibleMinimum: CGFloat = 0
+
     /// Called when `widths` change, as when the table moves to a place with other widths. Nothing else tells the header
     /// that the same table has another place to start at.
     fileprivate var widthsChanged: (() -> Void)?
@@ -38,6 +42,22 @@ final class ColumnResizing {
     /// The starting widths and shown columns last applied, so a change of place or of stored widths is applied once, and
     /// the same table moving to a place with other widths never keeps the last place's.
     private var applied: (widths: [CGFloat], columns: [NSUserInterfaceItemIdentifier])?
+
+    /// Gives the flexible column the width the others leave in the table, so the columns fill the table and none is cut off
+    /// by it while the name can give way.
+    fileprivate func fill(_ table: NSTableView, in scrollView: NSScrollView) {
+        guard !isDragging, let flexible else { return }
+        let shown = table.tableColumns.filter { !$0.isHidden }
+        guard shown.indices.contains(flexible), shown.count == widths.count, let first = table.tableColumns.firstIndex(of: shown[0]) else { return }
+        let insets = scrollView.contentInsets
+        // The table keeps the inset style's room before its first column and the same after its last.
+        let room = 2 * table.rect(ofColumn: first).minX
+        let available = scrollView.contentView.bounds.width - insets.left - insets.right - room
+        let others = shown.enumerated().reduce(CGFloat(0)) { $0 + ($1.offset == flexible ? 0 : $1.element.width) }
+        let target = max(flexibleMinimum, floor(available - others - table.intercellSpacing.width * CGFloat(shown.count)))
+        let column = shown[flexible]
+        if abs(column.width - target) >= 1 { column.width = target }
+    }
 
     /// Answers false while the table's shown columns are not yet the ones `widths` is for, as when SwiftUI replaces them
     /// after a change of place, so the caller tries again once they are.
@@ -72,6 +92,7 @@ private struct QuietTableHeader: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            if window == nil { stopWatching() }
             refresh()
             DispatchQueue.main.async { [weak self] in self?.refresh() }
         }
@@ -90,8 +111,32 @@ private struct QuietTableHeader: NSViewRepresentable {
             (table.headerView as? QuietHeaderView)?.backdrop = backdrop
             resizing?.header = table.headerView
             resizing?.widthsChanged = { [weak self] in self?.restoreAfterChange() }
-            if let scrollView = table.enclosingScrollView { fit(table, in: scrollView) }
+            if let scrollView = table.enclosingScrollView {
+                watch(scrollView)
+                fit(table, in: scrollView)
+            }
             table.headerView?.needsDisplay = true
+        }
+
+        private weak var watched: NSScrollView?
+        private var watching: (any NSObjectProtocol)?
+
+        /// Fits the columns again when the page the table sits in changes size, which this view's own layout does not always
+        /// follow: a window made narrower leaves the flexible column as wide as it was.
+        private func watch(_ scrollView: NSScrollView) {
+            guard watched !== scrollView else { return }
+            if let watching { NotificationCenter.default.removeObserver(watching) }
+            watched = scrollView
+            scrollView.postsFrameChangedNotifications = true
+            watching = NotificationCenter.default.addObserver(
+                forName: NSView.frameDidChangeNotification, object: scrollView, queue: .main
+            ) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } }
+        }
+
+        private func stopWatching() {
+            if let watching { NotificationCenter.default.removeObserver(watching) }
+            watching = nil
+            watched = nil
         }
 
         /// The width and columns the table was last fitted to.
@@ -114,8 +159,7 @@ private struct QuietTableHeader: NSViewRepresentable {
         /// sideways only where the minimums do not fit. A fit waits for the mouse to be up, so it does not undo a column
         /// a person is dragging, and happens again only when the width or the columns change.
         ///
-        /// A table that keeps its widths is never fitted, and what AppKit does with its columns is never stored (see
-        /// `ColumnResizing`).
+        /// An item table restores fixed widths and fits the unset Name column to the space left (`ColumnResizing`).
         private func fit(_ table: NSTableView, in scrollView: NSScrollView) {
             let safeRight = scrollView.safeAreaInsets.right
             if abs(scrollView.contentInsets.right - safeRight) > 0.5 { scrollView.contentInsets.right = safeRight }
@@ -123,6 +167,7 @@ private struct QuietTableHeader: NSViewRepresentable {
                 if table.columnAutoresizingStyle != .noColumnAutoresizing { table.columnAutoresizingStyle = .noColumnAutoresizing }
                 if resizing.restore(table) {
                     restoreTries = 0
+                    resizing.fill(table, in: scrollView)
                 } else if restoreTries < 50 {
                     restoreTries += 1
                     DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(20)) { [weak self] in self?.refresh() }

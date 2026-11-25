@@ -28,7 +28,7 @@ nonisolated extension SampleCastell.Maker {
         }
         func task(
             _ id: String, _ title: String, _ source: String, _ day: Int, _ time: String = "10:00", priority: String = "medium",
-            status: String = "pending", due: Int? = nil, parent: String? = nil, state: Marfa.ItemState = .active
+            status: String = "not_started", due: Int? = nil, parent: String? = nil, state: Marfa.ItemState = .active
         ) {
             make(id, Kind.task, title, source, day, time, state: state, parent: parent, due: due,
                  props: ["priority": .string(priority), "status": .string(status)])
@@ -114,7 +114,7 @@ nonisolated extension SampleCastell.Maker {
         make("note-fair-layout", Kind.note, "Print fair: stall layout", mfm, 3, "10:00", collections: ["collection-print-fair"])
         make("event-fair", Kind.event, "Lewes print fair, March", mfm, 3, "10:00",
              props: ["starts_at": .string(Self.stamp(start + 90 * 86_400 + 9 * 3600))], collections: ["collection-print-fair"])
-        make("t-van", Kind.task, "Book the van for the print fair", raycast, 5, "10:00", due: 0, props: ["priority": "medium", "status": "pending"],
+        make("t-van", Kind.task, "Book the van for the print fair", raycast, 5, "10:00", due: 0, props: ["priority": "medium", "status": "not_started"],
              collections: ["collection-print-fair"])
 
         // The Feed.

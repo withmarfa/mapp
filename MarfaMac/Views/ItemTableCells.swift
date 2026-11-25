@@ -13,8 +13,7 @@ extension View {
     }
 }
 
-/// One cell of the table. A value a person picks, such as a status or a priority, is a menu that changes it in place;
-/// anything else is shown as it reads, and edited on the item's page or in Details.
+/// One table cell. An editable status opens its value panel, and other choices use a menu.
 ///
 /// The library is handed in rather than read from the environment: the table lays out its cells in views of its own,
 /// which do not always have the window's environment yet.
@@ -107,9 +106,9 @@ struct ItemTableCell: View {
         case .parent: links(row.parent.map { [$0] } ?? [])
         case .children: links(row.children)
         case .collections: links(row.collections)
-        case .created: date(row.item.created, isDue: false)
-        case .edited: date(row.item.modified, isDue: false)
-        case .occurred: date(row.item.occurred ?? row.item.created, isDue: false)
+        case .created: date(row.item.created, hasTime: true, isDue: false)
+        case .edited: date(row.item.modified, hasTime: true, isDue: false)
+        case .occurred: date(row.item.occurred ?? row.item.created, hasTime: true, isDue: false)
         case .tags: tags
         case .source:
             // Read live, since the server names a source after the rows were made.
@@ -187,12 +186,7 @@ struct ItemTableCell: View {
                 .foregroundStyle(row.item.isUntitled ? .secondary : .primary)
                 .truncationMode(.tail)
             // A list of both tiers says which items are the Feed's.
-            if row.item.tier == .feed, browser.listing.scope == .all {
-                Image(systemName: ItemMove.moveToFeed.symbol)
-                    .imageScale(.small)
-                    .foregroundStyle(.tertiary)
-                    .accessibilityLabel("Feed")
-            }
+            if row.item.tier == .feed, browser.listing.scope == .all { FeedMark() }
             if row.item.isFavorite {
                 Image(systemName: "star.fill")
                     .imageScale(.small)
@@ -245,8 +239,9 @@ struct ItemTableCell: View {
             }
         case .date:
             if let current {
-                if let day = ItemDate.parse(current)?.date {
-                    date(day, isDue: library.catalogue.isDueDate(field, of: row.item.type))
+                // A field's date is a day, even with a time: a task due at four today is due Today.
+                if let parsed = ItemDate.parse(current) {
+                    date(parsed.date, hasTime: false, isDue: library.catalogue.isDueDate(field, of: row.item.type))
                 } else {
                     Text(current).foregroundStyle(.secondary)
                 }
@@ -304,7 +299,7 @@ struct ItemTableCell: View {
     @ViewBuilder private func chip(_ value: String, field: ItemTypeInfo.Field) -> some View {
         let label = ItemTypeInfo.Field.label(ofOption: value)
         if column.style == .status {
-            PageChip(text: label, kind: .status(StatusSymbol(group: field.statusGroup(of: value)), chevron: false), size: .row)
+            PageChip(text: label, kind: .status(StatusSymbol(group: field.statusGroup(of: value))), size: .row)
         } else {
             PageChip(
                 text: label,
@@ -312,9 +307,11 @@ struct ItemTableCell: View {
         }
     }
 
-    /// A value from a fixed set: a menu of the others where it can be changed, the value alone where it cannot.
+    /// Editable values use the status panel or a menu. Read-only values use a chip.
     @ViewBuilder private func picked(_ field: ItemTypeInfo.Field, current: String?, editable: Bool) -> some View {
-        if editable {
+        if editable, column.style(for: field) == .status {
+            statusButton(field, current: current)
+        } else if editable {
             picker(field, current: current)
         } else if let current {
             chip(current, field: field)
@@ -353,6 +350,32 @@ struct ItemTableCell: View {
         .accessibilityValue(Text(current.map(ItemTypeInfo.Field.label(ofOption:)) ?? String(localized: "Not Set")))
     }
 
+    /// A status as the cell shows it, which opens the status panel under it, as a status does wherever it is seen.
+    private func statusButton(_ field: ItemTypeInfo.Field, current: String?) -> some View {
+        Button {
+            guard let view = anchor.view else { return }
+            // The panel takes the pointer without sending the cell an exit.
+            hover.clear()
+            StatusPanel.open(row.id, in: library, undoManager: undoManager, under: view)
+        } label: {
+            offering(HStack(spacing: 4) {
+                if let current {
+                    chip(current, field: field)
+                } else if isHovering {
+                    Text("Empty").foregroundStyle(.tertiary)
+                }
+                Spacer(minLength: 0)
+            })
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .padding(.horizontal, -bleed.horizontal)
+        .padding(.vertical, -bleed.vertical)
+        .accessibilityLabel(Text(field.label))
+        .accessibilityValue(Text(current.map(ItemTypeInfo.Field.label(ofOption:)) ?? String(localized: "Not Set")))
+        .accessibilityHint(Text("Opens a panel to change the status"))
+    }
+
     private func set(_ field: ItemTypeInfo.Field, _ value: PropertyValue?) {
         library.setItemProperty(row.id, key: field.key, value: value, undoManager: undoManager)
     }
@@ -377,13 +400,13 @@ struct ItemTableCell: View {
         }
     }
 
-    /// A day as people say it: Today, Yesterday, a weekday this week, then the date. A due date already past, on
-    /// work not finished, is red.
-    private func date(_ date: Date, isDue: Bool) -> some View {
+    /// A day as people say it: Today, Yesterday, a weekday this week, then the date, and, for the item's own stamps, the time of one that is today.
+    /// A due date already past, on work not finished, is red.
+    private func date(_ date: Date, hasTime: Bool, isDue: Bool) -> some View {
         let now = library.now()
         let isLate = isDue && date < Calendar.current.startOfDay(for: now)
             && library.catalogue.statusGroup(of: row.item)?.isFinished != true
-        return Text(DateDisplay.text(of: date, hasTime: false, place: .table, format: dateFormat, now: now))
+        return Text(DateDisplay.text(of: date, hasTime: hasTime, place: .table, format: dateFormat, now: now))
             .foregroundStyle(isLate ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
             .monospacedDigit()
     }

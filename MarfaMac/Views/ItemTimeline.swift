@@ -23,7 +23,7 @@ struct ItemTimeline: View {
         let groups = ItemTimelineLayout.groups(
             for: items, field: field, looks: looks, catalogue: library.catalogue, today: now)
         let list = RowList(
-            mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, day: Calendar.current.startOfDay(for: now))
+            mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: now))
         let contents = rowContents.contents(
             of: items, in: library, looks: browser.propertyLooks(in: library), list: list, shape: CardShape(leaving: field))
 
@@ -105,7 +105,7 @@ struct ItemTimeline: View {
                                     .frame(width: 148, alignment: .leading)
                                 timeColumn(row)
                                     .frame(width: 112, alignment: .leading)
-                                TimelineRowView(content: content)
+                                TimelineRowView(content: content, itemID: row.id)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .tag(row.id)

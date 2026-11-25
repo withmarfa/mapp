@@ -203,7 +203,7 @@ private struct StatusPin: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
             } label: {
-                PageChip(text: label, kind: .status(mark, chevron: false))
+                PageChip(text: label, kind: .status(mark))
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
@@ -213,7 +213,7 @@ private struct StatusPin: View {
             .accessibilityValue(label)
             .accessibilityIdentifier("ItemStatusPin")
         } else {
-            PageChip(text: label, kind: .status(mark, chevron: false))
+            PageChip(text: label, kind: .status(mark))
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Status")
                 .accessibilityValue(label)

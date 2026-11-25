@@ -10,10 +10,10 @@ import Testing
         var body: some View {
             VStack(alignment: .leading, spacing: 18) {
                 row("Status") {
-                    PageChip(text: "Not started", kind: .status(.notStarted, chevron: true))
-                    PageChip(text: "In progress", kind: .status(.inProgress, chevron: true))
-                    PageChip(text: "Done", kind: .status(.completed, chevron: false))
-                    PageChip(text: "Canceled", kind: .status(.canceled, chevron: false))
+                    PageChip(text: "Not started", kind: .status(.notStarted))
+                    PageChip(text: "In progress", kind: .status(.inProgress))
+                    PageChip(text: "Done", kind: .status(.completed))
+                    PageChip(text: "Canceled", kind: .status(.canceled))
                 }
                 row("Priority") {
                     ForEach(Array(["Low", "Medium", "High", "Urgent"].enumerated()), id: \.offset) { index, name in
@@ -28,7 +28,7 @@ import Testing
                 row("In a row") {
                     PageChip(text: "High", kind: .option(.orange), size: .row)
                     PageChip(text: "research", kind: .tag, size: .row)
-                    PageChip(text: "In progress", kind: .status(.inProgress, chevron: false), size: .row)
+                    PageChip(text: "In progress", kind: .status(.inProgress), size: .row)
                 }
                 row("Type and link, as a fact") {
                     MarkedName(text: "Task", icon: "lucide:check-square")

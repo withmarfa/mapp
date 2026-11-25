@@ -45,7 +45,7 @@ struct ItemGallery: View {
         // The picture's opening lines are drawn on the card when the preview allows them, so the line under the title
         // does not say them again.
         let shape = CardShape(dropsOpening: browser.cards.preview == .pictureOrText || browser.cards.preview == .text)
-        let list = RowList(date: .look, format: dateFormat, day: Calendar.current.startOfDay(for: library.now()))
+        let list = RowList(date: .look, format: dateFormat, marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: library.now()))
         let contents = cardContents.contents(of: sections.flatMap(\.items), in: library, looks: browser.propertyLooks(in: library), list: list, shape: shape)
         let attachments = CardAttachments.of(sections.flatMap(\.items), in: library, showsPicture: browser.cards.preview.showsPicture)
         keyboardCollection(sections, ids: ids, plan: plan(for: browser.cards, contents: contents, attachments: attachments))
@@ -69,9 +69,7 @@ struct ItemGallery: View {
             }
         }
         .filteredEmptyState(browser)
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
-        }
+        .onClockChange { daysSeen += 1 }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
     }
@@ -225,7 +223,7 @@ private struct GalleryCell: View {
             browser.open([item.id])
         })
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(item.displayTitle)
+        .accessibilityLabel(content.inFeed ? Text("\(item.displayTitle), Feed") : Text(item.displayTitle))
         .accessibilityValue(isSelected ? Text("Selected") : Text(""))
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(isSelected ? .isSelected : [])

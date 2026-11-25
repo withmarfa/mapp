@@ -29,7 +29,7 @@ struct ItemBoard: View {
                 // A card leaves off what its lane already says: the field the board is grouped by.
                 let list = RowList(
                     mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat,
-                    day: Calendar.current.startOfDay(for: library.now()))
+                    marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: library.now()))
                 let contents = cardContents.contents(
                     of: items, in: library, looks: browser.propertyLooks(in: library), list: list, shape: CardShape(leaving: lanes.key, groupsByStatus: grouped))
                 if shown.isEmpty, !items.isEmpty, lanes.all.contains(where: { !$0.items.isEmpty }) {
@@ -52,9 +52,7 @@ struct ItemBoard: View {
             if let cursor, !ids.contains(cursor) { self.cursor = nil }
             if let anchor, !ids.contains(anchor) { self.anchor = nil }
         }
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
-        }
+        .onClockChange { daysSeen += 1 }
     }
 
     /// Set in the View panel's Board section (`ViewPanelLayoutRows`).
@@ -328,7 +326,7 @@ private struct BoardCard: View, Equatable {
                         .foregroundStyle(.secondary)
                         .accessibilityLabel(content.typeLabel)
                 }
-                Text(verbatim: content.title)
+                (content.inFeed ? FeedMark.titled(content.title) : Text(verbatim: content.title))
                     .interfaceFont(.body.weight(.medium))
                     .foregroundStyle(.primary)
                     .lineLimit(3)
@@ -343,7 +341,7 @@ private struct BoardCard: View, Equatable {
                         .lineLimit(2)
                 }
                 if !content.chips.isEmpty || content.more > 0 {
-                    ChipLine(content: content)
+                    ChipLine(content: content, statusItem: item.id)
                         .padding(.top, 4)
                 }
             }
