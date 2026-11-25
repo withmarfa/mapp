@@ -22,7 +22,10 @@ struct BesideColumn: ViewModifier {
     func body(content: Content) -> some View {
         let isShown = browser.showsBesidePage(opening: opening)
         HStack(spacing: 0) {
-            content
+            // Neither side holds a least width. The split view adds the sidebar and the panel over the column to its least
+            // width, and they change as it lays out: with a table's columns and the page's fixed width under them it came
+            // to more than the window, which AppKit's constraint pass never settles, and the app aborted.
+            content.frame(minWidth: 0, maxWidth: .infinity)
             if isShown {
                 Divider()
                 // One container, so the column's frame, its corner and its accessibility element each apply once, to the
@@ -35,12 +38,14 @@ struct BesideColumn: ViewModifier {
                         Color.clear
                     }
                 }
-                .frame(width: Self.width)
+                .frame(minWidth: 0, idealWidth: Self.width, maxWidth: Self.width)
                 .frame(maxHeight: .infinity)
                 .overlay { BesideCorner(browser: browser) }
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(Text("Item"))
                 .accessibilityIdentifier("BesideColumn")
+                // The page takes its width first; the layout has what is left.
+                .layoutPriority(1)
             }
         }
         .onChange(of: isShown, initial: true) { browser.columnBeside(host, isShown: isShown) }

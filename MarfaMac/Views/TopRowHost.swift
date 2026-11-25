@@ -202,8 +202,6 @@ private struct TopRowTableProbe: NSViewRepresentable {
         private weak var table: NSTableView?
         private var observers: [any NSObjectProtocol] = []
         private var isPlacing = false
-        /// The scroll view's safe area as the insets last took it, so the sides move by what changes.
-        private var safeSides: NSEdgeInsets?
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -221,19 +219,11 @@ private struct TopRowTableProbe: NSViewRepresentable {
         func refresh() {
             guard window != nil, let table = nearestTable(), let scroll = table.enclosingScrollView else { return }
             if self.table !== table { follow(table, in: scroll) }
-            let room = space.lineHeight + space.restHeight
             if scroll.automaticallyAdjustsContentInsets { scroll.automaticallyAdjustsContentInsets = false }
-            // Switching the adjustment off freezes the sides at what they were, so a change of the safe area moves them
-            // here: a sidebar that floats over this column, shown or hidden, moves where the rows begin.
+            // With the adjustment off the sides are the safe area's, set here: a sidebar that floats over this column, shown
+            // or hidden, moves where the rows begin. Set outright, never by what changed, which would keep an error forever.
             let safe = scroll.safeAreaInsets
-            var wanted = scroll.contentInsets
-            wanted.top = room
-            if let last = safeSides {
-                wanted.left += safe.left - last.left
-                wanted.right += safe.right - last.right
-                wanted.bottom += safe.bottom - last.bottom
-            }
-            safeSides = safe
+            let wanted = NSEdgeInsets(top: space.lineHeight + space.restHeight, left: safe.left, bottom: safe.bottom, right: safe.right)
             let current = scroll.contentInsets
             if current.top != wanted.top || current.left != wanted.left || current.bottom != wanted.bottom || current.right != wanted.right {
                 let clip = scroll.contentView
@@ -250,7 +240,6 @@ private struct TopRowTableProbe: NSViewRepresentable {
         private func follow(_ table: NSTableView, in scroll: NSScrollView) {
             stop()
             self.table = table
-            safeSides = nil
             // The split view moves its columns, and a sidebar over this one changes its safe area, with no layout of this view.
             var ancestor: NSView? = scroll.superview
             while let view = ancestor, !(view is NSSplitView) { ancestor = view.superview }
