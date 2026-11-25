@@ -270,12 +270,21 @@ final class FakeItemLibrary: ItemLibrary {
     }
     func relationships(for id: ItemID) -> [ItemRelationship] { relationshipsByItem[id] ?? [] }
     /// What `relationFields(of:)` answers, by item.
-    var relationFieldsByItem: [ItemID: [RelationField]] = [:]
-    func relationFields(of id: ItemID) -> [RelationField] { relationFieldsByItem[id] ?? [] }
+    var relationFieldsByItem: [ItemID: [RelationField]] = [:] { didSet { membershipRevision += 1 } }
+    /// How many times `relationFields(of:)` was asked, which a panel must not do again for each key it reads.
+    @ObservationIgnored private(set) var relationFieldReads = 0
+    func relationFields(of id: ItemID) -> [RelationField] {
+        relationFieldReads += 1
+        return relationFieldsByItem[id] ?? []
+    }
     func childIDs(of id: ItemID) -> [ItemID] { items.filter { $0.parentID == id }.map(\.id) }
-    func relationshipCandidates(for id: ItemID, field: String) -> [Item] { [] }
+    /// What `relationshipCandidates(for:field:)` answers, by item.
+    var candidatesByItem: [ItemID: [Item]] = [:]
+    func relationshipCandidates(for id: ItemID, field: String) -> [Item] { candidatesByItem[id] ?? [] }
     /// The refusal for each (item, other) a test sets; any other link is taken.
     var refusals: [ItemID: [ItemID: String]] = [:]
+    /// What `changeLinks` answers whatever it is asked, where a test sets one.
+    var linkAnswer: EdgeVerdict?
     /// The refusal for a new item filed under each parent a test sets.
     var childRefusals: [ItemID: String] = [:]
     /// Waits before `newChildVerdict` answers, as the core's check does for a moment.
@@ -284,9 +293,9 @@ final class FakeItemLibrary: ItemLibrary {
         await checkingParent?()
         return childRefusals[parent].map { .refused($0) } ?? .taken
     }
-    func relationshipVerdict(for id: ItemID, field: String, to other: ItemID) async -> EdgeVerdict {
-        refusals[id]?[other].map { .refused($0) } ?? .taken
-    }
+    /// What `linkTakenFrom` answers for each (item chosen, field) a test sets.
+    var takenFrom: [ItemID: ItemID] = [:]
+    func linkTakenFrom(_ other: ItemID, field: String, for id: ItemID) -> ItemID? { takenFrom[other] }
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] { [] }
     /// The items each type may be made under, by type.
     var parentCandidates: [String: [ItemID]] = [:]
@@ -491,6 +500,8 @@ final class FakeItemLibrary: ItemLibrary {
     func tookPropertyWrite(_ mark: Int) -> Bool { false }
     func changeLinks(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> EdgeVerdict {
         relationshipWrites.append((id, field, adding, removing))
+        if let answer = linkAnswer { return answer }
+        if let reason = adding.lazy.compactMap({ self.refusals[id]?[$0] }).first { return .refused(reason) }
         return acceptsRelationships ? .taken : .refused("Refused.")
     }
 

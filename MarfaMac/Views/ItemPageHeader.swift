@@ -136,10 +136,10 @@ struct ItemPageHeader: ViewModifier {
                 guard editor.isShowing(id), let item = library.item(id) else { return }
                 // An item that cannot be edited has no panel to change the parent in; the pin then only opens it.
                 guard item.allows(.links) else {
-                    if let target = Self.parent(in: library.relationships(for: id))?.targets.first?.itemID { editor.onOpenItem(target) }
+                    if let target = Self.parent(in: library.relationships(for: id))?.targets.first?.itemID { editor.follow(target) }
                     return
                 }
-                editor.presentEditor(Self.request(.parent, of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
+                editor.presentEditor(Self.request(.relation(PagePlacement.parent), of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
             case .edit(let row, let id, let rect):
                 Self.openValue(of: row, in: id, under: rect, library: library, drafts: drafts, undoManager: undoManager, editor: editor)
             case .fieldMenu(let row, let editsValue, let id, let rect):
@@ -159,37 +159,35 @@ struct ItemPageHeader: ViewModifier {
                 guard editor.isShowing(id), let type = library.item(id)?.type, row != PagePlacement.when else { return }
                 // The order is every row this item lists, folded ones too, as the drag left them. The type's saved order
                 // takes it for those rows and keeps the place of every row the item does not list.
-                PagePlacements.update { $0.setDraggedOrder(order.filter { $0 != PagePlacement.when }, of: type) }
+                PagePlacements.update { $0.setDraggedOrder(order.filter { $0 != PagePlacement.when && !$0.hasPrefix(PropertyRow.otherPrefix) }, of: type) }
             }
         }
     }
 
-    /// Opens the panel for one of the item's values under `rect`, or toggles a yes or no, which has no panel.
+    /// Opens the panel for one of the item's values under `rect`.
     private static func openValue(
         of row: String, in id: ItemID, under rect: CGRect, library: any ItemLibrary, drafts: DetailsPresentation,
         undoManager: UndoManager?, editor: EditorController
     ) {
         guard editor.isShowing(id), let item = library.item(id) else { return }
+        let catalogue = library.catalogue
         let kind: ValueEditKind?
         switch row {
         case PagePlacement.tags:
             kind = item.allows(.tags) ? .tags : nil
-        case PagePlacement.parent:
-            kind = item.allows(.links) ? .parent : nil
-        case MarfaMapping.collectionEdge:
-            kind = library.canJoinCollection(item) ? .collections : nil
+        case EventTime.rowID:
+            kind = EventTime.of(item.type, in: catalogue).flatMap { item.allows(.fields) ? ValueEditKind.eventTime($0) : nil }
         case ItemLocation.rowID:
             // A Location with no point and no way to set one has nothing to open.
-            let location = ItemLocation.of(library.catalogue.itemTypes[item.type])
+            let location = ItemLocation.of(catalogue.itemTypes[item.type])
             kind = location.flatMap { item.allows(.fields) || $0.hasPoint(item) ? ValueEditKind.location($0) : nil }
         default:
-            let field = library.catalogue.itemTypes[item.type]?.fields.first { $0.key == row }
-            // A yes or no is a toggle, not a panel.
-            if let field, field.kind == .boolean, item.allows(.fields) {
-                library.setItemProperty(id, key: row, value: .bool(!InspectorFields.isYes(item.value(of: row))), undoManager: undoManager)
-                return
+            // A link the item may hold, or a field of its type.
+            if let link = library.relationFields(of: id).first(where: { $0.field == row }) {
+                kind = link.editability == .editable ? .relation(row) : nil
+            } else {
+                kind = item.allows(.fields) ? catalogue.itemTypes[item.type]?.fields.first { $0.key == row }.flatMap(ValueEditKind.init(field:)) : nil
             }
-            kind = field.flatMap(ValueEditKind.init(field:))
         }
         guard let kind else { return }
         var request = Self.request(kind, of: id, in: library, undoManager: undoManager, editor: editor)
@@ -277,7 +275,7 @@ struct ItemPageHeader: ViewModifier {
             guard let key = kind.field?.key else { return false }
             return library.setItemProperty(id, key: key, value: value, undoManager: undoManager)
         }
-        request.open = { [weak editor] in editor?.onOpenItem($0) }
+        request.open = { [weak editor] in editor?.follow($0) }
         return request
     }
 

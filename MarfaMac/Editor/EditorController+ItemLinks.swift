@@ -66,11 +66,15 @@ extension EditorController {
         }
     }
 
+    /// Opens an item the page links to as Settings > General > Open Items says: a link in the text, a row or the foot, or
+    /// one in a panel.
+    func follow(_ id: ItemID) { (onFollowItemLink ?? onOpenItem)(id) }
+
     /// Shows the item a link names: a heading of the item on the page scrolls to it, any other item opens as a link in
     /// the text does.
     private func show(_ id: ItemID, heading: String?) {
         pendingHeading = heading.map { (id, $0) }
-        if id == pageItemID { revealPendingHeading(in: id) } else { (onFollowItemLink ?? onOpenItem)(id) }
+        if id == pageItemID { revealPendingHeading(in: id) } else { follow(id) }
     }
 
     /// A menu at the pointer naming each item a link could mean, by title.

@@ -25,8 +25,8 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 
 - **One head, built once.** `PageHead` decides the kicker, pins and rows; `editor/src/header.ts` draws them on a page with text, `PageHeadView` on a saved web page, which has no menu or drag. A rule added in one drawing must be added in the other.
 - **The kicker** is the type's mark and name, then Read Only, Feed or Archived where true. Its name opens Change Type where the item can change type.
-- **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset and hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
-- **A type that keeps no text shows its first six rows.**
+- **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset, hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
+- **A type that keeps no text shows its first six rows,** empty or not.
 - **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
 - **An event's time is one row, When,** always first, with how far off it is or All Day in grey.
 - **Long text stops after two lines;** an email, a phone and a number to call open.
@@ -96,9 +96,9 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 ## Text and links
 
 - **A plain click on a link places the caret**, because the page is for writing. Command-click, or Open Link at the caret, opens it.
-- **A link to an item opens as Settings says** (`ItemOpening`), and one followed in the modal stays there. A link in the property block or in Linked From shows the item in the list.
-- **Opening is refused for an address that may not be opened**, such as a script, and the rest of the link's menu stays.
+- **A link to an item opens as Settings says** (`ItemOpening`), and one followed in the modal stays there. So does a link in a row, the foot or a panel (`EditorController.follow`).
 - **Every look of a link reads the same under the pointer** (`LinkLook`), and a link to nothing keeps its dashes in all of them.
+- **Opening is refused for an address that may not be opened**, such as a script, and the rest of the link's menu stays.
 - **Removing a link keeps its words.**
 
 ## Files and saved web pages

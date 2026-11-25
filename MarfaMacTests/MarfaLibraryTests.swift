@@ -218,7 +218,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(parent.label == "Parent")
         #expect(parent.targets.map(\.itemID) == [F.p1])
         #expect(parent.targets.first?.title == "Alpha")
-        #expect(!parent.allowsMultiple)
         #expect(parent.isEditable)
         #expect(task.first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [F.t1])
         #expect(task.first { $0.field == "inverse:parent-of" }?.label == "Children")
@@ -233,7 +232,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         let note = library.relationships(for: F.n1)
         #expect(note.first { $0.field == "about" }?.label == "About")
-        #expect(note.first { $0.field == "about" }?.allowsMultiple == true)
         #expect(!note.contains { $0.field == "supersedes" })
         #expect(library.bodyMentions(for: F.n1).map(\.itemID) == [F.t1])
     }
@@ -241,7 +239,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func candidatesFollowTheCatalogueAndLeaveCyclesToTheCoresCheck() async throws {
         let (library, _) = try await loaded()
         // Not itself or anything in the bin. The task below it is offered: whether a link closes a cycle is the core's
-        // to say (`relationshipVerdict`), not this list's.
+        // to say when the link is changed, not this list's.
         #expect(Set(ids(library.relationshipCandidates(for: F.e1, field: "child-of"))) == [F.p1, F.n1, F.n2, F.en1, F.f1, F.p2, F.t1])
         #expect(Set(ids(library.relationshipCandidates(for: F.t1, field: "inverse:parent-of"))) == [F.n1, F.n2, F.en1, F.f1, F.p2, F.p1, F.e1])
         #expect(ids(library.relationshipCandidates(for: F.e1, field: "supersedes")) == [F.t1])
@@ -772,7 +770,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
             Edge(id: EdgeID("s1"), type: "supersedes", from: ItemID("t2"), to: .item(F.t1), origin: .property("supersedes")),
         ])
         let (library, source) = try await loaded(F.items + [bug2])
-        #expect(library.relationships(for: F.t1).first { $0.field == "inverse:supersedes" }?.allowsMultiple == false)
         // The first bug is already superseded by the second. That link is the second bug's own, so the task does
         // not take it: the person is told which item holds it, and nothing is sent.
         library.notices.answerAll()
@@ -811,19 +808,19 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.asked.withLock { $0 } == [.moved(EdgeID("s1"), .to, F.t1)])
     }
 
-    /// The core is asked of a replacement as a move and of every other link as a new one, whichever the picker asks.
+    /// The core is asked of a replacement as a move and of every other link as a new one.
     @Test func theCoreIsAskedOfAMoveForAReplacementAndOfANewLinkForAnAdd() async throws {
         let (library, source) = try await loaded()
-        #expect(await library.relationshipVerdict(for: F.t1, field: "child-of", to: F.p2) == .taken)
-        #expect(await library.relationshipVerdict(for: F.n1, field: "about", to: F.p2) == .taken)
-        #expect(source.asked.withLock { $0 }
-            == [.moved(EdgeID("c2"), .from, F.p2), .added(EdgeDraft(type: "about", from: F.n1, to: F.p2))])
-        // The core refuses the move: the row is refused with its words, and a change is told the same and sends nothing.
+        // The core refuses the move: a change is told its words and sends nothing.
         source.moveRefusals.withLock { $0[EdgeID("c2")] = "That would close a cycle." }
-        #expect(await library.relationshipVerdict(for: F.t1, field: "child-of", to: F.p2) == .refused("That would close a cycle."))
-        #expect(await library.changeLinks(F.t1, field: "child-of", adding: [F.p2], removing: [F.e1], undoManager: nil) != .taken)
+        #expect(await library.changeLinks(F.t1, field: "child-of", adding: [F.p2], removing: [F.e1], undoManager: nil) == .refused("That would close a cycle."))
         #expect(library.notices.waiting.last?.message == "That would close a cycle.")
         #expect(source.writes.isEmpty)
+        #expect(source.asked.withLock { $0 } == [.moved(EdgeID("c2"), .from, F.p2)])
+        source.moveRefusals.withLock { $0[EdgeID("c2")] = nil }
+        #expect(await source.taking { await library.changeLinks(F.n1, field: "about", adding: [F.p2], removing: [], undoManager: nil) } == .taken)
+        #expect(source.asked.withLock { $0 }
+            == [.moved(EdgeID("c2"), .from, F.p2), .added(EdgeDraft(type: "about", from: F.n1, to: F.p2))])
     }
 
     /// A refusal the copy could not foresee, such as a cycle through rows outside it, is the server's: it is told in the

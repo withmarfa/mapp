@@ -647,6 +647,37 @@ test('a long list of linked items expands, and folds again', () => {
   expect(section.querySelectorAll('.item-linked-row')).toHaveLength(3)
 })
 
+test('a row of many links draws the first the app names, then a button that draws the rest', () => {
+  const items = Array.from({ length: 5 }, (_, index) => ({
+    title: `Item ${index}`,
+    item: `i${index}`,
+    symbol: 'doc',
+    kind: 'link' as const,
+    tone: 'blue',
+  }))
+  header.set({
+    ...ticket,
+    rows: [
+      {
+        id: 'blocks',
+        label: 'Blocks',
+        symbol: 'link',
+        kind: 'items',
+        items,
+        itemsAfter: 3,
+        moreItems: '2 More',
+      },
+    ],
+  })
+  const count = () => root.querySelectorAll('.item-prop-value .item-chip').length
+  expect(count()).toBe(3)
+  const more = root.querySelector<HTMLButtonElement>('.item-more-items')!
+  expect(more.textContent).toBe('2 More')
+  more.click()
+  expect(count()).toBe(5)
+  expect(root.querySelector('.item-more-items')).toBeNull()
+})
+
 test('the title is told how many lines to show', () => {
   header.set({ ...ticket, titleLines: 4 })
   expect(root.style.getPropertyValue('--title-lines')).toBe('4')
@@ -1044,6 +1075,21 @@ test('a page with every row folded keeps Show More and draws no hairline until a
   expect(box.classList.contains('bare')).toBe(true)
   box.querySelector<HTMLButtonElement>('.item-more')!.click()
   expect(box.classList.contains('bare')).toBe(false)
+})
+
+test('rows the app puts under a heading come last under it, and are not dragged', () => {
+  const other = { ...rows(1)[0]!, id: 'other:odd', label: 'Odd', folded: true, section: 'Other' }
+  header.set({ ...ticket, rows: [...rows(2), other], showMore: 'Show 1 More' })
+  expect(root.querySelector('.item-prop-sections')!.hasAttribute('hidden')).toBe(true)
+  root.querySelector<HTMLButtonElement>('.item-rows > .item-more')!.click()
+  const section = root.querySelector('.item-prop-section')!
+  expect(section.querySelector('.item-prop-heading')!.textContent).toBe('Other')
+  expect(section.querySelectorAll('.item-prop')).toHaveLength(1)
+  expect(
+    root
+      .querySelector('.item-props:not(.item-prop-section .item-props)')!
+      .querySelectorAll('.item-prop'),
+  ).toHaveLength(2)
 })
 
 test("a long text is a row cut after two lines, and an event's When says how far off it is in grey", () => {

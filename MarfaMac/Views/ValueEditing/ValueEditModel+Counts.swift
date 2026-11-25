@@ -4,14 +4,13 @@ import Marfa
 extension ValueEditModel {
     /// The collections the panel lists now, whose member counts it shows beside them.
     var listedCollections: [ItemID] {
-        guard kind == .collections else { return [] }
-        return rows.compactMap { $0.id.hasPrefix(Self.collectionPrefix) ? ItemID(String($0.id.dropFirst(Self.collectionPrefix.count))) : nil }
+        guard case .relation = kind else { return [] }
+        return rows.compactMap { row in linkTarget(of: row.id).flatMap { isCollection($0) ? $0 : nil } }
     }
 
     /// The count beside a collection's row, or nil until Marfa has answered, so the row draws nothing in its place.
     func countText(of row: ValueListRow) -> String? {
-        guard kind == .collections, row.id.hasPrefix(Self.collectionPrefix) else { return nil }
-        let id = ItemID(String(row.id.dropFirst(Self.collectionPrefix.count)))
+        guard case .relation = kind, let id = linkTarget(of: row.id), isCollection(id) else { return nil }
         return library.counts.answer(of: id, .members).map { $0.total.formatted() }
     }
 
@@ -29,5 +28,9 @@ extension ValueEditModel {
     func releaseCounts() {
         library.counts.release(countedCollections, .members)
         countedCollections = []
+    }
+
+    private func isCollection(_ id: ItemID) -> Bool {
+        library.item(id).map { library.catalogue.isCollection($0.type) } ?? false
     }
 }

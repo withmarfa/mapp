@@ -26,6 +26,8 @@ nonisolated enum ValueEditMetrics {
     /// A chip in the find field: 22 points high with the field's 7 point corners, in a line of 28.
     static let chipHeight: CGFloat = 22
     static let fieldLine: CGFloat = 28
+    /// The most lines of chips the find field shows before it scrolls.
+    static let chipLines = 8
 
     /// The least and most a panel is wide for what it holds, at the default text size: a list is as wide as its longest
     /// row, a calendar as wide as its seven days. A typed value has none; its panel follows the value.
@@ -41,7 +43,7 @@ nonisolated enum ValueEditMetrics {
         case .status: 250...300
         case .choice: 170...260
         case .type: 230...264
-        case .parent, .collections: 200...264
+        case .relation: 210...210
         case .text, .number: nil
         }
     }
