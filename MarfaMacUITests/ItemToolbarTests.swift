@@ -73,23 +73,24 @@ nonisolated final class ItemToolbarTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    @MainActor func testViewOptionsOffersSortByAndGroupBy() {
+    @MainActor func testViewPanelOffersSortAndGroup() {
         control("ViewOptionsToolbar").click()
-        let sortBy = window.menuItems["Sort by"].firstMatch
-        let groupBy = window.menuItems["Group by"].firstMatch
-        XCTAssertTrue(sortBy.waitForExistence(timeout: 3))
-        XCTAssertTrue(groupBy.exists)
-        XCTAssertLessThan(sortBy.frame.minY, groupBy.frame.minY)
-        XCTAssertFalse(control("IncludeSubtypesToolbar").exists, "Include Subtypes is in the menu, not on the toolbar")
-        XCTAssertFalse(window.menuItems["Gallery"].exists, "View As has the views now")
-        XCTAssertFalse(window.menuItems["View As"].exists)
-        sortBy.hover()
-        for title in ["Date Edited", "Date Created", "Title"] {
-            XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), "\(title) is in the Sort by submenu")
-        }
-        capture("View Options menu")
+        let panel = window.descendants(matching: .any)["ViewPanel"]
+        XCTAssertTrue(panel.waitForExistence(timeout: 3))
+        let sort = control("ViewPanelSortRow")
+        let group = control("ViewPanelGroupRow")
+        XCTAssertTrue(sort.exists)
+        XCTAssertTrue(group.exists)
+        XCTAssertLessThan(sort.frame.minY, group.frame.minY)
+        XCTAssertFalse(control("IncludeSubtypesToolbar").exists, "Include Subtypes is in the panel, not on the toolbar")
+        XCTAssertTrue(control("ViewAsGallery").exists, "the panel's tiles hold the layouts")
+        sort.click()
+        XCTAssertTrue(control("ViewPanelAddSort").waitForExistence(timeout: 3), "Sort opens in place")
+        capture("View panel Sort")
         app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(control("ViewPanelSortRow").waitForExistence(timeout: 3), "Escape goes back to the first page")
         app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(panel.waitForNonExistence(timeout: 3))
     }
 
     @MainActor func testMoreHoldsTheItemActionsInOrder() {
@@ -153,7 +154,7 @@ nonisolated final class ItemToolbarTests: XCTestCase {
         let viewOptions = control("ViewOptionsToolbar")
         let details = control("DetailsToggle")
         let newItem = control("SidebarNew")
-        XCTAssertTrue(viewOptions.exists, "View Options stays reachable in the gallery")
+        XCTAssertTrue(viewOptions.exists, "View stays reachable in the gallery")
         XCTAssertTrue(newItem.exists, "New stays reachable in the gallery, from the sidebar")
         XCTAssertTrue(details.exists, "the card selected in the list is still selected, so the panel has something to show")
         XCTAssertFalse(control("ShareToolbar").exists, "a layout that spans the window has only Search, View and Panel")
@@ -173,17 +174,17 @@ nonisolated final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForNonExistence(timeout: 3))
     }
 
-    @MainActor func testViewAsShowsTheTableWithItsViewOptions() {
+    @MainActor func testViewAsShowsTheTableWithItsViewPanel() {
         show("View as Table")
         let table = control("ItemTable")
         XCTAssertTrue(table.waitForExistence(timeout: 3))
         XCTAssertFalse(window.outlines["ItemList"].exists, "the table spans the window")
         XCTAssertFalse(window.webViews.firstMatch.exists)
         control("ViewOptionsToolbar").click()
-        for title in ["Sort by", "Group by", "Columns"] {
-            XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), title)
+        for id in ["ViewPanelSortRow", "ViewPanelGroupRow", "ViewPanelPropertiesRow", "ViewPanelTableRows"] {
+            XCTAssertTrue(control(id).waitForExistence(timeout: 3), id)
         }
-        capture("Table View Options menu")
+        capture("Table View panel")
         app.typeKey(.escape, modifierFlags: [])
         show("View as Gallery")
         XCTAssertTrue(control("ItemGallery").waitForExistence(timeout: 3))

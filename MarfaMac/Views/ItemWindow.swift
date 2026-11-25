@@ -164,7 +164,7 @@ struct ItemWindow: View {
             if let id {
                 ItemInspectorHost(itemID: id, details: details, editor: editor)
                     .panelEdgeThroughToolbar()
-                    .toolbar { InspectorToolbar(details: details, editor: editor) }
+                    .toolbar { InspectorToolbar(details: details) }
             }
         }
     }

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The filters of the open place as the row above its list shows them: a chip for each clause, a locked chip for each
-/// condition a saved view holds that the window has no filter for, and the +. Once the row holds two filters a pop-up leads
+/// The Items page's filters, as the row under its tabs shows them: a chip for each clause and the +. A list's place
+/// changes its filters in the View panel instead (`ViewPanelFilter`). Once the row holds two filters a pop-up leads
 /// it (All or Any); a date relative to today is named at its trailing end, and what a view cannot keep under the chips. It
 /// works the place's table out only while it shows, so a place nobody filtered never builds one for a layout that does not
 /// need it.
@@ -17,7 +17,7 @@ struct FilterRow: View {
     private static let chipPrefix = "clause."
 
     var body: some View {
-        if browser.showsFilterRow {
+        if browser.showsIndexFilterRow {
             let content = browser.tableContent(in: library)
             let state = (browser.tableOptions[browser.shown] ?? ItemTableOptions()).filter
             let offer = content.filterOffer
@@ -34,12 +34,6 @@ struct FilterRow: View {
                 remove: { remove($0) },
                 add: { openFields() }
             )
-            .onChange(of: browser.isAddFilterRequested, initial: true) {
-                guard browser.isAddFilterRequested else { return }
-                browser.isAddFilterRequested = false
-                // The row is laid out first, so the + has a view to open under.
-                DispatchQueue.main.async { openFields() }
-            }
             .onChange(of: browser.shown.memoryKey) { FilterPanelPresenter.shared.dismiss(restoringFocus: false) }
         }
     }
@@ -138,7 +132,7 @@ struct FilterRow: View {
                 browser.dropUnfinishedFilters()
             }
         ) {
-            FilterClausePanelHost(browser: browser, index: at)
+            FilterConditionEditor(browser: browser, index: at)
                 .environment(\.library, library)
         }
         // The click that closed this panel asked to open it again: it stays closed.
@@ -150,7 +144,7 @@ struct FilterRow: View {
         let offer = content.filterOffer
         let state = (browser.tableOptions[browser.shown] ?? ItemTableOptions()).filter
         func option(_ target: FilterTarget) -> FilterFieldOption {
-            FilterFieldOption(id: target.id, title: target.label, symbol: Self.symbol(of: target))
+            FilterFieldOption(id: target.id, title: target.label, symbol: target.symbol)
         }
         var sections: [FilterFieldSection] = []
         if !offer.placeFields.isEmpty {
@@ -175,38 +169,6 @@ struct FilterRow: View {
 
     /// The count of conditions at which Filter By starts to say how many a view keeps.
     private static let footerFrom = 8
-
-    static func symbol(of target: FilterTarget) -> String {
-        switch target.id {
-        case ItemTableColumn.type.id: "square.grid.2x2"
-        case ItemTableColumn.tags.id: "tag"
-        case ItemTableColumn.collections.id: "square.stack"
-        case ItemTableColumn.parent.id: "link"
-        case FilterTarget.source.id: "antenna.radiowaves.left.and.right"
-        case ItemTableColumn.created.id: "calendar.badge.plus"
-        case ItemTableColumn.edited.id: "calendar.badge.clock"
-        case ItemTableColumn.occurred.id: "clock"
-        default: target.field.map { PageLayout.symbol(of: $0) } ?? "line.3.horizontal.decrease"
-        }
-    }
-}
-
-/// Names the items a clause's values hold by identifier: a type, a parent, a collection.
-@MainActor
-private struct FilterTitles {
-    private let titles: [String: String]
-
-    init(content: ItemTableContent) {
-        var titles: [String: String] = [:]
-        for row in content.allRows {
-            titles[row.item.type.rawValue] = row.typeLabel
-            if let parent = row.parent { titles[parent.id.rawValue] = parent.title }
-            for collection in row.collections { titles[collection.id.rawValue] = collection.title }
-        }
-        self.titles = titles
-    }
-
-    func title(of id: String) -> String? { titles[id] }
 }
 
 /// The answer to filters that hide every item, in the layouts that have no empty state of their own for it.
@@ -226,13 +188,6 @@ struct FilteredEmptyState: View {
 }
 
 extension View {
-    /// The place's filter row above the content, while the window shows it.
-    func filterChips(_ browser: Browser) -> some View {
-        safeAreaBar(edge: .top, spacing: 0) {
-            FilterRow(browser: browser)
-        }
-    }
-
     /// Says so, with Clear Filters, where the place's filters hide every item.
     func filteredEmptyState(_ browser: Browser) -> some View {
         overlay { FilteredEmptyState(browser: browser) }

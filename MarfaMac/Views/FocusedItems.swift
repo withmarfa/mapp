@@ -58,11 +58,6 @@ final class DetailsPresentation {
     var fieldEdit: FieldEditRequest?
     /// Version History, while the window shows it in place of its page.
     private(set) var history: VersionHistoryMode?
-    /// Whether the window's right sidebar is editing a view (`ViewPanel`), in place of the item's panel. The panel itself
-    /// is the browser's; this holds the sidebar for it and gives it back.
-    private(set) var isEditingView = false
-    /// Whether closing the view panel closes the sidebar, because opening it opened the sidebar.
-    @ObservationIgnored private var closesSidebarAtViewEnd = false
     /// The items the window's Add to Collection panel is asked for.
     var collectionPick: CollectionPickRequest?
     /// The items the window's Add Tag panel is asked for.
@@ -238,24 +233,9 @@ final class DetailsPresentation {
         history = nil
     }
 
-    /// Shows the sidebar, which takes the view panel, and remembers to close it again if it was closed.
-    func beginViewPanel() {
-        guard !isEditingView else { return }
-        closesSidebarAtViewEnd = !isPresented
-        isEditingView = true
-        isPresented = true
-    }
-
-    func endViewPanel() {
-        guard isEditingView else { return }
-        isEditingView = false
-        if closesSidebarAtViewEnd { isPresented = false }
-        closesSidebarAtViewEnd = false
-    }
-
-    /// Whether the person has the sidebar open, for the next launch: a sidebar only the view panel opened is not.
+    /// Whether the person has the sidebar open, for the next launch.
     var isPresentedByPerson: Bool {
-        isPresented && !(isEditingView && closesSidebarAtViewEnd)
+        isPresented
     }
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {

@@ -97,9 +97,15 @@ extension Browser {
         undoManager?.removeAllActions(withTarget: panel)
     }
 
-    /// The server can be reached again, so a later stretch without it is told again.
+    /// The server can be reached again: each view a write could not reach it for is written now, or when the window
+    /// shows it again, and a later stretch without it is told again.
     func reachabilityChanged(in library: any ItemLibrary) {
-        if library.reachesServer { toldOffline.removeAll() }
+        guard library.reachesServer else { return }
+        let waiting = toldOffline
+        toldOffline.removeAll()
+        for id in waiting {
+            if shown.isSame(.saved(id)) { scheduleWrite(of: id) } else { pendingViewWrites.insert(id) }
+        }
     }
 
     /// The window moved to another place, whose choices an Undo must not touch.
@@ -268,7 +274,7 @@ extension Browser {
             if toldOffline.insert(id).inserted {
                 library.notices.tell(
                     String(localized: "View Not Saved"),
-                    String(localized: "Your Marfa server can’t be reached, so the view is as it was. The window keeps your change, and the next change saves it once the server is back."))
+                    String(localized: "Your Marfa server can’t be reached. The window keeps your change and saves it once the server is back."))
             }
             return
         }
@@ -315,7 +321,10 @@ extension Browser {
             case .conflict:
                 undoManager?.removeAllActions(withTarget: self)
                 viewRefused(id, in: library)
-            case .offline, .gone, .notPermitted, .refused:
+            case .offline:
+                // The library has told the person; the change is written once the server is back.
+                toldOffline.insert(id)
+            case .gone, .notPermitted, .refused:
                 break
             }
         }

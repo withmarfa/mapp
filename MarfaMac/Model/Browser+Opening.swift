@@ -1,17 +1,18 @@
 import Foundation
 
-/// Opening an item the way Settings > General > Open Items says (`ItemOpening`): beside the list, in the modal over
-/// the window, as a full page, or in a window of its own. Every layout and the list open through here.
+/// Opening an item the way the place's Open Items, or Settings > General > Open Items, says (`ItemOpening`): beside
+/// the list, in the modal over the window, as a full page, or in a window of its own. Every layout and the list open
+/// through here.
 extension Browser {
     /// Whether an item is open in the modal.
     var isModalPresented: Bool { modalItem != nil }
 
-    /// Opens `ids` as `way`, or as Settings says when none is given. A column, a modal and a full page need exactly
+    /// Opens `ids` as `way`, or as the place says when none is given (`itemOpening`). A column, a modal and a full page need exactly
     /// one item; windows take every item chosen (the ask before many is the window opener's).
     /// Whether it opened anything, which a key handler answers with.
     @discardableResult
     func open(_ ids: Set<ItemID>, as way: ItemOpening? = nil, defaults: UserDefaults = .standard) -> Bool {
-        let way = way ?? ItemOpening.stored(in: defaults)
+        let way = way ?? itemOpening(defaults: defaults)
         guard way.canOpen(ids.count), let id = ids.first else { return false }
         switch way {
         case .newWindow: windowOpener?(ids)
@@ -44,7 +45,7 @@ extension Browser {
     /// How a link followed from a page in a layout that spans the window opens: where the page already is, beside
     /// the layout, with Beside the List, and as a full page otherwise, since the modal and a window are chosen apart.
     func wayToFollowInCollection(defaults: UserDefaults = .standard) -> ItemOpening {
-        ItemOpening.stored(in: defaults) == .besideList ? .besideList : .fullPage
+        itemOpening(defaults: defaults) == .besideList ? .besideList : .fullPage
     }
 
     private func presentModal(_ id: ItemID) {

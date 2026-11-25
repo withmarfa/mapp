@@ -86,6 +86,10 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     var archived: ArchivedItems?
     /// Whether a type lists its kinds; nil lists them.
     var includesKinds: Bool?
+    /// Whether the rows offer their quick actions; nil follows the place (`ViewMacSettings.showsQuickActions`).
+    var quickActions: Bool?
+    /// Where the place opens its items; nil follows Settings.
+    var opening: ItemOpening?
 
     init() {}
 
@@ -111,6 +115,9 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         scope = try container.decodeIfPresent(String.self, forKey: .scope).flatMap(ListScope.init(rawValue:))
         archived = try container.decodeIfPresent(String.self, forKey: .archived).flatMap(ArchivedItems.init(rawValue:))
         includesKinds = try container.decodeIfPresent(Bool.self, forKey: .includesKinds)
+        quickActions = try container.decodeIfPresent(Bool.self, forKey: .quickActions)
+        // A way this version does not know follows Settings.
+        opening = try container.decodeIfPresent(String.self, forKey: .opening).flatMap(ItemOpening.init(rawValue:))
     }
 
     var isEmpty: Bool { self == PlaceDefault() }
@@ -134,6 +141,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         filled.scope = scope ?? other.scope
         filled.archived = archived ?? other.archived
         filled.includesKinds = includesKinds ?? other.includesKinds
+        filled.quickActions = quickActions ?? other.quickActions
+        filled.opening = opening ?? other.opening
         return filled
     }
 

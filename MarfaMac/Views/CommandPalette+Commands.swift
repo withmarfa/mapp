@@ -202,11 +202,6 @@ extension CommandPalette {
             for command in SavedViewCommand.commands(for: browser, in: library, order: order) {
                 add(command.title, command.systemImage, in: .view, action: command.action)
             }
-            if browser.showsViewPanel {
-                add(String(localized: "Finish Editing View"), "checkmark", in: .view) {
-                    Task { await browser.finishViewPanel(in: library, order: order) }
-                }
-            }
             if browser.customizesSidebar {
                 add(String(localized: "Finish Customizing Sidebar"), "checkmark", in: .view) { browser.customizesSidebar = false }
             } else {

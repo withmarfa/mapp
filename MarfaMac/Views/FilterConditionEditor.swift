@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// A clause's panel content, read from the window as it is now, so a pick shows in it at once: the operators of the field,
-/// and the control its value needs.
-struct FilterClausePanelHost: View {
+/// A condition's editor, read from the window as it is now, so a pick shows in it at once: the operators of the field,
+/// and the control its value needs. The View panel's Filter and the Items page's filter row open it. The View panel
+/// offers no operator relative to today (`offersRelative`), which a saved view cannot keep.
+struct FilterConditionEditor: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
     let index: Int
+    var offersRelative = true
 
     var body: some View {
         let content = browser.tableContent(in: library)
@@ -13,7 +15,7 @@ struct FilterClausePanelHost: View {
         if state.clauses.indices.contains(index), let target = content.filterOffer.targets[state.clauses[index].field] {
             let clause = state.clauses[index]
             FilterClausePanel(
-                field: target.label, kind: target.kind, op: clause.op,
+                field: target.label, kind: target.kind, op: clause.op, offersRelative: offersRelative,
                 setOperator: { browser.setFilterOperator(at: index, to: $0, kind: target.kind) }
             ) {
                 valueControl(clause, target: target, content: content)
@@ -212,5 +214,40 @@ struct FilterChoices {
             for word in declared where !words.contains(where: { $0.word == word.value }) { words.append((word.value, word.group)) }
         }
         return words
+    }
+}
+
+/// Names the items a clause's values hold by identifier: a type, a parent, a collection.
+@MainActor
+struct FilterTitles {
+    private let titles: [String: String]
+
+    init(content: ItemTableContent) {
+        var titles: [String: String] = [:]
+        for row in content.allRows {
+            titles[row.item.type.rawValue] = row.typeLabel
+            if let parent = row.parent { titles[parent.id.rawValue] = parent.title }
+            for collection in row.collections { titles[collection.id.rawValue] = collection.title }
+        }
+        self.titles = titles
+    }
+
+    func title(of id: String) -> String? { titles[id] }
+}
+
+extension FilterTarget {
+    /// The symbol a condition on the target leads with.
+    var symbol: String {
+        switch id {
+        case ItemTableColumn.type.id: "square.grid.2x2"
+        case ItemTableColumn.tags.id: "tag"
+        case ItemTableColumn.collections.id: "square.stack"
+        case ItemTableColumn.parent.id: "link"
+        case FilterTarget.source.id: "antenna.radiowaves.left.and.right"
+        case ItemTableColumn.created.id: "calendar.badge.plus"
+        case ItemTableColumn.edited.id: "calendar.badge.clock"
+        case ItemTableColumn.occurred.id: "clock"
+        default: field.map { PageLayout.symbol(of: $0) } ?? "line.3.horizontal.decrease"
+        }
     }
 }

@@ -1,17 +1,18 @@
 import Foundation
 import Observation
 
-/// The right sidebar's panel that edits a view, or a place that can become one. It holds what only the panel knows:
-/// the name being typed, and how to put a place back if the person escapes a new view. What the person changes lives in
-/// the window (`Browser.tableOptions`, `viewSeeds`), where it shows at once and, in a saved view, is written as made.
+/// The View panel, the popover under the top row's View button that edits a view, or a place that can become one. It
+/// holds what only the panel knows: the page it shows, the name being typed, and how to put a place back if the person
+/// escapes a new view. What the person changes lives in the window (`Browser.tableOptions`, `viewSeeds`), where it shows
+/// at once and, in a saved view, is written as made.
 @Observable
 final class ViewPanel {
     enum Purpose: Equatable {
-        /// A saved view: each change is written as it is made, and Done closes the panel.
+        /// A saved view: each change is written as it is made.
         case edit(ItemID)
-        /// A view that does not exist yet, made of what the window shows: Done makes it, and Escape makes nothing.
+        /// A view that does not exist yet, made of what the window shows: Create View makes it, and Escape makes nothing.
         case new
-        /// A place that is not a view, such as a type's list: it has no name, keeps its choices in its default view (`PlaceDefaults`), and offers Save as View.
+        /// A place that is not a view, such as a type's list: it has no name, keeps its choices in its default view (`PlaceDefaults`), and offers New View….
         case place
     }
 
@@ -33,7 +34,15 @@ final class ViewPanel {
         let placeDefault: PlaceDefault?
     }
 
+    /// What the popover shows: the view's settings, or one of them opened in place, with a way back.
+    enum Page: Hashable {
+        case main, filter, sort, group, properties, types
+    }
+
     private(set) var purpose: Purpose
+    var page = Page.main
+    /// Whether the head shows the view's name as a field, as Rename… asks. A new view's always does.
+    var isRenaming = false
     @ObservationIgnored private var notices: Notices?
     /// The name being written to the server, which is neither kept nor lost until the write answers.
     @ObservationIgnored var renaming: String?

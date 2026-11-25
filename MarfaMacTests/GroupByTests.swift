@@ -56,12 +56,12 @@ struct GroupByTests {
     }
 
     private static func offer(
-        _ items: [MarfaMac.Item], types: Set<TypeID>, layout: ItemViewMode, isView: Bool = false
+        _ items: [MarfaMac.Item], types: Set<TypeID>, layout: ItemViewMode
     ) -> GroupOffer {
         let rows = rows(items)
         return GroupOffer.make(
             columns: columns(rows, types: types), types: types.union(items.map(\.type)), rows: rows, catalogue: catalogue,
-            layout: layout, isView: isView)
+            layout: layout)
     }
 
     /// Events where some have a start and status, and none fills Precision, Place or Attendees.
@@ -72,12 +72,15 @@ struct GroupByTests {
 
     // MARK: What is offered
 
-    @Test func aSavedViewShowsWhatItCannotKeepAsNotKept() {
-        let offer = Self.offer(Self.events, types: [Self.event], layout: .table, isView: true)
-        let starts = try! #require(offer.entries.first { $0.label == "Starts" })
-        #expect(starts.choices.map(\.isKept) == [true, true, true, true, false])
-        let words = Self.offer([Self.item("t", Self.task, ["status": .string("todo")])], types: [Self.task], layout: .table, isView: true)
-        #expect(words.sections[0][0].choices.map(\.isKept) == [true, false])
+    @Test func aSavedViewCanKeepEveryGroupingOffered() {
+        let rows = Self.rows(Self.events)
+        let columns = Self.columns(rows, types: [Self.event])
+        let offer = Self.offer(Self.events, types: [Self.event], layout: .table)
+        for choice in offer.entries.flatMap(\.choices) {
+            guard case .column(let id, let mode) = choice.grouping else { continue }
+            let kept = ViewDraft.group(columns.first { $0.id == id }, mode: mode)
+            #expect(kept.group != nil && kept.unkept.isEmpty, "\(id) by \(mode)")
+        }
     }
 
     // MARK: The groups

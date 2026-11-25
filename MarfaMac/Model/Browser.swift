@@ -13,6 +13,7 @@ final class Browser {
             modalItem = nil
             listMemory.scrollOffset = nil
             laterPlace = nil
+            if openedView.map({ showing?.savedView != $0.id }) == true { openedView = nil }
             viewPanelPlaceChanged()
         }
     }
@@ -359,7 +360,7 @@ final class Browser {
 
     /// External links stay in this window even when Open Items is set to New Window.
     func open(itemLink item: Item, in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
-        let way: ItemOpening = !isModalPresented && ItemOpening.stored(in: defaults) == .fullPage ? .fullPage : .modal
+        let way: ItemOpening = !isModalPresented && itemOpening(defaults: defaults) == .fullPage ? .fullPage : .modal
         select(item, in: library, order: order)
         open([item.id], as: way, defaults: defaults)
     }
@@ -479,13 +480,16 @@ final class Browser {
         viewPanel?.handOff(because: .libraryChanged)
         viewPanel = nil
         observedChoices = [:]
-        filterRowChoice = [:]
+        indexFilterChoice = [:]
         toldUnkept = [:]
         replacedGroups = [:]
         writingViews = []
         pendingViewWrites = []
         placeCards = [:]
         placeHidesEmptyGroups = [:]
+        placeQuickActions = [:]
+        placeOpenings = [:]
+        openedView = nil
         placeProperties = [:]
         placeCalendarScales = [:]
         calendarDay = nil
@@ -527,6 +531,15 @@ final class Browser {
     /// of a new view or a rename, until the server takes it, so a window that closes or changes library can give it back.
     var viewPanel: ViewPanel?
 
+    /// The saved view the window shows as it was when the window opened it, which Revert View puts back.
+    var openedView: OpenedView?
+
+    struct OpenedView {
+        let id: ItemID
+        var choices: ViewChoices
+        var mac: ViewMacSettings
+    }
+
     /// Views this window is deleting, whose absence from the library is its own doing and not news from elsewhere.
     @ObservationIgnored var viewsBeingDeleted: Set<ItemID> = []
 
@@ -552,12 +565,9 @@ final class Browser {
     /// back) gives back the groups another app ordered and hid there.
     @ObservationIgnored var replacedGroups: [ItemID: [String: LibraryViewGroup]] = [:]
 
-    /// Whether the row of filters above the list shows in a place the person chose, which is window state and never
-    /// saved (`Browser+FilterRow`). A place the person did not choose for shows it by what it holds.
-    var filterRowChoice: PlaceMemory<Bool> = [:]
-
-    /// Whether Add Filter… asked for its panel, which the row opens and then clears (`Browser+FilterRow`).
-    var isAddFilterRequested = false
+    /// Whether an index page's row of filters shows, where the person chose, which is window state and never saved
+    /// (`Browser+IndexPage`). A page the person did not choose for shows it by what it holds.
+    var indexFilterChoice: PlaceMemory<Bool> = [:]
 
     /// What the gallery draws on each card in a place that is not a saved view, as its default view keeps it
     /// (`Browser+PlaceDefaults`).
@@ -566,6 +576,10 @@ final class Browser {
     var placeCalendarScales: PlaceMemory<CalendarScale> = [:]
     /// The places whose default view leaves out the groups with no items.
     var placeHidesEmptyGroups: PlaceMemory<Bool> = [:]
+    /// Whether each place that is not a saved view offers its rows' quick actions, as its default view keeps it.
+    var placeQuickActions: PlaceMemory<Bool> = [:]
+    /// Where each place that is not a saved view opens its items, as its default view keeps it; none follows Settings.
+    var placeOpenings: PlaceMemory<ItemOpening> = [:]
     /// The Properties list of each place that is not a saved view, as its default view keeps it (`properties`).
     var placeProperties: PlaceMemory<ViewProperties> = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.

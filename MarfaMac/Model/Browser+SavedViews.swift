@@ -42,6 +42,7 @@ extension Browser {
         let home = PlaceView(Place.home(of: view.query, catalogue: library.catalogue), .saved(id))
         if showing != home { showing = home }
         if pendingViewWrites.remove(id) != nil { scheduleWrite(of: id) }
+        defer { noteOpened(id) }
         guard let seed = viewSeeds[id] else {
             apply(layout: ViewLayouts.stored(in: defaults).settings(for: id)?.layout, in: library)
             return self.seed(view, catalogue: library.catalogue)
@@ -74,6 +75,24 @@ extension Browser {
         tableOptions[place] = options
         timelineFields[place] = timelineDate
         observedChoices[place] = ViewChoices(options: options, timelineDate: timelineDate)
+        // The view as Marfa now holds it is what Revert View goes back to, not the window's choices it replaced.
+        if openedView?.id == view.id { openedView?.choices = ViewChoices(options: options, timelineDate: timelineDate) }
+    }
+
+    /// Keeps the view as the window first shows it, for Revert View, until the window shows another place.
+    private func noteOpened(_ id: ItemID) {
+        guard openedView?.id != id, viewSeeds[id] != nil else { return }
+        var mac = macSettings(for: id)
+        mac.layout = viewMode
+        openedView = OpenedView(id: id, choices: choices(in: .saved(id)), mac: mac)
+    }
+
+    /// Whether the person changed the view the window shows since the window opened it, which Revert View takes back.
+    var isViewChanged: Bool {
+        guard let opened = openedView, shown.isSame(.saved(opened.id)) else { return false }
+        var mac = macSettings(for: opened.id)
+        mac.layout = viewMode
+        return !liveChoices.parts(differingFrom: opened.choices).isEmpty || !mac.sameChoices(as: opened.mac)
     }
 
     /// Shows the settings of a view a write returned that the person has not changed since `earlier`, the seed the
@@ -365,10 +384,23 @@ extension Browser {
 
     // MARK: Putting the window back to the view
 
-    /// Puts the window back to the view as the library holds it, dropping a choice Marfa has not taken.
+    /// Puts the view back as it was when the window opened it, and writes that back to Marfa and this Mac. One step of
+    /// Undo brings the person's changes back.
     func revertView(in library: any ItemLibrary) {
-        guard let id = shown.savedView else { return }
-        viewRefused(id, in: library)
+        guard let opened = openedView, shown.isSame(.saved(opened.id)), isViewChanged else { return }
+        let id = opened.id
+        if let layout = opened.mac.layout, layout != viewMode, availableViewModes(in: library).contains(layout) {
+            viewMode = layout
+        }
+        changeViewSettings(id) { settings in
+            let layout = settings.layout
+            settings.take(choicesOf: opened.mac)
+            settings.layout = layout
+        }
+        put(opened.choices, in: shown)
+        choicesChanged()
+        // The steps of one event are one step of Undo.
+        undoManager?.setActionName(String(localized: "Revert View"))
     }
 
     /// The change that writes the window's choices to the view it shows, the version it is based on, and what of

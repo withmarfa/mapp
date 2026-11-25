@@ -13,12 +13,15 @@ struct ItemRowMenu<LayoutActions: View>: View {
     let undoManager: UndoManager?
     @ViewBuilder let layoutActions: LayoutActions
 
+    /// Where Open opens the items: the place's Open Items, else Settings.
+    private var way: ItemOpening { browser.chosenOpening ?? opening }
+
     var body: some View {
         Group {
             if !ids.isEmpty {
                 let items = ids.compactMap { library.item($0) }
                 let inBin = !items.isEmpty && items.allSatisfy { $0.state == .trashed }
-                ForEach(Array(RowMenuEntry.entries(opening: opening, inBin: inBin).enumerated()), id: \.offset) { _, entry in
+                ForEach(Array(RowMenuEntry.entries(opening: way, inBin: inBin).enumerated()), id: \.offset) { _, entry in
                     view(of: entry, single: items.count == 1 ? items.first : nil, items: items)
                 }
             }
@@ -30,8 +33,8 @@ struct ItemRowMenu<LayoutActions: View>: View {
     @ViewBuilder private func view(of entry: RowMenuEntry, single: Item?, items: [Item]) -> some View {
         switch entry {
         case .open:
-            Button("Open", systemImage: "arrow.up.right") { browser.open(ids, as: opening) }
-                .disabled(!opening.canOpen(ids.count))
+            Button("Open", systemImage: "arrow.up.right") { browser.open(ids, as: way) }
+                .disabled(!way.canOpen(ids.count))
         case .openAs(let way):
             Button(way.commandTitle, systemImage: way.symbol) { browser.open(ids, as: way) }
                 .disabled(!way.canOpen(ids.count))

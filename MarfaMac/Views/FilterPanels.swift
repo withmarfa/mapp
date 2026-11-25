@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 // The panels a filter chip and the + open, and the bodies they hold. They take rows and actions and know nothing of
-// `Browser`; `FilterPanelPresenter` puts one on the screen. `FilterChips.swift` has the row they open from.
+// `Browser`. The View panel's Filter opens them in a popover; on the Items page `FilterPanelPresenter` puts one on the
+// screen, from the row in `FilterChips.swift`.
 
 /// A value a filter can take, as the panel lists it.
 struct FilterValueOption: Identifiable, Hashable {
@@ -37,11 +38,13 @@ struct FilterFieldSection: Identifiable, Hashable {
 struct FilterOperatorMenu: View {
     let kind: FilterKind
     let op: FilterOp
+    /// Whether the dates relative to today are offered.
+    var offersRelative = true
     let choose: (FilterOp) -> Void
 
-    static func sections(for kind: FilterKind) -> [(title: String?, ops: [FilterOp])] {
+    static func sections(for kind: FilterKind, relative: Bool = true) -> [(title: String?, ops: [FilterOp])] {
         var result: [(title: String?, ops: [FilterOp])] = []
-        for entry in FilterOp.offered(for: kind) {
+        for entry in FilterOp.offered(for: kind) where relative || !entry.op.isRelative {
             if entry.startsSection || result.isEmpty {
                 result.append((entry.op.isRelative ? String(localized: "Relative to Today") : nil, []))
             }
@@ -51,7 +54,7 @@ struct FilterOperatorMenu: View {
     }
 
     var body: some View {
-        let sections = Self.sections(for: kind)
+        let sections = Self.sections(for: kind, relative: offersRelative)
         Menu {
             ForEach(sections.indices, id: \.self) { index in
                 if let title = sections[index].title {
@@ -83,6 +86,7 @@ struct FilterClausePanel<Content: View>: View {
     let field: String
     let kind: FilterKind
     let op: FilterOp
+    var offersRelative = true
     let setOperator: (FilterOp) -> Void
     @ViewBuilder let content: Content
     @Environment(\.interfaceTextSize) private var textSize
@@ -92,7 +96,7 @@ struct FilterClausePanel<Content: View>: View {
         VStack(alignment: .leading, spacing: 6 * scale) {
             HStack(spacing: 6 * scale) {
                 Text(verbatim: field).fontWeight(.semibold)
-                FilterOperatorMenu(kind: kind, op: op, choose: setOperator)
+                FilterOperatorMenu(kind: kind, op: op, offersRelative: offersRelative, choose: setOperator)
                 Spacer(minLength: 0)
             }
             .font(.system(size: ValueEditMetrics.textSize * scale))

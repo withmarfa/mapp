@@ -122,7 +122,6 @@ struct MainView: View {
             sidebarColumn
         } content: {
             ItemList(browser: browser, order: order, pane: $pane).equatable()
-                .filterChips(browser)
                 .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, isBesidePage: true, signal: topRowSignal)
                 // The split view reads the ideal only as it is built, so it comes from the tracker as it stands then.
                 .navigationSplitViewColumnWidth(
@@ -232,7 +231,6 @@ struct MainView: View {
                                     ItemGallery(browser: browser, order: order, pane: $pane)
                                 }
                             }
-                            .filterChips(browser)
                             .viewCorner(browser)
                             .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, signal: topRowSignal)
                         } else {
@@ -384,9 +382,8 @@ struct MainView: View {
                 }
             }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-            editor.onEscape = { [browser, details, library] in
-                if details.isEditingView { browser.escapeViewPanel(in: library) }
-                else if details.escapeFromPage() { return }
+            editor.onEscape = { [browser, details] in
+                if details.escapeFromPage() { return }
                 else if browser.isModalPresented { browser.closeModal() }
                 else { browser.focusRequest = .list }
             }
@@ -458,7 +455,7 @@ struct MainView: View {
         .deleteConfirmation(for: details)
         .archiveQuestion(for: details)
         .feedLimitQuestion(for: details)
-        .savedViewDialogs(browser: browser, details: details)
+        .savedViewDialogs(browser: browser)
     }
 
     private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }
@@ -498,7 +495,7 @@ struct MainView: View {
         case .page, .title:
             // The modal's own page takes the request, and no full page is opened behind it.
             // With Beside the List the page is the column beside the layout, so no full page is opened behind it.
-            if browser.showsCollection, !browser.isModalPresented, ItemOpening.stored() != .besideList {
+            if browser.showsCollection, !browser.isModalPresented, browser.itemOpening() != .besideList {
                 browser.isCollectionItemPresented = true
             }
             return
@@ -550,7 +547,7 @@ private struct ItemInspectorColumn: ViewModifier {
                     UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)
                 }
                 .inspectorColumnWidth(min: PanelWidth.standard, ideal: width, max: PanelWidth.widest)
-                .toolbar { InspectorToolbar(details: details, editor: editor, browser: browser) }
+                .toolbar { InspectorToolbar(details: details, browser: browser) }
         }
     }
 }

@@ -1,53 +1,27 @@
 import Foundation
 
-/// The row of filters above the list: whether the window shows it, and the request to add a filter, which the row
-/// answers by opening its Add Filter panel. Whether the row shows is the window's, and is never saved with a view.
+/// The open place's filters, as the View panel's Filter and the Items page's filter row change them. Each change goes
+/// through the window's choices (`choicesChanged`), so it is one step of Undo and, in a saved view, written as made.
 extension Browser {
-    /// Whether the row shows. A saved view opens with it hidden, since the count on the View Options button says filters
-    /// apply, and any other place shows it whenever it holds a filter, until the person hides it.
-    var showsFilterRow: Bool {
-        if let choice = filterRowChoice[shown] { return choice }
-        if shown.savedView != nil { return false }
-        return tableOptions[shown]?.isFiltering == true
-    }
-
-    /// What the command that shows or hides the row is called now.
-    var toggleFiltersTitle: LocalizedStringResource {
-        showsFilterRow ? "Hide Filters" : "Show Filters"
-    }
-
     /// How many filters the open place holds.
     var filterCount: Int {
         tableOptions[shown]?.filter.complete.clauses.count ?? 0
     }
 
-    /// View Options' and the View menu's Show Filters and Hide Filters.
-    func toggleFilterRow() {
-        filterRowChoice[shown] = !showsFilterRow
-    }
-
-    /// Add Filter…: shows the row and asks it to open its panel.
-    func requestAddFilter() {
-        filterRowChoice[shown] = true
-        isAddFilterRequested = true
-    }
-
-    /// Adds a filter on a field with the operator the field starts with, and returns its place in the row. It says too little
-    /// to filter by until the person gives it a value, so it hides nothing and is dropped if they leave it so
-    /// (`dropUnfinishedFilters`).
+    /// Adds a filter on a field with the operator the field starts with, and returns its place among the conditions. With
+    /// no `values` it says too little to filter by until the person gives it one, so it hides nothing and is dropped if
+    /// they leave it so (`dropUnfinishedFilters`).
     @discardableResult
-    func addFilter(on target: FilterTarget) -> Int {
-        filterRowChoice[shown] = true
+    func addFilter(on target: FilterTarget, values: [String] = []) -> Int {
         var options = tableOptions[shown] ?? ItemTableOptions()
-        options.filter.clauses.append(FilterClause(field: target.id, op: target.kind.startingOperator))
+        options.filter.clauses.append(FilterClause(field: target.id, op: target.kind.startingOperator, values: values))
         tableOptions[shown] = options
         return options.filter.clauses.count - 1
     }
 
-    /// Changes one clause of the row, keeping the row in view.
+    /// Changes one condition.
     func changeFilter(at index: Int, _ change: (inout FilterClause) -> Void) {
         guard var options = tableOptions[shown], options.filter.clauses.indices.contains(index) else { return }
-        filterRowChoice[shown] = true
         change(&options.filter.clauses[index])
         tableOptions[shown] = options
     }

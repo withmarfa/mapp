@@ -1,15 +1,15 @@
 import Foundation
 
-/// The panel that edits a view (`ViewPanel`): opening it, and what Done and Escape do. Each change shows in the window
-/// as it is made and, in a saved view, is written as it is made (`Browser+ViewWrites`); Done only closes the panel,
-/// except for a new view, which it makes.
+/// The View panel (`ViewPanel`): opening it, and what Create View, Escape and a click outside do. Each change shows in
+/// the window as it is made and, in a saved view, is written as it is made (`Browser+ViewWrites`), so closing the panel
+/// only closes it, except for a new view, which Create View makes.
 extension Browser {
     // MARK: Opening and closing
 
-    /// Whether the right sidebar holds the panel.
+    /// Whether the window shows the panel.
     var showsViewPanel: Bool { viewPanel != nil }
 
-    /// Edit View: a view opens its own panel, and any other place that can show a table opens one with no name.
+    /// View…: a view opens its own panel, and any other place that can show a table opens one with no name.
     func openViewPanel(in library: any ItemLibrary) {
         if viewPanel != nil { return }
         if let id = shown.savedView, let view = library.views.first(where: { $0.id == id }) {
@@ -20,7 +20,7 @@ extension Browser {
         }
     }
 
-    /// Edit View on a row of the sidebar's Views, which opens the view first.
+    /// View… on a row of the sidebar's Views, which opens the view first.
     func editView(_ id: ItemID, in library: any ItemLibrary, order: ItemOrder) {
         guard library.views.contains(where: { $0.id == id }) else { return }
         if viewPanel?.viewID == id, shown.isSame(.saved(id)) { return openViewPanel(in: library) }
@@ -44,8 +44,8 @@ extension Browser {
         viewPanel = ViewPanel(newFrom: viewSnapshot(), library: library)
     }
 
-    /// Done on a view or a place closes the panel, with a name still being typed written first. On a new view it makes
-    /// the view, with the name typed or the default one.
+    /// Create View on a new view makes it, with the name typed or the default one. On a view or a place it closes the
+    /// panel, with a name still being typed written first.
     func finishViewPanel(in library: any ItemLibrary, order: ItemOrder) async {
         guard let panel = viewPanel else { return }
         if panel.isNew { return await makeNewView(from: panel, in: library, order: order) }
@@ -53,8 +53,8 @@ extension Browser {
         if viewPanel === panel { viewPanel = nil }
     }
 
-    /// Closes the panel for a reason that is not the person's Done: a view's changes were already written, and a new
-    /// view is dropped, with the name the person typed given back, since the panel is where it lived.
+    /// Closes the panel for a reason that is not the person's own choice: a view's changes were already written, and a
+    /// new view is dropped, with the name the person typed given back, since the panel is where it lived.
     func closeViewPanel(in library: any ItemLibrary) {
         guard let panel = viewPanel else { return }
         panel.handOff(because: .left)
@@ -184,5 +184,66 @@ extension Browser {
         show(.saved(copy.id), in: library, order: order)
         followView(in: library)
         return copy
+    }
+}
+
+// MARK: Quick Actions and Open Items
+
+extension Browser {
+    /// Whether the open place's rows offer their quick actions: a saved view's choice on this Mac, else the place's
+    /// default view's, else the place's own (`ViewMacSettings.showsQuickActions`).
+    var showsQuickActions: Bool {
+        let chosen: Bool? = if let id = shown.savedView { macSettings(for: id).quickActions } else { placeQuickActions[shown] }
+        return ViewMacSettings.showsQuickActions(chosen, in: shown, scope: listing.scope)
+    }
+
+    /// Turns the open place's quick actions on or off. A saved view's choice is kept in the app's settings, and a place's
+    /// in its default view. Undo takes either back.
+    func setShowsQuickActions(_ shows: Bool) {
+        if let id = shown.savedView {
+            changeViewSettings(id) { $0.quickActions = shows }
+        } else if shows != showsQuickActions {
+            setPlaceQuickActions(shows, in: shown)
+        }
+    }
+
+    private func setPlaceQuickActions(_ shows: Bool?, in place: PlaceView) {
+        let before = placeQuickActions[place]
+        placeQuickActions[place] = shows
+        updatePlaceDefault(place) { $0.quickActions = shows }
+        registerUndo(String(localized: "Change View")) { browser in
+            guard browser.shown.isSame(place) else { return }
+            browser.setPlaceQuickActions(before, in: place)
+        }
+    }
+
+    /// Where the open place opens its items, where the person chose: a saved view's choice on this Mac, else the
+    /// place's default view's. Nil follows Settings.
+    var chosenOpening: ItemOpening? {
+        if let id = shown.savedView { macSettings(for: id).opening } else { placeOpenings[shown] }
+    }
+
+    /// Where Open, Return and a double-click open an item in the open place.
+    func itemOpening(defaults: UserDefaults = .standard) -> ItemOpening {
+        chosenOpening ?? ItemOpening.stored(in: defaults)
+    }
+
+    /// Changes where the open place opens its items; nil follows Settings. Undo takes it back.
+    func setOpening(_ opening: ItemOpening?) {
+        if let id = shown.savedView {
+            changeViewSettings(id) { $0.opening = opening }
+        } else if opening != chosenOpening {
+            setPlaceOpening(opening, in: shown)
+        }
+    }
+
+    private func setPlaceOpening(_ opening: ItemOpening?, in place: PlaceView) {
+        let before = placeOpenings[place]
+        placeOpenings[place] = opening
+        updatePlaceDefault(place) { $0.opening = opening }
+        registerUndo(String(localized: "Change View")) { browser in
+            guard browser.shown.isSame(place) else { return }
+            browser.setPlaceOpening(before, in: place)
+        }
     }
 }

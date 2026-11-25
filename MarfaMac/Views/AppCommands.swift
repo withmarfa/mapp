@@ -129,15 +129,10 @@ struct AppCommands: Commands {
                 command(.toggleFocus)
                 Divider()
                 if browser?.showsPlaceIndex != true {
-                    ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, shortcuts: shortcuts)
+                    ViewLayoutCommands(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, shortcuts: shortcuts)
                 }
                 Divider()
                 SavedViewMenu(browser: browser, library: library, shortcuts: shortcuts)
-                // The toolbar's Done for a view's panel.
-                Button("Finish Editing View", systemImage: "checkmark") {
-                    if let browser, let library { Task { await browser.finishViewPanel(in: library, order: order) } }
-                }
-                .disabled(browser?.showsViewPanel != true)
                 Divider()
                 Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
                     details?.isPresented.toggle()
@@ -145,20 +140,15 @@ struct AppCommands: Commands {
                 .shortcut(.toggleDetails, shortcuts)
                 .disabled(details == nil || focused?.ids.count != 1)
                 Divider()
-                // The toolbar's View Options and its filters, for the view in front.
+                // What the layout in front moves through, and its filters and groups, which the View panel sets.
                 if let library, let browser {
                     // A table, board or timeline with an item page open has no view options to offer.
                     if browser.offersViewOptions, !browser.showsPlaceIndex {
                         // The library is given inside the branch that shows it, so the menu's views never read it while it is
                         // gone: SwiftUI can update a view of a branch it is about to drop, which then still has its old one.
-                        Group {
-                            FilterCommands(browser: browser, shortcuts: shortcuts)
-                            CurrentViewOptions(browser: browser, shortcuts: shortcuts)
-                        }
-                        .environment(\.library, library)
+                        CurrentLayoutCommands(browser: browser, shortcuts: shortcuts)
+                            .environment(\.library, library)
                     }
-                } else {
-                    CurrentViewOptions(browser: nil)
                 }
                 Divider()
                 PageWidthOptions()
