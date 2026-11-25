@@ -1486,9 +1486,6 @@
     "%lld secrets to set again" : {
 
     },
-    "%lld set" : {
-
-    },
     "%lld settings are set on the machine %@ runs on." : {
 
     },
@@ -1640,9 +1637,6 @@
     },
     "%llu waiting to download" : {
       "extractionState" : "manual"
-    },
-    "+%lld" : {
-
     },
     "+%lld more" : {
 
@@ -2145,9 +2139,6 @@
     "Add Person…" : {
 
     },
-    "Add Property" : {
-
-    },
     "Add Relationship" : {
       "extractionState" : "manual"
     },
@@ -2560,9 +2551,6 @@
 
     },
     "Apps and keys using this rule will see items from every source for the types you limited, including subtypes." : {
-
-    },
-    "Apps you sign in show here." : {
 
     },
     "Archive" : {
@@ -3351,9 +3339,6 @@
     "Choose Parent…" : {
       "extractionState" : "manual"
     },
-    "Choose Source Mark…" : {
-
-    },
     "Choose Undo again to try it as things are now." : {
       "extractionState" : "manual"
     },
@@ -3362,9 +3347,6 @@
     },
     "Choose a Version" : {
       "extractionState" : "manual"
-    },
-    "Choose a collection to see what’s in it." : {
-
     },
     "Choose a date before the app’s sign-in ends." : {
 
@@ -3387,17 +3369,11 @@
     "Choose a plugin bundle." : {
 
     },
-    "Choose a source to see what it sends." : {
-
-    },
     "Choose a value" : {
 
     },
     "Choose an Icon" : {
       "extractionState" : "manual"
-    },
-    "Choose an item to see its details." : {
-
     },
     "Choose how often to back up." : {
 
@@ -3543,9 +3519,6 @@
     "Collections" : {
 
     },
-    "Collections that apps make show here." : {
-
-    },
     "Collections you make show here." : {
 
     },
@@ -3628,9 +3601,6 @@
       "extractionState" : "manual"
     },
     "Connection" : {
-
-    },
-    "Connection Actions" : {
 
     },
     "Connector" : {
@@ -4066,9 +4036,6 @@
     "Delete %@?" : {
 
     },
-    "Delete Collection…" : {
-
-    },
     "Delete Column" : {
 
     },
@@ -4364,9 +4331,6 @@
     "Edit Meaning…" : {
 
     },
-    "Edit New Row…" : {
-
-    },
     "Edit Pages As" : {
 
     },
@@ -4386,9 +4350,6 @@
 
     },
     "Edit View" : {
-
-    },
-    "Edit the New row" : {
 
     },
     "Edited" : {
@@ -4569,9 +4530,6 @@
 
     },
     "Everything under Items is saved in Marfa for every app. The rest is kept for Marfa for Mac." : {
-
-    },
-    "Everywhere" : {
 
     },
     "Excerpts" : {
@@ -5611,9 +5569,6 @@
     "Items About This" : {
       "extractionState" : "manual"
     },
-    "Items Page" : {
-
-    },
     "Items deleted more than %@ ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered." : {
       "extractionState" : "manual"
     },
@@ -5639,9 +5594,6 @@
     "Items that already hold a choice you take out keep it." : {
 
     },
-    "Items that apps send show here." : {
-
-    },
     "Items this sign-in can’t see are still of this type, so %@ was kept." : {
 
     },
@@ -5655,9 +5607,6 @@
 
     },
     "Items you favorite show here." : {
-
-    },
-    "Items you make or apps send show here." : {
 
     },
     "Items you make show here." : {
@@ -5938,17 +5887,11 @@
     "Keys keep working" : {
 
     },
-    "Keys you make show here." : {
-
-    },
     "Kind" : {
       "extractionState" : "manual"
     },
     "Kind of Item" : {
       "extractionState" : "manual"
-    },
-    "Kinds" : {
-
     },
     "Large" : {
       "extractionState" : "manual"
@@ -6660,9 +6603,6 @@
     "New Child Type…" : {
 
     },
-    "New Collection" : {
-
-    },
     "New Field Choices Not Kept" : {
 
     },
@@ -6803,12 +6743,6 @@
     "No Collections" : {
       "extractionState" : "manual"
     },
-    "No Collections in the Feed" : {
-
-    },
-    "No Collections in the Library" : {
-
-    },
     "No Connectors" : {
 
     },
@@ -6839,16 +6773,7 @@
     "No Items" : {
       "extractionState" : "manual"
     },
-    "No Items in the Feed" : {
-
-    },
-    "No Items in the Library" : {
-
-    },
     "No Jobs Yet" : {
-
-    },
-    "No Keys" : {
 
     },
     "No Library Open" : {
@@ -6890,12 +6815,6 @@
     "No Preview Yet" : {
 
     },
-    "No Properties" : {
-
-    },
-    "No Relationships" : {
-
-    },
     "No Results" : {
 
     },
@@ -6912,9 +6831,6 @@
 
     },
     "No Status" : {
-
-    },
-    "No Tags" : {
 
     },
     "No Types" : {
@@ -7771,9 +7687,6 @@
     "Pinned under the title." : {
 
     },
-    "Pinned under the title. Customize Layout on an item of this type changes the same." : {
-
-    },
     "Place" : {
 
     },
@@ -8071,9 +7984,6 @@
     "Relationship Removed" : {
 
     },
-    "Relationships" : {
-
-    },
     "Relative to Today" : {
 
     },
@@ -8095,9 +8005,6 @@
     "Remove %@" : {
 
     },
-    "Remove %@ From New" : {
-
-    },
     "Remove %@?" : {
 
     },
@@ -8105,9 +8012,6 @@
 
     },
     "Remove Condition" : {
-
-    },
-    "Remove Connection" : {
 
     },
     "Remove Downloaded Files" : {
@@ -8138,9 +8042,6 @@
 
     },
     "Remove Tag" : {
-
-    },
-    "Remove Tag %@" : {
 
     },
     "Remove This App’s Settings from %@?" : {
@@ -8263,9 +8164,6 @@
     },
     "Rename Source" : {
       "extractionState" : "manual"
-    },
-    "Rename Source…" : {
-
     },
     "Rename View" : {
       "extractionState" : "manual",
@@ -8585,9 +8483,6 @@
 
     },
     "Search People" : {
-
-    },
-    "Search Scope" : {
 
     },
     "Search Shortcuts" : {
@@ -8919,9 +8814,6 @@
 
     },
     "Show Plugins" : {
-
-    },
-    "Show Quick Add Options" : {
 
     },
     "Show Reader" : {
@@ -9945,9 +9837,6 @@
     "The command line’s way in." : {
 
     },
-    "The connection could not be removed." : {
-
-    },
     "The connections could not be saved. Your selection has been kept." : {
       "extractionState" : "manual"
     },
@@ -10416,9 +10305,6 @@
     "The source can’t change later." : {
 
     },
-    "The tag could not be added." : {
-
-    },
     "The time couldn’t be saved." : {
 
     },
@@ -10690,9 +10576,6 @@
 
     },
     "This Week" : {
-
-    },
-    "This Year" : {
 
     },
     "This address includes a sign-in, so it isn’t loaded." : {
@@ -10994,9 +10877,6 @@
 
     },
     "Tight" : {
-
-    },
-    "Tiles above the table for making a new item of a type." : {
 
     },
     "Time" : {
@@ -11335,9 +11215,6 @@
 
     },
     "Update to %@" : {
-
-    },
-    "Updated" : {
 
     },
     "Updated %@" : {
