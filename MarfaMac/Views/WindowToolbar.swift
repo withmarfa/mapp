@@ -72,6 +72,7 @@ struct WindowToolbar: ToolbarContent {
         if showsActions || (showsDetails && (listsHere || isIndex)) { ToolbarSpacer(.fixed) }
         if showsDetails {
             ToolbarItem { tools.detailsButton }
+                .sharedBackgroundVisibility(.hidden)
         }
     }
 }
@@ -175,26 +176,51 @@ struct InspectorToolbar: ToolbarContent {
                 ToolbarItem {
                     DetailsToggle(details: details, editor: editor)
                 }
+                .sharedBackgroundVisibility(.hidden)
             }
         }
     }
 }
 
-/// The Details button of a toolbar above the inspector: on, because the inspector is open.
+/// The Details button: on while the panel is open. Gray when on, as every on button is, which the system's own toggle
+/// cannot draw: it fills an on button with its tint and a white symbol, and with the gray a dark fill.
 struct DetailsToggle: View {
     let details: DetailsPresentation
     let editor: EditorController?
+    var isDisabled = false
 
     var body: some View {
         if details.isCustomizingLayout {
             LayoutDoneButton(details: details, editor: editor)
         } else {
-            Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
-                // Gray while on, as every on button is, rather than the accent color.
-                .tint(.secondary)
-                .help("Hide Details")
-                .accessibilityIdentifier("DetailsToggle")
+            Toggle(isOn: Binding { details.isPresented } set: { details.isPresented = $0 }) {
+                Label("Details", systemImage: "sidebar.right")
+            }
+            .toggleStyle(ToolbarOnOffStyle())
+            .help(details.isPresented ? "Hide Details" : "Show Details")
+            .disabled(isDisabled)
+            .accessibilityIdentifier("DetailsToggle")
         }
+    }
+}
+
+/// A toolbar button that is on or off, with the glass of its own that Back and Forward draw. Gray while on, never the
+/// accent color, and its symbol stays as an off button's.
+struct ToolbarOnOffStyle: ToggleStyle {
+    /// The height of the toolbar's own glass.
+    static let height: CGFloat = 36
+
+    func makeBody(configuration: Configuration) -> some View {
+        Button { configuration.isOn.toggle() } label: {
+            configuration.label
+                .labelStyle(.iconOnly)
+                .font(.system(size: 15))
+                .frame(width: Self.height, height: Self.height)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+        .glassEffect(configuration.isOn ? .regular.tint(CornerMetrics.onTint).interactive() : .regular.interactive(), in: .circle)
     }
 }
 
@@ -323,15 +349,10 @@ struct ItemToolbarActions {
     }
 
     @ViewBuilder var detailsButton: some View {
-        if details.isCustomizingLayout {
-            LayoutDoneButton(details: details, editor: editor)
-        } else {
-            Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
-                .help(details.isPresented ? "Hide Details" : "Show Details")
-                // An index page shows the container chosen in its table, so it has details whatever items are selected.
-                .disabled(browser?.showsSidebarIndex != true && (browser?.selection.count ?? items.count) != 1)
-                .accessibilityIdentifier("DetailsToggle")
-        }
+        // An index page shows the container chosen in its table, so it has details whatever items are selected.
+        DetailsToggle(
+            details: details, editor: editor,
+            isDisabled: browser?.showsSidebarIndex != true && (browser?.selection.count ?? items.count) != 1)
     }
 
     var ids: Set<ItemID> { browser.map(\.selection) ?? Set(items.map(\.id)) }

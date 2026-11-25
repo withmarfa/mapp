@@ -40,11 +40,11 @@ struct IndexToolbarItems: ToolbarContent {
             Toggle(isOn: Binding { browser.showsFilterRow } set: { _ in browser.toggleIndexFilter() }) {
                 Label("Filter", systemImage: "line.3.horizontal.decrease")
             }
-            // Gray while on, as the page's own Filter button is, rather than the accent color.
-            .tint(.secondary)
+            .toggleStyle(ToolbarOnOffStyle())
             .help(browser.toggleFiltersTitle)
             .accessibilityIdentifier("IndexFilterToolbar")
         }
+        .sharedBackgroundVisibility(.hidden)
         .hidden(!showsTools)
         ToolbarItem {
             IndexNewButton(browser: browser)

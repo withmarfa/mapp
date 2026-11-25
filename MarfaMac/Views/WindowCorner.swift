@@ -139,7 +139,7 @@ private struct CornerButtonLabel<Label: View>: View {
 
 enum CornerMetrics {
     /// What a button or a chosen segment that is on is tinted with: gray, never the accent color.
-    static let onTint = Color.gray.opacity(0.45)
+    static let onTint = Color.primary.opacity(0.09)
 
     /// The height of a button at the default interface text size.
     static let height: CGFloat = 32
