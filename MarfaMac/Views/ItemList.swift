@@ -145,9 +145,7 @@ struct ItemList: View, Equatable {
     }
 }
 
-/// The list, apart from the item list's body: a list reads its selection as it is made, so a change of selection
-/// runs this body rather than the item list's, which lists every item the place holds, and hands the list the same
-/// rows as before, which SwiftUI does not go through again.
+/// Binds the native list's selection to the window.
 private struct SelectableList<Content: View>: View {
     @Bindable var browser: Browser
     @ViewBuilder let content: Content

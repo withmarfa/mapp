@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// A place's items by day. Choosing a row runs the list that holds the selection, not this body, which reads where the
-/// browser placed every item, so a selection does not place them again.
+/// A place's items by day, in the order the browser calculated.
 struct ItemTimeline: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
@@ -262,8 +261,7 @@ struct ItemTimeline: View {
     }
 }
 
-/// The list, apart from the timeline's body: a list reads its selection as it is made, so a change of selection runs
-/// this body rather than the timeline's, which places every item the place holds.
+/// Binds the native list's selection to the window.
 private struct SelectableTimeline<Content: View>: View {
     @Bindable var browser: Browser
     @ViewBuilder var content: Content
@@ -273,8 +271,7 @@ private struct SelectableTimeline<Content: View>: View {
     }
 }
 
-/// Opens the right sidebar when a row is chosen. It reads the selection itself, so the timeline's body does not, and a
-/// change of selection does not work out every row again. The calendar uses it too.
+/// Opens the right sidebar when the person chooses a single item in the timeline or calendar.
 struct ChosenRowOpensSidebar: View {
     /// The window's, which the right sidebar is shown through.
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?

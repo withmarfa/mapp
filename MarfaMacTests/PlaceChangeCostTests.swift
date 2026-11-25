@@ -9,7 +9,7 @@ import Testing
 /// real window hosted in one nobody sees. For each move it prints
 /// `BUSY|<layout>|<move>|main=<ms>|busy=<percent>|stall=<ms>|window=<ms>`: the main thread's own CPU time over the window
 /// after the move, that as a share of the window, and the longest time the main actor did not answer, which is a hang at 250 ms
-/// or more. It checks only that the layout shows the change at the end. Run it with the Measure test plan, which sets
+/// or more. Run it with the Measure test plan, which sets
 /// `MARFA_MAC_MEASURE`; the other plans leave it out.
 @MainActor
 @Suite(.tags(.measure), .enabled(if: ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE"] != nil), .serialized)

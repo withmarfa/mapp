@@ -47,10 +47,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// this and `membershipRevision` rather than `contentRevision`, which a published keystroke moves. A library that
     /// bumps `membershipRevision` for every item change may leave this as that.
     var namesRevision: Int { get }
-    /// The items that changed after `revision` of `contentRevision`: their own values, or a link's far end, whose title a
-    /// row shows and whose coming or going takes an attached file out of the lists or back. Nil where the library cannot
-    /// say: the copy was read whole again, the catalogue changed, or the changes since are more than it keeps. What is
-    /// worked out from a place's items, and kept, is remade only for these.
+    /// IDs of items changed since the given content revision, including both ends of affected links. Returns nil
+    /// when the library cannot identify every affected item, such as after a catalogue change.
     func changedItems(since revision: Int) -> Set<ItemID>?
     /// Names the Marfa the library reads by its instance id, never its address, so what this Mac keeps for it, such
     /// as an item typed and not yet added, waits for it and goes to no other, even a server that later takes its

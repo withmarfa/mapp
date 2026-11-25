@@ -1,8 +1,6 @@
 import Foundation
 
-/// Which items each step of `contentRevision` changed, so a view that keeps something worked out from a place's items
-/// remakes only those (`ItemLibrary.changedItems(since:)`). A step that reads the whole copy again, or changes the
-/// catalogue, is a step no earlier revision can be followed across.
+/// The item IDs affected by each revision. A reader whose revision predates a reset or an evicted step must rebuild.
 nonisolated struct ItemChangeLog {
     /// The most ids kept. Past it the oldest steps go, and a reader from before them works everything out again, which a
     /// sync that changes more than this asks for anyway.
