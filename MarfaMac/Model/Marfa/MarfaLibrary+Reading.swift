@@ -130,7 +130,7 @@ extension MarfaLibrary {
                 if item.created == listing.items[position].created {
                     listing.items[position] = item
                 } else {
-                    // The listing is ordered by creation, so a new one moves the item, as a create the server dated does.
+                    // The server can give a queued creation a different timestamp.
                     leaving.insert(id)
                     joining.append(item)
                 }

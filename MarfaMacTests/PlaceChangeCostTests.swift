@@ -5,14 +5,10 @@ import SwiftUI
 import Testing
 @testable import MarfaMac
 
-/// What a sync costs the window on about fifty thousand items (`BigLibrary` at 75 times its mix), in each layout, with the
-/// real window hosted in one nobody sees. For each move it prints
-/// `BUSY|<layout>|<move>|main=<ms>|busy=<percent>|stall=<ms>|window=<ms>|landed=<ms>`: the main thread's own CPU time over
-/// the window after the move, that as a share of the window, the longest time the main actor did not answer, the move itself
-/// included, which is a hang at 250 ms or more, and when the layout first showed the change: the new titles of changed items
-/// it shows, or the new items. A move whose change has not shown by the end of the window is waited for, outside the
-/// measure, and one that never shows fails. Run it with the Measure test plan, which sets `MARFA_MAC_MEASURE`; the other
-/// plans leave it out.
+/// Measures a hosted window with 48,750 items in each layout. Run with the Measure test plan.
+/// Each `BUSY` line gives main-thread CPU time and share, the longest sampled stall including the action,
+/// and elapsed time. For sampled items, `landed` is when the layout cache first contains the expected titles.
+/// The test can wait for those titles after the five-second measurement ends.
 @MainActor
 @Suite(.tags(.measure), .enabled(if: ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE"] != nil), .serialized)
 struct PlaceChangeCostTests {
@@ -112,8 +108,7 @@ struct PlaceChangeCostTests {
             uniquingKeysWith: { first, _ in first })
     }
 
-    /// The title the layout last worked out for `id`, as it draws it, or nil where it does not show the item. Read from what
-    /// the browser holds, so asking starts no work.
+    /// Reads a cached title without asking the layout to update.
     private static func shown(_ id: ItemID, in browser: Browser, mode: ItemViewMode) -> String? {
         func nth<Group>(_ position: Int?, of groups: [Group], _ items: (Group) -> [Item]) -> String? {
             guard var position else { return nil }

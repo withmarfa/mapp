@@ -307,7 +307,7 @@ extension Browser {
                 clock: !keyed.filter.relative.isEmpty || keyed.grouping.groupsByDate ? ClockDay(now: library.now()) : nil,
                 tokens: narrowingSearchTokens),
             basis: TableBasis(content: library.contentRevision, membership: library.membershipRevision, counts: library.counts.revision))
-        // An arrangement for other choices, such as a sort the person left again, is older than this table and never lands.
+        // Returning to a cached sort supersedes the sort the person just left.
         if let held = tableMemo, held.key == key {
             if arranging.map({ $0.key != key }) == true { endArranging() }
             return held.content
@@ -502,9 +502,7 @@ extension Browser {
         func isSamePlace(as other: DerivedKey) -> Bool { library == other.library && place == other.place }
     }
 
-    /// The day and the time zone what a place shows by date is worked out for: a date's group, which may say Today, a
-    /// filter relative to the day, the timeline's days. Every key of such work holds it, so a window open over midnight
-    /// or through a change of zone works it out again when its layout asks (`onClockChange`).
+    /// Date groups and relative filters can change at midnight or when the time zone changes.
     nonisolated struct ClockDay: Equatable, Sendable {
         let day: Date
         let zone: TimeZone
@@ -634,8 +632,7 @@ extension Browser {
         let hidesEmpty: Bool
         /// The names the server gave sources, which a row holds from when it was made, so the Source column sorts by them.
         let sources: [String: SourceInfo]
-        /// The day a filter relative to the day, or a group by date, is worked out for, so the table is made again when it
-        /// or the zone changes.
+        /// The clock used for relative filters and date groups.
         let clock: ClockDay?
         /// The search's tokens, which narrow the rows the table keeps.
         let tokens: [FilterClause]

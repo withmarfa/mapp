@@ -288,9 +288,8 @@ private enum ListLine: Identifiable {
     .frame(width: 340, height: 460)
 }
 
-/// Draws enough of a layout drawn a page at a time (`Browser.listItemsDrawn`) to show the item the keyboard is on, or else
-/// the one chosen item: one chosen past what is drawn, as by Back, a link or a new item, and one a change moves past it, as
-/// a sync can. Its own view, so only it reads the selection, never the layout's body.
+/// Tracks the cursor or selection in a separate view so a selection change can extend the page
+/// without making the layout observe the selection.
 struct ChosenItemDrawn: View {
     let browser: Browser
     /// Where each item of the layout stands, counting from its first.
