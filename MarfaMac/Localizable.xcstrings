@@ -522,6 +522,16 @@
     "%@ wasn’t added." : {
       "extractionState" : "manual"
     },
+    "%@ wasn’t added: %@ What you typed for it is kept. It comes back the next time you make a new item." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ wasn’t added: %2$@ What you typed for it is kept. It comes back the next time you make a new item."
+          }
+        }
+      }
+    },
     "%@ were changed elsewhere. The app read the new values; yours weren’t saved." : {
 
     },
@@ -2161,6 +2171,9 @@
 
     },
     "Add Address" : {
+
+    },
+    "Add Again" : {
 
     },
     "Add Attachment…" : {
@@ -10013,6 +10026,9 @@
     "The app quit while this file was being added. Check that it isn’t in the library before you add it again." : {
 
     },
+    "The app quit while this item was being added. Check that it isn’t in the library before you add it again." : {
+
+    },
     "The app ran into a problem it can’t resolve itself. Choose Refresh to try again." : {
 
     },
@@ -10134,6 +10150,9 @@
 
     },
     "The field leaves every %@, in every app. Items keep the values they hold, and an app can still read them." : {
+
+    },
+    "The file" : {
 
     },
     "The file couldn’t be added." : {
@@ -10910,6 +10929,9 @@
     "This file isn’t on this Mac, and the Marfa server can’t be reached." : {
       "extractionState" : "manual"
     },
+    "This file may already have been added. Add it again?" : {
+
+    },
     "This folder was stopped somewhere else." : {
 
     },
@@ -10974,6 +10996,9 @@
       "extractionState" : "manual"
     },
     "This item isn’t ready to link yet. Try again once its copy has loaded." : {
+
+    },
+    "This item may already have been added. Add it again?" : {
 
     },
     "This item’s file isn’t in Marfa." : {
