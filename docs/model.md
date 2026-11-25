@@ -5,7 +5,8 @@ paths:
   - MarfaMac/Model/Items/Item.swift
   - MarfaMac/Model/Items/ItemAllows.swift
   - MarfaMac/Model/Items/ItemMoves.swift
-  - MarfaMac/Model/SidebarItem.swift
+  - MarfaMac/Model/Place.swift
+  - MarfaMac/Model/EarlierPlaces.swift
   - MarfaMac/Model/Marfa/MarfaMapping*.swift
 ---
 
@@ -55,6 +56,15 @@ Two defaults name types: the sidebar's and toolbar's starting set for New, and t
 - **Also open:** two notices when planner and queue skips coincide; one notice per failed rearchive in a bulk Undo of Delete; Delete's toast counts what it planned; Undo of New Item before the item shows.
 - **Archive with what is beneath takes every active item under the selection through `parent-of`** (`archivePlan`). Marfa's own archive reaches no child.
 
+## Places and views
+
+- **A window shows a place and one of its views** (`PlaceView`). `Place` and `ViewChoice` list them. Each is stored as a word; an unknown place word is skipped and kept, and an unknown view word reads as the place's own.
+- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its order among the place's views is the app's (`ViewOrders`), then by title.
+- **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on the one Settings gives (`lists.defaultScope`).
+- **The Library's Favorites view has an ordinary From,** kept by the app like a place's own view. It starts on Library whatever `lists.defaultScope` says, and a person may set it to All Items, since a Feed item can be a favorite. Its Feed items carry the Feed's mark, as in any list.
+- **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
+- **What earlier copies kept is read in once** (`EarlierPlace`). Recents' settings stay where they are, since the Library already takes All Items'. Files is no place: the person is told once, and its settings stay for older copies. Include Subtypes is not read in, because it started off and Include Kinds starts on.
+
 ## Vocabulary
 
 Use these words in names, strings and comments. A word with "Marfa" is the server's and is used as the server uses it.
@@ -72,7 +82,10 @@ Use these words in names, strings and comments. A word with "Marfa" is the serve
 | Source | Marfa | What wrote an item. Its name and mark are Marfa's |
 | Saved view | Both | A `system.view` item: title, query, sort and group. The app adds the rest (`ViewMacSettings`) |
 | Item link | Marfa | An item's `marfa://` or `https` address (`ItemAppLink`) |
-| Place | App | What a sidebar row opens (`SidebarItem`) |
+| Place | App | Where a window can be (`Place`) |
+| Library, Feed | Marfa | The two tiers, as places. Never Inbox, Yours, From Apps or Recents |
+| From | App | Which tiers a place lists (`ListScope`) |
+| Kind | Marfa | A type below another |
 | Layout | App | How a list is drawn (`ItemViewMode`) |
 | Look | App | How one type is drawn in every list (`TypeLook`) |
 | Preset | App | The look a type starts from (`LookPreset`) |

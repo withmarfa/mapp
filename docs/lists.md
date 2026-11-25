@@ -27,7 +27,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A write that Marfa has not taken stays in the window.** Until it is taken, Save View sends it again and Revert View drops it (`hasViewChanges`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current**, because a copy that is filling also lacks things.
-- **Save as View saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves an exact-type condition; a Type filter takes its place.
+- **Save as View saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type, which Marfa takes with its kinds, and an exact-type condition only with Include Kinds off; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and a view's become the window's (`ViewDraft`).
 - **Making, renaming and deleting a view needs the server.** A view has no bin, so deleting one asks.
 
 ## Layouts
@@ -42,7 +42,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 ## View Options
 
-- **The order is fixed:** filters, sort, group, properties, the layout's own options, subtypes, then the view's commands. The menu bar and palette have the same (`ViewOptionCommand`).
+- **The order is fixed:** filters, sort, group, properties, the layout's own options, Include Kinds, then the view's commands. The menu bar and palette have the same (`ViewOptionCommand`).
 - **An option that a place or layout lacks is absent.**
 
 ## Grouping
@@ -87,7 +87,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 ## Indexes
 
-- **Items, Collections and Sources are lists of things, not of items of one view** (`IndexPage`). A long list of items is worked out off the main actor (`ItemIndexModel`).
+- **The Library's index, Collections and Sources are lists of things, not of items of one view** (`IndexPage`). The Library's tabs are All, Library and Feed. A long list of items is worked out off the main actor (`ItemIndexModel`).
 - **Trap:** an index page's body must not read the choice, or choosing a row draws every row.
 - **A row's count is of what the place lists.**
 
