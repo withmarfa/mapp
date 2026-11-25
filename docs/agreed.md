@@ -139,7 +139,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Follow a chip | A click on a chip that is not being edited lists everything that shares its value, as a search token. | `PageChip`, `SearchNarrowing` | `Rethink-Follow-Chip` |
-| Drag onto a collection | A drop on a collection's row in the sidebar adds the items. Nothing else takes a drop there, and nothing springs open. | `SidebarGroups.swift` | `Rethink-Drag-To-Collection` |
 | Board lanes | Lanes are dragged into an order. | `ItemBoard.swift` | – |
 | Edit the type | A field's menu opens the type in Settings. | `FieldMenu` | – |
 | Settings' parts | A connector's Files row in its mapping. **Waits for Marfa.** | `MarfaMac/Settings/Marfa/` | – |

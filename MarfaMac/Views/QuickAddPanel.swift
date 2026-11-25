@@ -81,7 +81,7 @@ struct QuickAddPanel: View {
         .overlay {
             if isDropTargeted {
                 RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.accentColor, lineWidth: 2)
+                    .strokeBorder(Color.primary.opacity(0.3), lineWidth: 2)
                     .allowsHitTesting(false)
             }
         }

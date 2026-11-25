@@ -61,7 +61,8 @@ struct DropStep {
     /// Closes the group, named `name`, and returns what the toast's Undo takes back: nil where the drop began inside
     /// another group, since Undo would take that group's other steps with it.
     func finish(named name: String) -> StepUndo? {
-        undoManager?.setActionName(name)
+        // With no group open nothing was registered, which a drop the library refused leaves.
+        if let undoManager, undoManager.groupingLevel > 0 { undoManager.setActionName(name) }
         if opensGroup { undoManager?.endUndoGrouping() }
         guard startsGroup, let undoManager, undoManager.canUndo else { return nil }
         return StepUndo(undoManager: undoManager)
