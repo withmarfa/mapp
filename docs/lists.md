@@ -62,9 +62,9 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 ## Several items chosen
 
-- **Several selected items show a capsule at the foot** (`SelectionCapsule`), beneath a pile beside a list (`SelectionPile`). Keep leads for Feed items. More offers Move to Feed where it applies.
+- **Several selected items show a capsule at the foot** (`SelectionCapsule`), beneath a pile beside a list (`SelectionPile`). Keep leads for Feed items. More offers Move to Feed.
 - **The capsule uses the item commands.** In narrow columns, Add Tag, Add to Collection and Change Type move into More. Toasts and the corner sit above it.
-- **The count and Escape clear the selection.** ⌘⌫ deletes selected items (`deletesChosen`). Share and Copy Link require one item.
+- **The count and Escape clear the selection.** ⌘⌫ deletes the selected items the layout shows (`deletesChosen`). Share and Copy Link require one item.
 
 ## The View panel
 
