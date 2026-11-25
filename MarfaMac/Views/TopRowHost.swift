@@ -244,6 +244,17 @@ private struct TopRowTableProbe: NSViewRepresentable {
         private func follow(_ table: NSTableView, in scroll: NSScrollView) {
             stop()
             self.table = table
+            // The room the toolbar leaves is read from the scroll view's frame and the window's, which a resize sets after
+            // this view's layout: the insets are set again once each has its new size.
+            scroll.postsFrameChangedNotifications = true
+            observers.append(NotificationCenter.default.addObserver(
+                forName: NSView.frameDidChangeNotification, object: scroll, queue: .main
+            ) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } })
+            if let window = scroll.window {
+                observers.append(NotificationCenter.default.addObserver(
+                    forName: NSWindow.didResizeNotification, object: window, queue: .main
+                ) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } })
+            }
             scroll.contentView.postsBoundsChangedNotifications = true
             observers.append(NotificationCenter.default.addObserver(
                 forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main
