@@ -176,7 +176,7 @@ extension MarfaEngine {
             case .active:
                 return []
             case .archived:
-                // Restored and archived elsewhere since: a restore would unarchive it.
+                // The copy would show it as active until the server refused the restore.
                 throw Refused(problem: SyncProblem(code: "changed_since", message: BatchSkips.sentence(.changedSince, count: 1)))
             default:
                 // A row the copy does not hold, as one the slice let go, is restored by its id and shown nowhere

@@ -42,7 +42,7 @@ nonisolated enum ItemWrite: Hashable, Sendable {
     case retype(ItemID, TypeID, [String: PropertyValue?], base: ItemVersion)
     /// Marfa moves a row's tier as an update, which carries the version it read.
     case retier(ItemID, Tier, base: ItemVersion)
-    /// Never takes an item out of Recently Deleted; only `restore` does.
+    /// Archive, Unarchive, or Delete.
     case transition(ItemID, ItemState)
     /// Out of Recently Deleted, to active.
     case restore(ItemID)
