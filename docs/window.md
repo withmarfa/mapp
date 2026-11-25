@@ -54,15 +54,15 @@ paths:
 - **The views are a radio group;** VoiceOver reads every view, whatever has folded.
 - **The row folds by the room it has** (`ToolbarRoomProbe`) and holds no width.
 - **An on button is gray, never the accent.** An item that cannot act dims.
-- **Trap:** hide the title on the window (`hidesWindowTitle`), or it returns in full screen. Read the row's line from `TopRowSpace`, never a safe area: full screen hides the toolbar, and slides it down with the menu bar without changing the safe area, so the row follows that window (`ToolbarRevealProbe`).
+- **Trap:** hide the title on the window (`hidesWindowTitle`), or it returns in full screen. Read the row's line from `TopRowSpace`, never a safe area: full screen hides the toolbar.
 
 ## Sidebar closed
 
-- **The title opens the sidebar's rows as a menu** (`PlacesMenu`); over a column that spans the window, place, views and buttons share one row, and beside a page the views have the row below.
+- **The title opens the sidebar's rows as a menu** (`PlacesMenu`); place, views and buttons share one row, but beside a page, in a list column or under 800 wide, the title and views have the row below.
 
 ## Smallest window
 
-- **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900, and under 800 the views are one pill beside the title, which has the row below while a page is beside the layout.
+- **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900, and under 800 the views are one pill beside the title.
 - **Only what the window folded opens again,** also after a quit.
 - **The panel is 300 wide** in every window (`PanelWidth`).
 
@@ -81,11 +81,11 @@ paths:
 ## Opening an item
 
 - **Open, Return, a double click and a link follow Open Items** (`ItemOpening`).
-- **Beside the List is the standard:** a layout that spans the window shows the chosen item's page in a column of 372 (`BesideColumn`), and a new row replaces it once the selection rests (`BesideSettler`).
+- **Beside the List is the standard:** a layout that spans the window shows the chosen item's page in a column of up to 372 (`BesideColumn`), and a new row replaces it once the selection rests (`BesideSettler`).
 - **A column, a modal and a full page show one item** with the window's one editor, one at a time. New Window takes several and asks first above a limit (`ItemWindows`).
 - **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`), Keep moves on once queued, and a followed link stays in it.
 - **An item's window has the modal's controls and the panel** (`ItemWindowToolbar`); Back and Forward walk its links (`ItemWindow.go`).
-- **A full page's Back returns to the layout**, and the list's view options are not offered.
+- **A full page's Back returns to the layout**; it offers no view options.
 
 ## Item links
 
