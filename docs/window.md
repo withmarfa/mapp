@@ -80,7 +80,7 @@ paths:
 
 ## Opening an item
 
-- **Open, Return, a double click and a link follow Open Items** (`ItemOpening`), and the menu offers the other ways.
+- **Open, Return, a double click and a link follow Open Items** (`ItemOpening`).
 - **Beside the List is the standard:** a layout that spans the window shows the chosen item's page in a column of 372 (`BesideColumn`), and a new row replaces it once the selection rests (`BesideSettler`).
 - **A column, a modal and a full page show one item** with the window's one editor, one at a time. New Window takes several and asks first above a limit (`ItemWindows`).
 - **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`), Keep moves on once queued, and a followed link stays in it.
@@ -90,9 +90,9 @@ paths:
 ## Item links
 
 - **An item's app link is `marfa://`, its Marfa's id, then its own,** both exact and lowercase (`ItemAppLink`). Any other form is refused.
-- **A link only opens,** never writes, signs in, changes a setting or calls the server.
+- **A link only opens,** never writes, signs in, changes a setting or calls the server: any page can send one.
 - **It opens only when** the Marfa it names is the connected one, the copy holds the item, and the item is not in Recently Deleted. Otherwise the person is told why (`ItemLinkRoute`).
-- **It opens in the main window last in front** (`ItemLinkOpener`), as Open Items says.
+- **It opens in the main window last in front** (`ItemLinkOpener`), as a full page where Open Items says so and over the list otherwise.
 - **The newest link wins** over one that waits for the library or a window.
 - **Copy Link copies the server's `https` address**, and the `marfa://` one where the server gives none. Copy Wiki Link copies the text form.
 - **Trap:** a Debug test build registers another scheme (`ITEM_LINK_SCHEME`), so it never takes the installed app's links.
