@@ -143,7 +143,7 @@ private struct ViewPanelMain: View {
             ViewPanelUnkept(browser: browser)
             ViewPanelNewFoot(browser: browser, panel: panel)
         } else {
-            ViewPanelFoot(text: panel.purpose == .place ? ViewPanelKeeping.mac : ViewPanelKeeping.marfa)
+            ViewPanelFoot(text: panel.purpose == .place ? ViewPanelKeeping.mac : ViewPanelKeeping.savedViewOverview)
         }
     }
 
@@ -426,7 +426,7 @@ private struct ViewPanelNewFoot: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Divider()
-            Text(verbatim: ViewPanelKeeping.marfa)
+            Text(verbatim: ViewPanelKeeping.savedViewOverview)
                 .interfaceFont(.callout)
                 .foregroundStyle(.secondary)
             HStack {

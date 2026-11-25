@@ -57,7 +57,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 ## The View panel
 
 - **One popover under the View button holds the view** (`ViewPanelPopover`). Filter, Sort, Group, Properties and Types open one level in. The palette lists the same choices (`ViewOptionCommand`).
-- **Its foot says where they are kept:** "Kept for Marfa for Mac." for a place, "Saved in Marfa for every app." for a saved view.
+- **The footer names which settings Marfa shares and which Marfa for Mac keeps.**
 
 ## Grouping
 
@@ -85,7 +85,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 - **A new operator or kind changes every row of that table.** `FilterMatching` and the query must keep the same items; test both directions (`FilterClauseTests`, `ViewDraftTests`).
 - **Marfa's filter is one list, joined all by and or all by or.** A mix is refused before it is sent (`search-and-filters/filter-mixed-logic`), except that "is" several words of a closed field is written as "is not" the others.
 - **A view takes ten conditions.** Each value and each bound of a date counts.
-- **Marfa has no relative date or filter group,** so the Filter page offers neither. A default view keeps relative ones (`FilterOp.isRelative`).
+- **Marfa has no relative date or filter group,** so the Filter page offers neither. A default view still reads relative dates it already holds (`FilterOp.isRelative`).
 - **Marfa has no "does not include"** for people and tags, and cannot ask about a list of words, so neither is offered.
 - **A day is the person's day.** A date with a time is bounded by the Mac's clock, with its offset. A date alone is midnight UTC in Marfa, so it is counted in UTC (`FilterTarget.isDateOnly`).
 - **A condition the window cannot show is a locked row,** kept whenever the view is written.

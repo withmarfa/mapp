@@ -259,6 +259,7 @@ struct Arrangeable: ViewModifier {
 enum ViewPanelKeeping {
     static let marfa = String(localized: "Saved in Marfa for every app.")
     static let mac = String(localized: "Kept for Marfa for Mac.")
+    static let savedViewOverview = String(localized: "Everything under Items is saved in Marfa for every app. The rest is kept for Marfa for Mac.")
 
     /// The foot of a part whose choices Marfa saves in a saved view, and this Mac keeps for a place.
     static func foot(of panel: ViewPanel) -> String {
