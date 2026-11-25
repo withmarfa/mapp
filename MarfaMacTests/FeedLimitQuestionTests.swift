@@ -73,7 +73,7 @@ import Testing
             item("d", F.note, daysOld: 400), item("e", F.task, daysOld: 99, tier: .feed), item("f", F.task, daysOld: 99, state: .archived),
             item("p", F.project, daysOld: 8),
         ])
-        let ids = Set(["a", "b", "c", "d", "e", "f"].map(ItemID.init))
+        let ids = Set(["a", "b", "c", "d", "e", "f"].map { ItemID($0) })
         #expect(library.feedLimitQuestion(for: ids, now: Self.now) == FeedLimitQuestion(pastWindow: 2, window: nil),
                 "two types share no one window")
         #expect(library.feedLimitQuestion(for: ids.union([ItemID("p")]), now: Self.now)?.pastWindow == 3)
