@@ -88,7 +88,7 @@ nonisolated enum ItemTag {
     }
 }
 
-/// Something about an item as read that keeps it from being edited, such as properties the library could not read.
+/// Values or text the library could not read.
 nonisolated struct ItemProblem: Hashable, Sendable {
     let message: String
     /// The library could not read the item's text either, so the page shows none and says why.
@@ -131,9 +131,7 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
     var edgesOut: [Edge] = []
     var sync: SyncState = .settled
     var problem: ItemProblem?
-    /// Whether the server advises that a person's connector keeps this item, so a change made here would be put back
-    /// on the connector's next run. Advice only: the server refuses no write, and the value can be older than 15
-    /// minutes. What the app still offers on such an item is `obstacle(to:)`'s.
+    /// Advice from Marfa that a connector manages this item. May be more than 15 minutes old.
     var readOnly = false
     /// Each embed in this item's text, in order, with the file item the library bound it to or why it has none.
     var boundEmbeds: [BoundEmbed] = []

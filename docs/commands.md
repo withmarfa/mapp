@@ -26,7 +26,7 @@ The menu bar is the full list of commands. Every toolbar, corner and row command
 
 ## Tier and state
 
-Keep in Library, Move to Feed, Archive and Unarchive are `ItemLibrary` calls that take the whole selection and return a `CommandOutcome`, whose words are `movedMessage`.
+The `ItemLibrary` calls take the whole selection and return a `CommandOutcome`. Pass it to `movedMessage` to format the result.
 
 | Call | Moves | Leaves alone |
 | --- | --- | --- |

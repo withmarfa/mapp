@@ -16,10 +16,8 @@ nonisolated extension Item {
     ///
     /// - In Recently Deleted, nothing changes; Recover and Delete Immediately are not changes here.
     /// - Archived blocks nothing.
-    /// - Read only, which a connector keeps, blocks the title, text, fields and type, which its next run puts back. Its
-    ///   tags, state and tier it leaves as they stand (`items/natural-key-tags`, `items/tier-upsert`).
-    /// - A file has no text and keeps its type. Its title and the fields a person may change are edited as any other's;
-    ///   what the server sets (`MarfaMapping.fileFacts`) is never a row.
+    /// - Read only blocks edits to the connector-managed title, text, properties and type.
+    /// - A file has no text and keeps its type. Its page hides the fields in `MarfaMapping.fileFacts`.
     /// - A problem, values the library could not read, blocks the writes of the row itself: title, fields, type and
     ///   tier, and the text only where the text could not be read either.
     func obstacle(to change: ItemChange) -> BatchSkips.Reason? {

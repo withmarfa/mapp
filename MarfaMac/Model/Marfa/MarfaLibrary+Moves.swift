@@ -1,8 +1,6 @@
 import Foundation
 
-/// Keep, Move to Feed, Archive and Unarchive. Marfa has no call that moves many items, so each item is its own queued
-/// write, and a command's writes are one undo step. Archive and Unarchive are state changes, made and undone as Delete's
-/// are (`setStates`); a tier is an update that carries the version the copy holds (`items/update-tier`).
+/// Each item moves through the working copy’s queue so these commands work offline.
 extension MarfaLibrary {
     @discardableResult
     func setTier(_ ids: Set<ItemID>, to tier: Tier, undoManager: UndoManager?) -> CommandOutcome {
@@ -36,9 +34,7 @@ extension MarfaLibrary {
         return CommandOutcome(plan.changing, skips: plan.skips)
     }
 
-    /// As `setStates`: an Undo or Redo moves only an item still in the tier this Mac left it in (`tierLeft`), and the
-    /// step registered in return reverses only what the server took or may still take. A tier write carries a version,
-    /// so a change another device made in the meantime is refused by the server and told, never written over.
+    /// `tierLeft` includes writes the source has yet to show, so an undo can follow a pending move.
     func setTiers(_ changes: [ItemID: TierChange], name: String, undoManager: UndoManager?) {
         var changes = changes.filter { item($0.key) != nil }
         var changedSince = BatchSkips()

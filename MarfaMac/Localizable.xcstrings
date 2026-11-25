@@ -955,9 +955,6 @@
         }
       }
     },
-    "%lld items are collections, which stay in the Library." : {
-
-    },
     "%lld items are files, which can’t be moved between lanes." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1204,6 +1201,28 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld items have changed since, so they were left as they are."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld items must stay in the Library." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item must stay in the Library."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items must stay in the Library."
                 }
               }
             }
@@ -1713,6 +1732,9 @@
 
     },
     "A connector comes with its plugin. Its settings and secrets are kept in %@." : {
+
+    },
+    "A connector manages this item’s title, text, properties, and type." : {
 
     },
     "A connector’s sign-in needs the app signed in as an app. Sign in again in Connection." : {
@@ -7636,9 +7658,6 @@
     },
     "Read and Edit" : {
 
-    },
-    "Read only. A connector manages this item, so changes made here would be overwritten." : {
-      "extractionState" : "manual"
     },
     "Read the Audit Log" : {
 

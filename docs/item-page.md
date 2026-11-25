@@ -41,7 +41,7 @@ The page and the right sidebar draw what `Item.allows(_:)` answers, and never ju
 
 | The item is | The page |
 | --- | --- |
-| Read only | Locks the title, text and fields. Tags, Favorite, collections and links stay open, because the connector's next run keeps them |
+| Read only | Locks the title, text, properties, and type. Tags, Favorite, collections, and links stay open |
 | A file | Has no text and no Change Type. Its title, location and the fields a person may change stay open |
 | In Recently Deleted | Locks everything but Recover and Delete Immediately |
 

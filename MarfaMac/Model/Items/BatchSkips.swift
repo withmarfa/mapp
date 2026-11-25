@@ -58,7 +58,7 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case .cantBecomeType: String(localized: "\(count) items can’t become this type.")
         case .isCollection: String(localized: "\(count) items are collections, which can’t be in another collection.")
         case .cantJoinCollection: String(localized: "\(count) items can’t be filed in a collection.")
-        case .staysInLibrary: String(localized: "\(count) items are collections, which stay in the Library.")
+        case .staysInLibrary: String(localized: "\(count) items must stay in the Library.")
         case .fullOfTags: String(localized: "\(count) items already have the most tags an item can have.")
         case .cantMoveToLane: String(localized: "\(count) items can’t go in this lane.")
         case .needsValue: String(localized: "\(count) items need a value there, so it can’t be cleared.")

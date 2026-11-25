@@ -190,7 +190,7 @@ struct ItemInspector: View {
                         .interfaceFont(.callout).foregroundStyle(.red)
                 }
                 if item.readOnly {
-                    Label("Read only. A connector manages this item, so changes made here would be overwritten.", systemImage: "lock")
+                    Label("A connector manages this item’s title, text, properties, and type.", systemImage: "lock")
                         .interfaceFont(.callout).foregroundStyle(.secondary)
                 }
                 ForEach(sections, id: \.id) { section in

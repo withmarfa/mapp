@@ -49,7 +49,7 @@ extension ValueEditModel {
     private func holds(entry text: String) -> Bool {
         switch kind {
         case .tags:
-            // An item that became read-only still holds a tag that reached it first.
+            // An item moved to Recently Deleted still holds a tag saved before the move.
             let tag = ItemTag.normalized(text)
             let items = request.targets.compactMap(library.item)
             let taking = items.filter { $0.allows(.tags) }
