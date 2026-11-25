@@ -473,6 +473,29 @@ struct FilterClauseTests {
         #expect(tasks.filter == #"type eq "core.task" OR source eq "mail""#)
     }
 
+    @Test func aTypeAddedToAnAnyFilterIsOneOfItsConditionsAndNeverTheViewsTypes() throws {
+        var targets = Self.targets
+        targets[FilterTarget.type.id] = .type
+        targets[FilterTarget.source.id] = .source
+        func written(_ query: LibraryViewQuery, adding type: String) -> (query: LibraryViewQuery, unkept: [ViewDraft.Unkept]) {
+            let view = LibraryView(id: ItemID("v"), title: "V", query: query)
+            var state = ViewDraft.options(for: view, catalogue: Self.catalogue).filter
+            #expect(state.matchesAny)
+            state.clauses.append(Self.clause("type", .is, [type]))
+            return ViewDraft.replacing(query, with: state, targets: targets, seededTypes: nil, catalogue: Self.catalogue)
+        }
+        let anyOf = LibraryViewQuery(filter: #"source eq "mail" OR source eq "calendar""#)
+        let notes = written(anyOf, adding: "core.note")
+        #expect(notes.query.types.isEmpty, "the view's types would narrow every other condition")
+        let filter = try #require(notes.query.filter)
+        #expect(filter.contains(#"type eq "core.note""#) && filter.contains(#"source eq "mail""#) && !filter.contains(" AND "))
+        // A type outside the view's own types cannot be one of its conditions, so it is not saved, and the person is told.
+        let tasks = LibraryViewQuery(types: [Self.task], filter: anyOf.filter)
+        let outside = written(tasks, adding: "core.note")
+        #expect(outside.query == tasks)
+        #expect(outside.unkept.contains(.filter(column: FilterTarget.type.label)))
+    }
+
     @Test func aConditionTheRowCannotShowIsLockedAndTheRestIsShown() throws {
         let query = LibraryViewQuery(types: [Self.task], filter: #"id eq "x" AND properties.owner eq "ann" AND properties.status eq "todo" AND state eq "active""#)
         let locked = ViewDraft.unshownConditions(of: query, catalogue: Self.catalogue)
