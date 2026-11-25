@@ -105,6 +105,9 @@
         }
       }
     },
+    "%@ Selected" : {
+
+    },
     "%@ Template" : {
 
     },
@@ -745,6 +748,16 @@
     "%lld" : {
 
     },
+    "%lld %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld %2$@"
+          }
+        }
+      }
+    },
     "%lld %@ Brought Before" : {
       "localizations" : {
         "en" : {
@@ -774,6 +787,9 @@
 
     },
     "%lld Hours" : {
+
+    },
+    "%lld Items" : {
 
     },
     "%lld MB" : {
@@ -3541,9 +3557,6 @@
     "Choose it in Runs next time, or remove it in Terminal with %@." : {
 
     },
-    "Choose one item to read or edit it." : {
-
-    },
     "Choose the machine that runs %@ to see one." : {
 
     },
@@ -4297,6 +4310,9 @@
     },
     "Description" : {
       "extractionState" : "manual"
+    },
+    "Deselect All" : {
+
     },
     "Details" : {
       "extractionState" : "manual"
@@ -8776,6 +8792,9 @@
     },
     "Selected" : {
       "extractionState" : "manual"
+    },
+    "Selection" : {
+
     },
     "Send" : {
 
