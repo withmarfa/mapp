@@ -28,7 +28,7 @@ struct SavedViewCommand {
             })
         }
         if let view = shown {
-            if browser.isViewChanged {
+            if browser.canRevertView {
                 commands.append(SavedViewCommand(title: String(localized: "Revert View"), systemImage: "arrow.uturn.backward") {
                     browser.revertView(in: library)
                 })
@@ -83,7 +83,7 @@ struct SavedViewMenu: View {
             if let browser, let library { browser.revertView(in: library) }
         }
         .shortcut(.revertView, shortcuts)
-        .disabled(shown == nil || browser?.isViewChanged != true)
+        .disabled(shown == nil || browser?.canRevertView != true)
         Button("Reset View", systemImage: "arrow.uturn.backward") {
             if let browser, let library { browser.resetView(in: library) }
         }

@@ -105,7 +105,7 @@ extension Browser {
         guard shown.isSame(snapshot.place) else { return }
         restoreSetAsideSearch(of: panel)
         // A saved view shows what it became while the draft held the window: a change elsewhere, or an Undo of its own.
-        if snapshot.place.savedView != nil, let library { followView(in: library) }
+        if let id = snapshot.place.savedView, let library { followView(id, after: snapshot, in: library) }
     }
 
     /// Hands back an unsaved draft or rename when the window changes place.
@@ -144,7 +144,8 @@ extension Browser {
             place: place, options: tableOptions[place], timelineDate: timelineFields[place], viewMode: viewMode,
             columns: defaults.data(forKey: ItemTableColumnLayouts.key), mac: id.map { macSettings(for: $0) },
             cards: id == nil ? placeCards[place] : nil, density: id == nil ? density : nil,
-            placeDefault: id == nil && Self.hasDefaultView(place) ? PlaceDefaults.stored(in: defaults).default(for: place) ?? PlaceDefault() : nil)
+            placeDefault: id == nil && Self.hasDefaultView(place) ? PlaceDefaults.stored(in: defaults).default(for: place) ?? PlaceDefault() : nil,
+            seed: id.flatMap { viewSeeds[$0] })
     }
 
     /// Puts the place back. A new view that was made keeps the layout the person chose for it.

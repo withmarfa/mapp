@@ -957,6 +957,58 @@ struct ViewPanelTests {
         #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.widths == nil)
     }
 
+    @Test func aWriteReturningDuringADraftLeavesTheDraftsSortAndCancelShowsWhatTheViewBecame() async throws {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewChange = { await withCheckedContinuation { release = $0 } }
+        let merged = [LibraryViewSort(field: "title", ascending: true)]
+        library.changedElsewhere = { $0.sort = merged }
+        browser.setFilter(Self.status, values: ["todo"])
+        let task = browser.choicesChanged()
+        Self.close(undo)
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        let sort = browser.tableOptions[browser.shown]?.sort
+        let filter = browser.tableOptions[browser.shown]?.filter
+        browser.openNewViewPanel(in: library)
+        release?.resume()
+        await task?.value
+        let held = try #require(Self.held(library))
+        #expect(held.sort == merged, "another app's sort was merged into the write")
+        #expect(browser.tableOptions[browser.shown]?.sort == sort, "the draft's sort stays")
+        browser.escapeViewPanel(in: library)
+        #expect(browser.tableOptions[browser.shown]?.sort == ViewDraft.options(for: held, catalogue: library.catalogue).sort)
+        #expect(browser.tableOptions[browser.shown]?.filter == filter)
+        #expect(!browser.hasViewChanges)
+    }
+
+    @Test func cancelOfADraftShowsTheLayoutAnotherMacChoseForTheView() {
+        let (browser, library, undo) = Self.opened()
+        browser.openNewViewPanel(in: library)
+        undo.beginUndoGrouping()
+        browser.viewMode = .gallery
+        Self.close(undo)
+        Self.arrive(on: browser) { $0.layout = .list }
+        browser.escapeViewPanel(in: library)
+        #expect(browser.viewMode == .list)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.layout == .list)
+    }
+
+    @Test func revertViewIsNotOfferedWhileADraftIsOpenAndChangesNothing() {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.changeDensity(.compact)
+        Self.close(undo)
+        #expect(browser.canRevertView)
+        browser.openNewViewPanel(in: library)
+        #expect(!browser.canRevertView)
+        browser.revertView(in: library)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.density == .compact)
+        #expect(browser.viewPanel?.isNew == true)
+        browser.escapeViewPanel(in: library)
+        #expect(browser.canRevertView)
+    }
+
     @Test func revertPutsBackOnlyTheMacSettingsThisWindowChangedAndKeepsAnotherMacsAndSaysSo() {
         let (browser, library, undo) = Self.opened()
         undo.beginUndoGrouping()

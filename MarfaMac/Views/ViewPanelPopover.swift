@@ -177,7 +177,7 @@ private struct ViewPanelNameHead: View {
         Menu {
             if let id = panel.viewID {
                 Button("Revert View", systemImage: "arrow.uturn.backward") { browser.revertView(in: library) }
-                    .disabled(!browser.isViewChanged)
+                    .disabled(!browser.canRevertView)
                 Button("Save as New View…", systemImage: "plus.rectangle.on.rectangle") { browser.openNewViewPanel(in: library) }
                     .disabled(!canSave)
                 Button("Rename…", systemImage: "pencil") { panel.isRenaming = true }

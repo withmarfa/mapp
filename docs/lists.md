@@ -34,7 +34,8 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **While a change waits, the window lists the view's query with its own filters, From and Archived Items** (`viewPreview`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
-- **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`). Settings and widths chosen meanwhile are the draft's (`ViewPanel.mac`); Cancel writes nothing to the original.
+- **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`).
+- **A draft from a saved view owns the window,** settings and widths (`ViewPanel.mac`). Revert View is off and a returning write leaves it. Cancel writes nothing and shows the original as it is now.
 - **Making, renaming and deleting a view needs the server and is never queued.** A changed or submitted draft stays open; leaving it, or a late refusal, gives it back in words. A rename never replaces another app's; deleting asks.
 - **Starting points list what Marfa saves** (`NewViewStart`). This Search comes first while searching and saves supported tokens and From unless From changed. An existing view opens after confirmation if the draft changed.
 - **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
@@ -85,7 +86,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 - **A new operator or kind changes every row of that table.** `FilterMatching` and the query must keep the same items; test both directions (`FilterClauseTests`, `ViewDraftTests`).
 - **Marfa's filter is one list, joined all by and or all by or.** A mix is refused before it is sent (`search-and-filters/filter-mixed-logic`), except that "is" several words of a closed field is written as "is not" the others.
-- **An untouched Type condition stays in the filter,** as does any in a filter matched by Any. One outside the view's types is not saved, and the person is told.
+- **An untouched Type condition stays in the filter,** as does every type in an Any filter, whatever the view's types.
 - **A view takes ten conditions.** Each value and each bound of a date counts.
 - **Marfa has no relative date or filter group,** so the Filter page offers neither. A default view still reads relative dates it already holds (`FilterOp.isRelative`).
 - **Marfa has no "does not include"** for people and tags, and cannot ask about a list of words, so neither is offered.
@@ -112,7 +113,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 ## Search
 
-- **A search is narrowed in the query, never after it** (`SearchNarrowing`), except a token Marfa cannot say (`ItemTableContent`). Counting Marfa's limit first would hide matches. More conditions than a query takes are refused and named.
+- **A search is narrowed in the query, never after it** (`SearchNarrowing`), except a token Marfa cannot say (`ItemTableContent`). More conditions than a query takes are refused and named.
 - **What a search leaves out is said** (`SearchLeaveOuts`), with a way to include it.
 - **The list's search is tokens and words** (`ColumnSearch`). Return on an offer (`SearchOffers`) makes a token; a change of place clears it. A Type token narrows within the place's types; in Archive it searches archived items.
 - **A search in the list is sorted by relevance until the person sorts it.** The gallery and the table keep their own sorts until relevance is picked (`Browser.ordersByRelevance`).

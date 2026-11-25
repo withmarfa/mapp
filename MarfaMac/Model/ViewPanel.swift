@@ -32,6 +32,8 @@ final class ViewPanel {
         let density: Density?
         /// What the place's default view kept, where the place is not a view.
         let placeDefault: PlaceDefault?
+        /// What Marfa held for the view as the window last read it, where the place is one.
+        var seed: Browser.ViewSeed?
     }
 
     /// What the popover shows: the view's settings, or one of them opened in place, with a way back.

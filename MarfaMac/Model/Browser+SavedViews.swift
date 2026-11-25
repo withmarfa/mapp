@@ -79,7 +79,8 @@ extension Browser {
             version: view.version, options: options, viewFilter: options.filter, timelineDate: timelineDate, types: types,
             preview: ViewDraft.previewQuery(of: view.query, seededTypes: types, catalogue: catalogue), mac: mac)
         guard !keepingWindow else {
-            if let earlier {
+            // A new view's draft made from the view holds the window; Cancel shows what the view became.
+            if let earlier, newViewPanel(from: view.id) == nil {
                 follow(ViewChoices(options: options, timelineDate: timelineDate), of: view, in: place, over: earlier, sent: sent)
             }
             return
@@ -97,6 +98,17 @@ extension Browser {
         }
     }
 
+    /// Cancel of a new view's draft made from the view shows the view as opening it does: the settings this Mac stores
+    /// for it, and each setting a write returned meanwhile that the person had not changed before the draft.
+    func followView(_ id: ItemID, after snapshot: ViewPanel.Snapshot, in library: any ItemLibrary) {
+        viewSeeds[id]?.mac = ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
+        if let opened = snapshot.seed, let now = viewSeeds[id], now.version != opened.version,
+           let view = library.views.first(where: { $0.id == id }) {
+            follow(ViewChoices(options: now.options, timelineDate: now.timelineDate), of: view, in: .saved(id), over: opened, sent: LibraryViewChange())
+        }
+        followView(in: library)
+    }
+
     /// Keeps the view as the window first shows it, for Revert View, until the window shows another place.
     private func noteOpened(_ view: LibraryView) {
         guard openedView?.id != view.id, viewSeeds[view.id] != nil else { return }
@@ -111,6 +123,12 @@ extension Browser {
         var mac = macSettings(for: opened.id)
         mac.layout = viewMode
         return !liveChoices.parts(differingFrom: opened.choices).isEmpty || !mac.sameChoices(as: opened.mac)
+    }
+
+    /// Whether Revert View is offered: never while a new view's draft made from the view holds the window.
+    var canRevertView: Bool {
+        guard let id = openedView?.id else { return false }
+        return newViewPanel(from: id) == nil && isViewChanged
     }
 
     /// Shows the settings of a view a write returned that the person has not changed since `earlier`, the seed the
@@ -436,7 +454,7 @@ extension Browser {
     /// it then, with what the window cannot show (`OpenedView.raw`). A setting another app changed since, as Marfa holds
     /// it, stays and the person is told. One step of Undo brings the person's changes back.
     func revertView(in library: any ItemLibrary) {
-        guard let id = openedView?.id, shown.isSame(.saved(id)), isViewChanged else { return }
+        guard let id = openedView?.id, shown.isSame(.saved(id)), canRevertView else { return }
         // A change the window has not yet passed through the funnel is still its own.
         choicesChanged()
         guard let opened = openedView, let now = library.views.first(where: { $0.id == id }) else { return }
