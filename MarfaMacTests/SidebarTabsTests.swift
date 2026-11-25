@@ -61,6 +61,9 @@ struct SidebarTabsTests {
         let groups = try #require(back["groups"] as? [[String: Any]])
         #expect(groups.map { $0["id"] as? String } == ["library", "later", "types"])
         #expect(groups[1]["kind"] as? String == "pinboard" && groups[1]["extra"] as? Int == 1)
+        // Only sections this copy cannot read show none, not the sections a new sidebar starts with.
+        let onlyLater = Data(#"{"groups":[{"id":"later","kind":"pinboard","tab":"home"}]}"#.utf8)
+        #expect(try JSONDecoder().decode(SidebarLayout.self, from: onlyLater).allGroups.isEmpty)
     }
 
     @Test func draggingARowAcrossTheBlocksOfADefaultSectionIsKept() {

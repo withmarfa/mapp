@@ -176,7 +176,7 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
                     laterGroups[index] = raw
                 }
             }
-            groups = known.isEmpty && !laterGroups.isEmpty ? nil : known
+            groups = known
         }
         homes = try values.decodeIfPresent([String: String].self, forKey: .homes)
         colors = try values.decodeIfPresent([String: String].self, forKey: .colors)
