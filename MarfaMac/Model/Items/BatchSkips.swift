@@ -1,8 +1,6 @@
 import Foundation
 
-/// The items a command on a selection left alone, counted by why, so the person is told how many and why and no
-/// item is passed over without a word. An item already as the command would leave it is not skipped: there was
-/// nothing to do for it.
+/// Counts the items a command skipped by reason for a single notice.
 nonisolated struct BatchSkips: Equatable, Sendable {
     /// Why an item took no part. The words say what the person can do about it, or that nothing can be.
     enum Reason: CaseIterable, Sendable {
@@ -103,10 +101,7 @@ extension ItemLibrary {
         return (changing, skips)
     }
 
-    /// The items among `ids` that Delete moves to Recently Deleted, and why it leaves the others. An item a connector
-    /// keeps goes too: its next run leaves an item in the bin there (`items/natural-key-trashed`). An item already in
-    /// the bin or no longer held is skipped and counted, though a choice made only of items in the bin is not a Delete
-    /// but an erase (`Browser.delete`), which says nothing of them.
+    /// A connector's item can move because the next sync keeps it in Recently Deleted (`items/natural-key-trashed`).
     func deletePlan(_ ids: Set<ItemID>) -> (moving: Set<ItemID>, skips: BatchSkips) {
         var skips = BatchSkips()
         var moving: Set<ItemID> = []
