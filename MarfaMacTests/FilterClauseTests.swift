@@ -449,6 +449,74 @@ struct FilterClauseTests {
 
     // MARK: A saved view's own conditions
 
+    @Test func changingOneConditionOfAnAnyFilterLeavesTheTypeConditionWhereItWas() throws {
+        var targets = Self.targets
+        targets[FilterTarget.type.id] = .type
+        targets[FilterTarget.source.id] = .source
+        let query = LibraryViewQuery(filter: #"type eq "core.note" OR source eq "mail""#)
+        let view = LibraryView(id: ItemID("v"), title: "V", query: query)
+        let seed = ViewDraft.options(for: view, catalogue: Self.catalogue).filter
+        #expect(seed.matchesAny)
+        #expect(Set(seed.clauses) == [Self.clause("type", .is, ["core.note"]), Self.clause("source", .is, ["mail"])])
+        func written(_ clauses: [FilterClause]) -> LibraryViewQuery {
+            ViewDraft.replacing(
+                query, with: FilterState(clauses: clauses, matchesAny: true), targets: targets, seededTypes: nil, catalogue: Self.catalogue
+            ).query
+        }
+        // Mail to Calendar: the untouched type condition stays in the filter, so the view never narrows to notes from Calendar.
+        let calendar = written([Self.clause("type", .is, ["core.note"]), Self.clause("source", .is, ["calendar"])])
+        #expect(calendar.types.isEmpty)
+        #expect(calendar.filter == #"type eq "core.note" OR source eq "calendar""#)
+        // A changed type is still one of the conditions matched by Any.
+        let tasks = written([Self.clause("type", .is, ["core.task"]), Self.clause("source", .is, ["mail"])])
+        #expect(tasks.types.isEmpty)
+        #expect(tasks.filter == #"type eq "core.task" OR source eq "mail""#)
+    }
+
+    @Test func aTypeAddedToAnAnyFilterIsOneOfItsConditionsAndNeverTheViewsTypes() throws {
+        var targets = Self.targets
+        targets[FilterTarget.type.id] = .type
+        targets[FilterTarget.source.id] = .source
+        func written(_ query: LibraryViewQuery, adding type: String) -> (query: LibraryViewQuery, unkept: [ViewDraft.Unkept]) {
+            let view = LibraryView(id: ItemID("v"), title: "V", query: query)
+            var state = ViewDraft.options(for: view, catalogue: Self.catalogue).filter
+            #expect(state.matchesAny)
+            state.clauses.append(Self.clause("type", .is, [type]))
+            return ViewDraft.replacing(query, with: state, targets: targets, seededTypes: nil, catalogue: Self.catalogue)
+        }
+        let anyOf = LibraryViewQuery(filter: #"source eq "mail" OR tags contains "x""#)
+        let notes = written(anyOf, adding: "core.note")
+        #expect(notes.query.types.isEmpty, "the view's types would narrow every other condition")
+        let filter = try #require(notes.query.filter)
+        #expect(filter.contains(#"type eq "core.note""#) && filter.contains(#"source eq "mail""#) && !filter.contains(" AND "))
+        // A type outside the view's own types is still one of its conditions: Marfa applies the view's types apart.
+        let tasks = LibraryViewQuery(types: [Self.task], filter: anyOf.filter)
+        let outside = written(tasks, adding: "core.note")
+        #expect(outside.query.types == [Self.task])
+        let outsideFilter = try #require(outside.query.filter)
+        #expect(outsideFilter.contains(#"type eq "core.note""#) && outsideFilter.contains(#"source eq "mail""#) && !outsideFilter.contains(" AND "))
+        #expect(outside.unkept.isEmpty)
+    }
+
+    @Test func addingATypeToAnAnyFilterKeepsEveryTypeOfItWhetherOrNotTheViewListsIt() throws {
+        var targets = Self.targets
+        targets[FilterTarget.type.id] = .type
+        targets[FilterTarget.source.id] = .source
+        let query = LibraryViewQuery(types: [Self.task], filter: #"type eq "core.note" OR source eq "mail""#)
+        let view = LibraryView(id: ItemID("v"), title: "V", query: query)
+        var state = ViewDraft.options(for: view, catalogue: Self.catalogue).filter
+        #expect(state.matchesAny)
+        let index = try #require(state.clauses.firstIndex { $0.field == FilterTarget.type.id && $0.op == .is })
+        #expect(state.clauses[index].values == ["core.note"])
+        state.clauses[index].values.append(Self.task.rawValue)
+        let written = ViewDraft.replacing(query, with: state, targets: targets, seededTypes: nil, catalogue: Self.catalogue)
+        #expect(written.unkept.isEmpty)
+        #expect(written.query.types == [Self.task])
+        let filter = try #require(written.query.filter)
+        #expect(filter.contains("core.note") && filter.contains(Self.task.rawValue) && filter.contains(#"source eq "mail""#))
+        #expect(!filter.contains(" AND "))
+    }
+
     @Test func aConditionTheRowCannotShowIsLockedAndTheRestIsShown() throws {
         let query = LibraryViewQuery(types: [Self.task], filter: #"id eq "x" AND properties.owner eq "ann" AND properties.status eq "todo" AND state eq "active""#)
         let locked = ViewDraft.unshownConditions(of: query, catalogue: Self.catalogue)

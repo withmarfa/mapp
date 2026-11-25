@@ -267,7 +267,8 @@ struct ItemTable: View {
         let data: Data
         let place: String
         if let id = viewID {
-            data = viewLayouts.settings(for: id)?.widths ?? Data()
+            // A new view's draft made from the view keeps its own widths (`Browser.keepWidths`).
+            data = (browser.newViewPanel(from: id)?.mac ?? viewLayouts.settings(for: id))?.widths ?? Data()
             place = id.rawValue
         } else {
             data = storedColumns

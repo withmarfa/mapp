@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Observation
 
 /// What one main window is showing: the sidebar item, the selected items and the search. The window's views
@@ -557,6 +558,15 @@ final class Browser {
         /// The settings Revert View put back, as `raw` holds them: while the window shows one as it opened, it is
         /// written so, through an Undo and a Redo too (`Browser.viewUpdate`).
         var reverting: LibraryViewChange?
+        /// Each of this Mac's settings for the view that this window changed, by its path, as the window last wrote it
+        /// (`.null` where it cleared it). Revert View puts one back only while it is still stored so.
+        var macWritten: [ViewMacSettings.Path: JSONValue] = [:]
+
+        /// Notes the values a change of this Mac's settings for the view wrote.
+        mutating func wrote(from before: ViewMacSettings, to after: ViewMacSettings) {
+            let before = before.leaves, after = after.leaves
+            for path in Set(before.keys).union(after.keys) where before[path] != after[path] { macWritten[path] = after[path] ?? .null }
+        }
 
         /// Takes the view's choices as read for `parts`, but where they are still this window's own change: a setting
         /// another app changed becomes the opening one, and no longer this window's to put back.

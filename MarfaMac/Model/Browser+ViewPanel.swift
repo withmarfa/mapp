@@ -102,7 +102,10 @@ extension Browser {
         guard let snapshot = panel.snapshot else { return }
         restore(snapshot)
         // A search set aside for a starting point's list comes back, unless the window has moved on.
-        if shown.isSame(snapshot.place) { restoreSetAsideSearch(of: panel) }
+        guard shown.isSame(snapshot.place) else { return }
+        restoreSetAsideSearch(of: panel)
+        // A saved view shows what it became while the draft held the window: a change elsewhere, or an Undo of its own.
+        if let id = snapshot.place.savedView, let library { followView(id, after: snapshot, in: library) }
     }
 
     /// Hands back an unsaved draft or rename when the window changes place.
@@ -141,7 +144,8 @@ extension Browser {
             place: place, options: tableOptions[place], timelineDate: timelineFields[place], viewMode: viewMode,
             columns: defaults.data(forKey: ItemTableColumnLayouts.key), mac: id.map { macSettings(for: $0) },
             cards: id == nil ? placeCards[place] : nil, density: id == nil ? density : nil,
-            placeDefault: id == nil && Self.hasDefaultView(place) ? PlaceDefaults.stored(in: defaults).default(for: place) ?? PlaceDefault() : nil)
+            placeDefault: id == nil && Self.hasDefaultView(place) ? PlaceDefaults.stored(in: defaults).default(for: place) ?? PlaceDefault() : nil,
+            seed: id.flatMap { viewSeeds[$0] })
     }
 
     /// Puts the place back. A new view that was made keeps the layout the person chose for it.
@@ -155,9 +159,8 @@ extension Browser {
         } else {
             defaults.removeObject(forKey: ItemTableColumnLayouts.key)
         }
-        if let id = snapshot.place.savedView {
-            if let mac = snapshot.mac { keep(mac, for: id) }
-        } else {
+        // A saved view's draft has its own settings (`ViewPanel.mac`), so its row needs no restore.
+        if snapshot.place.savedView == nil {
             placeCards[snapshot.place] = snapshot.cards
             store(snapshot.density, for: snapshot.place)
             if let stored = snapshot.placeDefault { reinstate(stored, for: snapshot.place) }

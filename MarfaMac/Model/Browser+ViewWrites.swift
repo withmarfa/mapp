@@ -82,10 +82,10 @@ extension Browser {
     }
 
     /// Registers a step of the window's Undo. While a new view's panel is open the step belongs to the panel, so that
-    /// dropping the panel removes these steps and no earlier one (`dropUndoSteps`).
-    func registerUndo(_ name: String, _ undo: @escaping @MainActor (Browser) -> Void) {
+    /// dropping the panel removes these steps and no earlier one (`dropUndoSteps`), unless `owner` names who it belongs to.
+    func registerUndo(_ name: String, owner: AnyObject? = nil, _ undo: @escaping @MainActor (Browser) -> Void) {
         guard let undoManager else { return }
-        let target: AnyObject = viewPanel.flatMap { $0.isNew ? $0 : nil } ?? self
+        let target: AnyObject = owner ?? viewPanel.flatMap { $0.isNew ? $0 : nil } ?? self
         undoManager.registerUndo(withTarget: target) { [weak self] _ in
             MainActor.assumeIsolated { if let self { undo(self) } }
         }
@@ -334,8 +334,10 @@ extension Browser {
             sendOthersPending(of: id, in: library)
             if openedView?.id == id { openedView?.wrote(update.change, returned: view) }
             if update.change.group != nil, let replaced = update.view.group { replacedGroups[id, default: [:]][replaced.field] = replaced }
+            // A new view's draft made from the view holds the window's choices, which are not the view's to write or change.
+            let drafting = newViewPanel(from: id) != nil
             let changedSince = choices(in: place).parts(differingFrom: sent)
-            if !changedSince.isEmpty { rewritingViews.insert(id) }
+            if !changedSince.isEmpty, !drafting { rewritingViews.insert(id) }
             let shownFilter = tableOptions[place]?.filter
             // The window takes each setting this write did not send and the person has not changed, so another
             // app's merge is shown and the next write does not send the older value back.
@@ -350,7 +352,7 @@ extension Browser {
                 held.options.filter = sent.options.filter.savable
                 viewSeeds[id] = held
             }
-            if !changedSince.contains(.grouping), let held = viewSeeds[id]?.options, var options = tableOptions[place],
+            if !drafting, !changedSince.contains(.grouping), let held = viewSeeds[id]?.options, var options = tableOptions[place],
                options.grouping == held.grouping,
                options.groupOrder != held.groupOrder || options.hiddenGroups != held.hiddenGroups {
                 // A grouping this write sent by the same field comes back with the groups the view already ordered and

@@ -614,9 +614,8 @@ nonisolated extension ViewDraft {
     }
 
     /// The view's query with the window's filters in place of the conditions the window showed: the conditions
-    /// it could not show stay as they are, in order. A Type filter within the view's listed types leaves them as
-    /// they are and is saved as an exact-type condition (`keepsListedTypes`); one outside them replaces them. A window filter the view
-    /// cannot hold leaves the query whole, so a filter is never dropped for one the window could not save.
+    /// it could not show stay in order. An untouched Type condition, and any in a filter matched by Any, stays in the
+    /// filter. Another may replace the listed types (`narrowing`). A filter the view cannot hold leaves the query whole.
     static func replacing(
         _ query: LibraryViewQuery, with state: FilterState, targets: [String: FilterTarget], seededTypes: [String]?, catalogue: Catalogue,
         calendar: Calendar = .current
@@ -637,8 +636,16 @@ nonisolated extension ViewDraft {
         var result = query
         if targets[typeFieldID] != nil, let index = window.clauses.firstIndex(where: { $0.field == typeFieldID && $0.op == .is }) {
             let chosen = Set(window.clauses[index].values).subtracting([""])
+            // A Type filter read from the view's filter stays a condition there when it is untouched. One of several matched
+            // by Any, read or added, is always a condition of that filter, every type as the person chose it, since Marfa
+            // applies the view's types apart from it: moved to the view's types, it would narrow every other condition.
+            let read = seededTypes == nil
+                ? owned.first(where: { $0.clause.field == typeFieldID && $0.clause.op == .is }).map { Set($0.clause.values) } : nil
+            let ofAny = seededTypes == nil && window.matchesAny && window.clauses.count > 1
             if chosen.isEmpty {
                 window.clauses.remove(at: index)
+            } else if read == Set(window.clauses[index].values) || ofAny {
+                // The condition is written where it was, as the person changed it or not at all.
             } else if keepsListedTypes(chosen, listed: query.types, catalogue: catalogue) {
                 // The view's own types stay, and the filter is saved as an exact-type condition, a chip the view still shows
                 // when reopened.

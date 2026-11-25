@@ -806,4 +806,214 @@ struct ViewPanelTests {
         #expect(settings?.opening == .modal)
         #expect(settings?.quickActions == false)
     }
+
+    // MARK: This Mac's settings, beside another Mac's
+
+    /// Another Mac's choice reaching this Mac's defaults, as a settings sync puts it there.
+    private static func arrive(on browser: Browser, _ change: (inout ViewMacSettings) -> Void) {
+        ViewLayouts.update(in: browser.defaults) {
+            var settings = $0.settings(for: Self.id) ?? ViewMacSettings()
+            change(&settings)
+            $0.set(settings, for: Self.id)
+        }
+    }
+
+    @Test func aChangeOfOneSettingKeepsAnotherMacsNewerChoiceAndUndoPutsBackOnlyItsOwn() {
+        let (browser, _, undo) = Self.opened()
+        _ = browser.macSettings(for: Self.id)
+        Self.arrive(on: browser) { $0.opening = .modal }
+        undo.beginUndoGrouping()
+        browser.setShowsQuickActions(false)
+        Self.close(undo)
+        var stored = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        #expect(stored?.quickActions == false)
+        #expect(stored?.opening == .modal, "the other Mac's Open Items stays")
+        Self.arrive(on: browser) { $0.density = .compact }
+        undo.undo()
+        stored = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        #expect(stored?.quickActions == nil)
+        #expect(stored?.opening == .modal)
+        #expect(stored?.density == .compact, "Undo leaves a choice made after its step")
+    }
+
+    @Test func undoOfALayoutPutsBackOnlyTheLayout() {
+        let (browser, _, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.viewMode = .gallery
+        Self.close(undo)
+        Self.arrive(on: browser) { $0.opening = .modal }
+        undo.undo()
+        let stored = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        #expect(stored?.layout == .table)
+        #expect(stored?.opening == .modal)
+    }
+
+    @Test func aLayoutChosenForANewViewIsTheDraftsAndCancelWritesNothingToTheView() async throws {
+        let (browser, library, undo) = Self.opened()
+        let before = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        browser.openNewViewPanel(in: library)
+        undo.beginUndoGrouping()
+        browser.viewMode = .gallery
+        browser.changeDensity(.compact)
+        Self.close(undo)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id) == before, "the view's own settings stay")
+        #expect(browser.density == .compact, "the window shows the draft's")
+        Self.arrive(on: browser) { $0.layout = .board }
+        browser.escapeViewPanel(in: library)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.layout == .board, "Cancel leaves another Mac's layout")
+        #expect(browser.viewMode == .board, "Cancel shows the layout another Mac chose meanwhile, never the one before the draft")
+        // Create View gives the new view the draft's settings, and leaves the view's own.
+        Self.arrive(on: browser) { $0.layout = .table }
+        browser.openNewViewPanel(in: library)
+        undo.beginUndoGrouping()
+        browser.viewMode = .gallery
+        browser.changeDensity(.compact)
+        Self.close(undo)
+        await browser.finishViewPanel(in: library, order: Self.order)
+        let made = try #require(library.views.first { $0.id != Self.id })
+        let settings = ViewLayouts.stored(in: browser.defaults).settings(for: made.id)
+        #expect(settings?.layout == .gallery)
+        #expect(settings?.density == .compact)
+        let original = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        #expect(original?.layout == .table)
+        #expect(original?.density == nil)
+    }
+
+    @Test func undoOfOneCardSettingLeavesAnotherCardSettingAnotherMacChose() {
+        let (browser, _, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.changeCards { $0.size = .small }
+        Self.close(undo)
+        Self.arrive(on: browser) { $0.cards.fitsPicture = true }
+        undo.undo()
+        let cards = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.cards
+        #expect(cards?.size == .medium)
+        #expect(cards?.fitsPicture == true, "Undo puts back only the card setting of its own step")
+    }
+
+    @Test func aRefreshOfTheViewWhileADraftIsOpenKeepsTheDraftsChoices() async throws {
+        let (browser, library, undo) = Self.opened()
+        browser.openNewViewPanel(in: library)
+        undo.beginUndoGrouping()
+        browser.viewMode = .gallery
+        browser.changeDensity(.compact)
+        Self.close(undo)
+        let sort = browser.tableOptions[browser.shown]?.sort
+        var changed = try #require(Self.held(library))
+        changed.version += 1
+        changed.sort = [LibraryViewSort(field: "title", ascending: true)]
+        library.views = [changed]
+        browser.followView(in: library)
+        #expect(browser.viewMode == .gallery)
+        #expect(browser.density == .compact)
+        #expect(browser.tableOptions[browser.shown]?.sort == sort, "the draft's sort stays")
+        await browser.finishViewPanel(in: library, order: Self.order)
+        let made = try #require(library.views.first { $0.id != Self.id })
+        #expect(made.sort == Self.view().sort)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: made.id)?.layout == .gallery)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: made.id)?.density == .compact)
+    }
+
+    @Test func aChoiceThatAlreadySyncedShowsInTheWindowWithNoStepOfUndo() {
+        let (browser, _, undo) = Self.opened()
+        #expect(browser.density == nil)
+        Self.arrive(on: browser) { $0.density = .compact }
+        undo.beginUndoGrouping()
+        browser.changeDensity(.compact)
+        Self.close(undo)
+        #expect(browser.density == .compact)
+        // No step was made, so an Undo cannot take back the choice another Mac made.
+        if undo.canUndo { undo.undo() }
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.density == .compact)
+    }
+
+    @Test func anUndoFromBeforeADraftTakesBackTheViewsLayoutAndLeavesTheDrafts() {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.viewMode = .gallery
+        Self.close(undo)
+        browser.openNewViewPanel(in: library)
+        undo.undo()
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.layout == .table, "the view's layout is back")
+        #expect(browser.viewMode == .gallery, "the draft's layout stays")
+        #expect(browser.viewPanel?.mac?.layout == .gallery)
+        browser.escapeViewPanel(in: library)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.layout == .table)
+        #expect(browser.viewMode == .table, "Cancel shows the view as Undo left it")
+    }
+
+    @Test func columnWidthsDraggedInADraftAreTheDrafts() async throws {
+        let (browser, library, _) = Self.opened()
+        browser.openNewViewPanel(in: library)
+        browser.keepWidths(Data([1]), of: Self.id)
+        #expect(browser.macSettings(for: Self.id).widths == Data([1]))
+        browser.escapeViewPanel(in: library)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.widths == nil, "Cancel writes nothing to the view")
+        browser.openNewViewPanel(in: library)
+        browser.keepWidths(Data([2]), of: Self.id)
+        await browser.finishViewPanel(in: library, order: Self.order)
+        let made = try #require(library.views.first { $0.id != Self.id })
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: made.id)?.widths == Data([2]))
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.widths == nil)
+    }
+
+    @Test func aWriteReturningDuringADraftLeavesTheDraftsSortAndCancelShowsWhatTheViewBecame() async throws {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewChange = { await withCheckedContinuation { release = $0 } }
+        let merged = [LibraryViewSort(field: "title", ascending: true)]
+        library.changedElsewhere = { $0.sort = merged }
+        browser.setFilter(Self.status, values: ["todo"])
+        let task = browser.choicesChanged()
+        Self.close(undo)
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        let sort = browser.tableOptions[browser.shown]?.sort
+        let filter = browser.tableOptions[browser.shown]?.filter
+        browser.openNewViewPanel(in: library)
+        release?.resume()
+        await task?.value
+        let held = try #require(Self.held(library))
+        #expect(held.sort == merged, "another app's sort was merged into the write")
+        #expect(browser.tableOptions[browser.shown]?.sort == sort, "the draft's sort stays")
+        browser.escapeViewPanel(in: library)
+        #expect(browser.tableOptions[browser.shown]?.sort == ViewDraft.options(for: held, catalogue: library.catalogue).sort)
+        #expect(browser.tableOptions[browser.shown]?.filter == filter)
+        #expect(!browser.hasViewChanges)
+    }
+
+    @Test func revertViewIsNotOfferedWhileADraftIsOpenAndChangesNothing() {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.changeDensity(.compact)
+        Self.close(undo)
+        #expect(browser.canRevertView)
+        browser.openNewViewPanel(in: library)
+        #expect(!browser.canRevertView)
+        browser.revertView(in: library)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.density == .compact)
+        #expect(browser.viewPanel?.isNew == true)
+        browser.escapeViewPanel(in: library)
+        #expect(browser.canRevertView)
+    }
+
+    @Test func revertPutsBackOnlyTheMacSettingsThisWindowChangedAndKeepsAnotherMacsAndSaysSo() {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.changeDensity(.compact)
+        browser.changeCards { $0.size = .small }
+        Self.close(undo)
+        Self.arrive(on: browser) {
+            $0.cards.size = .large
+            $0.opening = .modal
+        }
+        undo.beginUndoGrouping()
+        browser.revertView(in: library)
+        Self.close(undo)
+        let stored = ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)
+        #expect(stored?.density == nil, "this window's own change is put back")
+        #expect(stored?.cards.size == .large, "a setting another Mac changed since stays")
+        #expect(stored?.opening == .modal, "a setting this window never changed stays")
+        #expect(library.notices.waiting.contains { $0.title == "View Partly Reverted" })
+    }
 }

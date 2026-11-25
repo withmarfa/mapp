@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// What the app keeps about each saved view that the view itself does not hold: the layout it opens in, its Properties,
 /// whether the board hides empty groups, and what the gallery's cards show. One value in the defaults, by view identifier,
@@ -27,7 +28,8 @@ nonisolated struct ViewLayouts: Equatable, Sendable {
     }
 }
 
-/// One view's settings in this app, which sync but for the table's widths.
+/// One view's settings in this app, which sync but for the table's widths. A new member needs only its `CodingKeys` case
+/// and its line in `init(from:)`: comparing, Undo, Revert View and Create View's copy take every member.
 nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
     /// The layout the view opens in. Nil follows the window.
     var layout: ItemViewMode?
@@ -89,23 +91,60 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         chosen ?? (shown.savedView == nil ? shown == .feed || shown == .archive : scope == .feed)
     }
 
-    /// Whether the choices a Save keeps are the same, leaving the widths out, which are kept as they are dragged.
+    /// Whether the choices are the same, leaving the widths out, which are kept as they are dragged. Every other member
+    /// counts, through the synthesized `==`, so a member added later needs no list here.
     func sameChoices(as other: ViewMacSettings) -> Bool {
-        layout == other.layout && properties == other.properties && hidesEmptyGroups == other.hidesEmptyGroups
-            && cards == other.cards && density == other.density && calendarScale == other.calendarScale
-            && quickActions == other.quickActions && opening == other.opening
+        var mine = self, theirs = other
+        mine.widths = nil
+        theirs.widths = nil
+        return mine == theirs
     }
 
-    /// Takes the choices of another and keeps its own widths.
-    mutating func take(choicesOf other: ViewMacSettings) {
-        layout = other.layout
-        properties = other.properties
-        hidesEmptyGroups = other.hidesEmptyGroups
-        cards = other.cards
-        density = other.density
-        calendarScale = other.calendarScale
-        quickActions = other.quickActions
-        opening = other.opening
+    /// A path from the top of the stored settings to one value that is not an object, such as `["cards", "size"]`.
+    typealias Path = [String]
+
+    /// Each value as stored, by its path, at any depth. A member that is not set has no entry.
+    var leaves: [Path: JSONValue] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(self), let value = try? JSONDecoder().decode(JSONValue.self, from: data) else { return [:] }
+        var leaves: [Path: JSONValue] = [:]
+        func collect(_ value: JSONValue, at path: Path) {
+            if case .object(let object) = value, !object.members.isEmpty {
+                for member in object.members { collect(member.value, at: path + [member.key]) }
+            } else if value != .null {
+                leaves[path] = value
+            }
+        }
+        collect(value, at: [])
+        return leaves
+    }
+
+    /// The settings these leaves store, or nil where they do not decode.
+    init?(leaves: [Path: JSONValue]) {
+        func build(_ leaves: [Path: JSONValue]) -> JSONValue {
+            // An empty object below which another Mac has since set a value is that object, not the empty one.
+            if let whole = leaves[[]], leaves.count == 1 { return whole }
+            let keys = Set(leaves.keys.compactMap(\.first)).sorted()
+            return .object(JSONObject(members: keys.map { key in
+                let below = leaves.reduce(into: [Path: JSONValue]()) { below, leaf in
+                    if leaf.key.first == key { below[Array(leaf.key.dropFirst())] = leaf.value }
+                }
+                return JSONMember(key: key, value: build(below))
+            }))
+        }
+        guard let data = try? JSONEncoder().encode(build(leaves)), let settings = try? JSONDecoder().decode(Self.self, from: data)
+        else { return nil }
+        self = settings
+    }
+
+    /// Puts back, at any depth, only the values that differ between the step's `before` and `after`, so a value another
+    /// Mac changed meanwhile, even beside one of the step's in the same member, stays.
+    mutating func undo(_ step: (before: ViewMacSettings, after: ViewMacSettings)) {
+        let before = step.before.leaves, after = step.after.leaves
+        var now = leaves
+        for path in Set(before.keys).union(after.keys) where before[path] != after[path] { now[path] = before[path] }
+        if let undone = Self(leaves: now) { self = undone }
     }
 }
 
