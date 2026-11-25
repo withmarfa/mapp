@@ -82,6 +82,34 @@ struct ItemBoardTests {
         #expect(wrongType.skips == cantGo, "only an item whose type doesn’t take the lane reads as one that can’t go in it")
     }
 
+    /// A board of rows and files, both with a `width`, where only the row's is the person's to change.
+    static func widths() -> (catalogue: Catalogue, row: Item, file: Item) {
+        let width = ItemTypeInfo.Field(key: "width", label: "Width", kind: .number, declaredBy: first)
+        let catalogue = Catalogue(itemTypes: [
+            type(first, fields: [width]),
+            ItemTypeInfo(id: .file, label: "File", fields: [width], titleField: "title", bodyField: nil, parent: nil),
+        ])
+        let wide = Property(key: "width", value: .number(640))
+        var row = item("row")
+        row.properties = [wide]
+        var file = Item(
+            id: ItemID("file"), type: .file, title: "file", titleRule: .property("title"), content: .file(.png, byteCount: 1),
+            version: ItemVersion(1), created: Date(timeIntervalSince1970: 0), modified: Date(timeIntervalSince1970: 0))
+        file.properties = [wide]
+        return (catalogue, row, file)
+    }
+
+    @Test func aMixedBoardNeverClearsAFactMarfaSetsOnAFile() {
+        let (catalogue, row, file) = Self.widths()
+        let library = FakeItemLibrary(items: [row, file])
+        library.catalogue = catalogue
+        let plan = ItemBoardLayout.movePlan([row.id, file.id], key: "width", to: .missing, shown: [row.id, file.id], in: library)
+        #expect(plan.changes.map(\.id) == [row.id])
+        var skipped = BatchSkips()
+        skipped.skip(.fileFact)
+        #expect(plan.skips == skipped)
+    }
+
     @Test func requiredFieldsCannotBeRemoved() {
         let required = Self.item("Required", type: Self.second, value: .string("review"))
         let optional = Self.item("Optional", value: .string("todo"))

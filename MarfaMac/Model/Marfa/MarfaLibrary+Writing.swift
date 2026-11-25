@@ -66,7 +66,7 @@ extension MarfaLibrary {
             return editProperty(id, key: key, to: .string(title), undoManager: undoManager)
         }
         // The text is the page's to write, never a property's.
-        guard item.allows(.fields), let type = catalogue.itemTypes[item.type], key != MarfaMapping.bodyField(of: type),
+        guard item.obstacle(toField: key) == nil, let type = catalogue.itemTypes[item.type], key != MarfaMapping.bodyField(of: type),
             let field = type.fields.first(where: { $0.key == key })
         else { return false }
         if let value, !field.kind.accepts(value) {
@@ -92,7 +92,7 @@ extension MarfaLibrary {
     func setItemProperties(_ id: ItemID, changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) -> Bool {
         guard let item = item(id), item.allows(.fields), let type = catalogue.itemTypes[item.type] else { return false }
         for (key, value) in changes {
-            guard key != MarfaMapping.bodyField(of: type), let field = type.fields.first(where: { $0.key == key }) else { return false }
+            guard item.obstacle(toField: key) == nil, key != MarfaMapping.bodyField(of: type), let field = type.fields.first(where: { $0.key == key }) else { return false }
             if let value, !field.accepts(value) {
                 notices.tell(String(localized: "Invalid Property"), String(localized: "The value does not match this property's type."))
                 return false

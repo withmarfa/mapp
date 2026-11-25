@@ -39,6 +39,18 @@ import UniformTypeIdentifiers
 
     // MARK: The seam
 
+    @Test func noWriteReachesAFactMarfaSetsOnAFile() async throws {
+        let (catalogue, row, file) = ItemBoardTests.widths()
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: [row, file], catalogue: catalogue)))
+        try #require(await eventually { library.isLoaded })
+        #expect(!library.setItemProperties(file.id, changes: ["width": nil], actionName: "Clear", undoManager: nil))
+        #expect(!library.setItemProperty(file.id, key: "width", value: nil, undoManager: nil))
+        #expect(library.setItemProperties(row.id, changes: ["width": nil], actionName: "Clear", undoManager: nil))
+        #expect(source.writes == [.editProperties(row.id, ["width": nil], base: row.version)])
+    }
+
     @Test func oneRuleSaysWhatAnItemAllows() {
         let plain = F.item(F.n1, F.note, "Plain", age: 1)
         #expect(ItemChange.allCases.allSatisfy(plain.allows))

@@ -42,4 +42,11 @@ nonisolated extension Item {
     }
 
     func allows(_ change: ItemChange) -> Bool { obstacle(to: change) == nil }
+
+    /// Why the item can't take a change to its field `key`: what blocks `.fields`, or a fact Marfa sets on a file
+    /// (`MarfaMapping.fileFacts`), which a list of mixed types may still show as a column.
+    func obstacle(toField key: String) -> BatchSkips.Reason? {
+        if let reason = obstacle(to: .fields) { return reason }
+        return isFile && MarfaMapping.fileFacts.contains(key) ? .fileFact : nil
+    }
 }

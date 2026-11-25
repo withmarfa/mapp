@@ -27,6 +27,8 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case needsValue
         /// A file, which has no lane to move to.
         case fileHasNoLane
+        /// A file, whose field here Marfa sets itself.
+        case fileFact
         /// Selected, but not on the board now, as when a search or filter has hidden it since.
         case notShown
         /// No longer as this Mac left it, so an Undo or Redo would overwrite a change made since.
@@ -63,6 +65,7 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case .cantMoveToLane: String(localized: "\(count) items can’t go in this lane.")
         case .needsValue: String(localized: "\(count) items need a value there, so it can’t be cleared.")
         case .fileHasNoLane: String(localized: "\(count) items are files, which can’t be moved between lanes.")
+        case .fileFact: String(localized: "\(count) items are files, and Marfa sets this property of a file itself.")
         case .notShown: String(localized: "\(count) items aren’t on this board.")
         case .changedSince: String(localized: "\(count) items have changed since, so they were left as they are.")
         }
