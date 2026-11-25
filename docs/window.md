@@ -14,7 +14,7 @@ paths:
 
 # The window
 
-`docs/look.md` has the window's areas. `docs/commands.md` has every command and shortcut.
+`docs/look.md` has the window's areas; `docs/commands.md`, every command.
 
 ## Places
 
@@ -35,11 +35,16 @@ paths:
 ### A layout an earlier copy stored
 
 - **An earlier Library or Views section is kept, drawn as nothing;** `places` and `pinned` stand there instead.
-- **What was put under them is pinned; what a hidden one held stays hidden, row by row.** `views` in `hidden` hides every saved view; one shown again goes in `shown`. The Library and the Feed stay fixed.
+- **What was put under them is pinned; what a hidden one held stays hidden, row by row.** The Library and the Feed stay fixed.
 - **A row whose section is gone shows under Pinned, a page under the Library;** its home is kept.
 - **The later arrangement wins whole,** also when two Macs change what is hidden before syncing.
-- **Accepted:** an older copy draws it its own way, and its Views edits miss Pinned, until Sparkle updates it.
 - **Recently Deleted is a page of Settings**, never a row.
+
+## Foot
+
+- **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`). Refresh, Settings and a warning line are buttons of their own; that line opens Settings › Connection.
+- **The line says how the library stands** (`SyncFootLine`). A local line replaces only "Updated", for a loopback address or no server (`MarfaConnection.isOnThisMac`).
+- **The panel lists the connected Marfa alone,** its three newest sources, and Show More for the rest.
 
 ## Toolbar
 
@@ -56,7 +61,7 @@ paths:
 ## Smallest window
 
 - **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900, and under 800 the views are one pill beside the title.
-- **Only what the window folded opens again,** also after a quit. It folds only as its width crosses a limit, never on opening.
+- **Only what the window folded opens again,** also after a quit.
 - **The panel is 300 wide** in every window (`PanelWidth`).
 
 ## Corner
@@ -67,24 +72,24 @@ paths:
 ## Menus and palettes
 
 - **Every menu of items is one menu** (`ItemRowMenu`), in every layout.
-- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`). Search Items is the same panel searching titles and text.
+- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`).
 - **Trap:** Actions grows out of the palette's bar with an ordinary transition: a Liquid Glass morph hung the app.
 - **A command that takes the keyboard says so** (`takesFocus`), so the palette does not take it back.
 
 ## Opening an item
 
-- **Open, Return, a double click and a link follow Open Items** (`ItemOpening`), and the menu offers the other ways.
+- **Open, Return, a double click and a link follow Open Items** (`ItemOpening`).
 - **A modal and a full page show one item.** New Window takes several and asks first above a limit (`ItemWindows`).
-- **The modal hosts the page with the window's one editor** (`ItemModal`), so two never write one item; the page beside the list steps aside.
+- **The modal hosts the page with the window's one editor** (`ItemModal`), so two never write one item.
 - **Escape, Close and a click outside save and close the modal.** Up and down follow the list behind it (`ListNeighbors`).
-- **A full page's Back returns to the layout**, without the list's view options.
+- **A full page's Back returns to the layout**.
 
 ## Item links
 
 - **An item's app link is `marfa://`, its Marfa's id, then its own,** both exact and lowercase (`ItemAppLink`). Any other form is refused.
-- **A link only opens,** never writes, signs in, changes a setting or calls the server: any page can send one.
+- **A link only opens,** never writes, signs in, changes a setting or calls the server.
 - **It opens only when** the Marfa it names is the connected one, the copy holds the item, and the item is not in Recently Deleted. Otherwise the person is told why (`ItemLinkRoute`).
-- **It opens in the main window last in front** (`ItemLinkOpener`), as a full page where Open Items says so and over the list otherwise.
+- **It opens in the main window last in front** (`ItemLinkOpener`), as Open Items says.
 - **The newest link wins** over one that waits for the library or a window.
 - **Copy Link copies the server's `https` address**, and the `marfa://` one where the server gives none. Copy Wiki Link copies the text form.
 - **Trap:** a Debug test build registers another scheme (`ITEM_LINK_SCHEME`), so it never takes the installed app's links.
