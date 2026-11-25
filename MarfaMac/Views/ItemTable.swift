@@ -44,7 +44,7 @@ struct ItemTable: View {
         let _ = setStartingWidths(browser.shownColumns(content.columns))
         let (allRows, rows) = (content.allRows, content.rows)
         let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
+        let title = browser.pageTitle(in: library)
 
         ItemTableSelection(browser: browser, content: content) { selection in
             table(selection: selection, columns: content.columns, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
@@ -73,6 +73,8 @@ struct ItemTable: View {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }
             .onChange(of: allRows.count) { browser.revealSelectionInTable(content) }
+            // The Archive names each item's source, which the server names after the items are read.
+            .task(id: library.membershipRevision) { if browser.listsArchive { await library.refreshSources() } }
             .task {
                 for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
             }
@@ -89,11 +91,12 @@ struct ItemTable: View {
     private func table(
         selection: Binding<Set<ItemID>>, columns: [ItemTableColumn], pages: Pages, grouping: ItemTableColumn?, collapsed: Set<String>
     ) -> some View {
-        Table(of: ItemTableRow.self, selection: selection, sortOrder: sortBinding(columns), columnCustomization: customization(columns)) {
+        let last = browser.shownColumns(columns).last?.id
+        return Table(of: ItemTableRow.self, selection: selection, sortOrder: sortBinding(columns), columnCustomization: customization(columns)) {
             // Only the columns showing. SwiftUI adds and hides every column it is given on live rows when the place
             // changes, which for the many columns of a mixed place costs far more than the few it shows.
             TableColumnForEach(browser.shownColumns(columns)) { column in
-                tableColumn(column)
+                tableColumn(column, endsRow: column.id == last)
             }
         } rows: {
             if let grouping {
@@ -141,10 +144,10 @@ struct ItemTable: View {
 
     /// A count has no sort control: it is asked for only the rows on screen (`ItemTableColumn.isSortable`).
     @TableColumnBuilder<ItemTableRow, ItemTableComparator>
-    private func tableColumn(_ column: ItemTableColumn) -> some TableColumnContent<ItemTableRow, ItemTableComparator> {
+    private func tableColumn(_ column: ItemTableColumn, endsRow: Bool) -> some TableColumnContent<ItemTableRow, ItemTableComparator> {
         if column.isSortable {
             TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
-                cell(of: row, in: column)
+                cell(of: row, in: column, endsRow: endsRow)
             }
             .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
             .customizationID(column.id)
@@ -153,7 +156,7 @@ struct ItemTable: View {
         }
         if !column.isSortable {
             TableColumn(Text(verbatim: column.label)) { row in
-                cell(of: row, in: column)
+                cell(of: row, in: column, endsRow: endsRow)
             }
             .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
             .customizationID(column.id)
@@ -161,8 +164,10 @@ struct ItemTable: View {
         }
     }
 
-    private func cell(of row: ItemTableRow, in column: ItemTableColumn) -> some View {
-        ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, dateFormat: dateFormat, hover: hover)
+    private func cell(of row: ItemTableRow, in column: ItemTableColumn, endsRow: Bool) -> some View {
+        var cell = ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, dateFormat: dateFormat, hover: hover)
+        cell.endsRow = endsRow
+        return cell
     }
 
     @TableRowBuilder<ItemTableRow>
@@ -201,6 +206,7 @@ struct ItemTable: View {
 
     /// How many items show, and of how many once a filter hides some.
     private func subtitle(shown: Int, of count: Int) -> Text {
+        if browser.listsArchive { return browser.countLine(shown, in: library) }
         if browser.isSearching { return Text("^[\(count) result](inflect: true)") }
         return shown == count ? Text("^[\(count) item](inflect: true)") : Text("\(shown) of \(count) items")
     }
@@ -209,7 +215,8 @@ struct ItemTable: View {
     private func sortBinding(_ columns: [ItemTableColumn]) -> Binding<[ItemTableComparator]> {
         Binding {
             browser.ordersByRelevance ? [] : ItemTableLayout.sort(
-                browser.tableOptions[browser.shown] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
+                browser.tableOptions[browser.shown] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder,
+                listsArchive: browser.listsArchive)
         } set: { sort in
             if !sort.isEmpty { browser.orderSearch(byRelevance: false) }
             browser.tableOptions[browser.shown, default: .init()].sort = Array(sort.prefix(ViewDraft.maxSortKeys))

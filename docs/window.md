@@ -25,28 +25,29 @@ paths:
 
 ## Sidebar
 
-- **Search and New, the Library and the Feed, then Pinned, Types and the person's sections** (`SidebarLayout`). Only the Library has a count. Search opens the Command Palette.
+- **Search and New, the Library and the Feed, then Pinned, Types and the person's sections** (`SidebarLayout`). Only the Library has a count; Search opens the palette.
 - **Pinned holds views, collections and items.** A saved view stays pinned until taken out.
-- **A type counts its items and its kinds'.** Types shows five, then "N More".
+- **A type counts its items and its kinds'.** Five show, then "N More".
 - **Under the pointer** a type, a kind and a collection show a plus for the count, and a heading Add and More. Sections never fold.
 - **Customize Sidebar works in place:** each faint place opens a menu of what can go there (`SidebarAddPlace`).
-- **A row whose thing is gone keeps its place**, so it returns there.
-- **Go lists the same places, views and types** (`GoMenu`).
+- **A row whose thing is gone keeps its place.**
+- **Go lists the same places, views and types** (`GoMenu`), and the Archive, which no row opens.
 
 ### A layout an earlier copy stored
 
-- **Nothing this copy cannot read is dropped:** it is written back as it was.
-- **An earlier Library or Views section is kept and drawn as nothing.** This copy adds `places` and `pinned` where they stood; Pinned takes the Views section's name and hidden state.
+- **What this copy cannot read is written back as it was.**
+- **An earlier Library or Views section is kept and drawn as nothing.** This copy adds `places` and `pinned` where they stood; Pinned keeps the Views section's name and hidden state.
 - **What the person put under Library or Views is read under Pinned;** their own sections keep theirs. Hidden stays hidden; `views` in `hidden` hides every saved view.
 - **Recently Deleted is a page of Settings**, never a row.
 
 ## Toolbar
 
-- **The toolbar is the same on every screen**, in one order: Search and View Options, View As, Share and More, then the right sidebar's button alone at the far right.
+- **The top row is drawn in the content under a hidden title;** a plain `toolbar` holds the buttons.
+  - It folds by the room it has. In the toolbar it needs a measured width, and an error, larger text or a closed sidebar sends everything to the overflow menu.
+  - It keeps one line with the sidebar closed or larger text, and VoiceOver reads it in order.
 - **An on button is gray, never the accent.**
-- **An item that cannot act dims**, so a person's arrangement keeps its shape from screen to screen.
-- **Trap:** nothing else in a window may declare a plain `toolbar`, because it turns customization off for the whole window.
-- **Trap:** each split view keeps a saved layout of its own (`WindowToolbarLayout`), because the system reshuffles one shared by several. A change to the sidebar's items changes the saved names.
+- **An item that cannot act dims**, so the row keeps its shape.
+- **Trap:** the row needs its own drag gesture and double click to move and zoom the window, and the window must hide its title, which returns in full screen.
 
 ## Corner
 

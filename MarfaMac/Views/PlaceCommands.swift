@@ -15,6 +15,8 @@ struct PlaceCommands: Commands {
             if let library {
                 let menu = GoMenu(library: library, layout: libraries.sidebarLayout)
                 group(menu.places, menu: menu, in: library)
+                Divider()
+                group(menu.builtInViews, menu: menu, in: library)
                 Section("Views") {
                     group(menu.views, menu: menu, in: library)
                 }

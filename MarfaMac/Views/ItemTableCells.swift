@@ -28,6 +28,8 @@ struct ItemTableCell: View {
     let dateFormat: DateFormat
     /// Which row the pointer is on, shared by the row's cells, so the name's cell can answer to it from any of them.
     let hover: ItemTableHover
+    /// Set on the last column shown, where the row's quick actions stand while the pointer is on the row.
+    var endsRow = false
     @State private var isHovering = false
     @State private var anchor = ValueEditAnchorBox()
 
@@ -35,8 +37,15 @@ struct ItemTableCell: View {
     /// reaches out by it, so the tint fills the cell to its edges; the content is padded in by the same amount, and the
     /// cell's control is pulled back out, so the content keeps the column's text edge.
     @State private var bleed = CellBleed.zero
+    /// The row's quick actions, shown in place of what the row's last cell holds while the pointer is on the row.
+    private var showsQuickActions: Bool { endsRow && hover.row == row.id && !browser.quickActions.isEmpty }
+
     var body: some View {
         content
+            .opacity(showsQuickActions ? 0 : 1)
+            .overlay(alignment: .trailing) {
+                if showsQuickActions { RowQuickActions(id: row.id, actions: browser.quickActions) }
+            }
             .lineLimit(1)
             // The same room for every cell, whether or not it offers an edit, so the probe measures the same frame throughout.
             .tableCellRoom()
@@ -102,6 +111,9 @@ struct ItemTableCell: View {
         case .edited: date(row.item.modified, isDue: false)
         case .occurred: date(row.item.occurred ?? row.item.created, isDue: false)
         case .tags: tags
+        case .source:
+            // Read live, since the server names a source after the rows were made.
+            Text(verbatim: row.item.source.flatMap { $0.isEmpty ? nil : library.sources.name($0) } ?? "").foregroundStyle(.secondary)
         case .count(let fact): count(fact)
         case .duration(let start, let end):
             if let seconds = ItemTableValue.duration(row, start: start, end: end) {
@@ -174,6 +186,13 @@ struct ItemTableCell: View {
                 .fontWeight(.medium)
                 .foregroundStyle(row.item.isUntitled ? .secondary : .primary)
                 .truncationMode(.tail)
+            // A list of both tiers says which items are the Feed's.
+            if row.item.tier == .feed, browser.listing.scope == .all {
+                Image(systemName: ItemMove.moveToFeed.symbol)
+                    .imageScale(.small)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityLabel("Feed")
+            }
             if row.item.isFavorite {
                 Image(systemName: "star.fill")
                     .imageScale(.small)

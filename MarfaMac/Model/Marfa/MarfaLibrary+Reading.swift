@@ -125,8 +125,17 @@ extension MarfaLibrary {
         switch place {
         case .library: scopeCounts(in: place).library
         case .feed: scopeCounts(in: place).feed
+        case .collections: standaloneCounts.collections
+        case .sources: listedSourceCount
         default: scopeCounts(in: place).count(in: scope)
         }
+    }
+
+    /// How many sources the Sources page lists: the server's that hold items once it has answered, else those of the
+    /// items loaded (`SourceDirectory.listing`).
+    private var listedSourceCount: Int {
+        let held = sources.counts ?? standaloneCounts.bySource.mapValues(\.all)
+        return held.filter { !$0.key.isEmpty && $0.value > 0 }.count
     }
 
     /// What `place` lists in each tier: its active items, or the Archive's archived ones, as its listing has them.
@@ -158,7 +167,8 @@ extension MarfaLibrary {
         }
         var alone = StandaloneCounts(
             active: counts(index.listed), archived: counts(index.listed, .only),
-            byType: index.byType.mapValues { counts($0) }, bySource: index.bySource.mapValues { counts($0) })
+            byType: index.byType.mapValues { counts($0) }, bySource: index.bySource.mapValues { counts($0) },
+            collections: catalogue.collectionTypes.reduce(0) { $0 + index.active(ofType: $1).count })
         for id in index.attachedToHeld() {
             guard let item = records[id]?.item else { continue }
             switch item.state {
@@ -250,6 +260,8 @@ nonisolated struct StandaloneCounts {
     var archived: ScopeCounts
     var byType: [TypeID: ScopeCounts]
     var bySource: [String: ScopeCounts]
+    /// The active collections, which the Collections page lists.
+    var collections: Int
 }
 
 private nonisolated extension ScopeCounts {

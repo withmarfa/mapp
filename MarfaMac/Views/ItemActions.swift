@@ -53,8 +53,6 @@ struct ItemOrganizeActions: View {
     var inMenuBar = false
     /// Keeps the items in the menu, dimmed, when nothing is selected, as the menu bar and the More menu do.
     var keepsPlace = false
-    /// Draws ⌘⌫ beside Delete, as a row's menu does. The key itself is the list's.
-    var showsDeleteKey = false
     var shortcuts: ShortcutBindings?
 
     var body: some View {
@@ -85,8 +83,8 @@ struct FavoriteButton: View {
     var shortcuts: ShortcutBindings?
 
     var body: some View {
-        // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change.
-        let active = ItemActionContext(library: library, ids: ids, keepsPlace: true).items.filter { $0.state == .active }
+        // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change. An archived one takes it.
+        let active = ItemActionContext(library: library, ids: ids, keepsPlace: true).items.filter { $0.state != .trashed }
         let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
         Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
             library.setFavorite(ids, !allFavorites, undoManager: undoManager)
@@ -122,8 +120,8 @@ struct ItemRemoveActions: View {
             Button("Delete", systemImage: "trash") {
                 library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }
-            .shortcut(.delete, shortcuts)
-            .keyboardShortcut(showsDeleteKey ? KeyboardShortcut(.delete, modifiers: .command) : nil)
+            // One binding, not two: a second `keyboardShortcut` that is nil would take the first one away.
+            .keyboardShortcut(showsDeleteKey ? KeyboardShortcut(.delete, modifiers: .command) : shortcuts?.shortcut(for: .delete)?.keyboardShortcut)
             .disabled(context.items.isEmpty)
         }
     }

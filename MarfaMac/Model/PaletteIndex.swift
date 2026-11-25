@@ -41,6 +41,7 @@ extension Browser {
             place.opens.flatMap { item in place.symbol.map { PaletteIndex.Place(item: item, icon: .symbol($0), title: nil) } }
         }
         places.append(.init(item: .favorites, icon: .symbol("star"), title: nil))
+        places.append(.init(item: .archive, icon: .symbol(GoMenu.archiveSymbol), title: nil))
         places += library.sourceCounts.map {
             .init(item: .source($0.code), icon: SourceTile.icon(for: library.sources.info($0.code)), title: $0.name)
         }

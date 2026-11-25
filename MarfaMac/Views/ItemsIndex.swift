@@ -68,7 +68,7 @@ struct ItemsIndex: View {
                     title: library.name(of: browser.shown), browser: browser,
                     tabs: Self.place.tabs.map { (tab: $0, count: tabs.count(for: $0)) },
                     tab: Binding { tab } set: { storedTab = $0 },
-                    new: { browser.openQuickAddFromIndex(remembered: lastType, in: library) })
+                    new: { browser.openQuickAddFromIndex(remembered: lastType, in: library) }, leadsOn: true)
             } extra: {
                 // The tiles show only where Settings > Lists asks for them, and the filter row takes their place while a
                 // filter is on.

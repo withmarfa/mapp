@@ -2467,9 +2467,6 @@
     "Archive All" : {
 
     },
-    "Archive Is Empty" : {
-
-    },
     "Archive Only These Items" : {
 
     },
@@ -5489,9 +5486,6 @@
     "Items you add show here." : {
 
     },
-    "Items you archive show here." : {
-
-    },
     "Items you delete wait here before they are permanently deleted." : {
 
     },
@@ -6975,6 +6969,9 @@
 
     },
     "Nothing is added until you install it." : {
+
+    },
+    "Nothing is archived." : {
 
     },
     "Nothing is installed until you choose it." : {

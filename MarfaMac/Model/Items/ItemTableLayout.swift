@@ -130,8 +130,11 @@ nonisolated enum ItemTableLayout {
     /// their dates. The columns of several types are the union of their looks. The fields of `listed` types no row holds
     /// come too, hidden, so a grouping or a sort can name a field no item has yet. Every other column starts hidden and the
     /// person can show any of them. A look's column that no row fills starts hidden too, as an empty column says nothing.
+    /// The Archive lists its items by what they are and where they came from, so it starts with the name, type, source
+    /// and edit date and hides the looks' columns.
     static func columns(
-        for rows: [ItemTableRow], types listed: Set<TypeID> = [], catalogue: Catalogue, hidden: Set<String>, looks: [TypeID: TypeLook]
+        for rows: [ItemTableRow], types listed: Set<TypeID> = [], catalogue: Catalogue, hidden: Set<String>, looks: [TypeID: TypeLook],
+        listsArchive: Bool = false
     ) -> [ItemTableColumn] {
         let held = Set(rows.map(\.item.type))
         let types = held.union(listed).sorted { $0.rawValue < $1.rawValue }
@@ -219,10 +222,21 @@ nonisolated enum ItemTableLayout {
                     content: .duration(start: MarfaMapping.startField, end: MarfaMapping.endField), style: .duration), shown: false)
             }
         }
-        for column in [ItemTableColumn.edited, .created, .occurred, .tags] where !used.contains(column.id) {
+        for column in [ItemTableColumn.edited, .created, .occurred, .tags, .source] where !used.contains(column.id) {
             add(column, shown: false)
         }
-        return columns
+        return listsArchive ? archiveColumns(columns) : columns
+    }
+
+    /// The Archive's own columns first and shown, then every other column hidden.
+    private static func archiveColumns(_ columns: [ItemTableColumn]) -> [ItemTableColumn] {
+        let own = [ItemTableColumn.title, .type, .source, .edited]
+        let ids = Set(own.map(\.id))
+        return (own + columns.filter { !ids.contains($0.id) }).map { column in
+            var column = column
+            column.isShownByDefault = ids.contains(column.id)
+            return column
+        }
     }
 
     /// The columns a sort can name for a view that shows `types`: the fields those types declare, and the columns every
@@ -237,7 +251,7 @@ nonisolated enum ItemTableLayout {
             case .field: column.style == .status ? 2 : 3
             case .parent: 4
             case .children, .collections, .count: 4
-            case .duration, .occurred: 5
+            case .duration, .occurred, .source: 5
             case .edited: 6
             case .created: 7
             case .tags: 8
@@ -314,9 +328,12 @@ nonisolated enum ItemTableLayout {
         }
     }
 
-    /// The order a place starts with: the most pressing first where items have a priority, else the latest edit. A
-    /// place that keeps its own order, as a collection does, starts unsorted, so its rows stay in the order given.
-    static func sort(_ options: ItemTableOptions, columns: [ItemTableColumn], keepsGivenOrder: Bool = false) -> [ItemTableComparator] {
+    /// The order a place starts with: the most pressing first where items have a priority, else the latest edit, which
+    /// is all the Archive uses. A place that keeps its own order, as a collection does, starts unsorted, so its rows stay
+    /// in the order given.
+    static func sort(
+        _ options: ItemTableOptions, columns: [ItemTableColumn], keepsGivenOrder: Bool = false, listsArchive: Bool = false
+    ) -> [ItemTableComparator] {
         if let sort = options.sort {
             // Resolve stored sort keys against the columns the place offers now.
             let fresh = sort.compactMap { comparator in
@@ -326,7 +343,7 @@ nonisolated enum ItemTableLayout {
         }
         if keepsGivenOrder { return [] }
         var sort: [ItemTableComparator] = []
-        if let priority = columns.first(where: { $0.style == .priority }) {
+        if !listsArchive, let priority = columns.first(where: { $0.style == .priority }) {
             sort.append(ItemTableComparator(column: priority, order: .reverse))
         }
         sort.append(ItemTableComparator(column: .edited, order: .reverse))

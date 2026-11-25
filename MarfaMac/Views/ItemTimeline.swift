@@ -26,7 +26,7 @@ struct ItemTimeline: View {
             mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, day: Calendar.current.startOfDay(for: now))
         let contents = rowContents.contents(
             of: items, in: library, looks: browser.propertyLooks(in: library), list: list, shape: CardShape(leaving: field))
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
+        let title = browser.pageTitle(in: library)
 
         timeline(groups, contents: contents, now: now)
         .bandsToolbar()
@@ -42,7 +42,7 @@ struct ItemTimeline: View {
         }
         .filteredEmptyState(browser)
         .navigationTitle(title)
-        .navigationSubtitle(Text("^[\(items.count) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
+        .navigationSubtitle(browser.countLine(items.count, in: library).editedSubtitle(browser.hasViewChanges))
         .background(ChosenRowOpensSidebar(browser: browser))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .onChange(of: browser.isSearchExpanded) {
