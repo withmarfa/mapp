@@ -31,7 +31,7 @@ Each kind of thing has one drawing, used on the page and in a panel, row, card o
 | Date, number, address, source | Plain text |
 
 - **A value from a set is a chip, and anything else is text or a fact**.
-- **A chip has one gray wash and no edge:** radius 7, text 12 at medium weight (11.5 at regular in a row). Only the type being given to an item is tinted (`TintedChip`); Appearance chooses Tinted (default) or Gray.
+- **A chip has one gray wash and no edge.** Only the type being given to an item is tinted (`TintedChip`); Appearance chooses Tinted (default) or Gray.
 - **A person's circle is 18 points: purple letters on pale purple, no edge** (`PersonCircle`). The name beside it is a fact: 13 points, regular.
 - **Chips come from one family** (`PageChip`, `PersonCircle`, `ChipLine`) in two sizes. `ChipLooks` owns the measures, the web header reads them as `--chip-*` variables, and `ChipLooksTests` checks they agree.
 - **Several values show as two, then a count.**
@@ -60,7 +60,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 
 - **`StatusSymbol` is the one map from a status's group to a symbol and a tint.** The words stay the type's own, so an app's "Closed" still reads Closed. A word that no group claims draws as not started.
 - **A task's priority takes its color from its rank**, never from its word (`OptionTone.prioritySteps`). Any other option takes one from its word.
-- **A status seen in a table, a list, a timeline or a card opens its panel on a click** (`StatusPanel`), the page's own, so an item that takes no change to its status is offered none.
+- **A status in a list, table or card opens its panel on a click** (`StatusPanel`).
 - **An empty value is the gray word Empty**, never a plus button.
 - **A favorite is a yellow star.** The tag behind it is never shown as a tag.
 
@@ -85,7 +85,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 
 ## Keycaps
 
-- **Where the app draws a shortcut, it is outlined keycaps**, one glyph each (`KeyCap`): 18 points high, radius 5, text 11. A menu keeps the system's glyphs.
+- **Where the app draws a shortcut, it is outlined keycaps**, one glyph each (`KeyCap`). A menu keeps the system's glyphs.
 
 ## Messages
 

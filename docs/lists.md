@@ -41,7 +41,6 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
 - **Favorites has an ordinary From,** starting on Library; a person may choose All Items.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
-- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`) once on each Mac, where they are unset, and stays for those copies.
 
 ## Layouts
 
@@ -54,9 +53,9 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse a drop: no single value is meant.
 - **A table's widths are stored only from a drag of a divider** (`keepWidths`), never from AppKit's layout, which changes by itself.
-- **A table's first column starts 40 points from the pane's edge,** where the title does (`ItemTable.margin`).
-- **A column takes the width of its words:** the widest of the first rows' (`ItemTableFit`), not less than its heading. The name takes what the others leave and not less than its least, until a person drags its divider. Past that the table scrolls sideways.
-- **Every date column reads one way** (`DateDisplay.Place.table`, which `PlaceIndex` shares): an item's own stamp is its time today, then Yesterday, a weekday and the date; a field's date is a day, so a task due at four today is due Today.
+- **A table's first column starts where the title does** (`ItemTable.margin`), **and a column takes its words' width** (`ItemTableFit`). The name takes the rest.
+- **Every date column reads one way** (`DateDisplay.Place.table`): an item's stamp is its time today, a field's date a day.
+
 
 ## The View panel
 
@@ -105,7 +104,6 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 - **Library › Types, Collections, and Sources** (`PlaceIndex`) show places and search by name. They have no View button.
 - **Types nest kinds under their type.** Made By waits for the package's provenance; a type has no link to copy.
-- **A source's Kind** is Connector where `GET /plugins` names it, App for an `oauth:` code, else empty (`SourceKind`).
 - **A table of more than 2,000 items is made off the main actor** (`Browser.arrange`), its last table showing meanwhile. A search's table is held apart.
 - **Trap:** a table's body must not read the choice, or choosing a row draws every row.
 - **A row's count is of what the place lists.** A file attached to an item shows on its page, so no list or count but search takes it. The Feed's row has none.
