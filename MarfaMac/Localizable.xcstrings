@@ -328,6 +328,16 @@
     "%@ kept the mapping as it was." : {
 
     },
+    "%@ leave the Feed after ^[%lld day](inflect: true)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ leave the Feed after ^[%2$lld day](inflect: true)"
+          }
+        }
+      }
+    },
     "%@ lists its jobs once it has started them." : {
 
     },
@@ -1625,6 +1635,28 @@
 
     },
     "+%lld more" : {
+
+    },
+    ", and %lld of the %lld items are older." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : ", and %1$lld of the %2$lld items are older."
+          }
+        }
+      }
+    },
+    ", and 1 of the %lld items is older." : {
+
+    },
+    ", and all %lld are older." : {
+
+    },
+    ", and both are older." : {
+
+    },
+    ", and this one is older." : {
 
     },
     "0 sets no limit." : {
@@ -5503,6 +5535,9 @@
     "It will send events for %@." : {
 
     },
+    "It would go to Recently Deleted within the hour." : {
+
+    },
     "Italic" : {
 
     },
@@ -5982,6 +6017,9 @@
 
     },
     "Leave a field empty to use %@’s own default." : {
+
+    },
+    "Leaves the Feed" : {
 
     },
     "Left Out of Search" : {
@@ -8744,6 +8782,9 @@
     "Show Backups" : {
 
     },
+    "Show Changes" : {
+
+    },
     "Show Command Palette" : {
 
     },
@@ -9405,13 +9446,7 @@
     "The Connector" : {
 
     },
-    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
+    "The Feed lets items go after a while" : {
 
     },
     "The Folder Is Missing Where This Copy Is Kept" : {
@@ -9896,9 +9931,6 @@
     },
     "The file couldn’t be attached." : {
       "extractionState" : "manual"
-    },
-    "The file for this page isn’t in Marfa." : {
-
     },
     "The file may be damaged or unavailable. Try opening it in another app." : {
 
@@ -10458,6 +10490,9 @@
     "They were removed from %@. This Mac keeps its own." : {
 
     },
+    "They would go to Recently Deleted within the hour." : {
+
+    },
     "They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it." : {
       "extractionState" : "manual"
     },
@@ -10683,6 +10718,9 @@
     "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The app reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected." : {
       "extractionState" : "manual"
     },
+    "This item couldn’t be read on this Mac." : {
+
+    },
     "This item doesn’t have a link yet. Try again once Marfa has finished syncing." : {
 
     },
@@ -10717,6 +10755,9 @@
       "extractionState" : "manual"
     },
     "This item isn’t ready to link yet. Try again once its copy has loaded." : {
+
+    },
+    "This item’s file isn’t in Marfa." : {
 
     },
     "This item’s tags can’t be changed." : {
@@ -11088,7 +11129,19 @@
     "Unarchive" : {
 
     },
+    "Unarchive ^[%lld item](inflect: true)?" : {
+
+    },
+    "Unarchive “%@”?" : {
+
+    },
     "Unarchived “%@”" : {
+
+    },
+    "Unarchived, it would go to Recently Deleted within the hour." : {
+
+    },
+    "Unarchived, they would go to Recently Deleted within the hour." : {
 
     },
     "Unavailable" : {
@@ -11768,6 +11821,9 @@
     "Your changes are kept on this Mac and sent when you’re back online." : {
       "extractionState" : "manual"
     },
+    "Your changes to this item haven’t reached the server." : {
+
+    },
     "Your changes to “%@” were saved as a copy" : {
       "extractionState" : "manual"
     },
@@ -11781,6 +11837,9 @@
 
     },
     "Your items are still loading." : {
+
+    },
+    "Your latest changes were too large to save to Marfa. They’re kept on this Mac, where you can copy them." : {
 
     },
     "Your settings are back as they were before Import, %@." : {

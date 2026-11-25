@@ -12,9 +12,11 @@ struct ArchiveRequest: Identifiable {
     let undoManager: UndoManager?
 }
 
-/// Items waiting for the person to confirm Move to Feed, which the Feed would let go.
+/// Items waiting for the person to confirm Move to Feed or Unarchive, which leaves the Feed to let them go.
 struct FeedLimitRequest: Identifiable {
     let id = UUID()
+    /// Move to Feed or Unarchive.
+    let move: ItemMove
     let ids: Set<ItemID>
     let title: String?
     let question: FeedLimitQuestion
@@ -33,10 +35,10 @@ extension ItemMove {
 }
 
 extension ItemLibrary {
-    /// Runs `move` on `ids`, or asks first where it must: Archive of items that hold others, and Move to Feed of items
-    /// the Feed would let go. The question belongs to `details`' window. Without one nothing can ask, so Archive takes
-    /// only the chosen items and Move to Feed goes ahead. `moved` hears what the copy queued, once it has judged each
-    /// write, where the move runs now; a move that asks first does not answer it.
+    /// Runs `move` on `ids`, or asks first where it must: Archive of items that hold others, and Move to Feed or
+    /// Unarchive of items the Feed would let go. The question belongs to `details`' window. Without one nothing can ask,
+    /// so Archive takes only the chosen items and Move to Feed and Unarchive go ahead. `moved` hears what the copy
+    /// queued, once it has judged each write, where the move runs now; a move that asks first does not answer it.
     func perform(
         _ move: ItemMove, on ids: Set<ItemID>, undoManager: UndoManager?, details: DetailsPresentation?,
         moved: ((CommandOutcome) -> Void)? = nil
@@ -44,9 +46,10 @@ extension ItemLibrary {
         func titleOfOne() -> String? { ids.count == 1 ? ids.first.flatMap { item($0)?.name } : nil }
         if let details {
             switch move {
-            case .moveToFeed:
-                if let question = feedLimitQuestion(for: ids) {
-                    details.feedLimit = FeedLimitRequest(ids: ids, title: titleOfOne(), question: question, undoManager: undoManager)
+            case .moveToFeed, .unarchive:
+                if let question = feedLimitQuestion(move, for: ids) {
+                    details.feedLimit = FeedLimitRequest(
+                        move: move, ids: ids, title: titleOfOne(), question: question, undoManager: undoManager)
                     return
                 }
             case .archive:
@@ -55,7 +58,7 @@ extension ItemLibrary {
                     details.archiving = ArchiveRequest(ids: ids, title: titleOfOne(), beneath: beneath, undoManager: undoManager)
                     return
                 }
-            case .keep, .unarchive:
+            case .keep:
                 break
             }
         }
@@ -96,7 +99,7 @@ extension View {
         modifier(ArchiveQuestion(details: details))
     }
 
-    /// Asks the person to confirm Move to Feed of items the Feed would let go, for the window whose presentation it is given.
+    /// Asks the person to confirm Move to Feed or Unarchive of items the Feed would let go, for the window whose presentation it is given.
     func feedLimitQuestion(for details: DetailsPresentation) -> some View {
         modifier(FeedLimitQuestionAlert(details: details))
     }
@@ -132,16 +135,16 @@ private struct FeedLimitQuestionAlert: ViewModifier {
 
     func body(content: Content) -> some View {
         content.alert(
-            details.feedLimit.map { MoveWords.feedTitle(selected: $0.ids.count, title: $0.title) } ?? "",
+            details.feedLimit.map { MoveWords.feedTitle($0.move, selected: $0.ids.count, title: $0.title) } ?? "",
             isPresented: Binding { details.feedLimit != nil } set: { if !$0 { details.feedLimit = nil } },
             presenting: details.feedLimit
         ) { request in
             Button("Cancel", role: .cancel) {}
-            Button("Move to Feed", role: .destructive) {
-                Browser.move(.moveToFeed, request.ids, in: library, undoManager: request.undoManager, toasts: details.toasts)
+            Button(request.move.name, role: .destructive) {
+                Browser.move(request.move, request.ids, in: library, undoManager: request.undoManager, toasts: details.toasts)
             }
         } message: { request in
-            Text(MoveWords.feedMessage(selected: request.ids.count, pastWindow: request.question.pastWindow))
+            Text(MoveWords.feedMessage(request.move, selected: request.ids.count, question: request.question))
         }
     }
 }

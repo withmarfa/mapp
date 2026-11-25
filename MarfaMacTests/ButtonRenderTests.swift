@@ -112,14 +112,29 @@ import Testing
         }
     }
 
-    // MARK: Banners and the toast
+    // MARK: Page notices and the toast
 
-    @Test func banners() async throws {
+    @Test func notices() async throws {
         let toast = ToastPresenter()
-        try await draw("Banners and the toast", size: CGSize(width: 760, height: 300)) {
+        try await draw("Page notices and the toast", size: CGSize(width: 760, height: 300)) {
             VStack(alignment: .leading, spacing: 16) {
-                SavedAsCopyBanner(copy: ItemID("10000000-0000-0000-0000-000000000009"))
-                PicturesWaitingCallout(count: 2, load: {}, close: {}).padding(.horizontal, 16)
+                PageNoticeView(
+                    notices: [
+                        PageNotice(
+                            kind: .copySaved, item: ItemID("10000000-0000-0000-0000-000000000001"),
+                            words: "This item changed elsewhere, so your changes were saved as a copy.",
+                            action: .openCopy(ItemID("10000000-0000-0000-0000-000000000009")))
+                    ],
+                    run: { _ in }
+                ).padding(.horizontal, 28)
+                PageNoticeView(
+                    notices: [
+                        PageNotice(
+                            kind: .picturesWaiting, item: ItemID("10000000-0000-0000-0000-000000000001"),
+                            words: PageNotice.picturesWaiting(2), action: .loadPictures, waitingPictures: 2)
+                    ],
+                    run: { _ in }, close: {}
+                ).padding(.horizontal, 28)
                 ToastView(
                     toast: .init(message: "Moved “Kitchen quotes” to Recently Deleted", symbol: "trash", undo: {}), presenter: toast)
                     .padding(.horizontal, 16)

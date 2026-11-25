@@ -63,6 +63,8 @@ nonisolated enum EditorMessage: Sendable {
     case valueMoved(ItemID, row: String, CGRect, viewportHeight: Double)
     /// The kicker's type name was pressed: Change Type, under the name's frame.
     case changeType(ItemID, CGRect, viewportHeight: Double)
+    /// The page's notice action was chosen, for the item the page shows. Loading pictures is the page's own.
+    case noticeAction(ItemID, kind: String)
     case openLink(String)
     /// A link in the item's property block or its linked items was clicked.
     case openItem(ItemID)
@@ -166,6 +168,9 @@ nonisolated enum EditorMessage: Sendable {
                   let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
             else { return nil }
             self = .headerMenu(menu, ItemID(item), CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
+        case "noticeAction":
+            guard let item = dict["item"] as? String, let kind = dict["kind"] as? String else { return nil }
+            self = .noticeAction(ItemID(item), kind: kind)
         case "changeType":
             guard let item = dict["item"] as? String,
                   let rect = (dict["rect"] as? [NSNumber])?.map(\.doubleValue), rect.count == 4, rect.allSatisfy(\.isFinite),

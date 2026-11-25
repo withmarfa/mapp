@@ -9,7 +9,7 @@ import {
 } from './editor'
 import { ItemHeader, type HeaderIcons, type HeaderModel } from './header'
 import { LinkStyle } from './link-style'
-import { showSymbol, showSymbolButton } from './symbol'
+import { PageNoticeLine, type NoticeModel } from './notice'
 import {
   InkKitError,
   normalizeLinkAddress,
@@ -71,6 +71,7 @@ declare global {
       setReadingWidth(ems: number): void
       setHeader(model: HeaderModel | null): void
       setHeaderIcons(icons: HeaderIcons): void
+      setNotices(models: NoticeModel[]): void
       setLinkStyle(variables: Record<string, string>): void
       setOptions(options: { textInput: TextInputPreferences; display: DisplayPreferences }): void
       setLineSpacing(multiple: number): void
@@ -82,23 +83,9 @@ declare global {
 const root = document.getElementById('editor')
 const headerRoot = document.getElementById('item-header')
 const footerRoot = document.getElementById('item-footer')
-const pictureBar = document.getElementById('picture-bar')
-const pictureButton = pictureBar?.querySelector<HTMLButtonElement>('.picture-load')
-const pictureClose = pictureBar?.querySelector<HTMLButtonElement>('.picture-close')
-const pictureCloseIcon = pictureClose?.querySelector<HTMLElement>('.picture-close-icon')
-const pictureSentence = pictureBar?.querySelector<HTMLElement>('.picture-sentence')
-const pictureIcon = pictureBar?.querySelector<HTMLElement>('.picture-icon')
-if (
-  !root ||
-  !headerRoot ||
-  !footerRoot ||
-  !pictureBar ||
-  !pictureButton ||
-  !pictureClose ||
-  !pictureCloseIcon ||
-  !pictureSentence ||
-  !pictureIcon
-)
+const noticeRoot = document.getElementById('page-notice')
+const reasonRoot = document.getElementById('page-reason')
+if (!root || !headerRoot || !footerRoot || !noticeRoot || !reasonRoot)
   throw new Error('editor root missing')
 const labels = splitLabels((window as unknown as { marfaLabels?: AppLabels }).marfaLabels ?? {})
 
@@ -124,23 +111,40 @@ const editor = await ItemEditor.mount(
     headings(headings, generation) {
       postToHost({ type: 'headings', headings, generation })
     },
-    // Above the text, so an item with pictures that wait can load them all at once.
+    // The page counts the pictures that wait and says so in its notice, which the app's own notice replaces.
     picturesWaiting(count, sentence, button, shown) {
-      pictureBar.hidden = !shown
-      pictureSentence.textContent = sentence
-      pictureButton.textContent = button
+      notice.setPictures(
+        shown && count > 0
+          ? {
+              kind: 'picturesWaiting',
+              symbol: 'photo',
+              words: sentence,
+              action: button,
+              closable: true,
+            }
+          : null,
+      )
     },
   },
   labels.editor,
   labels.words,
 )
 const header = new ItemHeader(headerRoot, footerRoot, labels.header)
-pictureButton.addEventListener('click', () => editor.loadPictures())
-// Closing hides the callout for this page: it loads nothing and changes no setting.
-pictureClose.addEventListener('click', () => editor.dismissPictures())
-const closeLabel = labels.words.closePictures ?? 'Close'
-pictureClose.setAttribute('aria-label', closeLabel)
-pictureClose.title = closeLabel
+const notice = new PageNoticeLine(
+  noticeRoot,
+  reasonRoot,
+  {
+    // Loading pictures is the page's own: it asks the app for each, as its own Load buttons do.
+    // Any other action is for the item the app made the notice for, so it needs no item on the page.
+    action: (kind, item) => {
+      if (kind === 'picturesWaiting') editor.loadPictures()
+      else if (item) postToHost({ type: 'noticeAction', item, kind })
+    },
+    // Closing hides the notice for this page: it loads nothing and changes no setting.
+    close: () => editor.dismissPictures(),
+  },
+  () => labels.words.closePictures ?? 'Close',
+)
 
 // Escape hands the keyboard back to the list. Heard on the window, since a read-only page's editor hears
 // no keys of its own.
@@ -189,11 +193,11 @@ window.addEventListener(
 )
 
 let generation = 0
-// The toolbar shows the title once the head has gone under it; the app hears only when that changes. A page with no
-// head to show, as in Focus, has its title there from the start.
+// The toolbar shows the title once the head has gone under it; the app hears only when that changes. A page in Focus
+// has its title there from the start; one whose head is not yet sent, or not yet laid out, has not scrolled it away.
 let headerScrolledAway = false
 function checkHeaderScrolledAway(): void {
-  const away = header.isHidden || window.scrollY >= header.bottom
+  const away = header.isAway(window.scrollY)
   if (away === headerScrolledAway) return
   headerScrolledAway = away
   postToHost({ type: 'headerScrolledAway', away, generation: editor.loadedGeneration })
@@ -226,7 +230,11 @@ window.addEventListener('resize', () => {
 // A header that only grew wider moves nothing below it.
 let surround = -1
 const surroundObserver = new ResizeObserver(() => {
-  const height = headerRoot.offsetHeight + pictureBar.offsetHeight + footerRoot.offsetHeight
+  const height =
+    headerRoot.offsetHeight +
+    noticeRoot.offsetHeight +
+    reasonRoot.offsetHeight +
+    footerRoot.offsetHeight
   // With linked items the text ends where it ends and they follow it; with none, the text fills the window.
   const follows = header.hasFooterItems
   const key = follows ? -2 - height : height
@@ -241,7 +249,8 @@ const surroundObserver = new ResizeObserver(() => {
   })
 })
 surroundObserver.observe(headerRoot)
-surroundObserver.observe(pictureBar)
+surroundObserver.observe(noticeRoot)
+surroundObserver.observe(reasonRoot)
 surroundObserver.observe(footerRoot)
 
 const linkStyle = new LinkStyle(document.documentElement.style)
@@ -370,10 +379,9 @@ window.editor = {
   },
   setHeaderIcons: (icons) => {
     header.setIcons(icons)
-    showSymbol(pictureIcon, icons.symbols?.photo)
-    // The close button is only that symbol, so it waits for it rather than show as an empty circle.
-    showSymbolButton(pictureClose, pictureCloseIcon, icons.symbols?.xmark)
+    notice.setIcons(icons)
   },
+  setNotices: (models) => notice.setApp(models),
 }
 
 postToHost({ type: 'ready' })

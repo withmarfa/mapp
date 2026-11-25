@@ -81,31 +81,21 @@ struct ItemPage: View {
     var backsToolbar = true
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsToolbarBackground = true
     @Environment(\.topRowSpace) private var topRow
-    @State private var bannerHeight: CGFloat = 0
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.settingsLauncher) private var settingsLauncher
 
     var body: some View {
         GeometryReader { proxy in
             // The toolbar's height as the top row knows it, which holds while full screen hides the toolbar.
             let toolbarHeight = max(proxy.safeAreaInsets.top, topRow.lineHeight)
             ZStack(alignment: .top) {
-                // The page runs under the toolbar and any banner, and scrolls beneath it. It starts a little above the
-                // toolbar's lower edge (`TopRowMetrics.pageLift`), where the boards put the kicker.
-                ItemEditor(controller: editor, topInset: toolbarHeight - TopRowMetrics.pageLift + bannerHeight)
+                // The page runs under the toolbar and scrolls beneath it. It starts a little above the toolbar's lower edge
+                // (`TopRowMetrics.pageLift`), where the boards put the kicker. Its notice is drawn by the page, above the head.
+                ItemEditor(controller: editor, topInset: toolbarHeight - TopRowMetrics.pageLift)
                     .ignoresSafeArea(.container, edges: .top)
                     .modifier(ItemPageHeader(item: item, editor: editor, drafts: headerDrafts))
                 ToolbarBand(toolbarHeight: toolbarHeight, isShown: backsToolbar && showsToolbarBackground && editor.isContentUnderToolbar)
-                VStack(spacing: 0) {
-                    if item.state == .trashed {
-                        DeletedItemBanner(id: item.id)
-                    } else if case .conflicted(let copy?, _) = item.sync {
-                        SavedAsCopyBanner(copy: copy)
-                    } else if let problem = item.problem, problem.withholdsText {
-                        UnreadableItemBanner(message: problem.message)
-                    }
-                }
-                // Below the toolbar, which the safe area does not hold while full screen hides it.
-                .padding(.top, topRow.uncovered)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bannerHeight = $0 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -140,11 +130,13 @@ struct ItemPage: View {
         .onChange(of: formatShortcuts, initial: true) { _, shortcuts in editor.setFormatShortcuts(shortcuts) }
         .onChange(of: item.id, initial: true) { old, id in
             if old != id { headerDrafts.headerScrolled(nil, for: old) }
+            editor.onNoticeAction = noticeAction
             guard let item = library.item(id) else { return }
             // Returning from Settings reattaches the same editor without resetting its scroll position or undo.
             editor.select(item)
             feedHeaderScroll()
         }
+        .onChange(of: PageNotice.all(for: item), initial: true) { _, notices in editor.setNotices(notices) }
         .onChange(of: editor.isHeaderScrolledAway) { feedHeaderScroll() }
         .onChange(of: editor.pageItemID) { feedHeaderScroll() }
         .onChange(of: item.title) { feedHeaderScroll() }
@@ -166,65 +158,17 @@ struct ItemPage: View {
             away ? ScrolledHead(item: item.id, title: item.title, typeIcon: library.catalogue.icon(for: item.type)) : nil, for: item.id)
     }
 
+    /// What the page's notice asks for the item it names, if the item still gives that notice.
+    private var noticeAction: (ItemID, String) -> Void {
+        let library = library, undoManager = undoManager, openWindow = openWindow, settingsLauncher = settingsLauncher
+        return { [weak editor] id, kind in
+            guard let editor, editor.isShowing(id), let item = library.item(id),
+                  let notice = PageNotice.all(for: item).first(where: { $0.kind.rawValue == kind }) else { return }
+            notice.run(in: library, undoManager: undoManager, openWindow: openWindow, openSettings: { [settingsLauncher] in settingsLauncher?.show($0) })
+        }
+    }
+
     private func itemChanged() {
         if let item = library.item(item.id) { editor.itemChanged(item) }
-    }
-}
-
-/// The server kept another device's text over the person's and saved theirs as a copy, which the page now shows
-/// beside the text the server kept. It stays above the page while the item scrolls.
-struct SavedAsCopyBanner: View {
-    @Environment(\.openWindow) private var openWindow
-    let copy: ItemID
-
-    var body: some View {
-        HStack {
-            Text("This item changed elsewhere, so your changes were saved as a copy.")
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button("Open Copy") { openWindow(value: copy) }
-                .appButton(.secondary, size: .small)
-        }
-        .interfaceFont(.callout)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.bar)
-    }
-}
-
-/// The library could not read this item, so the page is empty and read-only. This says why, so an empty page is not
-/// taken for text the person lost.
-private struct UnreadableItemBanner: View {
-    let message: String
-
-    var body: some View {
-        Text(message)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .interfaceFont(.callout)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.bar)
-    }
-}
-
-/// Deleted items cannot be edited; this says so and offers the way back, as Notes does.
-private struct DeletedItemBanner: View {
-    @CurrentLibrary private var library
-    @Environment(\.undoManager) private var undoManager
-    let id: ItemID
-
-    var body: some View {
-        HStack {
-            Text("Recently deleted items can’t be edited.")
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button("Recover") { library.recover([id], undoManager: undoManager) }
-                .appButton(.secondary, size: .small)
-        }
-        .interfaceFont(.callout)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.bar)
     }
 }

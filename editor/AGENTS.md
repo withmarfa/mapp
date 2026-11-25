@@ -17,7 +17,7 @@ The item editor's page: TypeScript on Inkkit, built by Vite into one self-contai
 - **Keep Inkkit's frame sandbox.** A PDF is a card with Open; do not loosen the sandbox to paint it.
 - **A file card's corner holds Quick Look before Open** (`src/file-actions.ts`). Inkkit refuses an action on a card that is a placeholder or opens when activated, so keep both off a file card.
 - **A picture at a web address is asked of the app** (`src/pictures.ts`, `askPicture`), never of `embeds`. The page decides nothing of the setting. Printing and export ask with `'cached'`.
-- **A waiting picture's Load button loads that picture alone** (`choose`), and only the bar at the top of the page loads them all (`chooseAll`).
+- **A waiting picture's Load button loads that picture alone** (`choose`), and only the page's notice loads them all (`chooseAll`). The page counts what waits and draws that notice itself (`src/notice.ts`). The app's notices (`setNotices`) take precedence.
 - **Style a waiting picture with Inkkit's placeholder tokens** (`--inkkit-file-placeholder-*`). `src/style.css` adds rules only for what has no token.
 - **A picture's width stays in its name, as `|400`,** in a Markdown picture and in an embed, because Obsidian reads both. Keep both forms working.
 

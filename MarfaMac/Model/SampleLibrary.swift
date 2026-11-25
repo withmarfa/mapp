@@ -98,7 +98,7 @@ nonisolated enum SampleLibrary {
             fields: [
                 TypeField(name: "title", type: "string", declaredBy: "core.note"),
                 TypeField(name: "body", type: "string", declaredBy: "core.note"),
-            ], titleField: "title", bodyField: "body", icon: "lucide:sticky-note"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:sticky-note", feedDays: 30),
         ItemType(
             id: "core.task", label: "Task", description: "Something to do.",
             fields: [
@@ -180,7 +180,7 @@ nonisolated enum SampleLibrary {
                 TypeField(name: "title", type: "string", declaredBy: "core.note"),
                 TypeField(name: "body", type: "string", declaredBy: "core.note"),
                 TypeField(name: "description", type: "string", declaredBy: "sample.project"),
-            ], titleField: "title", bodyField: "body", icon: "lucide:briefcase"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:briefcase", feedDays: 30),
         ItemType(
             id: "core.collection", label: "Collection",
             description: "Items of any type that you gather together. Members join it through the in-collection edge, and it can hold any item but another container.",

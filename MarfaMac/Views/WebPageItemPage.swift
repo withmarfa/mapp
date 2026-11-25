@@ -9,10 +9,10 @@ import SwiftUI
 /// connector keeps that way (`ItemLibrary.pageLayout(of:)`). The body is read only, and the title and properties are
 /// not edited on the page, except a pinned status, which keeps its menu; the inspector shows them all.
 ///
-/// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, a callout at the
-/// top of the page, above the title, says how many and loads them, as the pictures banner on an item's page does
-/// (`PicturesWaitingCallout`).
-/// Its close button hides it for the page until the page is opened again.
+/// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, the page's notice
+/// (`PageNotice`) at the top, above the title, says how many and loads them, as on an item's page. Its close button hides
+/// it for the page until the page is opened again. The same line says a deleted item, a copy saved beside it, a held write
+/// and a file the library does not have.
 struct WebPageItemPage: View {
     private enum Content: Equatable {
         case loading
@@ -62,6 +62,9 @@ struct WebPageItemPage: View {
     }
 
     @CurrentLibrary private var library
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.settingsLauncher) private var settingsLauncher
     @StoredPageStyle private var style
     @AppStorage(RemotePictureSetting.key) private var remotePictures = RemotePictureSetting.standard
     @AppStorage(SourceViewMode.key) private var mode = SourceViewMode.standard
@@ -85,23 +88,33 @@ struct WebPageItemPage: View {
     @State private var content = Content.loading
     @State private var shownID: ItemID?
     @State private var pictures: SealedPictures?
-    /// Whether the person closed the pictures callout on this page.
-    @State private var calloutDismissal = PicturesCalloutDismissal()
+    /// Whether the person closed the pictures notice on this page.
+    @State private var noticeDismissal = PicturesNoticeDismissal()
     /// The look the person chose for this mail, which does not follow the choice made for articles.
     @State private var mailChoice: SourceViewMode?
     @State private var attempt = 0
     /// How far the page has scrolled, which the header follows. Read only by the views that move with it, so a scroll
     /// redraws them and not the page.
     @State private var headerScroll = HeaderScroll()
-    /// How far down the title and pins reach, below the callout when there is one: the distance the page scrolls before the
+    /// How far down the title and pins reach, below the notice when there is one: the distance the page scrolls before the
     /// header is under the toolbar.
     @State private var headerHeight: CGFloat = 0
     @State private var blockHeight: CGFloat = 0
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsToolbarBackground = true
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
 
-    /// One step of the callout's spacing, as on the item page.
-    private var calloutGap: CGFloat { CGFloat(interfaceTextSize) * 4 / 13 * 4 }
+    /// One step of the notice's spacing, as on the item page.
+    private var noticeGap: CGFloat { CGFloat(interfaceTextSize) * 4 / 13 * 4 }
+
+    /// What the page says, if anything: the item's own notice, then the pictures that wait unless the person put that away.
+    private var notices: [PageNotice] {
+        let waiting = pictures.map { noticeDismissal.isClosed(for: item.id) ? 0 : $0.waitingCount } ?? 0
+        return PageNotice.all(for: item, fileIsMissing: content == .unavailable, waitingPictures: waiting)
+    }
+
+    private func run(_ notice: PageNotice) {
+        notice.run(in: library, undoManager: undoManager, openWindow: openWindow, openSettings: { [settingsLauncher] in settingsLauncher?.show($0) }) { pictures?.loadWaiting() }
+    }
 
     /// The look the page is in, once it is known.
     private var shownMode: SourceViewMode? {
@@ -134,19 +147,19 @@ struct WebPageItemPage: View {
                 ScrollingHeader(scroll: headerScroll) {
                     VStack(spacing: 0) {
                         // Above the title, so the page says it first. It stays in Focus, which leaves only the page.
-                        if let pictures, pictures.waitingCount > 0, !calloutDismissal.isClosed(for: item.id) {
-                            PicturesWaitingCallout(
-                                count: pictures.waitingCount, load: { pictures.loadWaiting() },
-                                close: { calloutDismissal.close(for: item.id) })
+                        if !notices.isEmpty {
+                            PageNoticeView(
+                                notices: notices, run: run,
+                                close: notices.contains(where: \.isClosable) ? { noticeDismissal.close(for: item.id) } : nil)
                                 .padding(.horizontal, inset)
-                                .padding(.top, calloutGap * 3)
+                                .padding(.top, noticeGap * 3)
                                 // The header's own space is under it, unless Focus has taken the header out.
-                                .padding(.bottom, drafts.isFocused(on: item.id) ? calloutGap * 3 : 0)
+                                .padding(.bottom, drafts.isFocused(on: item.id) ? noticeGap * 3 : 0)
                         }
                         // Focus leaves only the page: its title is in the toolbar and its properties are hidden.
                         if !drafts.isFocused(on: item.id) {
                             WebPageHeader(item: item, inset: inset, drafts: drafts, open: open)
-                                // As far down as the header reaches, with the callout above it counted.
+                                // As far down as the header reaches, with the notice above it counted.
                                 .onGeometryChange(for: CGFloat.self) { [space = Self.headerBlock] in $0.frame(in: .named(space)).maxY } action: { headerHeight = $0 }
                         }
                     }
@@ -161,8 +174,8 @@ struct WebPageItemPage: View {
         }
         .accessibilityIdentifier("WebPageItemPage")
         .onAppear {
-            // Opening the page again, the same item included, shows a callout the person closed.
-            calloutDismissal.reopen()
+            // Opening the page again, the same item included, shows a notice the person closed.
+            noticeDismissal.reopen()
             offerLook()
         }
         .onDisappear {
@@ -234,13 +247,9 @@ struct WebPageItemPage: View {
                 .ignoresSafeArea(.container, edges: .top)
                 // Each item's pictures are answered by a page made for it.
                 .id(pictures.map(ObjectIdentifier.init))
+        // The page's notice says so.
         case .unavailable:
-            ContentUnavailableView {
-                Label("File Unavailable", systemImage: "questionmark.folder")
-            } description: {
-                Text("The file for this page isn’t in Marfa.")
-            }
-            .padding(.top, blockHeight)
+            Color.clear
         case .failed:
             ContentUnavailableView {
                 Label("Can’t Get This File", systemImage: "exclamationmark.icloud")
@@ -353,10 +362,10 @@ private struct ScrollingToolbarBand: View {
     }
 }
 
-/// Whether the person closed the pictures callout, and for which item. Closing hides it for that item until the page
+/// Whether the person closed the pictures notice, and for which item. Closing hides it for that item until the page
 /// is opened again; a different item never inherits it, and neither the count of waiting pictures nor loading them
 /// brings it back.
-struct PicturesCalloutDismissal: Equatable {
+struct PicturesNoticeDismissal: Equatable {
     private var closed: ItemID?
 
     func isClosed(for item: ItemID) -> Bool { closed == item }
@@ -365,56 +374,6 @@ struct PicturesCalloutDismissal: Equatable {
 
     /// The page is opened, again or anew.
     mutating func reopen() { closed = nil }
-}
-
-/// At the top of the page while some of its pictures wait for the person, in the words and the layout of the pictures
-/// banner at the top of an item's page (`#picture-bar` in the editor), which follows Mail's mailing-list banner: how
-/// many are not loaded, the app's small gray button that loads them, and a plain round close button that hides the banner
-/// for the page. Its spacing is the item page's, in steps of 4/13 of the interface text size (4 points at 13).
-struct PicturesWaitingCallout: View {
-    @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
-    let count: Int
-    let load: () -> Void
-    let close: () -> Void
-
-    var body: some View {
-        let size = CGFloat(textSize)
-        let step = size * 4 / 13
-        HStack(spacing: step * 3) {
-            Image(systemName: "photo")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            Group {
-                if count == 1 {
-                    Text("1 picture from another website isn’t loaded.")
-                } else {
-                    Text("\(count) pictures from other websites aren’t loaded.")
-                }
-            }
-            .foregroundStyle(.primary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            // The close button sits two points (at 13) closer to Load Pictures than the other parts are to each other.
-            HStack(spacing: size * 10 / 13) {
-                Button(action: load) {
-                    if count == 1 { Text("Load Picture") } else { Text("Load Pictures") }
-                }
-                .appButton(.secondary, size: .small)
-                Button(action: close) {
-                    Image(systemName: "xmark")
-                }
-                .appButton(.plain, size: .small, icon: true)
-                .help("Close")
-                .accessibilityLabel("Close")
-                .accessibilityIdentifier("PicturesWaitingCalloutClose")
-            }
-        }
-        .font(.system(size: size))
-        // 9, 10, 9 and 14 points at 13, as the editor's banner is padded.
-        .padding(EdgeInsets(top: size * 9 / 13, leading: size * 14 / 13, bottom: size * 9 / 13, trailing: size * 10 / 13))
-        .background(.quinary, in: RoundedRectangle(cornerRadius: size * 10 / 13, style: .continuous))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("PicturesWaitingCallout")
-    }
 }
 
 /// A page's switch between its looks, as the page's corner and the menus reach it.

@@ -44,6 +44,7 @@ struct RootView: View {
             itemLinks?.register(browser, window: windowHandle)
         }
         .notices(libraries.host.notices) { browser.showSettings($0) }
+        .environment(\.settingsLauncher, settingsLauncher)
     }
 
     @ViewBuilder private var workspace: some View {
