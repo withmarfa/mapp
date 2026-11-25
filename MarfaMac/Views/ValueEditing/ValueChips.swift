@@ -13,7 +13,7 @@ struct ValueMarkView: View {
         case .none:
             EmptyView()
         case .status(let group):
-            StatusMark(group: group, size: 12 * scale).frame(width: 14 * scale)
+            StatusMark(group: group, scale: scale).frame(width: 14 * scale)
         case .person(let initials):
             PersonCircle(initials: initials.isEmpty ? nil : initials)
         case .tag:

@@ -111,7 +111,7 @@ nonisolated enum SampleCastell {
                 TypeField(name: "body", type: "string", declaredBy: Kind.message),
             ], titleField: "title", bodyField: "body", icon: "lucide:message-square"),
         ItemType(
-            id: Kind.place, label: "Place", description: "Somewhere you go.",
+            id: Kind.place, label: "Place", description: "Somewhere you go.", parent: "core.entity",
             fields: [
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.entity"),
                 TypeField(name: "address", type: "string", declaredBy: Kind.place),

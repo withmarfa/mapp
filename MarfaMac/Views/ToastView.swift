@@ -6,6 +6,7 @@ struct ToastView: View {
     let toast: ToastPresenter.Toast
     let presenter: ToastPresenter
     @Environment(\.interfaceTextSize) private var textSize
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
@@ -29,7 +30,13 @@ struct ToastView: View {
         .padding(.trailing, (toast.undo == nil ? 10 : 8) * scale)
         .frame(height: 40 * scale)
         .background(.background, in: .rect(cornerRadius: 12 * scale, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: 12 * scale, style: .continuous).strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5) }
+        // In dark the window's own fill would not show against the window, so the bar takes the chosen row's white
+        // wash on top of it, and a hairline of white at 12% (`docs/look.md`, Dark values).
+        .background(scheme == .dark ? SelectionLooks.chosen(for: scheme) : .clear, in: .rect(cornerRadius: 12 * scale, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12 * scale, style: .continuous)
+                .strokeBorder(scheme == .dark ? Color.white.opacity(0.12) : Color.primary.opacity(0.12), lineWidth: 0.5)
+        }
         .shadow(color: .black.opacity(0.12), radius: 14, y: 8)
         .shadow(color: .black.opacity(0.05), radius: 3, y: 2)
         .fixedSize()

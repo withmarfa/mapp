@@ -125,7 +125,7 @@ struct ItemBoard: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 7) {
-                if let symbol = lane.symbol { StatusMark(symbol, size: 12) }
+                if let symbol = lane.symbol { StatusMark(symbol) }
                 Text(verbatim: lane.title)
                     .interfaceFont(.body.weight(.semibold))
                     .lineLimit(1)

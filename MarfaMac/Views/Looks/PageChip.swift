@@ -87,7 +87,7 @@ struct PageChip: View {
     @ViewBuilder private func leading(looks: ChipLooks, scale: CGFloat) -> some View {
         switch kind {
         case .status(let symbol, _):
-            StatusMark(symbol, size: looks.statusSymbolSize * scale)
+            StatusMark(symbol, scale: scale)
         case .option(let tone):
             Circle()
                 .fill(tone.color(for: scheme))
