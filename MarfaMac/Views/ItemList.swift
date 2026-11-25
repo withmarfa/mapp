@@ -185,7 +185,7 @@ private struct ListLineRow: View {
             .padding(.top, isFirst ? 0 : 10)
         case .item:
             if let content {
-                ItemRow(content: content, density: density, excerpt: excerpt)
+                ItemRow(content: content, density: density, excerpt: excerpt, itemID: line.id)
                     .wantsCounts(of: line.id, content.countQueries, in: library.counts)
             }
         }

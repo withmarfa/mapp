@@ -18,6 +18,7 @@ struct ItemTable: View {
     /// What this Mac keeps for each saved view, whose column widths the table records (`Browser.keepWidths`).
     @AppStorage(ViewLayouts.key) private var viewLayouts = ViewLayouts()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
+    @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     @State private var daysSeen = 0
     @State private var hover = ItemTableHover()
     @State private var placeTrace = TablePlaceTrace()
@@ -29,22 +30,24 @@ struct ItemTable: View {
     /// The inset style's own margin before the first column.
     static let inset: CGFloat = 16
     /// The room the table leaves at each side of the pane, so a group's chevron, which hangs in the margin, sits inside
-    /// the window and a selected row's highlight stops short of its edge.
-    static let margin: CGFloat = 8
-    /// Where the table's first column starts, measured from the pane's edge. The filter chips, the group names and
-    /// Load More line up here, so the table reads as one left edge.
-    static let leadingEdge: CGFloat = inset + margin
+    /// the window and a selected row's highlight stops short of its edge. With the inset it puts the first column's text
+    /// 40 points from the pane's edge, where the title and the boards' tables begin (`TopRowMetrics.lead`).
+    static let margin: CGFloat = TopRowMetrics.lead - inset
 
     var body: some View {
         let _ = daysSeen
         let _ = placeTrace.bodyRan(for: browser.shown)
         let content = tableContent()
-        let _ = setStartingWidths(browser.shownColumns(content.columns))
+        let shown = browser.shownColumns(content.columns)
+        let fit = ItemTableFit.widths(
+            of: shown, rows: content.rows.prefix(ItemTableFit.sample), library: library, format: dateFormat, now: library.now(),
+            scale: CGFloat(textSize) / CGFloat(InterfaceStyle.defaultTextSize))
+        let _ = setStartingWidths(shown, fit: fit)
         let (allRows, rows) = (content.allRows, content.rows)
         let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
 
         ItemTableSelection(browser: browser, content: content) { selection in
-            table(selection: selection, columns: content.columns, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
+            table(selection: selection, columns: content.columns, fit: fit, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
         }
             .padding(.horizontal, Self.margin)
             .searchStatus(browser)
@@ -85,14 +88,15 @@ struct ItemTable: View {
     }
 
     private func table(
-        selection: Binding<Set<ItemID>>, columns: [ItemTableColumn], pages: Pages, grouping: ItemTableColumn?, collapsed: Set<String>
+        selection: Binding<Set<ItemID>>, columns: [ItemTableColumn], fit: [String: ItemTableFit.Width], pages: Pages,
+        grouping: ItemTableColumn?, collapsed: Set<String>
     ) -> some View {
         let last = browser.shownColumns(columns).last?.id
         return Table(of: ItemTableRow.self, selection: selection, sortOrder: sortBinding(columns), columnCustomization: customization(columns)) {
             // Only the columns showing. SwiftUI adds and hides every column it is given on live rows when the place
             // changes, which for the many columns of a mixed place costs far more than the few it shows.
             TableColumnForEach(browser.shownColumns(columns)) { column in
-                tableColumn(column, endsRow: column.id == last)
+                tableColumn(column, fit: fit[column.id], endsRow: column.id == last)
             }
         } rows: {
             if let grouping {
@@ -139,12 +143,15 @@ struct ItemTable: View {
 
     /// A count has no sort control: it is asked for only the rows on screen (`ItemTableColumn.isSortable`).
     @TableColumnBuilder<ItemTableRow, ItemTableComparator>
-    private func tableColumn(_ column: ItemTableColumn, endsRow: Bool) -> some TableColumnContent<ItemTableRow, ItemTableComparator> {
+    private func tableColumn(
+        _ column: ItemTableColumn, fit: ItemTableFit.Width?, endsRow: Bool
+    ) -> some TableColumnContent<ItemTableRow, ItemTableComparator> {
+        let widths = (min: fit?.minimum ?? column.widths.min, ideal: fit?.ideal ?? column.widths.ideal, max: column.widths.max)
         if column.isSortable {
             TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
                 cell(of: row, in: column, endsRow: endsRow)
             }
-            .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
+            .width(min: widths.min, ideal: widths.ideal, max: widths.max)
             .customizationID(column.id)
             // The order is the Properties list's to change, which the header cannot hold.
             .disabledCustomizationBehavior(Self.disabledCustomization(of: column))
@@ -153,7 +160,7 @@ struct ItemTable: View {
             TableColumn(Text(verbatim: column.label)) { row in
                 cell(of: row, in: column, endsRow: endsRow)
             }
-            .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
+            .width(min: widths.min, ideal: widths.ideal, max: widths.max)
             .customizationID(column.id)
             .disabledCustomizationBehavior(Self.disabledCustomization(of: column))
         }
@@ -248,9 +255,12 @@ struct ItemTable: View {
 
     /// Tells the table's header what width each shown column starts at, which is the width the person kept or the column's
     /// ideal one (`ColumnResizing`).
-    private func setStartingWidths(_ shown: [ItemTableColumn]) {
+    private func setStartingWidths(_ shown: [ItemTableColumn], fit: [String: ItemTableFit.Width]) {
         let kept = (try? JSONEncoder().encode(decodedWidths())).map(Self.keptWidths(in:)) ?? [:]
-        resizing.widths = shown.map { kept[$0.id] ?? $0.widths.ideal }
+        resizing.widths = shown.map { kept[$0.id] ?? fit[$0.id]?.ideal ?? $0.widths.ideal }
+        // The name takes what the other columns leave, until a person drags its divider.
+        resizing.flexible = shown.firstIndex { $0.content == .title && kept[$0.id] == nil }
+        resizing.flexibleMinimum = ItemTableColumn.title.widths.min
     }
 
     /// The stored widths for the place showing now. Decoded when the place or the stored data changes, and kept until
@@ -405,7 +415,7 @@ extension ItemTableColumn {
     /// How wide the column starts and how far it can be dragged: wide for the name and for prose, narrow for marks.
     var widths: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
         switch style {
-        case .title: (240, 420, 800)
+        case .title: (240, 420, .infinity)
         case .status: (110, 140, 220)
         case .priority: (90, 110, 160)
         case .choice, .text: (90, 150, 320)

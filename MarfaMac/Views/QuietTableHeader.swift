@@ -29,6 +29,11 @@ final class ColumnResizing {
         didSet { if widths != oldValue { widthsChanged?() } }
     }
 
+    /// Which shown column takes what the others leave of the table's width, nil where none does: the name, until a person
+    /// drags its divider. It never goes under `flexibleMinimum`, and the table scrolls sideways only past that.
+    var flexible: Int?
+    var flexibleMinimum: CGFloat = 0
+
     /// Called when `widths` change, as when the table moves to a place with other widths. Nothing else tells the header
     /// that the same table has another place to start at.
     fileprivate var widthsChanged: (() -> Void)?
@@ -38,6 +43,22 @@ final class ColumnResizing {
     /// The starting widths and shown columns last applied, so a change of place or of stored widths is applied once, and
     /// the same table moving to a place with other widths never keeps the last place's.
     private var applied: (widths: [CGFloat], columns: [NSUserInterfaceItemIdentifier])?
+
+    /// Gives the flexible column the width the others leave in the table, so the columns fill the table and none is cut off
+    /// by it while the name can give way.
+    fileprivate func fill(_ table: NSTableView, in scrollView: NSScrollView) {
+        guard !isDragging, let flexible else { return }
+        let shown = table.tableColumns.filter { !$0.isHidden }
+        guard shown.indices.contains(flexible), shown.count == widths.count, let first = table.tableColumns.firstIndex(of: shown[0]) else { return }
+        let insets = scrollView.contentInsets
+        // The table keeps the inset style's room before its first column and the same after its last.
+        let room = 2 * table.rect(ofColumn: first).minX
+        let available = scrollView.contentView.bounds.width - insets.left - insets.right - room
+        let others = shown.enumerated().reduce(CGFloat(0)) { $0 + ($1.offset == flexible ? 0 : $1.element.width) }
+        let target = max(flexibleMinimum, floor(available - others - table.intercellSpacing.width * CGFloat(shown.count)))
+        let column = shown[flexible]
+        if abs(column.width - target) >= 1 { column.width = target }
+    }
 
     /// Answers false while the table's shown columns are not yet the ones `widths` is for, as when SwiftUI replaces them
     /// after a change of place, so the caller tries again once they are.
@@ -123,6 +144,7 @@ private struct QuietTableHeader: NSViewRepresentable {
                 if table.columnAutoresizingStyle != .noColumnAutoresizing { table.columnAutoresizingStyle = .noColumnAutoresizing }
                 if resizing.restore(table) {
                     restoreTries = 0
+                    resizing.fill(table, in: scrollView)
                 } else if restoreTries < 50 {
                     restoreTries += 1
                     DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(20)) { [weak self] in self?.refresh() }

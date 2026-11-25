@@ -53,6 +53,7 @@ The first that fits wins, so the order is the rule: Quote, Place, Person, Media,
 
 - **A row draws plain values** (`RowContent`), worked out once for each item value (`RowContents`), and looks nothing up. What every row of a list shares is in `RowList`.
 - **The date is the one the list is sorted by**, else the look's. A list sorted by a field shows no date where the item has none, because another date would say nothing about the order.
+- **A Feed item's name has the Feed's mark after it** in every layout that shows a name, where the list holds both tiers (`RowList.marksFeed`, which a place's From of All Items sets): the symbol of Move to Feed in tertiary gray (`FeedMark`). The name shortens before the mark does; a name that wraps carries it as its last word.
 - **The type shows only where the list mixes types** and is not grouped by type.
 - **A row shows two facts, and a count of the rest.** A fact with no value is skipped.
 - **A row's picture comes from the item's own file, its first embed or an attached image**, never from a web address, because drawing a list must load nothing from a website. Its frame stays when no picture can be made, so a row never changes height.

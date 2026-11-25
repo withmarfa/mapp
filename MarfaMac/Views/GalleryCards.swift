@@ -98,7 +98,7 @@ struct GalleryCard: View, Equatable {
 
     private func lines(titleFont: Font, secondaryFont: Font, title: String, secondary: String, reserves: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(verbatim: title)
+            (content.inFeed && !reserves ? FeedMark.titled(title) : Text(verbatim: title))
                 .interfaceFont(titleFont)
                 .lineLimit(2, reservesSpace: reserves)
                 .multilineTextAlignment(.leading)

@@ -118,7 +118,8 @@ nonisolated enum DateDisplay {
         case value
         /// A line of the list, where the time shows only today.
         case list
-        /// A cell of the table, where a day is all there is.
+        /// A cell of the table, where a day is all there is, except that a stamp of the item's (`hasTime`) reads as its time today.
+        /// Every date column of every table reads this way.
         case table
     }
 
@@ -138,6 +139,7 @@ nonisolated enum DateDisplay {
             return listLabel(date, now: now, format: format, calendar: calendar, locale: locale)
         case .table:
             guard format.usesWords else { return dated(date, now: now, format: format, calendar: calendar, locale: locale) }
+            if hasTime, calendar.isDate(date, inSameDayAs: now) { return timeOfDay(of: date, format: format, calendar: calendar, locale: locale) }
             return dayLabel(date, now: now, format: format, calendar: calendar, locale: locale)
         }
     }

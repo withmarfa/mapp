@@ -5,6 +5,8 @@ import SwiftUI
 /// types. Every row is these two lines and one height, so a row with nothing to say on the second line keeps it.
 struct TimelineRowView: View {
     let content: RowContent
+    /// The item the row is for, which its status chip changes by a click.
+    var itemID: ItemID?
 
     var body: some View {
         let face = TimelineRowFace(content)
@@ -16,9 +18,10 @@ struct TimelineRowView: View {
                     Text(face.title)
                         .interfaceFont(.body)
                         .lineLimit(1)
+                    if content.inFeed { FeedMark() }
                     Spacer(minLength: 8)
                     if !face.chips.isEmpty || face.more > 0 {
-                        ChipLine(chips: face.chips, more: face.more)
+                        ChipLine(chips: face.chips, more: face.more, statusItem: content.editsStatus ? itemID : nil)
                             .fixedSize()
                             .layoutPriority(1)
                     }

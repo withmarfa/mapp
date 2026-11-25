@@ -44,6 +44,8 @@ nonisolated struct RowList: Hashable, Sendable {
     var placedField: String?
     /// Whether the list's rows show a picture, which a Standard list does and a Compact one never does.
     var showsPictures = false
+    /// Whether the list holds both tiers, so a row of a Feed item says so (`RowContent.inFeed`).
+    var marksFeed = false
     /// The start of today, which is all a row's dates need of the moment.
     var day: Date
 }
@@ -77,6 +79,10 @@ nonisolated struct RowContent: Hashable, Sendable {
     var typeIcon: String?
     var typeLabel: String
     var mixesTypes: Bool
+    /// Whether the row says the item is the Feed's, which a list of both tiers does (`RowList.marksFeed`).
+    var inFeed = false
+    /// Whether the item's status takes a change, so the status chip on its bottom line is a button (`StatusPanel`).
+    var editsStatus = false
     /// The bottom line: the type, where the list mixes types, the status, and up to two facts.
     var chips: [Chip] = []
     /// How many values the bottom line leaves out, as "+N".
@@ -103,7 +109,8 @@ nonisolated struct RowContent: Hashable, Sendable {
             case .person(_, let name): name
             }
         }
-        return ([title, date, secondary].compactMap { $0 } + chipWords).joined(separator: ", ")
+        let feed = inFeed ? [String(localized: "Feed")] : []
+        return ([title] + feed + [date, secondary].compactMap { $0 } + chipWords).joined(separator: ", ")
     }
 
     // MARK: Making
@@ -123,6 +130,8 @@ nonisolated struct RowContent: Hashable, Sendable {
         var content = RowContent(
             title: item.displayTitle, date: includesDate ? maker.date(of: look, showsTime: showsTime) : nil, secondary: maker.secondary(of: look),
             typeIcon: catalogue.icon(for: item.type), typeLabel: catalogue.label(for: item.type), mixesTypes: list.mixesTypes)
+        content.inFeed = list.marksFeed && item.tier == .feed
+        content.editsStatus = catalogue.itemTypes[item.type]?.statusField.map { item.obstacle(toField: $0.key) == nil } ?? false
         maker.addBottomLine(of: look, to: &content)
         content.countQueries = look.countQueries
         content.picture = RowPicture.of(item, attachments: attachments, in: list)
