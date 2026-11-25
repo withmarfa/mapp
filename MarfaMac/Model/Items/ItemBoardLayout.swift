@@ -84,7 +84,7 @@ nonisolated enum ItemBoardLayout {
     }
 
     /// The lanes of a board by `key`: the words the items' types declare, a status field's by their group (as the
-    /// table lists them) and then in declared order, then No Value, and Invalid Value and Not Applicable where an
+    /// table lists them) and then in declared order, then No Status or No and the field's name, and Invalid Value and Not Applicable where an
     /// item needs them. A board's fields are closed, so a word no type declares is an invalid value. Where the types
     /// keep their status in different fields, or the person groups by them (`statusGroups`), the lanes are Marfa's
     /// status groups instead. Within a lane the cards follow `order`, each item's place in the sort the window shows, or
@@ -96,10 +96,12 @@ nonisolated enum ItemBoardLayout {
         if statusGroups { return groupLanes(items: items, catalogue: catalogue, order: order, asMarfa: asMarfa) }
         var values: [(word: String, bucket: StatusBucket)] = []
         var isStatus = false
+        var label: String?
         var seen: Set<String> = []
         for type in Set(items.map(\.type)).sorted(by: { $0.rawValue < $1.rawValue }) {
             for field in eligibleFields(of: type, catalogue: catalogue) where field.key == key {
                 if field.isStatus { isStatus = true }
+                label = label ?? field.label
                 for word in field.options where !word.isEmpty && seen.insert(word).inserted {
                     values.append((word, field.isStatus ? field.statusBucket(of: word) : .other))
                 }
@@ -113,7 +115,9 @@ nonisolated enum ItemBoardLayout {
                 id: .option(entry.word), title: ItemTypeInfo.Field.label(ofOption: entry.word),
                 symbol: isStatus ? StatusSymbol(group: statusGroup(of: entry.bucket)) : nil, items: [])
         }
-        lanes.append(ItemBoardLane(id: .missing, title: String(localized: "No Value"), items: []))
+        // Named as the table names it: No Status for a status, else No and the field's name.
+        let none = isStatus ? String(localized: "No Status") : label.map { String(localized: "No \($0)") } ?? String(localized: "No Value")
+        lanes.append(ItemBoardLane(id: .missing, title: none, items: []))
         if groups[.invalid] != nil {
             lanes.append(ItemBoardLane(id: .invalid, title: String(localized: "Invalid Value"), items: []))
         }
