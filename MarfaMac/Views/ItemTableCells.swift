@@ -304,7 +304,7 @@ struct ItemTableCell: View {
     @ViewBuilder private func chip(_ value: String, field: ItemTypeInfo.Field) -> some View {
         let label = ItemTypeInfo.Field.label(ofOption: value)
         if column.style == .status {
-            PageChip(text: label, kind: .status(StatusSymbol(group: field.statusGroup(of: value)), chevron: false), size: .row)
+            PageChip(text: label, kind: .status(StatusSymbol(group: field.statusGroup(of: value))), size: .row)
         } else {
             PageChip(
                 text: label,

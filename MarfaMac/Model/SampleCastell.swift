@@ -434,7 +434,7 @@ nonisolated extension SampleCastell {
             switch type {
             case Kind.note: return ["title": .string(name), "body": .string("\(quote) Kept for the \(topic.lowercased()).")]
             case Kind.task:
-                let statuses = ["pending", "pending", "in_progress", "completed"]
+                let statuses = ["not_started", "not_started", "in_progress", "completed"]
                 let priorities = ["low", "medium", "high"]
                 return ["title": .string(name), "body": .string("About the \(topic.lowercased())."), "status": .string(statuses[n % 4]), "priority": .string(priorities[n % 3])]
             case Kind.bookmark, Kind.article:

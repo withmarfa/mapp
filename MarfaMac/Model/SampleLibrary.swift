@@ -108,7 +108,7 @@ nonisolated enum SampleLibrary {
                 TypeField(
                     name: "status", type: "status", declaredBy: "core.task",
                     definition: ["status_values": [
-                        ["value": "pending", "group": "not_started"], ["value": "in_progress", "group": "in_progress"],
+                        ["value": "not_started", "group": "not_started"], ["value": "in_progress", "group": "in_progress"],
                         ["value": "completed", "group": "completed"], ["value": "canceled", "group": "canceled"],
                     ]]),
                 TypeField(
@@ -448,11 +448,11 @@ private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
 }
 
 nonisolated private let tasks: [(title: String, status: String, priority: String, body: String)] = [
-    ("Find a quieter reading layout", "pending", "high", "Compare a narrow reading column with properties beside it."),
-    ("Choose the first three collections", "pending", "medium", "Start with the places used every day."),
+    ("Find a quieter reading layout", "not_started", "high", "Compare a narrow reading column with properties beside it."),
+    ("Choose the first three collections", "not_started", "medium", "Start with the places used every day."),
     ("Test the new item flow", "in_progress", "high", "Try an empty note, a task and an item with required fields."),
     ("Give the board room to breathe", "in_progress", "medium", "Compare comfortable cards with a compact layout."),
-    ("Review the source information", "pending", "medium", "Waiting for a source sample with an author and publication date."),
+    ("Review the source information", "not_started", "medium", "Waiting for a source sample with an author and publication date."),
     ("Keep the view picker in one place", "completed", "high", "Switch views without moving the surrounding controls."),
     ("Try a weekly planning view", "canceled", "low", "Keep undated items visible so nothing disappears."),
     ("Decide where this belongs", "", "low", "An item without a status still needs a place on the board."),

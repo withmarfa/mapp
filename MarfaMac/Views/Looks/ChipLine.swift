@@ -25,7 +25,7 @@ struct ChipLine: View {
                 case .type(let icon, let label):
                     MarkedName(text: label, icon: icon, size: .row)
                 case .status(let symbol, let label):
-                    PageChip(text: label, kind: .status(symbol, chevron: false), size: .row)
+                    PageChip(text: label, kind: .status(symbol), size: .row)
                 case .option(let label, let tone):
                     PageChip(text: label, kind: .option(tone), size: .row)
                 case .person(let initials, let name):

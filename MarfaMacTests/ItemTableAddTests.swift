@@ -27,7 +27,7 @@ struct ItemTableAddTests {
             id: task, label: "Task",
             fields: [
                 .init(key: "title", label: "Title", kind: .text, declaredBy: task),
-                .init(key: "status", label: "Status", kind: .status([.init(value: "pending", group: .notStarted)]), declaredBy: task),
+                .init(key: "status", label: "Status", kind: .status([.init(value: "not_started", group: .notStarted)]), declaredBy: task),
                 .init(key: "priority", label: "Priority", kind: .choice(["low", "high"]), declaredBy: task),
                 .init(key: "due", label: "Due", kind: .date(includesTime: false), declaredBy: task),
                 .init(key: "labels", label: "Labels", kind: .words, declaredBy: task),

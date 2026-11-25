@@ -12,7 +12,7 @@ struct InspectorFieldsTests {
 
     private static let words: JSONObject = [
         "status_values": [
-            ["value": "pending", "group": "not_started"], ["value": "in_progress", "group": "in_progress"],
+            ["value": "not_started", "group": "not_started"], ["value": "in_progress", "group": "in_progress"],
             ["value": "completed", "group": "completed"], ["value": "canceled", "group": "canceled"],
         ]
     ]
@@ -109,7 +109,7 @@ struct InspectorFieldsTests {
     @Test func theStatusMenuKeepsAValueTheCatalogueDoesNotList() throws {
         let status = try #require(Self.task.statusField)
         let blocked = Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string("blocked"))])
-        #expect(ItemPageHeader.statusChoices(of: blocked, in: status) == ["pending", "in_progress", "completed", "canceled", "blocked"])
+        #expect(ItemPageHeader.statusChoices(of: blocked, in: status) == ["not_started", "in_progress", "completed", "canceled", "blocked"])
         let completed = Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string("completed"))])
         #expect(ItemPageHeader.statusChoices(of: completed, in: status) == status.options)
         #expect(PageHead.statusValue(of: Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string(""))]), in: status) == nil)
