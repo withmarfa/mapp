@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where an item's Linked From list shows: at the foot of its page, or in the inspector.
+/// Where an item's Linked From list shows: at the foot of its page, or only in the panel.
 nonisolated enum LinkedFromPlace: String, Codable, Sendable {
     case page, inspector
 }

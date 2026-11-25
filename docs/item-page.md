@@ -22,7 +22,7 @@ An item's page is its title, pinned properties, property block and text. One pag
 ## Rules
 
 - **The app decides and the page draws.** `PagePins` and `PropertyRow` decide which values show and where; the web header draws what it is sent. A rule added in `editor/src/header.ts` would be missing from Customize Layout and VoiceOver.
-- **Nothing a person can read is lost by arranging.** A value is in the pins or the block, never both. A pinned row that an event's time pushes out goes back to the block, and the right sidebar lists every property whatever the page hides.
+- **Nothing a person can read is lost by arranging.** A value is in the pins or the block, never both. A pinned row that an event's time pushes out goes back to the block, and Info lists every property whatever the page hides.
 - **Nothing sits between the title and the pins**, and nothing else uses the space under a title, because the page reads the same from type to type.
 - **An empty value is the word Empty where the person can set it, and absent where they cannot.** No placeholder stands for a missing pin.
 - **A value is cut, never reworded.** The whole value is its help.
@@ -45,7 +45,7 @@ An item's page is its title, pinned properties, property block and text. One pag
 
 ## What the page locks
 
-The page and the right sidebar draw what `Item.allows(_:)` answers, and never judge an item themselves.
+The page and the panel draw what `Item.allows(_:)` answers, and never judge an item themselves.
 
 | The item is | The page |
 | --- | --- |
@@ -57,6 +57,7 @@ The page and the right sidebar draw what `Item.allows(_:)` answers, and never ju
 
 - **A layout belongs to a type.** Every item of the type follows it, at once, in every window, and a child type does not inherit it.
 - **It changes no item**, so a read-only item can be laid out, and a lock does not stop it.
+- **Linked From has one place,** the page's foot or the panel's Links.
 - **A type nobody customized has no entry** (`PagePlacements`), so a better default reaches it. Use Defaults removes the entry.
 - **Escape ends it, and Focus waits for it**, because it arranges the header that Focus hides.
 - **Trap:** `Choice.pins` of nil means the default pins and an empty list means no pins. Treating one as the other pins properties that a person removed. `PagePlacement` gives the defaults.

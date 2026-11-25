@@ -44,8 +44,8 @@ enum InspectorMetrics {
 }
 
 extension EnvironmentValues {
-    /// The widest name among the rows of the inspector, which every row's name column takes, so Details and
-    /// Properties line up. Nil until the rows have measured their names.
+    /// The widest name among the rows of the inspector, which every row's name column takes, so the
+    /// rows line up. Nil until the rows have measured their names.
     @Entry var inspectorNameWidth: CGFloat?
 }
 
@@ -75,16 +75,13 @@ private struct SharedNameColumn: ViewModifier {
 /// section that can take something new has a small plus on its heading, beside the chevron.
 ///
 /// The box takes each view of `content` as a row, with a divider between rows, so a row is a view of its own, never a
-/// stack of several. A section with nothing in it shows `placeholder` as its one row. A section that is not `boxed`
-/// draws its content as it is, for Details, whose cells are boxes of their own, and for Relationships, whose groups each
-/// draw one. Its `placeholder` is still a box of its own.
+/// stack of several. A section with nothing in it shows `placeholder` as its one row.
 struct InspectorSection<Content: View, Add: View>: View {
     let title: LocalizedStringKey
     var count: Int?
     @Binding var isOpen: Bool
     let identifier: String
     var placeholder: LocalizedStringKey?
-    var boxed = true
     /// The plus control, given whether the heading is hovered.
     let add: (Bool) -> Add
     @ViewBuilder let content: Content
@@ -95,10 +92,8 @@ struct InspectorSection<Content: View, Add: View>: View {
             if isOpen {
                 if let placeholder {
                     InspectorBox { Text(placeholder).foregroundStyle(.secondary) }
-                } else if boxed {
-                    InspectorBox { content }
                 } else {
-                    content
+                    InspectorBox { content }
                 }
             }
         }

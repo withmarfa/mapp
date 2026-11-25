@@ -20,7 +20,7 @@ struct ItemPropertyRow: View {
     /// that opens a panel shows it. A yes/no waits for a click.
     var startsEditing = false
     /// Whether the row writes or hands back what was typed when it leaves the screen. A row whose draft belongs to a
-    /// window (the inspector's) or to a sheet that may be cancelled leaves that to its owner: a section folded, or a
+    /// window (the inspector's) or to a sheet that may be cancelled leaves that to its owner: a pill changed, or a
     /// sheet closed, must not raise "Property Not Saved" or put text on the clipboard.
     var handsOffOnLeave = true
     /// Whether the page shows this property too, and what changes it; nil offers no choice.
@@ -136,7 +136,7 @@ struct ItemPropertyRow: View {
         }
     }
 
-    /// A value nothing here changes, read as a Details row is.
+    /// A value nothing here changes, drawn as plain text.
     @ViewBuilder private var plain: some View {
         if definition.kind.isDate, let dateText {
             InspectorText(text: dateText, keepsOneLine: true, endsAtTrailingEdge: true)
