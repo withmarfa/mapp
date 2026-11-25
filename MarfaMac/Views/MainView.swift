@@ -319,7 +319,7 @@ struct MainView: View {
         .onChange(of: browser.snapshotParts) {
             if restoresWindow {
                 browser.saveSnapshot { storedBrowser = $0 }
-                if browser.keptLaterPlace == nil { StartWith.remember(browser.shown) }
+                if browser.laterPlace == nil { StartWith.remember(browser.shown) }
             }
         }
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to

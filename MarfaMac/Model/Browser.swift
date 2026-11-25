@@ -12,6 +12,7 @@ final class Browser {
             guard !(showing.map { $0.isSame(oldValue) } ?? (oldValue == nil)) else { return }
             modalItem = nil
             listMemory.scrollOffset = nil
+            laterPlace = nil
             viewPanelPlaceChanged()
         }
     }
@@ -28,8 +29,8 @@ final class Browser {
     @ObservationIgnored let sidebarMemory = ColumnMemory()
     /// How far the list, table or gallery is scrolled, kept for the same reasons and for the next launch (`snapshot()`).
     @ObservationIgnored let listMemory = ColumnMemory()
-    /// The place a later copy wrote for this window, kept as written while the window stays where it opened.
-    @ObservationIgnored var laterPlace: LaterPlace?
+    /// The place a later copy wrote for this window, kept as written until the person goes elsewhere.
+    @ObservationIgnored var laterPlace: [String: String]?
     /// The rows of the Items index under each tab, kept by the window so they survive an item's full page (`ItemIndexModel`).
     @ObservationIgnored let itemIndex = ItemIndexModel()
     /// The item whose row Items scrolls into view once it shows it, asked for by a reveal (`revealOnItems`).
@@ -284,10 +285,17 @@ final class Browser {
     /// Shows the place that lists an item no place on screen does: the Archive for an archived item, the Feed or the
     /// Library by its tier, or for a deleted item Settings > Recently Deleted, the only list that holds it.
     private func showListing(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
+        guard let place = Self.listing(of: item) else { return showSettings(.recentlyDeleted) }
+        show(PlaceView(place), in: library, order: order)
+    }
+
+    /// The place that lists an item whatever else does: the Archive, or the Library or the Feed by its tier. None lists a
+    /// deleted item.
+    nonisolated static func listing(of item: Item) -> Place? {
         switch item.state {
-        case .trashed: showSettings(.recentlyDeleted)
-        case .archived: show(.archive, in: library, order: order)
-        default: show(item.tier == .feed ? .feed : .library, in: library, order: order)
+        case .trashed: nil
+        case .archived: .archive
+        default: item.tier == .feed ? .feed : .library
         }
     }
 

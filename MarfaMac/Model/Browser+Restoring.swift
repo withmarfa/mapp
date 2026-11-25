@@ -15,18 +15,14 @@ extension Browser {
         var scrollOffset: Double?
         /// The window was left in Files, which is no place now. Never stored.
         var leftFiles = false
+        /// The selection is one favorite an earlier copy opened, shown where it is listed now. Never stored.
+        var findsChosen = false
         /// The place as a later copy wrote it, where this copy cannot read all of it: a place word it does not know, or
-        /// a view word. Written back as it was while the window stays where it opened (`LaterPlace`).
+        /// a view word. Written back as it was until the person goes elsewhere (`Browser.laterPlace`).
         var laterPlace: [String: String]?
 
         /// Whether the place is one this copy knows, so the window can open in it.
         var knowsPlace: Bool { laterPlace?["place"].flatMap(Place.init(word:)) != nil || laterPlace == nil }
-    }
-
-    /// A place a later copy wrote that this copy reads only in part, and where the window opened for it.
-    struct LaterPlace {
-        var written: [String: String]
-        var opened: PlaceView?
     }
 
     /// The most items of a selection a window keeps for the next launch. A selection larger than this is kept as
@@ -38,13 +34,7 @@ extension Browser {
         let kept = selection.count > Self.restoredSelectionLimit ? [] : selection.sorted { $0.rawValue < $1.rawValue }
         return Snapshot(
             place: shown, selection: kept, viewMode: viewMode, opensItem: isCollectionItemPresented,
-            scrollOffset: listMemory.scrollOffset.map(Double.init), laterPlace: keptLaterPlace)
-    }
-
-    /// The place a later copy wrote, while the window is still where it opened for it.
-    var keptLaterPlace: [String: String]? {
-        guard let laterPlace, laterPlace.opened == showing else { return nil }
-        return laterPlace.written
+            scrollOffset: listMemory.scrollOffset.map(Double.init), laterPlace: laterPlace)
     }
 
     /// Updates the stored window only after its new snapshot encodes successfully.
@@ -79,7 +69,9 @@ extension Browser {
         if snapshot?.leftFiles == true || (snapshot == nil && startKeys.contains { EarlierPlace.read(key: $0) == .files }) {
             EarlierPlace.tellFilesOnce(library.notices, in: defaults)
         }
-        let opening = start.map { Snapshot(place: $0.place, selection: $0.selecting.map { [$0] } ?? []) }
+        let opening = start.map {
+            Snapshot(place: $0.place, selection: $0.selecting.map { [$0] } ?? [], findsChosen: $0.selecting != nil)
+        }
         if var snapshot {
             // A place this copy does not know opens where a new window would, and is written back as it was.
             if !snapshot.knowsPlace {
@@ -87,7 +79,7 @@ extension Browser {
                 (snapshot.opensItem, snapshot.scrollOffset) = (nil, nil)
             }
             restore(snapshot, in: library, order: order)
-            laterPlace = snapshot.laterPlace.map { LaterPlace(written: $0, opened: showing) }
+            laterPlace = snapshot.laterPlace
         } else if let opening {
             restore(opening, in: library, order: order)
         } else {
@@ -100,6 +92,9 @@ extension Browser {
     func restore(_ snapshot: Snapshot, in library: any ItemLibrary, order: ItemOrder) {
         set(layout: snapshot.viewMode)
         var place = snapshot.place
+        if snapshot.findsChosen, let item = snapshot.selection.first.flatMap(library.item), let listing = Self.listing(of: item) {
+            place = PlaceView(listing)
+        }
         if let id = place.savedView {
             place = library.views.contains { $0.id == id } ? .saved(id, in: library) : .library
         }
@@ -115,7 +110,7 @@ extension Browser {
         if selection.isEmpty { selectFirstItem(in: library, order: order) }
         // Only where the window is back in the place it was left, and not with another item chosen in its stead.
         guard shown == place else { return }
-        if snapshot.opensItem == true, keptSelection, selection.count == 1, usesCollection {
+        if snapshot.opensItem == true, keptSelection, selection.count == 1, usesCollection || shown == .library {
             isCollectionItemPresented = true
         }
         if let offset = snapshot.scrollOffset, offset > 0 { listMemory.restore(to: CGFloat(offset)) }
@@ -154,7 +149,7 @@ extension Browser.Snapshot {
             switch name == "recentlyDeleted" ? .place(.library) : EarlierPlace.read(name: name, value: value["_0"]) {
             case .place(let place, let chosen)?:
                 self.place = place
-                if let chosen { selection = [chosen] }
+                if let chosen { (selection, findsChosen) = ([chosen], true) }
                 keepsPosition = chosen == nil && !["recents", "recentlyDeleted"].contains(name)
             case .files?:
                 self.place = .library
