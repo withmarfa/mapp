@@ -865,8 +865,10 @@ struct ViewPanelTests {
         // Create View gives the new view the draft's settings, and leaves the view's own.
         Self.arrive(on: browser) { $0.layout = .table }
         browser.openNewViewPanel(in: library)
+        undo.beginUndoGrouping()
         browser.viewMode = .gallery
         browser.changeDensity(.compact)
+        Self.close(undo)
         await browser.finishViewPanel(in: library, order: Self.order)
         let made = try #require(library.views.first { $0.id != Self.id })
         let settings = ViewLayouts.stored(in: browser.defaults).settings(for: made.id)

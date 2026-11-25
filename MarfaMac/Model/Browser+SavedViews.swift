@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// Following the saved view a window shows: its order, grouping, filters and timeline date from Marfa, and its
 /// layout, columns, cards and rows from this Mac (`ViewLayouts`). What the person changes is written as they change it:
@@ -194,9 +195,16 @@ extension Browser {
 
     // MARK: This Mac's settings for a view
 
-    /// The layout, columns, empty groups, cards and density the window shows for a view, which are what the Mac holds.
+    /// The layout, columns, empty groups, cards and density the window shows for a view, which are what the Mac holds,
+    /// or a new view's made from it while its panel is open.
     func macSettings(for id: ItemID) -> ViewMacSettings {
-        viewSeeds[id]?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
+        newViewPanel(from: id)?.mac ?? viewSeeds[id]?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
+    }
+
+    /// The panel of a new view made from the saved view `id`, which holds this Mac's settings until the view exists.
+    private func newViewPanel(from id: ItemID) -> ViewPanel? {
+        guard let panel = viewPanel, panel.isNew, panel.mac != nil, panel.snapshot?.place.savedView == id else { return nil }
+        return panel
     }
 
     /// Whether the open place leaves out the groups with no items, in every layout that groups: a saved view's choice
@@ -328,27 +336,33 @@ extension Browser {
         }
     }
 
-    /// Changes this Mac's settings for a view, and keeps them at once. Undo puts the earlier ones back.
+    /// Changes this Mac's settings for a view, and keeps them at once. Undo puts back only the settings this step changed.
     func changeViewSettings(_ id: ItemID, _ change: (inout ViewMacSettings) -> Void) {
-        let before = macSettings(for: id)
-        var settings = before
-        change(&settings)
-        guard !settings.sameChoices(as: before) else { return }
-        keep(settings, for: id)
+        guard let step = writeViewSettings(id, change) else { return }
         registerUndo(String(localized: "Change View")) { browser in
             guard browser.shown.isSame(.saved(id)) else { return }
-            browser.changeViewSettings(id) { $0.take(choicesOf: before) }
+            browser.changeViewSettings(id) { $0.undo(step) }
         }
     }
 
-    /// Stores a view's settings in this app, keeping the widths the table recorded.
-    func keep(_ settings: ViewMacSettings, for id: ItemID) {
-        var kept = settings
-        ViewLayouts.update(in: defaults) {
-            kept.widths = $0.settings(for: id)?.widths
-            $0.set(kept, for: id)
+    /// Makes the change to the view's settings as stored now, never to the window's copy, so a choice another Mac made
+    /// meanwhile stays. A new view's panel takes the change instead (`ViewPanel.mac`). Nil where nothing changed.
+    @discardableResult
+    private func writeViewSettings(
+        _ id: ItemID, _ change: (inout ViewMacSettings) -> Void
+    ) -> (before: ViewMacSettings, after: ViewMacSettings)? {
+        let panel = newViewPanel(from: id)
+        let before = panel?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
+        var after = before
+        change(&after)
+        guard !after.sameChoices(as: before) else { return nil }
+        if let panel {
+            panel.mac = after
+        } else {
+            ViewLayouts.update(in: defaults) { $0.set(after, for: id) }
+            viewSeeds[id]?.mac = after
         }
-        viewSeeds[id]?.mac = kept
+        return (before, after)
     }
 
     /// Takes the person's own change of layout, which is kept in the app's settings at once. Undo goes back to the layout
@@ -361,12 +375,9 @@ extension Browser {
             registerPlaceLayoutUndo(in: shown, from: old, to: layout)
             return
         }
-        let before = macSettings(for: id)
-        var settings = before
-        settings.layout = viewMode
-        guard settings != before else { return }
-        keep(settings, for: id)
-        registerLayoutUndo(of: id, from: old, to: viewMode, mac: before)
+        let layout = viewMode
+        guard let step = writeViewSettings(id, { $0.layout = layout }) else { return }
+        registerLayoutUndo(of: id, from: old, to: layout, stored: step)
     }
 
     /// A place that is not a view keeps its layout in its default view, and Undo puts the earlier one back.
@@ -379,13 +390,14 @@ extension Browser {
         }
     }
 
-    private func registerLayoutUndo(of id: ItemID, from old: ItemViewMode, to new: ItemViewMode, mac before: ViewMacSettings) {
+    private func registerLayoutUndo(
+        of id: ItemID, from old: ItemViewMode, to new: ItemViewMode, stored step: (before: ViewMacSettings, after: ViewMacSettings)
+    ) {
         registerUndo(String(localized: "Change Layout")) { browser in
             guard browser.shown.isSame(.saved(id)) else { return }
-            let after = browser.macSettings(for: id)
             browser.set(layout: old)
-            browser.keep(before, for: id)
-            browser.registerLayoutUndo(of: id, from: new, to: old, mac: after)
+            guard let back = browser.writeViewSettings(id, { $0.undo(step) }) else { return }
+            browser.registerLayoutUndo(of: id, from: new, to: old, stored: back)
         }
     }
 
@@ -538,5 +550,22 @@ extension Browser {
         if viewPanel?.viewID == id { viewPanel = nil }
         forgetView(id)
         if shown.savedView == id { showing = firstView(of: shown.place, in: library) }
+    }
+}
+
+nonisolated extension ViewMacSettings {
+    /// Puts back the members a step changed, from `before` to `after`, and keeps the rest as they are now. Members are
+    /// compared as they are stored, so one a later version adds is put back too.
+    mutating func undo(_ step: (before: ViewMacSettings, after: ViewMacSettings)) {
+        guard var now = Self.members(of: self), let before = Self.members(of: step.before), let after = Self.members(of: step.after)
+        else { return }
+        for key in Set(before.keys).union(after.keys) where before[key] != after[key] { now[key] = before[key] }
+        guard let data = try? JSONEncoder().encode(now), let undone = try? JSONDecoder().decode(Self.self, from: data) else { return }
+        self = undone
+    }
+
+    private static func members(of settings: ViewMacSettings) -> [String: JSONValue]? {
+        guard let data = try? JSONEncoder().encode(settings) else { return nil }
+        return try? JSONDecoder().decode([String: JSONValue].self, from: data)
     }
 }

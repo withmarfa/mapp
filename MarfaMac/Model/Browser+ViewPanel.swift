@@ -155,9 +155,8 @@ extension Browser {
         } else {
             defaults.removeObject(forKey: ItemTableColumnLayouts.key)
         }
-        if let id = snapshot.place.savedView {
-            if let mac = snapshot.mac { keep(mac, for: id) }
-        } else {
+        // A view's own settings were never changed for the new view (`ViewPanel.mac`), so nothing is written back to them.
+        if snapshot.place.savedView == nil {
             placeCards[snapshot.place] = snapshot.cards
             store(snapshot.density, for: snapshot.place)
             if let stored = snapshot.placeDefault { reinstate(stored, for: snapshot.place) }

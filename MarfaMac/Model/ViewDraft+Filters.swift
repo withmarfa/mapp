@@ -637,8 +637,19 @@ nonisolated extension ViewDraft {
         var result = query
         if targets[typeFieldID] != nil, let index = window.clauses.firstIndex(where: { $0.field == typeFieldID && $0.op == .is }) {
             let chosen = Set(window.clauses[index].values).subtracting([""])
+            // A Type filter read from the view's filter stays a condition there when it is untouched, or when it is one of
+            // several matched by Any: moved to the view's types, it would narrow every other condition.
+            let read = seededTypes == nil
+                ? owned.first(where: { $0.clause.field == typeFieldID && $0.clause.op == .is }).map { Set($0.clause.values) } : nil
+            let listed = scope(of: query, catalogue: catalogue)
+            let staysInFilter = read.map { read in
+                read == Set(window.clauses[index].values) || window.matchesAny && window.clauses.count > 1
+                    && (listed.isEmpty || chosen.allSatisfy { listed.contains(TypeID($0)) })
+            } ?? false
             if chosen.isEmpty {
                 window.clauses.remove(at: index)
+            } else if staysInFilter {
+                // The condition is written where it was, as the person changed it or not at all.
             } else if keepsListedTypes(chosen, listed: query.types, catalogue: catalogue) {
                 // The view's own types stay, and the filter is saved as an exact-type condition, a chip the view still shows
                 // when reopened.

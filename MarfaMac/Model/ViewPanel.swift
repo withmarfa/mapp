@@ -24,7 +24,7 @@ final class ViewPanel {
         let viewMode: ItemViewMode
         /// The columns the place keeps for itself (`ItemTableColumnLayouts`), as stored.
         let columns: Data?
-        /// What this Mac held for the view, where the place is one.
+        /// What this Mac held for the view, where the place is one, which a new view starts from.
         let mac: ViewMacSettings?
         /// What the window drew on each card for the place, where it is not a view.
         let cards: ViewCards?
@@ -93,6 +93,9 @@ final class ViewPanel {
     var addsToSidebar = false
     /// The new view's Quick Actions on this Mac; nil follows the place.
     var quickActions: Bool?
+    /// This Mac's settings for a new view made from a saved view: the window shows and changes these until Create View
+    /// gives them to the new view, so the saved view's own stay as they are.
+    var mac: ViewMacSettings?
     var problem: Problem?
     /// The name the panel last suggested, which follows the view's settings until the person types their own.
     private(set) var suggestedName = ""
@@ -164,6 +167,7 @@ final class ViewPanel {
         knownTitle = ""
         form = ViewTitleForm(library: library)
         self.snapshot = snapshot
+        mac = snapshot.mac
         notices = library.notices
         Self.open.add(self)
     }
@@ -187,6 +191,7 @@ final class ViewPanel {
         purpose = .new
         form = ViewTitleForm(library: library)
         self.snapshot = snapshot
+        mac = snapshot.mac
         notices = library.notices
     }
 
