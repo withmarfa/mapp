@@ -9,6 +9,8 @@ extension ValueEditModel {
     static let linkLimit = 50
     static let linkPrefix = "link:"
     static let openID = "open"
+    static let moreID = "more:links"
+    static let noResultsID = "header:none"
 
     /// An item the field links to now, as a chip shows it.
     struct HeldLink: Hashable {
@@ -21,8 +23,28 @@ extension ValueEditModel {
     /// judged by the library, which tells the person which it left alone. A row on the page names one item and one field.
     var isBatch: Bool { !request.items.isEmpty }
 
+    /// What the panel reads of the library's links, worked out once for each revision of the library: building the
+    /// field puts every target through the index, and a keystroke reads it six to ten times.
+    struct LinkReading {
+        let membership: Int
+        let names: Int
+        let field: RelationField?
+        let held: [HeldLink]
+    }
+
+    var linkReading: LinkReading {
+        let (membership, names) = (library.membershipRevision, library.namesRevision)
+        if let cached = linkReadingCache, cached.membership == membership, cached.names == names { return cached }
+        let field = readLinkField()
+        let reading = LinkReading(membership: membership, names: names, field: field, held: readHeldLinks(of: field))
+        linkReadingCache = reading
+        return reading
+    }
+
     /// The field as the library reads it now. Nil for the command's items, or where the item no longer has the field.
-    var linkField: RelationField? {
+    var linkField: RelationField? { linkReading.field }
+
+    private func readLinkField() -> RelationField? {
         guard case .relation(let name) = kind, !isBatch, let id = request.item else { return nil }
         return library.relationFields(of: id).first { $0.field == name }
     }
@@ -45,38 +67,59 @@ extension ValueEditModel {
 
     /// The links the field holds now, which the search field shows as chips: for several items, the collections that
     /// every one of them is in.
-    var heldLinks: [HeldLink] {
+    var heldLinks: [HeldLink] { linkReading.held }
+
+    private func readHeldLinks(of field: RelationField?) -> [HeldLink] {
         if isBatch {
             let members = library.collectionMembers(request.targets).compactMap(library.item)
             guard let first = members.first else { return [] }
             let common = members.dropFirst().reduce(Set(first.collectionIDs)) { $0.intersection($1.collectionIDs) }
             return library.joinableCollections.filter { common.contains($0.id) }.map { HeldLink(id: $0.id, title: $0.displayTitle, item: $0) }
         }
-        return linkField?.targets.compactMap { target in
+        return field?.targets.compactMap { target in
             target.itemID.map { HeldLink(id: $0, title: target.isOpenable ? target.displayTitle : String(localized: "Item not found"), item: library.item($0)) }
         } ?? []
     }
 
+    /// The chips of the links held: the first `PageHead.linkLimit`, then "N More", which shows the rest.
     var linkChips: [ValueChip] {
-        heldLinks.map { ValueChip(id: Self.linkPrefix + $0.id.rawValue, title: $0.title, mark: $0.item.map(mark(of:)) ?? .none) }
+        let held = heldLinks
+        let shown = showsAllLinks ? held[...] : held.prefix(PageHead.linkLimit)
+        var chips = shown.map { ValueChip(id: Self.linkPrefix + $0.id.rawValue, title: $0.title, mark: $0.item.map(mark(of:)) ?? .none) }
+        if held.count > shown.count {
+            chips.append(ValueChip(id: Self.moreID, title: PageHead.moreLinksText(held.count - shown.count), isRemovable: false, revealsMore: true))
+        }
+        return chips
     }
 
     /// The items the list offers: those the field could link that it does not hold, in the order the library gives
-    /// (by title) narrowed by what is typed, and for a field of one link, the way to open the one it holds.
+    /// (by the name a row shows) narrowed by what is typed. A field of one link lists the link it holds first, lit, and
+    /// the way to open it beside it, since the chip in the field is no row.
     var linkRows: [ValueListRow] {
-        let held = Set(heldLinks.map(\.id))
+        let held = heldLinks
+        let heldIDs = Set(held.map(\.id))
         let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matching = linkCandidates.filter { !held.contains($0.id) && (typed.isEmpty || $0.displayTitle.localizedStandardContains(typed)) }
-        var rows = matching.prefix(Self.linkLimit).map { candidate in
+        func fits(_ item: Item) -> Bool { typed.isEmpty || item.displayTitle.localizedStandardContains(typed) }
+        let matching = linkCandidates.filter { !heldIDs.contains($0.id) && fits($0) }
+        var rows: [ValueListRow] = []
+        if holdsOne, let current = held.first, let item = current.item, fits(item) {
+            var row = ValueListRow(
+                id: Self.linkPrefix + item.id.rawValue, role: .option, title: item.displayTitle, detail: item.state == .archived ? String(localized: "Archived") : nil,
+                mark: mark(of: item))
+            row.isCurrent = true
+            rows.append(row)
+            if typed.isEmpty {
+                rows.append(ValueListRow(id: Self.openID, role: .option, title: String(localized: "Open “\(item.displayTitle)”"), mark: .symbol("arrow.up.right")))
+            }
+            if !matching.isEmpty { rows.append(.separator) }
+        }
+        rows += matching.prefix(Self.linkLimit).map { candidate in
             ValueListRow(
                 id: Self.linkPrefix + candidate.id.rawValue, role: .option, title: candidate.displayTitle,
                 detail: detail(of: candidate), mark: mark(of: candidate))
         }
         if matching.count > Self.linkLimit { rows.append(.header(String(localized: "Type to narrow the list"), id: "header:more")) }
-        if holdsOne, typed.isEmpty, let current = heldLinks.first, let item = current.item {
-            rows.append(.separator)
-            rows.append(ValueListRow(id: Self.openID, role: .option, title: String(localized: "Open “\(item.displayTitle)”"), mark: .symbol("arrow.up.right")))
-        }
+        if rows.isEmpty, !typed.isEmpty { rows.append(.header(String(localized: "No Results"), id: Self.noResultsID)) }
         return rows
     }
 

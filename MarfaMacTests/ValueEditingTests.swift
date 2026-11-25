@@ -209,6 +209,52 @@ struct ValueEditingTests {
         #expect(library.relationshipWrites.count == 1, "the move is one call, so one undo step")
     }
 
+    @Test func aKeystrokeReadsTheFieldFromTheRevisionItHasAndNotFromTheLibraryAgain() {
+        let (model, library, item, _) = linkPanel(Self.aboutField)
+        for typed in ["o", "ot", "oth", "othe"] {
+            model.query = typed
+            _ = model.rows
+            _ = model.chips
+            _ = model.takesLinks
+        }
+        #expect(library.relationFieldReads == 1)
+        library.relationFieldsByItem[item.id] = [
+            RelationField(field: "about", label: "About", cardinality: .many, allowedTypes: [], targets: [], editability: .readOnly("In the text."))
+        ]
+        #expect(!model.takesLinks)
+        #expect(library.relationFieldReads == 2, "a change of the library's links is read again")
+    }
+
+    @Test func aFieldHoldingManyLinksShowsThirtyChipsThenMoreWhichShowsTheRest() {
+        let held = (0..<45).map { ItemRelationshipTarget(title: "Item \($0)", itemID: ItemID(String(format: "20000000-0000-0000-0000-%012d", $0)), resolution: .resolved(ItemID(String(format: "20000000-0000-0000-0000-%012d", $0)))) }
+        let field = RelationField(
+            field: "about", label: "About", cardinality: .many, allowedTypes: [], targets: held, editability: .editable)
+        let (model, _, _, _) = linkPanel(field)
+        var chips = model.chips
+        #expect(chips.count == 31)
+        #expect(chips.last?.title == PageHead.moreLinksText(15) && chips.last?.isRemovable == false)
+        model.remove(chips[30])
+        chips = model.chips
+        #expect(chips.count == 45 && !chips.contains { $0.revealsMore })
+    }
+
+    @Test func aFieldOfOneLinkListsTheLinkItHoldsLitFirstWithOpenAndAnUnmatchedTextSaysSo() {
+        let (item, other) = (Self.item(), Self.item(id: "10000000-0000-0000-0000-000000000002"))
+        let library = Self.library([item, other])
+        let field = RelationField(
+            field: "child-of", label: "Parent", cardinality: .one, allowedTypes: [],
+            targets: [ItemRelationshipTarget(title: other.displayTitle, itemID: other.id, resolution: .resolved(other.id))], editability: .editable)
+        library.relationFieldsByItem[item.id] = [field]
+        library.candidatesByItem[item.id] = [other]
+        let model = ValueEditModel(Self.request(.relation(field.field), item: item, in: library))
+        let rows = model.rows
+        #expect(rows.first?.id == ValueEditModel.linkPrefix + other.id.rawValue && rows.first?.isCurrent == true)
+        #expect(rows.dropFirst().first?.id == ValueEditModel.openID)
+        #expect(model.activeRow == rows.first?.id, "the held link is lit")
+        model.query = "zzzz"
+        #expect(model.rows.map(\.title) == ["No Results"])
+    }
+
     @Test func aPanelForAFieldTheItemCannotChangeTakesNoLink() async {
         let locked = RelationField(
             field: "references", label: "References", cardinality: .many, allowedTypes: [], targets: [], editability: .readOnly("In the text."))

@@ -270,8 +270,13 @@ final class FakeItemLibrary: ItemLibrary {
     }
     func relationships(for id: ItemID) -> [ItemRelationship] { relationshipsByItem[id] ?? [] }
     /// What `relationFields(of:)` answers, by item.
-    var relationFieldsByItem: [ItemID: [RelationField]] = [:]
-    func relationFields(of id: ItemID) -> [RelationField] { relationFieldsByItem[id] ?? [] }
+    var relationFieldsByItem: [ItemID: [RelationField]] = [:] { didSet { membershipRevision += 1 } }
+    /// How many times `relationFields(of:)` was asked, which a panel must not do again for each key it reads.
+    @ObservationIgnored private(set) var relationFieldReads = 0
+    func relationFields(of id: ItemID) -> [RelationField] {
+        relationFieldReads += 1
+        return relationFieldsByItem[id] ?? []
+    }
     func childIDs(of id: ItemID) -> [ItemID] { items.filter { $0.parentID == id }.map(\.id) }
     /// What `relationshipCandidates(for:field:)` answers, by item.
     var candidatesByItem: [ItemID: [Item]] = [:]

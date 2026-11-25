@@ -48,7 +48,16 @@ struct ValueChipView: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        if chip.givesType, case .type(let icon) = chip.mark {
+        if chip.revealsMore {
+            Button(action: remove) {
+                Text(verbatim: chip.title)
+                    .font(.system(size: 12 * scale))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6 * scale)
+                    .frame(height: ValueEditMetrics.chipHeight * scale)
+            }
+            .buttonStyle(.plain)
+        } else if chip.givesType, case .type(let icon) = chip.mark {
             TintedChip(text: chip.title, icon: icon, chevron: false, scale: scale)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text(verbatim: chip.title))

@@ -222,4 +222,18 @@ struct EventTimeTests {
         model.choose(day: Self.day(2026, 11, 28))
         #expect(library.items[0].value(of: "starts_at") == .string("2026-11-28T16:00:37.123Z"))
     }
+
+    @Test func theWhenRowOfAnEditableEventOpensTheEventTimeAndAReadOnlyOneDoesNot() throws {
+        var item = Self.item(Self.timed)
+        let library = FakeItemLibrary(items: [item])
+        library.catalogue = Self.catalogue
+        let row = try #require(PageHead(of: item, in: library).rows.first { $0.id == EventTime.rowID })
+        #expect(row.editable, "the page opens the event time only for a row marked editable")
+        #expect(EventTime.of(item.type, in: Self.catalogue) != nil)
+
+        item.readOnly = true
+        library.items = [item]
+        let locked = try #require(PageHead(of: item, in: library).rows.first { $0.id == EventTime.rowID })
+        #expect(!locked.editable)
+    }
 }

@@ -90,7 +90,9 @@ nonisolated struct PageHead: Equatable, Sendable {
             icon: { PageHead.typeIcon(of: $0, in: library) }, isPerson: { PageHead.isPerson($0, in: library) },
             label: { catalogue.label(ofField: $0, for: item.type) })
         let when = event.map {
-            PropertyRow(id: PagePlacement.when, label: String(localized: "When"), value: .when($0.time, note: $0.note), help: $0.help)
+            PropertyRow(
+                id: PagePlacement.when, label: String(localized: "When"), value: .when($0.time, note: $0.note), help: $0.help,
+                editable: item.allows(.fields))
         }
         self.init(
             kicker: Kicker(
@@ -138,6 +140,12 @@ nonisolated struct PageHead: Equatable, Sendable {
 
     /// Most values of a list a pin shows before "+N more": the first, so it can be shown whole.
     static let listLimit = 1
+
+    /// Most links a row or a link panel shows before "N More", which reveals the rest.
+    static let linkLimit = 30
+
+    /// "12 More", the button that shows the links past the limit. The page draws these words and never counts.
+    static func moreLinksText(_ count: Int) -> String { String(localized: "\(count) More") }
 
     /// What a pin says of the values of a list it left out: "+4 more". The page draws these words and never makes them.
     static func moreText(_ count: Int) -> String { String(localized: "+\(count) more") }

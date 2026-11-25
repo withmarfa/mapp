@@ -135,7 +135,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 }
 
 extension PropertyRow: Encodable {
-    private enum Key: String, CodingKey { case id, label, symbol, kind, text, note, texts, items, options, people, more, help, editable, long, folded, muted, section }
+    private enum Key: String, CodingKey { case id, label, symbol, kind, text, note, texts, items, options, people, more, itemsAfter, moreItems, help, editable, long, folded, muted, section }
     /// What the page draws of an item a row links to: a type chip in the item's own tone, or a person's initials and
     /// name. The tone is one of `TypeTone`'s names; the page never picks a color.
     private struct Link: Encodable {
@@ -177,6 +177,10 @@ extension PropertyRow: Encodable {
         case .items(let targets):
             try container.encode("items", forKey: .kind)
             try container.encode(targets.map(Link.init), forKey: .items)
+            if targets.count > PageHead.linkLimit {
+                try container.encode(PageHead.linkLimit, forKey: .itemsAfter)
+                try container.encode(PageHead.moreLinksText(targets.count - PageHead.linkLimit), forKey: .moreItems)
+            }
         case .people(let names):
             try container.encode("people", forKey: .kind)
             try container.encode(names.map { Listed(title: $0, initials: PersonInitials.of($0)) }, forKey: .people)

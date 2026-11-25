@@ -81,6 +81,10 @@ export interface HeaderRow {
   /** A choice or a list of words, each with the tone of its dot. */
   options?: { label: string; tone: string }[]
   items?: HeaderItem[]
+  /** How many of `items` the row draws before `moreItems`, a button that draws the rest. Absent where it draws all. */
+  itemsAfter?: number
+  /** The words of that button, such as "12 More". The app words it; the page never counts. */
+  moreItems?: string
   people?: HeaderListedPerson[]
   /** What a pin says of the values of a list it left out, such as "+4 more", drawn after the first value. The app
    *  words it; the page never counts. */
@@ -365,7 +369,11 @@ export class ItemHeader {
    *  pointer. */
   private drawn = ''
   /** Whether the person has opened Show More, for the item on the page. */
-  private expanded = { item: '', properties: false }
+  private expanded: { item: string; properties: boolean; rows: string[] } = {
+    item: '',
+    properties: false,
+    rows: [],
+  }
   private readonly statusPin: HTMLButtonElement
   private readonly parentPin: HTMLButtonElement
   /** The item whose title is being edited, so a blur after the page moved to another item commits nothing. */
@@ -575,7 +583,7 @@ export class ItemHeader {
     this.showPin(this.statusPin, model.status)
     this.showPin(this.parentPin, model.parent)
     if (previous?.item !== model.item) {
-      this.expanded = { item: model.item, properties: false }
+      this.expanded = { item: model.item, properties: false, rows: [] }
       this.linked.reset()
     }
     this.redraw()
@@ -825,6 +833,23 @@ export class ItemHeader {
     link.addEventListener('click', open)
   }
 
+  /** The items a row links to: the first the app names, then a button that draws the rest. */
+  private itemsOf(value: HTMLElement, row: HeaderRow) {
+    const items = row.items ?? []
+    const after = row.itemsAfter
+    const all = after === undefined || this.expanded.rows.includes(row.id)
+    for (const target of all ? items : items.slice(0, after)) this.linkedItem(value, target)
+    if (all || !row.moreItems) return
+    const more = element('button', 'item-more-items', value)
+    more.type = 'button'
+    more.textContent = row.moreItems
+    more.addEventListener('click', (event) => {
+      event.stopPropagation()
+      this.expanded.rows = [...this.expanded.rows, row.id]
+      this.redraw()
+    })
+  }
+
   /** Draws the kicker, the pins, the rows and the linked items from the model. */
   private redraw() {
     const model = this.model
@@ -1000,7 +1025,7 @@ export class ItemHeader {
         if (model.parent) value.append(this.parentPin)
         break
       case 'items':
-        for (const target of row.items ?? []) this.linkedItem(value, target)
+        this.itemsOf(value, row)
         break
       case 'people':
         for (const person of row.people ?? []) this.person(value, 'span', person)

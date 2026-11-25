@@ -647,6 +647,37 @@ test('a long list of linked items expands, and folds again', () => {
   expect(section.querySelectorAll('.item-linked-row')).toHaveLength(3)
 })
 
+test('a row of many links draws the first the app names, then a button that draws the rest', () => {
+  const items = Array.from({ length: 5 }, (_, index) => ({
+    title: `Item ${index}`,
+    item: `i${index}`,
+    symbol: 'doc',
+    kind: 'link' as const,
+    tone: 'blue',
+  }))
+  header.set({
+    ...ticket,
+    rows: [
+      {
+        id: 'blocks',
+        label: 'Blocks',
+        symbol: 'link',
+        kind: 'items',
+        items,
+        itemsAfter: 3,
+        moreItems: '2 More',
+      },
+    ],
+  })
+  const count = () => root.querySelectorAll('.item-prop-value .item-chip').length
+  expect(count()).toBe(3)
+  const more = root.querySelector<HTMLButtonElement>('.item-more-items')!
+  expect(more.textContent).toBe('2 More')
+  more.click()
+  expect(count()).toBe(5)
+  expect(root.querySelector('.item-more-items')).toBeNull()
+})
+
 test('the title is told how many lines to show', () => {
   header.set({ ...ticket, titleLines: 4 })
   expect(root.style.getPropertyValue('--title-lines')).toBe('4')

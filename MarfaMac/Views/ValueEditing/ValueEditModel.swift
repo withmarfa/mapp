@@ -101,6 +101,10 @@ final class ValueEditModel {
     var hasConflict = false
     /// A change to links that has not been answered yet.
     var isSaving = false
+    /// Whether the person asked for the links past `PageHead.linkLimit`, which the field shows as "N More".
+    var showsAllLinks = false
+    /// The field as the library read it at one revision, so a keystroke reads it from here (`linkReading`).
+    @ObservationIgnored var linkReadingCache: LinkReading?
     @ObservationIgnored private(set) var isFinished = false
     /// The Location panel's own state, for a request of that kind.
     @ObservationIgnored private(set) var location: LocationPanelModel?
@@ -381,6 +385,11 @@ final class ValueEditModel {
         let rows = navigable
         if let highlight, rows.contains(where: { $0.id == highlight }) { return highlight }
         if case .yesNo = kind { return rows.first { $0.isCurrent }?.id }
+        // A link's panel opens with the link the field holds lit, and once something is typed Return takes another.
+        if case .relation = kind {
+            if query.trimmingCharacters(in: .whitespaces).isEmpty { return rows.first { $0.isCurrent }?.id }
+            return rows.first { $0.id != Self.openID && !$0.isCurrent }?.id
+        }
         guard hasSearch, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
         switch kind {
         case .tags, .words: return rows.first { $0.role == .create }?.id ?? rows.first?.id
@@ -546,6 +555,10 @@ final class ValueEditModel {
     /// Takes one chip's value away: a tag, word or person from the list it is in, or the one value of a status, a choice
     /// or a parent.
     func remove(_ chip: ValueChip) {
+        if chip.revealsMore {
+            showsAllLinks = true
+            return
+        }
         guard isEditable, chip.isRemovable else { return }
         switch kind {
         case .tags, .words: removeToken(chip.title)

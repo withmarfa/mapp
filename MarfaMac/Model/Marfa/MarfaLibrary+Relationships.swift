@@ -232,9 +232,18 @@ extension MarfaLibrary {
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
         guard let item = item(id), let end = fieldEnd(field) else { return [] }
         guard admits(item.type, end.info, atTo: end.atTo) else { return [] }
+        // By the name a row shows, which an item with no title takes from its text, so one never leads the list.
         return heldItems(linkable)
             .filter { $0.id != id && admits($0.type, end.info, atTo: !end.atTo) }
-            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            .map { (item: $0, name: $0.displayTitle) }
+            .sorted {
+                switch $0.name.localizedStandardCompare($1.name) {
+                case .orderedAscending: true
+                case .orderedDescending: false
+                case .orderedSame: $0.item.id.rawValue < $1.item.id.rawValue
+                }
+            }
+            .map(\.item)
     }
 
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] {

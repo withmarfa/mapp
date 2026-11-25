@@ -312,7 +312,9 @@ private struct ValueEditRow: View {
     var body: some View {
         HStack(spacing: 8 * scale) {
             ValueMarkView(mark: row.mark, scale: scale)
-            Text(verbatim: row.title).lineLimit(1).truncationMode(.tail)
+            // A detail that is a line of its own ("In <name>") gives the name the width first, and is cut itself; a count
+            // is short and keeps its room.
+            Text(verbatim: row.title).lineLimit(1).truncationMode(.tail).layoutPriority(row.detail == nil ? 0 : 1)
             Spacer(minLength: 8 * scale)
             if row.role == .create {
                 // The key cap shows only while Return takes this row.
@@ -321,7 +323,9 @@ private struct ValueEditRow: View {
                 Text(verbatim: detail)
                     .font(.system(size: 12 * scale))
                     .monospacedDigit()
-                    .layoutPriority(1)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .layoutPriority(row.detail == nil ? 1 : 0)
                     .foregroundStyle(.secondary)
             }
         }

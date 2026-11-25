@@ -200,6 +200,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         } else {
             row = PropertyRow(id: link.field, label: link.label, value: targets.isEmpty ? .empty(symbol: Value.items([]).symbol) : .items(targets))
         }
+        // A collection has its own mark, the one its places wear.
+        if link.field == MarfaMapping.collectionEdge { row.symbol = SidebarPlace.collections.symbol }
         switch link.editability {
         case .editable: row.editable = true
         case .readOnly(let reason): row.lock = reason

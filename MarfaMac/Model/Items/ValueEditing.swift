@@ -112,6 +112,8 @@ nonisolated struct ValueChip: Identifiable, Hashable, Sendable {
     var isRemovable = true
     /// Whether the chip is the type being given to an item, the one chip that takes a tint.
     var givesType = false
+    /// Whether the chip is "N More", which shows the chips it left out and takes nothing away.
+    var revealsMore = false
 }
 
 /// One line of a list in a value panel or a menu.
