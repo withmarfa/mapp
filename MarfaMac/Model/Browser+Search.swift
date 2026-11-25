@@ -71,6 +71,27 @@ extension Browser {
         let membership: Int
     }
 
+    struct ParentKey: Equatable {
+        let types: Set<TypeID>
+        let content: Int
+        let membership: Int
+    }
+
+    /// The items a listed type may have as a parent, which Parent offers by title; none where no listed type can have one.
+    /// Worked out once for the types and what the library holds, not for each key typed.
+    private func parentOptions(of types: Set<TypeID>, in library: any ItemLibrary) -> [SearchOffers.Option] {
+        let key = ParentKey(types: types, content: library.contentRevision, membership: library.membershipRevision)
+        if let held = parentMemo, held.key == key { return held.options }
+        let ids = (types.isEmpty ? Set(library.catalogue.itemTypes.keys) : types).filter { library.canHaveParent(typeID: $0.rawValue) }
+        var seen = Set<ItemID>()
+        let options = ids.sorted { $0.rawValue < $1.rawValue }
+            .flatMap { library.creationParentCandidates(typeID: $0.rawValue) }
+            .filter { seen.insert($0.id).inserted }
+            .map { SearchOffers.Option(id: $0.id.rawValue, title: $0.displayTitle) }
+        parentMemo = (key, options)
+        return options
+    }
+
     /// What the field offers for the words typed in it. The fields are those of the types the place lists, or of the whole
     /// catalogue where it lists no fixed types, so what the words found never decides them. Worked out once for a key.
     func searchOffers(in library: any ItemLibrary) -> [SearchOffer] {
@@ -82,9 +103,12 @@ extension Browser {
         let catalogue = library.catalogue
         let types = listedTypes(in: library)
         let several = (types.isEmpty ? catalogue.itemTypes.count : types.count) > 1
+        var values = library.searchOfferValues
+        values.parents = parentOptions(of: types, in: library)
         let context = SearchOffers.Context(
-            targets: FilterTarget.fields(among: types, catalogue: catalogue) + FilterTarget.everyItem.filter { $0.kind != .parent } + [.tier],
-            values: library.searchOfferValues, hasSeveralTypes: several, calendar: .current, now: library.now())
+            targets: FilterTarget.fields(among: types, catalogue: catalogue)
+                + FilterTarget.everyItem.filter { $0.kind != .parent || !values.parents.isEmpty } + [.tier],
+            values: values, hasSeveralTypes: several, calendar: .current, now: library.now())
         let offers = SearchOffers.make(text: searchText, in: context, existing: searchTokens)
         offerMemo = (key, offers)
         return offers

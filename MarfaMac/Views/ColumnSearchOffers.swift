@@ -14,19 +14,26 @@ final class SearchOffersModel {
 enum SearchOffersMetrics {
     static let rowHeight: CGFloat = 28
     static let inset: CGFloat = 5
+    /// The line that names the filters, above the first.
+    static let headingHeight: CGFloat = 24
     /// The rule above the last row, with the space round it.
     static let rule: CGFloat = 9
     static let width: ClosedRange<CGFloat> = 260...380
 
+    /// Whether the list has filters to name: it does when any offer is a token.
+    static func hasFilters(_ offers: [SearchOffer]) -> Bool { offers.contains { $0.kind != .text } }
+
     /// The height of the list for `offers`, at `scale` of the interface's text size.
     static func height(of offers: [SearchOffer], scale: CGFloat) -> CGFloat {
         let rows = CGFloat(offers.count) * rowHeight * scale
-        return rows + inset * 2 + (offers.count > 1 && offers.last?.kind == .text ? rule : 0)
+        let heading = hasFilters(offers) ? headingHeight * scale : 0
+        return rows + heading + inset * 2 + (offers.count > 1 && offers.last?.kind == .text ? rule : 0)
     }
 }
 
-/// The menu of what typing in the search can make: a token for each matching field and value, then the words as the
-/// search. It is read by VoiceOver as a list, with the row the arrow keys are on selected.
+/// The menu of what typing in the search can make: under Filter, a token for each matching field and value, with the field
+/// at the start of its row and the value at the end, then the words as the search. It is read by VoiceOver as a list, with
+/// the row the arrow keys are on selected.
 struct SearchOffersList: View {
     let model: SearchOffersModel
     @Environment(\.interfaceTextSize) private var textSize
@@ -34,6 +41,14 @@ struct SearchOffersList: View {
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
         VStack(spacing: 0) {
+            if SearchOffersMetrics.hasFilters(model.offers) {
+                Text("Filter")
+                    .interfaceFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .frame(maxWidth: .infinity, minHeight: SearchOffersMetrics.headingHeight * scale, alignment: .leading)
+                    .accessibilityAddTraits(.isHeader)
+            }
             ForEach(Array(model.offers.enumerated()), id: \.element.id) { index, offer in
                 if offer.kind == .text, index > 0 {
                     Divider().padding(.vertical, 4)
@@ -50,11 +65,9 @@ struct SearchOffersList: View {
         .accessibilityIdentifier("ColumnSearchOffers")
     }
 
-    /// The field in the secondary color, then the rest.
-    private static func styled(field: String, rest: String) -> AttributedString {
-        var head = AttributedString(field)
-        head.foregroundColor = .secondary
-        return head + AttributedString(" " + rest)
+    /// Whether Return acts on this row: the one chosen, or the words as the search while none is.
+    private func returnActs(_ offer: SearchOffer, isChosen: Bool) -> Bool {
+        isChosen || (model.highlighted == nil && offer.kind == .text)
     }
 
     private func row(_ offer: SearchOffer, isChosen: Bool) -> some View {
@@ -65,15 +78,25 @@ struct SearchOffersList: View {
                 .accessibilityHidden(true)
             switch offer.kind {
             case .token:
-                Text(Self.styled(field: offer.field, rest: offer.value))
+                Text(offer.field)
+                    .lineLimit(1)
+                    .layoutPriority(1)
+                Spacer(minLength: 12)
+                Text(offer.value)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             case .text:
                 Text(offer.title)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                Spacer(minLength: 12)
             }
-            Spacer(minLength: 0)
+            if returnActs(offer, isChosen: isChosen) {
+                Image(systemName: "return")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.horizontal, 8)
         .frame(maxHeight: .infinity)

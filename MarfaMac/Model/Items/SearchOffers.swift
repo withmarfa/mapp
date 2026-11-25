@@ -73,6 +73,8 @@ nonisolated enum SearchOffers {
         var sources: [Option] = []
         var tags: [String] = []
         var collections: [Option] = []
+        /// The items the place's types may have as a parent.
+        var parents: [Option] = []
     }
 
     /// Everything an offer is worked out from, so it needs no library and its test no machine.
@@ -156,6 +158,7 @@ nonisolated enum SearchOffers {
             return [Option(id: "true", title: String(localized: "Yes")), Option(id: "false", title: String(localized: "No"))]
         case .type: return context.values.types
         case .collection: return context.values.collections
+        case .parent: return context.values.parents
         case .tags: return context.values.tags.map { Option(id: $0, title: $0) }
         case .source:
             if target.isTier { return Tier.allCases.reversed().map { Option(id: $0.word, title: $0.title) } }
@@ -192,6 +195,7 @@ nonisolated enum SearchOffers {
         case .tags: "tag"
         case .type: "square.grid.2x2"
         case .collection: "rectangle.stack"
+        case .parent: "arrow.turn.up.right"
         case .source: "antenna.radiowaves.left.and.right"
         default: "line.3.horizontal.decrease"
         }
