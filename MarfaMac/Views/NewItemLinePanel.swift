@@ -490,7 +490,7 @@ struct NewItemLinePanel: View {
         }
     }
 
-    /// The matches one a line, what was typed in bold and the kind of item at the end; Return takes the gray one.
+    /// Return takes the highlighted match.
     private func matchList(_ matches: [Match], query: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             if matches.isEmpty {

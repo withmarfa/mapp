@@ -486,9 +486,7 @@ final class QuickAdd {
         return types
     }
 
-    /// The kinds as the kind menu lists them: first the sidebar's own in its order, then File wherever the sidebar
-    /// shows it, which Tab and Shift-Tab move through; then, after a divider, the rest by name. The chosen kind is
-    /// always among the first.
+    /// Keeps the chosen kind above the divider even if the sidebar does not show it.
     static func kindMenu(_ types: [ItemTypeOption], shown: [TypeID], chosen: String?) -> (first: [ItemTypeOption], rest: [ItemTypeOption]) {
         var first = shown.filter { $0 != .file }.compactMap { id in types.first { $0.id == id } }
         if first.isEmpty, let note = types.first(where: { $0.id == TypeID("core.note") }) { first.append(note) }
@@ -918,6 +916,4 @@ extension Browser {
         finishNewItems(in: library)
         return id
     }
-
 }
-

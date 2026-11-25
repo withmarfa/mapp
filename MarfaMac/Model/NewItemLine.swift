@@ -160,8 +160,7 @@ extension QuickAdd {
         return shown
     }
 
-    /// Whether the line makes `word` a tag, as typed and as offered in its tag row: a tag as the line reads one that
-    /// is neither Favorite's nor one the library sets itself.
+    /// Keeps Favorite and tags set by the library out of parsing and suggestions.
     static func takesTag(_ word: String, in library: any ItemLibrary) -> Bool {
         NewItemText.isTag(word) && word != ItemTag.favorite && !library.reservedTags.contains(word)
     }
