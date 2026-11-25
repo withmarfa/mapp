@@ -166,8 +166,11 @@ struct SidebarShortcutsSection: View, Equatable {
             ForEach(section.shortcuts) { data in
                 SidebarShortcutRow(
                     data: data, keys: keys(for: data.shortcut), customizing: customizing,
-                    isEnabled: !customizing && !((data.shortcut == .new || isCreate(data.shortcut)) && !canCreate)
-                ) { perform(data) }
+                    isEnabled: !((data.shortcut == .new || isCreate(data.shortcut)) && !canCreate)
+                ) {
+                    // While customizing a command draws as it does, and acts on nothing.
+                    if !customizing { perform(data) }
+                }
                 .contextMenu {
                     Button("Remove from Sidebar") {
                         libraries.updateSidebarLayout { $0.removeShortcut(data.shortcut, from: section.id) }
@@ -237,6 +240,7 @@ private struct SidebarShortcutRow: View {
         .selectionDisabled()
         .disabled(!isEnabled)
         .onHover { isHovering = $0 }
+        .sidebarRowGround(isHovering && !customizing)
         .accessibilityIdentifier(identifier)
     }
 
@@ -328,6 +332,7 @@ struct SidebarPlaceRow: View, Equatable {
             }
         }
         .onHover { isHovering = $0 }
+        .sidebarRowGround(isHovering && !customizing)
         .contextMenu {
             SidebarPlaceMenu(data: data, groups: groups, customizing: customizing, browser: browser, order: order)
         }
@@ -350,7 +355,11 @@ struct SidebarPlaceRow: View, Equatable {
                             .opacity(isHovering && data.adds ? 0 : 1)
                     }
                     if data.adds, isHovering {
-                        SidebarPlus(name: addName, add: add)
+                        SidebarPlus(name: addName) {
+                            // The quick add's window takes the pointer, which then never leaves the row.
+                            isHovering = false
+                            add()
+                        }
                     }
                 }
             }
@@ -429,6 +438,16 @@ struct SidebarPlus: View {
 }
 
 extension View {
+    /// The rounded ground behind a row under the pointer, as `Sidebar-Pointer` draws it: the row's whole height and the
+    /// selection's width. The row keeps its own hover state, so the sidebar's body does not run on hover.
+    func sidebarRowGround(_ isShown: Bool) -> some View {
+        listRowBackground(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(nsColor: .labelColor).opacity(isShown ? 0.045 : 0))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 0.5))
+    }
+
     /// Text at a row's trailing end, a count or a shortcut, in the size of the system's own count, ending where it
     /// does.
     func sidebarTrailing() -> some View {

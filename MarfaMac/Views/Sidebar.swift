@@ -255,7 +255,9 @@ private struct SidebarList: View {
         .sheet(item: $choosingIcon) { TypeIconPicker(request: $0, library: library) }
         .sheet(item: $choosingItem) { request in
             SidebarItemChooser { id in
-                libraries.updateSidebarLayout { $0.put(.item(id), in: request.group) }
+                // A collection chosen as an item is pinned as the collection, so it has one row.
+                let place: SidebarPlace = library.collections.contains { $0.id == id } ? .collection(id) : .item(id)
+                libraries.updateSidebarLayout { $0.put(place, in: request.group) }
             }
         }
         .namingAlert($naming, name: $name) { request, name in
@@ -277,7 +279,8 @@ private struct SidebarList: View {
                 actions: actions, browser: browser, order: order)
         case .types:
             SidebarTypesSection(
-                rows: content.typeRows, plan: content.plan, showsAll: browser.sidebarShowsAllTypes, customizing: content.customizing,
+                rows: content.typeRows, plan: content.plan, showsAll: browser.sidebarShowsAllTypes, open: openType,
+                customizing: content.customizing,
                 creatable: content.creatable, folding: folding, browser: browser, choosingIcon: $choosingIcon, header: header,
                 place: SidebarAddPlace(group: section.id, kind: .types, tab: content.tab.id, offers: content.offers, actions: actions))
         case .places, .pinned, .custom:
@@ -288,6 +291,11 @@ private struct SidebarList: View {
                     group: section.id, kind: section.plan.group.kind, tab: content.tab.id, offers: content.offers, actions: actions,
                     name: section.plan.group.name))
         }
+    }
+
+    /// The type the window shows, if it shows one.
+    private var openType: TypeID? {
+        if case .type(let type)? = browser.showing?.place { type } else { nil }
     }
 
     /// The sections a row can move to, apart from the one it is in.

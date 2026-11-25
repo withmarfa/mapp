@@ -6,15 +6,11 @@ nonisolated struct SidebarGroupPlan: Identifiable, Equatable {
     /// The places it holds, in order, hidden ones included, so Customize Sidebar can offer them back. Empty for the
     /// Commands and the types section, which list their own kinds of row.
     let members: [SidebarPlace]
+    /// The members the person has not hidden, in order.
+    let shown: [SidebarPlace]
     let isEmpty: Bool
 
     var id: String { group.id }
-    var shown: [SidebarPlace] { members.filter { !hiddenKeys.contains($0.key) && !hidesSavedViews(of: $0) } }
-    let hiddenKeys: Set<String>
-
-    private func hidesSavedViews(of place: SidebarPlace) -> Bool {
-        if case .view = place { hiddenKeys.contains(SidebarLayout.savedViewsKey) } else { false }
-    }
 
     /// The sections of every tab, in the layout's order.
     @MainActor
@@ -25,13 +21,13 @@ nonisolated struct SidebarGroupPlan: Identifiable, Equatable {
         return layout.allGroups.map { group in
             let mine = group.holdsPlaces ? candidates.filter { homes[$0.key] == group.id } : []
             let members = ordered(mine, in: group.id, layout: layout)
-            let plan = SidebarGroupPlan(group: group, members: members, isEmpty: false, hiddenKeys: layout.hidden)
+            let shown = members.filter { !layout.isHidden($0) }
             let isEmpty: Bool = switch group.kind {
             case .shortcuts: group.shortcuts.isEmpty
             case .types: !showsTypes
-            default: plan.shown.isEmpty
+            default: shown.isEmpty
             }
-            return SidebarGroupPlan(group: group, members: members, isEmpty: isEmpty, hiddenKeys: layout.hidden)
+            return SidebarGroupPlan(group: group, members: members, shown: shown, isEmpty: isEmpty)
         }
     }
 

@@ -23,6 +23,15 @@ struct AppearancePage: View {
     @State private var hasListedFonts = false
     private var registry = ColumnWidthRegistry.shared
 
+    /// Gray is the default, so choosing it stores nothing.
+    private var storedSidebarColor: Binding<SidebarColor> {
+        Binding {
+            sidebarColor
+        } set: { color in
+            if color == .gray { UserDefaults.standard.removeObject(forKey: SidebarColor.key) } else { sidebarColor = color }
+        }
+    }
+
     var body: some View {
         SettingsPageColumn {
             SettingsSection("Theme") {
@@ -64,7 +73,7 @@ struct AppearancePage: View {
             }
             SettingsSection("Window") {
                 SettingsRow("Sidebar", line: "Gray, or white behind a hairline.") {
-                    SettingsPopUp(title: "Sidebar", selection: $sidebarColor) {
+                    SettingsPopUp(title: "Sidebar", selection: storedSidebarColor) {
                         ForEach(SidebarColor.allCases) { Text($0.title).tag($0) }
                     }
                     .accessibilityIdentifier("SidebarColor")

@@ -12,6 +12,8 @@ struct SidebarTypesSection: View, Equatable {
     let rows: [SidebarPlan.TypeRow]
     let plan: SidebarPlan
     let showsAll: Bool
+    /// The type the window shows, which keeps its row when it is past "N More".
+    let open: TypeID?
     let customizing: Bool
     /// The types a plus under the pointer can make an item of.
     let creatable: Set<String>
@@ -24,7 +26,7 @@ struct SidebarTypesSection: View, Equatable {
     /// The section's data and nothing else, so a change of selection does not run its body. `folding` and the plan it
     /// holds are worked out from the same layout and types, which are compared; the closures and the binding are not.
     static func == (a: Self, b: Self) -> Bool {
-        a.rows == b.rows && a.showsAll == b.showsAll && a.customizing == b.customizing && a.header == b.header
+        a.rows == b.rows && a.showsAll == b.showsAll && a.open == b.open && a.customizing == b.customizing && a.header == b.header
             && a.plan.types == b.plan.types && a.plan.layout == b.plan.layout && a.folding.order == b.folding.order
             && a.creatable == b.creatable && a.place.offers == b.place.offers
     }
@@ -46,7 +48,7 @@ struct SidebarTypesSection: View, Equatable {
     }
 
     @ViewBuilder private var typeRows: some View {
-        let limited = SidebarPlan.limited(rows, showsAll: showsAll)
+        let limited = SidebarPlan.limited(rows, showsAll: showsAll, open: open)
         let rows = limited.rows
         let steps = SidebarTypeRow.steps(for: rows, subtypeIcons: showsSubtypeIcons)
         let widest = rows.filter(\.isExpandable).map(\.node.count).max() ?? 0
@@ -96,17 +98,20 @@ struct SidebarTypesSection: View, Equatable {
                 .contextMenu { typeMenu(node) }
                 .accessibilityIdentifier("SidebarType-\(node.id)")
         } else {
-            // A group only folds, so a click anywhere on its row does.
-            Button { toggle(row) } label: {
-                content.contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .selectionDisabled()
-            .listRowInsets(.vertical, 0)
-            .contextMenu { typeMenu(node) }
-            .accessibilityLabel(Text(node.label))
-            .accessibilityValue(row.isExpanded ? Text("Expanded") : Text("Collapsed"))
-            .accessibilityIdentifier("SidebarTypeGroup-\(node.id)")
+            // A group only folds, so a click anywhere on its row does. A tap, not a button, so the row's ground under
+            // the pointer reaches the list.
+            content
+                .contentShape(.rect)
+                .onTapGesture { toggle(row) }
+                .selectionDisabled()
+                .listRowInsets(.vertical, 0)
+                .contextMenu { typeMenu(node) }
+                .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { toggle(row) }
+                .accessibilityLabel(Text(node.label))
+                .accessibilityValue(row.isExpanded ? Text("Expanded") : Text("Collapsed"))
+                .accessibilityIdentifier("SidebarTypeGroup-\(node.id)")
         }
     }
 

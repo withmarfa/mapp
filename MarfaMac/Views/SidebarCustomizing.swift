@@ -28,14 +28,11 @@ nonisolated struct SidebarOffers: Equatable {
     var hiddenSections: [SidebarGroup.Kind] = []
     /// The commands each tab holds, by the tab's identifier.
     var commands: [String: [SidebarShortcut]] = [:]
-    /// Every saved view, so showing one where all were hidden hides the others in its place.
-    var savedViews: [ItemID] = []
 
     @MainActor
     init(library: any ItemLibrary, plan: SidebarPlan, creatable: Set<String>) {
         let layout = plan.layout
         views = plan.views.map { SidebarPick(key: SidebarPlace.view($0.id).key, title: $0.title) }
-        savedViews = plan.views.map(\.id)
         collections = library.collections.map { SidebarPick(key: SidebarPlace.collection($0.id).key, title: $0.displayTitle) }
         self.creatable = QuickAdd.types(in: library).filter { creatable.contains($0.id.rawValue) }
             .map { SidebarPick(key: $0.id.rawValue, title: $0.label) }
@@ -183,11 +180,7 @@ struct SidebarOfferMenu: View {
         Menu {
             ForEach(offers.views) { pick in
                 Button(pick.title) {
-                    guard case .view(let id)? = SidebarPlace(key: pick.key) else { return }
-                    libraries.updateSidebarLayout {
-                        $0.show(id, among: offers.savedViews)
-                        $0.put(.view(id), in: group)
-                    }
+                    if let place = SidebarPlace(key: pick.key) { libraries.updateSidebarLayout { $0.put(place, in: group) } }
                 }
             }
         } label: {

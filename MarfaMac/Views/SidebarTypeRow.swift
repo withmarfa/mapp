@@ -71,9 +71,7 @@ struct SidebarTypeRow: View {
         }
         .frame(maxHeight: .infinity)
         .onHover { isHovering = $0 }
-        .accessibilityActions {
-            if let add { Button(addName, action: add) }
-        }
+        .sidebarRowGround(isHovering)
         .overlay(alignment: .trailing) {
             if row.isExpandable {
                 HStack(spacing: 0) {
@@ -103,11 +101,19 @@ struct SidebarTypeRow: View {
                 SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
                     .opacity(isHovering && add != nil ? 0 : 1)
                 if isHovering, let add {
-                    SidebarPlus(name: addName, add: add).padding(.trailing, -4)
+                    SidebarPlus(name: addName) {
+                        // The quick add's window takes the pointer, which then never leaves the row.
+                        isHovering = false
+                        add()
+                    }
+                    .padding(.trailing, -4)
                 }
             }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityActions {
+            if let add { Button(addName, action: add) }
+        }
     }
 
     /// One column of a kind's indent before its content.
