@@ -48,7 +48,9 @@ Two defaults name types: the sidebar's and toolbar's starting set for New, and t
 - **Read only locks the connector-managed title, text, properties, and type.** A natural-key upsert keeps the current tags and tier when the connector omits them (`items/natural-key-tags`, `items/tier-upsert`). A binned item stays in the bin (`items/natural-key-trashed`).
 - **Archived blocks nothing.** In Recently Deleted, everything is blocked but Recover and Delete Immediately.
 - **The tier and the state are separate.** Keep and Move to Feed send `ItemWrite.retier`. Archive, Unarchive, and Delete send `ItemWrite.transition` through `setStates`. Recover and undo or redo steps that take an item out of Recently Deleted use `ItemWrite.restore`. Each item is its own queued write, and a command is one undo step.
-- **Undo and Redo check where the Mac left the item** (`stateLeft`, `tierLeft`), including moves still waiting in the queue. If the item is already where the step would put it, the library skips the item quietly. If it sees the item somewhere else, the library skips it and tells the person.
+- **One rule judges every state and tier write,** Undo and Redo included: `MarfaEngine.judge`, at queue time, against the working copy with its queued writes. A write whose item is not in the state or tier it names is skipped (`.changedSince`; in the bin, `.inBin`), never taken. A command tells its skips once, with the count (`gatheringSkips`).
+- **A step reverses only moves the server made or may still make.** A tier Undo waits for the server's answer to the write it reverses (`MarfaLibrary.reverse`).
+- **Known gap:** a transition names no expected state (withmarfa/marfa#3523), and a queued tier `PATCH` carries `conflict=auto`, so a change the copy has not yet learned of is written over.
 - **Archive with what is beneath takes every active item under the selection through `parent-of`** (`archivePlan`). Marfa's own archive reaches no child.
 
 ## Vocabulary
