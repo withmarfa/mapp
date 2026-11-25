@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// The changes to saved views that could not reach the server, kept on this Mac until it can. A window keeps the change
 /// it holds for a view here as it makes it offline, so leaving the view, closing the window or quitting loses nothing,
