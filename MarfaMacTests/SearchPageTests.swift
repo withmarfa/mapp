@@ -21,7 +21,7 @@ import Testing
         try #require(await eventually { library.isLoaded })
         var narrowing = SearchNarrowing()
         narrowing.includesArchived = false
-        narrowing.includesInbox = false
+        narrowing.includesFeed = false
         _ = await eventually { !library.search("alpha", narrowedBy: narrowing).isPending }
         let target = try #require(source.targets.withLock { $0.last })
         guard case .items(let query, _, _) = target else { Issue.record("not an items search"); return }

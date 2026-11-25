@@ -53,7 +53,7 @@ struct ItemInspectorHost: View {
             if library.item(id) != nil { openWindow(value: id) }
             return
         }
-        browser.searchText = ""
+        browser.clearSearch()
         if library.item(id)?.state == .trashed {
             browser.showSettings(.recentlyDeleted)
             return

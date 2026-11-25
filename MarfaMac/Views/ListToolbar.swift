@@ -33,6 +33,7 @@ struct ViewToolbarItems: ToolbarContent {
             text: $browser.searchText,
             prompt: String(localized: "Search"),
             layout: layout,
+            browser: browser,
             focusRequests: browser.searchFocusRequests,
             onDown: { browser.focusRequest = .list }
         )

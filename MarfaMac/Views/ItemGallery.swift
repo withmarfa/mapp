@@ -62,7 +62,7 @@ struct ItemGallery: View {
             if ids.isEmpty {
                 if browser.listHidesEveryGroup(in: library) {
                     HiddenGroupsEmptyState()
-                } else if browser.isSearching {
+                } else if browser.narrowsBySearch {
                     SearchEmptyState(browser: browser)
                         .accessibilityIdentifier("GalleryEmptySearch")
                 } else { PlaceEmptyState(browser: browser) }
@@ -104,7 +104,7 @@ struct ItemGallery: View {
             .focusable()
             .focusEffectDisabled()
             .focused(pane, equals: .list)
-            .accessibilityLabel(browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown))
+            .accessibilityLabel(library.name(of: browser.shown))
             .accessibilityIdentifier("ItemGallery")
             .onAppear {
                 if let selected = ids.first(where: browser.selection.contains) { proxy.scrollTo(selected) }

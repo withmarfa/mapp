@@ -34,7 +34,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Undo of state and tier where the copy cannot be sure | **Waits for Marfa:** an expected state on a transition (marfa#3523) and an update that refuses a stale version (marfa#3528). Until then, Undo does nothing and says so when the copy shows a change, and a change the copy has not yet learned of can still be overwritten. | `MarfaEngine+Writing.swift`, `MarfaLibrary+Bin.swift`, `MarfaLibrary+Moves.swift` | `Rethink-Archive-Toast` |
-| One type's archive | One type's archived items are the Archive narrowed by a token in Search. | Search | `Rethink-Type-Archive` |
 | An archived item's page | Says Archived over its title, and edits as any other. | `ItemPageHeader.swift`, `BatchSkips` | `Rethink-Archived-Page` |
 
 ## Several items
@@ -86,8 +85,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Tokens | Under the field, offers of fields and values that match what is typed, then Search for the text. Return makes a token and Delete takes the last away. Nothing is saved. | `SearchViews.swift`, `SearchNarrowing` | `Rethink-Search`, `Rethink-Search-Offers`, `Rethink-Search-Where` |
-| Palette | Plain type marks, filters as tokens, no results with New Item on the field's line, the words Feed and Archived, one row for Settings. | `CommandPalette` | `Rethink-Palette`, `Rethink-Palette-Typed`, `Rethink-Palette-Actions`, `Rethink-Search-Items`, `Rethink-Search-Items-None` |
 
 ## Making an item
 

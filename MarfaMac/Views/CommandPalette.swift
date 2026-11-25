@@ -20,7 +20,7 @@ struct CommandPalette: View {
     @AppStorage(QuickAdd.lastTypeKey) var lastType = ""
     @AppStorage(DateFormat.key) var dateFormat = DateFormat.standard
     @AppStorage(SearchOptions.includesArchivedKey) var includesArchived = SearchOptions.includesArchivedStandard
-    @AppStorage(SearchOptions.includesInboxKey) var includesInbox = SearchOptions.includesInboxStandard
+    @AppStorage(SearchOptions.includesFeedKey) var includesFeed = SearchOptions.includesFeedStandard
     @AppStorage(SearchOptions.orderKey) var searchOrder = SearchOptions.Order.standard
     @AppStorage(SearchOptions.showsSnippetsKey) private var showsSnippets = SearchOptions.showsSnippetsStandard
     let browser: Browser
@@ -32,11 +32,24 @@ struct CommandPalette: View {
     @State private var scrollTarget: String?
     /// The row Actions is open for, by its identifier, or nil while it is shut.
     @State private var actionsFor: String?
-    @State private var showsFilters = false
-    /// The filter row's height, which the list gives up while the row shows, so showing filters never grows the palette.
-    @State private var filterRowHeight: CGFloat = 0
-    /// The filters and the panel open for one, which last until the palette is put away.
-    @State private(set) var filterState = PaletteFilterState()
+    /// Search Items' tokens, which last until the palette is put away. Nothing here is saved.
+    @State private(set) var tokens = PaletteTokens()
+    /// The token a click chose, which Delete takes away.
+    @State private var selectedToken: FilterClause?
+    /// Whether an arrow key has moved the choice since the words last changed. A list of nothing but offers has no choice
+    /// until it has, so Return makes the item and not a token.
+    @State private var arrowed = false
+
+    /// Whether a row is chosen: always where there are results, and among offers alone only once an arrow has moved to one.
+    private func hasChoice(_ rows: [Entry]) -> Bool {
+        arrowed || rows.contains { !$0.isOffer }
+    }
+
+    /// Makes `clause` a token and puts the words that offered it away.
+    func addToken(_ clause: FilterClause) {
+        tokens.clauses.append(clause)
+        query = ""
+    }
     /// Where the keyboard was before the palette took it, and goes back to once the palette is put away.
     @State private(set) var returnFocus: Browser.Pane = .list
     /// Every item's title folded once while the palette is open, so a keystroke folds only what was typed.
@@ -59,15 +72,10 @@ struct CommandPalette: View {
     /// Whether Show asked for this search once with nothing left out. A new search leaves out again.
     @State private(set) var showsLeftOut = false
 
-    /// `filters` are the ones Search Items opens with, its filter row showing while any is set.
-    init(browser: Browser, editor: EditorController, mode: Browser.Palette, filters: PaletteFilters = PaletteFilters()) {
+    init(browser: Browser, editor: EditorController, mode: Browser.Palette) {
         self.browser = browser
         self.editor = editor
         self.mode = mode
-        let state = PaletteFilterState()
-        state.filters = filters
-        _filterState = State(initialValue: state)
-        _showsFilters = State(initialValue: !filters.isEmpty)
     }
 
     typealias Entry = PaletteEntry
@@ -85,10 +93,6 @@ struct CommandPalette: View {
         let target = actionsFor.flatMap { id in rows.first { $0.id == id } }
         VStack(spacing: 0) {
             searchField(sections)
-            if mode == .search, showsFilters {
-                PaletteFilterRow(state: filterState)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { filterRowHeight = $0 }
-            }
             results(sections, rows: rows, chosen: chosen, target: target)
         }
         .floatingPanelSurface(width: 680)
@@ -99,18 +103,21 @@ struct CommandPalette: View {
             return .handled
         }
         .background { actionShortcuts(for: target) }
-        // The Type filter is part of the search, so a change to it asks again; the others narrow what was found.
-        .onChange(of: filterState.filters) { old, new in
+        // The type token is part of the search, so a change to it asks again; the others narrow what was found.
+        .onChange(of: tokens) { old, new in
             highlighted = 0
             scrollTarget = nil
-            if old.types != new.types || old.negated.contains(.type) != new.negated.contains(.type) {
+            if old.typeClause != new.typeClause {
                 refreshSearch()
             } else {
                 applyFilters(to: searched, leftOut: leftOut)
             }
         }
+        .onChange(of: selectedToken) { if selectedToken != nil { focus = .field } }
         .onChange(of: query) {
+            selectedToken = nil
             highlighted = 0
+            arrowed = false
             scrollTarget = nil
             showsLeftOut = false
             // At once, so Return before the next draw reads the answer for what was typed.
@@ -141,22 +148,43 @@ struct CommandPalette: View {
     }
 
     private func searchField(_ sections: [Section]) -> some View {
-        HStack(spacing: PaletteMetrics.markGap) {
-            // In the rows' mark column, so the typed words start where the titles do.
+        let results = sections.flatMap(\.rows).filter { !$0.isOffer }
+        return HStack(spacing: PaletteMetrics.markGap) {
+            // In the rows' mark column, so the typed words start where the titles do, on a circle that overhangs it.
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
                 .frame(width: PaletteMetrics.markWidth)
-            TextField(mode == .search ? "Search Items" : "Search Commands and Items", text: $query)
+                .background {
+                    if mode == .search { Circle().fill(.quaternary.opacity(0.6)).frame(width: 30, height: 30) }
+                }
+            if !tokens.isEmpty {
+                PaletteTokenRow(tokens: tokens, library: library, selected: $selectedToken) { clause in
+                    tokens.clauses.removeAll { $0 == clause }
+                    selectedToken = nil
+                    focus = .field
+                }
+            }
+            TextField(fieldPrompt, text: $query)
                 .textFieldStyle(.plain)
                 .interfaceFont(.title3)
                 .focused($focus, equals: .field)
-                .appFocusRing(isFocused: focus == .field)
                 // Actions holds the keyboard while it is open.
                 .disabled(actionsFor != nil)
+                // Delete takes the chosen token away, or in an empty field the last, as it does in the list's search.
+                .onKeyPress(.delete) {
+                    if let chosen = selectedToken {
+                        tokens.clauses.removeAll { $0 == chosen }
+                        selectedToken = nil
+                        return .handled
+                    }
+                    guard query.isEmpty, !tokens.isEmpty else { return .ignored }
+                    tokens.clauses.removeLast()
+                    return .handled
+                }
                 // Read afresh: Return can come before the view is drawn again after the last key.
                 .onSubmit {
                     let current = shown().flatMap(\.rows)
-                    if current.isEmpty {
+                    if !current.contains(where: { !$0.isOffer }) && !arrowed {
                         newItem()
                     } else if let id = actionsFor, let live = current.first(where: { $0.id == id }) {
                         performHighlighted(on: live)
@@ -167,11 +195,22 @@ struct CommandPalette: View {
                 .onExitCommand { escape() }
                 .accessibilityIdentifier("CommandPaletteField")
             if isTyped {
-                let count = PaletteSections.resultCount(sections) { $0.id != Self.searchItemsID }
-                Text(count == 1 ? String(localized: "1 result") : String(localized: "\(count) results"))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .accessibilityIdentifier("CommandPaletteCount")
+                if results.isEmpty {
+                    // Offers alone fill the body, so the answer is at the field's line then, and in the body otherwise.
+                    if !sections.flatMap(\.rows).isEmpty {
+                        Text(emptyAnswer)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .accessibilityIdentifier("CommandPaletteCount")
+                    }
+                    PaletteNewItem(returnMakes: !arrowed, onNew: newItem)
+                } else {
+                    let count = PaletteSections.resultCount(sections) { $0.id != Self.searchItemsID && !$0.isOffer }
+                    Text(count == 1 ? String(localized: "1 result") : String(localized: "\(count) results"))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .accessibilityIdentifier("CommandPaletteCount")
+                }
             }
         }
         .padding(.horizontal, PaletteMetrics.markInset)
@@ -179,12 +218,24 @@ struct CommandPalette: View {
         .padding(.bottom, 12)
     }
 
+    /// Whether the copy is still filling, so that what matches may not have arrived.
+    private var isLooking: Bool { Self.emptyAnswer(searching: mode == .search, results: searched) == .stillLooking }
+
+    private var emptyAnswer: LocalizedStringKey { isLooking ? "Still Looking" : "No Results" }
+
+    private var fieldPrompt: LocalizedStringKey {
+        if mode == .search { tokens.isEmpty ? "Search Items" : "" } else { "Search Commands and Items" }
+    }
+
     private func moveDown(_ rows: [Entry], chosen: Int, target: Entry?) -> KeyPress.Result {
         if let target {
             actionsHighlighted = min(actionsHighlighted + 1, max(PaletteAction.filtered(actions(for: target), by: actionsQuery).count - 1, 0))
             return .handled
         }
-        highlighted = min(chosen + 1, max(rows.count - 1, 0))
+        guard !rows.isEmpty else { return .handled }
+        // Among offers alone nothing is chosen yet, so the first arrow chooses the first.
+        highlighted = hasChoice(rows) ? min(chosen + 1, max(rows.count - 1, 0)) : 0
+        arrowed = true
         scrollTarget = rows.indices.contains(highlighted) ? rows[highlighted].id : nil
         return .handled
     }
@@ -194,6 +245,7 @@ struct CommandPalette: View {
             actionsHighlighted = max(actionsHighlighted - 1, 0)
             return .handled
         }
+        guard hasChoice(rows) else { return .handled }
         highlighted = max(chosen - 1, 0)
         scrollTarget = rows.indices.contains(highlighted) ? rows[highlighted].id : nil
         return .handled
@@ -227,40 +279,29 @@ struct CommandPalette: View {
         ZStack(alignment: .bottomTrailing) {
             Group {
                 if rows.isEmpty {
+                    // Nothing found says so, centred, with New Item at the field's line; what was left out is under it.
                     VStack(spacing: 0) {
-                        Group {
-                            if Self.emptyAnswer(searching: mode == .search && isTyped, results: searched) == .stillLooking {
-                                Text("Still Looking")
-                            } else {
-                                Text("No Results")
-                            }
-                        }
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, minHeight: PaletteMetrics.emptyResultsHeight - (leftOutLine == nil ? 0 : 60))
+                        if isTyped { PaletteNoResults(isLooking: isLooking) }
                         leftOutRow
                     }
                 } else {
-                    list(sections, chosen: chosen)
+                    list(sections, chosen: chosen, showsBar: hasChoice(rows))
                 }
             }
             .safeAreaBar(edge: .bottom, spacing: 0) {
                 // Kept in place while Actions is out, so the rows above do not move.
-                HStack(alignment: .bottom, spacing: PaletteBar.spacing) {
-                    if mode == .search {
-                        PaletteFilterButton(count: filterState.filters.count, isOn: showsFilters) { showsFilters.toggle() }
-                    }
-                    Spacer(minLength: 0)
-                    if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
+                if hasChoice(rows), let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
+                    HStack(alignment: .bottom, spacing: PaletteBar.spacing) {
+                        Spacer(minLength: 0)
                         PaletteFooter(
                             openTitle: openTitle(for: row), onOpen: { run(rows, at: chosen) },
-                            actionsKeys: keys(.paletteActions), onActions: { toggleActions(rows, chosen: chosen) })
-                    } else {
-                        PaletteFooter(openTitle: String(localized: "New Item"), onOpen: newItem, actionsKeys: nil, onActions: nil)
+                            actionsKeys: row.isOffer ? nil : keys(.paletteActions),
+                            onActions: row.isOffer ? nil : { toggleActions(rows, chosen: chosen) })
                     }
+                    .opacity(target == nil ? 1 : 0)
+                    .allowsHitTesting(target == nil)
+                    .padding(PaletteBar.inset)
                 }
-                .opacity(target == nil ? 1 : 0)
-                .allowsHitTesting(target == nil)
-                .padding(PaletteBar.inset)
             }
             if actionsFor != nil {
                 // A click beside the panel puts it away and keeps the palette.
@@ -282,7 +323,7 @@ struct CommandPalette: View {
         .frame(minHeight: actionsFor == nil ? 0 : 340)
     }
 
-    private func list(_ sections: [Section], chosen: Int) -> some View {
+    private func list(_ sections: [Section], chosen: Int, showsBar: Bool) -> some View {
         var offset = 0
         let numbered = sections.map { section in
             defer { offset += section.rows.count }
@@ -296,7 +337,7 @@ struct CommandPalette: View {
                         ForEach(Array(group.section.rows.enumerated()), id: \.element.id) { position, entry in
                             let index = group.start + position
                             PaletteRow(
-                                entry: entry, query: query, isHighlighted: index == chosen,
+                                entry: entry, query: query, isHighlighted: index == chosen && hasChoice(sections.flatMap(\.rows)),
                                 isSearch: mode == .search, showsSnippets: showsSnippets
                             ) {
                                 if highlighted != index { highlighted = index }
@@ -310,8 +351,10 @@ struct CommandPalette: View {
                 }
                 .padding(.horizontal, PaletteMetrics.listInset)
             }
+            // The last row can scroll clear of the bar that stands over the foot.
+            .contentMargins(.bottom, showsBar ? PaletteBar.height + PaletteBar.inset * 2 : 0, for: .scrollContent)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
-            .frame(maxHeight: PaletteMetrics.resultsHeight - (mode == .search && showsFilters ? filterRowHeight : 0))
+            .frame(maxHeight: PaletteMetrics.resultsHeight)
             .onChange(of: scrollTarget) { if let scrollTarget { proxy.scrollTo(scrollTarget) } }
         }
     }
@@ -324,7 +367,8 @@ struct CommandPalette: View {
     }
 
     private func openTitle(for row: Entry) -> String {
-        row.item == nil ? String(localized: "Run") : String(localized: "Open")
+        if row.isOffer { return String(localized: "Add Filter") }
+        return row.item == nil ? String(localized: "Run") : String(localized: "Open")
     }
 
     // MARK: Running
@@ -332,6 +376,10 @@ struct CommandPalette: View {
     private func run(_ entries: [Entry], at index: Int? = nil) {
         let index = index ?? highlighted
         guard entries.indices.contains(index) else { return }
+        if entries[index].staysOpen {
+            entries[index].action()
+            return
+        }
         close(returningFocus: !entries[index].takesFocus)
         entries[index].action()
         if mode == .search, isTyped, let id = entries[index].item {

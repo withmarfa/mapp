@@ -74,7 +74,7 @@ paths:
 ## Menus and palettes
 
 - **Every menu of items is one menu** (`ItemRowMenu`), in every layout.
-- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`).
+- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`). Search Items' filters are tokens (`PaletteTokens`).
 - **Trap:** Actions grows out of the palette's bar with an ordinary transition: a Liquid Glass morph hung the app.
 - **A command that takes the keyboard says so** (`takesFocus`), so the palette does not take it back.
 

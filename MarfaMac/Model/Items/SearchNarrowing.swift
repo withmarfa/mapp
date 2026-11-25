@@ -39,16 +39,16 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
     /// Whether archived items are searched (Include Archived Items).
     var includesArchived = true
     /// Whether search includes Feed items.
-    var includesInbox = true
+    var includesFeed = true
 
     static let none = SearchNarrowing()
 
-    var isEmpty: Bool { types.isEmpty && leaveOut.isEmpty && includesArchived && includesInbox }
+    var isEmpty: Bool { types.isEmpty && leaveOut.isEmpty && includesArchived && includesFeed }
 
     /// The states a search over every item keeps, and the tier it is limited to: asked of the copy in the search call
     /// itself (`ItemQuery.states`, `ItemQuery.tier`), so the most a search lists is counted after them.
     var searchedStates: Set<ItemState> { includesArchived ? [.active, .archived] : [.active] }
-    var searchedTier: Tier? { includesInbox ? nil : .library }
+    var searchedTier: Tier? { includesFeed ? nil : .library }
 
     /// The most conditions a filter holds, and the most types the `types` key takes.
     static let maxConditions = 10
@@ -171,7 +171,7 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
 
     /// Whether the archived and Feed choices allow `item`.
     func admitsOptions(_ item: Item) -> Bool {
-        (includesArchived || item.state != .archived) && (includesInbox || item.tier != .feed)
+        (includesArchived || item.state != .archived) && (includesFeed || item.tier != .feed)
     }
 
     /// Whether an item of `type` is one the chosen types let through.

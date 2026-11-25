@@ -50,13 +50,15 @@ struct ItemTable: View {
             .searchStatus(browser)
             .overlay {
                 if allRows.isEmpty {
-                    if browser.isSearching {
+                    if browser.narrowsBySearch {
                         SearchEmptyState(browser: browser)
                     } else {
                         PlaceEmptyState(browser: browser)
                     }
                 } else if content.hidesEveryGroup {
                     HiddenGroupsEmptyState()
+                } else if rows.isEmpty, browser.hasSearchTokens {
+                    SearchEmptyState(browser: browser)
                 } else if rows.isEmpty {
                     EmptyState(title: Text("No Matching Items"), detail: Text("No items match the filters.")) {
                         Button("Clear Filters") { browser.tableOptions[browser.shown, default: .init()].clearFilters() }

@@ -28,6 +28,12 @@ nonisolated struct FilterTarget: Hashable, Sendable, Identifiable {
     static let collection = FilterTarget(id: ItemTableColumn.collections.id, label: String(localized: "Collection"), kind: .collection)
     static let parent = FilterTarget(id: ItemTableColumn.parent.id, label: String(localized: "Parent"), kind: .parent)
     static let source = FilterTarget(id: "source", label: String(localized: "Source"), kind: .source)
+    /// Which tier an item is in, as the From control names it. It is a source-kind target, since it says where an item
+    /// came from in the same words and offers the same operators. Only a search offers it (`SearchOffers`); Filter By does not.
+    static let tier = FilterTarget(id: "tier", label: String(localized: "From"), kind: .source)
+
+    /// Whether the target is the tier rather than the source code.
+    var isTier: Bool { id == Self.tier.id }
     static let created = FilterTarget(id: ItemTableColumn.created.id, label: ItemTableColumn.created.label, kind: .moment)
     static let edited = FilterTarget(id: ItemTableColumn.edited.id, label: ItemTableColumn.edited.label, kind: .moment)
     static let occurred = FilterTarget(id: ItemTableColumn.occurred.id, label: ItemTableColumn.occurred.label, kind: .moment)
@@ -77,6 +83,22 @@ nonisolated struct FilterTarget: Hashable, Sendable, Identifiable {
             if best == nil || style.specificity > best!.style.specificity { best = (field, style) }
         }
         return best.flatMap { target(id: Browser.fieldColumnPrefix + key, label: $0.field.label, field: $0.field, style: $0.style) }
+    }
+
+    /// The fields of `types`, or of every type in the catalogue where none are given, found from the catalogue alone: the
+    /// status first, then in the order the types declare them, each as `target(ofProperty:among:catalogue:)` reads it.
+    static func fields(among types: Set<TypeID>, catalogue: Catalogue) -> [FilterTarget] {
+        var keys: [String] = []
+        var skipped: Set<String> = ["title", "body"]
+        let scope = types.isEmpty ? Set(catalogue.itemTypes.keys) : types
+        for type in scope.sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let info = catalogue.itemTypes[type] else { continue }
+            skipped.formUnion([info.titleKey, info.bodyKey].compactMap { $0 })
+            for field in info.fields where !keys.contains(field.key) { keys.append(field.key) }
+        }
+        var targets = keys.filter { !skipped.contains($0) }.compactMap { target(ofProperty: $0, among: types, catalogue: catalogue) }
+        if let status = targets.firstIndex(where: { $0.kind == .status }) { targets.insert(targets.remove(at: status), at: 0) }
+        return targets
     }
 }
 

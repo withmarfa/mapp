@@ -32,7 +32,7 @@ struct ItemTimeline: View {
         .searchStatus(browser)
         .overlay {
             if items.isEmpty {
-                if browser.isSearching {
+                if browser.narrowsBySearch {
                     SearchEmptyState(browser: browser)
                 } else {
                     PlaceEmptyState(browser: browser)

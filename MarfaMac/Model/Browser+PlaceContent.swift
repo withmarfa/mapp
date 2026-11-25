@@ -1,12 +1,25 @@
 import Foundation
 
 extension Browser {
+    /// Where the text search looks: what the place lists with the window's choices, which a place that lists items
+    /// answers whatever the list's filters hold (the search runs within them), narrowed by the tokens that Marfa can say.
+    /// A place that lists no items, such as an index, has the whole library.
     func searchScope(in library: any ItemLibrary) -> SearchScope {
-        guard searchesPlace, SearchScope.narrows(shown) else { return .everywhere }
-        if let id = shown.savedView { return .view(id) }
+        guard SearchScope.narrows(shown) else { return .everywhere }
+        if let id = shown.savedView, !hasSearchTokens { return .view(id) }
         // The search follows what the place lists: its From, its archived items and a type's kinds.
-        return ViewDraft.query(for: shown, listing: listing, catalogue: library.catalogue, views: library.views)
-            .map(SearchScope.query) ?? .everywhere
+        guard var query = ViewDraft.query(for: shown, listing: listing, catalogue: library.catalogue, views: library.views) else {
+            return .everywhere
+        }
+        if hasSearchTokens {
+            // Each token Marfa can say narrows the search itself, so the most it lists is counted after them; the rest are
+            // applied to what it lists (`ItemTableContent.kept`), which is the only place every token is applied. A Type
+            // token only narrows within the place's types, never lists others.
+            query = ViewDraft.adding(
+                FilterState(clauses: searchTokens), to: query, targets: tokenTargets(in: library), catalogue: library.catalogue,
+                replacingTypes: false).query
+        }
+        return .query(query)
     }
 
     /// What the search finds, or nil while the window is not searching.
@@ -43,8 +56,7 @@ extension Browser {
 
     /// The title a layout gives the window: the Archive is a page of the Library and keeps its title through a search.
     func pageTitle(in library: any ItemLibrary) -> String {
-        if listsArchive { return String(localized: "Library") }
-        return isSearching ? String(localized: "Search") : library.name(of: shown)
+        listsArchive ? String(localized: "Library") : library.name(of: shown)
     }
 
     /// What `shown` lists besides its filters, as the person or a saved view chose, else the place's own: the Library
@@ -157,21 +169,23 @@ extension Browser {
         var options: ItemTableOptions
         /// Whether the table's sort and grouping order the list.
         var arranged: Bool
+        /// The search's tokens, which narrow the list as the filters do.
+        var tokens: [FilterClause] = []
     }
 
     var listShape: ListShape? {
-        guard let options = tableOptions[shown] else { return nil }
+        let options = tableOptions[shown] ?? ItemTableOptions()
         var grouped = false
         if options.grouping.columnID != nil { grouped = true }
         let arranged = options.sort != nil || grouped
-        guard arranged || options.isFiltering else { return nil }
+        guard arranged || options.isFiltering || hasSearchTokens else { return nil }
         var shape = options.settled
         if !arranged {
             shape.collapsed = nil
             shape.sort = nil
             shape.grouping = .automatic
         }
-        return ListShape(options: shape, arranged: arranged)
+        return ListShape(options: shape, arranged: arranged, tokens: searchTokens)
     }
 
     /// The sections of a place that is filtered or arranged, worked out from the table's content, which the table
@@ -212,13 +226,14 @@ extension Browser {
     /// The items the open place shows in the layouts that arrange them themselves (the board, the timeline): the
     /// place's items, less those the filters hide. `items(in:)` stays whole, for whatever needs every item.
     func filteredItems(in library: any ItemLibrary) -> [Item] {
-        guard tableOptions[shown]?.isFiltering == true else { return items(in: library) }
+        guard tableOptions[shown]?.isFiltering == true || hasSearchTokens else { return items(in: library) }
         return tableContent(in: library).kept.map(\.item)
     }
 
-    /// Whether the open place has filters that hide everything it lists.
+    /// Whether the open place has filters that hide everything it lists. A search's tokens that do so are the search's
+    /// own empty result (`SearchEmptyState`).
     func filtersHideEverything(in library: any ItemLibrary) -> Bool {
-        guard tableOptions[shown]?.isFiltering == true else { return false }
+        guard tableOptions[shown]?.isFiltering == true, !hasSearchTokens else { return false }
         let content = tableContent(in: library)
         return content.kept.isEmpty && !content.allRows.isEmpty
     }
@@ -244,7 +259,7 @@ extension Browser {
         let key = TableKey(
             derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, counts: library.counts.revision,
             hidesEmpty: hidesEmptyGroups, sources: library.sources.infos,
-            relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()))
+            relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()), tokens: searchTokens)
         if let held = tableMemo, held.key == key { return held.content }
         // A search's table is held apart, so its results never show the Library's table nor drop it.
         let searching = isSearching
@@ -410,6 +425,8 @@ extension Browser {
         let sources: [String: SourceInfo]
         /// The day a filter relative to the day is worked out for, so the table is made again when it changes.
         let relativeDay: Date?
+        /// The search's tokens, which narrow the rows the table keeps.
+        let tokens: [FilterClause]
     }
 
     private var showsOnlyFavorites: Bool { shown.isFavorites }

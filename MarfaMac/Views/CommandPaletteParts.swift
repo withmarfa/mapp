@@ -4,7 +4,7 @@ import SwiftUI
 struct PaletteEntry: Identifiable {
     var id: String
     let title: String
-    /// The type's name for an item, at the row's right.
+    /// Feed or Archived for an item that is one, at the row's right.
     var detail: String?
     /// The words a search shows under the title where it has no excerpt: the item's text, or its type and collections.
     var snippet: String?
@@ -20,7 +20,12 @@ struct PaletteEntry: Identifiable {
     var takesFocus = false
     /// The menu group ⌘K lists it under with nothing typed; nil for a command only typing finds.
     var group: PaletteSections.CommandGroup? = .file
+    /// Running it leaves the palette open, as a row that makes a token does.
+    var staysOpen = false
     let action: () -> Void
+
+    /// Whether the row offers a token of Search Items rather than something to open or run.
+    var isOffer: Bool { id.hasPrefix(CommandPalette.offerPrefix) }
 }
 
 /// The grey of a chosen row: quiet in light and in dark, with the text keeping its own color.
@@ -36,14 +41,11 @@ enum PaletteMetrics {
     static let markInset: CGFloat = listInset + rowInset
     static let markWidth: CGFloat = 20
     static let markGap: CGFloat = 10
-    /// The tallest the results grow, the filter row included; the bar adds its own height under them.
+    /// The tallest the results grow; the bar adds its own height under them.
     static let resultsHeight: CGFloat = 460
-    /// The results' height with nothing found, so the palette is about 400 points tall with its field: taller than a
-    /// line of text asks for, and shorter than a full list.
-    static let emptyResultsHeight: CGFloat = 302
 }
 
-/// The bar at the foot of the results, which rows scroll under: the filter button in Search Items, and Open and Actions.
+/// The bar at the foot of the results, which rows scroll under: Open and Actions.
 enum PaletteBar {
     static let inset: CGFloat = 10
     static let spacing: CGFloat = 8
@@ -70,23 +72,15 @@ struct PaletteSectionHeader: View {
     }
 }
 
-/// A type's mark in its tone, or a command's symbol.
+/// A type's mark or a command's symbol, in the one plain gray, so a row's words are what stands out.
 private struct PaletteMark: View {
     let icon: RowIcon
 
     var body: some View {
-        Group {
-            switch icon {
-            case .type(let name):
-                TonedGlyph(id: name)
-            case .symbol:
-                RowIconImage(icon: icon)
-                    .foregroundStyle(.secondary)
-                    .frame(width: PaletteMetrics.markWidth, height: PaletteMetrics.markWidth)
-            }
-        }
-        .frame(width: PaletteMetrics.markWidth)
-        .accessibilityHidden(true)
+        RowIconImage(icon: icon)
+            .foregroundStyle(.secondary)
+            .frame(width: PaletteMetrics.markWidth, height: PaletteMetrics.markWidth)
+            .accessibilityHidden(true)
     }
 }
 
@@ -120,11 +114,15 @@ struct PaletteRow: View {
                 }
             }
             Spacer(minLength: 8)
-            if let trailing = isSearch ? entry.date : entry.detail {
-                Text(trailing)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .fixedSize()
+            if entry.detail != nil || (isSearch && entry.date != nil) {
+                HStack(spacing: 8) {
+                    ForEach([entry.detail, isSearch ? entry.date : nil].compactMap { $0 }, id: \.self) { word in
+                        Text(word)
+                    }
+                }
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
             } else if let shortcut = entry.shortcut {
                 ShortcutKeys(shortcut)
             }
@@ -246,208 +244,57 @@ struct PaletteLeftOutLine: View {
     }
 }
 
-/// The glass button at the bar's left in Search Items that shows and hides the filter row. With filters set, it shows
-/// their number beside its symbol and a soft fill inside its glass, in the bar's own neutral color.
-struct PaletteFilterButton: View {
-    let count: Int
-    let isOn: Bool
-    let toggle: () -> Void
+/// New Item at the end of the field's line, flat, once the words found nothing: Return makes it. Where the copy is still
+/// filling, what matches may not have arrived (`PaletteNoResults`).
+struct PaletteNewItem: View {
+    /// Whether Return makes the item, which it does until the person arrows to a token offer.
+    var returnMakes = true
+    let onNew: () -> Void
 
     var body: some View {
-        Button(action: toggle) {
-            HStack(spacing: 4) {
-                Image(systemName: "line.3.horizontal.decrease")
-                if count > 0 { Text(count, format: .number) }
-            }
-            .font(.system(size: PaletteBar.fontSize))
-            .padding(.horizontal, count > 0 ? 9 : 0)
-            .frame(minWidth: PaletteBar.height, minHeight: PaletteBar.height)
-            .background {
-                if count > 0 {
-                    Capsule().fill(.primary.opacity(0.12)).padding(PaletteBar.fillInset)
+        Button(action: onNew) {
+            HStack(spacing: 6) {
+                Text("New Item")
+                if returnMakes {
+                    ShortcutKeys("↩")
+                        .accessibilityHidden(true)
                 }
             }
-            .contentShape(.capsule)
-            // Drawn here, since the glass button style pads an icon out to a wide pill: as tall and as round as the
-            // capsule beside it, but only as wide as it is tall.
-            .glassEffect(.regular.interactive(), in: .capsule)
+            .foregroundStyle(.secondary)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.primary)
-        .accessibilityLabel(isOn ? "Hide Filters" : "Show Filters")
-        .accessibilityValue(count > 0 ? Text("\(count) set") : Text(""))
-        .accessibilityIdentifier("CommandPaletteFilters")
+        .appButton(.plain, size: .small)
+        .accessibilityIdentifier("CommandPaletteNewItem")
     }
 }
 
-/// What the palette's filters hold and the panel open for one of them. A class, so the panels, which open in windows of
-/// their own, read and change the same state the palette draws.
-@MainActor @Observable
-final class PaletteFilterState {
-    var filters = PaletteFilters()
-    /// The field whose panel is open, which keeps its chip in the row while it has no value yet.
-    var openField: PaletteFilters.Field?
-}
-
-/// The row under the field that holds the filters' chips and the +, which are a view's filter row (`FilterChipsBar`)
-/// with the palette's three fields.
-struct PaletteFilterRow: View {
-    @CurrentLibrary private var library
-    let state: PaletteFilterState
-    @State private var anchors = FilterChipAnchors()
+/// What the palette's body says while nothing answered the words, centred: so, or that it is still looking.
+struct PaletteNoResults: View {
+    let isLooking: Bool
+    /// The body's height, which the panel keeps whatever is typed.
+    static let height: CGFloat = 150
 
     var body: some View {
-        FilterChipsBar(
-            chips: chips, leadingInset: PaletteMetrics.markInset, showsHelp: false, anchors: anchors,
-            open: { id in PaletteFilters.Field(rawValue: id).map(openValues) },
-            remove: { id in if let field = PaletteFilters.Field(rawValue: id) { remove(field) } },
-            add: openFields
-        )
-        .onDisappear { FilterPanelPresenter.shared.dismiss(restoringFocus: false) }
-        .accessibilityIdentifier("CommandPaletteFilterRow")
-    }
-
-    private var chips: [FilterChipItem] {
-        PaletteFilters.Field.allCases.compactMap { field in
-            guard state.filters.isSet(field) || state.openField == field else { return nil }
-            return FilterChipItem(
-                id: field.rawValue, field: field.title,
-                relation: state.filters.negated.contains(field) ? String(localized: "is not") : String(localized: "is"),
-                values: PaletteFilterOptions(library: library).chosen(in: state.filters, for: field).map(\.title).joined(separator: ", "))
-        }
-    }
-
-    private func remove(_ field: PaletteFilters.Field) {
-        if state.openField == field { FilterPanelPresenter.shared.dismiss(restoringFocus: false) }
-        state.filters.clear(field)
-    }
-
-    private func openValues(_ field: PaletteFilters.Field) {
-        state.openField = field
-        FilterPanelPresenter.shared.present(
-            key: field.rawValue, anchor: anchors.view(for: field.rawValue), width: 280, onClose: { state.openField = nil }
-        ) {
-            PaletteFilterValueHost(state: state, field: field).environment(\.library, library)
-        }
-        // The click that closed this panel asked to open it again: it stays closed.
-        if !FilterPanelPresenter.shared.isOpen(for: field.rawValue) { state.openField = nil }
-    }
-
-    private func openFields() {
-        let fields = PaletteFilters.Field.allCases.filter { !state.filters.isSet($0) && state.openField != $0 }.map {
-            FilterFieldOption(id: $0.rawValue, title: $0.title, symbol: $0.symbol)
-        }
-        FilterPanelPresenter.shared.present(key: FilterChipAnchors.addKey, anchor: anchors.view(for: FilterChipAnchors.addKey), width: 240, onClose: {}) {
-            FilterFieldPanel(fields: fields) { id in
-                FilterPanelPresenter.shared.dismiss(restoringFocus: false)
-                guard let field = PaletteFilters.Field(rawValue: id) else { return }
-                state.openField = field
-                anchors.whenShown(field.rawValue) { openValues(field) }
-            }
-        }
+        Text(isLooking ? "Still Looking" : "No Results")
+            .interfaceFont(.title3)
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, minHeight: Self.height)
+            .accessibilityIdentifier("CommandPaletteNoResults")
     }
 }
 
-extension PaletteFilters.Field {
-    var title: String {
-        switch self {
-        case .type: String(localized: "Type")
-        case .collection: String(localized: "Collection")
-        case .updated: String(localized: "Updated")
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .type: "square.grid.2x2"
-        case .collection: "rectangle.stack"
-        case .updated: "calendar"
-        }
-    }
-}
-
-extension PaletteFilters.Period {
-    var title: String {
-        switch self {
-        case .today: String(localized: "Today")
-        case .thisWeek: String(localized: "This Week")
-        case .thisMonth: String(localized: "This Month")
-        case .thisYear: String(localized: "This Year")
-        }
-    }
-}
-
-/// The values each field offers in the library as it is now.
-private struct PaletteFilterOptions {
+/// Search Items' tokens before the field's words, as the list's search draws its own.
+struct PaletteTokenRow: View {
+    let tokens: PaletteTokens
     let library: any ItemLibrary
-
-    func all(for field: PaletteFilters.Field) -> [FilterValueOption] {
-        switch field {
-        case .type:
-            // The type's own name, as a table's Type column says it; the sidebar's longer label only where two types share one.
-            let counts = library.itemTypeCounts
-            let names = counts.map { library.catalogue.label(for: $0.id) }
-            return zip(counts, names).map { count, name in
-                FilterValueOption(id: count.id.rawValue, title: names.filter { $0 == name }.count > 1 ? count.label : name, mark: .type(icon: count.icon))
-            }
-        case .collection:
-            return library.collections.map {
-                FilterValueOption(id: $0.id.rawValue, title: $0.displayTitle, mark: .type(icon: library.catalogue.icon(for: $0.type)))
-            }
-        case .updated:
-            return PaletteFilters.Period.allCases.map { FilterValueOption(id: $0.rawValue, title: $0.title, mark: .symbol("calendar")) }
-        }
-    }
-
-    /// The values the filter holds that the library still has.
-    func chosen(in filters: PaletteFilters, for field: PaletteFilters.Field) -> [FilterValueOption] {
-        let held: Set<String> = switch field {
-        case .type: Set(filters.types.map(\.rawValue))
-        case .collection: Set(filters.collections.map(\.rawValue))
-        case .updated: filters.period.map { [$0.rawValue] } ?? []
-        }
-        return all(for: field).filter { held.contains($0.id) }
-    }
-}
-
-/// A field's value panel, read from the palette's filters as they are now, so a pick shows in it at once.
-private struct PaletteFilterValueHost: View {
-    @CurrentLibrary private var library
-    let state: PaletteFilterState
-    let field: PaletteFilters.Field
+    @Binding var selected: FilterClause?
+    let onRemove: (FilterClause) -> Void
 
     var body: some View {
-        let options = PaletteFilterOptions(library: library)
-        let chosen = options.chosen(in: state.filters, for: field)
-        let held = Set(chosen.map(\.id))
-        FilterValuePanel(
-            field: field.title,
-            isNegated: state.filters.negated.contains(field),
-            chosen: chosen.map { ValueChip(id: $0.id, title: $0.title, mark: $0.mark) },
-            options: options.all(for: field).filter { !held.contains($0.id) },
-            setNegated: { isNegated in
-                if isNegated { state.filters.negated.insert(field) } else { state.filters.negated.remove(field) }
-            },
-            add: add,
-            remove: remove
-        )
-    }
-
-    private func add(_ id: String) {
-        switch field {
-        case .type: state.filters.types.insert(TypeID(id))
-        case .collection: state.filters.collections.insert(ItemID(rawValue: id))
-        case .updated: state.filters.period = PaletteFilters.Period(rawValue: id)
+        let chips = tokens.clauses.compactMap { clause in
+            tokens.parts(of: clause, titles: { library.title(ofValue: $0) }).map { SearchChip(clause: clause, parts: $0) }
         }
-    }
-
-    private func remove(_ id: String) {
-        switch field {
-        case .type: state.filters.types.remove(TypeID(id))
-        case .collection: state.filters.collections.remove(ItemID(rawValue: id))
-        case .updated: state.filters.period = nil
-        }
-        if !state.filters.isSet(field) { state.filters.negated.remove(field) }
+        SearchChipRow(chips: chips, width: 360, selected: $selected, onRemove: { onRemove($0.clause) })
     }
 }
 

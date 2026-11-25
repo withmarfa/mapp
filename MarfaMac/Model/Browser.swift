@@ -172,6 +172,10 @@ final class Browser {
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
+    /// The items the listed types may have as a parent, held for the types and what the library holds.
+    @ObservationIgnored var parentMemo: (key: ParentKey, options: [SearchOffers.Option])?
+    /// The search's offers for the last key they were worked out for (`searchOffers`).
+    @ObservationIgnored var offerMemo: (key: OfferKey, offers: [SearchOffer])?
     @ObservationIgnored var tableMemo: (key: TableKey, content: ItemTableContent)?
     /// The last table of each large place, shown while its next is arranged off the main actor (`Browser+PlaceContent`).
     @ObservationIgnored var heldTables: PlaceMemory<(key: TableKey, content: ItemTableContent)> = [:]
@@ -213,9 +217,9 @@ final class Browser {
     /// layout's own start (`ordersByRelevance`). It is forgotten when the search ends, so the next one starts again
     /// and the person's own sort, which relevance never touches, is the order once more.
     var relevanceChoice: Bool?
-    /// Whether the search covers only the place shown rather than everything. It applies wherever the place can be
-    /// searched alone (`SearchScope.narrows`) and means everything elsewhere.
-    var searchesPlace = false
+    /// What the search's tokens filter by, joined by AND beside the place's own filters (`Browser+Search`). Like the
+    /// text, they belong to the field and are never saved; a change of place clears both.
+    var searchTokens: [FilterClause] = []
     /// Where the keyboard should go next, asked for by an action such as New Item or Search Items. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
@@ -396,9 +400,8 @@ final class Browser {
         defer { isMovingThroughHistory = false }
         isCollectionItemPresented = false
         modalItem = nil
-        if isSearching || !entry.place.isSame(showing) {
-            searchText = ""
-            isSearchExpanded = false
+        if isSearching || hasSearchTokens || !entry.place.isSame(showing) {
+            clearSearch()
             showing = entry.place.savedView.map { PlaceView.saved($0, in: library) } ?? entry.place
         }
         if !items(in: library).contains(where: { $0.id == entry.id }) { showing = .library }
@@ -461,6 +464,8 @@ final class Browser {
         arranging?.task.cancel()
         arranging = nil
         indexRowsMemo = nil
+        offerMemo = nil
+        parentMemo = nil
         sectionsMemo = nil
         viewModesMemo = nil
         fieldsMemo = nil
@@ -496,9 +501,7 @@ final class Browser {
         sidebarTab = nil
         sidebarMemory.forget()
         listMemory.forget()
-        searchText = ""
-        searchesPlace = false
-        isSearchExpanded = false
+        clearSearch()
         palette = nil
         fetchedFile = nil
         giveUpNewItem(because: .windowLeft)

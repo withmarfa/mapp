@@ -26,7 +26,7 @@ nonisolated extension ViewDraft {
     private static func filterField(of target: FilterTarget) -> FilterField? {
         switch target.kind {
         case .type: .system(.type)
-        case .source: .system(.source)
+        case .source: target.isTier ? .system(.tier) : .system(.source)
         case .parent: .edge(type: MarfaMapping.parentEdge, direction: .backref)
         case .collection: .edge(type: MarfaMapping.collectionEdge, direction: .outbound)
         case .tags: .tags
@@ -511,14 +511,16 @@ nonisolated extension ViewDraft {
 
     /// The query with the window's filters added to a place's own (a new view). A Type filter makes the saved query's types the
     /// window's chosen types, replacing the place's own type terms and types. Marfa takes a type with its subtypes,
-    /// so a chosen type that has any stays a filter, as the exact-type condition the window applied.
+    /// so a chosen type that has any stays a filter, as the exact-type condition the window applied. Where `replacingTypes`
+    /// is false the query's types stay and a Type filter is only a condition beside them, which a search needs.
     static func adding(
-        _ state: FilterState, to query: LibraryViewQuery, targets: [String: FilterTarget], catalogue: Catalogue, calendar: Calendar = .current
+        _ state: FilterState, to query: LibraryViewQuery, targets: [String: FilterTarget], catalogue: Catalogue, calendar: Calendar = .current,
+        replacingTypes: Bool = true
     ) -> (query: LibraryViewQuery, unkept: [Unkept]) {
         var query = query
         var clauses = state.savable.clauses
         let matchesAny = state.savable.matchesAny
-        if let index = clauses.firstIndex(where: { $0.field == typeFieldID && $0.op == .is }), targets[typeFieldID] != nil {
+        if replacingTypes, let index = clauses.firstIndex(where: { $0.field == typeFieldID && $0.op == .is }), targets[typeFieldID] != nil {
             let chosen = Set(clauses[index].values).subtracting([""])
             if chosen.isEmpty {
                 clauses.remove(at: index)

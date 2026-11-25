@@ -38,7 +38,7 @@ struct ItemBoard: View {
                     board(shown, key: lanes.key, grouped: grouped, contents: contents)
                 }
             } else if items.isEmpty {
-                if browser.isSearching { SearchEmptyState(browser: browser) }
+                if browser.narrowsBySearch { SearchEmptyState(browser: browser) }
                 else { PlaceEmptyState(browser: browser) }
             }
         }

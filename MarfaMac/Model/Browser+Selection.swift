@@ -8,8 +8,7 @@ extension Browser {
         defer { interval.end() }
         isCollectionItemPresented = false
         modalItem = nil
-        searchText = ""
-        isSearchExpanded = false
+        clearSearch()
         // A saved view is shown at its home, wherever it was asked for.
         showing = item.savedView.map { PlaceView.saved($0, in: library) } ?? item
         fallBackToListIfUnavailable(in: library)

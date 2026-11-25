@@ -17,26 +17,16 @@ extension SearchExcerpt {
     }
 }
 
-/// What sits above the results while the window searches: where to look, where there is more than one choice, and a
-/// plain line for whatever makes the results less than all there is. It draws nothing when it has nothing to say.
+/// What sits above the results while the window searches: a plain line for whatever makes the results less than all
+/// there is. It draws nothing when it has nothing to say.
 struct SearchStatusBar: View {
     @CurrentLibrary private var library
-    @Bindable var browser: Browser
+    let browser: Browser
 
     var body: some View {
         let results = browser.searchResults(in: library)
-        let offersScope = SearchScope.narrows(browser.shown)
-        if offersScope || results?.isIncomplete == true || results?.cappedCount != nil {
+        if results?.isIncomplete == true || results?.cappedCount != nil {
             VStack(alignment: .leading, spacing: 6) {
-                if offersScope {
-                    Picker("Search Scope", selection: $browser.searchesPlace) {
-                        Text("Everywhere").tag(false)
-                        Text(verbatim: library.name(of: browser.shown)).tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .accessibilityIdentifier("SearchScope")
-                }
                 if results?.isIncomplete == true {
                     Text("Still loading your items, so these results may be incomplete.")
                         .accessibilityIdentifier("SearchIncomplete")
@@ -56,7 +46,7 @@ struct SearchStatusBar: View {
 }
 
 extension View {
-    /// The search's scope and notices above the content, while the window searches.
+    /// The search's notices above the content, while the window searches.
     func searchStatus(_ browser: Browser) -> some View {
         safeAreaBar(edge: .top, spacing: 0) {
             if browser.isSearching { SearchStatusBar(browser: browser) }
@@ -77,7 +67,12 @@ struct SearchEmptyState: View {
         } else if results?.isIncomplete == true {
             EmptyState("Still Looking", detail: "Your items are still loading.")
         } else {
-            EmptyState.search()
+            EmptyState(title: Text("No Results"), detail: Text("Nothing matches your search.")) {
+                Button("Clear Search") { browser.clearSearch() }
+                    .appButton(.secondary)
+                    .padding(.top, 6)
+                    .accessibilityIdentifier("EmptyStateClearSearch")
+            }
         }
     }
 }

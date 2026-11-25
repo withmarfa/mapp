@@ -116,7 +116,7 @@ Search this page before you propose a look. Each line is a refused design, then 
 ## Palettes
 
 - **Actions floating above the bar, or morphing out of glass.** It takes the bar's place.
-- **A filter button in the command palette.** Only Search Items has one, neutral.
+- **A filter button in the command palette.** Search Items' filters are tokens in its field.
 - **A taller palette for filters, rows of two heights, or large marks.** Keep one shape.
 - **A divider under the field, hard-cut rows, or filled keycaps.** Rows fade at the bar.
 - **Open and Actions as two capsules, or "Open at Match".** One capsule, and Open.

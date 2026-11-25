@@ -47,7 +47,8 @@ private struct TopRowOverList: ViewModifier {
                         Color.clear
                     } else {
                         TopRowTitleLine(
-                            browser: browser, content: row, showsViews: row.hasViews && isAway, opensPlaces: opensPlaces, isSmall: isSmall)
+                            browser: browser, content: row, showsViews: row.hasViews && isAway, opensPlaces: opensPlaces, isSmall: isSmall,
+                            isCovered: isBesidePage && browser.isSearchExpanded)
                             .padding(.leading, room.titleLead(base: isBesidePage ? TopRowMetrics.listLead : TopRowMetrics.lead))
                             .padding(.trailing, room.titleTrail)
                     }
