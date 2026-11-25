@@ -70,7 +70,7 @@ Use these words in names, strings and comments. A word with "Marfa" is the serve
 | Section, tab | App | A heading over sidebar rows, and a set of sections (`SidebarGroup`, `SidebarTab`) |
 | Shortcut | App | A sidebar row that acts and is never selected (`SidebarShortcut`), or a key (`ShortcutCommand`). Say which |
 | Chip | App | A word from a set, drawn small (`PageChip`) |
-| Type mark, tone | App | A type's icon in its color (`TypeMark`, `TypeTone`) |
+| Type mark, tone | App | A type's icon in its color (`TonedGlyph`, `TypeTile`, `TypeTone`) |
 | Toast | App | The short message with Undo (`ToastView`) |
 | Keycap | App | A key drawn by the app (`KeyCap`) |
 | Settings window | App | The window that holds the app's settings and the Marfa's (`SettingsWindowView`) |

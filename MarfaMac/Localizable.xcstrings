@@ -10021,6 +10021,9 @@
     "The title “%@” for “%@” couldn’t be saved. Open the item to change the title or discard your changes." : {
       "extractionState" : "manual"
     },
+    "The type you give an item." : {
+
+    },
     "The types and sources chosen and left out make more conditions than one search can hold." : {
 
     },
@@ -10589,6 +10592,9 @@
     "Timeline date" : {
 
     },
+    "Tinted" : {
+
+    },
     "Tinted Pill" : {
       "extractionState" : "manual"
     },
@@ -10712,6 +10718,9 @@
     "Type" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
+    },
+    "Type Chips" : {
+
     },
     "Type Description Not Kept" : {
 
