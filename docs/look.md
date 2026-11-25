@@ -60,7 +60,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 
 - **`StatusSymbol` is the one map from a status's group to a symbol and a tint.** The words stay the type's own, so an app's "Closed" still reads Closed. A word that no group claims draws as not started.
 - **A task's priority takes its color from its rank**, never from its word (`OptionTone.prioritySteps`). Any other option takes one from its word.
-- **A status in a list, table or card opens its panel on a click** (`StatusPanel`).
+- **Clicking an editable status chip opens its panel** (`StatusPanel`).
 - **An empty value is the gray word Empty**, never a plus button.
 - **A favorite is a yellow star.** The tag behind it is never shown as a tag.
 

@@ -26,7 +26,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 ## Two kinds of view
 
-- **A place's default view is the app's** (`PlaceDefaults`). Every change is kept as it is made, and Reset View puts the place back. Types, Collections and Sources have none.
+- **The app saves changes to a place's default view immediately** (`PlaceDefaults`). Reset View restores it. Types, Collections and Sources have none.
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest, such as layout and properties (`ViewMacSettings` in `ViewLayouts`).
 - **A change to a saved view is written as it is made** (`Browser+ViewWrites`), naming only the settings that changed.
 - **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits by setting (`PendingViewChanges`), through closing and quitting. A refused one goes to the clipboard in words.
@@ -41,6 +41,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
 - **Favorites has an ordinary From,** starting on Library; a person may choose All Items.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
+- **Earlier place settings fill unset keys once per Mac** (`EarlierPlace.readIn`).
 
 ## Layouts
 
@@ -52,10 +53,9 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse a drop: no single value is meant.
-- **A table's widths are stored only from a drag of a divider** (`keepWidths`), never from AppKit's layout, which changes by itself.
-- **A table's first column starts where the title does** (`ItemTable.margin`), **and a column takes its words' width** (`ItemTableFit`). The name takes the rest.
-- **Every date column reads one way** (`DateDisplay.Place.table`): an item's stamp is its time today, a field's date a day.
-
+- **Only divider drags save widths** (`keepWidths`).
+- **Item tables align with their titles.** Unset widths sample 120 rows (`ItemTableFit`). Name fills the remaining space until resized.
+- **Table timestamps show the time today with date words on** (`DateDisplay.Place.table`). Other dates use day labels.
 
 ## The View panel
 
@@ -104,6 +104,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 - **Library › Types, Collections, and Sources** (`PlaceIndex`) show places and search by name. They have no View button.
 - **Types nest kinds under their type.** Made By waits for the package's provenance; a type has no link to copy.
+- **Source kind** shows App for `oauth:` codes and Connector for `GET /plugins` sources (`SourceKind`).
 - **A table of more than 2,000 items is made off the main actor** (`Browser.arrange`), its last table showing meanwhile. A search's table is held apart.
 - **Trap:** a table's body must not read the choice, or choosing a row draws every row.
 - **A row's count is of what the place lists.** A file attached to an item shows on its page, so no list or count but search takes it. The Feed's row has none.

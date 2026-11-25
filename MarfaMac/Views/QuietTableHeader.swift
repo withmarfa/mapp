@@ -8,8 +8,7 @@ extension View {
     /// and sort by a click. SwiftUI cannot style the header the `NSTableView` behind a `Table` draws, so this gives the
     /// table a header view that draws every column's heading itself. The headings are drawn over the table's own
     /// background, or over `backdrop` where the table has none, so rows that scroll under them do not show through. The
-    /// same view keeps the table as wide as its page (see `Probe.fit`), or, for a table whose column widths a person
-    /// sets and keeps, leaves every width to the person's drags (`resizing`).
+    /// same view fits the table to its page, respecting any widths the person set (`Probe.fit`).
     func quietTableHeader(backdrop: NSColor = .windowBackgroundColor, resizing: ColumnResizing? = nil) -> some View {
         background(QuietTableHeader(backdrop: backdrop, resizing: resizing))
     }
@@ -160,8 +159,7 @@ private struct QuietTableHeader: NSViewRepresentable {
         /// sideways only where the minimums do not fit. A fit waits for the mouse to be up, so it does not undo a column
         /// a person is dragging, and happens again only when the width or the columns change.
         ///
-        /// A table that keeps its widths is never fitted, and what AppKit does with its columns is never stored (see
-        /// `ColumnResizing`).
+        /// An item table restores fixed widths and fits the unset Name column to the space left (`ColumnResizing`).
         private func fit(_ table: NSTableView, in scrollView: NSScrollView) {
             let safeRight = scrollView.safeAreaInsets.right
             if abs(scrollView.contentInsets.right - safeRight) > 0.5 { scrollView.contentInsets.right = safeRight }

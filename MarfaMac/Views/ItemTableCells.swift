@@ -13,8 +13,7 @@ extension View {
     }
 }
 
-/// One cell of the table. A value a person picks, such as a status or a priority, is a menu that changes it in place;
-/// anything else is shown as it reads, and edited on the item's page or in Details.
+/// One table cell. An editable status opens its value panel, and other choices use a menu.
 ///
 /// The library is handed in rather than read from the environment: the table lays out its cells in views of its own,
 /// which do not always have the window's environment yet.
@@ -308,7 +307,7 @@ struct ItemTableCell: View {
         }
     }
 
-    /// A value from a fixed set: a menu of the others where it can be changed, the value alone where it cannot.
+    /// Editable values use the status panel or a menu. Read-only values use a chip.
     @ViewBuilder private func picked(_ field: ItemTypeInfo.Field, current: String?, editable: Bool) -> some View {
         if editable, column.style(for: field) == .status {
             statusButton(field, current: current)
