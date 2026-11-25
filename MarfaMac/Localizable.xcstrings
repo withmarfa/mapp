@@ -5221,6 +5221,7 @@
     "The app couldn’t renew its sign-in because the server redirected the request. Check the server address in Settings, then try again. If this keeps happening, sign in again." : {},
     "The app couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again." : {},
     "The app couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again." : {},
+    "The app couldn’t save the new item on this Mac before sending it, so nothing was added. What you typed is still there. Try again." : {},
     "The app couldn’t send this change." : {
       "extractionState" : "manual"
     },
@@ -6094,6 +6095,7 @@
     "Update From the Command Line" : {},
     "Update and Maintain" : {},
     "Update to %@" : {},
+    "Updated" : {},
     "Updated %@" : {},
     "Updated %@ to %@." : {
       "localizations" : {

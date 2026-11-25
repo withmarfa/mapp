@@ -36,26 +36,25 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ### The line
 
-- **Keys:** Tab moves the kind, `#` a tag, `@` a parent, `/` a property. Before typing, each row offers the most recent.
-- **Add (↩) keeps the line open with the same kind,** with an Undo. ⌘↩ adds and opens; ⇧↩ moves the draft to the text form.
-- **What the line reads becomes a chip after the title,** in typing order (`QuickAdd.lineChips`). Delete before the title or on a chip puts the words back as text (`QuickAdd.Draft.putBack`). Emptying the title drops them.
-- **A tag is `#` and a letter at a word's start** (`NewItemText.takeTags`). `Issue #12` and reserved tags stay text.
-- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), in the person's locale: `27/11` or `Fri 27 Nov` in Britain. It is read once a word follows it, or at Add.
+- **Keys:** Tab moves the kind, `#` a tag, `@` a parent, `/` a property. Rows offer the most recent first.
+- **Add (↩) keeps the line open with the same kind,** with an Undo. ⌘↩ adds and opens; ⇧↩ opens the text form.
+- **Words stay in the title until Add or ⇧↩,** which take out what was read (`QuickAdd.finishLine`). Chips show what is read (`QuickAdd.lineChips`); the board draws words leaving.
+- **Delete on a chip stops it being read** (`QuickAdd.Draft.decline`). An offer chosen for a typed word keeps the word (`QuickAdd.Mark`).
+- **A tag is `#` and a letter at a word's start** (`NewItemText.tags`). Favorite, reserved tags and `Issue #12` are never read; Return alone never swaps them for another tag.
+- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), in the person's locale: `27/11` or `Fri 27 Nov` in Britain.
 - **A web address pasted into an empty line makes a bookmark** (`QuickAdd.bookmarkKind`).
-- **A kind change sets aside values it cannot hold** (`QuickAdd.tellSetAside`).
+- **A kind change keeps the title and sets aside values it cannot hold** (`QuickAdd.tellSetAside`).
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps each new item typed and not added, through a closed window, a quit and a refused write. A slot is `Slot.line` or `Slot.inPlace(_:)`; a library is its instance (`serverKey`).
+`NewItemDrafts` keeps each new item not added through a closed window, a quit and a refusal. A slot is `Slot.line` or `Slot.inPlace(_:)`; a library is its instance (`serverKey`). New Item waits for it (`QuickAdd.isAvailable`).
 
 | Call | Does |
 | --- | --- |
-| `make(_:_:in:)`, `take(_:in:)` | Start or claim a draft. Two holders never share one |
-| `update(_:_:)`, `escape(_:)` | Keep what was typed, and drop a draft that is empty |
-| `sending(_:as:)`, `settle(in:)` | Keep the item's ID first; hide the draft until Marfa accepts or refuses it for good (`takeReturned(_:in:)`) |
+| `make(_:_:in:)`, `take(_:in:)` | Start or claim a draft, never shared |
+| `update(_:_:)`, `escape(_:)` | Keep what was typed; drop an empty draft |
+| `sending(_:as:)`, `settle(in:)` | Write the item's ID first, or make nothing. Hide the draft until Marfa accepts or refuses it (`ItemLibrary.refusedCreates`), even after its row shows |
 | `release(_:)`, `drop(_:)` | The holder went, or the person cleared it |
-
-A kept file no longer on disk is named when its draft comes back.
 
 ## Changing type
 
