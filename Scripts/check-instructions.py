@@ -63,6 +63,7 @@ BUDGETS = {  # words
     "docs/agreed.md": 4500,
     "docs/commands.md": 1200,
     "docs/concepts.md": 2600,
+    "docs/dropping.md": 400,
     "docs/editing.md": 900,
     "docs/item-page.md": 1600,
     "docs/lists.md": 1400,
