@@ -252,14 +252,13 @@ private struct TopRowTableProbe: NSViewRepresentable {
             self.table = table
             safeSides = nil
             // The split view moves its columns, and a sidebar over this one changes its safe area, with no layout of this view.
-            observers.append(NotificationCenter.default.addObserver(
-                forName: NSSplitView.didResizeSubviewsNotification, object: nil, queue: .main
-            ) { [weak self] note in
-                MainActor.assumeIsolated {
-                    guard let self, let split = note.object as? NSSplitView, split.window === self.window else { return }
-                    self.refresh()
-                }
-            })
+            var ancestor: NSView? = scroll.superview
+            while let view = ancestor, !(view is NSSplitView) { ancestor = view.superview }
+            if let split = ancestor {
+                observers.append(NotificationCenter.default.addObserver(
+                    forName: NSSplitView.didResizeSubviewsNotification, object: split, queue: .main
+                ) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } })
+            }
             scroll.contentView.postsBoundsChangedNotifications = true
             observers.append(NotificationCenter.default.addObserver(
                 forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main
