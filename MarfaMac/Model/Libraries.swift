@@ -364,7 +364,8 @@ import MarfaTesting
                     return SampleLibrary.open(connection, galleryFiles: files)
                 },
                 describer: { _ in SampleLibrary.name },
-                historian: { _, _ in nil }, configurer: { _, _ in nil })
+                historian: { _, _ in nil }, configurer: { _, _ in nil },
+                sourceNamer: { _, _ in SampleCastell.requested == nil ? nil : SampleCastell.sourceNames })
             host.presetTestServer(sample)
             return Libraries(host: host, defaults: defaults, restorePoints: points, defaultsDomain: suite)
         }

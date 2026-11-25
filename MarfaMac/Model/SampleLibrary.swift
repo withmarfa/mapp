@@ -58,12 +58,13 @@ nonisolated enum SampleLibrary {
         galleryFiles: [SampleGallery.File] = []
     ) -> MarfaSource {
         let gallery = given == nil && !galleryFiles.isEmpty
+        let castell = given == nil ? SampleCastell.requested.map { SampleCastell.world($0, now: now) } : nil
         let fake = WorkingCopy.fake(
-            items: given ?? (items(now: now, tasksAndEvents: withCollections) + (gallery ? SampleGallery.rows(now: now, files: galleryFiles) : [])),
+            items: given ?? castell?.items ?? (items(now: now, tasksAndEvents: withCollections) + (gallery ? SampleGallery.rows(now: now, files: galleryFiles) : [])),
             edges: edges ?? (given == nil
-                ? memberships(now: now) + (withCollections ? taskLinks(now: now) : []) + SampleGallery.edges(now: now, files: galleryFiles)
+                ? castell?.edges ?? (memberships(now: now) + (withCollections ? taskLinks(now: now) : []) + SampleGallery.edges(now: now, files: galleryFiles))
                 : []),
-            itemTypes: itemTypes + (gallery ? SampleGallery.types : []),
+            itemTypes: castell == nil ? itemTypes + (gallery ? SampleGallery.types : []) : SampleCastell.itemTypes,
             edgeTypes: edgeTypes, views: views, displays: display)
         if gallery { SampleGallery.writeFiles(galleryFiles) }
         let server = SampleServer(copy: fake.copy)
