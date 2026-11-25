@@ -31,7 +31,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **The app saves changes to a place's default view immediately** (`PlaceDefaults`). Reset View restores it. Types, Collections and Sources have none.
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest, such as layout and properties (`ViewMacSettings` in `ViewLayouts`).
 - **Saved view changes are written as they happen** (`Browser+ViewWrites`). Writes name the changed settings and use the current row for Mac settings.
-- **A write that Marfa has not taken stays in the window.** Save View sends it again (`hasViewChanges`). Offline, it waits by setting (`PendingViewChanges`), through closing and quitting. A refused one goes to the clipboard in words.
+- **A write that Marfa has not taken stays in the window.** Save View resends it (`hasViewChanges`). Offline, it waits by setting (`PendingViewChanges`), through closing and quitting. A refused one goes to the clipboard in words.
 - **Revert View writes back each setting the window changed as it was at opening** (`openedView`), Marfa's whole. One changed elsewhere since stays, and the person is told.
 - **While a change waits, the window lists the view's query with its own filters, From and Archived Items** (`viewPreview`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
@@ -42,7 +42,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Starting points list what Marfa saves** (`NewViewStart`). This Search comes first while searching and saves supported tokens and From unless From changed. An existing view opens after confirmation if the draft changed.
 - **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
-- **Favorites starts on Library** and offers the usual From choices, including All Items.
+- **Favorites starts on Library,** with the usual From choices.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
 - **Earlier place settings fill unset keys once per Mac** (`EarlierPlace.readIn`).
 
@@ -52,6 +52,8 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Unarchive and Delete stand on an Archive row under the pointer** (`RowQuickActions`).
 - **Layouts draw the supplied items** (`ItemViewMode`).
 - **One row menu, one density and one drag serve every layout.**
+- **Several chosen items show a capsule of item commands** (`SelectionCapsule`), under a pile beside a list (`SelectionPile`).
+- **The count and Escape clear the choice;** ⌘⌫ deletes only the chosen items the layout shows (`deletesChosen`).
 - **An item's date is its own type's** (`ItemPlacement`), so a place of several types puts each where it belongs. The view can point at one field.
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
@@ -59,12 +61,6 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Only divider drags save widths** (`keepWidths`).
 - **Item table text starts where the title does** (`TopRowMetrics.collectionLead`). Unset widths sample 120 rows (`ItemTableFit`). Name fills the remaining space until resized.
 - **Table timestamps show the time today with date words on** (`DateDisplay.Place.table`). Other dates use day labels.
-
-## Several items chosen
-
-- **Several selected items show a capsule at the foot** (`SelectionCapsule`), beneath a pile beside a list (`SelectionPile`). Keep leads for Feed items. More offers Move to Feed.
-- **The capsule uses the item commands.** In narrow columns, Add Tag, Add to Collection and Change Type move into More. Toasts and the corner sit above it.
-- **The count and Escape clear the selection.** ⌘⌫ deletes the selected items the layout shows (`deletesChosen`). Share and Copy Link require one item.
 
 ## The View panel
 
