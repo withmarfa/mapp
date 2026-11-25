@@ -23,11 +23,10 @@ struct NewViewTests {
         let library = FakeItemLibrary(items: tasks, now: date)
         library.views = views
         library.reachesServer = reachesServer
-        let undo = UndoManager()
-        undo.groupsByEvent = false
+        // No undo manager: a step registered outside a group of the test's own leaves the host hanging (`ViewPanelTests`).
         let browser = Browser()
         browser.defaults = ThrowawayDefaults.make("MarfaMac.NewViewTests")
-        browser.adopt(library, undoManager: undo)
+        browser.adopt(library)
         browser.showing = place
         browser.viewMode = .table
         return (browser, library)
