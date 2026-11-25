@@ -6,7 +6,7 @@ The Swift side of the item editor. The page is in `editor/`; read `editor/AGENTS
 
 - **Use AppKit's `WKWebView` in an `NSViewRepresentable`,** because SwiftUI's `WebView` lacks printing, menu filtering, Undo routing, dropped files and focus.
 - **A private WebKit setting is allowed only when** Apple's own `WebView` uses it, WebKit responds to its selector, and the page works without it (`WebViewChrome.swift`).
-- **Trap:** the system's scroll edge never reaches the page and the toolbar draws no background, so the app draws its own band (`ToolbarBand`, `bandsToolbar()`, `bandsFoot`). No view in this window may rely on the system's edge.
+- **Trap:** the system's scroll edge never reaches the page and the toolbar draws no background, so the app draws its own band (`ToolbarBand`, `bandsFoot`). No view in this window may rely on the system's edge.
 - **Keep the bridge's decoding hand-written.** `MarfaMacTests/EditorBridgeTests.swift` checks it against `editor/bridge-messages.json`.
 - **A script error the page reports is logged,** never shown as the notice's words (`EditorController.tellPageFault`).
 - **The navigation delegate allows only the page itself and `marfa-embed:`** (`EditorController+Navigation.swift`). Keep every other navigation canceled.

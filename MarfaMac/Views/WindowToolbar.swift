@@ -269,8 +269,6 @@ struct ItemToolbarActions {
         return item
     }
 
-    var hasScrollingHeader: Bool { itemWithScrollingHeader != nil || isFocused }
-
     /// Whether that item's page has scrolled its header away, whatever the title says: an item with no title still
     /// brings its toolbar item, with no text.
     var hasHeaderAway: Bool { isFocused || itemWithScrollingHeader.map { details.isHeaderAway(of: $0.id) } == true }

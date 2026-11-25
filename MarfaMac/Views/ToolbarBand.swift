@@ -4,7 +4,8 @@ import SwiftUI
 /// manner of the system's hard scroll edge effect. The window hides its toolbar's background (`MarfaMacApp`), so the
 /// system's own edge never draws for a view in it; the app draws the band itself. It is absent while nothing is
 /// behind the toolbar and appears once something is. The page draws it from the web view's report
-/// (`EditorController.isContentUnderToolbar`), and the list, gallery, board and timeline through `bandsToolbar()`.
+/// (`EditorController.isContentUnderToolbar`), and the list, gallery, board and timeline from the top row's scroll
+/// (`TopRowFrame`).
 /// Show Toolbar Background When Scrolling (`InterfaceKey.showsPageToolbarBackground`) turns it off in all of them.
 /// The sidebar's foot draws the same band mirrored (`edge: .bottom`).
 struct ToolbarBand: View {
@@ -52,26 +53,7 @@ struct ToolbarBand: View {
 }
 
 extension View {
-    /// Gives a list or other scroll view the same toolbar edge as the page: a `ToolbarBand` over the toolbar once
-    /// the content has scrolled beneath it. The system's own edge for the scroll view is hidden, so only one draws.
-    /// Show Toolbar Background When Scrolling (`InterfaceKey.showsPageToolbarBackground`) turns the band off.
-    /// Attach it to the scroll view itself, so the scroll geometry it reads is that view's.
-    func bandsToolbar() -> some View {
-        modifier(BandsToolbar())
-    }
-
-    /// Reports whether this scroll view's content has scrolled beneath the toolbar, and hides the system's own top
-    /// edge for it, so the band the caller draws is the only one. Attach it to the scroll view itself.
-    func reportsContentUnderToolbar(_ isUnder: Binding<Bool>) -> some View {
-        // At rest the content starts exactly below the toolbar, which the scroll geometry reports as an inset.
-        onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 0.5 } action: { _, new in
-            isUnder.wrappedValue = new
-        }
-        .scrollEdgeEffectHidden(true, for: .top)
-    }
-
-    /// Draws the toolbar's band over the full width of this view once `isUnderToolbar`, for content that is narrower
-    /// than the column it scrolls in and reports through `reportsContentUnderToolbar`.
+    /// Draws the toolbar's band over the full width of this view once `isUnderToolbar`, for an index page's own scroll.
     func toolbarBand(isUnderToolbar: Bool) -> some View {
         overlay(alignment: .top) { ToolbarBandOverlay(isUnderToolbar: isUnderToolbar) }
     }
@@ -85,16 +67,6 @@ extension View {
     /// foot, so the first frame already draws the band or not as the last one did.
     func bandsFoot<Foot: View>(memory: ColumnMemory? = nil, @ViewBuilder _ foot: () -> Foot) -> some View {
         modifier(BandsFoot(foot: foot(), memory: memory))
-    }
-}
-
-private struct BandsToolbar: ViewModifier {
-    @State private var isUnderToolbar = false
-
-    func body(content: Content) -> some View {
-        content
-            .reportsContentUnderToolbar($isUnderToolbar)
-            .toolbarBand(isUnderToolbar: isUnderToolbar)
     }
 }
 
