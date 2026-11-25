@@ -90,32 +90,32 @@ nonisolated enum SampleCastell {
             fields: [
                 TypeField(name: "body", type: "string", declaredBy: Kind.highlight),
                 TypeField(name: "title", type: "string", declaredBy: Kind.highlight),
-            ], titleField: "title", bodyField: "body"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:highlighter"),
         ItemType(
             id: Kind.article, label: "Article", description: "Something written to read.",
             fields: [
                 TypeField(name: "title", type: "string", declaredBy: Kind.article),
                 TypeField(name: "url", type: "string", declaredBy: Kind.article),
                 TypeField(name: "body", type: "string", declaredBy: Kind.article),
-            ], titleField: "title", bodyField: "body"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:newspaper"),
         ItemType(
             id: Kind.book, label: "Book", description: "A book.",
             fields: [
                 TypeField(name: "title", type: "string", declaredBy: Kind.book),
                 TypeField(name: "body", type: "string", declaredBy: Kind.book),
-            ], titleField: "title", bodyField: "body"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:book-open"),
         ItemType(
             id: Kind.message, label: "Message", description: "A message from someone.",
             fields: [
                 TypeField(name: "title", type: "string", declaredBy: Kind.message),
                 TypeField(name: "body", type: "string", declaredBy: Kind.message),
-            ], titleField: "title", bodyField: "body"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:message-square"),
         ItemType(
             id: Kind.place, label: "Place", description: "Somewhere you go.",
             fields: [
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.entity"),
                 TypeField(name: "address", type: "string", declaredBy: Kind.place),
-            ], titleField: "title"),
+            ], titleField: "title", icon: "lucide:map-pin"),
         ItemType(
             id: Kind.issue, label: "GitHub Issue", description: "An issue on GitHub.",
             fields: [
@@ -126,7 +126,7 @@ nonisolated enum SampleCastell {
                     definition: ["status_values": [
                         ["value": "open", "group": "in_progress"], ["value": "closed", "group": "completed"],
                     ]]),
-            ], titleField: "title", bodyField: "body"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:terminal"),
         ItemType(
             id: Kind.pullRequest, label: "GitHub Pull Request", description: "A pull request on GitHub.",
             fields: [
@@ -139,7 +139,7 @@ nonisolated enum SampleCastell {
                         ["value": "closed", "group": "canceled"],
                     ]]),
                 TypeField(name: "url", type: "string", declaredBy: Kind.pullRequest),
-            ], titleField: "title", bodyField: "body"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:terminal"),
     ]
 
     /// The catalogue's types for a Castell Studio library: the sample's own, the gallery's file, image and bookmark, and these.
