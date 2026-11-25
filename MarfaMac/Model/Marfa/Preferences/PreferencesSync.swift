@@ -364,6 +364,8 @@ final class PreferencesSync {
             record.winning = marked.isEmpty ? nil : marked
             record.save(defaults)
             answered = answered.filter { id, _ in record.marfas.values.contains { $0.awaiting[id] != nil } }
+            // What an earlier copy on another Mac kept for a place reaches this Mac only through the Marfa.
+            EarlierPlace.readIn(in: defaults, synced: record.marfas[instance]?.base ?? [:])
             standing = .syncing
         } catch is Moved {
             again = true

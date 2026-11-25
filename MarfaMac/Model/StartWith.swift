@@ -5,7 +5,7 @@ import Foundation
 /// which syncs through the Marfa (`PreferencesMap`); the place last used stays on this Mac.
 ///
 /// Earlier copies kept both under keys of their own (`earlierKey`, `earlierLastPlaceKey`), which they still read, so
-/// those are read in once (`EarlierPlace.readIn`) and never written.
+/// those are read in once (`EarlierPlace.readIn`) and never written. Only `earlierKey` synced.
 nonisolated enum StartWith: Hashable, Sendable, RawRepresentable {
     case leftOff
     /// A place, and the item chosen in it, which only one favorite of an earlier copy names.
@@ -80,10 +80,17 @@ nonisolated enum StartWith: Hashable, Sendable, RawRepresentable {
         }
     }
 
-    /// Copies what an earlier copy kept to the new keys, where they hold nothing (`EarlierPlace.readIn`).
-    static func readIn(in defaults: UserDefaults) {
-        for (earlier, new) in [(earlierKey, key), (earlierLastPlaceKey, lastPlaceKey)] where defaults.string(forKey: new) == nil {
-            if let start = defaults.string(forKey: earlier).flatMap(Self.init(earlier:)) { defaults.set(start.rawValue, forKey: new) }
+    /// Copies what an earlier copy kept to the new keys, where they hold nothing (`EarlierPlace.readIn`): what it kept on
+    /// this Mac, else the Opening another Mac's earlier copy synced (`synced`). Each is copied once (`done`).
+    @MainActor static func readIn(in defaults: UserDefaults, synced: PreferenceUnits, done: inout Set<String>) {
+        let syncedStart = synced[.member(.general, earlierKey)].flatMap { PreferenceJSON.value($0) as? String }
+        let earlier = [
+            (key, defaults.string(forKey: earlierKey) ?? syncedStart), (lastPlaceKey, defaults.string(forKey: earlierLastPlaceKey)),
+        ]
+        for (new, text) in earlier where !done.contains(new) {
+            guard let start = text.flatMap(Self.init(earlier:)) else { continue }
+            done.insert(new)
+            if defaults.string(forKey: new) == nil { defaults.set(start.rawValue, forKey: new) }
         }
     }
 }

@@ -398,9 +398,9 @@ enum ItemTableColumnLayouts {
 
     /// Copies the columns earlier copies kept for each place to the new keys (`EarlierPlace.readIn`). Data that cannot
     /// be read is left as it is.
-    static func readIn(in defaults: UserDefaults) {
+    static func readIn(in defaults: UserDefaults, done: inout Set<String>) {
         guard let stored = defaults.data(forKey: key), let layouts = layouts(in: stored) else { return }
-        let carried = EarlierPlace.carried(layouts) { held, earlier in held == .init() ? earlier : held }
+        let carried = EarlierPlace.carried(layouts, setting: "columns", done: &done) { held, earlier in held == .init() ? earlier : held }
         guard carried != layouts, let data = try? JSONEncoder().encode(carried) else { return }
         defaults.set(data, forKey: key)
     }
