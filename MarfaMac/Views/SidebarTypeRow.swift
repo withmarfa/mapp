@@ -1,13 +1,12 @@
 import SwiftUI
 
 /// A sidebar row's mark and name, laid out as the system lays out its own sidebar labels. A place's mark is a
-/// symbol in the system's grey, or in its `tone` where it has one, as a view's does with no tile; a type's is its
-/// colored `TonedGlyph`. Without a mark it is the name alone.
+/// symbol in the system's gray; a type's is its colored `TonedGlyph`, or the same glyph in gray for a collection
+/// (`grayType`). Without a mark it is the name alone.
 struct SidebarLabel: View {
-    @Environment(\.colorScheme) private var scheme
     let title: String
     let icon: RowIcon?
-    var tone: TypeTone?
+    var grayType = false
 
     var body: some View {
         if let icon {
@@ -16,8 +15,10 @@ struct SidebarLabel: View {
             } icon: {
                 switch icon {
                 case .symbol(let symbol):
-                    Image(systemName: symbol).interfaceFont(.body)
-                        .foregroundStyle(tone.map { AnyShapeStyle($0.color(for: scheme)) } ?? AnyShapeStyle(.secondary))
+                    Image(systemName: symbol).interfaceFont(.body).foregroundStyle(.secondary)
+                case .type(let id) where grayType:
+                    Image(typeGlyph: id).resizable().scaledToFit().foregroundStyle(.secondary)
+                        .frame(width: ChipLooks.defaults.chipMarkSize, height: ChipLooks.defaults.chipMarkSize)
                 case .type(let id): TonedGlyph(id: id)
                 }
             }
@@ -35,7 +36,8 @@ struct SidebarLabel: View {
 }
 
 /// A row of the Types section: the type's mark and name, a count at the trailing edge in line with the system's own,
-/// and, where the row folds subtypes under it, a chevron.
+/// and, where the row folds kinds under it, a chevron. Under the pointer a plus takes the count's place, which makes an
+/// item of the type; the chevron and everything else stay where they are.
 ///
 /// Only a parent type's row has a mark by default; its subtypes, such as Sessions and Logs under Agent, have none.
 ///
@@ -51,7 +53,12 @@ struct SidebarTypeRow: View {
     /// The guide columns before the row's own content, outermost first.
     let steps: [Step]
     let showsIcon: Bool
+    /// Makes an item of the type, where the person can; nil leaves the count under the pointer.
+    var add: (() -> Void)?
+    /// What the plus makes, as its help says: "New Note".
+    var addName = ""
     let toggle: () -> Void
+    @State private var isHovering = false
 
     /// The padding above and below the content. The list's own row inset is set to zero (`listRowInsets`) so the
     /// guide runs unbroken from one row to the next, and this puts the space back inside the row.
@@ -66,6 +73,10 @@ struct SidebarTypeRow: View {
             content.padding(.vertical, Self.verticalInset).padding(.trailing, Self.countInset)
         }
         .frame(maxHeight: .infinity)
+        .onHover { isHovering = $0 }
+        .accessibilityActions {
+            if let add { Button(addName, action: add) }
+        }
         .overlay(alignment: .trailing) {
             if row.isExpandable {
                 HStack(spacing: 0) {
@@ -91,7 +102,13 @@ struct SidebarTypeRow: View {
             label
             Spacer(minLength: 8)
             if row.isExpandable { disclosure.hidden().accessibilityHidden(true) }
-            SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
+            ZStack(alignment: .trailing) {
+                SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
+                    .opacity(isHovering && add != nil ? 0 : 1)
+                if isHovering, let add {
+                    SidebarPlus(name: addName, add: add).padding(.trailing, -4)
+                }
+            }
         }
         .accessibilityElement(children: .combine)
     }

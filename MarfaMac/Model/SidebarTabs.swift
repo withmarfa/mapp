@@ -21,11 +21,12 @@ nonisolated enum SidebarShortcut: Hashable, Sendable {
     case settings
     /// Opens New Item in the type with this identifier.
     case create(String)
-    /// Opens the place with this key (`SidebarPlace.key`): a view, a type or a collection.
+    /// Opens the place with this key (`SidebarPlace.key`), as an earlier copy offered. It is read and kept, and no
+    /// longer offered, since Pinned holds places.
     case go(String)
 
     /// What a new library's first shortcuts are: none makes an item of a type the person made.
-    static let defaults: [SidebarShortcut] = [.new, .search]
+    static let defaults: [SidebarShortcut] = [.search, .new]
 
     var key: String {
         switch self {
@@ -65,11 +66,12 @@ extension SidebarShortcut: Codable {
     }
 }
 
-/// A section of a tab: a heading over rows. Library, Views and Types are the sections every sidebar starts with,
-/// Shortcuts is the block of rows that act, and a person's own sections (`custom`) hold views, collections and
-/// sources. A section is never lost: hiding a built-in one keeps it, so Add Section can bring it back.
+/// A section of a tab. Search and New (`shortcuts`, the Commands) and the Library and the Feed (`places`) are the two
+/// zones without a heading; Pinned and Types are the sections every sidebar starts with; a person's own sections
+/// (`custom`) hold views, collections, sources and items. A section is never lost: hiding a built-in one keeps it, so
+/// the Section place in Customize Sidebar can bring it back.
 nonisolated struct SidebarGroup: Codable, Equatable, Identifiable, Sendable {
-    enum Kind: String, Codable, Sendable { case shortcuts, library, views, types, custom }
+    enum Kind: String, Codable, Sendable { case shortcuts, places, pinned, types, custom }
 
     var id: String
     var kind: Kind
@@ -81,30 +83,46 @@ nonisolated struct SidebarGroup: Codable, Equatable, Identifiable, Sendable {
     /// What a shortcuts block holds, in order.
     var shortcuts: [SidebarShortcut] = []
 
-    /// The sections of a sidebar nobody has arranged, in order: what it showed before tabs and sections existed.
+    static let placesID = "places"
+    static let pinnedID = "pinned"
+
+    /// The sections of a sidebar nobody has arranged, in order.
     static func defaults(tab: String) -> [SidebarGroup] {
         [
             SidebarGroup(id: "shortcuts", kind: .shortcuts, tab: tab, shortcuts: SidebarShortcut.defaults),
-            SidebarGroup(id: "library", kind: .library, tab: tab),
-            SidebarGroup(id: "views", kind: .views, tab: tab),
+            SidebarGroup(id: placesID, kind: .places, tab: tab),
+            SidebarGroup(id: pinnedID, kind: .pinned, tab: tab),
             SidebarGroup(id: "types", kind: .types, tab: tab),
         ]
     }
 
-    /// What the heading says when the person has not renamed the section. The shortcuts block has no heading.
+    /// What the heading says when the person has not renamed the section. The two zones have no heading.
     var name: String {
         if let title, !title.isEmpty { return title }
         return switch kind {
-        case .shortcuts: String(localized: "Shortcuts")
-        case .library: String(localized: "Library")
-        case .views: String(localized: "Views")
+        case .shortcuts: String(localized: "Commands")
+        case .places: String(localized: "Library")
+        case .pinned: String(localized: "Pinned")
         case .types: String(localized: "Types")
         case .custom: String(localized: "Section")
         }
     }
 
-    /// Whether the person can hold views, collections and sources in it by hand. The types section lists types only.
+    /// Whether the section draws a heading: every one but the two zones at the top.
+    var hasHeading: Bool { kind != .shortcuts && kind != .places }
+
+    /// Whether the person can put places in it. The types section lists types only, and Commands only commands.
     var holdsPlaces: Bool { kind != .types && kind != .shortcuts }
+
+    /// Whether `place` can be put in it: under the Library, the Library, the Feed and the Library's pages; in Pinned
+    /// and a person's own section, what a person pins.
+    func holds(_ place: SidebarPlace) -> Bool {
+        switch kind {
+        case .places: !place.isPinnable
+        case .pinned, .custom: place.isPinnable
+        case .shortcuts, .types: false
+        }
+    }
 }
 
 // MARK: Tabs and sections
@@ -193,10 +211,10 @@ nonisolated extension SidebarLayout {
         for (slot, group) in zip(slots, inTab) { groups?[slot] = group }
     }
 
-    /// Whether the sidebar hides a section: the section itself is hidden, or, for the types section, an older layout
-    /// hid it as a place (Show Types in an earlier Settings), which `SidebarPlan` reads too.
+    /// Whether the sidebar hides a section: the section itself is hidden, or, for the types section, an earlier copy
+    /// hid it as a place (Show Types in an earlier Settings).
     func hides(_ group: SidebarGroup) -> Bool {
-        group.isHidden || (group.kind == .types && isHidden(.types))
+        group.isHidden || (group.kind == .types && hidden.contains(Self.typesSectionKey))
     }
 
     /// Moves a section to the end of another tab. Nothing happens for a tab that does not exist.
@@ -211,13 +229,14 @@ nonisolated extension SidebarLayout {
 
     /// Names a section; an empty name returns it to the kind's own.
     mutating func renameGroup(_ id: String, to name: String) {
-        guard let index = allGroups.firstIndex(where: { $0.id == id }), allGroups[index].kind != .shortcuts else { return }
+        guard let index = allGroups.firstIndex(where: { $0.id == id }), allGroups[index].hasHeading else { return }
         materialize()
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         groups?[index].title = name.isEmpty ? nil : name
     }
 
-    /// Hides a built-in section, which Add Section brings back, or takes a person's own away, with where its places were put.
+    /// Hides a built-in section, which the Section place brings back, or takes a person's own away, with where its
+    /// places were put.
     mutating func hideGroup(_ id: String) {
         guard let index = allGroups.firstIndex(where: { $0.id == id }) else { return }
         materialize()
@@ -243,7 +262,7 @@ nonisolated extension SidebarLayout {
         groups?.removeAll { $0.id == group.id }
         group.tab = tab
         group.isHidden = false
-        if group.kind == .types { setHidden(.types, false) }
+        if group.kind == .types { hidden.remove(Self.typesSectionKey) }
         groups?.append(group)
         return group.id
     }
@@ -283,30 +302,20 @@ nonisolated extension SidebarLayout {
 
     // MARK: Places
 
-    /// The section a place sits in: where the person put it, if that section is still there, otherwise its own. A
-    /// collection or a source has no section of its own.
+    /// The section a place sits in: where the person put it, if that section is still there and holds it, otherwise
+    /// its own. What an earlier copy's Library or Views section held by the person's hand is read under Pinned, where
+    /// Pinned holds it. A collection, a source, an item or a page of the Library has no section of its own.
     func home(of place: SidebarPlace) -> String? {
-        if let put = homes?[place.key], allGroups.contains(where: { $0.id == put && $0.holdsPlaces }) { return put }
-        let kind: SidebarGroup.Kind
+        if let put = homes?[place.key] {
+            if allGroups.contains(where: { $0.id == put && $0.holds(place) }) { return put }
+            if earlierGroupIDs.contains(put), place.isPinnable { return firstGroup(.pinned) }
+        }
         switch place {
-        case .library, .sources, .collections: kind = .library
-        case .feed, .favorites, .view, .item: kind = .views
+        case .library, .feed: return firstGroup(.places)
+        case .view: return firstGroup(.pinned)
         default: return nil
         }
-        return allGroups.first { $0.kind == kind }?.id
     }
 
-    // MARK: View colors
-
-    /// The color of a view's mark: the person's choice, or the view's own.
-    func color(of place: SidebarPlace) -> TypeTone {
-        colors?[place.key].flatMap(TypeTone.init(rawValue:)) ?? place.defaultTone ?? .gray
-    }
-
-    /// Keeps the color chosen for a view; nil returns it to the view's own.
-    mutating func setColor(_ tone: TypeTone?, of place: SidebarPlace) {
-        var all = colors ?? [:]
-        all[place.key] = tone?.rawValue
-        colors = all.isEmpty ? nil : all
-    }
+    private func firstGroup(_ kind: SidebarGroup.Kind) -> String? { allGroups.first { $0.kind == kind }?.id }
 }

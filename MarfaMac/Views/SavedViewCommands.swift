@@ -111,32 +111,6 @@ struct SavedViewMenu: View {
     }
 }
 
-/// The heading of the section that holds the saved views, with New View, which shows only while the pointer is over
-/// the heading, as the control of a sidebar's section heading does.
-struct ViewsHeading: View {
-    let title: String
-    let browser: Browser
-    @CurrentLibrary private var library
-    @State private var isHovering = false
-
-    var body: some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Button("New View", systemImage: "plus") { browser.openNewViewPanel(in: library) }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
-                .opacity(isHovering ? 1 : 0)
-                .disabled(!SavedViews.canSave(browser, in: library))
-                .help(SavedViews.canSave(browser, in: library) ? Text("Make a view of what this window shows") : Text("This place can’t be saved as a view"))
-                .accessibilityIdentifier("NewSavedView")
-        }
-        .padding(.trailing, 12)
-        .contentShape(.rect)
-        .onHover { isHovering = $0 }
-    }
-}
-
 extension View {
     /// Asks before deleting a view, opens each view with its own order, grouping and the layout and columns this Mac
     /// keeps for it, and gives the panel that edits one the right sidebar.

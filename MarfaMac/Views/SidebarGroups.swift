@@ -1,38 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: Data the sections are drawn from
-
-/// A place a section's Show list offers, shown or not.
-nonisolated struct SidebarShowChoice: Equatable, Identifiable {
-    let place: SidebarPlace
-    let title: String
-    let isShown: Bool
-
-    var id: String { place.key }
-}
-
-/// Something Add Shortcut or Add Section can name: its key (a place's, or a type's identifier) and its name.
-nonisolated struct SidebarPick: Equatable, Identifiable {
-    let key: String
-    let title: String
-
-    var id: String { key }
-}
-
-/// What the Add Shortcut and Add Section menus offer, worked out only while the sidebar is being customized.
-nonisolated struct SidebarChoices: Equatable {
-    var views: [SidebarPick] = []
-    var types: [SidebarPick] = []
-    /// Every collection and source, for a shortcut that goes to one.
-    var collections: [SidebarPick] = []
-    var sources: [SidebarPick] = []
-    /// The collections and sources with no row yet, for a new section to hold.
-    var unplacedCollections: [SidebarPick] = []
-    var unplacedSources: [SidebarPick] = []
-    /// The kinds a Create shortcut can make, by type identifier.
-    var creatable: [SidebarPick] = []
-}
+// MARK: Dragging
 
 /// A section as it is dragged by its handle, which is all a drop on another section's heading reads.
 nonisolated struct SidebarSectionDrag: Codable, Transferable {
@@ -60,75 +29,69 @@ struct SidebarHandle: View {
 
 // MARK: Headings
 
-/// A section's heading. Outside customizing it is the name alone, with New View on hover for the section that holds
-/// the saved views. While customizing it has the section's menu and a handle that drags the section.
+/// A section's heading. Under the pointer it shows Add, which offers what the section can hold, and More, the
+/// section's menu; while customizing it shows More and a handle that drags the section. Nothing in the heading moves.
 struct SidebarGroupHeader: View, Equatable {
     @Environment(Libraries.self) private var libraries
+    @State private var isHovering = false
     let section: SidebarSectionData
     let tabs: [SidebarTab]
     let tab: String
     let customizing: Bool
+    let offers: SidebarOffers
     let browser: Browser
     let isFirst: Bool
     let isLast: Bool
-    let ask: (SidebarNaming) -> Void
+    let actions: SidebarActions
 
     static func == (a: Self, b: Self) -> Bool {
-        a.section == b.section && a.tabs == b.tabs && a.tab == b.tab && a.customizing == b.customizing
+        a.section == b.section && a.tabs == b.tabs && a.tab == b.tab && a.customizing == b.customizing && a.offers == b.offers
             && a.isFirst == b.isFirst && a.isLast == b.isLast
     }
 
     var body: some View {
         let group = section.plan.group
-        if !customizing, group.kind == .views {
-            ViewsHeading(title: group.name, browser: browser)
-                .accessibilityIdentifier(Self.headingIdentifier(group))
-        } else {
-            HStack(spacing: 8) {
-                Text(group.name)
-                Spacer()
-                if customizing {
-                    menu
-                    SidebarHandle().draggable(SidebarSectionDrag(id: group.id))
-                }
+        HStack(spacing: 10) {
+            Text(group.name)
+            Spacer(minLength: 0)
+            if customizing {
+                more
+                SidebarHandle().draggable(SidebarSectionDrag(id: group.id))
+            } else {
+                add.opacity(isHovering ? 1 : 0)
+                more.opacity(isHovering ? 1 : 0)
             }
-            .padding(.trailing, 12)
-            .contentShape(.rect)
-            .dropDestination(for: SidebarSectionDrag.self) { drops, _ in
-                guard customizing, let drop = drops.first else { return false }
-                libraries.updateSidebarLayout { $0.moveGroup(drop.id, onto: group.id) }
-                return true
-            }
-            .accessibilityIdentifier(Self.headingIdentifier(group))
         }
+        .padding(.trailing, 12)
+        .contentShape(.rect)
+        .onHover { isHovering = $0 }
+        .dropDestination(for: SidebarSectionDrag.self) { drops, _ in
+            guard customizing, let drop = drops.first else { return false }
+            libraries.updateSidebarLayout { $0.moveGroup(drop.id, onto: group.id) }
+            return true
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(group.name))
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("SidebarHeading-\(group.id)")
     }
 
-    /// An identifier on the section is copied onto every row, so the section's name stays on the heading.
-    private static func headingIdentifier(_ group: SidebarGroup) -> String {
-        switch group.kind {
-        case .library: "SidebarLibraryGroup"
-        case .views: "SidebarViews"
-        case .types: "SidebarTypes"
-        case .custom: "SidebarGroup-\(group.id)"
-        case .shortcuts: "SidebarGroup-\(group.id)"
-        }
-    }
-
-    private var menu: some View {
+    private var add: some View {
         let group = section.plan.group
         return Menu {
-            if !section.choices.isEmpty {
-                Menu("Show") {
-                    ForEach(section.choices) { choice in
-                        Toggle(choice.title, isOn: Binding {
-                            choice.isShown
-                        } set: { shown in
-                            libraries.updateSidebarLayout { $0.setHidden(choice.place, !shown) }
-                        })
-                    }
-                }
-            }
-            Button("Rename…") { ask(.renameGroup(group.id, current: group.name)) }
+            SidebarOfferMenu(group: group.id, kind: group.kind, tab: tab, offers: offers, actions: actions)
+        } label: {
+            Image(systemName: "plus")
+        }
+        .headingButton()
+        .accessibilityLabel(Text("Add to \(group.name)"))
+        .accessibilityIdentifier("SidebarSectionAdd-\(group.id)")
+    }
+
+    private var more: some View {
+        let group = section.plan.group
+        return Menu {
+            Button("Rename…") { actions.ask(.renameGroup(group.id, current: group.name)) }
             Divider()
             Button("Move Up") { libraries.updateSidebarLayout { $0.moveGroup(group.id, by: -1) } }
                 .disabled(isFirst)
@@ -139,80 +102,96 @@ struct SidebarGroupHeader: View, Equatable {
                     Button(other.name) { libraries.updateSidebarLayout { $0.moveGroup(group.id, toTab: other.id) } }
                 }
                 if tabs.count > 1 { Divider() }
-                Button("New Tab…") { ask(.newTab(moving: group.id)) }
+                Button("New Tab") {
+                    var created: String?
+                    libraries.updateSidebarLayout { layout in
+                        created = layout.addTab(named: "")
+                        if let created { layout.moveGroup(group.id, toTab: created) }
+                    }
+                    if let created { browser.sidebarTab = created }
+                }
             }
             Divider()
             Button("Hide Section") { libraries.updateSidebarLayout { $0.hideGroup(group.id) } }
+            if !customizing {
+                Divider()
+                SidebarCustomizeButton(browser: browser)
+            }
         } label: {
             Image(systemName: "ellipsis")
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
+        .headingButton()
         .accessibilityLabel(Text("Section Options"))
         .accessibilityIdentifier("SidebarSectionMenu-\(group.id)")
     }
 }
 
-// MARK: Shortcuts
+private extension View {
+    /// A heading's Add or More: a borderless menu as small as its symbol.
+    func headingButton() -> some View {
+        menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+    }
+}
 
-/// The shortcuts block: rows that act or go somewhere, never taking the selection. While customizing each has a
-/// handle, a context menu that removes it, and the Add Shortcut row follows.
+// MARK: Commands
+
+/// Search, New and the other commands: rows that act or go somewhere, never taking the selection. Under the pointer
+/// Search and New show their shortcuts. While customizing each has a handle and a context menu that removes it, and the
+/// Command place follows.
 struct SidebarShortcutsSection: View, Equatable {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
+    @Environment(ShortcutBindings.self) private var bindings: ShortcutBindings?
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     let section: SidebarSectionData
     let tab: String
     let canCreate: Bool
     let customizing: Bool
     let addsShortcuts: Bool
-    let choices: SidebarChoices
+    let offers: SidebarOffers
+    let actions: SidebarActions
     let browser: Browser
     let order: ItemOrder
 
     /// The section's data and nothing else, so a change of selection does not run its body.
     static func == (a: Self, b: Self) -> Bool {
         a.section == b.section && a.tab == b.tab && a.canCreate == b.canCreate && a.customizing == b.customizing
-            && a.addsShortcuts == b.addsShortcuts && a.choices == b.choices && a.order == b.order
+            && a.addsShortcuts == b.addsShortcuts && a.offers == b.offers && a.order == b.order
     }
 
     var body: some View {
         Section {
             ForEach(section.shortcuts) { data in
-                row(data)
+                SidebarShortcutRow(
+                    data: data, keys: keys(for: data.shortcut), customizing: customizing,
+                    isEnabled: !customizing && !((data.shortcut == .new || isCreate(data.shortcut)) && !canCreate)
+                ) { perform(data) }
+                .contextMenu {
+                    Button("Remove from Sidebar") {
+                        libraries.updateSidebarLayout { $0.removeShortcut(data.shortcut, from: section.id) }
+                    }
+                    Divider()
+                    SidebarCustomizeButton(browser: browser)
+                }
             }
             .onMove { source, destination in
                 libraries.updateSidebarLayout { $0.moveShortcuts(in: section.id, fromOffsets: source, toOffset: destination) }
             }
             if customizing, addsShortcuts {
-                SidebarAddShortcutRow(tab: tab, present: Set(section.plan.group.shortcuts), choices: choices)
+                SidebarAddPlace(group: section.id, kind: .shortcuts, tab: tab, offers: offers, actions: actions)
             }
         }
     }
 
-    private func row(_ data: SidebarShortcutRowData) -> some View {
-        Button { perform(data) } label: {
-            // The label is only as wide as its words; the frame gives the click the whole row.
-            HStack {
-                SidebarLabel(title: data.title, icon: data.icon)
-                Spacer(minLength: 0)
-                if customizing { SidebarHandle() }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
+    /// What a row shows under the pointer: the shortcut of the command it runs, where it has one.
+    private func keys(for shortcut: SidebarShortcut) -> String? {
+        switch shortcut {
+        case .search: bindings?.display(for: .commandPalette)
+        case .new: bindings?.display(for: .newItem)
+        default: nil
         }
-        .buttonStyle(.plain)
-        .selectionDisabled()
-        .disabled(customizing || ((data.shortcut == .new || isCreate(data.shortcut)) && !canCreate))
-        .contextMenu {
-            Button("Remove Shortcut") {
-                libraries.updateSidebarLayout { $0.removeShortcut(data.shortcut, from: section.id) }
-            }
-            Divider()
-            SidebarCustomizeButton(browser: browser)
-        }
-        .accessibilityIdentifier(Self.identifier(of: data.shortcut))
     }
 
     private func isCreate(_ shortcut: SidebarShortcut) -> Bool {
@@ -223,249 +202,333 @@ struct SidebarShortcutsSection: View, Equatable {
         switch data.shortcut {
         case .new: browser.openQuickAdd(remembered: lastType, in: library)
         case .create(let type): browser.openQuickAdd(typeID: type, in: library)
-        case .search: browser.palette = .search
+        case .search: browser.palette = .commands
         case .settings: browser.showSettings()
         case .go:
             if let item = data.item { browser.show(item, in: library, order: order) }
         }
     }
-
-    private static func identifier(of shortcut: SidebarShortcut) -> String {
-        switch shortcut {
-        case .new: "SidebarNew"
-        case .search: "SidebarSearch"
-        default: "SidebarShortcut-" + shortcut.key
-        }
-    }
 }
 
-/// The row that adds a shortcut to the tab: New, Search or Settings where it is not there, a place to go to, or a
-/// kind of item to create.
-struct SidebarAddShortcutRow: View {
-    @Environment(Libraries.self) private var libraries
-    let tab: String
-    let present: Set<SidebarShortcut>
-    let choices: SidebarChoices
+/// One command's row. The label is only as wide as its words; the frame gives the click the whole row.
+private struct SidebarShortcutRow: View {
+    @State private var isHovering = false
+    let data: SidebarShortcutRowData
+    let keys: String?
+    let customizing: Bool
+    let isEnabled: Bool
+    let perform: () -> Void
 
     var body: some View {
-        Menu {
-            let fixed: [(SidebarShortcut, String)] = [
-                (.new, String(localized: "New")), (.search, String(localized: "Search")), (.settings, String(localized: "Settings")),
-            ]
-            ForEach(fixed.filter { !present.contains($0.0) }, id: \.0.key) { shortcut, title in
-                Button(title) { add(shortcut) }
-            }
-            Divider()
-            Menu("Go To") {
-                pickMenu("A View", choices.views) { .go($0) }
-                pickMenu("A Type", choices.types) { .go($0) }
-                pickMenu("A Collection", choices.collections) { .go($0) }
-                pickMenu("A Source", choices.sources) { .go($0) }
-            }
-            pickMenu("Create", choices.creatable) { .create($0) }
-        } label: {
-            SidebarLabel(title: String(localized: "Add Shortcut"), icon: .symbol("plus"))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(.rect)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .accessibilityIdentifier("SidebarAddShortcut")
-    }
-
-    private func pickMenu(_ title: LocalizedStringKey, _ picks: [SidebarPick], make: @escaping (String) -> SidebarShortcut) -> some View {
-        Menu(title) {
-            ForEach(picks) { pick in
-                let shortcut = make(pick.key)
-                Button(pick.title) { add(shortcut) }
-                    .disabled(present.contains(shortcut))
-            }
-        }
-        .disabled(picks.isEmpty)
-    }
-
-    private func add(_ shortcut: SidebarShortcut) {
-        libraries.updateSidebarLayout { $0.addShortcut(shortcut, toTab: tab) }
-    }
-}
-
-// MARK: Add Section
-
-/// The row that adds a section to the tab: a built-in one that was hidden, a new one, or a new one holding a
-/// collection or a source.
-struct SidebarAddSectionRow: View {
-    @Environment(Libraries.self) private var libraries
-    let tab: String
-    let hiddenKinds: [SidebarGroup.Kind]
-    let choices: SidebarChoices
-
-    var body: some View {
-        Menu {
-            ForEach(hiddenKinds, id: \.self) { kind in
-                Button(Self.title(of: kind)) { libraries.updateSidebarLayout { $0.addGroup(kind, toTab: tab) } }
-            }
-            Button("New Section") { libraries.updateSidebarLayout { $0.addGroup(.custom, toTab: tab) } }
-            Divider()
-            holding("A Collection", choices.unplacedCollections)
-            holding("A Source", choices.unplacedSources)
-        } label: {
-            SidebarLabel(title: String(localized: "Add Section"), icon: .symbol("plus"))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(.rect)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .accessibilityIdentifier("SidebarAddSection")
-    }
-
-    private func holding(_ title: LocalizedStringKey, _ picks: [SidebarPick]) -> some View {
-        Menu(title) {
-            ForEach(picks) { pick in
-                Button(pick.title) {
-                    libraries.updateSidebarLayout { layout in
-                        let group = layout.addGroup(.custom, toTab: tab)
-                        if let place = SidebarPlace(key: pick.key) { layout.put(place, in: group) }
-                    }
+        Button(action: perform) {
+            HStack {
+                SidebarLabel(title: data.title, icon: data.icon)
+                Spacer(minLength: 0)
+                if customizing {
+                    SidebarHandle()
+                } else if let keys {
+                    Text(verbatim: keys).sidebarTrailing().opacity(isHovering ? 1 : 0).accessibilityHidden(true)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
         }
-        .disabled(picks.isEmpty)
+        .buttonStyle(.plain)
+        .selectionDisabled()
+        .disabled(!isEnabled)
+        .onHover { isHovering = $0 }
+        .accessibilityIdentifier(identifier)
     }
 
-    private static func title(of kind: SidebarGroup.Kind) -> String {
-        SidebarGroup(id: kind.rawValue, kind: kind, tab: "").name
+    private var identifier: String {
+        switch data.shortcut {
+        case .new: "SidebarNew"
+        case .search: "SidebarSearch"
+        default: "SidebarShortcut-" + data.shortcut.key
+        }
     }
 }
 
 // MARK: Places
 
-/// A section of places: the library's indexes, views, collections and sources, in the order the person arranged. While
-/// customizing, the rows carry handles and drag to reorder.
+/// A section of places: the Library and the Feed with no heading, or Pinned or a person's own under one, in the order
+/// the person arranged. While customizing, the rows carry handles and drag to reorder, and the section's place follows.
 struct SidebarPlacesSection: View, Equatable {
     @Environment(Libraries.self) private var libraries
     let section: SidebarSectionData
     let groups: [SidebarGroupChoice]
     let customizing: Bool
     let browser: Browser
-    let header: SidebarGroupHeader
+    let order: ItemOrder
+    let header: SidebarGroupHeader?
+    let place: SidebarAddPlace
 
     /// The section's data and nothing else, so a change of selection does not run its body.
     static func == (a: Self, b: Self) -> Bool {
         a.section == b.section && a.groups == b.groups && a.customizing == b.customizing && a.header == b.header
+            && a.order == b.order && a.place.offers == b.place.offers
     }
 
     var body: some View {
-        let group = section.plan.group
-        Section {
-            ForEach(section.rows, id: \.place.key) { data in
-                SidebarPlaceRow(data: data, groups: groups, customizing: customizing, browser: browser)
-                    .tag(data.item)
+        if let header {
+            // The sections never fold: the system's outline would take a press on the heading's menu as a fold.
+            Section(isExpanded: .constant(true)) { rows } header: { header }
+        } else {
+            Section { rows }
+        }
+    }
+
+    @ViewBuilder private var rows: some View {
+        ForEach(section.rows, id: \.place.key) { data in
+            row(data)
+        }
+        .onMove { source, destination in
+            libraries.updateSidebarLayout {
+                $0.moveInSection(section.id, places: section.plan.members, shown: section.plan.shown, fromOffsets: source, toOffset: destination)
             }
-            .onMove { source, destination in
-                libraries.updateSidebarLayout {
-                    $0.moveInSection(section.id, places: section.plan.members, shown: section.plan.shown, fromOffsets: source, toOffset: destination)
-                }
-            }
-            if group.kind == .views { SidebarPendingViewRow(browser: browser) }
-        } header: {
-            header
+        }
+        if customizing { place }
+    }
+
+    @ViewBuilder private func row(_ data: SidebarPlaceRowData) -> some View {
+        let row = SidebarPlaceRow(data: data, groups: groups, customizing: customizing, browser: browser, order: order)
+        if let opens = data.opens {
+            row.tag(opens)
+        } else {
+            row.selectionDisabled()
         }
     }
 }
 
-/// One sidebar row with its mark, name, and optional count.
+/// One place's row: its mark and name, the Library's count, and under the pointer a collection's plus where a count
+/// would be. A pinned item is a button that opens the item, since it is no place to select.
 struct SidebarPlaceRow: View, Equatable {
+    @CurrentLibrary private var library
+    @Environment(Libraries.self) private var libraries
+    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
+    @State private var isHovering = false
     let data: SidebarPlaceRowData
     let groups: [SidebarGroupChoice]
     let customizing: Bool
     let browser: Browser
+    let order: ItemOrder
 
-    static func == (a: Self, b: Self) -> Bool { a.data == b.data && a.groups == b.groups && a.customizing == b.customizing }
+    static func == (a: Self, b: Self) -> Bool {
+        a.data == b.data && a.groups == b.groups && a.customizing == b.customizing && a.order == b.order
+    }
 
     var body: some View {
         Group {
-            if customizing {
-                HStack {
-                    label
-                    Spacer(minLength: 8)
-                    SidebarHandle()
-                }
+            if case .item(let id) = data.place, !customizing {
+                Button { open(id) } label: { content.frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect) }
+                    .buttonStyle(.plain)
             } else {
-                label.badge(data.count > 0 ? Text(data.count, format: .number).monospacedDigit() : nil)
+                content
             }
         }
-        .sidebarPlaceMenu(data: data, groups: groups, browser: browser)
+        .onHover { isHovering = $0 }
+        .contextMenu {
+            SidebarPlaceMenu(data: data, groups: groups, customizing: customizing, browser: browser, order: order)
+        }
+        .accessibilityActions {
+            if data.adds, !customizing { Button(addName) { add() } }
+        }
         .accessibilityIdentifier(identifier)
     }
 
-    private var label: SidebarLabel { SidebarLabel(title: data.title, icon: .symbol(data.symbol), tone: data.tone) }
+    private var content: some View {
+        HStack(spacing: 0) {
+            SidebarMarkLabel(title: data.title, mark: data.mark)
+            Spacer(minLength: 8)
+            if customizing {
+                SidebarHandle()
+            } else if data.adds || data.count != nil {
+                ZStack(alignment: .trailing) {
+                    if let count = data.count {
+                        Text(count, format: .number).monospacedDigit().sidebarTrailing()
+                            .opacity(isHovering && data.adds ? 0 : 1)
+                    }
+                    if data.adds, isHovering {
+                        SidebarPlus(name: addName, add: add)
+                    }
+                }
+            }
+        }
+    }
+
+    private var addName: String {
+        String(localized: "New Item in \(data.title)")
+    }
+
+    private func add() {
+        guard let opens = data.opens else { return }
+        browser.show(opens, in: library, order: order)
+        browser.openQuickAdd(remembered: lastType, in: library)
+    }
+
+    private func open(_ id: ItemID) {
+        guard let item = library.item(id) else { return }
+        browser.open(itemLink: item, in: library, order: order)
+    }
 
     private var identifier: String {
         if case .view(let id) = data.place { "SidebarView-\(id.rawValue)" } else { "SidebarPlace-\(data.place.key)" }
     }
 }
 
-/// The view a New View panel is making, drawn as the selected row of Views until Done makes it or Escape drops it. It
-/// is no place yet, so it takes no selection of its own.
-struct SidebarPendingViewRow: View {
-    let browser: Browser
+/// A row's mark and name, for every mark a place can have.
+struct SidebarMarkLabel: View {
+    let title: String
+    let mark: SidebarMark
 
     var body: some View {
-        if browser.viewPanel?.isNew == true {
-            SidebarLabel(title: String(localized: "New View"), icon: .symbol(SidebarPlace.viewSymbol))
-                .listRowBackground(Color(nsColor: .labelColor).opacity(0.08).clipShape(.rect(cornerRadius: 6)))
-                .selectionDisabled()
-                .accessibilityAddTraits(.isSelected)
-                .accessibilityIdentifier("SidebarNewView")
+        switch mark {
+        case .symbol(let name): SidebarLabel(title: title, icon: .symbol(name))
+        case .icon(let icon): SidebarLabel(title: title, icon: icon)
+        case .grayType(let id): SidebarLabel(title: title, icon: .type(id), grayType: true)
+        case .view(let id): SidebarViewLabel(title: title, id: id)
         }
+    }
+}
+
+/// A saved view's label, whose mark is its layout's on this Mac. It reads the views' layouts itself, so a change of
+/// layout or of a column's width redraws the view rows alone.
+private struct SidebarViewLabel: View {
+    @AppStorage(ViewLayouts.key) private var layouts = ViewLayouts()
+    let title: String
+    let id: ItemID
+
+    var body: some View {
+        SidebarLabel(title: title, icon: .symbol(SidebarPlace.symbol(ofView: id, in: layouts)))
+    }
+}
+
+/// The plus that takes a count's place under the pointer, and makes an item of a type or in a collection. Under the
+/// pointer itself it has a ground, and its help names what it makes.
+struct SidebarPlus: View {
+    @State private var isHovering = false
+    let name: String
+    let add: () -> Void
+
+    var body: some View {
+        Button(action: add) {
+            Image(systemName: "plus")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 18, height: 18)
+                .background(
+                    Color(nsColor: .labelColor).opacity(isHovering ? 0.08 : 0), in: .rect(cornerRadius: 5))
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help(name)
+        .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// Text at a row's trailing end, a count or a shortcut, in the size of the system's own count, ending where it
+    /// does.
+    func sidebarTrailing() -> some View {
+        font(.subheadline)
+            .foregroundStyle(.tertiary)
+            .padding(.trailing, 4)
     }
 }
 
 // MARK: Tabs
 
-/// The tabs, above the list, shown only where there is more than one: each a symbol, the chosen one with its name, and a
-/// plus that adds another.
+/// The tabs, above the list, shown where there is more than one and always while customizing: each a pill with its
+/// name, the chosen one filled. A new tab is named in place. While customizing a faint "Tab" place adds one;
+/// otherwise a plus does.
 struct SidebarTabBar: View {
     @Environment(Libraries.self) private var libraries
+    @State private var editing: String?
+    @State private var draft = ""
+    @FocusState private var isFocused: Bool
     let tabs: [SidebarTab]
     let chosen: String
+    let customizing: Bool
     let browser: Browser
-    let ask: (SidebarNaming) -> Void
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(tabs) { tab in
-                let isChosen = tab.id == chosen
-                Button { browser.sidebarTab = tab.id } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: tab.symbol)
-                        if isChosen { Text(tab.name).lineLimit(1) }
-                    }
-                    .interfaceFont(.body)
-                    .foregroundStyle(isChosen ? .primary : .secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(isChosen ? Color(nsColor: .labelColor).opacity(0.08) : .clear, in: .rect(cornerRadius: 6))
-                    .contentShape(.rect)
+                if editing == tab.id {
+                    TextField("Name", text: $draft)
+                        .textFieldStyle(.plain)
+                        .focused($isFocused)
+                        .fixedSize()
+                        .interfaceFont(.body.weight(.medium))
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
+                        .background(Color(nsColor: .labelColor).opacity(0.08), in: .capsule)
+                        .onSubmit { commit(tab.id) }
+                        .onExitCommand { editing = nil }
+                        .onChange(of: isFocused) { if !isFocused { commit(tab.id) } }
+                        .accessibilityIdentifier("SidebarTabName")
+                } else {
+                    pill(tab)
                 }
-                .buttonStyle(.plain)
-                .help(tab.name)
-                .accessibilityLabel(Text(tab.name))
-                .accessibilityAddTraits(isChosen ? .isSelected : [])
-                .contextMenu {
-                    Button("Rename…") { ask(.renameTab(tab.id, current: tab.name)) }
-                    Button("Remove Tab") { libraries.updateSidebarLayout { $0.removeTab(tab.id) } }
-                        .disabled(tabs.count < 2)
-                }
-                .accessibilityIdentifier("SidebarTab-\(tab.id)")
+            }
+            if customizing {
+                SidebarDashedButton(title: String(localized: "Tab"), height: 24) { addTab() }
+                    .fixedSize()
+                    .accessibilityIdentifier("SidebarNewTab")
+            } else {
+                Button("New Tab", systemImage: "plus") { addTab() }
+                    .labelStyle(.iconOnly)
+                    .appButton(.plain, size: .small, icon: true)
+                    .accessibilityIdentifier("SidebarNewTab")
             }
             Spacer(minLength: 0)
-            Button("New Tab", systemImage: "plus") { ask(.newTab(moving: nil)) }
-                .labelStyle(.iconOnly)
-                .appButton(.plain, size: .small, icon: true)
-                .accessibilityIdentifier("SidebarNewTab")
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .padding(.vertical, 6)
+    }
+
+    private func pill(_ tab: SidebarTab) -> some View {
+        let isChosen = tab.id == chosen
+        return Button { browser.sidebarTab = tab.id } label: {
+            Text(tab.name)
+                .lineLimit(1)
+                .interfaceFont(.body.weight(.medium))
+                .foregroundStyle(isChosen ? .primary : .secondary)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .background(isChosen ? Color(nsColor: .labelColor).opacity(0.08) : .clear, in: .capsule)
+                .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isChosen ? .isSelected : [])
+        .contextMenu {
+            Button("Rename…") { beginNaming(tab) }
+            Button("Remove Tab") { libraries.updateSidebarLayout { $0.removeTab(tab.id) } }
+                .disabled(tabs.count < 2)
+        }
+        .accessibilityIdentifier("SidebarTab-\(tab.id)")
+    }
+
+    private func addTab() {
+        var created: String?
+        libraries.updateSidebarLayout { created = $0.addTab(named: "") }
+        guard let created else { return }
+        browser.sidebarTab = created
+        draft = ""
+        editing = created
+        isFocused = true
+    }
+
+    private func beginNaming(_ tab: SidebarTab) {
+        draft = tab.name
+        editing = tab.id
+        isFocused = true
+    }
+
+    private func commit(_ id: String) {
+        guard editing == id else { return }
+        editing = nil
+        libraries.updateSidebarLayout { $0.renameTab(id, to: draft) }
     }
 }

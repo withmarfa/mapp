@@ -3,44 +3,36 @@ import Marfa
 import Observation
 
 /// A row the sidebar can show, named by a key that stays the same across launches, so what the person chose to hide
-/// or move is found again. The Library and the Feed keep the keys earlier copies gave All Items and Inbox, so a layout
-/// arranged then reads as it was; Recents is no row now, and its key is left where it is stored, for those copies.
+/// or move is found again. The Library and the Feed keep the keys earlier copies gave All Items and Inbox, and the
+/// Collections and Sources pages keep theirs, so a layout arranged then reads as it was. Words this copy no longer
+/// shows as rows (`favorites`, `recents`, and `views` and `types` in `hidden`) are left where they are stored.
 nonisolated enum SidebarPlace: Hashable, Sendable {
-    case library, feed, favorites, sources
-    /// The index of items other items are filed under.
-    case collections
-    /// The block that holds the library's types.
-    case types
-    /// The pinned saved views; hiding it hides every one and leaves the Feed and Favorites.
-    case views
+    case library, feed
+    /// Library › Types, Library › Collections and Library › Sources, which a person can add under the Library.
+    case types, collections, sources
     /// A type's row, or a group of types by its stem (`TypeNode.id`).
     case type(String)
     /// One saved view's row, by its item ID, which opens the view at its home.
     case view(ItemID)
-    /// One collection's row, by its item ID, which a section the person made holds.
+    /// One collection's row, by its item ID.
     case collection(ItemID)
-    /// One source's row, by its code, which a section the person made holds.
+    /// One source's row, by its code.
     case source(String)
     /// One pinned item's row, by its item ID, which opens the item.
     case item(ItemID)
 
-    /// The places in the Library group, under New and Search, in their default order.
-    static let destinations: [SidebarPlace] = [.library, .sources, .collections]
-    /// The rows at the top of the Pinned block, in their default order.
-    static let builtInViews: [SidebarPlace] = [.feed, .favorites]
-
-    /// Every saved view's symbol: a view is a filtered list, whatever it lists.
-    static let viewSymbol = "square.stack.3d.up"
+    /// The Library and the Feed, in their default order: the zone under Search and New.
+    static let places: [SidebarPlace] = [.library, .feed]
+    /// The pages of the Library a person can add under it, in their default order.
+    static let pages: [SidebarPlace] = [.types, .collections, .sources]
 
     var key: String {
         switch self {
         case .library: "all"
         case .feed: "inbox"
-        case .favorites: "favorites"
-        case .sources: "sources"
+        case .types: "index:types"
         case .collections: "collections"
-        case .types: "types"
-        case .views: "views"
+        case .sources: "sources"
         case .type(let id): "type:" + id
         case .view(let id): "view:" + id.rawValue
         case .collection(let id): "collection:" + id.rawValue
@@ -54,11 +46,9 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         switch key {
         case "all": self = .library
         case "inbox": self = .feed
-        case "favorites": self = .favorites
-        case "sources": self = .sources
+        case "index:types": self = .types
         case "collections": self = .collections
-        case "types": self = .types
-        case "views": self = .views
+        case "sources": self = .sources
         default:
             guard let colon = key.firstIndex(of: ":") else { return nil }
             let value = String(key[key.index(after: colon)...])
@@ -74,18 +64,16 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         }
     }
 
-    /// The mark of a place that is drawn by symbol; a type and an item draw their type's own, from the catalogue.
+    /// The gray symbol of a place that has one of its own; a view, a collection, a source, a type and an item take
+    /// theirs from the library (`SidebarContent`).
     var symbol: String? {
         switch self {
         case .library: "square.grid.2x2"
-        case .feed: "tray"
-        case .favorites: "star"
+        case .feed: "water.waves"
+        case .types: "square.on.square"
+        case .collections: "square.stack"
         case .sources: "antenna.radiowaves.left.and.right"
-        case .collections, .collection: "square.stack"
-        case .source: "antenna.radiowaves.left.and.right"
-        case .types: "rectangle.3.group"
-        case .views, .view: Self.viewSymbol
-        case .type, .item: nil
+        case .type, .view, .collection, .source, .item: nil
         }
     }
 
@@ -95,31 +83,36 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         switch self {
         case .library: .library
         case .feed: .feed
-        case .favorites: .favorites
-        case .sources: .sources
+        case .types: .types
         case .collections: .collections
+        case .sources: .sources
+        case .type(let id): .type(TypeID(id))
         case .view(let id): .saved(id)
         case .collection(let id): .collection(id)
         case .source(let code): .source(code)
-        case .types, .views, .type, .item: nil
+        case .item: nil
         }
     }
 
-    /// A mark takes the color the person chose for it, or gray. Every place with a symbol of its own has one: the
-    /// views, the three indexes, and a collection or a source in a section the person made. A type and an item draw
-    /// their type's mark, and the two blocks that hold rows have none.
-    var defaultTone: TypeTone? {
+    /// A saved view's mark: the symbol of the layout this Mac keeps for it, or a list's.
+    static func symbol(ofView id: ItemID, in layouts: ViewLayouts) -> String {
+        (layouts.settings(for: id)?.layout ?? .list).symbol
+    }
+
+    /// Whether the row is one a person pins: a view, a collection, a source or an item. What an earlier copy placed
+    /// under its Library or Views sections is read under Pinned when it is one of these.
+    var isPinnable: Bool {
         switch self {
-        case .type, .types, .views, .item: nil
-        default: .gray
+        case .view, .collection, .source, .item: true
+        default: false
         }
     }
 
-    /// Whether the row carries a count. The indexes and a saved view list what the copy holds on their own, an item is
-    /// one, and the Feed is a stream to read, not a store to size.
-    var showsCount: Bool {
+    /// Whether the row is in the sidebar only where the person put it, and is no longer put anywhere when taken out.
+    /// The rest are hidden where they stand, so showing them puts them back.
+    var showsOnlyWherePut: Bool {
         switch self {
-        case .library, .favorites, .collection, .source: true
+        case .collection, .source, .item, .types, .collections, .sources: true
         default: false
         }
     }
@@ -127,8 +120,12 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
 
 /// What one library's person chose for the sidebar: the places hidden, the types folded shut, the order of the rest,
 /// and the tabs and sections they arranged (`SidebarTabs.swift`). A place the layout does not mention, such as a type the
-/// catalogue has just gained, is shown, after the ones that have a position. Everything about tabs, sections and colors
-/// is optional, so a layout stored before they existed reads as one tab with the sections the sidebar always had.
+/// catalogue has just gained, is shown, after the ones that have a position. Everything about tabs and sections is
+/// optional, so a layout stored before they existed reads as one tab with the sections the sidebar starts with.
+///
+/// Any copy of the app may read the layout, so nothing this copy cannot read is dropped: a section of a kind it does not
+/// know is written back where it was, and the keys of `hidden`, `order`, `collapsed`, `homes` and `colors` are kept
+/// whatever they name.
 nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     private(set) var hidden: Set<String> = []
     /// The keys of the places the person has placed, in order. Places of different groups share the list, because a
@@ -141,19 +138,23 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
 
     /// The tabs in order; nil until the person adds one, which reads as the one tab, Home.
     var tabs: [SidebarTab]?
-    /// Every section of every tab, in order, hidden ones included; nil until the person changes one, which reads as
-    /// the sections the sidebar always had, in Home.
+    /// Every section of every tab this copy can read, in order, hidden ones included; nil until the person changes
+    /// one, which reads as the sections the sidebar starts with, in Home.
     var groups: [SidebarGroup]?
     /// Where a place sits when the person put it in a section, by the place's key and the section's identifier. A
-    /// collection or a source has no section of its own, so it shows only where it is put. Keys stay for a collection,
-    /// a source or a view that is deleted or missing from a sync, so its row returns with it; only removing the section
-    /// they name drops them (`hideGroup`).
+    /// collection, a source or an item has no section of its own, so it shows only where it is put. Keys stay for a
+    /// place that is deleted or missing from a sync, so its row returns with it; only removing the section they name
+    /// drops them (`hideGroup`).
     var homes: [String: String]?
-    /// The color the person chose for a view's mark, by the place's key and the tone's name.
-    var colors: [String: String]?
+    /// The colors an earlier copy let a person give a view's mark, by the place's key. This copy draws every mark gray
+    /// or in its type's own color, and keeps them for the copies that read them.
+    private var colors: [String: String]?
     /// The sections this copy cannot read, such as a kind a later copy added, by their position among all the sections,
     /// written back there so that copy keeps them.
     private var laterGroups: [Int: JSONValue] = [:]
+    /// The identifiers of the Library and Views sections an earlier copy made, which this copy keeps as written and
+    /// reads only to know where the person put a place (`home(of:)`).
+    private(set) var earlierGroupIDs: Set<String> = []
 
     init() {}
 
@@ -169,17 +170,49 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         tabs = try values.decodeIfPresent([SidebarTab].self, forKey: .tabs)
         if let stored = try values.decodeIfPresent([JSONValue].self, forKey: .groups) {
             var known: [SidebarGroup] = []
+            var earlier: [EarlierGroup.Kind: (group: EarlierGroup, at: Int)] = [:]
             for (index, raw) in stored.enumerated() {
-                if let group = try? JSONDecoder().decode(SidebarGroup.self, from: JSONEncoder().encode(raw)) {
+                let data = try JSONEncoder().encode(raw)
+                if let group = try? JSONDecoder().decode(SidebarGroup.self, from: data) {
                     known.append(group)
                 } else {
                     laterGroups[index] = raw
+                    if let group = try? JSONDecoder().decode(EarlierGroup.self, from: data) {
+                        earlierGroupIDs.insert(group.id)
+                        if earlier[group.kind] == nil { earlier[group.kind] = (group, known.count) }
+                    }
                 }
             }
-            groups = known
+            groups = Self.reading(known, earlier: earlier, firstTab: tabs?.first?.id ?? SidebarTab.homeID)
         }
         homes = try values.decodeIfPresent([String: String].self, forKey: .homes)
         colors = try values.decodeIfPresent([String: String].self, forKey: .colors)
+    }
+
+    /// The sections an earlier copy arranged, read into this copy's: its Library section gives way to the Library and
+    /// the Feed, without a heading, and its Views section to Pinned, each in the tab and at the place the earlier one
+    /// had, Pinned with the person's name for it and hidden where it was hidden. A layout that has them already is
+    /// read as it is.
+    private static func reading(
+        _ known: [SidebarGroup], earlier: [EarlierGroup.Kind: (group: EarlierGroup, at: Int)], firstTab: String
+    ) -> [SidebarGroup] {
+        var groups = known
+        let views = earlier[.views]
+        if !groups.contains(where: { $0.kind == .pinned }) {
+            var pinned = SidebarGroup(id: SidebarGroup.pinnedID, kind: .pinned, tab: views?.group.tab ?? firstTab)
+            pinned.title = views?.group.title
+            pinned.isHidden = views?.group.isHidden ?? false
+            groups.insert(pinned, at: min(views?.at ?? groups.count, groups.count))
+        }
+        if !groups.contains(where: { $0.kind == .places }) {
+            let library = earlier[.library]
+            let tab = library?.group.tab ?? views?.group.tab ?? firstTab
+            let afterShortcuts = groups.firstIndex { $0.kind == .shortcuts && $0.tab == tab }.map { $0 + 1 }
+            let at = library.map { min($0.at, groups.count) } ?? afterShortcuts
+                ?? groups.firstIndex { $0.tab == tab } ?? groups.count
+            groups.insert(SidebarGroup(id: SidebarGroup.placesID, kind: .places, tab: tab), at: at)
+        }
+        return groups
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -197,7 +230,15 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         try values.encodeIfPresent(colors, forKey: .colors)
     }
 
-    func isHidden(_ place: SidebarPlace) -> Bool { hidden.contains(place.key) }
+    func isHidden(_ place: SidebarPlace) -> Bool {
+        if case .view = place, hidden.contains(Self.savedViewsKey) { return true }
+        return hidden.contains(place.key)
+    }
+
+    /// The word an earlier copy kept in `hidden` for Hide Views from Sidebar, which hid every saved view.
+    static let savedViewsKey = "views"
+    /// The word an earlier copy kept in `hidden` when Settings hid the Types section.
+    static let typesSectionKey = "types"
 
     func isCollapsed(_ section: SidebarPlace) -> Bool { collapsed.contains(section.key) }
 
@@ -209,9 +250,19 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         if isHidden { hidden.insert(place.key) } else { hidden.remove(place.key) }
     }
 
+    /// Shows a saved view where an earlier copy hid every one, by hiding each of the others in its place, so only this
+    /// one comes back.
+    mutating func show(_ view: ItemID, among views: [ItemID]) {
+        if hidden.contains(Self.savedViewsKey) {
+            hidden.remove(Self.savedViewsKey)
+            for other in views where other != view { hidden.insert(SidebarPlace.view(other).key) }
+        }
+        hidden.remove(SidebarPlace.view(view).key)
+    }
+
     /// Puts a place in a section, last, and shows it.
     mutating func put(_ place: SidebarPlace, in group: String) {
-        guard allGroups.contains(where: { $0.id == group && $0.holdsPlaces }) else { return }
+        guard allGroups.contains(where: { $0.id == group && $0.holds(place) }) else { return }
         tabs = allTabs
         groups = allGroups
         homes = (homes ?? [:]).merging([place.key: group]) { _, new in new }
@@ -220,12 +271,14 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         order.append(place.key)
     }
 
-    /// Takes a place out of the sidebar. A place with a section of its own is hidden there, where Show brings it back;
-    /// a collection or a source, which has none, is no longer put anywhere.
+    /// Takes a place out of the sidebar. A place with a section of its own is hidden there, where it can be added
+    /// again; a collection, a source, an item or a page of the Library, which has none, is no longer put anywhere.
     mutating func take(_ place: SidebarPlace) {
-        switch place {
-        case .collection, .source: homes?.removeValue(forKey: place.key)
-        default: setHidden(place, true)
+        if place.showsOnlyWherePut {
+            homes?.removeValue(forKey: place.key)
+            if homes?.isEmpty == true { homes = nil }
+        } else {
+            setHidden(place, true)
         }
     }
 
@@ -284,18 +337,33 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     }
 }
 
+/// A Library or Views section as an earlier copy stored it, read only for where it was and what it was called.
+private nonisolated struct EarlierGroup: Decodable {
+    enum Kind: String, Decodable { case library, views }
+
+    let id: String
+    let kind: Kind
+    let tab: String
+    var title: String?
+    var isHidden = false
+
+    private enum CodingKeys: String, CodingKey { case id, kind, tab, title, isHidden }
+
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        kind = try values.decode(Kind.self, forKey: .kind)
+        tab = try values.decode(String.self, forKey: .tab)
+        title = try values.decodeIfPresent(String.self, forKey: .title)
+        isHidden = try values.decodeIfPresent(Bool.self, forKey: .isHidden) ?? false
+    }
+}
+
 /// What the sidebar shows for a library, from the library and the person's layout: one list for each part of the
-/// sidebar, in order, hidden places included so Settings can offer them back.
+/// sidebar, in order, hidden places included so Customize Sidebar can offer them back.
 @MainActor
 struct SidebarPlan {
-    /// The Library and the indexes of sources and collections.
-    let destinations: [SidebarPlace]
-    /// The Feed and Favorites rows at the top of the Views section by default.
-    let builtInViews: [SidebarPlace]
-    /// The saved views in the Views block, where the server has saved any views the library can read, then the Types
-    /// block, where the library holds any types.
-    let library: [SidebarPlace]
-    /// The types the Types block lists, nested. The person orders the top rows; the rows under one keep the order
+    /// The types the Types section lists, nested. The person orders the top rows; the rows under one keep the order
     /// of their items.
     let types: [TypeNode]
     /// The saved views, in the person's order, hidden ones included. Views the person never placed follow by title.
@@ -310,20 +378,17 @@ struct SidebarPlan {
         let started = ContinuousClock.now
         defer { Cost.record(.sidebarPlan, since: started) }
         self.layout = layout
-        destinations = layout.ordered(SidebarPlace.destinations)
-        builtInViews = layout.ordered(SidebarPlace.builtInViews)
         views = layout.ordered(library.views, by: { SidebarPlace.view($0.id).key })
         types = layout.ordered(library.typeTree, by: { SidebarPlace.type($0.id).key })
-        self.library = (library.views.isEmpty ? [] : [.views]) + (types.isEmpty ? [] : [.types])
         tabs = layout.allTabs
-        let showsTypes = !layout.isHidden(.types) && types.contains { !layout.isHidden(.type($0.id)) }
+        let showsTypes = types.contains { !layout.isHidden(.type($0.id)) }
         groups = SidebarGroupPlan.plans(in: library, layout: layout, views: views, showsTypes: showsTypes)
     }
 
     /// The sections of a tab that are shown, in order. A person's own or built-in section with nothing in it stays
     /// out unless `customizing`, which keeps every one so something can be put in it.
     func groups(in tab: String, customizing: Bool) -> [SidebarGroupPlan] {
-        groups.filter { layout.tabID(of: $0.group) == tab && !$0.group.isHidden && (customizing || !$0.isEmpty) }
+        groups.filter { layout.tabID(of: $0.group) == tab && !layout.hides($0.group) && (customizing || !$0.isEmpty) }
     }
 
     func isShown(_ place: SidebarPlace) -> Bool { !layout.isHidden(place) }
@@ -408,23 +473,23 @@ struct SidebarPlan {
         }
     }
 
-    /// The Types block shows this many types, with their subtypes, until Show More.
-    static let shownTypeCount = 6
+    /// The Types section shows this many types, with their kinds, until its "N More" row.
+    static let shownTypeCount = 5
 
-    /// The first `limit` types of `rows`, each with the subtype rows folded open under it, and whether more types
-    /// follow. With `showsAll` every row stays. A type's subtypes are never cut off from it, and do not count.
+    /// The first `limit` types of `rows`, each with the kind rows folded open under it, and how many types follow.
+    /// With `showsAll` every row stays. A type's kinds are never cut off from it, and do not count.
     static func limited(
         _ rows: [TypeRow], showsAll: Bool, limit: Int = shownTypeCount
-    ) -> (rows: [TypeRow], hasMore: Bool) {
+    ) -> (rows: [TypeRow], more: Int) {
         let topLevel = rows.filter { $0.depth == 0 }.count
-        guard topLevel > limit else { return (rows, false) }
-        guard !showsAll else { return (rows, true) }
+        guard topLevel > limit else { return (rows, 0) }
+        guard !showsAll else { return (rows, topLevel - limit) }
         var seen = 0
         let kept = rows.prefix { row in
             if row.depth == 0 { seen += 1 }
             return seen <= limit
         }
-        return (Array(kept), true)
+        return (Array(kept), topLevel - limit)
     }
 
     private static func shown(_ nodes: [TypeNode], by plan: SidebarPlan) -> [TypeNode] {

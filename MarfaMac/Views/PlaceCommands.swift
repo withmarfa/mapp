@@ -14,9 +14,7 @@ struct PlaceCommands: Commands {
         CommandMenu("Go") {
             if let library {
                 let menu = GoMenu(library: library, layout: libraries.sidebarLayout)
-                group(menu.places.filter { !SidebarPlace.builtInViews.contains($0.place) }, menu: menu, in: library)
-                Divider()
-                group(menu.places.filter { SidebarPlace.builtInViews.contains($0.place) }, menu: menu, in: library)
+                group(menu.places, menu: menu, in: library)
                 Section("Views") {
                     group(menu.views, menu: menu, in: library)
                 }

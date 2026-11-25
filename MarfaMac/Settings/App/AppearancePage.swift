@@ -16,6 +16,7 @@ struct AppearancePage: View {
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true
     @AppStorage(InterfaceKey.showsSidebarHistory) private var showsHistory = true
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
+    @AppStorage(SidebarColor.key) private var sidebarColor = SidebarColor.gray
     /// Read when the page has appeared, since asking the system for every installed font is slow.
     @State private var families: [String] = []
     @State private var monospacedFamilies: [String] = []
@@ -62,6 +63,12 @@ struct AppearancePage: View {
                 }
             }
             SettingsSection("Window") {
+                SettingsRow("Sidebar", line: "Gray, or white behind a hairline.") {
+                    SettingsPopUp(title: "Sidebar", selection: $sidebarColor) {
+                        ForEach(SidebarColor.allCases) { Text($0.title).tag($0) }
+                    }
+                    .accessibilityIdentifier("SidebarColor")
+                }
                 SettingsRow("Back and Forward", line: "Over the sidebar.") {
                     SettingsToggle(title: "Back and Forward", isOn: $showsHistory).accessibilityIdentifier("SidebarHistoryToggle")
                 }
