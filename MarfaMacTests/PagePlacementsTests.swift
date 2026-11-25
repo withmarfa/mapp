@@ -108,11 +108,11 @@ struct PagePlacementsTests {
     @Test func aMemberThisVersionDoesNotReadSurvivesARewrite() throws {
         let stored = #"{"aic.ticket":{"linkedFrom":"inspector","rows":{"repo":false},"sidebar":["details","tags"]}}"#
         var placements = try #require(PagePlacements(rawValue: stored))
-        placements.setShown(true, row: "repo", of: Self.ticket)
-        placements.setShown(false, row: "github_id", of: Self.comment)
+        placements.setShows(.always, row: "repo", of: Self.ticket)
+        placements.setShows(.hidden, row: "github_id", of: Self.comment)
         #expect(
             placements.rawValue
-                == #"{"aic.comment":{"rows":{"github_id":false}},"aic.ticket":{"linkedFrom":"inspector","rows":{"repo":true},"sidebar":["details","tags"]}}"#)
+                == #"{"aic.comment":{"rows":{"github_id":false},"shows":{"github_id":"hidden"}},"aic.ticket":{"linkedFrom":"inspector","rows":{"repo":true},"shows":{"repo":"always"},"sidebar":["details","tags"]}}"#)
     }
 
     @Test func theDefaultsHoldTheChoicesUnderOneKey() throws {
