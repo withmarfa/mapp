@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A toast as the design system's `Toast` draws it: a solid, rounded bar 44 points tall with an optional symbol, the
-/// message, Undo where the action can be undone, and a close button (`docs/look.md`).
+/// A toast as the design system's `Toast` draws it: a solid, rounded bar 40 points tall with an optional symbol, the
+/// message and Undo where the action can be undone. It has no close button, since it leaves on its own (`docs/look.md`).
 struct ToastView: View {
     let toast: ToastPresenter.Toast
     let presenter: ToastPresenter
@@ -9,7 +9,7 @@ struct ToastView: View {
 
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
-        HStack(spacing: 10 * scale) {
+        HStack(spacing: 8 * scale) {
             if let symbol = toast.symbol {
                 Image(systemName: symbol)
                     .font(.system(size: 14 * scale))
@@ -22,15 +22,12 @@ struct ToastView: View {
                 .padding(.trailing, 4 * scale)
             if toast.undo != nil {
                 Button("Undo") { presenter.undo() }
-                    .appButton(.primary, size: .small)
+                    .appButton(.secondary, size: .small)
             }
-            Button("Dismiss", systemImage: "xmark") { presenter.dismiss() }
-                .labelStyle(.iconOnly)
-                .appButton(.plain, size: .small, icon: true)
         }
-        .padding(.leading, 16 * scale)
-        .padding(.trailing, 8 * scale)
-        .frame(height: 44 * scale)
+        .padding(.leading, 14 * scale)
+        .padding(.trailing, (toast.undo == nil ? 10 : 8) * scale)
+        .frame(height: 40 * scale)
         .background(.background, in: .rect(cornerRadius: 12 * scale, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: 12 * scale, style: .continuous).strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5) }
         .shadow(color: .black.opacity(0.12), radius: 14, y: 8)

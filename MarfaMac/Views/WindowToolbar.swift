@@ -548,6 +548,7 @@ private struct MoreMenu: View {
             command(.print)
             command(.exportPDF)
             Divider()
+            ItemMoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
             ItemRemoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
         }
         .menuIndicator(.hidden)

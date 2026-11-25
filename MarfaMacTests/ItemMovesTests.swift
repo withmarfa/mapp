@@ -185,4 +185,64 @@ import Testing
         stays.skip(.staysInLibrary)
         #expect(collections.tierPlan([holiday, F.n1], to: .feed) == ([F.n1], stays))
     }
+
+    @Test func aMenuListsTheTierMovesThenArchiveAndUnarchiveOnlyWhereNothingCanBeArchived() async throws {
+        let (library, _) = try await loaded()
+        #expect(library.menuMoves([F.n1, F.n2]) == [.keep, .moveToFeed, .archive])
+        #expect(library.menuMoves([F.n2, F.t1]) == [.keep, .moveToFeed, .archive], "a mixed selection archives")
+        #expect(library.menuMoves([F.t1]).last == .unarchive && !library.menuMoves([F.t1]).contains(.archive))
+        #expect(library.menuMoves([F.n3]).isEmpty, "an item in the bin offers none")
+    }
+
+    /// What a window's manager does between events: this one opens no group of its own, so a move's group is its step.
+    private static func manager() -> StepCountingUndoManager {
+        let manager = StepCountingUndoManager()
+        manager.groupsByEvent = false
+        return manager
+    }
+
+    @Test func aMoveSaysWhatItQueuedAndTheToastsUndoIsItsStep() async throws {
+        let (library, source) = try await loaded()
+        let toasts = ToastPresenter()
+        let undo = Self.manager()
+        Browser.move(.archive, [F.p1], in: library, undoManager: undo, toasts: toasts)
+        #expect(toasts.current == nil, "the engine has judged nothing yet")
+        let alpha = try #require(source.submitted.first { $0.write == .transition(F.p1, .archived, from: .active) })
+        source.send(.taken(alpha.id))
+        try #require(await eventually { toasts.current != nil })
+        #expect(toasts.current?.message == "Archived “Alpha”")
+        #expect(toasts.current?.undo != nil)
+
+        source.clearWrites()
+        try await show([F.p1], in: library, source) { $0.state = .archived }
+        toasts.undo()
+        toasts.undo()
+        #expect(source.writes == [.transition(F.p1, .active, from: .archived)], "one undo, once")
+        #expect(toasts.current == nil)
+    }
+
+    @Test func aMoveThatChangesNothingShowsNoToast() async throws {
+        let (library, _) = try await loaded()
+        let toasts = ToastPresenter()
+        Browser.move(.unarchive, [F.p1], in: library, undoManager: Self.manager(), toasts: toasts)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(toasts.current == nil, "an active item needs nothing")
+    }
+
+    @Test func aMoveThatAsksFirstChangesNothingUntilAnswered() {
+        let library = FakeItemLibrary(items: F.items)
+        let details = DetailsPresentation()
+        library.perform(.archive, on: [F.p1], undoManager: nil, details: details)
+        #expect(details.archiving?.beneath == 2 && details.archiving?.ids == [F.p1])
+        #expect(library.item(F.p1)?.state == .active && library.item(F.e1)?.state == .active)
+
+        library.feedLimit = FeedLimitQuestion(pastWindow: 1)
+        library.perform(.moveToFeed, on: [F.p1], undoManager: nil, details: details)
+        #expect(details.feedLimit?.question == FeedLimitQuestion(pastWindow: 1))
+        #expect(library.item(F.p1)?.tier == .library)
+
+        library.feedLimit = nil
+        library.perform(.moveToFeed, on: [F.p1], undoManager: nil, details: details)
+        #expect(library.item(F.p1)?.tier == .feed, "with no question to ask, it moves")
+    }
 }

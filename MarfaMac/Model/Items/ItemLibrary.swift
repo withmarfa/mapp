@@ -278,6 +278,8 @@ protocol ItemLibrary: AnyObject, Observable {
     func archive(_ ids: Set<ItemID>, beneath: Bool, undoManager: UndoManager?, moved: ((CommandOutcome) -> Void)?)
     /// Makes each archived item among `ids` active, in one undoable change. Items beneath them stay as they are.
     func unarchive(_ ids: Set<ItemID>, undoManager: UndoManager?, moved: ((CommandOutcome) -> Void)?)
+    /// What to ask before Move to Feed of `ids`, or nil where it needs no question.
+    func feedLimitQuestion(for ids: Set<ItemID>) -> FeedLimitQuestion?
 
     // MARK: Views
 

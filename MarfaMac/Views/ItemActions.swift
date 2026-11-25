@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The actions for a set of items, shared by the list's context menu and the menu bar: whether it is a favorite, then
-/// what removes it. The More menu places the same two parts apart, with other commands between them.
+/// the moves and what removes it. The More menu places them apart, with other commands between.
 struct ItemActions: View {
     @CurrentLibrary private var library
     /// The window's, for the Add to Collection panel; the menu bar passes the front window's in.
@@ -18,6 +18,7 @@ struct ItemActions: View {
         ItemOrganizeActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar, shortcuts: shortcuts)
         CollectionActions(selection: ids, details: details, undoManager: undoManager)
         if inMenuBar || ids.contains(where: { library.item($0) != nil }) { Divider() }
+        ItemMoveActions(ids: ids, undoManager: undoManager, keepsPlace: inMenuBar, shortcuts: shortcuts)
         ItemRemoveActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar, shortcuts: shortcuts)
     }
 }
@@ -113,7 +114,7 @@ struct ItemRemoveActions: View {
             }
             .disabled(!library.reachesServer)
         } else {
-            Button("Delete", systemImage: "trash", role: .destructive) {
+            Button("Delete", systemImage: "trash") {
                 library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }
             .shortcut(.delete, shortcuts)

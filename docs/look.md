@@ -85,7 +85,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 
 ## Messages
 
-- **A toast says what happened, and offers Undo** (`ToastView`). It rises at the foot of the content, a window shows one, and it waits while the pointer is over it. It is for items moved to Recently Deleted.
+- **A toast says what happened, and offers Undo** (`ToastView`): a symbol, the words and Undo in the label color, 40 points high, with no close button. It rises at the foot of the content, a window shows one for five seconds, a second replaces the first, and it waits while the pointer is over it. It reports items moved to Recently Deleted, between the Library and the Feed, and in and out of the archive.
 - **Undo in a toast takes back that step alone** (`StepUndo`). Any later step, undo or redo removes the toast, so it never takes back something else.
 - **What cannot be undone asks first**, in the system's alert.
 - **A window's toast belongs to that window** (`ToastPresenter`), and another workspace in it does not drop the toast.

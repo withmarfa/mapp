@@ -5,6 +5,8 @@ paths:
   - MarfaMac/Views/ShortcutCatalogue.swift
   - MarfaMac/Views/*Commands.swift
   - MarfaMac/Views/ItemActions.swift
+  - MarfaMac/Views/ItemMoveActions.swift
+  - MarfaMac/Model/Browser+Moves.swift
   - MarfaMac/Views/ItemRowMenu.swift
 ---
 
@@ -15,7 +17,7 @@ The menu bar is the full list of commands. Every toolbar, corner and row command
 ## Adding a command
 
 - **A command on the open page or the selection is an `ItemCommand` case.** It gives the title, symbol, `shortcutCommand`, `paletteGroup`, `isEnabled(in:)` and `perform(in:)` once. The palette lists every case; place it in `AppCommands` and in the toolbar's `MoreMenu`.
-- **A command that changes items is a button in `ItemActions.swift`**, as Add to Favorites is. It takes the whole selection, files too, leaves alone what it cannot change and says so. Place it in `ItemOrganizeActions` or `ItemRemoveActions`.
+- **A command that changes items is a button in `ItemActions.swift`**, as Add to Favorites is. It takes the whole selection, files too, leaves alone what it cannot change and says so. Place it in `ItemOrganizeActions`, `ItemMoveActions` or `ItemRemoveActions`.
 - **The row menu has one order,** `RowMenuEntry.entries`, for items in use and for the bin. Add a case there and draw it in `ItemRowMenu`; never add to one layout's menu, or menus differ. What only one layout has goes in `layoutActions`.
 - **The palette repeats a button's rule in `CommandPalette+Commands.swift`.** Change both, because nothing joins them.
 - **Add the command to `ShortcutCommand` and its `all`,** even with no default shortcut, so a person can give it one. A test refuses a shortcut that two commands or the system holds.
@@ -26,16 +28,22 @@ The menu bar is the full list of commands. Every toolbar, corner and row command
 
 ## Tier and state
 
-The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` with the planned changes and planner skips. The engine can skip additional items when it queues the writes.
+The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` with the planned changes and planner skips. The engine can skip additional items when it queues the writes. Each call gives `moved` the outcome of what was queued once the writes have their first answers.
 
 | Call | Moves | Leaves alone |
 | --- | --- | --- |
-| `setTier(_:to:undoManager:)` | Each item to the Library or the Feed (`tierPlan`) | An item already there; a collection, view or settings item going to the Feed |
-| `archive(_:beneath:undoManager:)` | Each active item, and with `beneath` every active item under it (`archivePlan`) | An item archived or in Recently Deleted |
-| `unarchive(_:undoManager:)` | Each archived item (`unarchivePlan`) | An active item |
+| `setTier(_:to:undoManager:moved:)` | Each item to the Library or the Feed (`tierPlan`) | An item already there; a collection, view or settings item going to the Feed |
+| `archive(_:beneath:undoManager:moved:)` | Each active item, and with `beneath` every active item under it (`archivePlan`) | An item archived or in Recently Deleted |
+| `unarchive(_:undoManager:moved:)` | Each archived item (`unarchivePlan`) | An active item |
 
-- **A menu shows what `selectionCommands` offers:** each move that would change at least one item, so a selection in both tiers offers both.
-- **Move to Feed asks nothing yet.** `feedLimitQuestion` is nil until the catalogue gives a type's feed window.
+- **`ItemLibrary.perform(_:on:undoManager:details:)` is the one way a menu runs a move.** It asks first where it must, then calls `Browser.move`.
+- **A menu shows what `menuMoves` lists:** each move that would change at least one item, so a selection in both tiers lists Keep in Library and Move to Feed. Archive is listed whenever any item can be archived, and Unarchive only when none can. The menu bar and the More menu keep all three, dimmed where nothing would change. Keep, Move to Feed and Archive end the item menu before Delete.
+- **Archive and Unarchive are one command, ⌃⌘A,** which toggles by state and archives a mixed selection.
+- **A toast follows each move** (`Browser.move`): "Kept “x” in the Library", "Moved “x” to the Feed", "Archived “x”" or "Unarchived “x”", or the count. It shows only what the copy queued, and only once the library has answered. Its Undo is the step the move registered, so where the write it reverses is not yet answered the library puts the step back and tells the person.
+- **Archive asks when items are under the selection:** Archive All, Archive Only This Item or Cancel, with the count `archivePlan` puts beneath (`ArchiveRequest`).
+- **Move to Feed asks when the Feed would let the items go** (`FeedLimitRequest`). `feedLimitQuestion` answers nil until the catalogue gives a type's feed window (withmarfa/marfa#3560, withmarfa/marfa-swift#559), so no question is asked yet.
+- **A collection can be archived and is never moved to the Feed.** A table gets no Move to Feed once the package says which types hold one (withmarfa/marfa-swift#561).
+- **These queue offline,** so none waits on `reachesServer`.
 
 ## Shortcuts
 
@@ -57,11 +65,11 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | File | New Window | ⌥⌘N | Yes |
 | File | Refresh | ⌘R | Yes |
 | File | Open in New Window | ⌘O | Yes |
-| File | Keep in Library | ⌃⌘K | Agreed |
-| File | Archive, Unarchive | ⌃⌘A | Agreed |
+| File | Keep in Library | ⌃⌘K | Yes |
+| File | Archive, Unarchive | ⌃⌘A | Yes |
 | File | Print… | ⌘P | Yes |
-| File | Open, Open as Modal, Open as Full Page, Quick Look, Open Original, Open in Browser, Share…, Add to Favorites, Add Tag…, Change Type…, Add to Collection…, Customize Layout…, Version History…, Delete, Recover, Rename Source…, Choose Source Mark…, Delete Collection…, Export Layouts…, Import Layouts…, Export as PDF… | – | Yes |
-| File | Open Beside the List, Move to Feed | – | Agreed |
+| File | Open, Open as Modal, Open as Full Page, Quick Look, Open Original, Open in Browser, Share…, Add to Favorites, Add Tag…, Change Type…, Add to Collection…, Customize Layout…, Version History…, Move to Feed, Delete, Recover, Rename Source…, Choose Source Mark…, Delete Collection…, Export Layouts…, Import Layouts…, Export as PDF… | – | Yes |
+| File | Open Beside the List | – | Agreed |
 | Edit | Copy Link | ⇧⌘C | Yes |
 | Edit | Add Attachment… | ⇧⌘A | Yes |
 | Edit | Search Items… | ⇧⌘P | Yes |

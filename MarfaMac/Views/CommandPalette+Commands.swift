@@ -172,6 +172,11 @@ extension CommandPalette {
                     details.typeChange = TypeChangeRequest(ids: ids, undoManager: undoManager)
                 }
             }
+            for move in library.menuMoves(ids) {
+                add(move.name, move.symbol, keys(move.shortcutCommand), in: .file) {
+                    library.perform(move, on: ids, undoManager: undoManager, details: details)
+                }
+            }
             add(String(localized: "Delete"), "trash", in: .file) {
                 library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }

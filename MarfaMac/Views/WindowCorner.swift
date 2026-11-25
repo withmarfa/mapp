@@ -35,7 +35,7 @@ struct WindowCorner<Buttons: View, Card: View>: View {
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
         // The toast's own height and the space under it (`ToastHost`), and a little between.
-        let lift = details?.toasts.current == nil ? 0 : 22 + 44 * scale + 10 - Self.inset
+        let lift = details?.toasts.current == nil ? 0 : 22 + 40 * scale + 10 - Self.inset
         VStack(alignment: .trailing, spacing: 8) {
             if isCardOpen && cardPlacement == .aboveButtons {
                 card

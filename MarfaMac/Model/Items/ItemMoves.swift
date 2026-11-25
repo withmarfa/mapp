@@ -64,6 +64,16 @@ extension ItemMove {
         }
     }
 
+    /// The command's symbol, which its menu items and its toast draw.
+    var symbol: String {
+        switch self {
+        case .keep: "tray.and.arrow.down"
+        case .moveToFeed: "water.waves"
+        case .archive: "archivebox"
+        case .unarchive: "arrow.uturn.backward"
+        }
+    }
+
     /// The title of the notice where the command changed nothing.
     var failing: String {
         switch self {
@@ -179,8 +189,21 @@ extension ItemLibrary {
         return offered
     }
 
-    /// The question to ask before Move to Feed of `ids`. Nil for now: it waits for the type's feed window in the
-    /// catalogue (withmarfa/marfa#3560, withmarfa/marfa-swift#559), which `GET /types` alone does not give the copy.
+    /// The moves a menu lists for `ids`, in the menu's order: Keep, Move to Feed, then Archive, or Unarchive where
+    /// nothing in the selection can be archived. A selection in both tiers lists both tier moves.
+    func menuMoves(_ ids: Set<ItemID>) -> [ItemMove] {
+        let offered = selectionCommands(ids)
+        var moves: [ItemMove] = [.keep, .moveToFeed].filter(offered.contains)
+        if offered.contains(.archive) {
+            moves.append(.archive)
+        } else if offered.contains(.unarchive) {
+            moves.append(.unarchive)
+        }
+        return moves
+    }
+
+    /// Nil for now: the question waits for the type's feed window in the catalogue (withmarfa/marfa#3560,
+    /// withmarfa/marfa-swift#559), which `GET /types` alone does not give the copy.
     func feedLimitQuestion(for ids: Set<ItemID>) -> FeedLimitQuestion? { nil }
 
     /// A collection, a view or the app's settings stays in the Library.
