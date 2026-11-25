@@ -87,6 +87,120 @@ nonisolated struct ItemLocation: Hashable, Sendable {
         return keys
     }
 
+    // MARK: Reading
+
+    /// What the item's two numbers say.
+    enum Reading: Hashable, Sendable {
+        /// Neither number is set.
+        case none
+        /// Only one is set, so there is no point to draw. The text says what is held.
+        case partial(String)
+        case point(LocationPoint)
+        /// Both are set and are no place on Earth, or are not numbers. The text says what is held.
+        case unplaceable(String)
+    }
+
+    func reading(of item: Item) -> Reading {
+        let north = item.value(of: latitude.key), east = item.value(of: longitude.key)
+        let hasNorth = InspectorFields.hasValue(north), hasEast = InspectorFields.hasValue(east)
+        guard hasNorth || hasEast else { return .none }
+        func text(_ value: PropertyValue?) -> String { InspectorFields.hasValue(value) ? value.map(ItemValueText.string) ?? "–" : "–" }
+        let held = "\(text(north)), \(text(east))"
+        guard hasNorth, hasEast else { return .partial(held) }
+        if case .number(let degreesNorth)? = north, case .number(let degreesEast)? = east,
+           let point = LocationPoint(latitude: degreesNorth.nearestDouble, longitude: degreesEast.nearestDouble) {
+            return .point(point)
+        }
+        return .unplaceable(held)
+    }
+
+    /// The name the item holds for the place, or nil where the type has none or it is empty. A place shows its own name
+    /// only once it has a point, since a name with nowhere to point is the page's title and not a place.
+    func name(of item: Item) -> String? {
+        switch name {
+        case .typed(let field):
+            return Self.firstLine(item.value(of: field.key)?.string)
+        case .itemName:
+            guard case .point = reading(of: item) else { return nil }
+            return Self.firstLine(item.name ?? item.title)
+        case .none:
+            return nil
+        }
+    }
+
+    private static func firstLine(_ text: String?) -> String? {
+        guard let line = text?.split(whereSeparator: \.isNewline).first?.trimmingCharacters(in: .whitespaces), !line.isEmpty else { return nil }
+        return line
+    }
+
+    /// What the Location row reads, or nil where the item has no Location to show. A point with no name reads Map; a
+    /// pair that cannot be drawn reads as it is stored, so what the item holds is never hidden.
+    func summary(of item: Item) -> String? {
+        let name = name(of: item)
+        switch reading(of: item) {
+        case .point: return name ?? String(localized: "Map")
+        case .partial(let held), .unplaceable(let held): return name ?? held
+        case .none: return name
+        }
+    }
+
+    /// Whether the panel has something to show an item that cannot be edited: a point on the map.
+    func hasPoint(_ item: Item) -> Bool {
+        if case .point = reading(of: item) { true } else { false }
+    }
+
+    /// Why the panel cannot draw what the item holds, or nil where it can.
+    func problem(of item: Item) -> String? {
+        switch reading(of: item) {
+        case .partial: String(localized: "Only one of the two coordinates is set, so there is no point to show.")
+        case .unplaceable: String(localized: "These coordinates are not a place on Earth, so they cannot be shown on the map.")
+        case .none, .point: nil
+        }
+    }
+
+    /// Whether the panel offers a field to name the place.
+    var hasNameField: Bool { nameKey != nil }
+
+    // MARK: Row
+
+    /// The row for the head and the pins. A value the item does not have is an Empty row that opens the panel where the
+    /// item can take the edit, as every value the page sets does. An item that cannot be edited still opens the panel where
+    /// it has a point, which then only shows it.
+    func row(of item: Item) -> PropertyRow {
+        let label = String(localized: "Location")
+        if let summary = summary(of: item) {
+            return PropertyRow(
+                id: Self.rowID, label: label, value: .text(summary), editable: item.allows(.fields) || hasPoint(item), symbol: Self.symbol)
+        }
+        return PropertyRow(id: Self.rowID, label: label, value: .empty(symbol: Self.symbol), editable: item.allows(.fields))
+    }
+
+    // MARK: Writing
+
+    /// What putting the point on the map writes: both numbers, and the name where it was typed and differs from what the
+    /// item holds. Only what changes is listed, so a point put where it already is writes nothing.
+    func placing(_ point: LocationPoint, name typed: String? = nil, in item: Item) -> [String: PropertyValue?] {
+        var changes: [String: PropertyValue?] = [:]
+        for (field, degrees) in [(latitude, point.latitude), (longitude, point.longitude)] {
+            let value = LocationPoint.stored(degrees)
+            if item.value(of: field.key) != value { changes.updateValue(value, forKey: field.key) }
+        }
+        if let typed, let naming = naming(typed, in: item) { changes.merge(naming) { first, _ in first } }
+        return changes
+    }
+
+    /// What typing a name writes, or nil where the type has no name to type or the text is what the item holds. An empty
+    /// name takes the field's value away.
+    func naming(_ text: String, in item: Item) -> [String: PropertyValue?]? {
+        guard case .typed(let field) = name else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let new: PropertyValue? = trimmed.isEmpty ? nil : .string(trimmed)
+        let held = item.value(of: field.key)
+        guard InspectorFields.hasValue(held) || new != nil, held != new else { return nil }
+        return [field.key: new]
+    }
+
+    /// What clearing the Location writes: both numbers taken away, and the name left, which is the person's own words.
     func clearing(_ item: Item) -> [String: PropertyValue?] {
         var changes: [String: PropertyValue?] = [:]
         for field in [latitude, longitude] where InspectorFields.hasValue(item.value(of: field.key)) {
