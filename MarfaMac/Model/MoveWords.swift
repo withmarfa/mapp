@@ -30,8 +30,19 @@ nonisolated enum MoveWords {
         return AttributedString(localized: "Move ^[\(selected) item](inflect: true) to the Feed?").text
     }
 
-    /// What the question says: how many of the `selected` items are older than the Feed keeps.
-    static func feedMessage(selected: Int, pastWindow: Int) -> String {
+    /// What the question says: how many of the `selected` items are older than the Feed keeps, and, where they share one
+    /// type, how long it keeps them.
+    static func feedMessage(selected: Int, question: FeedLimitQuestion) -> String {
+        let pastWindow = question.pastWindow
+        if let window = question.window {
+            let (plural, days) = (window.typePlural, window.days)
+            if selected == 1 {
+                return AttributedString(localized: "\(plural) leave the Feed after ^[\(days) day](inflect: true), and this one is older. It would go to Recently Deleted within the hour.").text
+            }
+            return pastWindow == 1
+                ? AttributedString(localized: "\(plural) leave the Feed after ^[\(days) day](inflect: true), and 1 of these is older. It would go to Recently Deleted within the hour.").text
+                : AttributedString(localized: "\(plural) leave the Feed after ^[\(days) day](inflect: true), and \(pastWindow) of these are older. They would go to Recently Deleted within the hour.").text
+        }
         if selected == 1 {
             return String(localized: "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour.")
         }

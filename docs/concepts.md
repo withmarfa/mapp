@@ -108,7 +108,8 @@ The server one person owns, and the source of every item the app shows.
 - **A list never mixes Feed items in unmarked.** In a list of all items, each item in the Feed has the Feed's mark.
 - **A list never leaves Feed items out without a visible way to see them.**
 - **A count says what it counts.** The Library's row counts the Library. A count beside a title is of what the control after it names.
-- **A date to leave the Feed appears only where the item's type sets a limit.**
+- **Info says when an item leaves the Feed** only where its type sets a window and the item is active in the Feed: its creation plus the window's days of 24 hours.
+- **Move to Feed asks first** only where that moment has passed for an active item, since Marfa would bin it within the hour. An archived item stays, and so does one whose type is unknown or keeps its feed items.
 
 ## Archive and Recently Deleted
 

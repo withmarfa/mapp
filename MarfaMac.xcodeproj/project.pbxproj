@@ -739,7 +739,7 @@
 			repositoryURL = "https://github.com/withmarfa/marfa-swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.93;
+				minimumVersion = 0.0.98;
 			};
 		};
 		3310001B3066ED47005D07A2 /* XCRemoteSwiftPackageReference "app-telemetry-swift" */ = {

@@ -61,12 +61,15 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     /// The field that holds each item's own identity at the connector that writes the type, such as a GitHub issue's
     /// node ID. It is a fact for the connector, not something to read, so the page leaves it out until asked.
     var linkField: String?
+    /// How many whole days of 24 hours the type's feed items stay in the Feed from their creation, as Marfa resolves it
+    /// (a kind holds its parent's); nil where the type keeps its feed items.
+    var feedDays: Int?
 
     /// `plural` is the core's, which the catalogue always carries; where a preview or a test gives none, it is the label.
     init(
         id: TypeID, label: String, plural: String? = nil, fields: [Field], titleField: String?, bodyField: String?,
         parent: TypeID?, icon: String? = nil, description: String? = nil, version: Int64? = nil, roles: [String] = [],
-        linkField: String? = nil
+        linkField: String? = nil, feedDays: Int? = nil
     ) {
         self.id = id
         self.label = label
@@ -80,6 +83,7 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
         self.version = version
         self.roles = roles
         self.linkField = linkField
+        self.feedDays = feedDays
     }
 
     func declares(_ key: String) -> Bool { fields.contains { $0.key == key } }

@@ -141,7 +141,7 @@ private struct FeedLimitQuestionAlert: ViewModifier {
                 Browser.move(.moveToFeed, request.ids, in: library, undoManager: request.undoManager, toasts: details.toasts)
             }
         } message: { request in
-            Text(MoveWords.feedMessage(selected: request.ids.count, pastWindow: request.question.pastWindow))
+            Text(MoveWords.feedMessage(selected: request.ids.count, question: request.question))
         }
     }
 }

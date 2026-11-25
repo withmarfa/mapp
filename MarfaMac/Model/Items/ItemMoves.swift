@@ -30,8 +30,16 @@ nonisolated struct CommandOutcome: Equatable, Sendable {
 
 /// The question before Move to Feed of items older than the type's feed window, which the Feed would let go.
 nonisolated struct FeedLimitQuestion: Equatable, Sendable {
+    /// What the items past the window share, where they are of one type.
+    struct Window: Equatable, Sendable {
+        /// What the core calls a list of the type's items, such as `Messages`.
+        let typePlural: String
+        let days: Int
+    }
+
     /// How many of the items are older than the window.
     let pastWindow: Int
+    var window: Window?
 }
 
 extension ItemMove {
@@ -203,12 +211,36 @@ extension ItemLibrary {
         return offered
     }
 
-    /// Nil for now: the question waits for the type's feed window in the catalogue (withmarfa/marfa#3560,
-    /// withmarfa/marfa-swift#559), which `GET /types` alone does not give the copy.
-    func feedLimitQuestion(for ids: Set<ItemID>) -> FeedLimitQuestion? { nil }
+    /// Asks only where the move would put an item in the bin at once: an active item that `tierPlan` moves and that is
+    /// past its type's window (`Catalogue.feedExpiry`), the `feed-expiry` job running hourly. Nothing is asked of a type
+    /// the catalogue does not hold or that keeps its feed items, nor of an archived item, which the job leaves.
+    func feedLimitQuestion(for ids: Set<ItemID>) -> FeedLimitQuestion? { feedLimitQuestion(for: ids, now: .now) }
+
+    func feedLimitQuestion(for ids: Set<ItemID>, now: Date) -> FeedLimitQuestion? {
+        let past = tierPlan(ids, to: .feed).changing.compactMap(item).filter { item in
+            item.state == .active && catalogue.feedExpiry(of: item).map { now > $0 } == true
+        }
+        guard let first = past.first else { return nil }
+        let days = catalogue.itemTypes[first.type]?.feedDays
+        let window = days.flatMap { days in
+            past.allSatisfy { $0.type == first.type }
+                ? FeedLimitQuestion.Window(typePlural: catalogue.plural(for: first.type), days: days) : nil
+        }
+        return FeedLimitQuestion(pastWindow: past.count, window: window)
+    }
 
     /// A collection, a view or the app's settings stays in the Library.
     private func canGoToFeed(_ item: Item) -> Bool {
         !catalogue.isCollection(item.type) && !item.type.isHidden
+    }
+}
+
+nonisolated extension Catalogue {
+    /// When the type's feed window ends for `item`: its creation plus the type's days of 24 hours, as Marfa's `feed-expiry`
+    /// job counts them. Once it has passed, the job moves the item to the bin if it is active in the Feed. Nil where the
+    /// type keeps its feed items or the catalogue does not hold the type.
+    func feedExpiry(of item: Item) -> Date? {
+        guard let days = itemTypes[item.type]?.feedDays, days > 0 else { return nil }
+        return item.created.addingTimeInterval(Double(days) * 86_400)
     }
 }
