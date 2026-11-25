@@ -36,11 +36,12 @@ paths:
 
 ## Toolbar
 
-- **The toolbar is the same on every screen**, in one order: Search and View Options, View As, Share and More, then the right sidebar's button alone at the far right.
+- **The top row is drawn in the content under a hidden title;** a plain `toolbar` holds the buttons.
+  - It folds by the room it has. In the toolbar it needs a measured width, and an error, larger text or a closed sidebar sends everything to the overflow menu.
+  - It keeps one line with the sidebar closed or larger text, and VoiceOver reads it in order.
 - **An on button is gray, never the accent.**
-- **An item that cannot act dims**, so a person's arrangement keeps its shape from screen to screen.
-- **Trap:** nothing else in a window may declare a plain `toolbar`, because it turns customization off for the whole window.
-- **Trap:** each split view keeps a saved layout of its own (`WindowToolbarLayout`), because the system reshuffles one shared by several. A change to the sidebar's items changes the saved names.
+- **An item that cannot act dims**, so the row keeps its shape.
+- **Trap:** the row needs its own drag gesture and double click to move and zoom the window, and the window must hide its title, which returns in full screen.
 
 ## Corner
 
