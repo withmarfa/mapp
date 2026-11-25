@@ -79,7 +79,7 @@ struct TopRowContent {
             ? library.count(in: .library) + library.count(in: .feed) : library.count(in: shown, favoritesScope: listing.scope)
 
         // The Archive is a page of the Library and keeps its title through a search; its count says how many items it
-        // holds and how many of them a search or a filter leaves (`Browser.countLine`).
+        // holds and how many of them a search or a filter leaves.
         var count = results == nil ? listed : everything
         var narrowed = results.map(\.items.count)
         if browser.listsArchive {
