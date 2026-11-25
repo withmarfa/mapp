@@ -209,6 +209,8 @@ import Observation
     @ObservationIgnored var undoRuns: [WriteID: UndoRun] = [:]
     /// What follows the answer to each write of a state change, told what the answer means for the move (`setStates`).
     @ObservationIgnored var stateAnswers: [WriteID: (StateAnswer) -> Void] = [:]
+    /// The state writes the engine has not yet judged, and the change each belongs to (`stateWriteJudged`).
+    @ObservationIgnored var stateJudging: [WriteID: StateMoves] = [:]
     /// The restores whose item is archived once the server accepts them, and that item (`setStates`).
     @ObservationIgnored var awaitingArchive: [WriteID: ItemID] = [:]
     /// Restores answered blocked or dead whose archive will not follow, told together once no restore waits.

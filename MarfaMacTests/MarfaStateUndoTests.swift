@@ -71,6 +71,26 @@ import Testing
         #expect(library.notices.waiting.last?.message == String(localized: "That change wasn’t made, so there is nothing to redo here."))
     }
 
+    @Test func aRedoPressedBeforeTheUndoIsJudgedLeavesAnItemAnotherDeviceRecovered() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        library.delete([F.n1], undoManager: undo)
+        try await accept(F.n1, .trashed, in: library, source)
+        try #require(await eventually { library.stateJudging.isEmpty })
+        source.clearWrites()
+        // Another device recovers the item, and the copy syncs it.
+        try await show(F.n1, .active, in: library, source)
+
+        undo.undo()
+        undo.redo()
+        #expect(source.writes == [.restore(F.n1)], "the Redo waits for the engine to judge the Undo")
+        #expect(library.notices.waiting.last?.message == MarfaLibrary.earlierNotAnswered)
+        try skip(.changedSince, source)
+        #expect(await eventually { library.stateJudging.isEmpty })
+        #expect(source.writes == [.restore(F.n1)])
+        #expect(library.item(F.n1)?.state == .active)
+    }
+
     @Test func anUndoWhoseRestoreIsSkippedArchivesNothing() async throws {
         let (library, source, undo) = try await binnedFromArchive()
         undo.undo()

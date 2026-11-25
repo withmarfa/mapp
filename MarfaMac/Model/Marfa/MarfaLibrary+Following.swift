@@ -19,6 +19,7 @@ extension MarfaLibrary {
             propertyMarks[id] = nil
             read(id)
             answered(id, outcome, toldWithCommand: gatherAnswer(id, outcome))
+            stateWriteJudged(id, outcome)
             stateWriteAnswered(id, outcome)
             tierWriteAnswered(id, outcome)
             settle(id)
@@ -30,6 +31,7 @@ extension MarfaLibrary {
             if let edit = propertyEdits[id] { edit.take(holding: { item(edit.item)?.value(of: $0) }) }
             took(id)
             gatherAnswer(id, nil)
+            stateWriteJudged(id, nil)
             read(id)
             settle(id)
         case .catalogue(let catalogue):

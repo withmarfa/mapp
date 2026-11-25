@@ -28,24 +28,45 @@ extension MarfaLibrary {
     }
 
     /// The engine sends each write only while the copy shows the item in the state it leaves (`MarfaEngine.judge`).
-    /// The step registered in return reverses only the moves the server made or may still make.
+    /// The step registered in return reverses only the moves the server made or may still make, each recorded once
+    /// the engine has judged its write.
     func setStates(_ changes: [ItemID: StateChange], name: String, undoManager: UndoManager?) {
         guard !changes.isEmpty else { return }
         let made = StateMoves()
         for (id, change) in changes { move(id, change, recordingIn: made, name: name) }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            guard !made.moves.isEmpty else { return library.notices.tell(name, library.notMade) }
-            library.gatheringSkips(failing: name) {
-                library.setStates(made.moves.mapValues { (from: $0.to, to: $0.from) }, name: name, undoManager: undoManager)
-            }
+            library.reverse(made, name: name, undoManager: undoManager)
         }
+    }
+
+    /// An inverse sent before the engine judged the step's own writes could pass `judge` and undo a move the engine
+    /// then skipped, so the step waits: an Undo goes back on its stack and a Redo tells the person why it did not run.
+    private func reverse(_ made: StateMoves, name: String, undoManager: UndoManager?) {
+        guard made.judging.isEmpty else { return waitForEarlier(name: name) }
+        guard !made.moves.isEmpty else { return notices.tell(name, notMade) }
+        gatheringSkips(failing: name) {
+            setStates(made.moves.mapValues { (from: $0.to, to: $0.from) }, name: name, undoManager: undoManager)
+        }
+    }
+
+    /// The engine has judged `write`, which it queued where `outcome` is nil, or answered it first: its move is
+    /// recorded unless it will not be made.
+    func stateWriteJudged(_ write: WriteID, _ outcome: WriteOutcome?) {
+        guard let made = stateJudging.removeValue(forKey: write), let judged = made.judging.removeValue(forKey: write) else { return }
+        if let outcome, StateAnswer(outcome) == .notMade { return }
+        made.moves[judged.0] = judged.1
+    }
+
+    private func judge(_ write: WriteID, _ id: ItemID, _ change: StateChange, in made: StateMoves) {
+        made.judging[write] = (id, change)
+        stateJudging[write] = made
     }
 
     /// The server takes an item out of the bin only to active (`items/transition`), so a move from the bin to the
     /// archive restores it, then archives it once the server has accepted the restore. Queued together, the archive
     /// would be sent after a refused restore (`queue-and-verdicts/answer-frees-follower`) and archive an item another
-    /// device had restored meanwhile. Where the archive does not follow, the item ends active and the step registered
-    /// in return records that move.
+    /// device had restored meanwhile. The restore records the move to active; where the archive follows and is judged,
+    /// the move to the archive replaces it.
     private func move(_ id: ItemID, _ change: StateChange, recordingIn made: StateMoves, name: String) {
         guard item(id) != nil else { return skip(.gone) }
         let throughActive = change.from == .trashed && change.to == .archived
@@ -53,7 +74,9 @@ extension MarfaLibrary {
         let write = change.from == .trashed ? ItemWrite.restore(id) : .transition(id, change.to, from: change.from)
         let restore = submit(write, failing: title)
         guard isFollowed(restore) else { return }
-        made.moves[id] = change
+        gathering?.items[restore] = id
+        let active: StateChange = (from: change.from, to: .active)
+        judge(restore, id, throughActive ? active : change, in: made)
         if throughActive { awaitingArchive[restore] = id }
         let run = undoRun
         stateAnswers[restore] = { [weak self] answer in
@@ -61,20 +84,18 @@ extension MarfaLibrary {
             case .notMade:
                 made.moves[id] = nil
             case .mayBeMade:
-                if throughActive { made.moves[id] = (from: change.from, to: .active) }
+                break
             case .made:
                 guard let self, awaitingArchive.removeValue(forKey: restore) != nil else { return }
                 // Held like the step's own writes while the copy catches up, but the restore was made, so an archive
                 // the engine gives back or skips is told as not made rather than putting the step back.
                 within(run) {
                     let archive = submit(.transition(id, .archived, from: .active), failing: String(localized: "Recovered but Not Archived"))
-                    guard isFollowed(archive) else {
-                        made.moves[id] = (from: change.from, to: .active)
-                        return
-                    }
+                    guard isFollowed(archive) else { return }
                     leaveOutOfGiveBack(archive)
+                    judge(archive, id, change, in: made)
                     stateAnswers[archive] = { answer in
-                        if answer == .notMade { made.moves[id] = (from: change.from, to: .active) }
+                        if answer == .notMade { made.moves[id] = active }
                     }
                 }
             }
@@ -157,4 +178,6 @@ enum StateAnswer {
 /// return reverses only those.
 final class StateMoves {
     var moves: [ItemID: StateChange] = [:]
+    /// The writes the engine has not yet judged, and the move each would record.
+    var judging: [WriteID: (ItemID, StateChange)] = [:]
 }
