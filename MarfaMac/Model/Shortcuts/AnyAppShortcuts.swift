@@ -5,7 +5,9 @@ import Observation
 /// front; New Item opens the new-item line over the other app, which keeps the keyboard when it closes
 /// (`NewItemAnywhere`).
 nonisolated enum AnyAppCommand: String, CaseIterable, Sendable {
-    case commandPalette, searchItems, newItem
+    case commandPalette, searchItems
+    /// Stored under its first word, so a shortcut a person set is kept.
+    case newItem = "quickAdd"
 
     var title: String {
         switch self {
