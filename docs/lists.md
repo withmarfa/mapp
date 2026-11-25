@@ -36,7 +36,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
 - **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`). Settings and widths chosen meanwhile are the draft's (`ViewPanel.mac`); Cancel writes nothing to the original.
 - **Making, renaming and deleting a view needs the server and is never queued.** A changed or submitted draft stays open; leaving it, or a late refusal, gives it back in words. A rename never replaces another app's; deleting asks.
-- **Starting points are what Marfa saves exactly** (`NewViewStart`), and list their own items while chosen. This Search, first while searching, takes the sayable tokens, From as the tier, unless the From changed.
+- **Starting points list what Marfa saves** (`NewViewStart`). This Search comes first while searching and saves supported tokens and From unless From changed. An existing view opens after confirmation if the draft changed.
 - **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
 - **Favorites starts on Library** and offers the usual From choices, including All Items.
