@@ -6,18 +6,22 @@ import SwiftUI
 struct Sidebar: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
+    /// The places' kept choices, for the From whose favorites the Favorites row counts.
+    @AppStorage(PlaceDefaults.key) private var placeDefaults: Data?
     let browser: Browser
     let order: ItemOrder
 
     /// Works out what the list draws once, from what the sidebar depends on and nothing else: the library's
-    /// membership, its saved views and catalogue, the person's layout, and this window's tab and whether it is
-    /// customizing. A click, a selection or an edit that moves none of them never runs it, and its parts are handed
-    /// down as values, so a row whose own input is the same is not drawn again.
+    /// membership, its saved views and catalogue, the person's layout, the places' kept choices (for the Favorites
+    /// view's From), and this window's tab and whether it is customizing. A click, a selection or an edit that moves
+    /// none of them never runs it, and its parts are handed down as values, so a row whose own input is the same is not
+    /// drawn again.
     var body: some View {
         let _ = Cost.record(.sidebarBody, since: .now)
         SidebarList(
             content: SidebarContent(
-                library: library, layout: libraries.sidebarLayout, tab: browser.sidebarTab, customizing: browser.customizesSidebar),
+                library: library, layout: libraries.sidebarLayout, tab: browser.sidebarTab, customizing: browser.customizesSidebar,
+                favoritesScope: PlaceDefaults.favoritesScope(in: placeDefaults)),
             browser: browser, order: order)
     }
 }
@@ -42,7 +46,7 @@ struct SidebarContent {
 
     var showsTabs: Bool { tabs.count > 1 }
 
-    init(library: any ItemLibrary, layout: SidebarLayout, tab: String?, customizing: Bool) {
+    init(library: any ItemLibrary, layout: SidebarLayout, tab: String?, customizing: Bool, favoritesScope: ListScope = .library) {
         let plan = SidebarPlan(library, layout: layout)
         self.plan = plan
         self.customizing = customizing
@@ -55,7 +59,7 @@ struct SidebarContent {
             guard let item = place.opens, let symbol = place.symbol else { return nil }
             return SidebarPlaceRowData(
                 place: place, item: item, title: library.name(of: item), symbol: symbol,
-                count: place.showsCount ? library.count(in: item) : 0, tone: place.defaultTone == nil ? nil : layout.color(of: place))
+                count: place.showsCount ? library.count(in: item, favoritesScope: favoritesScope) : 0, tone: place.defaultTone == nil ? nil : layout.color(of: place))
         }
         sections = plan.groups(in: self.tab.id, customizing: customizing).map { group in
             SidebarSectionData(

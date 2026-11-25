@@ -467,10 +467,10 @@ extension ItemLibrary {
     }
 
     /// How many active items a window showing `shown` lists, as a sidebar row counts them: a saved view's members, the
-    /// Library's favorites, or the place in both tiers.
-    func count(in shown: PlaceView) -> Int {
+    /// favorites of the Favorites view's From (`favoritesScope`), or the place in both tiers.
+    func count(in shown: PlaceView, favoritesScope: ListScope) -> Int {
         if let id = shown.savedView { return items(inView: id).count }
-        if shown.isFavorites { return favoriteItems(in: .library, archived: .hidden).count }
+        if shown.isFavorites { return favoriteItems(in: favoritesScope, archived: .hidden).count }
         return count(in: shown.place)
     }
 

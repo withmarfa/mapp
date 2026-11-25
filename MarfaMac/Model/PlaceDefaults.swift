@@ -270,6 +270,12 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
         defaults.data(forKey: key).map { read($0).readable } ?? PlaceDefaults()
     }
 
+    /// The From the Favorites view lists, as stored in `data`: the person's choice, else the Library, whatever Settings
+    /// says (`Browser.listing(in:)`).
+    static func favoritesScope(in data: Data?) -> ListScope {
+        data.flatMap { read($0).readable.default(for: .favorites)?.scope } ?? .library
+    }
+
     /// Changes the stored defaults. What this write would replace and cannot read is kept aside first.
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PlaceDefaults) -> Void) {
         var value = PlaceDefaults()

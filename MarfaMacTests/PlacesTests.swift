@@ -161,6 +161,36 @@ struct PlacesTests {
         #expect(try read(#"{"favoriteItem":{"_0":"n1"}}"#).opensItem == nil)
     }
 
+    @Test func anEarlierWindowOpensItsItemAndFindsAFavoriteWhereItIsListed() throws {
+        let kept = FakeItemLibrary.note("Kept", modified: .now)
+        let fed = FakeItemLibrary.note("Fed", modified: .now, tier: .feed, isFavorite: true)
+        let library = FakeItemLibrary(items: [kept, fed])
+        func restored(_ text: String?, start: (place: PlaceView, selecting: ItemID?)? = nil) -> Browser {
+            let browser = Browser()
+            browser.defaults = ThrowawayDefaults.make("PlacesTests.restore")
+            browser.restore(from: text.map { Data($0.utf8) }, in: library, order: ItemOrder(), start: start)
+            return browser
+        }
+        let items = restored(#"{"place":{"allNotes":{}},"selection":["\#(kept.id.rawValue)"],"viewMode":"table","opensItem":true}"#)
+        #expect(items.shown == .library && items.selection == [kept.id] && items.isCollectionItemPresented)
+        let favorite = restored(#"{"place":{"favoriteItem":{"_0":"\#(fed.id.rawValue)"}},"selection":[]}"#)
+        #expect(favorite.shown == .feed && favorite.selection == [fed.id])
+        let started = restored(nil, start: (.library, fed.id))
+        #expect(started.shown == .feed && started.selection == [fed.id])
+    }
+
+    @Test func theFavoritesRowCountsWhatItsFromLists() throws {
+        let library = FakeItemLibrary(items: [
+            FakeItemLibrary.note("Kept", modified: .now, isFavorite: true),
+            FakeItemLibrary.note("Fed", modified: .now, tier: .feed, isFavorite: true),
+        ])
+        #expect(library.count(in: .favorites, favoritesScope: PlaceDefaults.favoritesScope(in: nil)) == 1)
+        let defaults = ThrowawayDefaults.make("PlacesTests.favoritesCount")
+        PlaceDefaults.update(in: defaults) { $0.set({ var all = PlaceDefault(); all.scope = .all; return all }(), for: .favorites) }
+        let scope = PlaceDefaults.favoritesScope(in: defaults.data(forKey: PlaceDefaults.key))
+        #expect(library.count(in: .favorites, favoritesScope: scope) == 2)
+    }
+
     @Test func aPlaceALaterCopyWroteIsWrittenBackAsItWas() throws {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("One", modified: .now), FakeItemLibrary.note("Two", modified: .now)])
         let written = #"{"place":{"place":"later:1","view":"own"},"selection":[]}"#
@@ -175,8 +205,10 @@ struct PlacesTests {
         // A view word this copy does not know is kept the same way.
         let view = try JSONDecoder().decode(Browser.Snapshot.self, from: Data(#"{"place":{"place":"feed","view":"pinned"},"selection":[]}"#.utf8))
         #expect(view.place == .feed && view.laterPlace?["view"] == "pinned")
-        // Once the person moves, the window is where they are.
+        // Once the person moves, the window is where they are, coming back too.
         browser.showing = .library
+        #expect(browser.snapshot().laterPlace == nil)
+        browser.showing = .feed
         #expect(browser.snapshot().laterPlace == nil)
         // An order of views keeps a word it does not know.
         var orders = ViewOrders(["library": ["pinned", "own"]])
