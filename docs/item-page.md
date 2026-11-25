@@ -23,20 +23,20 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 
 ## The head
 
-- **One head, built once.** `PageHead` decides the kicker, pins and rows; `editor/src/header.ts` and `PageHeadView` draw them. A rule added in a drawing would be missing from the other.
+- **One head, built once.** `PageHead` decides the kicker, pins and rows; `editor/src/header.ts` draws them on a page with text, `PageHeadView` on a saved web page. There the rows show values and open links, with no menu or drag, and only the kicker's type opens Change Type. A rule added in one drawing must be added in the other.
 - **The kicker** is the type's mark and name, then Read Only with a lock, Feed or Archived where true. It is a heading. The type's name opens Change Type where the item can change type.
 - **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset and hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
 - **A type that keeps no text shows its first six rows,** empty or not.
-- **A row is dragged by its name,** which shows a grey fill and six dots under the pointer. A drag or Move Up or Down moves only that row in the type's one order. VoiceOver reads grabber, name and value as three elements.
+- **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
 - **An event's time is one row, When,** always first, with how far off it is or All Day in grey.
-- **Long text stops after two lines;** an email, a phone and a number to call (`ListShape.numberToCall`) open; Location stands for latitude and longitude.
+- **Long text stops after two lines;** an email, a phone and a number to call open.
 - **A value is cut, never reworded,** and a linked item that cannot be read, is gone or is in the bin shows nothing, never an id.
 - **The head is never drawn again while the person types,** and a rebuild keeps the caret and the text's undo (`EditorController.showHeader`).
 - **Once the head is out of sight** the page says so with the item, title and mark (`DetailsPresentation.scrolledHead`).
 
 ## A row's menu
 
-`FieldMenu` is the rule; a row's name, or a right-click on the row, opens it: Show When It Has a Value, Always Show, Hide on <Type> Pages (and Pin Under the Title while pinned properties are on), then Move Up and Move Down, then the field's own entries.
+`FieldMenu` is the rule; a row's name, or a right-click on the row, opens it: Show When It Has a Value, Always Show, Hide on <Type> Pages (and Pin Under the Title while pinned properties are on), then Move Up and Move Down, then the field's own entries. A field Marfa or a plugin provides says so last instead.
 
 - **How a row shows belongs to the type** (`PagePlacements`, `RowShows`) and changes no item, so a read-only item can be arranged.
 - **Text is 15 points by default** (title 28 on 34), in steps of 13 to 24; a stored 11 or 12 reads as the nearest.
@@ -94,7 +94,6 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 - **A size belongs to one file.** Another item's page opens fitted.
 - **Focus belongs to one window and one item.** It hides the head only, so Linked From stays.
 - **Escape closes the formats bar first, then leaves Focus.** A sheet, the palette and quick add keep Escape for themselves.
-- **The formats bar runs the Format menu's commands** (`FormatsBar`), with no code of its own.
 
 ## Text and links
 
@@ -113,5 +112,5 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 ## Version history
 
 - **It takes the place of the left sidebar and the page** (`VersionHistoryWorkspace`), so nothing in it edits the item by mistake.
-- **The page shows the version as it was**, with the fields it pins, added words tinted and removed words struck through.
+- **The page shows the version as it was**, with the fields it pins while Pinned Properties is on, added words tinted and removed words struck through.
 - **Restoring is a new version**, and Restore Version is offered only when it can be done (`VersionHistoryMode`).

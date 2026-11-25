@@ -6,6 +6,7 @@ import SwiftUI
 /// but a long text, which keeps to two, with the whole of it in the help.
 struct PageHeadView<Title: View>: View {
     @CurrentLibrary private var library
+    @Environment(\.undoManager) private var undoManager
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let item: Item
     let head: PageHead
@@ -21,7 +22,9 @@ struct PageHeadView<Title: View>: View {
         let step = size * 4 / 13
         let shown = expanded ? head.rows : head.rows.filter { !$0.folded }
         VStack(alignment: .leading, spacing: 0) {
-            PageKicker(kicker: head.kicker)
+            PageKicker(kicker: head.kicker) {
+                drafts.typeChange = TypeChangeRequest(ids: [item.id], undoManager: undoManager)
+            }
                 .padding(.bottom, size * 6 / 13)
             title
             if !head.pins.isEmpty {
@@ -256,19 +259,23 @@ private struct PinLayout: Layout {
 }
 
 /// The kicker of a head SwiftUI draws: the type's mark in its tone and its name, 12 points at 500 in grey, then each of
-/// Read Only, Feed and Archived with its symbol, lighter. VoiceOver reads it as one heading.
+/// Read Only, Feed and Archived with its symbol, lighter. VoiceOver reads it as one heading. Where the type can be
+/// changed (`changesType`), its name is a button that asks for Change Type.
 struct PageKicker: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let kicker: PageHead.Kicker
+    let changeType: () -> Void
 
     var body: some View {
         let size = CGFloat(textSize)
         HStack(spacing: size * 8 / 13) {
-            HStack(spacing: size * 6 / 13) {
-                TonedGlyph(id: kicker.typeIcon, size: size * 12 / 13)
-                Text(verbatim: kicker.typeName)
+            if kicker.changesType {
+                Button(action: changeType) { typeName(size) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(verbatim: "\(kicker.typeName), \(String(localized: "Change Type"))"))
+            } else {
+                typeName(size)
             }
-            .foregroundStyle(.secondary)
             ForEach(kicker.flags, id: \.self) { flag in
                 HStack(spacing: size * 4 / 13) {
                     Image(systemName: flag.symbol)
@@ -280,8 +287,17 @@ struct PageKicker: View {
         }
         .font(.system(size: size * 12 / 13, weight: .medium))
         .frame(minHeight: size * 20 / 13)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(kicker.spoken)
+        // Where the type name is a button, the heading holds it and the flags, so the button stays reachable.
+        .accessibilityElement(children: kicker.changesType ? .contain : .ignore)
+        .accessibilityLabel(kicker.changesType ? "" : kicker.spoken)
         .accessibilityAddTraits(.isHeader)
+    }
+
+    private func typeName(_ size: CGFloat) -> some View {
+        HStack(spacing: size * 6 / 13) {
+            TonedGlyph(id: kicker.typeIcon, size: size * 12 / 13)
+            Text(verbatim: kicker.typeName)
+        }
+        .foregroundStyle(.secondary)
     }
 }

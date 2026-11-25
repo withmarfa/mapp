@@ -1036,6 +1036,16 @@ test('folded rows wait behind Show More, and a hidden one is grey once shown', (
   expect(more.hidden).toBe(true)
 })
 
+test('a page with every row folded keeps Show More and draws no hairline until a row shows', () => {
+  const folded = { ...rows(1)[0]!, id: 'hidden', folded: true }
+  header.set({ ...ticket, rows: [folded], showMore: 'Show 1 More' })
+  const box = root.querySelector<HTMLElement>('.item-rows')!
+  expect(box.hidden).toBe(false)
+  expect(box.classList.contains('bare')).toBe(true)
+  box.querySelector<HTMLButtonElement>('.item-more')!.click()
+  expect(box.classList.contains('bare')).toBe(false)
+})
+
 test("a long text is a row cut after two lines, and an event's When says how far off it is in grey", () => {
   header.set({
     ...ticket,

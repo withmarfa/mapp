@@ -125,6 +125,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Customize Layout | It goes, since a row's menu holds what it placed. | `CustomizeLayout.swift` | `Rethink-Item-Menus` |
+| Stored `rows` | A page placement is stored with `rows` beside `shows`, because a copy from before `shows` sets the whole map aside without `rows`. Removed after the first v0.1 release: write `shows` only and keep reading an old `rows` once. | `PagePlacements.swift` | – |
 | Scrolled | The title sits in the toolbar on one line. | `ItemDetail.swift`, `WindowToolbar.swift` | `Rethink-Page-Scrolled`, `Rethink-White-Page` |
 | Foot | Sub-Items with nesting on any item that has them; a Timeline of mentions on a person and a place; more after 30. | `LinkedFromPlace`, `editor/src/header.ts` | `Rethink-Sub-Items`, `Rethink-Person`, `Rethink-Place` |
 | Corner | Formats, text size and Focus on a written page; size and Focus otherwise; Open on a file. | `PageCorner` | `Rethink-Formats`, `Rethink-Focus` |

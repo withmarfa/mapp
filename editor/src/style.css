@@ -166,6 +166,12 @@ body {
   user-select: none;
 }
 
+/* The head's own bottom padding is the gap to the text; Inkkit's top padding would add to it. Focus hides the head and
+   keeps the padding. */
+body:has(> #item-header:not([hidden])) {
+  --inkkit-padding-top: 0px;
+}
+
 #item-header[hidden],
 #item-footer[hidden] {
   display: none;
@@ -741,6 +747,10 @@ button.item-kicker-type:focus-visible {
   margin-top: calc(var(--step) * 4);
   padding-bottom: calc(var(--step) * 2);
   border-bottom: 1px solid var(--separator);
+}
+
+.item-rows.bare {
+  border-bottom: 0;
 }
 
 .item-pins:not([hidden]) + .item-rows {

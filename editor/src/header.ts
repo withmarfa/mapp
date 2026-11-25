@@ -851,6 +851,7 @@ export class ItemHeader {
       : model.showMore
     this.moreProperties.setAttribute('aria-expanded', String(this.expanded.properties))
     this.rowsBox.hidden = shown.length === 0 && !folded
+    this.rowsBox.classList.toggle('bare', shown.length === 0)
 
     this.linked.draw(this.labels.linkedFrom, model.linked, model.linkedFoldAfter, {
       more: model.showMoreLinked,

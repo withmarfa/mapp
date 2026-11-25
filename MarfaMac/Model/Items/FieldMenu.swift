@@ -6,7 +6,7 @@ import Foundation
 /// on; then Move Up and Move Down; then the field's own menu. What changes the type for every item (rename, edit
 /// choices, remove) is offered only for a field the type declares and no type above it does, on a type that is not
 /// Marfa's own, and only while the server can be reached. A field that is not the person's to change shows what stops
-/// them instead, and none of those entries.
+/// them in that place instead, last, and none of those entries.
 nonisolated struct FieldMenu: Equatable, Sendable {
     enum Command: Hashable, Sendable {
         case showWhenSet, alwaysShow, hide

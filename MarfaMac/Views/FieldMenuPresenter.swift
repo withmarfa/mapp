@@ -49,13 +49,6 @@ enum FieldMenuPresenter {
         let result = NSMenu()
         result.autoenablesItems = false
         var keep: [Choice] = []
-        if let lock = menu.lockText {
-            let note = NSMenuItem(title: lock, action: nil, keyEquivalent: "")
-            note.image = NSImage(systemSymbolName: "lock", accessibilityDescription: nil)
-            note.isEnabled = false
-            result.addItem(note)
-            if !menu.sections.isEmpty { result.addItem(.separator()) }
-        }
         for (index, section) in menu.sections.enumerated() {
             if index > 0 { result.addItem(.separator()) }
             for entry in section {
@@ -74,6 +67,14 @@ enum FieldMenuPresenter {
                 }
                 result.addItem(item)
             }
+        }
+        // What stops a change stands where the field's own entries would, last.
+        if let lock = menu.lockText {
+            if !menu.sections.isEmpty { result.addItem(.separator()) }
+            let note = NSMenuItem(title: lock, action: nil, keyEquivalent: "")
+            note.image = NSImage(systemSymbolName: "lock", accessibilityDescription: nil)
+            note.isEnabled = false
+            result.addItem(note)
         }
         return (result, keep as AnyObject)
     }
