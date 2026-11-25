@@ -202,6 +202,17 @@ struct NavigationCostTests {
         }
     }
 
+    /// The sidebar's content on about fifty thousand items: the first build after the library loads, which counts
+    /// every type and its kinds, and each build after, which a change of layout or tab makes.
+    @Test func theSidebarOnALargeLibrary() async throws {
+        let (library, _) = try await BigLibrary.loaded(scale: 75)
+        let layout = SidebarLayout()
+        let first = median(1) { _ = SidebarContent(library: library, layout: layout, tab: nil, customizing: false) }
+        line("sidebar(\(library.items(in: .library).count))", "contentFirst", first)
+        line("sidebar", "content", median { _ = SidebarContent(library: library, layout: layout, tab: nil, customizing: false) })
+        line("sidebar", "customizing", median { _ = SidebarContent(library: library, layout: layout, tab: nil, customizing: true) })
+    }
+
     /// How often each cost runs for one window render of each layout, as the views ask for them today.
     @Test func countsForOneNavigation() async throws {
         let (library, _) = try await BigLibrary.loaded()
