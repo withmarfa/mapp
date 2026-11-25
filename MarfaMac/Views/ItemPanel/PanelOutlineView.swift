@@ -70,14 +70,14 @@ struct PanelOutlineView: View {
     }
 }
 
-/// The facts of a part: a small grid of labels over values, two to a row, with no boxes. `trailing` is a last fact that
-/// is a control, such as In.
+/// The facts of a part: a small grid of labels over values, two to a row, with no boxes. `trailing` holds the last facts,
+/// given as views, such as the control In.
 struct PanelFacts: View {
     let facts: [PanelFact]
-    var trailing: (name: String, content: AnyView)?
+    var trailing: [(name: String, content: AnyView)] = []
 
     var body: some View {
-        let count = facts.count + (trailing == nil ? 0 : 1)
+        let count = facts.count + trailing.count
         Grid(alignment: .topLeading, horizontalSpacing: PanelMetrics.factsGap.width, verticalSpacing: PanelMetrics.factsGap.height) {
             ForEach(Array(stride(from: 0, to: count, by: 2)), id: \.self) { start in
                 GridRow {
@@ -92,8 +92,9 @@ struct PanelFacts: View {
     @ViewBuilder private func cell(_ index: Int) -> some View {
         if index < facts.count {
             PanelFactCell(fact: facts[index])
-        } else if let trailing {
-            PanelFactCell(name: trailing.name) { trailing.content }
+        } else {
+            let fact = trailing[index - facts.count]
+            PanelFactCell(name: fact.name) { fact.content }
         }
     }
 }

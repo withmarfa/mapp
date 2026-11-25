@@ -328,6 +328,16 @@
     "%@ kept the mapping as it was." : {
 
     },
+    "%@ leave the Feed after ^[%lld day](inflect: true)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ leave the Feed after ^[%2$lld day](inflect: true)"
+          }
+        }
+      }
+    },
     "%@ lists its jobs once it has started them." : {
 
     },
@@ -1625,6 +1635,28 @@
 
     },
     "+%lld more" : {
+
+    },
+    ", and %lld of the %lld items are older." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : ", and %1$lld of the %2$lld items are older."
+          }
+        }
+      }
+    },
+    ", and 1 of the %lld items is older." : {
+
+    },
+    ", and all %lld are older." : {
+
+    },
+    ", and both are older." : {
+
+    },
+    ", and this one is older." : {
 
     },
     "0 sets no limit." : {
@@ -5503,6 +5535,9 @@
     "It will send events for %@." : {
 
     },
+    "It would go to Recently Deleted within the hour." : {
+
+    },
     "Italic" : {
 
     },
@@ -5982,6 +6017,9 @@
 
     },
     "Leave a field empty to use %@’s own default." : {
+
+    },
+    "Leaves the Feed" : {
 
     },
     "Left Out of Search" : {
@@ -9405,13 +9443,7 @@
     "The Connector" : {
 
     },
-    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
-
-    },
-    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
+    "The Feed lets items go after a while" : {
 
     },
     "The Folder Is Missing Where This Copy Is Kept" : {
@@ -10458,6 +10490,9 @@
     "They were removed from %@. This Mac keeps its own." : {
 
     },
+    "They would go to Recently Deleted within the hour." : {
+
+    },
     "They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it." : {
       "extractionState" : "manual"
     },
@@ -11088,7 +11123,19 @@
     "Unarchive" : {
 
     },
+    "Unarchive ^[%lld item](inflect: true)?" : {
+
+    },
+    "Unarchive “%@”?" : {
+
+    },
     "Unarchived “%@”" : {
+
+    },
+    "Unarchived, it would go to Recently Deleted within the hour." : {
+
+    },
+    "Unarchived, they would go to Recently Deleted within the hour." : {
 
     },
     "Unavailable" : {

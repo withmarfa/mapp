@@ -37,9 +37,8 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Feed | No count on its row, no words of waiting. Its first view is named All. | `SidebarGroups.swift`, `Browser` | `Rethink-Inbox`, `Rethink-Inbox-View`, `Rethink-Inbox-Page`, `Rethink-Inbox-Modal` |
 | Default From | Settings > Lists offers All Items (the default) and Library. | `PreferencesMap`, Settings > Lists | `Rethink-Scope-Menu` |
 | Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. The table of both tiers has it; the list and gallery do not yet. | `ItemRow.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
-| A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. **Waits for the package:** its catalogue does not say which types hold a table, and the app names no type (marfa-swift#561). | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |
+| A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. The package now says which types hold a table; the app does not use that yet. | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |
 | Quick Actions | Keep, Archive and Delete on the row under the pointer, a choice of each view, with the default that `docs/concepts.md` gives. | `ItemRow.swift`, `ViewMacSettings` | `Rethink-Inbox-Actions`, `Rethink-View-Quick-Actions` |
-| Leaves the Feed | A date beside In, only where the type has a limit and the item is active in the Feed. Move to Feed asks first only where the limit would remove the item at once: the alert is built and asks `ItemLibrary.feedLimitQuestion`, which answers nothing until the limit is in the catalogue. **Waits for Marfa and the package:** a type's feed window in the catalogue (marfa#3560, marfa-swift#559). | `PanelInfoView.swift`, `ItemMoves.swift` | `Rethink-Feed-Limit`, `Rethink-Feed-Limit-Move` |
 
 ## Archiving
 

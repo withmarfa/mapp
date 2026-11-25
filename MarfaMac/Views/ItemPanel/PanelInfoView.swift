@@ -12,6 +12,8 @@ struct PanelInfoModel {
     /// Which of Library and Feed the item may move to, or nil where it may not move at all.
     var moves: Set<Tier>?
     let move: (Tier) -> Void
+    /// When the item leaves the Feed, where its type has a window and the item is active in the Feed.
+    var leavesTheFeed: Date?
 }
 
 struct PanelInfoView<Legacy: View>: View {
@@ -26,7 +28,7 @@ struct PanelInfoView<Legacy: View>: View {
             if let line = PanelKeptBy.line(of: model.item, source: model.source, direction: direction) { keptBy(line) }
             PanelFacts(
                 facts: PanelInfo.facts(of: model.item, source: model.source, version: model.version, pages: model.pages, format: dateFormat),
-                trailing: (String(localized: "In"), AnyView(placeControl)))
+                trailing: [(name: String(localized: "In"), content: AnyView(placeControl))] + leavesTheFeed)
             historySection
             legacy
         }
@@ -85,6 +87,13 @@ struct PanelInfoView<Legacy: View>: View {
         } else {
             Text(name)
         }
+    }
+
+    /// The day the item leaves the Feed, beside In, as any value's day is written.
+    private var leavesTheFeed: [(name: String, content: AnyView)] {
+        guard let date = model.leavesTheFeed else { return [] }
+        let day = DateDisplay.text(of: date, hasTime: false, place: .value, format: dateFormat)
+        return [(name: String(localized: "Leaves the Feed"), content: AnyView(Text(verbatim: day)))]
     }
 
     private static func name(of tier: Tier) -> String {
