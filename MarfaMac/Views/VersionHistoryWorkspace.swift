@@ -27,8 +27,6 @@ struct VersionHistoryWorkspace: View {
                 }
                 // The thread's header already says it. The window keeps the title for Mission Control and VoiceOver.
                 .toolbar(removing: .title)
-                // Plain, not `toolbar(id:)`: the mode has nothing to arrange, so the window's toolbar is not customizable
-                // while it is on, and it names no saved layout to change or lose. The window's own layout comes back as it was.
                 .toolbar { toolbar }
         }
         .navigationTitle("Version History")

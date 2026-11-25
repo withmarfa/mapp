@@ -12,6 +12,7 @@ struct ItemList: View, Equatable {
     @State private var daysSeen = 0
     @State private var width = ColumnWidth.list.defaultWidth
     @SceneStorage("sidebarHidden") private var isSidebarHidden = false
+    @AppStorage(InterfaceKey.showsSidebarHistory) private var showsSidebarHistory = true
     @AppStorage(ListKey.density) private var settingsDensity = Density.standard
     /// Only watched: a place's density is read from the defaults (`Browser.density`), where another window may change it.
     @AppStorage(PlaceDensities.key) private var placeDensities: Data?
@@ -64,10 +65,13 @@ struct ItemList: View, Equatable {
             return .handled
         }
         .searchStatus(browser)
-        .bandsToolbar()
-        .toolbar(id: WindowToolbarLayout.list) {
-            // While the sidebar is hidden its button leads this column's toolbar, so the field has that much less room.
-            ListToolbar(browser: browser, columnWidth: width - (isSidebarHidden ? ColumnSearchMetrics.sidebarButtonRoom : 0))
+        .topRowScrolls()
+        .toolbar {
+            // While the sidebar is hidden its button and Back and Forward lead this column's toolbar, so the field has
+            // that much less room.
+            ListToolbar(
+                browser: browser, columnWidth: width - (isSidebarHidden ? ColumnSearchMetrics.sidebarButtonRoom : 0),
+                leadsWithHistory: isSidebarHidden && showsSidebarHistory)
         }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
@@ -88,11 +92,6 @@ struct ItemList: View, Equatable {
         } primaryAction: { ids in
             browser.open(ids)
         }
-        .navigationTitle(title)
-        // Hidden and folded groups leave the list, not the place, so their items still count.
-        .navigationSubtitle(subtitle(count: browser.listedCount(in: library) ?? sections.reduce(0) { $0 + $1.items.count }))
-        // The search field takes the title's place while it is out.
-        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
     }
 
     /// The list and its row traits, apart from `body` so that neither is too long for the compiler to check.
@@ -130,11 +129,6 @@ struct ItemList: View, Equatable {
         .accessibilityLabel(title)
         .focused(pane, equals: .list)
         .takesKeyboardOnClick { browser.focusRequest = .list }
-    }
-
-    private func subtitle(count: Int) -> Text {
-        let counted = browser.isSearching ? Text("^[\(count) result](inflect: true)") : Text("^[\(count) item](inflect: true)")
-        return counted.editedSubtitle(browser.hasViewChanges)
     }
 
     /// What was just typed reaches the item before it goes, since a deleted item takes no edit.

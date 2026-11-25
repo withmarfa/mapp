@@ -70,7 +70,7 @@ enum PreferencesMap {
     private static let members: [SyncedSetting] =
         members(AppearanceKey.all + [
             InterfaceKey.textSize, InterfaceKey.valuePanelStyle, InterfaceKey.paletteMaterial, InterfaceKey.showsScrolledTitle,
-            InterfaceKey.showsPageToolbarBackground, InterfaceKey.showsSidebarHistory, InterfaceKey.toolbarLabelStyle,
+            InterfaceKey.showsPageToolbarBackground, InterfaceKey.showsSidebarHistory,
             SidebarTypeRow.subtypeIconsKey,
         ], in: .appearance)
         + members([

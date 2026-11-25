@@ -49,7 +49,6 @@ enum TestHost {
 struct MarfaMacApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var settingsLauncher = SettingsLauncher()
-    @AppStorage(InterfaceKey.toolbarLabelStyle) private var toolbarLabelStyle: ToolbarLabelStyle = .iconOnly
     private var libraries: Libraries { delegate.libraries }
     static let mainWindowID = "main"
 
@@ -58,6 +57,8 @@ struct MarfaMacApp: App {
     var body: some Scene {
         WindowGroup(id: Self.mainWindowID) {
             RootView(settingsLauncher: settingsLauncher, libraries: libraries)
+                // The smallest the window goes: the panel, the sidebar, the control and the views have given way by then.
+                .frame(minWidth: 760, minHeight: 520)
                 .interfaceTextStyle()
                 // The page's web view is backed by this color, which, unlike the window's default background, is
                 // not tinted by the desktop. Making it the window's background gives the list, Settings and the
@@ -74,7 +75,7 @@ struct MarfaMacApp: App {
         }
         .handlesExternalEvents(matching: [])
         .defaultSize(width: 1100, height: 720)
-        .windowToolbarLabelStyle($toolbarLabelStyle)
+        .windowResizability(.contentMinSize)
         .commands {
             AppCommands(library: libraries.current, host: libraries.host, shortcuts: libraries.shortcuts)
             PlaceCommands(library: libraries.current, libraries: libraries)
@@ -82,7 +83,8 @@ struct MarfaMacApp: App {
             ImportFromDevicesCommands()
             LooksCommands(libraries: libraries)
             FormatCommands(shortcuts: libraries.shortcuts)
-            ToolbarCommands()
+            // No Customize Toolbar: the buttons are fixed, and every one is a command of the menus and the palette.
+            CommandGroup(replacing: .toolbar) {}
             SettingsCommands(launcher: settingsLauncher, shortcuts: libraries.shortcuts)
             AboutCommands(updater: delegate.updater)
             HelpCommands(launcher: settingsLauncher)
@@ -137,7 +139,6 @@ struct MarfaMacApp: App {
         }
         .handlesExternalEvents(matching: [])
         .defaultSize(width: 640, height: 720)
-        .windowToolbarLabelStyle($toolbarLabelStyle)
     }
 }
 

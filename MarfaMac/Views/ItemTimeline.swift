@@ -26,10 +26,9 @@ struct ItemTimeline: View {
             mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, day: Calendar.current.startOfDay(for: now))
         let contents = rowContents.contents(
             of: items, in: library, looks: browser.propertyLooks(in: library), list: list, shape: CardShape(leaving: field))
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
 
         timeline(groups, contents: contents, now: now)
-        .bandsToolbar()
+        .topRowScrolls()
         .searchStatus(browser)
         .overlay {
             if items.isEmpty {
@@ -41,10 +40,7 @@ struct ItemTimeline: View {
             }
         }
         .filteredEmptyState(browser)
-        .navigationTitle(title)
-        .navigationSubtitle(Text("^[\(items.count) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
         .background(ChosenRowOpensSidebar(browser: browser))
-        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
         }

@@ -2,14 +2,13 @@ import SwiftUI
 
 /// The tabs of an index page as a segmented control in the window's toolbar, which come in once the page's own tabs have
 /// scrolled away. They stand in the middle of the toolbar, where the title would.
-struct IndexTabsToolbarItem: CustomizableToolbarContent {
+struct IndexTabsToolbarItem: ToolbarContent {
     let browser: Browser
 
-    var body: some CustomizableToolbarContent {
-        ToolbarItem(id: "indexTabs", placement: .principal) {
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
             if let place = browser.indexPlace { IndexTabPicker(place: place).id(place) }
         }
-        .customizationBehavior(.disabled)
         .hidden(!browser.showsIndexTools)
     }
 }
@@ -18,16 +17,15 @@ struct IndexTabsToolbarItem: CustomizableToolbarContent {
 /// then the page's View Options. Edit is on Items whether or not the page is scrolled, since it has no counterpart
 /// on the page, but only while the page shows its New tiles (Settings > Lists). The rest are absent while the page's own buttons show. Search is the toolbar's field, which takes the
 /// text and the open state of the page's.
-struct IndexToolbarItems: CustomizableToolbarContent {
+struct IndexToolbarItems: ToolbarContent {
     @Bindable var browser: Browser
     @AppStorage(ListKey.showsQuickAdd) private var showsQuickAdd = false
 
-    var body: some CustomizableToolbarContent {
+    var body: some ToolbarContent {
         let showsTools = browser.showsIndexTools && browser.indexPlaceHasTools
-        ToolbarItem(id: "indexEdit") {
+        ToolbarItem {
             IndexEditButton(browser: browser)
         }
-        .customizationBehavior(.disabled)
         .hidden(browser.indexPlace != .items || !showsQuickAdd)
         ColumnSearch(
             isExpanded: $browser.isSearchExpanded,
@@ -35,11 +33,10 @@ struct IndexToolbarItems: CustomizableToolbarContent {
             prompt: String(localized: "Search"),
             layout: .item,
             focusRequests: browser.searchFocusRequests,
-            onDown: { browser.focusRequest = .list },
-            restoresTitle: false
+            onDown: { browser.focusRequest = .list }
         )
         .hidden(!showsTools)
-        ToolbarItem(id: "indexFilter") {
+        ToolbarItem {
             Toggle(isOn: Binding { browser.showsFilterRow } set: { _ in browser.toggleIndexFilter() }) {
                 Label("Filter", systemImage: "line.3.horizontal.decrease")
             }
@@ -48,14 +45,12 @@ struct IndexToolbarItems: CustomizableToolbarContent {
             .help(browser.toggleFiltersTitle)
             .accessibilityIdentifier("IndexFilterToolbar")
         }
-        .customizationBehavior(.disabled)
         .hidden(!showsTools)
-        ToolbarItem(id: "indexNew") {
+        ToolbarItem {
             IndexNewButton(browser: browser)
         }
-        .customizationBehavior(.disabled)
         .hidden(!showsTools)
-        ToolbarItem(id: "viewOptions") {
+        ToolbarItem {
             if let place = browser.indexPlace { IndexViewOptionsMenu(place: place, browser: browser) }
         }
     }

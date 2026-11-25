@@ -22,7 +22,6 @@ struct ItemBoard: View {
         let items = browser.filteredItems(in: library)
         // The lanes are the place's group (`Browser.boardGrouping`), so a saved view's group is its lanes.
         let lanes = browser.boardLanes(in: library)
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
         VStack(spacing: 0) {
             if let lanes {
                 let shown = browser.shownBoardLanes(lanes)
@@ -45,9 +44,6 @@ struct ItemBoard: View {
         }
         .searchStatus(browser)
         .filteredEmptyState(browser)
-        .navigationTitle(title)
-        .navigationSubtitle(Text("^[\(items.count) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
-        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .accessibilityIdentifier("ItemBoard")
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
@@ -95,7 +91,7 @@ struct ItemBoard: View {
                     // The window's own width at least, so a few lanes stay at the left.
                     .frame(minWidth: geometry.size.width, alignment: .leading)
                 }
-                .bandsToolbar()
+                .topRowScrolls()
             }
             .focusable()
             .focusEffectDisabled()

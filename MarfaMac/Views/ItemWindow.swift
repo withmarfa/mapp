@@ -12,8 +12,6 @@ struct ItemWindow: View {
     @Binding var id: ItemID?
     /// Where the item's file is, once known, for sharing.
     @State private var fileURL: URL?
-    /// Version History waits for Customize Toolbar's tray to close, as replacing a toolbar under its tray crashes.
-    @State private var isToolbarTrayOpen = false
 
     init(id: Binding<ItemID?>) {
         _id = id
@@ -55,13 +53,12 @@ struct ItemWindow: View {
 
     var body: some View {
         Group {
-            if let history = details.history, !isToolbarTrayOpen {
+            if let history = details.history {
                 VersionHistoryWorkspace(mode: history, details: details)
             } else {
                 page
             }
         }
-        .modifier(ToolbarTrayWatch { isToolbarTrayOpen = $0 })
         .focusedSceneValue(\.detailsPresentation, details)
         .toastOverlay()
         .environment(details)
@@ -107,7 +104,7 @@ struct ItemWindow: View {
                     .toolbar(removing: .title)
                     .focusedSceneValue(\.editor, editor)
                     .focusedSceneValue(\.focusedItems, FocusedItems(ids: [item.id], undoManager: undoManager))
-                    .toolbar(id: "note") {
+                    .toolbar {
                         WindowToolbar(browser: nil, items: [item], editor: editor, details: details)
                     }
             } else if let item {
@@ -116,7 +113,7 @@ struct ItemWindow: View {
                     .escapesFromPage(details)
                     .navigationTitle(item.displayTitle)
                     .focusedSceneValue(\.focusedItems, FocusedItems(ids: [item.id], undoManager: undoManager))
-                    .toolbar(id: "note") {
+                    .toolbar {
                         WindowToolbar(browser: nil, items: [item], editor: nil, details: details, fileURL: fileURL)
                     }
             }
@@ -124,7 +121,7 @@ struct ItemWindow: View {
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
             if let id {
                 ItemInspectorHost(itemID: id, details: details, editor: editor)
-                    .toolbar(id: "note") { InspectorToolbar(details: details, editor: editor) }
+                    .toolbar { InspectorToolbar(details: details, editor: editor) }
             }
         }
     }

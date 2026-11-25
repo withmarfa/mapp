@@ -27,10 +27,14 @@ struct MainView: View {
     /// Whether the window has restored what it showed, before which an item link waits, so the restore does not
     /// replace the item the link opened.
     @State private var isRestored = false
-    /// The shape kept while Customize Toolbar's tray is open: replacing a toolbar under its tray crashes, and menu
-    /// commands still reach the window. A change made meanwhile shows once the tray closes.
-    @State private var heldPresentation: WorkspacePresentation?
-    @State private var heldViewMode: ItemViewMode?
+    /// How far the list in front has scrolled, which the top row reads to bring the views up beside the title.
+    @State private var listScroll = TopRowScroll()
+    /// The window's width, which folds the panel and then the sidebar as the window narrows (`foldForWidth`).
+    @State private var windowWidth: CGFloat = 0
+    /// Whether the window folded the panel or the sidebar itself, and so opens it again when the room returns. A panel or
+    /// sidebar the person closed stays closed.
+    @State private var foldedPanel = false
+    @State private var foldedSidebar = false
     private let restoresWindow: Bool
 
     init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
@@ -64,17 +68,13 @@ struct MainView: View {
         return usesCollectionLayout ? .collection : .list
     }
 
-    private var shownPresentation: WorkspacePresentation { heldPresentation ?? workspacePresentation }
-    private var shownViewMode: ItemViewMode { heldViewMode ?? browser.viewMode }
+    private var shownPresentation: WorkspacePresentation { workspacePresentation }
+    private var shownViewMode: ItemViewMode { browser.viewMode }
 
     private var activeWindow: some View {
         // Release the outgoing toolbar providers before changing the column count.
         // Browser, editor, drafts, and column preferences remain above this presentation identity.
         dialogsWindow.id(shownPresentation)
-        .modifier(ToolbarTrayWatch { isOpen in
-            heldPresentation = isOpen ? workspacePresentation : nil
-            heldViewMode = isOpen ? browser.viewMode : nil
-        })
         .onChange(of: workspacePresentation) {
             editor.flush()
             // Version History takes the whole window, which the modal would otherwise stay over.
@@ -119,10 +119,11 @@ struct MainView: View {
     private var splitView: some View {
         // The gallery and the table replace this entire split view rather than changing the columns inside it.
         NavigationSplitView(columnVisibility: listColumnVisibility) {
-            sidebarColumn(WindowToolbarLayout.list)
+            sidebarColumn
         } content: {
             ItemList(browser: browser, order: order, pane: $pane).equatable()
                 .filterChips(browser)
+                .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, signal: topRowSignal)
                 // The split view reads the ideal only as it is built, so it comes from the tracker as it stands then.
                 .navigationSplitViewColumnWidth(
                     min: ColumnWidth.list.range.lowerBound, ideal: measuredWidths.width(of: .list),
@@ -130,25 +131,37 @@ struct MainView: View {
         } detail: {
             // The modal holds the window's one editor while it is open, so the page beside the list steps aside.
             Group {
-                if browser.isModalPresented { Color.clear } else { itemPage }
+                if browser.isModalPresented { Color.clear } else { itemPage.topRowOverPage(tools: pageTools, signal: topRowSignal) }
             }
                 .toastOverlay()
-                .modifier(itemInspector(WindowToolbarLayout.list))
-                .toolbar(id: WindowToolbarLayout.list) { windowToolbar(hasListColumn: true) }
+                .modifier(itemInspector)
+                .toolbar { windowToolbar(hasListColumn: true) }
         }
     }
 
     private func windowToolbar(hasListColumn: Bool = false) -> WindowToolbar {
         WindowToolbar(
             browser: browser, items: browser.selectedHeaderItems(in: library), editor: editor, details: details,
-            hasListColumn: hasListColumn, hasSidebarBack: isSidebarVisible && showsSidebarHistory)
+            hasListColumn: hasListColumn, hasHistory: showsSidebarHistory,
+            leadsWithHistory: !isSidebarVisible && showsSidebarHistory && !hasListColumn)
+    }
+
+    /// What the top row of a page reads, which the toolbar's own items read too.
+    private var pageTools: ItemToolbarActions {
+        ItemToolbarActions(library: library, browser: browser, items: browser.selectedHeaderItems(in: library), editor: editor, details: details)
+    }
+
+    /// What changes the toolbar's items beside a row, so the row measures its room again.
+    private var topRowSignal: AnyHashable {
+        AnyHashable(TopRowSignal(
+            isSearching: browser.isSearchExpanded, isPanelOpen: details.isPresented, isSidebarVisible: isSidebarVisible,
+            isPage: browser.isCollectionItemPresented, hasSelection: !browser.selection.isEmpty, layout: browser.viewMode))
     }
 
     /// Only the three-column split has a list column to measure.
     private var hasListColumn: Bool { shownPresentation == .list }
 
-    /// `toolbarLayout` is the split view's own, which all of its columns' toolbars share.
-    private func sidebarColumn(_ toolbarLayout: String) -> some View {
+    private var sidebarColumn: some View {
         VStack(spacing: 0) {
             Sidebar(browser: browser, order: order)
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
@@ -163,7 +176,7 @@ struct MainView: View {
             if hasListColumn, widths.count > 1 { measuredWidths.record(widths[1], for: .list) }
         }
         .toolbar(removing: .sidebarToggle)
-        .toolbar(id: toolbarLayout) {
+        .toolbar {
             SidebarToolbar(browser: browser, isSidebarVisible: Binding { isSidebarVisible } set: { isSidebarVisible = $0 })
         }
         // Last: under a toolbar the split view reads no limits, and the sidebar drags to any width.
@@ -192,24 +205,24 @@ struct MainView: View {
                     .toastOverlay()
             } else if shownPresentation == .items {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
-                    sidebarColumn(WindowToolbarLayout.items)
+                    sidebarColumn
                 } detail: {
                     ItemsIndex(browser: browser, pane: $pane)
                         .toastOverlay()
-                        .modifier(itemInspector(WindowToolbarLayout.items))
-                        .toolbar(id: WindowToolbarLayout.items) { windowToolbar() }
+                        .modifier(itemInspector)
+                        .toolbar { windowToolbar() }
                 }
             } else if shownPresentation == .index {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
-                    sidebarColumn(WindowToolbarLayout.index)
+                    sidebarColumn
                 } detail: {
                     SidebarIndex(browser: browser, details: details, order: order, pane: $pane)
                         .toastOverlay()
-                        .toolbar(id: WindowToolbarLayout.index) { windowToolbar() }
+                        .toolbar { windowToolbar() }
                 }
             } else if shownPresentation == .collection {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
-                    sidebarColumn(WindowToolbarLayout.collection(shownViewMode))
+                    sidebarColumn
                 } detail: {
                     Group {
                         if browser.showsCollection {
@@ -229,14 +242,14 @@ struct MainView: View {
                             }
                             .filterChips(browser)
                             .viewCorner(browser)
+                            .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, signal: topRowSignal)
                         } else {
-                            // The page has no title of the window's own to show.
-                            fullPage.toolbar(removing: .title)
+                            fullPage.topRowOverPage(tools: pageTools, signal: topRowSignal)
                         }
                     }
                     .toastOverlay()
-                    .modifier(itemInspector(WindowToolbarLayout.collection(shownViewMode)))
-                    .toolbar(id: WindowToolbarLayout.collection(shownViewMode)) { windowToolbar() }
+                    .modifier(itemInspector)
+                    .toolbar { windowToolbar() }
                 }
                 // Each view has its own split view: swapped inside one, the next squeezes the right sidebar to its
                 // minimum. Only the split is remade, as the dialogs above it watch the view for a saved view's layout.
@@ -247,12 +260,43 @@ struct MainView: View {
         }
     }
 
-    private func itemInspector(_ toolbarLayout: String) -> ItemInspectorColumn {
-        ItemInspectorColumn(browser: browser, details: details, editor: editor, toolbarLayout: toolbarLayout)
+    private var itemInspector: ItemInspectorColumn {
+        ItemInspectorColumn(browser: browser, details: details, editor: editor)
+    }
+
+    /// Under this width the panel folds, and under the next the sidebar does.
+    private static let panelFoldsBelow: CGFloat = 1000
+    private static let sidebarFoldsBelow: CGFloat = 900
+
+    /// Folds the panel and then the sidebar as the window narrows past their widths, and opens them again as it widens, but
+    /// only what it folded itself. It acts when the width crosses a limit, so a person who opens one in a narrow window
+    /// keeps it open.
+    private func foldForWidth(from old: CGFloat, to new: CGFloat) {
+        func crossed(_ limit: CGFloat) -> Bool? {
+            if new < limit, old >= limit || old == 0 { return true }
+            if new >= limit, old < limit, old > 0 { return false }
+            return nil
+        }
+        if let folds = crossed(Self.panelFoldsBelow) {
+            if folds, details.isPresented { foldedPanel = true; details.isPresented = false }
+            else if !folds, foldedPanel { foldedPanel = false; details.isPresented = true }
+        }
+        if let folds = crossed(Self.sidebarFoldsBelow) {
+            if folds, isSidebarVisible { foldedSidebar = true; isSidebarVisible = false }
+            else if !folds, foldedSidebar { foldedSidebar = false; isSidebarVisible = true }
+        }
     }
 
     private var presentedWindow: some View {
         workspace
+        // The window keeps a title for Mission Control and VoiceOver; the top row draws it.
+        .navigationTitle(library.name(of: browser.shown))
+        .hidesWindowTitle()
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { new in
+            let old = windowWidth
+            windowWidth = new
+            foldForWidth(from: old, to: new)
+        }
         // The window's toolbar is part of what a modal covers: dimmed and silent, as behind a sheet.
         .disabled(browser.isModalPresented)
         .escapesFromPage(details)
@@ -372,7 +416,7 @@ struct MainView: View {
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }
-            // After this update, not in it: chosen while the window's customizable toolbars are first mounted, the page
+            // After this update, not in it: chosen while the window's toolbars are first mounted, the page
             // can miss the selection and stay on No Item Selected.
             Task {
                 if restoresWindow { browser.restore(from: storedBrowser ?? earlierBrowser, in: library, order: order, start: StartWith.stored().start()) }
@@ -469,6 +513,16 @@ private enum WorkspacePresentation: Hashable {
     case list, collection, index, items, history
 }
 
+/// What changes the toolbar's items beside the top row, which the row measures again when any of it changes.
+private struct TopRowSignal: Hashable {
+    let isSearching: Bool
+    let isPanelOpen: Bool
+    let isSidebarVisible: Bool
+    let isPage: Bool
+    let hasSelection: Bool
+    let layout: ItemViewMode
+}
+
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every
 /// resize of the window lay out every column again, which made live resizing several times slower, and one applied
 /// after the column's toolbar raises an exception during layout when a new window opens.
@@ -476,10 +530,9 @@ private struct ItemInspectorColumn: ViewModifier {
     let browser: Browser
     let details: DetailsPresentation
     let editor: EditorController
-    let toolbarLayout: String
     /// Read once, as the window remakes this column when its layout changes and the column's own width goes with it.
     /// Kept out of the state as it changes, so a drag is not fed back into the column it is resizing.
-    @State private var width = UserDefaults.standard.object(forKey: InterfaceKey.inspectorWidth) as? Double ?? 310
+    @State private var width = UserDefaults.standard.object(forKey: InterfaceKey.inspectorWidth) as? Double ?? 300
 
     /// Whether the person is dragging the sidebar's own edge, which is what chooses its width. Dragging another divider
     /// or the window's edge can squeeze the sidebar too, and that is not a choice to keep.
@@ -497,7 +550,7 @@ private struct ItemInspectorColumn: ViewModifier {
                     UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)
                 }
                 .inspectorColumnWidth(min: 260, ideal: width, max: 440)
-                .toolbar(id: toolbarLayout) { InspectorToolbar(details: details, editor: editor, browser: browser) }
+                .toolbar { InspectorToolbar(details: details, editor: editor, browser: browser) }
         }
     }
 }

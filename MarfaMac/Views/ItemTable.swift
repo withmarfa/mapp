@@ -19,8 +19,6 @@ struct ItemTable: View {
     @AppStorage(ViewLayouts.key) private var viewLayouts = ViewLayouts()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @State private var daysSeen = 0
-    /// Whether rows have scrolled up past the headings, under the toolbar.
-    @State private var isUnderToolbar = false
     @State private var hover = ItemTableHover()
     @State private var placeTrace = TablePlaceTrace()
     /// The column widths last decoded, so a click does not decode them again.
@@ -44,7 +42,6 @@ struct ItemTable: View {
         let _ = setStartingWidths(browser.shownColumns(content.columns))
         let (allRows, rows) = (content.allRows, content.rows)
         let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
 
         ItemTableSelection(browser: browser, content: content) { selection in
             table(selection: selection, columns: content.columns, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
@@ -66,9 +63,6 @@ struct ItemTable: View {
                     }
                 }
             }
-            .navigationTitle(title)
-            .navigationSubtitle(subtitle(shown: rows.count, of: allRows.count).editedSubtitle(browser.hasViewChanges))
-            .toolbar(removing: browser.isSearchExpanded ? .title : nil)
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }
@@ -111,9 +105,8 @@ struct ItemTable: View {
         .tableStyle(.inset)
         .onChange(of: browser.panelIsOut) { _, isOut in if isOut { hover.clear() } }
         .softSelection(rows: pages.shownIDs + collapsed.sorted(), hovers: true, inert: pages.headerPlaces(collapsed: collapsed), selection: { browser.selection })
-        .quietTableHeader(isUnderToolbar: $isUnderToolbar, resizing: resizing)
-        .scrollEdgeEffectHidden(true, for: .top)
-        .toolbarBand(isUnderToolbar: isUnderToolbar)
+        .quietTableHeader(resizing: resizing)
+        .topRowTable()
         .remembersScroll(in: browser.listMemory)
         .alternatingRowBackgrounds(.disabled)
         .scrollContentBackground(.hidden)
@@ -197,12 +190,6 @@ struct ItemTable: View {
     /// or reordered, and both write the Properties list. One call sets the whole set, as a second would replace the first.
     static func disabledCustomization(of column: ItemTableColumn) -> TableColumnCustomizationBehavior {
         column.content == .title ? [.visibility, .reorder] : []
-    }
-
-    /// How many items show, and of how many once a filter hides some.
-    private func subtitle(shown: Int, of count: Int) -> Text {
-        if browser.isSearching { return Text("^[\(count) result](inflect: true)") }
-        return shown == count ? Text("^[\(count) item](inflect: true)") : Text("\(shown) of \(count) items")
     }
 
     /// The header's sort: a click puts its column first, and only the last few columns clicked are kept.

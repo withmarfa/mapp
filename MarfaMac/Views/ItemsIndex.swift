@@ -41,8 +41,6 @@ struct ItemsIndex: View {
         let tabs = browser.itemIndexTabs(in: library)
         content(tabs: tabs, searching: searching)
             .searchStatus(browser)
-            // The page has its own large title.
-            .toolbar(removing: .title)
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }
@@ -54,7 +52,6 @@ struct ItemsIndex: View {
             // An item that goes (deleted here or by another app, or gone on a sync) takes the right sidebar's content with it.
             .onChange(of: library.membershipRevision, initial: true) { browser.keepItemChoice(in: library) }
             .onDisappear { if browser.shown != .library { model.stop() } }
-            .navigationTitle(library.name(of: browser.shown))
             .accessibilityIdentifier("ItemsIndex")
     }
 

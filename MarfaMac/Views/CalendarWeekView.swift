@@ -112,8 +112,6 @@ struct CalendarWeekView: View {
             if isReady { position.scrollTo(x: CGFloat(tracker.settledIndex) * column, y: keyboard.offsetY) }
         }
         .onChange(of: firstDay) { _, day in go(to: day) }
-        .navigationTitle(ItemCalendar.title(of: DateInterval(start: first, end: end), calendar: calendar))
-        .navigationSubtitle(Text("Week \(calendar.component(.weekOfYear, from: first))").editedSubtitle(browser.hasViewChanges))
         .accessibilityLabel("Week")
     }
 

@@ -38,7 +38,7 @@ struct SidebarIndex: View {
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
             IndexInspector(choice: choice, place: place, rows: rows) { browser.show(PlaceView($0.place), in: library, order: order) }
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
-                .toolbar(id: WindowToolbarLayout.index) { InspectorToolbar(details: details, editor: nil, browser: browser) }
+                .toolbar { InspectorToolbar(details: details, editor: nil, browser: browser) }
         }
         .task(id: Following(place: place, library: ObjectIdentifier(library))) {
             choice.chosen = nil
@@ -69,9 +69,6 @@ struct SidebarIndex: View {
         }
         .focusedSceneValue(\.indexActions, actions(in: rows))
         .onDisappear { model.stop() }
-        // The page has its own large title.
-        .toolbar(removing: .title)
-        .navigationTitle(library.name(of: browser.shown))
         .accessibilityIdentifier("SidebarIndex")
     }
 

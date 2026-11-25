@@ -1,15 +1,13 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// A window's toolbar, which a person can change with Customize Toolbar. Each split view the main window mounts keeps a
-/// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
-/// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
+/// The buttons of a window's toolbar, and nothing else: the top row draws the title and the views in the content
+/// (`TopRow`), under the window's hidden title. A list has Search, View and Panel; an item's page has Favorite, Share
+/// and More as one group, then Panel. A person cannot rearrange them. Every action is a menu command too.
 ///
-/// The defaults run Search and View Options, View As, Share and More, and Details at the far right. Save as View… is in
-/// View Options and the View menu, never here. In the list Search and View Options are the list column's
-/// (`ListToolbar`). `ExtraToolbarItems` start in the tray. Format and the Reader and Original switch are in the page's
-/// corner (`ItemCorner`), not here.
-struct WindowToolbar: CustomizableToolbarContent {
+/// The index pages keep their own tabs and buttons until they go (`IndexToolbarItems`). Format and the Reader and
+/// Original switch are in the page's corner (`ItemCorner`), not here.
+struct WindowToolbar: ToolbarContent {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
     let browser: Browser?
@@ -18,199 +16,89 @@ struct WindowToolbar: CustomizableToolbarContent {
     let editor: EditorController?
     let details: DetailsPresentation
     var fileURL: URL?
-    /// Whether the list column holds Search and View Options, which otherwise come here.
+    /// Whether the list column holds Search and View, which otherwise come here.
     var hasListColumn = false
-    /// Whether Back stands over the sidebar, which a page opened from a layout then needs no Back of its own beside.
-    var hasSidebarBack = false
+    /// Whether Back and Forward are in the window, which a page opened from a layout then needs no Back of its own beside.
+    var hasHistory = false
+    /// Whether Back and Forward lead this column, because the sidebar that holds them is closed.
+    var leadsWithHistory = false
 
-    var body: some CustomizableToolbarContent {
+    var body: some ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
-        let showsItem = browser?.showsSidebarIndex != true
+        let isIndex = browser?.showsSidebarIndex == true
         let opensFromCollection = browser?.isCollectionItemPresented == true && !hasListColumn
-        // A navigation item that is merely hidden still moves the title in a collection, so these two come and go.
-        if let browser, opensFromCollection, !hasSidebarBack {
-            ToolbarItem(id: "backToCollection", placement: .navigation) {
+        let editsView = browser?.showsViewPanel == true
+        // A list beside its page has the page's buttons here; a list that spans the window has Search and View.
+        let listsHere = browser != nil && !isIndex && !hasListColumn && !opensFromCollection
+        let showsActions = !isIndex && !listsHere && !editsView
+        let showsDetails = !tools.showsInspector
+        if let browser, leadsWithHistory {
+            ToolbarItem(placement: .navigation) { SidebarHistory(browser: browser) }
+                .sharedBackgroundVisibility(.hidden)
+        }
+        if let browser, opensFromCollection, !hasHistory {
+            ToolbarItem(placement: .navigation) {
                 // A plain arrow with no label: it goes back to wherever the page was opened from.
                 Button("Back", systemImage: "chevron.backward") { browser.returnToCollection() }
                     .labelStyle(.iconOnly)
                     .help("Back")
                     .accessibilityIdentifier("BackToGallery")
             }
-            .customizationBehavior(.disabled)
         }
-        // In the list the item stays in the toolbar while the page's title is in view and only its text goes, rather
-        // than the item being hidden and shown as the page scrolls. A hidden item keeps no place at the detail
-        // column's leading edge, so the first time it was shown it could be laid out from the list column's side,
-        // under that column's buttons. Both kinds of page that scroll their header away (an item's, and a web page's)
-        // report through the window's `DetailsPresentation`, by item, so the title of the item shown before cannot
-        // appear for the next. Any other page keeps no header to scroll, so its item is hidden.
-        if hasListColumn || browser == nil {
-            ToolbarItem(id: "scrolledTitle") {
-                ScrolledItemTitle(title: tools.scrolledTitle, icon: tools.scrolledIcon, showsIcon: tools.hasHeaderAway, subtitle: tools.scrolledSubtitle)
+        // A window of its own has no top row, so the page's title is an item of its toolbar once its head has scrolled.
+        if browser == nil, showsScrolledTitle || tools.isFocused, let head = tools.scrolledPageTitle {
+            ToolbarItem {
+                ScrolledItemTitle(title: head.title, icon: head.icon, showsIcon: true, subtitle: head.subtitle)
             }
             .sharedBackgroundVisibility(.hidden)
-            .customizationBehavior(.disabled)
-            .hidden((!showsScrolledTitle && !tools.isFocused) || !tools.hasScrollingHeader || browser?.showsCollection == true)
-        } else if opensFromCollection, showsScrolledTitle || tools.isFocused, tools.hasHeaderAway {
-            ToolbarItem(id: "scrolledTitle", placement: .navigation) {
-                ScrolledItemTitle(title: tools.scrolledTitle, icon: tools.scrolledIcon, showsIcon: tools.hasHeaderAway, subtitle: tools.scrolledSubtitle)
-            }
-            .sharedBackgroundVisibility(.hidden)
-            .customizationBehavior(.disabled)
         }
-        // The index pages' tabs come into the toolbar once their own have scrolled away.
-        if let browser, browser.showsSidebarIndex, !hasListColumn { IndexTabsToolbarItem(browser: browser) }
+        if let browser, isIndex {
+            IndexTabsToolbarItem(browser: browser)
+        }
         ToolbarSpacer(.flexible)
-        // A hidden spacer still leaves its gap, so the fixed spacers are not hidden: each stands after a group that
-        // shows and before another that does, which keeps one standard gap between groups in every state. They are
-        // locked, so they come and go like the items that are.
-        // While a view is edited the toolbar keeps to what edits it: its layout is chosen in the panel, and Share and
-        // More act on items, not on the view.
-        let editsView = browser?.showsViewPanel == true
-        let showsViewTools = browser != nil && !hasListColumn && !opensFromCollection
-        // A full page opened from a layout has no view options, so no layout to choose.
-        let showsViewMode = browser != nil && showsItem && !editsView && !opensFromCollection
-        let showsActions = showsItem && !editsView
-        let showsDetails = !tools.showsInspector
-        let showsAfterViewMode = showsActions || showsDetails
-        let showsAfterViewTools = showsViewMode || showsAfterViewMode
-        if let browser, browser.showsSidebarIndex, !hasListColumn {
+        if let browser, isIndex {
             IndexToolbarItems(browser: browser)
+        } else if let browser, listsHere {
+            ViewToolbarItems(browser: browser, layout: .item)
         }
-        if let browser, !browser.showsSidebarIndex, !hasListColumn {
-            ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
+        if showsActions {
+            ToolbarItemGroup {
+                tools.withUndo { FavoriteButton(ids: tools.ids, undoManager: $0) }
+                tools.shareLink
+                tools.moreMenu.disabled(items.isEmpty)
+            }
         }
-        if browser != nil, !hasListColumn {
-            if showsViewTools && showsAfterViewTools { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
+        // With the panel open its own toolbar holds its button over the panel, so a gap stands before it either way.
+        if showsActions || (showsDetails && (listsHere || isIndex)) { ToolbarSpacer(.fixed) }
+        if showsDetails {
+            ToolbarItem { tools.detailsButton }
         }
-        if let browser {
-            ToolbarItem(id: "viewMode") { ViewModeMenu(browser: browser) }
-                .hidden(!showsViewMode)
-            if showsViewMode && showsAfterViewMode { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
-        }
-        ToolbarItem(id: "share") { tools.shareLink }
-            .hidden(!showsActions)
-        ToolbarItem(id: "more") {
-            tools.moreMenu.disabled(items.isEmpty)
-        }
-        .hidden(!showsActions)
-        // With the right sidebar open its own toolbar holds the Details button, which would otherwise join Share and
-        // More into one capsule, so the gap stands whether Details is here or over the sidebar.
-        if showsActions { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
-        ToolbarItem(id: "details") { tools.detailsButton }
-            .hidden(!showsDetails)
-        ExtraToolbarItems(tools: tools)
     }
 }
 
-/// What a person can add from the tray. Each is a command of the menu bar too. One that cannot act on what is showing
-/// dims, as Mail's do, so a layout keeps its shape from view to view.
-private struct ExtraToolbarItems: CustomizableToolbarContent {
-    let tools: ItemToolbarActions
-
-    var body: some CustomizableToolbarContent {
-        if let browser = tools.browser {
-            ToolbarItem(id: "historyBack") { HistoryButton(direction: .back, browser: browser) }
-                .defaultCustomization(.hidden)
-            ToolbarItem(id: "historyForward") { HistoryButton(direction: .forward, browser: browser) }
-                .defaultCustomization(.hidden)
-        }
-        ToolbarItem(id: "favorite") { tools.withUndo { FavoriteButton(ids: tools.ids, undoManager: $0) } }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "addTag") { tools.withUndo { AddTagButton(ids: tools.ids, details: tools.details, undoManager: $0) } }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "quickLook") { tools.command(.quickLook) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "openInNewWindow") { tools.command(.openInNewWindow) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "versionHistory") { VersionHistoryButton(ids: tools.ids, details: tools.details) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "customizeLayout") { CustomizeLayoutButton(ids: tools.ids, details: tools.details) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "addAttachment") { tools.command(.addAttachment) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "toggleSource") { tools.command(.toggleSource) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "print") { tools.command(.print) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "exportPDF") { tools.command(.exportPDF) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "delete") { tools.withUndo { ItemRemoveActions(ids: tools.ids, undoManager: $0, keepsPlace: true) } }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "bold") { FormatToggle(format: .bold, symbol: "bold", tools: tools) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "italic") { FormatToggle(format: .italic, symbol: "italic", tools: tools) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "bulletList") { FormatToggle(format: .bulletList, symbol: "list.bullet", tools: tools) }
-            .defaultCustomization(.hidden)
-        ToolbarItem(id: "checklist") { FormatToggle(format: .checklist, symbol: "checklist", tools: tools) }
-            .defaultCustomization(.hidden)
-    }
-}
-
-/// Back or Forward through the items a window has shown.
-private struct HistoryButton: View {
+/// Back or Forward through the places a window has shown, in one capsule.
+struct SidebarHistory: View {
     @CurrentLibrary private var library
-    let direction: SelectionHistory.Direction
     let browser: Browser
 
-    var body: some View {
-        switch direction {
-        case .back:
-            Button("Back", systemImage: "chevron.backward") { browser.go(.back, in: library) }
-                .disabled(!browser.canGoBack(in: library))
-        case .forward:
-            Button("Forward", systemImage: "chevron.forward") { browser.go(.forward, in: library) }
-                .disabled(!browser.canGoForward(in: library))
-        }
-    }
-}
-
-/// A style of the Format menu as a button of its own, on while the caret is in that style.
-private struct FormatToggle: View {
-    let format: Format
-    let symbol: String
-    let tools: ItemToolbarActions
+    /// The height of the toolbar's own glass.
+    private static let height: CGFloat = 36
 
     var body: some View {
-        let editor = tools.editableItem == nil ? nil : tools.editor
-        Toggle(isOn: Binding { editor.map { format.isActive(in: $0.caret) } ?? false } set: { _ in editor?.apply(format) }) {
-            Label { Text(format.title) } icon: { Image(systemName: symbol) }
+        HStack(spacing: 0) {
+            Button("Back", systemImage: "chevron.backward") { browser.stepBack(in: library) }
+                .disabled(!browser.canStepBack(in: library))
+                .help("Back")
+                .accessibilityIdentifier("SidebarBack")
+            Button("Forward", systemImage: "chevron.forward") { browser.stepForward(in: library) }
+                .disabled(!browser.canStepForward(in: library))
+                .help("Forward")
+                .accessibilityIdentifier("SidebarForward")
         }
-        .disabled(editor?.canApply(format) != true)
-    }
-}
-
-/// The saved toolbars of the main window, one for each split view it mounts. All of a split view's columns name the same
-/// one. A layout saved under a name without the sidebar's items (`SidebarToolbar`) would show none of them, so a change to
-/// those items changes these names.
-enum WindowToolbarLayout {
-    static let list = "window.list"
-    static let index = "window.index"
-    static let items = "window.items"
-
-    static func collection(_ mode: ItemViewMode) -> String { "window.collection.\(mode)" }
-}
-
-/// Says when the Customize Toolbar tray of this window opens and closes. Menu commands still reach a window under its
-/// tray, so a window holds its shape meanwhile. Only the active window's tray counts: it is where the tray opens from.
-struct ToolbarTrayWatch: ViewModifier {
-    @Environment(\.appearsActive) private var appearsActive
-    @State private var trayWindow: NSWindow?
-    let changed: (Bool) -> Void
-
-    func body(content: Content) -> some View {
-        content
-            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willBeginSheetNotification)) { sheet in
-                guard appearsActive, let window = sheet.object as? NSWindow, window.toolbar?.customizationPaletteIsRunning == true else { return }
-                trayWindow = window
-                changed(true)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { sheet in
-                guard let window = sheet.object as? NSWindow, window === trayWindow else { return }
-                trayWindow = nil
-                changed(false)
-            }
+        .labelStyle(.iconOnly)
+        .frame(height: Self.height)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -260,13 +148,13 @@ struct ScrolledItemTitle: View {
 /// inspector can always be closed whatever a person's layout holds, or the view panel's actions while it has the
 /// column. It contributes nothing while the inspector is closed, because the system keeps a closed inspector's toolbar
 /// and would show a second Details beside the page's.
-struct InspectorToolbar: CustomizableToolbarContent {
+struct InspectorToolbar: ToolbarContent {
     @CurrentLibrary private var library
     let details: DetailsPresentation
     let editor: EditorController?
     var browser: Browser?
 
-    var body: some CustomizableToolbarContent {
+    var body: some ToolbarContent {
         if details.isPresented, browser?.isModalPresented != true {
             if let browser, details.isEditingView, let panel = browser.viewPanel {
                 ViewPanelToolbar(browser: browser, panel: panel, editor: editor)
@@ -275,22 +163,18 @@ struct InspectorToolbar: CustomizableToolbarContent {
                 if let browser, browser.showsItemsIndex {
                     let items = browser.selectedHeaderItems(in: library)
                     let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: nil, details: details)
-                    ToolbarItem(id: "inspectorOpen") {
+                    ToolbarItem {
                         Button("Open") { browser.openSelection() }
                             .disabled(browser.selection.count != 1)
                             .help("Open")
                             .accessibilityIdentifier("OpenItemToolbar")
                     }
-                    .customizationBehavior(.disabled)
-                    ToolbarItem(id: "inspectorShare") { tools.shareLink.disabled(items.isEmpty) }
-                        .customizationBehavior(.disabled)
-                    ToolbarItem(id: "inspectorMore") { tools.moreMenu.disabled(items.isEmpty) }
-                        .customizationBehavior(.disabled)
+                    ToolbarItem { tools.shareLink.disabled(items.isEmpty) }
+                    ToolbarItem { tools.moreMenu.disabled(items.isEmpty) }
                 }
-                ToolbarItem(id: "inspectorDetails") {
+                ToolbarItem {
                     DetailsToggle(details: details, editor: editor)
                 }
-                .customizationBehavior(.disabled)
             }
         }
     }
@@ -397,6 +281,13 @@ struct ItemToolbarActions {
         if let item = focusedItem { return library.pageLayout(of: item) == .text ? item.title : item.displayTitle }
         guard let item = itemWithScrollingHeader, details.isHeaderAway(of: item.id) else { return "" }
         return library.pageLayout(of: item) == .text ? item.title : item.displayTitle
+    }
+
+    /// What the top row shows of the page once its head has scrolled away, and nil while the head shows. The one place the
+    /// row reads it, so the page's own report (`DetailsPresentation`) replaces these four reads in one step.
+    var scrolledPageTitle: (title: String, icon: String?, subtitle: String?)? {
+        guard hasHeaderAway else { return nil }
+        return (scrolledTitle, scrolledIcon, scrolledSubtitle)
     }
 
     /// The icon id of the item's type, shown before the title wherever the title is shown. Nil for a type with no icon.
