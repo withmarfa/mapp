@@ -98,7 +98,7 @@ nonisolated enum SampleLibrary {
             fields: [
                 TypeField(name: "title", type: "string", declaredBy: "core.note"),
                 TypeField(name: "body", type: "string", declaredBy: "core.note"),
-            ], titleField: "title", bodyField: "body"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:sticky-note"),
         ItemType(
             id: "core.task", label: "Task", description: "Something to do.",
             fields: [
@@ -119,7 +119,7 @@ nonisolated enum SampleLibrary {
                     definition: ["items_type": "object", "items_fields": [
                         "name": ["type": "string"], "email": ["type": "email"],
                     ]]),
-            ], titleField: "title", bodyField: "body"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:square-check-big"),
         ItemType(
             id: "core.event", label: "Event", description: "Something that happens at a time.",
             fields: [
@@ -134,7 +134,7 @@ nonisolated enum SampleLibrary {
                         "name": ["type": "string"], "email": ["type": "email"],
                         "response": ["type": "enum", "enum_values": ["needs_action", "accepted", "declined", "tentative"]],
                     ]]),
-            ], titleField: "title", bodyField: "body"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:calendar"),
         ItemType(
             id: "core.entity.person", label: "Person", plural: "People", description: "Someone you know.",
             fields: [
@@ -156,7 +156,7 @@ nonisolated enum SampleLibrary {
                         "label": ["type": "string"], "street_address": ["type": "string"], "locality": ["type": "string"],
                         "region": ["type": "string"], "postal_code": ["type": "string"], "country": ["type": "string"],
                     ]]),
-            ], titleField: "title"),
+            ], titleField: "title", icon: "lucide:user"),
         ItemType(
             id: "core.media", label: "Media", plural: "Media", description: "Something to read, watch or play.",
             fields: [
@@ -168,14 +168,14 @@ nonisolated enum SampleLibrary {
                         ["value": "finished", "group": "completed"], ["value": "abandoned", "group": "canceled"],
                     ]]),
                 TypeField(name: "rating", type: "integer", declaredBy: "core.media", definition: ["minimum": 1, "maximum": 5]),
-            ], titleField: "title"),
+            ], titleField: "title", icon: "lucide:library-big"),
         ItemType(
             id: "sample.project", label: "Project", description: "Work with an outcome.", parent: "core.note",
             fields: [
                 TypeField(name: "title", type: "string", declaredBy: "core.note"),
                 TypeField(name: "body", type: "string", declaredBy: "core.note"),
                 TypeField(name: "description", type: "string", declaredBy: "sample.project"),
-            ], titleField: "title", bodyField: "body"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:briefcase"),
         ItemType(
             id: "core.collection", label: "Collection",
             description: "Items of any type that you gather together. Members join it through the in-collection edge, and it can hold any item but another container.",
@@ -183,7 +183,7 @@ nonisolated enum SampleLibrary {
                 TypeField(name: "title", type: "string", required: true, description: "Name of the collection", declaredBy: "core.collection"),
                 TypeField(
                     name: "description", type: "string", description: "What the collection gathers", declaredBy: "core.collection"),
-            ], titleField: "title", bodyField: "description", roles: ["container"]),
+            ], titleField: "title", bodyField: "description", icon: "lucide:layers", roles: ["container"]),
     ]
 
     static let edgeTypes: [Marfa.EdgeType] = [

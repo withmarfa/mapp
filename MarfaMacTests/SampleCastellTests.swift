@@ -40,6 +40,16 @@ import Testing
         #expect(seconds < 10)
     }
 
+    /// A mark and a chip take their color from the type's icon, so a sample type with items and no icon the tone table knows
+    /// would draw gray.
+    @Test func everyTypeWithItemsHasAnIconTheToneTableKnows() {
+        let catalogue = MarfaMapping.catalogue(itemTypes: SampleCastell.itemTypes, edgeTypes: SampleLibrary.edgeTypes)
+        for type in Set(SampleCastell.world(.studio, now: .now).items.map(\.type)).sorted() {
+            let icon = catalogue.icon(for: TypeID(type))
+            #expect(icon.flatMap { TypeTone.table[$0] } != nil, "\(type) has icon \(icon ?? "none")")
+        }
+    }
+
     /// The places show the studio as its boards count it, read through the library's place calls: the Library holds only
     /// Library items, the Feed only Feed items, the Archive every archived item of both tiers, and each source, type and
     /// collection what it wrote or holds.
