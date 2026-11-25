@@ -596,19 +596,3 @@ extension Browser {
         if shown.savedView == id { showing = firstView(of: shown.place, in: library) }
     }
 }
-
-nonisolated extension ViewMacSettings {
-    /// Restores the top-level keys that changed between the step's encoded settings.
-    mutating func undo(_ step: (before: ViewMacSettings, after: ViewMacSettings)) {
-        guard var now = Self.members(of: self), let before = Self.members(of: step.before), let after = Self.members(of: step.after)
-        else { return }
-        for key in Set(before.keys).union(after.keys) where before[key] != after[key] { now[key] = before[key] }
-        guard let data = try? JSONEncoder().encode(now), let undone = try? JSONDecoder().decode(Self.self, from: data) else { return }
-        self = undone
-    }
-
-    private static func members(of settings: ViewMacSettings) -> [String: JSONValue]? {
-        guard let data = try? JSONEncoder().encode(settings) else { return nil }
-        return try? JSONDecoder().decode([String: JSONValue].self, from: data)
-    }
-}
