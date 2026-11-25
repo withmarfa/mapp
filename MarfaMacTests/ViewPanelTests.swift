@@ -108,9 +108,8 @@ struct ViewPanelTests {
         #expect(held.query.states == unknown.query.states)
         #expect(held.sort == sort)
         #expect(held.group == group)
-        browser.setShowsQuickActions(false)
+        await Self.change(browser) { browser.setShowsQuickActions(false) }
         #expect(!browser.showsQuickActions)
-        await browser.choicesChanged()?.value
         #expect(Self.held(library)?.version == 2)
     }
 
