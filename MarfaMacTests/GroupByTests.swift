@@ -183,6 +183,61 @@ struct GroupByTests {
         #expect(opened.hiddenGroups == [""])
     }
 
+    /// Chooses `mode` on `column` in a view that has no grouping, puts `order` first and hides `hidden`, and reads the
+    /// view back as the window opens it.
+    private static func roundTrip(
+        _ column: ItemTableColumn, mode: GroupMode, types: [TypeID] = [], order: [String], hidden: Set<String>
+    ) throws -> (written: LibraryViewGroup, reread: ItemTableOptions) {
+        var view = LibraryView(id: ItemID("v"), title: "V", version: 2)
+        view.query.types = types
+        var window = ViewDraft.Window(place: .saved(view.id), columns: [column], sort: [], grouping: column)
+        window.layout = .table
+        window.groupMode = mode
+        let seed = ViewDraft.options(for: view, catalogue: catalogue)
+        var chosen = seed
+        chosen.grouping = .column(column.id, by: mode)
+        let first = ViewDraft.change(window, options: chosen, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: catalogue)
+        guard case .set(let grouped) = try #require(first.change.group) else { throw CancellationError() }
+        #expect(first.unkept.isEmpty)
+        view.group = grouped
+        let regrouped = ViewDraft.options(for: view, catalogue: catalogue)
+        #expect(regrouped.grouping == .column(column.id, by: mode), "the view opens with the grouping it was given")
+        var arranged = regrouped
+        arranged.groupOrder = order
+        arranged.hiddenGroups = hidden
+        let second = ViewDraft.change(window, options: arranged, seed: regrouped, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: catalogue)
+        guard case .set(let written) = try #require(second.change.group) else { throw CancellationError() }
+        view.group = written
+        return (written, ViewDraft.options(for: view, catalogue: catalogue))
+    }
+
+    @Test func aViewKeepsGroupsByStatusGroupWithTheirOrderAndHiddenGroups() throws {
+        let column = ItemTableColumn(id: "field.status", label: "Status", content: .field(Self.taskStatus), style: .status)
+        let result = try Self.roundTrip(column, mode: .statusGroups, types: [Self.task], order: ["completed", "not_started"], hidden: [""])
+        #expect(result.written == LibraryViewGroup(
+            field: "status_group", order: [.string("completed"), .string("not_started")], hidden: [.null]))
+        #expect(result.reread.grouping == .column("field.status", by: .statusGroups))
+        #expect(result.reread.groupOrder == ["completed", "not_started"])
+        #expect(result.reread.hiddenGroups == [""])
+    }
+
+    @Test func aViewKeepsGroupsBySetOrNotSetWithTheirOrderAndHiddenGroups() throws {
+        let column = ItemTableColumn(id: "field.due_at", label: "Due", content: .field(Self.due), style: .date)
+        let result = try Self.roundTrip(column, mode: .presence, order: [GroupKey.notSet], hidden: [GroupKey.set])
+        #expect(result.written == LibraryViewGroup(field: "properties.due_at", byPresence: true, order: [.bool(false)], hidden: [.bool(true)]))
+        #expect(result.reread.grouping == .column("field.due_at", by: .presence))
+        #expect(result.reread.groupOrder == [GroupKey.notSet])
+        #expect(result.reread.hiddenGroups == [GroupKey.set])
+    }
+
+    @Test func aViewKeepsGroupsBySourceWithTheirOrderAndHiddenGroups() throws {
+        let result = try Self.roundTrip(.source, mode: .value, order: ["mail", ""], hidden: ["calendar"])
+        #expect(result.written == LibraryViewGroup(field: "source", order: [.string("mail"), .null], hidden: [.string("calendar")]))
+        #expect(result.reread.grouping == .column(ItemTableColumn.source.id, by: .value))
+        #expect(result.reread.groupOrder == ["mail", ""])
+        #expect(result.reread.hiddenGroups == ["calendar"])
+    }
+
     // MARK: The board
 
     @Test func aBoardByNotSetClearsAnOptionalFieldAndRefusesARequiredOne() {

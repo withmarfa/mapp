@@ -175,7 +175,7 @@ struct ViewPanelSwitchRow: View {
                 .foregroundStyle(.secondary)
                 .frame(width: ViewPanelMetrics.symbolWidth)
                 .accessibilityHidden(true)
-            Toggle(isOn: Binding { isOn } set: set) {
+            Toggle(isOn: Binding { isOn } set: { set($0) }) {
                 Text(verbatim: label)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

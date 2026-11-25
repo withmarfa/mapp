@@ -4,7 +4,7 @@ import Testing
 @testable import MarfaMac
 
 /// What the panel that edits a view does: each change shows in the window as it is made, is written to a saved view as it
-/// is made, and is taken back by one Undo. Done only closes the panel, except for a new view, which it makes.
+/// is made, and is taken back by one Undo. Closing the panel writes nothing more, except a new view's Create View.
 @MainActor
 // Serialised: each test drives its own undo manager's groups by hand, and tests that interleave on the main actor hung the host.
 @Suite(.serialized, .hangLimit)
@@ -25,7 +25,9 @@ struct ViewPanelTests {
             sort: [LibraryViewSort(field: "updated_at", ascending: false)], group: LibraryViewGroup(field: "properties.status"))
     }
 
-    private static func opened(filter: String? = nil, reachesServer: Bool = true) -> (Browser, FakeItemLibrary, UndoManager) {
+    private static func opened(
+        filter: String? = nil, view custom: LibraryView? = nil, reachesServer: Bool = true
+    ) -> (Browser, FakeItemLibrary, UndoManager) {
         let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let tasks = ["todo", "done", "in_progress"].enumerated().map { index, status in
             Item(
@@ -33,7 +35,7 @@ struct ViewPanelTests {
                 properties: [Property(key: "status", value: .string(status))], version: ItemVersion(1), created: date, modified: date)
         }
         let library = FakeItemLibrary(items: tasks, now: date)
-        library.views = [view(filter: filter)]
+        library.views = [custom ?? view(filter: filter)]
         library.viewMembers[id] = tasks.map(\.id)
         library.reachesServer = reachesServer
         let undo = UndoManager()
@@ -85,6 +87,31 @@ struct ViewPanelTests {
         await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
         #expect(Self.held(library)?.version == 2)
         #expect(Self.held(library)?.query.filter?.contains("todo") == true)
+    }
+
+    /// A view another app wrote, with a sort, a group and a condition this app cannot show, keeps them all when the
+    /// panel changes one setting, and a setting only this Mac keeps writes nothing to it.
+    @Test func oneChangeKeepsWhatTheAppCannotShow() async throws {
+        let sort = [LibraryViewSort(field: "properties.mood", ascending: true), LibraryViewSort(field: "updated_at", ascending: false)]
+        let group = LibraryViewGroup(field: "properties.weather", order: [.string("sunny")], hidden: [.string("rain")], otherBucket: "elsewhere")
+        let unknown = LibraryView(
+            id: Self.id, title: "Open Tasks", version: 1,
+            query: LibraryViewQuery(types: [TypeID("core.task")], states: [.active], filter: #"properties.mood eq "calm""#),
+            sort: sort, group: group)
+        let (browser, library, _) = Self.opened(view: unknown)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        let held = try #require(Self.held(library))
+        #expect(held.version == 2)
+        #expect(held.query.filter?.contains(#""calm""#) == true)
+        #expect(held.query.filter?.contains(#""todo""#) == true)
+        #expect(held.query.types == unknown.query.types)
+        #expect(held.query.states == unknown.query.states)
+        #expect(held.sort == sort)
+        #expect(held.group == group)
+        browser.setShowsQuickActions(false)
+        #expect(!browser.showsQuickActions)
+        await browser.choicesChanged()?.value
+        #expect(Self.held(library)?.version == 2)
     }
 
     @Test func undoOfAFilterWritesTheEarlierValueBack() async {
@@ -495,7 +522,7 @@ struct ViewPanelTests {
         #expect(!undo.canUndo)
     }
 
-    @Test func aSecondDoneOnANewViewIsSilent() async {
+    @Test func aSecondCreateViewOnANewViewIsSilent() async {
         let (browser, library, _) = Self.opened()
         browser.openNewViewPanel(in: library)
         var release: CheckedContinuation<Void, Never>?
@@ -541,9 +568,9 @@ struct ViewPanelTests {
         #expect(browser.viewMode == .list)
     }
 
-    // MARK: Done and Escape
+    // MARK: Closing, Create View and Escape
 
-    @Test func doneOnAViewOnlyClosesThePanelAndWritesNothingMore() async {
+    @Test func closingThePanelOnAViewWritesNothingMore() async {
         let (browser, library, _) = Self.opened()
         browser.openViewPanel(in: library)
         await browser.finishViewPanel(in: library, order: Self.order)
@@ -551,7 +578,7 @@ struct ViewPanelTests {
         #expect(Self.held(library)?.version == 1)
     }
 
-    @Test func aTypedNameIsWrittenOnDoneAndUndoWritesTheOldNameBack() async {
+    @Test func aTypedNameIsWrittenOnClosingAndUndoWritesTheOldNameBack() async {
         let (browser, library, undo) = Self.opened()
         browser.openViewPanel(in: library)
         browser.viewPanel?.name = "Renamed"
@@ -563,7 +590,7 @@ struct ViewPanelTests {
         #expect(Self.held(library)?.title == "Open Tasks")
     }
 
-    @Test func doneOnANewViewMakesItWithTheDefaultNameAndEscapeMakesNothing() async {
+    @Test func createViewMakesItWithTheDefaultNameAndEscapeMakesNothing() async {
         let (browser, library, _) = Self.opened()
         browser.openNewViewPanel(in: library)
         browser.escapeViewPanel(in: library)
