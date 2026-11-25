@@ -35,7 +35,7 @@ paths:
 ### A layout an earlier copy stored
 
 - **An earlier Library or Views section is kept, drawn as nothing;** `places` and `pinned` stand there instead.
-- **What was put under them is pinned; what a hidden one held stays hidden, row by row.** The Library and the Feed stay fixed.
+- **What was put under them is pinned; what a hidden one held stays hidden, row by row.** `views` in `hidden` hides every saved view; one shown again goes in `shown`. The Library and the Feed stay fixed.
 - **A row whose section is gone shows under Pinned, a page under the Library;** its home is kept.
 - **The later arrangement wins whole,** also when two Macs change what is hidden before syncing.
 - **Recently Deleted is a page of Settings**, never a row.
@@ -43,8 +43,6 @@ paths:
 ## Foot
 
 - **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`). Refresh, Settings and a warning line are buttons of their own; that line opens Settings › Connection.
-- **The line says how the library stands** (`SyncFootLine`). A local line replaces only "Updated", for a loopback address or no server (`MarfaConnection.isOnThisMac`).
-- **The panel lists the connected Marfa alone,** its three newest sources, and Show More for the rest.
 
 ## Toolbar
 
@@ -61,7 +59,7 @@ paths:
 ## Smallest window
 
 - **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900, and under 800 the views are one pill beside the title.
-- **Only what the window folded opens again,** also after a quit.
+- **Only what the window folded opens again,** also after a quit. It folds only as its width crosses a limit, never on opening.
 - **The panel is 300 wide** in every window (`PanelWidth`).
 
 ## Corner
@@ -72,7 +70,7 @@ paths:
 ## Menus and palettes
 
 - **Every menu of items is one menu** (`ItemRowMenu`), in every layout.
-- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`).
+- **The palette has the menu bar's commands under its headings, then items and places** (`CommandPalette`). Search Items is the same panel searching titles and text.
 - **Trap:** Actions grows out of the palette's bar with an ordinary transition: a Liquid Glass morph hung the app.
 - **A command that takes the keyboard says so** (`takesFocus`), so the palette does not take it back.
 
@@ -80,9 +78,9 @@ paths:
 
 - **Open, Return, a double click and a link follow Open Items** (`ItemOpening`).
 - **A modal and a full page show one item.** New Window takes several and asks first above a limit (`ItemWindows`).
-- **The modal hosts the page with the window's one editor** (`ItemModal`), so two never write one item.
+- **The modal hosts the page with the window's one editor** (`ItemModal`), so two never write one item; the page beside the list steps aside.
 - **Escape, Close and a click outside save and close the modal.** Up and down follow the list behind it (`ListNeighbors`).
-- **A full page's Back returns to the layout**.
+- **A full page's Back returns to the layout**, without the list's view options.
 
 ## Item links
 

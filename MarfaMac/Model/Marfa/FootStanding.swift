@@ -13,7 +13,7 @@ nonisolated struct FootStanding: Sendable {
 
     /// Nil where there is nothing to say.
     func line(now: Date) -> SyncFootLine? {
-        guard hasServer else { return onThisMac ? .onThisMac : nil }
+        guard hasServer else { return .onThisMac }
         return SyncFootLine(state: state, report: report, lastSynced: lastSynced, now: now, onThisMac: onThisMac)
     }
 }

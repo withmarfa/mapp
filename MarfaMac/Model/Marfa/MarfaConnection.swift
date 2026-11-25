@@ -47,10 +47,15 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         return components.url ?? address
     }
 
-    /// Whether the server runs on this Mac: an address that names the loopback, as `localhost`, `127.0.0.1` and `::1` do.
+    /// Whether the server runs on this Mac: an address that names the loopback, as `localhost`, an IPv4 address in `127.0.0.0/8` and `::1` do.
     var isOnThisMac: Bool {
         guard let host = address.host(percentEncoded: false)?.lowercased() else { return false }
-        return host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host == "[::1]" || host.hasPrefix("127.")
+        return host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host == "[::1]" || Self.isLoopbackIPv4(host)
+    }
+
+    private static func isLoopbackIPv4(_ host: String) -> Bool {
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        return parts.count == 4 && parts[0] == "127" && parts.allSatisfy { !$0.isEmpty && $0.count <= 3 && UInt8($0) != nil }
     }
 
     /// Throws only for an address holding a user or password, which `init(address:)` already refuses.

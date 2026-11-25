@@ -47,11 +47,27 @@ struct MarfaPanelContent {
     }
 }
 
+/// Holds the panel's content from the first time it draws until the panel closes, so the foot's refreshes while the
+/// panel is open do not work it out again.
+private final class PanelContentCache {
+    private var content: MarfaPanelContent?
+
+    func content(_ make: () -> MarfaPanelContent) -> MarfaPanelContent {
+        if let content { return content }
+        let made = make()
+        content = made
+        return made
+    }
+}
+
 /// The popover the sidebar's foot opens: the Marfa's name and size, its latest updates, and the Marfa the app is
-/// connected to. A latest update opens its source's place.
+/// connected to. A latest update opens its source's place. Only the Updated line and its clock follow the sync.
 struct MarfaPanel: View {
     @State private var showsAll = false
-    let content: MarfaPanelContent
+    @State private var cache = PanelContentCache()
+    let library: any ItemLibrary
+    let name: String
+    let address: String
     /// Nil where no server is asked, so no sync is told.
     let lastSynced: Date?
     let open: (Place) -> Void
@@ -59,6 +75,10 @@ struct MarfaPanel: View {
 
     static let width: CGFloat = 300
     private static let rowHeight: CGFloat = 28
+
+    private var content: MarfaPanelContent {
+        cache.content { MarfaPanelContent(library: library, name: name, address: address) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

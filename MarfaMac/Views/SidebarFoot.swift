@@ -39,7 +39,7 @@ struct SidebarFoot: View {
         let address = host.configuredConnection.map { SettingsWording.hostName(of: $0.address) } ?? ""
         let standing = FootStanding(host: host)
         return MarfaPanel(
-            content: MarfaPanelContent(library: library, name: name, address: address),
+            library: library, name: name, address: address,
             lastSynced: standing.hasServer ? standing.lastSynced : nil,
             open: { place in
                 showsPanel = false
@@ -54,8 +54,8 @@ struct SidebarFoot: View {
 
 /// The foot's row, given what it shows and what its controls do. Refresh is disabled where it has nothing to do.
 ///
-/// The whole row is a button that opens the Marfa's panel, with a soft fill under the pointer. The name and the line sit
-/// over it and let a click through; Refresh, the cog and a line that asks for action are buttons of their own. They are
+/// The whole row is a button that opens the Marfa's panel, with a soft fill under the pointer. The name lets a click
+/// through and the line passes it on, so the line keeps its tooltip; Refresh, the cog and a line that asks for action are buttons of their own. They are
 /// plain labels that dim with the window, as the sidebar's rows do. A pointer click hands the keyboard back, so no focus
 /// ring stays on a control that was clicked; tabbing still reaches each. Refresh is only drawn while the pointer is over
 /// the row or the keyboard is on it, but it stays in the accessibility tree.
@@ -154,7 +154,10 @@ struct SidebarFootRow: View {
                     .simultaneousGesture(TapGesture().onEnded { focus = nil })
                     .help(line.help ?? "")
             } else {
-                syncLine(line).allowsHitTesting(false)
+                syncLine(line).onTapGesture {
+                    focus = nil
+                    openPanel?()
+                }
             }
             if line.showsSpinner {
                 ProgressView()

@@ -36,7 +36,8 @@ struct SyncFootLineTests {
         for address in ["http://localhost:8080", "http://127.0.0.1:3000", "http://[::1]:3000", "https://notes.localhost"] {
             #expect(try MarfaConnection(address: address).isOnThisMac, "\(address)")
         }
-        for address in ["https://marfa.example.com", "http://192.168.1.4:3000", "https://localhost.example.com"] {
+        for address in ["https://marfa.example.com", "http://192.168.1.4:3000", "https://localhost.example.com", "https://127.example.com",
+                        "http://127.0.0.1.example.com", "http://127.0.0.256"] {
             #expect(try !MarfaConnection(address: address).isOnThisMac, "\(address)")
         }
     }
