@@ -226,7 +226,7 @@ struct MainView: View {
                                     ItemTable(
                                         browser: browser, order: order, pane: $pane,
                                         titleLead: TopRowMetrics.collectionLead(
-                                            browser: browser, opening: opening, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow))
+                                            browser: browser, settings: opening, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow))
                                 case .board:
                                     ItemBoard(browser: browser, pane: $pane)
                                 case .timeline:
