@@ -202,6 +202,8 @@ private struct TopRowTableProbe: NSViewRepresentable {
         private weak var table: NSTableView?
         private var observers: [any NSObjectProtocol] = []
         private var isPlacing = false
+        /// The scroll view's safe area as the insets last took it, so the sides move by what changes.
+        private var safeSides: NSEdgeInsets?
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -221,14 +223,25 @@ private struct TopRowTableProbe: NSViewRepresentable {
             if self.table !== table { follow(table, in: scroll) }
             let room = space.lineHeight + space.restHeight
             if scroll.automaticallyAdjustsContentInsets { scroll.automaticallyAdjustsContentInsets = false }
-            if scroll.contentInsets.top != room {
+            // Switching the adjustment off freezes the sides at what they were, so a change of the safe area moves them
+            // here: a sidebar that floats over this column, shown or hidden, moves where the rows begin.
+            let safe = scroll.safeAreaInsets
+            var wanted = scroll.contentInsets
+            wanted.top = room
+            if let last = safeSides {
+                wanted.left += safe.left - last.left
+                wanted.right += safe.right - last.right
+                wanted.bottom += safe.bottom - last.bottom
+            }
+            safeSides = safe
+            let current = scroll.contentInsets
+            if current.top != wanted.top || current.left != wanted.left || current.bottom != wanted.bottom || current.right != wanted.right {
                 let clip = scroll.contentView
                 let scrolled = clip.bounds.origin.y + clip.contentInsets.top
-                var insets = scroll.contentInsets
-                insets.top = room
-                scroll.contentInsets = insets
-                // Keeps the rows where they were: the same distance from the first, and the same sideways place.
-                clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: scrolled - clip.contentInsets.top))
+                let moved = wanted.left - current.left
+                scroll.contentInsets = wanted
+                // Keeps the rows where they were: the same distance from the first, and the same sideways place or the new edge.
+                clip.scroll(to: NSPoint(x: clip.bounds.origin.x - moved, y: scrolled - clip.contentInsets.top))
                 scroll.reflectScrolledClipView(clip)
             }
             place()
@@ -237,6 +250,16 @@ private struct TopRowTableProbe: NSViewRepresentable {
         private func follow(_ table: NSTableView, in scroll: NSScrollView) {
             stop()
             self.table = table
+            safeSides = nil
+            // The split view moves its columns, and a sidebar over this one changes its safe area, with no layout of this view.
+            observers.append(NotificationCenter.default.addObserver(
+                forName: NSSplitView.didResizeSubviewsNotification, object: nil, queue: .main
+            ) { [weak self] note in
+                MainActor.assumeIsolated {
+                    guard let self, let split = note.object as? NSSplitView, split.window === self.window else { return }
+                    self.refresh()
+                }
+            })
             scroll.contentView.postsBoundsChangedNotifications = true
             observers.append(NotificationCenter.default.addObserver(
                 forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main
