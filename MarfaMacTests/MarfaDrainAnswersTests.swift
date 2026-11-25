@@ -267,6 +267,10 @@ struct MarfaDrainAnswersTests {
             .appending(path: "New Item Parent Links.json")
     }
 
+    private static func told(_ state: ChangeLog.State) -> [SourceFailure] {
+        state.changes.compactMap { if case .unavailable(let failure) = $0 { failure } else { nil } }
+    }
+
     /// Queues a child under a parent, then closes the copy, as a quit does. Answers the link's write.
     private func queueChildAndQuit(at root: URL) async throws -> (Marfa.QueuedWrite, URL) {
         let (source, log, store) = try await open(at: root)
@@ -293,15 +297,14 @@ struct MarfaDrainAnswersTests {
         links.refuse(link.id, reason: "That kind can’t be under this one.")
         try Self.record(link.id, "DELETE FROM queue WHERE id = ?", at: store)
 
-        let (source, _, _) = try await open(at: root)
-        let library = MarfaLibrary(source: source, notices: Notices())
-        let told = await eventually {
-            library.notices.waiting.contains {
+        let (source, log, _) = try await open(at: root)
+        let told = await log.wait {
+            Self.told($0).contains {
                 $0.title == "Can’t Put Item Under Its Parent" && $0.message.contains("That kind can’t be under this one.")
                     && $0.message.contains("“Seeds”")
             }
         }
-        #expect(told, "told: \(library.notices.waiting.map(\.message))")
+        #expect(told != nil, "told: \(Self.told(log.current).map(\.message))")
         await source.close()
     }
 
@@ -314,12 +317,11 @@ struct MarfaDrainAnswersTests {
         try Self.record(link.id, "DELETE FROM queue WHERE id = ?", at: store)
 
         do {
-            let (source, _, _) = try await open(at: root)
-            let library = MarfaLibrary(source: source, notices: Notices())
-            let told = await eventually {
-                library.notices.waiting.contains { $0.message.contains("“Seeds”") && $0.message.contains("may not have been made") }
+            let (source, log, _) = try await open(at: root)
+            let told = await log.wait {
+                Self.told($0).contains { $0.message.contains("“Seeds”") && $0.message.contains("may not have been made") }
             }
-            #expect(told, "told: \(library.notices.waiting.map(\.message))")
+            #expect(told != nil, "told: \(Self.told(log.current).map(\.message))")
             await source.close()
         }
         #expect(ParentLinkStore(file: try Self.parentLinks(at: root)).isEmpty, "then dropped")
