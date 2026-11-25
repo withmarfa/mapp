@@ -152,12 +152,12 @@ extension Browser {
         let derived = derivedKey(in: library)
         let shape = listShape
         let choices = SectionsChoices(
-            derived: derived.key, order: order, day: Calendar.current.startOfDay(for: now), shape: shape,
+            derived: derived.key, order: order, clock: ClockDay(now: now), shape: shape,
             hidesEmpty: shape != nil && hidesEmptyGroups)
         // A filtered or arranged place takes its rows, and where it is arranged its order and groups, from the table.
         let content = shape.map { _ in tableContent(in: library) }
         let key = SectionsKey(choices: choices, table: content?.serial, content: content == nil ? library.contentRevision : nil)
-        if let held = sectionsWork.held, held.key == key { return held.value }
+        if let held = sectionsWork.value(for: key) { return held }
         // A list of the place's own items that no change touched stands as it is.
         if content == nil, let held = sectionsWork.held, held.key.choices == choices, let since = held.value.content,
            let changed = library.changedItems(since: since),
@@ -256,7 +256,7 @@ extension Browser {
         let key = PlacingKey(
             derived: derived.key, shape: listShape, choice: choice, table: content?.serial,
             content: narrows ? nil : library.contentRevision)
-        if let held = work.held, held.key == key { return held.value }
+        if let held = work.value(for: key) { return held }
         let items = narrows ? content?.keptItems ?? [] : derived.items ?? self.items(in: library)
         let shown = work.held.flatMap { $0.key.derived.isSamePlace(as: derived.key) ? $0.value : nil }
         guard items.count > Self.arrangesAlongsideAbove, let shown else {
@@ -304,15 +304,23 @@ extension Browser {
             choices: TableChoices(
                 derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, hidesEmpty: hidesEmptyGroups,
                 sources: library.sources.infos,
-                relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()),
+                clock: !keyed.filter.relative.isEmpty || keyed.grouping.groupsByDate ? ClockDay(now: library.now()) : nil,
                 tokens: narrowingSearchTokens),
             basis: TableBasis(content: library.contentRevision, membership: library.membershipRevision, counts: library.counts.revision))
-        if let held = tableMemo, held.key == key { return held.content }
+        // An arrangement for other choices, such as a sort the person left again, is older than this table and never lands.
+        if let held = tableMemo, held.key == key {
+            if arranging.map({ $0.key != key }) == true { endArranging() }
+            return held.content
+        }
         // A search's table is held apart, so its results never show the Library's table nor drop it.
         let searching = isSearching
         let held = (searching ? heldSearch : heldTables[shown]).flatMap { $0.key.choices.derived.isSamePlace(as: key.choices.derived) ? $0 : nil }
         // The table the place held is the one asked for again, as when a search ends on the place it began on.
-        if let held, held.key == key { tableMemo = held; return held.content }
+        if let held, held.key == key {
+            if arranging.map({ $0.key != key }) == true { endArranging() }
+            tableMemo = held
+            return held.content
+        }
         if let held, arranging?.key == key { return held.content }
         let listed = derived.items ?? items(in: library)
         let isLarge = listed.count > Self.arrangesAlongsideAbove
@@ -494,6 +502,19 @@ extension Browser {
         func isSamePlace(as other: DerivedKey) -> Bool { library == other.library && place == other.place }
     }
 
+    /// The day and the time zone what a place shows by date is worked out for: a date's group, which may say Today, a
+    /// filter relative to the day, the timeline's days. Every key of such work holds it, so a window open over midnight
+    /// or through a change of zone works it out again when its layout asks (`onClockChange`).
+    nonisolated struct ClockDay: Equatable, Sendable {
+        let day: Date
+        let zone: TimeZone
+
+        init(now: Date) {
+            day = Calendar.current.startOfDay(for: now)
+            zone = .current
+        }
+    }
+
     /// What a layout's placing of the items is worked out for (`placed`).
     nonisolated struct PlacingKey<Choice: Equatable & Sendable>: Equatable, Sendable {
         let derived: DerivedKey
@@ -522,7 +543,8 @@ extension Browser {
     nonisolated struct TimelineChoice: Equatable, Sendable {
         let field: String?
         let looks: [TypeID: TypeLook]
-        let today: Date
+        /// Today leads the timeline.
+        let clock: ClockDay
     }
 
     /// Where each item stands on the calendar (`CalendarLayout.entries`).
@@ -541,9 +563,7 @@ extension Browser {
     func timelinePlacing(in library: any ItemLibrary, field: String?, now: Date) -> TimelinePlacing {
         let looks = looks(in: library)
         let catalogue = library.catalogue
-        // Placed again as the day changes, so today leads.
-        let today = Calendar.current.startOfDay(for: now)
-        return placed(timelineWork, choice: TimelineChoice(field: field, looks: looks, today: today), in: library) { items in
+        return placed(timelineWork, choice: TimelineChoice(field: field, looks: looks, clock: ClockDay(now: now)), in: library) { items in
             TimelinePlacing(groups: ItemTimelineLayout.groups(for: items, field: field, looks: looks, catalogue: catalogue, today: now))
         }
     }
@@ -582,7 +602,8 @@ extension Browser {
     nonisolated struct SectionsChoices: Equatable, Sendable {
         let derived: DerivedKey
         let order: ItemOrder
-        let day: Date
+        /// The list's date headings say Today and Yesterday.
+        let clock: ClockDay
         let shape: ListShape?
         /// Hide Empty Groups, which only an arranged list's groups read and which is kept apart from the place's options.
         let hidesEmpty: Bool
@@ -613,8 +634,9 @@ extension Browser {
         let hidesEmpty: Bool
         /// The names the server gave sources, which a row holds from when it was made, so the Source column sorts by them.
         let sources: [String: SourceInfo]
-        /// The day a filter relative to the day is worked out for, so the table is made again when it changes.
-        let relativeDay: Date?
+        /// The day a filter relative to the day, or a group by date, is worked out for, so the table is made again when it
+        /// or the zone changes.
+        let clock: ClockDay?
         /// The search's tokens, which narrow the rows the table keeps.
         let tokens: [FilterClause]
     }

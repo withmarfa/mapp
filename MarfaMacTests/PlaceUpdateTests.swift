@@ -28,6 +28,7 @@ import UniformTypeIdentifiers
         let fresh = self.browser(library, showing: browser.shown, options: browser.tableOptions[browser.shown])
         fresh.viewMode = browser.viewMode
         fresh.searchText = browser.searchText
+        fresh.searchTokens = browser.searchTokens
         return fresh
     }
 
@@ -322,4 +323,177 @@ import UniformTypeIdentifiers
         try #require(await eventually { made.isLoaded })
         return (made, source)
     }
+
+    // MARK: What the window shows
+
+    /// A Type token with no filter of its own keeps only its type, in a table made in place and one made off the main
+    /// actor, made whole and updated.
+    @Test(arguments: [1, 4])
+    func aSearchTokenKeepsItsTypeThroughAChange(scale: Int) async throws {
+        let (library, source) = try await BigLibrary.loaded(scale: scale)
+        let table = browser(library, options: ItemTableOptions(sort: [ItemTableComparator(column: .title)]))
+        table.addSearchToken(FilterClause(field: FilterTarget.type.id, op: .is, values: [BigLibrary.task.rawValue]))
+        try await expectSameTable(table, in: library, "the first table")
+        let note = try #require(library.items(in: .type(BigLibrary.note)).first)
+        try await send([Self.with(note, step: 1, Self.title("Aa note"))], to: source, of: library)
+        try await expectSameTable(table, in: library, "a note edited")
+        let kept = try await settled(table, in: library).keptItems
+        #expect(!kept.isEmpty && kept.allSatisfy { $0.type == BigLibrary.task }, "what the list, board and Select All read")
+        let task = library.items(in: Self.tasks.place)[2]
+        try await send([Self.with(task, step: 2, Self.title("Aa task"))], to: source, of: library)
+        try await expectSameTable(table, in: library, "a task edited")
+    }
+
+    /// What the rows of a list (or the cards of a gallery) say, as the layout draws them, made by `browser`'s own held
+    /// contents.
+    private func drawn(
+        _ browser: Browser, in library: any ItemLibrary, order: ItemOrder, cards: CardContents? = nil
+    ) -> [ItemID: RowContent] {
+        let arrangement = browser.arrangement(in: library, order: order, now: Self.now)
+        let items = arrangement.drawn(upTo: browser.listItemsDrawn).sections.flatMap(\.items)
+        if let cards {
+            return cards.contents(
+                of: items, in: library, looks: browser.propertyLooks(in: library),
+                list: RowList(date: .look, day: Calendar.current.startOfDay(for: Self.now)), shape: CardShape())
+        }
+        let list = browser.rowList(of: arrangement.types, in: library, order: order, now: Self.now, format: .standard, density: .standard)
+        return browser.rowContents.contents(
+            of: items.map { RowContents.Entry(item: $0, showsTime: false) }, in: library, looks: browser.propertyLooks(in: library),
+            list: list)
+    }
+
+    /// A row or card made while a large list still shows its last arrangement says the item's new value once the next lands.
+    @Test(arguments: [false, true])
+    func aRowMadeWhileTheListWaitsShowsTheItemOnceItLands(asCards: Bool) async throws {
+        let (library, source) = try await BigLibrary.loaded(scale: 4)
+        let order = ItemOrder(sort: .dateCreated, groupsByDate: false)
+        let list = browser(library)
+        list.viewMode = asCards ? .gallery : .list
+        let cards = asCards ? CardContents() : nil
+        _ = try await settledSections(list, in: library, order: order)
+        _ = drawn(list, in: library, order: order, cards: cards)
+        let item = try #require(list.sections(in: library, order: order, now: Self.now).first?.items.dropFirst(3).first)
+        try await send([Self.with(item, step: 1, Self.title("Renamed while arranging"))], to: source, of: library)
+        _ = drawn(list, in: library, order: order, cards: cards)
+        #expect(list.sectionsWork.runningKey != nil, "the list still shows its last arrangement, and draws from it")
+        _ = try await settledSections(list, in: library, order: order)
+        let shown = drawn(list, in: library, order: order, cards: cards)
+        let fresh = fresh(like: list, in: library)
+        #expect(shown[item.id]?.title == "Renamed while arranging")
+        #expect(shown == drawn(fresh, in: library, order: order, cards: asCards ? CardContents() : nil))
+    }
+
+    /// An edge whose from end moves to another item, keeping its id as Marfa's contract has it, still points at its target,
+    /// whichever item the change names first.
+    @Test(arguments: [false, true])
+    func aLinkMovedToAnotherItemKeepsItsTarget(newHolderFirst: Bool) async throws {
+        let (library, source) = try await BigLibrary.loaded()
+        let notes = library.items(in: .type(BigLibrary.note))
+        let (a, b, target) = (notes[0], notes[1], notes[2])
+        let id = EdgeID("moved#supersedes")
+        func edge(from: ItemID) -> Edge {
+            Edge(id: id, type: "supersedes", from: from, to: .item(target.id), origin: .property("supersedes"))
+        }
+        try await send([Self.with(a, step: 1) { $0.edgesOut.append(edge(from: a.id)) }], to: source, of: library)
+        let held = try #require(library.item(a.id))
+        let moved = [
+            Self.with(b, step: 2) { $0.edgesOut.append(edge(from: b.id)) },
+            Self.with(held, step: 3) { $0.edgesOut.removeAll { $0.id == id } },
+        ]
+        try await send(newHolderFirst ? moved : moved.reversed(), to: source, of: library)
+        let (made, _) = try await Self.copy(of: library)
+        for item in [a.id, b.id, target.id] {
+            #expect(Set(library.index.links(touching: item)) == Set(made.index.links(touching: item)))
+            #expect(library.relationships(for: item).count == made.relationships(for: item).count)
+        }
+        #expect(library.index.links(touching: target.id).filter { $0.id == id }.map(\.from) == [b.id])
+    }
+
+    /// A table, a list and a layout placed by `placed` asked for one choice, then another, then the first again before the
+    /// second lands, keep the first: the second's answer never lands over it.
+    @Test func anAnswerForAChoiceLeftNeverLands() async throws {
+        let (library, _) = try await BigLibrary.loaded(scale: 4)
+        let byCreated = ItemTableOptions(sort: [ItemTableComparator(column: .created)])
+        let table = browser(library, options: byCreated)
+        let first = try await settled(table, in: library)
+        table.tableOptions[.library] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        _ = table.tableContent(in: library)
+        table.tableOptions[.library] = byCreated
+        #expect(table.tableContent(in: library) === first)
+
+        let list = browser(library)
+        list.viewMode = .list
+        let created = ItemOrder(sort: .dateCreated, groupsByDate: false)
+        let sections = try await settledSections(list, in: library, order: created)
+        _ = list.sections(in: library, order: ItemOrder(sort: .title), now: Self.now)
+        #expect(list.sections(in: library, order: created, now: Self.now) == sections)
+
+        let timeline = browser(library)
+        timeline.viewMode = .timeline
+        let days = timeline.timelinePlacing(in: library, field: nil, now: Self.now).groups
+        _ = timeline.timelinePlacing(in: library, field: "due_at", now: Self.now)
+        #expect(timeline.timelinePlacing(in: library, field: nil, now: Self.now).groups == days)
+
+        // Time enough for an answer under way to land, which it must not.
+        try await Task.sleep(for: .seconds(2))
+        #expect(table.tableMemo?.content === first)
+        #expect(table.tableContent(in: library) === first)
+        #expect(list.sectionsWork.held?.key.choices.order == created)
+        #expect(list.sections(in: library, order: created, now: Self.now) == sections)
+        #expect(timeline.timelineWork.held?.key.choice.field == nil)
+        #expect(timeline.timelinePlacing(in: library, field: nil, now: Self.now).groups == days)
+    }
+
+    /// A table, a board and a timeline grouped by day, left open over midnight, name the days as a window opened then does.
+    @Test func dateGroupsFollowTheDay() async throws {
+        let items = BigLibrary.items()
+        let newest = try #require(items.map(\.created).max())
+        let clock = Clock(newest.addingTimeInterval(60))
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices(), now: { clock.now })
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: BigLibrary.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        let byDay = ItemTableOptions(grouping: .column(ItemTableColumn.created.id, by: .bucket(.day)))
+        let table = browser(library, options: byDay)
+        let board = browser(library, options: byDay)
+        board.viewMode = .board
+        let timeline = browser(library)
+        timeline.viewMode = .timeline
+        func names() -> (table: [String], board: [String]?, timeline: [ItemTimelineGroup]) {
+            (table.tableContent(in: library).allGroups.map(\.title), board.boardLanes(in: library)?.all.map(\.title),
+             timeline.timelinePlacing(in: library, field: nil, now: library.now()).groups)
+        }
+        let before = names()
+        #expect(before.table.contains("Today"))
+        #expect(before.board?.contains("Today") == true)
+        clock.now = clock.now.addingTimeInterval(86_400)
+        let after = names()
+        let opened = (fresh(like: table, in: library), fresh(like: board, in: library), fresh(like: timeline, in: library))
+        #expect(after.table == opened.0.tableContent(in: library).allGroups.map(\.title))
+        #expect(after.board == opened.1.boardLanes(in: library)?.all.map(\.title))
+        #expect(after.timeline == opened.2.timelinePlacing(in: library, field: nil, now: library.now()).groups)
+        #expect(after.table != before.table, "yesterday is no longer Today")
+    }
+
+    /// A listing patched for an item whose creation time changed, as a create the server dated otherwise, lists it where a
+    /// fresh listing does, ties included.
+    @Test func aListingPlacesAnItemWhoseCreationTimeChanged() async throws {
+        let (library, source) = try await BigLibrary.loaded()
+        // Both listings are held, so the change patches them.
+        _ = library.items(in: Self.tasks.place)
+        let listed = library.items(in: .library)
+        let moved = listed[3]
+        // To the creation time of an item far down the list, so the tie is broken by id.
+        let tie = listed[listed.count - 10]
+        try await send([Self.with(moved, step: 1) { $0.created = tie.created }], to: source, of: library)
+        let (made, _) = try await Self.copy(of: library)
+        #expect(library.items(in: .library).map(\.id) == made.items(in: .library).map(\.id))
+        #expect(library.items(in: Self.tasks.place).map(\.id) == made.items(in: Self.tasks.place).map(\.id))
+    }
+}
+
+/// A clock a test moves on.
+private final class Clock: @unchecked Sendable {
+    var now: Date
+    init(_ now: Date) { self.now = now }
 }

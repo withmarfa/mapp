@@ -117,7 +117,8 @@ extension MarfaLibrary {
     }
 
     /// Brings `listing` up to date with only the `changed` items: each takes its new value where it stays, and, where
-    /// membership moved, leaves or joins in the listing's order (`ordered`), which the others keep.
+    /// membership moved or its creation time changed, leaves or joins in the listing's order (`ordered`), which the others
+    /// keep.
     private func patch(_ listing: inout Listing, of key: ListingKey, changed: Set<ItemID>, membershipMoved: Bool) {
         let positions = listing.positions ?? Dictionary(uniqueKeysWithValues: listing.ids.enumerated().map { ($1, $0) })
         var leaving: Set<ItemID> = []
@@ -125,7 +126,14 @@ extension MarfaLibrary {
         for id in changed {
             let isMember = membershipMoved ? isMember(id, of: key) : positions[id] != nil
             if let position = positions[id] {
-                if isMember, let item = records[id]?.item { listing.items[position] = item } else { leaving.insert(id) }
+                guard isMember, let item = records[id]?.item else { leaving.insert(id); continue }
+                if item.created == listing.items[position].created {
+                    listing.items[position] = item
+                } else {
+                    // The listing is ordered by creation, so a new one moves the item, as a create the server dated does.
+                    leaving.insert(id)
+                    joining.append(item)
+                }
             } else if isMember, let item = records[id]?.item {
                 joining.append(item)
             }

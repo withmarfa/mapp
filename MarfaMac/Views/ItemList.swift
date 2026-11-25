@@ -82,12 +82,7 @@ struct ItemList: View, Equatable {
         .onChange(of: ids) { old, new in
             browser.keepSelection(from: old, to: new, isPending: isPending)
         }
-        // An item chosen past what is drawn, as by Back, a link or a new item, is drawn.
-        .onChange(of: browser.selection, initial: true) {
-            if browser.selection.count == 1, let id = browser.selection.first, let position = arrangement.positions[id] {
-                browser.drawList(through: position)
-            }
-        }
+        .background(ChosenItemDrawn(browser: browser, positions: arrangement.positions))
         // An answer that lists what the waiting list listed (nothing, most often) changes no ids.
         .onChange(of: isPending) { _, isPending in
             if !isPending { browser.keepHeldSelection(in: ids) }
@@ -291,4 +286,21 @@ private enum ListLine: Identifiable {
     .listStyle(.inset)
     .interfaceTextStyle()
     .frame(width: 340, height: 460)
+}
+
+/// Draws enough of a layout drawn a page at a time (`Browser.listItemsDrawn`) to show the item the keyboard is on, or else
+/// the one chosen item: one chosen past what is drawn, as by Back, a link or a new item, and one a change moves past it, as
+/// a sync can. Its own view, so only it reads the selection, never the layout's body.
+struct ChosenItemDrawn: View {
+    let browser: Browser
+    /// Where each item of the layout stands, counting from its first.
+    let positions: [ItemID: Int]
+    var cursor: ItemID?
+
+    var body: some View {
+        let id = cursor ?? (browser.selection.count == 1 ? browser.selection.first : nil)
+        Color.clear.onChange(of: id.flatMap { positions[$0] }, initial: true) { _, position in
+            if let position { browser.drawList(through: position) }
+        }
+    }
 }

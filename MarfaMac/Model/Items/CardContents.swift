@@ -98,8 +98,9 @@ final class CardContents {
         var shaped: [TypeID: (look: TypeLook, wanted: Set<Relation>, counts: Set<CountFact>)] = [:]
         for item in items {
             let id = item.id
-            // Nothing this card is made of changed since it was made.
-            if let changed, !changed.contains(id), held[id] != nil { continue }
+            // Nothing this card is made of changed since it was made. The item is compared too: a layout still showing its last
+            // placing hands in an item older than the library's, whose newer value must be made when it lands.
+            if let changed, !changed.contains(id), held[id]?.item == item { continue }
             let own: (look: TypeLook, wanted: Set<Relation>, counts: Set<CountFact>)
             if let known = shaped[item.type] {
                 own = known

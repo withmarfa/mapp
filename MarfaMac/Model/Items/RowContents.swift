@@ -56,8 +56,11 @@ final class RowContents {
         var wanted: [TypeID: (relations: Set<Relation>, counts: Set<CountFact>)] = [:]
         for entry in entries {
             let id = entry.item.id
-            // Nothing this row is made of changed since it was made.
-            if let changed, !changed.contains(id), let known = held[id], known.showsTime == entry.showsTime { continue }
+            // Nothing this row is made of changed since it was made. The item is compared too: a list still showing its last
+            // arrangement hands in an item older than the library's, whose newer value must be made when it lands.
+            if let changed, !changed.contains(id), let known = held[id], known.showsTime == entry.showsTime, known.item == entry.item {
+                continue
+            }
             let look = looks[entry.item.type] ?? .empty
             let asked = wanted[entry.item.type] ?? { let asked = (look.relations, look.counts); wanted[entry.item.type] = asked; return asked }()
             // A linked item's title, or its coming or going, or a count's answer coming, changes this row though this item is the same.

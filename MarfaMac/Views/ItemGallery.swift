@@ -61,12 +61,8 @@ struct ItemGallery: View {
             if let cursor, !new.contains(cursor) { self.cursor = nil }
             if let anchor, !new.contains(anchor) { self.anchor = nil }
         }
-        // An item chosen past what is drawn, as by Back, a link or the arrow keys, is drawn.
-        .onChange(of: browser.selection, initial: true) {
-            if browser.selection.count == 1, let id = browser.selection.first, let position = arrangement.positions[id] {
-                browser.drawList(through: position)
-            }
-        }
+        // The arrow keys move the cursor, with Shift too, so it is drawn wherever it goes.
+        .background(ChosenItemDrawn(browser: browser, positions: arrangement.positions, cursor: cursor))
         .overlay {
             if ids.isEmpty {
                 if browser.listHidesEveryGroup(in: library) {

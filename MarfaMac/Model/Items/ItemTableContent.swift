@@ -41,14 +41,7 @@ final class ItemTableContent {
 
     /// The rows the filters and the search's tokens keep, in the order the items came in: what a layout that sorts and
     /// groups the items itself (the list, the board, the timeline) works from.
-    lazy var kept: [ItemTableRow] = {
-        let clock = FilterMatching.Clock(now: now, calendar: .current)
-        let filtered = options.isFiltering
-            ? FilterMatching.filter(allRows, by: options.filter, targets: filterOffer.targets, catalogue: catalogue, clock: clock)
-            : allRows
-        return tokens.isEmpty
-            ? filtered : FilterMatching.filter(filtered, by: tokens, targets: tokenTargets, catalogue: catalogue, clock: clock)
-    }()
+    lazy var kept: [ItemTableRow] = ordering.keeping(allRows, targets: filterOffer.targets)
 
     /// The items of `kept`, for the layouts that place items themselves.
     lazy var keptItems: [Item] = kept.map(\.item)
@@ -67,7 +60,7 @@ final class ItemTableContent {
         guard let grouping else { return [] }
         let made = ItemTableLayout.groups(
             of: rows, by: grouping, mode: groupMode, catalogue: catalogue, declared: options.grouping != .automatic,
-            asMarfa: groupsAsMarfa, calendar: calendar)
+            asMarfa: groupsAsMarfa, calendar: calendar, now: now)
         return ItemTableLayout.ordered(made, by: options.groupOrder)
     }
     /// The groups shown: all but the hidden ones (`device/view-group-hidden`), and the empty ones where Hide Empty Groups is on.
@@ -268,6 +261,8 @@ final class ItemTableContent {
     nonisolated struct Ordering: Sendable {
         let allRows: [ItemTableRow]
         let filter: FilterState?
+        /// The search's tokens and the fields they ask about, nil where there are none.
+        let tokens: (state: FilterState, targets: [String: FilterTarget])?
         let columns: [ItemTableColumn]
         let types: Set<TypeID>
         let catalogue: Catalogue
@@ -302,7 +297,7 @@ final class ItemTableContent {
                     ItemTableLayout.ordered(
                         ItemTableLayout.groups(
                             of: rows, by: $0, mode: ordering.groupMode, catalogue: ordering.catalogue, declared: ordering.declaresGroups,
-                            asMarfa: ordering.groupsAsMarfa, calendar: ordering.calendar),
+                            asMarfa: ordering.groupsAsMarfa, calendar: ordering.calendar, now: ordering.now),
                         by: ordering.groupOrder)
                 } ?? []
             }
@@ -317,12 +312,21 @@ final class ItemTableContent {
             }
         }
 
+        /// Whether anything but the place narrows its rows: the filters or the search's tokens.
+        var narrows: Bool { filter != nil || tokens != nil }
+
+        /// The rows of `rows` the filters and the search's tokens keep: the one rule of what a table keeps, whether it is
+        /// worked out whole or updated.
+        func keeping(_ rows: [ItemTableRow], targets: [String: FilterTarget]) -> [ItemTableRow] {
+            let clock = FilterMatching.Clock(now: now, calendar: .current)
+            let filtered = filter.map { FilterMatching.filter(rows, by: $0, targets: targets, catalogue: catalogue, clock: clock) } ?? rows
+            guard let tokens else { return filtered }
+            return FilterMatching.filter(filtered, by: tokens.state, targets: tokens.targets, catalogue: catalogue, clock: clock)
+        }
+
         func ordered() -> Ordered {
             let offer = FilterOffer.make(columns: columns, types: types, catalogue: catalogue)
-            guard let filter else { return Ordered(ordering: self, offer: offer, kept: allRows) }
-            let kept = FilterMatching.filter(
-                allRows, by: filter, targets: offer.targets, catalogue: catalogue, clock: .init(now: now, calendar: .current))
-            return Ordered(ordering: self, offer: offer, kept: kept)
+            return Ordered(ordering: self, offer: offer, kept: narrows ? keeping(allRows, targets: offer.targets) : allRows)
         }
 
         /// What `ordered()` gives, worked out from `earlier`, the same table's before the rows of `changed` were made
@@ -335,9 +339,8 @@ final class ItemTableContent {
             let fresh = allRows.filter { changed.contains($0.id) }
             let kept: [ItemTableRow]
             let freshKept: [ItemTableRow]
-            if let filter {
-                freshKept = FilterMatching.filter(
-                    fresh, by: filter, targets: offer.targets, catalogue: catalogue, clock: .init(now: now, calendar: .current))
+            if narrows {
+                freshKept = keeping(fresh, targets: offer.targets)
                 let passes = Set(freshKept.map(\.id))
                 let wasKept = Set(earlier.ordered.kept.map(\.id))
                 kept = allRows.filter { changed.contains($0.id) ? passes.contains($0.id) : wasKept.contains($0.id) }
@@ -363,7 +366,8 @@ final class ItemTableContent {
 
     var ordering: Ordering {
         Ordering(
-            allRows: allRows, filter: options.isFiltering ? options.filter : nil, columns: columns,
+            allRows: allRows, filter: options.isFiltering ? options.filter : nil,
+            tokens: tokens.isEmpty ? nil : (tokens, tokenTargets), columns: columns,
             types: listedTypes.union(heldTypes), catalogue: catalogue, now: now, sort: sort,
             grouping: grouping, groupMode: groupMode, declaresGroups: options.grouping != .automatic,
             groupsAsMarfa: groupsAsMarfa, groupOrder: options.groupOrder, calendar: calendar)

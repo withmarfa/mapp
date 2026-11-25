@@ -48,6 +48,11 @@ nonisolated struct ItemTableOptions: Hashable, Sendable {
         var mode: GroupMode {
             if case .column(_, let mode) = self { mode } else { .value }
         }
+
+        /// Whether the groups are a date's spans, whose names may say Today.
+        var groupsByDate: Bool {
+            if case .bucket = mode { true } else { false }
+        }
     }
 
     var grouping = Grouping.automatic

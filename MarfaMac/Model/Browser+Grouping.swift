@@ -176,6 +176,8 @@ extension Browser {
         let own: Bool
         let groupOrder: [String]?
         let asMarfa: Bool
+        /// Lanes by date may say Today.
+        let clock: ClockDay?
     }
 
     /// The open board's lanes, by `boardGrouping`: a choice or status by its words with every option a lane and a card
@@ -188,7 +190,9 @@ extension Browser {
         guard let column = content.columns.first(where: { $0.id == id && $0.groups(by: mode) }) else { return nil }
         let options = tableOptions[shown]
         let own = options?.grouping == grouping
-        let choice = BoardChoice(column: column, mode: mode, own: own, groupOrder: own ? options?.groupOrder : nil, asMarfa: isViewPlace)
+        let choice = BoardChoice(
+            column: column, mode: mode, own: own, groupOrder: own ? options?.groupOrder : nil, asMarfa: isViewPlace,
+            clock: grouping.groupsByDate ? ClockDay(now: library.now()) : nil)
         // The cards follow the place's sort where the person or the view set one, else their titles.
         let rows = options?.sort?.isEmpty == false ? content.rows : nil
         let kept = content.kept

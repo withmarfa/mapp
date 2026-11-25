@@ -27,7 +27,8 @@ struct ItemTimeline: View {
             of: groups.flatMap { $0.rows.map(\.item) }, in: library, looks: browser.propertyLooks(in: library), list: list,
             shape: CardShape(leaving: field))
 
-        timeline(groups, more: more, contents: contents, now: now)
+        // Select All chooses every item, those not drawn yet too.
+        timeline(groups, more: more, contents: contents, now: now) { browser.selection = Set(placing.positions.keys) }
         .topRowScrolls()
         .clearsSeveralOnEscape(browser)
         .deletesChosen(browser) { Set(items.map(\.id)) }
@@ -46,15 +47,8 @@ struct ItemTimeline: View {
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
         }
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
-        }
-        // An item chosen past what is drawn, as by Back or a link, is drawn.
-        .onChange(of: browser.selection, initial: true) {
-            if browser.selection.count == 1, let id = browser.selection.first, let position = placing.positions[id] {
-                browser.drawList(through: position)
-            }
-        }
+        .onClockChange { daysSeen += 1 }
+        .background(ChosenItemDrawn(browser: browser, positions: placing.positions))
     }
 
     /// One line of a day's list: a row, or the line that marks the present moment.
@@ -88,9 +82,12 @@ struct ItemTimeline: View {
         return lines
     }
 
-    private func timeline(_ groups: [ItemTimelineGroup], more: Bool, contents: [ItemID: RowContent], now: Date) -> some View {
+    private func timeline(
+        _ groups: [ItemTimelineGroup], more: Bool, contents: [ItemID: RowContent], now: Date, selectAll: @escaping () -> Void
+    ) -> some View {
         ScrollViewReader { proxy in
             list(groups, more: more, contents: contents, now: now)
+                .selectsAll(selectAll)
                 // The days run from today on and then back, so today's agenda is the first line of the first group.
                 .onChange(of: browser.timelineTodayRequests) {
                     guard let first = groups.first.flatMap({ lines(of: $0, now: now).first }) else { return }

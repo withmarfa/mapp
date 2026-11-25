@@ -12,6 +12,17 @@ final class PlaceWork<Key: Equatable & Sendable, Value: Sendable> {
     /// The run under way, if any, and what it is for.
     var runningKey: Key? { running?.key }
 
+    /// The value held for `key`, if it is what is held. A run under way for another key is then older and is ended, so an
+    /// answer asked for before the person went back, such as a sort they left, never lands over this one.
+    func value(for key: Key) -> Value? {
+        guard let held, held.key == key else { return nil }
+        if let running, running.key != key {
+            running.task.cancel()
+            self.running = nil
+        }
+        return held.value
+    }
+
     /// Holds `value`, worked out in place, and ends any run under way, which is then older.
     func hold(_ value: Value, for key: Key) {
         running?.task.cancel()
