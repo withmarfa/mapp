@@ -278,13 +278,14 @@ struct PaletteNoResults: View {
 struct PaletteTokenRow: View {
     let tokens: PaletteTokens
     let library: any ItemLibrary
+    @Binding var selected: FilterClause?
     let onRemove: (FilterClause) -> Void
 
     var body: some View {
         let chips = tokens.clauses.compactMap { clause in
             tokens.parts(of: clause, titles: { library.title(ofValue: $0) }).map { SearchChip(clause: clause, parts: $0) }
         }
-        SearchChipRow(chips: chips, width: 360, onRemove: { onRemove($0.clause) })
+        SearchChipRow(chips: chips, width: 360, selected: $selected, onRemove: { onRemove($0.clause) })
     }
 }
 

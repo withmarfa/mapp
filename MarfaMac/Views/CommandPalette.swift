@@ -34,6 +34,8 @@ struct CommandPalette: View {
     @State private var actionsFor: String?
     /// Search Items' tokens, which last until the palette is put away. Nothing here is saved.
     @State private(set) var tokens = PaletteTokens()
+    /// The token a click chose, which Delete takes away.
+    @State private var selectedToken: FilterClause?
     /// Whether an arrow key has moved the choice since the words last changed. A list of nothing but offers has no choice
     /// until it has, so Return makes the item and not a token.
     @State private var arrowed = false
@@ -111,7 +113,9 @@ struct CommandPalette: View {
                 applyFilters(to: searched, leftOut: leftOut)
             }
         }
+        .onChange(of: selectedToken) { if selectedToken != nil { focus = .field } }
         .onChange(of: query) {
+            selectedToken = nil
             highlighted = 0
             arrowed = false
             scrollTarget = nil
@@ -151,7 +155,11 @@ struct CommandPalette: View {
                 .foregroundStyle(.secondary)
                 .frame(width: PaletteMetrics.markWidth)
             if !tokens.isEmpty {
-                PaletteTokenRow(tokens: tokens, library: library) { clause in tokens.clauses.removeAll { $0 == clause } }
+                PaletteTokenRow(tokens: tokens, library: library, selected: $selectedToken) { clause in
+                    tokens.clauses.removeAll { $0 == clause }
+                    selectedToken = nil
+                    focus = .field
+                }
             }
             TextField(fieldPrompt, text: $query)
                 .textFieldStyle(.plain)
@@ -160,8 +168,13 @@ struct CommandPalette: View {
                 .appFocusRing(isFocused: focus == .field)
                 // Actions holds the keyboard while it is open.
                 .disabled(actionsFor != nil)
-                // Delete in an empty field takes the last token away, as it does in the list's search.
+                // Delete takes the chosen token away, or in an empty field the last, as it does in the list's search.
                 .onKeyPress(.delete) {
+                    if let chosen = selectedToken {
+                        tokens.clauses.removeAll { $0 == chosen }
+                        selectedToken = nil
+                        return .handled
+                    }
                     guard query.isEmpty, !tokens.isEmpty else { return .ignored }
                     tokens.clauses.removeLast()
                     return .handled

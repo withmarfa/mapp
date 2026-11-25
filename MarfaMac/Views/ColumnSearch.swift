@@ -166,6 +166,8 @@ struct ColumnSearchField: View {
     let onEnd: () -> Void
     @State private var clears = 0
     @State private var isFocused = false
+    /// The token a click chose, which Delete takes away.
+    @State private var selected: FilterClause?
     @State private var controller = SearchOffersController()
     @Environment(\.interfaceTextSize) private var textSize
 
@@ -176,16 +178,14 @@ struct ColumnSearchField: View {
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             if !chips.isEmpty {
-                SearchChipRow(chips: chips, width: width * ColumnSearchMetrics.chipShare) { chip in
-                    onRemove(chip)
-                    // With the last token gone, no text and no keyboard in the field, nothing is left to stay open for.
-                    if !isFocused, text.isEmpty, chips.allSatisfy({ $0 == chip }) { onEnd() }
-                }
+                SearchChipRow(
+                    chips: chips, width: width * ColumnSearchMetrics.chipShare, selected: Binding { selected } set: { choose($0) },
+                    onRemove: remove)
             }
             ToolbarSearchText(
                 text: $text, prompt: chips.isEmpty ? prompt : "", label: prompt, focusRequests: focusRequests + clears, keepsOpen: !chips.isEmpty,
                 controller: controller, offers: offers, onSubmit: onSubmit, onDown: onDown, onPick: onPick,
-                onDeleteAtStart: onDeleteAtStart, onFocus: { isFocused = $0 }, onEnd: onEnd
+                onDelete: delete, onFocus: { isFocused = $0 }, onEnd: onEnd
             )
             .frame(minWidth: 60 * scale)
             if !text.isEmpty || !chips.isEmpty {
@@ -207,6 +207,31 @@ struct ColumnSearchField: View {
         .appFocusRing(Capsule(), isFocused: isFocused)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ColumnSearchField")
+        // Typing, or a token that has gone, leaves nothing chosen.
+        .onChange(of: text) { selected = nil }
+        .onChange(of: chips) { if let selected, !chips.contains(where: { $0.clause == selected }) { self.selected = nil } }
+    }
+
+    /// Chooses a token, with the keyboard back in the field so Delete reaches it.
+    private func choose(_ clause: FilterClause?) {
+        selected = clause
+        if clause != nil { clears += 1 }
+    }
+
+    private func remove(_ chip: SearchChip) {
+        selected = nil
+        onRemove(chip)
+        // With the last token gone, no text and no keyboard in the field, nothing is left to stay open for.
+        if !isFocused, text.isEmpty, chips.allSatisfy({ $0 == chip }) { onEnd() }
+    }
+
+    /// Delete: takes the chosen token away, or at the start of the field the last one. Whether it did either.
+    private func delete(atStart: Bool) -> Bool {
+        if let selected, let chip = chips.first(where: { $0.clause == selected }) {
+            remove(chip)
+            return true
+        }
+        return atStart && onDeleteAtStart()
     }
 }
 
@@ -214,12 +239,15 @@ struct ColumnSearchField: View {
 struct SearchChipRow: View {
     let chips: [SearchChip]
     let width: CGFloat
+    /// The token a click chose, which Delete takes away.
+    @Binding var selected: FilterClause?
     let onRemove: (SearchChip) -> Void
 
     private var row: some View {
         HStack(spacing: 4) {
             ForEach(chips) { chip in
-                SearchChipView(chip: chip) { onRemove(chip) }
+                SearchChipView(
+                    chip: chip, isSelected: selected == chip.clause, select: { selected = chip.clause }, remove: { onRemove(chip) })
             }
         }
         .fixedSize()
@@ -238,8 +266,12 @@ struct SearchChipRow: View {
     }
 }
 
+/// A token: the field in the secondary color and its value in the primary. It has no button; a click chooses it, Delete
+/// takes it away, and VoiceOver has Remove.
 private struct SearchChipView: View {
     let chip: SearchChip
+    let isSelected: Bool
+    let select: () -> Void
     let remove: () -> Void
     @Environment(\.interfaceTextSize) private var textSize
 
@@ -258,22 +290,21 @@ private struct SearchChipView: View {
             Text(styled)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            Button(action: remove) {
-                Image(systemName: "xmark").font(.system(size: 8 * scale, weight: .bold)).foregroundStyle(.secondary)
-                    .frame(minWidth: 16, minHeight: 16)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove Filter")
         }
         .font(.system(size: looks.textSize * scale))
         .padding(.horizontal, looks.padding * scale)
         .frame(height: looks.height * scale)
         .frame(maxWidth: FilterChipMetrics.widest * scale)
-        .background(.quaternary.opacity(0.6), in: .rect(cornerRadius: looks.cornerRadius * scale, style: .continuous))
+        .background(
+            isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.3)) : AnyShapeStyle(.quaternary.opacity(0.6)),
+            in: .rect(cornerRadius: looks.cornerRadius * scale, style: .continuous))
         .fixedSize(horizontal: true, vertical: false)
-        .accessibilityElement(children: .contain)
+        .contentShape(.rect)
+        .onTapGesture(perform: select)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(chip.parts.sentence)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAction(named: "Remove", remove)
         .accessibilityIdentifier("SearchToken")
     }
 }
@@ -295,7 +326,8 @@ private struct ToolbarSearchText: NSViewRepresentable {
     let onSubmit: () -> Void
     let onDown: () -> Void
     let onPick: (SearchOffer) -> Void
-    let onDeleteAtStart: () -> Bool
+    /// Delete, and whether it was at the start of the field: whether it took a token away.
+    let onDelete: (Bool) -> Bool
     let onFocus: (Bool) -> Void
     let onEnd: () -> Void
 
@@ -372,8 +404,8 @@ private struct ToolbarSearchText: NSViewRepresentable {
             case #selector(NSResponder.insertNewline(_:)):
                 if let offer = controller.chosen { parent.onPick(offer) } else { parent.onSubmit() }
             case #selector(NSResponder.deleteBackward(_:)):
-                // At the start of the field, Delete takes the last token, as it does in Mail.
-                guard textView.selectedRange == NSRange(location: 0, length: 0), parent.onDeleteAtStart() else { return false }
+                // A chosen token goes; otherwise at the start of the field Delete takes the last, as it does in Mail.
+                guard parent.onDelete(textView.selectedRange == NSRange(location: 0, length: 0)) else { return false }
             default: return false
             }
             return true
