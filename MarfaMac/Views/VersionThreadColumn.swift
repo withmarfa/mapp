@@ -12,6 +12,11 @@ struct VersionThreadColumn: View {
     let list: VersionList?
     let now: Date
 
+    /// How far the title, the marks and the writers' names are from the column's edge: 20, as the board has them. A
+    /// `List(.inset)` already keeps its rows 16 from the edge (measured), so each row's own inset is the rest.
+    private static let edge: CGFloat = 20
+    private static let rowInsets = EdgeInsets(top: 0, leading: edge - 16, bottom: 0, trailing: edge - 16)
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
@@ -26,7 +31,7 @@ struct VersionThreadColumn: View {
                 Text(count).interfaceFont(.callout).foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Self.edge)
         .padding(.top, 8)
         .padding(.bottom, 10)
         .accessibilityElement(children: .combine)
@@ -67,10 +72,11 @@ struct VersionThreadColumn: View {
             ForEach(blocks) { block in
                 Text(VersionBlocks.title(of: block.kind, now: now, calendar: .autoupdatingCurrent))
                     .interfaceFont(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(VersionLooks.faint)
                     .padding(.top, block.id == blocks.first?.id ? 0 : 10)
                     .accessibilityAddTraits(.isHeader)
                     .listRowSeparator(.hidden)
+                    .listRowInsets(Self.rowInsets)
                 ForEach(block.elements) { entry in
                     row(entry, list: list)
                     if entry.isCurrent, !list.isComplete { gap }
@@ -109,7 +115,7 @@ struct VersionThreadColumn: View {
             summary: list.summary(of: entry, in: library.catalogue))
             .tag(entry.id)
             .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
+            .listRowInsets(Self.rowInsets)
             .accessibilityIdentifier("VersionHistoryRow.\(entry.version)")
     }
 
@@ -134,7 +140,7 @@ struct VersionThreadColumn: View {
         .padding(.vertical, 6)
         .selectionDisabled()
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
+        .listRowInsets(Self.rowInsets)
     }
 }
 
@@ -160,19 +166,17 @@ private struct VersionThreadRow: View {
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
                             .frame(minHeight: 17)
-                            .background(SelectionLooks.chosen(for: scheme), in: RoundedRectangle(cornerRadius: 5))
+                            .background(VersionLooks.currentWash, in: RoundedRectangle(cornerRadius: 5))
                     }
                 }
                 Text(summary).interfaceFont(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
             if let writer = entry.writer {
-                Text(verbatim: writer.displayName).interfaceFont(.subheadline).foregroundStyle(.tertiary).lineLimit(1)
+                Text(verbatim: writer.displayName).interfaceFont(.subheadline).foregroundStyle(VersionLooks.faint).lineLimit(1)
             }
         }
         .padding(.vertical, 3)
         .accessibilityElement(children: .combine)
     }
-
-    @Environment(\.colorScheme) private var scheme
 }

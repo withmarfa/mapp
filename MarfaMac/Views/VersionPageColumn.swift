@@ -78,7 +78,7 @@ struct VersionPageColumn: View {
                 if !rows.isEmpty { propertyRows(rows, size: size) }
                 Group {
                     if let text = content.text {
-                        VersionTextView(old: older?.content.text, new: text)
+                        VersionTextView(old: older?.content.text, new: text, size: CGFloat(style.textSize))
                     } else {
                         Text("No text").foregroundStyle(.secondary)
                     }
@@ -132,6 +132,8 @@ struct VersionPageColumn: View {
 struct VersionTextView: View {
     let old: String?
     let new: String
+    /// The page's text size, which the lines and the headings over them scale from.
+    let size: CGFloat
     @State private var lines: [ReadLine]?
 
     private struct Job: Hashable {
@@ -143,11 +145,13 @@ struct VersionTextView: View {
         let shown = TextExcerpt(new)
         VStack(alignment: .leading, spacing: 6) {
             LazyVStack(alignment: .leading, spacing: 6) {
-                ForEach(lines ?? []) { VersionLineView(line: $0) }
+                ForEach(lines ?? []) { VersionLineView(line: $0, size: size) }
             }
             .textSelection(.enabled)
             if shown.omitted > 0 {
-                Text("\(shown.omitted.formatted()) more characters aren’t shown.").foregroundStyle(.secondary)
+                Text("\(shown.omitted.formatted()) more characters aren’t shown.")
+                    .font(.system(size: size))
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -163,15 +167,20 @@ struct VersionTextView: View {
 
 private struct VersionLineView: View {
     let line: ReadLine
+    let size: CGFloat
 
     var body: some View {
+        content.font(.system(size: size))
+    }
+
+    @ViewBuilder private var content: some View {
         switch line.kind {
         case .blank:
             Color.clear.frame(height: 6)
         case .rule:
             Divider()
         case .heading(let level):
-            Text(attributed).font(Self.font(forHeading: level)).padding(.top, 6)
+            Text(attributed).font(Self.font(forHeading: level, size: size)).padding(.top, 6)
         case .bullet(let depth, let number):
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(number.map { "\($0)." } ?? "•").foregroundStyle(.secondary)
@@ -183,7 +192,7 @@ private struct VersionLineView: View {
                 .padding(.leading, 14)
                 .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 3) }
         case .code:
-            Text(attributed).font(.system(.body, design: .monospaced))
+            Text(attributed).font(.system(size: size, design: .monospaced))
         case .paragraph:
             Text(attributed)
         case .table(let table):
@@ -191,12 +200,14 @@ private struct VersionLineView: View {
         }
     }
 
-    private static func font(forHeading level: Int) -> Font {
+    /// The board's headings as multiples of the text size: 19 and 16 where the text is 15, the next level down at the
+    /// text's own size, and the top level a step above the second.
+    private static func font(forHeading level: Int, size: CGFloat) -> Font {
         switch level {
-        case 1: .title.bold()
-        case 2: .title2.bold()
-        case 3: .title3.bold()
-        default: .headline
+        case 1: .system(size: size * 22 / 15, weight: .bold)
+        case 2: .system(size: size * 19 / 15, weight: .semibold)
+        case 3: .system(size: size * 16 / 15, weight: .semibold)
+        default: .system(size: size, weight: .semibold)
         }
     }
 
@@ -292,4 +303,16 @@ enum VersionLooks {
         let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         return NSColor(srgbRed: 48 / 255, green: 164 / 255, blue: 108 / 255, alpha: isDark ? addedDarkOpacity : addedLightOpacity)
     })
+
+    /// The board's third text level, for block headings and writers' names: ink at 36%, white at 36% in dark.
+    static let faint = neutral(0.36)
+    /// The wash behind Current: ink at 6%, white at 6% in dark.
+    static let currentWash = neutral(0.06)
+
+    private static func neutral(_ opacity: Double) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return (isDark ? NSColor.white : NSColor.black).withAlphaComponent(opacity)
+        })
+    }
 }
