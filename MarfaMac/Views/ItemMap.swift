@@ -154,7 +154,7 @@ private struct UnplacedList: View {
             }
         }
         .listStyle(.plain)
-        .frame(width: 300, height: min(CGFloat(ids.count) * 26 + 16, 360))
+        .frame(width: 300, height: min(CGFloat(ids.count) * 34 + 8, 360))
         .accessibilityLabel("Items With No Location")
     }
 }
