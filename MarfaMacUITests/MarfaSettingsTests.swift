@@ -57,7 +57,7 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         openLibraryPage()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         address.click()
-        address.typeText("marfa.example")
+        address.typeText("ftp://marfa.example")
         connect.click()
         let notice = app.descendants(matching: .any)["MarfaNotice"].firstMatch
         XCTAssertTrue(notice.waitForExistence(timeout: 3))
