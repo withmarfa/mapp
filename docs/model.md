@@ -3,6 +3,8 @@ summary: Which side owns each thing, Marfa or the app, and the word this app use
 paths:
   - MarfaMac/Model/Items/Catalogue.swift
   - MarfaMac/Model/Items/Item.swift
+  - MarfaMac/Model/Items/ItemAllows.swift
+  - MarfaMac/Model/Items/ItemMoves.swift
   - MarfaMac/Model/SidebarItem.swift
   - MarfaMac/Model/Marfa/MarfaMapping*.swift
 ---
@@ -39,6 +41,14 @@ Each is a case where a declared field is not enough. Add to this list only where
 - `LookPreset.suggested`: the highlight type, found by walking up.
 
 Two defaults name types: the sidebar's and toolbar's starting set for New, and the type quick add begins with. Both use only types the library offers.
+
+## Tier, state and what an item allows
+
+- **One rule says what an item allows:** `Item.obstacle(to:)`, for each `ItemChange`. Every editor, command and planner asks it, and its answer is the `BatchSkips.Reason` a command on several tells.
+- **Read only blocks only what a connector's next run puts back:** the title, text, fields and type. Its run leaves tags, state and tier as they stand (`items/natural-key-tags`, `items/tier-upsert`), and a binned item stays in the bin (`items/natural-key-trashed`).
+- **Archived blocks nothing.** In Recently Deleted, everything is blocked but Recover and Delete Immediately.
+- **The tier and the state are separate.** Keep and Move to Feed send `ItemWrite.retier`; Archive and Unarchive send `ItemWrite.transition` through `setStates`, as Delete does. Each item is its own queued write, and a command is one undo step.
+- **Archive with what is beneath takes every active item under the selection through `parent-of`** (`archivePlan`). Marfa's own archive reaches no child.
 
 ## Vocabulary
 

@@ -49,7 +49,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Library or Feed control | After the count on a type, a collection and a source that has Feed items: All Items, Library, Feed, each with its count. It is quiet while it says what the setting says. With Library or Feed chosen, the title's count is of what is listed and the sidebar's stays. It is the first to give way for room. | `ListToolbar.swift`, `ItemTableOptions`, `PlaceDefault` | `Rethink-Scope-Menu`, `Rethink-Type-Inbox` |
 | What a type opens on | A setting in Lists: All Items (the default) or Library. | `PreferencesMap` | `Rethink-Scope-Menu` |
 | Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. | `ItemRow.swift`, `ItemTableCells.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
-| Keep and Move to Feed | Commands on one item or several, one undo, with a toast that names the item or the count. Keeping an archived item leaves it archived. A mixed selection offers both, and each acts on what it applies to. Views and tables have neither. Queued offline (`ItemWrite.retier`). | `ItemActions.swift`, `ItemRowMenu.swift`, `ItemLibrary` | `Rethink-Keep-Toast`, `Rethink-Item-Menu`, `Rethink-Item-Menus` |
+| Keep and Move to Feed | Commands on one item or several, with a toast that names the item or the count (`ItemLibrary.movedMessage`). Views and tables have neither. | `ItemActions.swift`, `ItemRowMenu.swift` | `Rethink-Keep-Toast`, `Rethink-Item-Menu`, `Rethink-Item-Menus` |
 | Quick Actions | Keep, Archive and Delete on the row under the pointer, a choice of each view, with the default that `docs/concepts.md` gives. | `ItemRow.swift`, `ViewMacSettings` | `Rethink-Inbox-Actions`, `Rethink-View-Quick-Actions` |
 | In | A value on the panel's Info for every item, Library or Feed, that a person changes there. | `ItemInspector.swift` | `Rethink-Feed-Page-In` |
 | Leaves the Feed | A date beside In, only where the type has a limit and the item is active in the Feed. Move to Feed asks first only where the limit would remove the item at once. **Waits for Marfa:** the limit in the type's catalogue. | `ItemInspector.swift` | `Rethink-Feed-Limit`, `Rethink-Feed-Limit-Move` |
@@ -59,25 +59,18 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Archive and Unarchive | ⌃⌘A, in the item menu after Keep or Move to Feed and before Delete. Queued offline. Undo uses the way Delete's undo checks for changes from elsewhere (`MarfaLibrary+Bin.swift`), never a second one. | `ItemActions.swift`, `ItemLibrary`, `MarfaLibrary+Bin.swift` | `Rethink-Archive-Toast`, `Rethink-Item-Menu` |
-| With sub-items | It asks: Archive All, Archive Only This Item, Cancel. The count, and what Archive All archives, is everything beneath. One undo. | `LibraryDialogs.swift` | `Rethink-Archive-Sub-Items` |
+| Archive and Unarchive | ⌃⌘A, in the item menu after Keep or Move to Feed and before Delete. | `ItemActions.swift` | `Rethink-Archive-Toast`, `Rethink-Item-Menu` |
+| With sub-items | It asks: Archive All, Archive Only This Item, Cancel. The count is what `archivePlan` puts beneath. | `LibraryDialogs.swift` | `Rethink-Archive-Sub-Items` |
 | Library's Archive | The one list of everything archived, from both the Library and the Feed, with its own count and its own layout choice. One type's archived items are this place narrowed by a token in Search. | `SidebarIndex.swift`, `MarfaItemIndex` | `Rethink-Archive`, `Rethink-Type-Archive` |
 | An archived item's page | Says Archived over its title, and edits as any other. | `ItemPageHeader.swift`, `BatchSkips` | `Rethink-Archived-Page` |
 | Archived Items in a view | Hidden, Shown or Only Archived. A view that names no state lists both, so it reads Shown. | `ViewPanel`, `ViewDraft` | `Rethink-View-Panels` |
-
-## What an item allows
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-| Read-only and archived items | Library, Feed, archive, delete, favorite, tags, collections and links work on both. Title, text and fields stay locked on a read-only item, with the reason. A command on several says how many it did not change, and why. | `BatchSkips`, `ItemWrite` | `Rethink-Read-Only`, `Rethink-Read-Only-Full` |
-| A file's fields | A file's title and the fields Marfa lets a person change are editable. What the server sets is not shown as rows. | `FileItemContent`, `MarfaMapping` | `Rethink-Image`, `Rethink-PDF` |
 
 ## Several items
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | The capsule | Several chosen items are one capsule of symbols at the foot of the window, in glass: Keep leads in the Feed, then Archive, Add Tag, Add to Collection, Change Type and More, and Delete stands apart at the end. The count is the control that lets them go. Beside a list, the same stands under the pile of cards in the page's column. | `MainView.swift`, `ItemActions.swift` | `Rethink-Selection-Table`, `Rethink-Selection-List`, `Rethink-Selection-States` |
-| Undo | Each Keep, move, archive, link and new row is one undo, however many items. | `StepUndo`, `ItemWrite` | `Rethink-Archive-Toast` |
+| Undo | Each link and new row is one undo, however many items. | `StepUndo`, `ItemWrite` | `Rethink-Archive-Toast` |
 
 ## Layouts
 

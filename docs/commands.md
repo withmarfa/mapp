@@ -24,6 +24,19 @@ The menu bar is the full list of commands. Every toolbar, corner and row command
 - **A Format command's shortcut is the page's too** (`Format.pageKey`), because the page takes keys before the menu.
 - **Put the test beside the rule:** `ItemOpeningTests` for the row menu's order, `ShortcutTests` for the catalogue.
 
+## Tier and state
+
+Keep in Library, Move to Feed, Archive and Unarchive are `ItemLibrary` calls that take the whole selection and return a `CommandOutcome`, whose words are `movedMessage`.
+
+| Call | Moves | Leaves alone |
+| --- | --- | --- |
+| `setTier(_:to:undoManager:)` | Each item to the Library or the Feed (`tierPlan`) | An item already there; a collection, view or settings item going to the Feed |
+| `archive(_:beneath:undoManager:)` | Each active item, and with `beneath` every active item under it (`archivePlan`) | An item archived or in Recently Deleted |
+| `unarchive(_:undoManager:)` | Each archived item (`unarchivePlan`) | An active item |
+
+- **A menu shows what `selectionCommands` offers:** each move that would change at least one item, so a selection in both tiers offers both.
+- **Move to Feed asks nothing yet.** `feedLimitQuestion` is nil until the catalogue gives a type's feed window.
+
 ## Shortcuts
 
 - **Only a person's choices are stored** (`ShortcutBindings`), and a stored command this build does not know is kept.

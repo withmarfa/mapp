@@ -35,6 +35,16 @@ An item's page is its title, pinned properties, property block and text. One pag
 - **With nothing chosen it is one quiet line** for what the place lists (`InspectorPrompt`), or blank where another pane already says so.
 - **It holds no buttons that act on a container**, because the person may make it narrow.
 
+## What the page locks
+
+The page and the right sidebar draw what `Item.allows(_:)` answers, and never judge an item themselves.
+
+| The item is | The page |
+| --- | --- |
+| Read only | Locks the title, text and fields. Tags, Favorite, collections and links stay open, because the connector's next run keeps them |
+| A file | Has no text and no Change Type. Its title, location and the fields a person may change stay open |
+| In Recently Deleted | Locks everything but Recover and Delete Immediately |
+
 ## Customize Layout
 
 - **A layout belongs to a type.** Every item of the type follows it, at once, in every window, and a child type does not inherit it.
