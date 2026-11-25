@@ -88,7 +88,7 @@ BANNED = [(re.compile(p), why) for p, why in (
     (rf"\b{MONTH} \d{{4}}\b|\b\d{{4}}-\d\d-\d\d\b", "dates are for git"),
     (r"\b[Ss]ession \d{2,}", "history is for git"),
     (r"\bAugust\b", "name no person"),
-    (r"(?<![\w/.#-])[A-Z]\d{1,3}[a-z]?(?![\w.-])", "board numbers change; name the board's file"),
+    (r"(?<![\w/.#-])[A-Z]\d{1,3}[a-z]?(?!\w|[.-]\w)", "board numbers change; name the board's file"),
     (r"[\u2014\u00b7]", "no em dash or interpunct"),
 )]
 THIS_MAC = re.compile(r"\bthis Mac\b")

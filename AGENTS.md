@@ -4,7 +4,7 @@ A macOS app for a Marfa server's items. It works only through the `marfa-swift` 
 
 ## Before you change anything
 
-`docs/` and the nested `AGENTS.md` files hold what the code and its tests cannot show. Read the rows that fit your task.
+`docs/` and the nested `AGENTS.md` files hold what the code and its tests cannot show. Read the rows that fit.
 
 | If you change | Read |
 | --- | --- |

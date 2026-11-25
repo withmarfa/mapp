@@ -67,7 +67,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 | Which rows a filter keeps in the window | `FilterMatching` |
 | To and from a saved view's query | `ViewDraft` in `ViewDraft+Filters.swift` |
 
-- **A new operator or kind changes every row of that table.** `FilterMatching` and the query must keep the same items; test both directions.
+- **A new operator or kind changes every row of that table.** `FilterMatching` and the query must keep the same items; test both directions (`FilterClauseTests`, `ViewDraftTests`).
 - **Marfa's filter is one list, joined all by and or all by or.** A mix is refused before it is sent (`search-and-filters/filter-mixed-logic`), except that "is" several words of a closed field is written as "is not" the others.
 - **A view takes ten conditions.** Each value and each bound of a date counts.
 - **Marfa has no relative date.** "Is in the last…" and the like (`FilterOp.isRelative`) stay in a default view and are left out of a saved one.
