@@ -9,8 +9,8 @@ nonisolated enum MarfaMapping {
     static let blobField = "blob_ref"
     static let mimeTypeField = "mime_type"
     static let sizeField = "size_bytes"
-    /// The keys a file item keeps its bytes' facts under, shown as the file's kind and size instead.
-    static let fileFacts: Set<String> = [blobField, mimeTypeField, sizeField]
+    /// The file’s blob reference, kind, size, and values Marfa reads from the bytes (`READ_FROM_BYTES`).
+    static let fileFacts: Set<String> = [blobField, mimeTypeField, sizeField, "extracted_text", "width", "height", durationField]
     /// Marfa's folder device writes a body link as this edge, so it reads as the body's, not a property's.
     static let bodyLinkEdge = "references"
     /// Marfa writes an embed of a file as this edge, from the file's item to the item whose body embeds it.
@@ -23,6 +23,8 @@ nonisolated enum MarfaMapping {
     static let collectionEdge = "in-collection"
     /// The role a type plays to be a collection, which `in-collection` names at its to item.
     static let containerRole = "container"
+    /// How a merge verdict names the item's tier among the fields it resolved.
+    static let tierField = "tier"
     /// The type a task is, or descends from: only such a type's `priority` and `due_at` are read as a priority and a
     /// due date.
     static let taskType = TypeID("core.task")

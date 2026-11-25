@@ -215,8 +215,8 @@ extension MarfaLibrary {
     /// refused, saying why. Never `later`: only the earlier edits a step is built on make it wait.
     private func stepVerdict(of edit: PropertyEdit, undoing: Bool) -> StepVerdict {
         guard let item = item(edit.item) else { return .refused(BatchSkips.sentence(.gone, count: 1)) }
-        guard item.isEditable else {
-            return .refused(item.problem?.message ?? item.writeObstacle.map { BatchSkips.sentence($0, count: 1) } ?? Self.cantChange)
+        if let reason = item.obstacle(to: .fields) {
+            return .refused(item.problem?.message ?? BatchSkips.sentence(reason, count: 1))
         }
         guard let type = catalogue.itemTypes[item.type] else { return .refused(Self.changedSince(undoing: undoing)) }
         var unread = false

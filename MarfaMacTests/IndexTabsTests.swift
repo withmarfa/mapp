@@ -28,7 +28,7 @@ import Testing
         undo.groupsByEvent = false
         Browser.delete([holiday], in: library, undoManager: undo, toasts: toasts, naming: "Holiday")
 
-        #expect(source.writes == [.transition(holiday, .trashed)], "the collection is written, and no member")
+        #expect(source.writes == [.transition(holiday, .trashed, from: .active)], "the collection is written, and no member")
         #expect(toasts.current?.message == "Moved “Holiday” to Recently Deleted")
         #expect(toasts.current?.undo != nil)
         for id in members {
@@ -37,9 +37,12 @@ import Testing
             #expect(member.collectionIDs.contains(holiday), "a member keeps its place in the collection that is in Recently Deleted")
         }
 
+        // The Undo waits for the engine to queue the move.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try #require(await eventually { library.stateJudging.isEmpty })
         source.clearWrites()
         toasts.undo()
-        #expect(source.writes == [.transition(holiday, .active)], "Undo brings back the collection alone")
+        #expect(source.writes == [.restore(holiday)], "Undo brings back the collection alone")
     }
 
     @Test func deletingACollectionThatIsAlreadyGoneShowsNoToast() async throws {

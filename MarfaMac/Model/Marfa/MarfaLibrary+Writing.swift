@@ -12,7 +12,7 @@ extension MarfaLibrary {
         let title = String(localized: "Couldn’t Save “\(item.displayTitle)”")
         // A save that arrives after the row stopped being writable, such as text typed as the copy found it could not
         // read the row, is kept nowhere, so the person gets the text back. Text that waits is checked again as it goes.
-        guard item.isWritable else { return notices.notKept(title, text: body, reason: Self.cantChange) }
+        guard item.allows(.text) else { return notices.notKept(title, text: body, reason: Self.cantChange) }
         takeTyped(body, of: id, readAt: readAt, failing: title)
     }
 
@@ -52,20 +52,22 @@ extension MarfaLibrary {
     /// A title is the property the type keeps it in, which the views name `title` whatever it is.
     @discardableResult
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool {
-        guard let item = item(id), item.isEditable else { return false }
+        guard let item = item(id) else { return false }
         let cantEdit = String(localized: "Can’t Edit This Property")
         var key = key
         if key == "title" || item.titleRule == .property(key) {
+            guard item.allows(.title) else { return false }
             guard case .property(let field) = item.titleRule else {
                 notices.tell(cantEdit, String(localized: "This item’s title is the first line of its text."))
                 return false
             }
-            guard let title = value?.string.map(NameText.trimmed), !title.isEmpty else { return false }
+            // A file's title can be a fact Marfa sets, such as its extracted text.
+            guard item.obstacle(toField: field) == nil, let title = value?.string.map(NameText.trimmed), !title.isEmpty else { return false }
             key = field
             return editProperty(id, key: key, to: .string(title), undoManager: undoManager)
         }
         // The text is the page's to write, never a property's.
-        guard let type = catalogue.itemTypes[item.type], key != MarfaMapping.bodyField(of: type),
+        guard item.obstacle(toField: key) == nil, let type = catalogue.itemTypes[item.type], key != MarfaMapping.bodyField(of: type),
             let field = type.fields.first(where: { $0.key == key })
         else { return false }
         if let value, !field.kind.accepts(value) {
@@ -89,9 +91,9 @@ extension MarfaLibrary {
 
     @discardableResult
     func setItemProperties(_ id: ItemID, changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) -> Bool {
-        guard let item = item(id), item.isEditable, let type = catalogue.itemTypes[item.type] else { return false }
+        guard let item = item(id), item.allows(.fields), let type = catalogue.itemTypes[item.type] else { return false }
         for (key, value) in changes {
-            guard key != MarfaMapping.bodyField(of: type), let field = type.fields.first(where: { $0.key == key }) else { return false }
+            guard item.obstacle(toField: key) == nil, key != MarfaMapping.bodyField(of: type), let field = type.fields.first(where: { $0.key == key }) else { return false }
             if let value, !field.accepts(value) {
                 notices.tell(String(localized: "Invalid Property"), String(localized: "The value does not match this property's type."))
                 return false
@@ -242,7 +244,7 @@ extension MarfaLibrary {
     /// Writes `change.to` over an item that still holds `change.from`; a part the item no longer holds is left alone
     /// and told, since writing over it would replace what was typed after. False where nothing was written.
     private func writeRestore(_ change: RestoreChange, of id: ItemID) -> Bool {
-        guard let item = item(id), item.isWritable else {
+        guard let item = item(id), item.allows(.text) else {
             notices.tell(Self.cantRestore, String(localized: "This item can’t be changed right now."))
             return false
         }
@@ -326,7 +328,7 @@ extension MarfaLibrary {
     /// meanwhile is not sent a remove for it, which the server would answer as it answers any change that changes
     /// nothing. Undo and redo run this again, so they act on what the items hold then.
     private func setTag(_ tag: String, on: Bool, _ ids: Set<ItemID>, undoManager: UndoManager?) {
-        let changing = Set(ids.filter { id in item(id).map { $0.canEditTags && $0.tags.contains(tag) != on } ?? false })
+        let changing = Set(ids.filter { id in item(id).map { $0.allows(.tags) && $0.tags.contains(tag) != on } ?? false })
         guard !changing.isEmpty else { return }
         let name = on ? String(localized: "Add Tag") : String(localized: "Remove Tag")
         let title = on ? String(localized: "Can’t Add Tag") : String(localized: "Can’t Remove Tag")

@@ -417,7 +417,7 @@ struct ItemToolbarActions {
     }
 
     /// Formatting acts only on the writable item currently visible in the editor.
-    var editableItem: Item? { visibleItem.flatMap { $0.isWritable ? $0 : nil } }
+    var editableItem: Item? { visibleItem.flatMap { $0.allows(.text) ? $0 : nil } }
 
     private var selectedFileURL: URL? {
         guard (browser?.selection.count ?? items.count) == 1,
@@ -507,7 +507,7 @@ private struct MoreMenu: View {
         guard let details, let item = context.item, context.showsPage, !context.hidesCorner, let library = context.library else { return [] }
         return PageCorner.inMore(
             layout: library.pageLayout(of: item), hasReader: details.pageLook?.item == item.id,
-            canWrite: item.isWritable && editor != nil, file: details.fileViewing(of: item.id)?.kind,
+            canWrite: item.allows(.text) && editor != nil, file: details.fileViewing(of: item.id)?.kind,
             shows: PageCornerChoice(formats: showsFormats, textSize: showsTextSize, focus: showsFocus))
     }
 

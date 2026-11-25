@@ -204,12 +204,12 @@ nonisolated enum ItemBoardLayout {
     static func move(_ item: Item, key: String, to destination: ItemBoardLane.ID, catalogue: Catalogue) -> Move {
         if case .group(let group) = destination { return move(item, toGroup: group, catalogue: catalogue).move }
         // Clearing suits any field the type declares, as Set or Not Set's Not Set does.
-        if destination == .missing, item.isEditable, let info = catalogue.itemTypes[item.type],
+        if destination == .missing, item.obstacle(toField: key) == nil, let info = catalogue.itemTypes[item.type],
            key != "title", key != info.titleKey, key != info.bodyKey, let declared = info.fields.first(where: { $0.key == key }) {
             guard !declared.required else { return .needsValue }
             return item.value(of: key) == nil ? .unchanged : .set(nil)
         }
-        guard item.isEditable, let field = field(key, of: item, catalogue: catalogue) else { return .refused }
+        guard item.obstacle(toField: key) == nil, let field = field(key, of: item, catalogue: catalogue) else { return .refused }
         let value: PropertyValue?
         switch destination {
         case .option(let option):
@@ -224,7 +224,7 @@ nonisolated enum ItemBoardLayout {
 
     /// A move into a status group writes the item's own status field, the first word its type declares in the group.
     static func move(_ item: Item, toGroup group: StatusGroup, catalogue: Catalogue) -> (key: String, move: Move) {
-        guard item.isEditable, let field = statusField(of: item, catalogue: catalogue) else { return ("", .refused) }
+        guard let field = statusField(of: item, catalogue: catalogue), item.obstacle(toField: field.key) == nil else { return ("", .refused) }
         guard let word = firstWord(field, in: group) else { return (field.key, .refused) }
         if case .string(let current)? = item.value(of: field.key), field.statusGroup(of: current) == group { return (field.key, .unchanged) }
         return (field.key, .set(.string(word)))
@@ -263,8 +263,8 @@ nonisolated enum ItemBoardLayout {
             switch outcome {
             case .set(let value): plan.changes.append((id, writeKey, value))
             case .unchanged: break
-            case .refused: plan.skips.skip(item.writeObstacle ?? (item.isFile ? .fileHasNoLane : .cantMoveToLane))
-            case .needsValue: plan.skips.skip(item.writeObstacle ?? .needsValue)
+            case .refused: plan.skips.skip(item.obstacle(toField: writeKey) ?? (item.isFile ? .fileHasNoLane : .cantMoveToLane))
+            case .needsValue: plan.skips.skip(item.obstacle(toField: writeKey) ?? .needsValue)
             }
         }
         return plan

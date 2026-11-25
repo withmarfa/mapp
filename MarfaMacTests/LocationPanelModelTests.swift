@@ -273,13 +273,13 @@ import UniformTypeIdentifiers
         #expect(model.point == LocationPoint(latitude: 51.5246, longitude: -0.0788))
     }
 
-    @Test func anImageWithCoordinatesShowsAMapAndNoNameField() throws {
+    @Test func anImagesPointIsAPersonsToMoveAndItHasNoNameField() throws {
         let image = add("core.file.image", london, content: .file(.png, byteCount: 3))
         let model = try panel(for: image)
         #expect(model.point != nil)
-        #expect(!model.canEdit && !model.hasNameField)
+        #expect(model.canEdit && !model.hasNameField)
         step { model.place(Self.point(1, 1)) }
-        #expect(library.propertiesSet.isEmpty)
+        #expect(library.propertiesSet.map { $0.changes.keys.sorted() } == [["latitude", "longitude"]])
     }
 
     @Test func aRefusedWriteIsToldAndLeavesThePointAlone() throws {

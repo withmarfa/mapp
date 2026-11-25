@@ -299,13 +299,13 @@ import Testing
         }
         await scene.caughtUp()
         try await scene.wait("the item held read only") { $0.item(titled: "First")?.readOnly == true }
-        #expect(scene.shown("First")?.isEditable == false)
+        #expect(scene.shown("First")?.allows(.fields) == false)
         #expect(scene.reads.whole == whole, "no whole read")
 
         scene.reads.readOnly.withLock { $0 = [] }
         await scene.caughtUp()
         try await scene.wait("the item released") { $0.item(titled: "First")?.readOnly == false }
-        #expect(scene.shown("First")?.isEditable == true)
+        #expect(scene.shown("First")?.allows(.fields) == true)
         #expect(scene.reads.whole == whole)
         await finish(scene)
     }

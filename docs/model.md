@@ -3,6 +3,8 @@ summary: Which side owns each thing, Marfa or the app, and the word this app use
 paths:
   - MarfaMac/Model/Items/Catalogue.swift
   - MarfaMac/Model/Items/Item.swift
+  - MarfaMac/Model/Items/ItemAllows.swift
+  - MarfaMac/Model/Items/ItemMoves.swift
   - MarfaMac/Model/SidebarItem.swift
   - MarfaMac/Model/Marfa/MarfaMapping*.swift
 ---
@@ -39,6 +41,19 @@ Each is a case where a declared field is not enough. Add to this list only where
 - `LookPreset.suggested`: the highlight type, found by walking up.
 
 Two defaults name types: the sidebar's and toolbar's starting set for New, and the type quick add begins with. Both use only types the library offers.
+
+## Tier, state and what an item allows
+
+- **One rule says what an item allows:** `Item.obstacle(to:)`, for each `ItemChange`. Its answer is the `BatchSkips.Reason` a command on several tells.
+- **Read only locks the connector-managed title, text, properties, and type.** A natural-key upsert keeps the current tags and tier when the connector omits them (`items/natural-key-tags`, `items/tier-upsert`). A binned item stays in the bin (`items/natural-key-trashed`).
+- **Archived blocks nothing.** In Recently Deleted, everything is blocked but Recover and Delete Immediately.
+- **The tier and the state are separate.** Keep and Move to Feed send `ItemWrite.retier`. Archive, Unarchive, and Delete send `ItemWrite.transition` through `setStates`. Recover and undo or redo steps that take an item out of Recently Deleted use `ItemWrite.restore`. Each item is its own queued write, and a command is one undo step.
+- **`MarfaEngine.judge` checks every state and tier write,** Undo and Redo included, against the copy with its queued writes and its bin. Queue-time skips are told in one notice (`gatheringSkips`).
+- **A move command's `CommandOutcome` counts what the copy queued,** given to `moved` once each write is judged.
+- **Undo records a state move once its write is judged, and a tier move once the server answers.** Before that, Undo goes back on its stack and Redo says why it did not run (`waitForEarlier`).
+- **Known gaps:** a queued write can overwrite a change the copy has not yet learned of (withmarfa/marfa#3523, withmarfa/marfa#3528), including one the copy applies between `judge` and the queue, two package calls.
+- **Also open:** two notices when planner and queue skips coincide; one notice per failed rearchive in a bulk Undo of Delete; Delete's toast counts what it planned; Undo of New Item before the item shows.
+- **Archive with what is beneath takes every active item under the selection through `parent-of`** (`archivePlan`). Marfa's own archive reaches no child.
 
 ## Vocabulary
 

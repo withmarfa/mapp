@@ -138,7 +138,7 @@ struct ItemPage: View {
         // and a server that keeps its own text over the person's changes the text without one. The action may run
         // on an earlier copy of this view, so the item is read as it is now.
         .onChange(of: item.version) { itemChanged() }
-        .onChange(of: item.isWritable) { itemChanged() }
+        .onChange(of: item.allows(.text)) { itemChanged() }
         .onChange(of: library.body(of: item.id)) { itemChanged() }
     }
 

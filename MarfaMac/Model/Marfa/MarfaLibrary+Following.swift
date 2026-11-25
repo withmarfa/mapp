@@ -18,8 +18,10 @@ extension MarfaLibrary {
             propertyWrites[id] = nil
             propertyMarks[id] = nil
             read(id)
-            answered(id, outcome)
+            answered(id, outcome, toldWithCommand: gatherAnswer(id, outcome))
+            stateWriteJudged(id, outcome)
             stateWriteAnswered(id, outcome)
+            tierWriteAnswered(id, outcome)
             settle(id)
             propertyAnswered(id, outcome, holding: holding)
         case .taken(let id):
@@ -28,7 +30,8 @@ extension MarfaLibrary {
             if let mark = propertyMarks.removeValue(forKey: id) { remember(taken: mark) }
             if let edit = propertyEdits[id] { edit.take(holding: { item(edit.item)?.value(of: $0) }) }
             took(id)
-            stateWriteTaken(id)
+            gatherAnswer(id, nil)
+            stateWriteJudged(id, nil)
             read(id)
             settle(id)
         case .catalogue(let catalogue):
@@ -171,15 +174,16 @@ extension MarfaLibrary {
             || old.source != new.source || old.edgesOut != new.edgesOut
     }
 
-    private func answered(_ id: WriteID, _ outcome: WriteOutcome) {
+    /// `toldWithCommand` where the engine skipped the write, which its command tells with its other skips.
+    private func answered(_ id: WriteID, _ outcome: WriteOutcome, toldWithCommand: Bool) {
         let refusal = refusals.removeValue(forKey: id)
         let textWrite = textWrites.removeValue(forKey: id)
         let typed = textWrite?.typed
         let run = undoRuns.removeValue(forKey: id)
         if case .refused(let problem) = outcome, let run, MarfaEngine.isHeldRefusal(problem.code) {
             giveBack(run, problem, title: refusal?.title, text: typed ?? refusal?.text)
-        } else if case .refused(let problem) = outcome, problem.code == MarfaEngine.withdrawnCode {
-            // The person withdrew it themselves.
+        } else if case .refused(let problem) = outcome, problem.code == MarfaEngine.withdrawnCode || toldWithCommand {
+            // The person withdrew it themselves, or its command tells it.
         } else if case .refused(let problem) = outcome, let refusal {
             let message = problem.message ?? String(localized: "The Marfa server refused this change.")
             if problem.code == MarfaEngine.closedCode {

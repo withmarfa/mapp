@@ -40,9 +40,14 @@ nonisolated enum ItemWrite: Hashable, Sendable {
     /// Moves the item to another type, with the property changes the move makes in the same edit (`TypeChange`). A
     /// nil value removes the property.
     case retype(ItemID, TypeID, [String: PropertyValue?], base: ItemVersion)
-    /// Marfa moves a row's tier as an update, which carries the version it read.
+    /// Marfa moves a row's tier as an update, which carries the version it read. Sent only while the copy shows the
+    /// item in the other tier (`MarfaEngine.judge`).
     case retier(ItemID, Tier, base: ItemVersion)
-    case transition(ItemID, ItemState)
+    /// Archive, Unarchive, or Delete, sent only while the copy shows the item in `from`, or, where `from` is nil, out
+    /// of Recently Deleted (`MarfaEngine.judge`).
+    case transition(ItemID, ItemState, from: ItemState?)
+    /// Out of Recently Deleted, to active, sent only while the copy shows the item there or does not hold it.
+    case restore(ItemID)
     /// Sent at the version the person was shown, so an item changed elsewhere since is refused rather than erased.
     case purge(ItemID, version: ItemVersion)
     case tag(ItemID, String, on: Bool)

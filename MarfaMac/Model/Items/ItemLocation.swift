@@ -95,7 +95,7 @@ nonisolated struct ItemLocation: Hashable, Sendable {
     /// Whether a list of the item's properties shows its Location: the item holds something it draws, or the person
     /// just added it (`revealed` holds `rowID`).
     func isListed(in item: Item, revealed: Set<String> = []) -> Bool {
-        hasValue(in: item) || (item.isEditable && revealed.contains(Self.rowID))
+        hasValue(in: item) || (item.allows(.fields) && revealed.contains(Self.rowID))
     }
 
     // MARK: Reading
@@ -181,9 +181,9 @@ nonisolated struct ItemLocation: Hashable, Sendable {
         let label = String(localized: "Location")
         if let summary = summary(of: item) {
             return PropertyRow(
-                id: Self.rowID, label: label, value: .text(summary), editable: item.isEditable || hasPoint(item), symbol: Self.symbol)
+                id: Self.rowID, label: label, value: .text(summary), editable: item.allows(.fields) || hasPoint(item), symbol: Self.symbol)
         }
-        guard offersEmpty, item.isEditable else { return nil }
+        guard offersEmpty, item.allows(.fields) else { return nil }
         return PropertyRow(id: Self.rowID, label: label, value: .empty(symbol: Self.symbol), editable: true)
     }
 

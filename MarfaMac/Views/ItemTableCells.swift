@@ -75,7 +75,7 @@ struct ItemTableCell: View {
 
     /// Whether the cell is a value picked from a menu that this row's own field declares and that can be changed.
     private var offersPicker: Bool {
-        guard let rowField, row.item.isEditable else { return false }
+        guard let rowField, row.item.obstacle(toField: rowField.key) == nil else { return false }
         return column.picksFrom(rowField)
     }
 
@@ -212,7 +212,7 @@ struct ItemTableCell: View {
     @ViewBuilder private func value(of field: ItemTypeInfo.Field) -> some View {
         let current = ItemTableValue.string(row, key: field.key)
         let declares = library.catalogue.itemTypes[row.item.type]?.declares(field.key) ?? false
-        let editable = declares && row.item.isEditable
+        let editable = declares && row.item.obstacle(toField: field.key) == nil
         switch column.style(for: field) {
         case .status, .priority, .choice:
             picked(field, current: current, editable: editable)

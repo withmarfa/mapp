@@ -217,7 +217,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(note.first { $0.field == "about" }?.allowsMultiple == true)
         #expect(!note.contains { $0.field == "supersedes" })
         #expect(library.bodyMentions(for: F.n1).map(\.itemID) == [F.t1])
-        #expect(library.relationships(for: F.f1).allSatisfy { !$0.isEditable })
     }
 
     @Test func candidatesFollowTheCatalogueAndLeaveCyclesToTheCoresCheck() async throws {
@@ -265,9 +264,12 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { library.item(id) != nil })
         source.clearWrites()
         undo.undo()
-        #expect(source.writes == [.transition(id, .trashed)])
+        #expect(source.writes == [.transition(id, .trashed, from: .active)])
+        // The engine queues the move, which its Undo or Redo waits for.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try #require(await eventually { library.stateJudging.isEmpty })
         undo.redo()
-        #expect(source.writes == [.transition(id, .trashed), .transition(id, .active)])
+        #expect(source.writes == [.transition(id, .trashed, from: .active), .restore(id)])
     }
 
     @Test func aCreateTheCatalogueRefusesIsToldAndNotSent() async throws {
@@ -446,21 +448,31 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         library.delete([F.n1, F.n3], undoManager: undo)
-        #expect(source.writes == [.transition(F.n1, .trashed)])
+        #expect(source.writes == [.transition(F.n1, .trashed, from: .active)])
         #expect(undo.undoActionName == String(localized: "Delete Item"))
+        // The engine queues the move, which its Undo or Redo waits for.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try #require(await eventually { library.stateJudging.isEmpty })
         undo.undo()
-        #expect(source.writes.last == .transition(F.n1, .active))
+        #expect(source.writes.last == .restore(F.n1))
+        source.send(.taken(try #require(source.submitted.last?.id)))
         source.clearWrites()
         library.recover([F.n3, F.n1], undoManager: undo)
-        #expect(source.writes == [.transition(F.n3, .active)])
+        #expect(source.writes == [.restore(F.n3)])
+        // The engine queues the move, which its Undo or Redo waits for.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try #require(await eventually { library.stateJudging.isEmpty })
         undo.undo()
-        #expect(source.writes.last == .transition(F.n3, .trashed))
+        #expect(source.writes.last == .transition(F.n3, .trashed, from: .active))
     }
 
     @Test func anItemTheServersBinHoldsIsListedAndRecoveredLikeAnyOther() async throws {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         library.delete([F.n1], undoManager: undo)
+        // The engine queues the move, which its Undo or Redo waits for.
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        try #require(await eventually { library.stateJudging.isEmpty })
         // The server took the delete and the copy let the row go; the source still lists it, as the bin holds it.
         var binned = try #require(library.item(F.n1))
         binned.state = .trashed
@@ -469,7 +481,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.deletedCount == 2)
         source.clearWrites()
         undo.undo()
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
         #expect(library.notices.waiting.last == nil)
 
         // A restore the server refuses is told in the server's own words.
@@ -827,7 +839,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func aFieldOrItemThatCantChangeSendsNothing() async throws {
         let (library, source) = try await loaded()
-        #expect(await library.changeItemRelationship(F.f1, field: "about", adding: [F.p1], removing: [], undoManager: nil) == false)
+        #expect(await library.changeItemRelationship(F.n3, field: "about", adding: [F.p1], removing: [], undoManager: nil) == false)
         #expect(await library.changeItemRelationship(F.n1, field: "nothing", adding: [F.p1], removing: [], undoManager: nil) == false)
         #expect(source.writes.isEmpty)
     }

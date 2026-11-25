@@ -1,9 +1,10 @@
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import MarfaMac
 
-/// An item a person's connector keeps, which the server marks read only: the seam that decides an item takes
-/// changes refuses it everywhere, the items around it are changed as before, and what stays open to a person stays open.
+/// An item a person's connector keeps, which the server marks read only: `Item.obstacle(to:)` refuses what the
+/// connector's next run puts back, everywhere, and leaves the rest open.
 @MainActor
 @Suite(.hangLimit) struct ReadOnlyItemTests {
     typealias F = LibraryFixture
@@ -38,26 +39,38 @@ import Testing
 
     // MARK: The seam
 
-    @Test func anItemNoConnectorKeepsTakesChangesAsBefore() {
-        let item = F.item(F.n1, F.note, "Plain", age: 1)
-        #expect(!item.readOnly)
-        #expect(item.isEditable && item.isWritable && item.canEditTags)
-        #expect(item.writeObstacle == nil)
+    @Test func noWriteReachesAFactMarfaSetsOnAFile() async throws {
+        let (catalogue, row, file) = ItemBoardTests.widths()
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: [row, file], catalogue: catalogue)))
+        try #require(await eventually { library.isLoaded })
+        #expect(!library.setItemProperties(file.id, changes: ["width": nil], actionName: "Clear", undoManager: nil))
+        #expect(!library.setItemProperty(file.id, key: "width", value: nil, undoManager: nil))
+        #expect(library.setItemProperties(row.id, changes: ["width": nil], actionName: "Clear", undoManager: nil))
+        #expect(source.writes == [.editProperties(row.id, ["width": nil], base: row.version)])
     }
 
-    @Test func aReadOnlyItemOffersNoValueTextOrTagToChange() {
-        var item = F.item(F.n1, F.note, "Plain", age: 1)
-        item.readOnly = true
-        #expect(!item.isEditable, "the page and the sidebar offer no value to edit")
-        #expect(!item.isWritable, "and the body takes no typing")
-        #expect(!item.canEditTags)
-        #expect(item.writeObstacle == .readOnly)
-    }
+    @Test func oneRuleSaysWhatAnItemAllows() {
+        let plain = F.item(F.n1, F.note, "Plain", age: 1)
+        #expect(ItemChange.allCases.allSatisfy(plain.allows))
 
-    @Test func aReadOnlyItemInTheBinIsToldAsInTheBinFirst() {
-        var item = F.item(F.n1, F.note, "Plain", age: 1, state: .trashed)
-        item.readOnly = true
-        #expect(item.writeObstacle == .inBin)
+        var kept = plain
+        kept.readOnly = true
+        #expect(ItemChange.allCases.filter { !kept.allows($0) } == [.title, .text, .fields, .type])
+        #expect(kept.obstacle(to: .fields) == .readOnly)
+
+        var archived = kept
+        archived.state = .archived
+        #expect(ItemChange.allCases.filter { !archived.allows($0) } == [.title, .text, .fields, .type], "archived adds nothing")
+
+        let file = F.item(F.f1, F.image, "Photo", age: 1, content: .file(.png, byteCount: 1))
+        #expect(ItemChange.allCases.filter { !file.allows($0) } == [.text, .type])
+        #expect(file.obstacle(to: .text) == .file)
+
+        var binned = kept
+        binned.state = .trashed
+        #expect(ItemChange.allCases.allSatisfy { binned.obstacle(to: $0) == .inBin })
     }
 
     // MARK: Writes through the library
@@ -69,6 +82,15 @@ import Testing
         #expect(library.setItemProperty(F.n1, key: "title", value: .string("Renamed"), undoManager: nil), "its neighbours still take edits")
     }
 
+    @Test func aFileTitleMarfaSetsIsNotWritten() async throws {
+        let (library, source) = try await loaded()
+        let file = F.item(F.f1, F.image, "Photo", age: 8, titleRule: .property("extracted_text"), content: .file(.png, byteCount: 0))
+        source.send(.upserted([file]))
+        try #require(await eventually { library.item(F.f1)?.titleRule == .property("extracted_text") })
+        #expect(!library.setItemProperty(F.f1, key: "title", value: .string("Renamed"), undoManager: nil))
+        #expect(source.writes.isEmpty)
+    }
+
     @Test func theBodyOfAReadOnlyItemIsNotWrittenAndTheTextIsGivenBack() async throws {
         let (library, source) = try await loaded()
         let read = try #require(library.item(F.n2)).version
@@ -77,15 +99,16 @@ import Testing
         #expect(library.notices.told == 1, "the text is returned to the person, never dropped")
     }
 
-    @Test func tagsOfAReadOnlyItemAreNotChangedAndTheOthersAre() async throws {
+    @Test func aReadOnlyItemTakesTagsFavoriteCollectionsLinksAndDelete() async throws {
         let (library, source) = try await loaded()
-        library.addTag("work", to: [F.n1, F.n2], undoManager: nil)
-        #expect(source.writes == [.tag(F.n1, "work", on: true)])
-        #expect(library.notices.waiting.last?.message == skips(.readOnly))
-
-        source.clearWrites()
-        library.removeTag("work", from: [F.p2], undoManager: nil)
-        #expect(source.writes.isEmpty, "a tag a connector keeps is not removed here")
+        library.addTag("later", to: [F.n2], undoManager: nil)
+        library.setFavorite([F.n2], true, undoManager: nil)
+        #expect(library.addToCollection([F.n2], Self.holiday, undoManager: nil))
+        #expect(await library.changeItemRelationship(F.n2, field: "about", adding: [F.p1], removing: [], undoManager: nil))
+        library.delete([F.n2], undoManager: nil)
+        #expect(source.writes.count == 5, "sent \(source.writes)")
+        #expect(source.writes.last == .transition(F.n2, .trashed, from: .active))
+        #expect(library.notices.waiting.isEmpty)
     }
 
     @Test func aReadOnlyItemDoesNotChangeType() async throws {
@@ -95,71 +118,10 @@ import Testing
         #expect(library.notices.waiting.last?.message == skips(.readOnly))
     }
 
-    @Test func favoriteLeavesAReadOnlyItemAloneAndTellsHowMany() async throws {
-        let (library, source) = try await loaded()
-        library.setFavorite([F.n1, F.n2], true, undoManager: nil)
-        #expect(source.writes.isEmpty, "Plain note is a favorite already, and Feed note is kept by a connector")
-        #expect(library.notices.waiting.last?.message == skips(.readOnly))
-
-        library.setFavorite([F.e1, F.n2], true, undoManager: nil)
-        #expect(source.writes == [.tag(F.e1, ItemTag.favorite, on: true)])
-    }
-
-    @Test func deleteLeavesAReadOnlyItemInPlace() async throws {
-        let (library, source) = try await loaded()
-        library.delete([F.e1, F.n2], undoManager: nil)
-        #expect(source.writes == [.transition(F.e1, .trashed)])
-        #expect(library.notices.waiting.last?.title == String(localized: "Some Items Were Skipped"))
-        #expect(library.notices.waiting.last?.message == skips(.readOnly))
-    }
-
-    @Test func deletingOnlyAReadOnlyItemSaysSoAndAsksNothing() async throws {
-        let (library, source) = try await loaded()
-        var asked = false
-        Browser.delete([F.n2, F.p2], in: library, undoManager: nil, asking: { _ in asked = true })
-        #expect(!asked, "nothing is left to confirm")
-        #expect(source.writes.isEmpty)
-        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Delete"))
-        #expect(library.notices.waiting.last?.message == skips(.readOnly, .readOnly))
-    }
-
-    @Test func aReadOnlyItemBesideItemsInTheBinErasesNothing() async throws {
-        let (library, source) = try await loaded()
-        Browser.delete([F.n2, MarfaCollectionsTests.oldAlbum], in: library, undoManager: nil)
-        #expect(library.itemsToPurge.isEmpty, "a selection with a live item in it never erases anything")
-        #expect(source.writes.isEmpty)
-    }
-
-    @Test func aMixedDeleteAsksAboutOnlyTheItemsItWillMove() async throws {
-        let (library, _) = try await loaded()
-        var asked: Set<ItemID>?
-        Browser.delete([F.e1, F.n1, F.n2], in: library, undoManager: nil, asking: { asked = $0 })
-        #expect(asked == [F.e1, F.n1])
-    }
-
     @Test func aReadOnlyItemInTheBinCanStillBeRecovered() async throws {
         let (library, source) = try await loaded()
         library.recover([F.n3], undoManager: nil)
-        #expect(source.writes == [.transition(F.n3, .active)])
+        #expect(source.writes == [.restore(F.n3)])
         #expect(library.notices.told == 0)
     }
-
-    @Test func aReadOnlyItemIsNotFiledInACollection() async throws {
-        let (library, source) = try await loaded()
-        #expect(!library.canJoinCollection(try #require(library.item(F.n2))))
-        #expect(library.addToCollection([F.e1, F.n2], Self.holiday, undoManager: nil))
-        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft) = write { draft.from } else { nil } }
-        #expect(joined == [F.e1])
-        #expect(library.notices.waiting.last?.message == skips(.readOnly))
-    }
-
-    @Test func theRelationshipsOfAReadOnlyItemOfferNoChange() async throws {
-        let (library, source) = try await loaded()
-        #expect(library.relationships(for: F.n2).allSatisfy { !$0.isEditable })
-        let kept = await library.changeItemRelationship(F.n2, field: "about", adding: [F.p1], removing: [], undoManager: nil)
-        #expect(!kept)
-        #expect(source.writes.isEmpty)
-        #expect(library.relationships(for: F.n1).contains { $0.isEditable }, "an item no connector keeps still does")
-    }
-
 }

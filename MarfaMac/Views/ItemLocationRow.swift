@@ -16,7 +16,7 @@ struct ItemLocationRow: View {
     @State private var anchor = ValueEditAnchorBox()
 
     private var summary: String? { spec.summary(of: item) }
-    private var canOpen: Bool { item.isEditable || spec.hasPoint(item) }
+    private var canOpen: Bool { item.allows(.fields) || spec.hasPoint(item) }
 
     var body: some View {
         InspectorRow(name: "Location") {

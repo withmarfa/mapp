@@ -207,12 +207,20 @@ import Observation
     /// (`MarfaLibrary+Undoing`).
     @ObservationIgnored var undoRun: UndoRun?
     @ObservationIgnored var undoRuns: [WriteID: UndoRun] = [:]
-    /// Where this Mac's state change on its way leaves each item, until the copy shows it (`setStates`).
-    @ObservationIgnored var movingTo: [ItemID: StateMoving] = [:]
     /// What follows the answer to each write of a state change, told what the answer means for the move (`setStates`).
-    @ObservationIgnored var stateAnswers: [WriteID: (WriteID, StateAnswer) -> Void] = [:]
+    @ObservationIgnored var stateAnswers: [WriteID: (StateAnswer) -> Void] = [:]
+    /// The state writes the engine has not yet judged, and the change each belongs to (`stateWriteJudged`).
+    @ObservationIgnored var stateJudging: [WriteID: StateMoves] = [:]
+    /// The restores whose item is archived once the server accepts them, and that item (`setStates`).
+    @ObservationIgnored var awaitingArchive: [WriteID: ItemID] = [:]
     /// Restores answered blocked or dead whose archive will not follow, told together once no restore waits.
     @ObservationIgnored var archivesDropped = 0
+    /// What follows when the server does not make each tier write, until its last answer (`setTiers`).
+    @ObservationIgnored var tierWrites: [WriteID: () -> Void] = [:]
+    /// The command whose skips are gathered now, and the one each write waiting for its first answer belongs to
+    /// (`gatheringSkips`).
+    @ObservationIgnored var gathering: SkipNotice?
+    @ObservationIgnored var skipNotices: [WriteID: SkipNotice] = [:]
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []

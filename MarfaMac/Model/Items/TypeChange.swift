@@ -134,10 +134,9 @@ nonisolated struct TypeChangePreview: Hashable, Sendable {
 
 extension ItemLibrary {
     /// What a type change reads of an item: its properties, and its text under the key its type keeps it in. Nil
-    /// for an item whose type the app cannot change: a file, one in the bin or with a problem, or one whose text is
-    /// not read yet.
+    /// for an item whose type the app cannot change (`ItemChange.type`), or one whose text is not read yet.
     func typeChangeValues(of id: ItemID) -> [String: PropertyValue]? {
-        guard let item = headerItem(id), item.isEditable else { return nil }
+        guard let item = headerItem(id), item.allows(.type) else { return nil }
         var values = Dictionary(item.properties.map { ($0.key, $0.value) }, uniquingKeysWith: { first, _ in first })
         if let bodyKey = catalogue.itemTypes[item.type]?.bodyKey {
             // `bodyText` follows emptiness, not each edit. The header asks this on every build, and the text of a
@@ -158,7 +157,7 @@ extension ItemLibrary {
 
     /// Whether the item's type can be changed now: an item `typeChangeValues` reads.
     func canChangeType(_ id: ItemID) -> Bool {
-        guard let item = headerItem(id), item.isEditable else { return false }
+        guard let item = headerItem(id), item.allows(.type) else { return false }
         return catalogue.itemTypes[item.type]?.bodyKey == nil || bodyText(id) != nil
     }
 
@@ -194,10 +193,8 @@ extension ItemLibrary {
                 continue
             }
             guard item.type != type else { continue }
-            if let reason = item.writeObstacle {
+            if let reason = item.obstacle(to: .type) {
                 result.skips.skip(reason)
-            } else if item.isFile {
-                result.skips.skip(.file)
             } else if let new, !catalogue.isFileType(type), let values = typeChangeValues(of: id),
                       case .success(let plan) = TypeChange.plan(
                         values, from: catalogue.itemTypes[item.type], to: new, filling: filling) {

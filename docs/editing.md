@@ -12,6 +12,18 @@ paths:
 
 Every change a person makes to an item is an `ItemWrite` through `ItemLibrary`. `docs/commands.md` says how a command is added, and `MarfaMac/Model/AGENTS.md` how a write is kept.
 
+## What an item allows
+
+Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKind.change`), so a value is locked by one rule. `docs/model.md` says why.
+
+| The item is | Locked |
+| --- | --- |
+| Read only | Title, text, fields and type |
+| A file | Text and type, and the facts the server reads from the bytes (`MarfaMapping.fileFacts`) |
+| Unreadable in part (`problem`) | Title, fields, type and tier, and the text where it could not be read |
+| Archived | Nothing |
+| In Recently Deleted | Everything |
+
 ## Making an item
 
 - **Quick add is the one way to make an item** (`QuickAdd`): every plus, command and any-app shortcut opens the same panel, so a person learns one.

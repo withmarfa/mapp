@@ -51,7 +51,7 @@ nonisolated enum InspectorFields {
     static func properties(of item: Item, type: ItemTypeInfo?, hidden: Set<String>, revealed: Set<String> = []) -> [ItemTypeInfo.Field] {
         (type?.fields ?? []).filter { field in
             if hidden.contains(field.key) { return false }
-            return hasValue(item.value(of: field.key)) || (item.isEditable && revealed.contains(field.key))
+            return hasValue(item.value(of: field.key)) || (item.allows(.fields) && revealed.contains(field.key))
         }
     }
 
@@ -68,7 +68,7 @@ nonisolated enum InspectorFields {
     /// The empty fields the Add Property menu offers, in the catalogue's order: those the item can take a value
     /// for and the inspector does not list yet. A list or an object is shown but not edited, so it is not offered.
     static func addable(of item: Item, type: ItemTypeInfo?, hidden: Set<String>, revealed: Set<String> = []) -> [ItemTypeInfo.Field] {
-        guard item.isEditable else { return [] }
+        guard item.allows(.fields) else { return [] }
         let listed = Set(properties(of: item, type: type, hidden: hidden, revealed: revealed).map(\.key))
         return (type?.fields ?? []).filter { field in
             if hidden.contains(field.key) || listed.contains(field.key) { return false }

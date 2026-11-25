@@ -886,6 +886,29 @@
     "%lld in the trash" : {
 
     },
+    "%lld files were skipped because Marfa sets this property." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file was skipped because Marfa sets this property."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files were skipped because Marfa sets this property."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld items" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1201,6 +1224,28 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld items have changed since, so they were left as they are."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld items must stay in the Library." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item must stay in the Library."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items must stay in the Library."
                 }
               }
             }
@@ -1710,6 +1755,9 @@
 
     },
     "A connector comes with its plugin. Its settings and secrets are kept in %@." : {
+
+    },
+    "A connector manages this item’s title, text, properties, and type." : {
 
     },
     "A connector’s sign-in needs the app signed in as an app. Sign in again in Connection." : {
@@ -2407,7 +2455,13 @@
     "Apps you sign in show here." : {
 
     },
+    "Archive" : {
+
+    },
     "Archived Items" : {
+
+    },
+    "Archived “%@”" : {
 
     },
     "Archived, unarchived or moved to or from another state." : {
@@ -2751,6 +2805,9 @@
     "Can’t Add to Favorites" : {
 
     },
+    "Can’t Archive" : {
+
+    },
     "Can’t Attach Images" : {
 
     },
@@ -2796,11 +2853,17 @@
     "Can’t Get This File" : {
       "extractionState" : "manual"
     },
+    "Can’t Keep in Library" : {
+
+    },
     "Can’t Keep the Sign-In" : {
       "extractionState" : "manual"
     },
     "Can’t Move Items" : {
       "extractionState" : "manual"
+    },
+    "Can’t Move to Feed" : {
+
     },
     "Can’t Open Link" : {
 
@@ -2870,6 +2933,9 @@
     },
     "Can’t Show This View" : {
       "extractionState" : "manual"
+    },
+    "Can’t Unarchive" : {
+
     },
     "Can’t Undo" : {
 
@@ -5590,6 +5656,9 @@
         }
       }
     },
+    "Keep in Library" : {
+
+    },
     "Keep in Marfa Again" : {
 
     },
@@ -5625,6 +5694,9 @@
 
     },
     "Kept on This Mac Only" : {
+
+    },
+    "Kept “%@” in the Library" : {
 
     },
     "Key" : {
@@ -6204,6 +6276,9 @@
     "Move Up" : {
 
     },
+    "Move to Feed" : {
+
+    },
     "Move to Recently Deleted" : {
       "extractionState" : "manual"
     },
@@ -6229,6 +6304,9 @@
 
     },
     "Moved “%@” to Recently Deleted" : {
+
+    },
+    "Moved “%@” to the Feed" : {
 
     },
     "Moving %@ to %@…" : {
@@ -7603,9 +7681,6 @@
     },
     "Read and Edit" : {
 
-    },
-    "Read only. A connector manages this item, so changes made here would be overwritten." : {
-      "extractionState" : "manual"
     },
     "Read the Audit Log" : {
 
@@ -10786,6 +10861,12 @@
     "Typing in “%@” Might Be Missing" : {
 
     },
+    "Unarchive" : {
+
+    },
+    "Unarchived “%@”" : {
+
+    },
     "Unavailable" : {
       "extractionState" : "manual"
     },
@@ -11573,14 +11654,26 @@
     "^[%lld version](inflect: true)" : {
 
     },
+    "^[Archived %lld item](inflect: true)" : {
+
+    },
     "^[Delete %lld item](inflect: true) immediately?" : {
       "extractionState" : "manual"
+    },
+    "^[Kept %lld item](inflect: true) in the Library" : {
+
     },
     "^[Move %lld item](inflect: true) to Recently Deleted?" : {
       "extractionState" : "manual"
     },
     "^[Moved %lld item](inflect: true) to Recently Deleted" : {
       "extractionState" : "manual"
+    },
+    "^[Moved %lld item](inflect: true) to the Feed" : {
+
+    },
+    "^[Unarchived %lld item](inflect: true)" : {
+
     },
     "a connector" : {
 

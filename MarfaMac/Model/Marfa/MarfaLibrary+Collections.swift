@@ -66,7 +66,7 @@ extension MarfaLibrary {
         var drafts: [EdgeDraft] = []
         for id in ids {
             guard let link = index.link(type: MarfaMapping.collectionEdge, from: id, to: collection) else { continue }
-            if let reason = item(id)?.writeObstacle {
+            if let reason = item(id)?.obstacle(to: .collections) {
                 skips.skip(reason)
             } else {
                 drafts.append(EdgeDraft(type: link.type, from: link.from, to: link.to, position: link.position))

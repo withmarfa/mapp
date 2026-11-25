@@ -32,6 +32,7 @@ import Testing
         try await show(id, state, in: library, source)
         source.send(.taken(write))
         source.send(.answered(write, .accepted))
+        try #require(await eventually { library.stateJudging[write] == nil })
     }
 
     /// An archived item this Mac moved to Recently Deleted, the move taken and accepted.
@@ -40,39 +41,100 @@ import Testing
         try await show(F.n1, .archived, in: library, source)
         let undo = UndoManager()
         library.delete([F.n1], undoManager: undo)
-        try #require(source.writes == [.transition(F.n1, .trashed)])
+        try #require(source.writes == [.transition(F.n1, .trashed, from: .archived)])
         try await accept(F.n1, .trashed, in: library, source)
         source.clearWrites()
         return (library, source, undo)
     }
 
-    @Test func anUndoLeavesAnItemWhoseStateChangedSinceAlone() async throws {
+    /// The engine skips the last write, as it does one whose item the copy no longer shows as the step left it.
+    private func skip(_ reason: BatchSkips.Reason, _ source: FakeItemSource) throws {
+        let write = try #require(source.submitted.last?.id)
+        source.send(.answered(write, .refused(MarfaEngine.skipped(reason).problem)))
+    }
+
+    @Test func aRedoAfterAnotherDeviceRecoveredTheItemLeavesIt() async throws {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         library.delete([F.n1], undoManager: undo)
         try await accept(F.n1, .trashed, in: library, source)
-        // Another device restores the item and archives it.
-        try await show(F.n1, .archived, in: library, source)
         source.clearWrites()
 
         undo.undo()
-        #expect(source.writes.isEmpty)
-        #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.changedSince, count: 1))
-        #expect(library.item(F.n1)?.state == .archived)
+        #expect(source.writes == [.restore(F.n1)])
+        // Another device recovered the item before the restore was queued.
+        try await show(F.n1, .active, in: library, source)
+        try skip(.changedSince, source)
+        #expect(await eventually { library.notices.waiting.last?.message == BatchSkips.sentence(.changedSince, count: 1) })
 
-        // The Undo made nothing, so its Redo says so in its own words.
         undo.redo()
-        #expect(source.writes.isEmpty)
+        #expect(source.writes == [.restore(F.n1)], "the redo leaves the item where the other device put it")
         #expect(library.notices.waiting.last?.message == String(localized: "That change wasn’t made, so there is nothing to redo here."))
+    }
+
+    @Test func aRedoPressedBeforeTheUndoIsJudgedLeavesAnItemAnotherDeviceRecovered() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        library.delete([F.n1], undoManager: undo)
+        try await accept(F.n1, .trashed, in: library, source)
+        source.clearWrites()
+        // Another device recovers the item, and the copy syncs it.
+        try await show(F.n1, .active, in: library, source)
+
+        undo.undo()
+        undo.redo()
+        #expect(source.writes == [.restore(F.n1)], "the Redo waits for the engine to judge the Undo")
+        #expect(library.notices.waiting.last?.message == MarfaLibrary.earlierNotAnswered)
+        try skip(.changedSince, source)
+        #expect(await eventually { library.stateJudging.isEmpty })
+        #expect(source.writes == [.restore(F.n1)])
+        #expect(library.item(F.n1)?.state == .active)
+    }
+
+    @Test func anUndoWhoseRestoreIsSkippedArchivesNothing() async throws {
+        let (library, source, undo) = try await binnedFromArchive()
+        undo.undo()
+        try await show(F.n1, .active, in: library, source)
+        try skip(.changedSince, source)
+        // Lets the library take the answer, which would send the archive at once if it were taken as made.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(source.writes == [.restore(F.n1)])
+        undo.redo()
+        #expect(source.writes == [.restore(F.n1)])
+    }
+
+    @Test func aRestoreWithdrawnAfterACanceledSwitchLeavesNothingToRedo() async throws {
+        let (library, source, undo) = try await binnedFromArchive()
+        undo.undo()
+        let restore = try #require(source.submitted.last)
+        // A change of library begins and is canceled.
+        library.dropWaitingArchives()
+        #expect(library.notices.waiting.last?.message == Self.comesBackActive(1))
+        source.send(.answered(restore.id, .blocked(.conflictUnresolved, nil)))
+        source.send(.answered(restore.id, .refused(SyncProblem(code: MarfaEngine.withdrawnCode))))
+        try #require(await eventually { library.stateAnswers.isEmpty })
+        undo.redo()
+        #expect(source.writes == [.restore(F.n1)])
+    }
+
+    @Test func skipsOfOneCommandAreToldOnceWithTheirCount() async throws {
+        let (library, source) = try await loaded()
+        library.archive([F.n1, F.p1], beneath: false, undoManager: nil)
+        let writes = source.submitted
+        try #require(writes.count == 2)
+        for write in writes { source.send(.answered(write.id, .refused(MarfaEngine.skipped(.changedSince).problem))) }
+        #expect(await eventually { library.notices.told == 1 })
+        #expect(library.notices.waiting.map(\.message) == [BatchSkips.sentence(.changedSince, count: 2)])
+        #expect(library.notices.waiting.first?.title == ItemMove.archive.failing)
     }
 
     @Test func anUndoOfBinningAnArchivedItemLeavesItArchived() async throws {
         let (library, source, undo) = try await binnedFromArchive()
         undo.undo()
         // The server takes an item out of the bin only to active, and the archive waits for that answer.
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
         try await accept(F.n1, .active, in: library, source)
-        #expect(await eventually { source.writes == [.transition(F.n1, .active), .transition(F.n1, .archived)] })
+        #expect(await eventually { source.writes == [.restore(F.n1), .transition(F.n1, .archived, from: .active)] })
         try await accept(F.n1, .archived, in: library, source)
         #expect(library.item(F.n1)?.state == .archived)
         #expect(library.notices.waiting.isEmpty)
@@ -82,15 +144,15 @@ import Testing
         let (library, source, undo) = try await binnedFromArchive()
         undo.undo()
         let restore = try #require(source.submitted.last)
-        #expect(restore.write == .transition(F.n1, .active))
+        #expect(restore.write == .restore(F.n1))
         source.send(.answered(restore.id, .refused(SyncProblem(code: "item_not_found", message: "The server doesn’t hold this item."))))
         #expect(await eventually { library.notices.waiting.last?.title == String(localized: "Can’t Recover") })
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
         #expect(library.item(F.n1)?.state == .trashed)
 
         // Redo has nothing to put back, since the Undo made nothing.
         undo.redo()
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
         #expect(library.notices.waiting.last?.message == String(localized: "That change wasn’t made, so there is nothing to redo here."))
     }
 
@@ -100,12 +162,12 @@ import Testing
         let restore = try #require(source.submitted.last)
         source.send(.answered(restore.id, .blocked(.failingAlone, nil)))
         #expect(await eventually { library.notices.waiting.last?.message == Self.comesBackActive(1) })
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
 
         // The restore is released and lands, so Redo moves the item back to the bin.
         try await show(F.n1, .active, in: library, source)
         undo.redo()
-        #expect(source.writes == [.transition(F.n1, .active), .transition(F.n1, .trashed)])
+        #expect(source.writes == [.restore(F.n1), .transition(F.n1, .trashed, from: .active)])
     }
 
     @Test func restoresBlockedTogetherAreToldInOneNoticeWithTheirCount() async throws {
@@ -122,6 +184,7 @@ import Testing
             source.send(.taken(bin.id))
             source.send(.answered(bin.id, .accepted))
         }
+        try #require(await eventually { library.stateJudging.isEmpty })
         source.clearWrites()
 
         undo.undo()
@@ -144,25 +207,9 @@ import Testing
         try await accept(F.n1, .active, in: library, source)
         // Lets the library take the answer, which would send the archive at once.
         try await Task.sleep(for: .milliseconds(200))
-        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(source.writes == [.restore(F.n1)])
         undo.redo()
-        #expect(source.writes == [.transition(F.n1, .active), .transition(F.n1, .trashed)])
-    }
-
-    @Test func anUndoOfAnItemAlreadyWhereItWouldPutItIsMadeQuietly() async throws {
-        let (library, source) = try await loaded()
-        let undo = UndoManager()
-        library.delete([F.n1], undoManager: undo)
-        try await accept(F.n1, .trashed, in: library, source)
-        // Another device restores the item.
-        try await show(F.n1, .active, in: library, source)
-        source.clearWrites()
-
-        undo.undo()
-        #expect(source.writes.isEmpty)
-        #expect(library.notices.waiting.isEmpty)
-        undo.redo()
-        #expect(source.writes == [.transition(F.n1, .trashed)])
+        #expect(source.writes == [.restore(F.n1), .transition(F.n1, .trashed, from: .active)])
     }
 
     @Test func anArchiveGivenBackAfterTheRestoreIsToldAndNotPutBack() async throws {
@@ -176,7 +223,7 @@ import Testing
         #expect(!undo.canUndo, "the restore was made, so the Undo is not put back")
 
         undo.redo()
-        #expect(source.writes.last == .transition(F.n1, .trashed))
+        #expect(source.writes.last == .transition(F.n1, .trashed, from: .active))
     }
 
     private static func comesBackActive(_ count: Int) -> String {
@@ -192,6 +239,6 @@ import Testing
         source.clearWrites()
 
         undo.redo()
-        #expect(source.writes == [.transition(F.n1, .trashed)])
+        #expect(source.writes == [.transition(F.n1, .trashed, from: .archived)])
     }
 }

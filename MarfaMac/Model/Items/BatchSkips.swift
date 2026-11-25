@@ -9,7 +9,7 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         /// Another device removed it for good, or the selection named an item the library no longer holds.
         case gone
         case inBin
-        /// Archived, with a problem the library found in it, or its text not yet read.
+        /// With a problem the library found in it, such as values or text it could not read.
         case cantChange
         /// Held read only: a person's connector keeps it and would put back a change made here.
         case readOnly
@@ -19,12 +19,16 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         /// A collection, which collections are flat and can't join.
         case isCollection
         case cantJoinCollection
+        /// A collection, a view or the app's settings, which stays in the Library.
+        case staysInLibrary
         case fullOfTags
         case cantMoveToLane
         /// Its type requires the field a Not Set lane would clear.
         case needsValue
         /// A file, which has no lane to move to.
         case fileHasNoLane
+        /// Marfa sets this field on the file.
+        case fileFact
         /// Selected, but not on the board now, as when a search or filter has hidden it since.
         case notShown
         /// No longer as this Mac left it, so an Undo or Redo would overwrite a change made since.
@@ -38,6 +42,10 @@ nonisolated struct BatchSkips: Equatable, Sendable {
 
     mutating func skip(_ reason: Reason) {
         counts[reason, default: 0] += 1
+    }
+
+    mutating func add(_ other: BatchSkips) {
+        counts.merge(other.counts, uniquingKeysWith: +)
     }
 
     /// One sentence for each reason, in a steady order, or nil where nothing was skipped.
@@ -56,29 +64,15 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case .cantBecomeType: String(localized: "\(count) items can’t become this type.")
         case .isCollection: String(localized: "\(count) items are collections, which can’t be in another collection.")
         case .cantJoinCollection: String(localized: "\(count) items can’t be filed in a collection.")
+        case .staysInLibrary: String(localized: "\(count) items must stay in the Library.")
         case .fullOfTags: String(localized: "\(count) items already have the most tags an item can have.")
         case .cantMoveToLane: String(localized: "\(count) items can’t go in this lane.")
         case .needsValue: String(localized: "\(count) items need a value there, so it can’t be cleared.")
         case .fileHasNoLane: String(localized: "\(count) items are files, which can’t be moved between lanes.")
+        case .fileFact: String(localized: "\(count) files were skipped because Marfa sets this property.")
         case .notShown: String(localized: "\(count) items aren’t on this board.")
         case .changedSince: String(localized: "\(count) items have changed since, so they were left as they are.")
         }
-    }
-}
-
-nonisolated extension Item {
-    /// Why a command that only sets a tag leaves the item alone: it is in Recently Deleted or archived.
-    var stateObstacle: BatchSkips.Reason? {
-        switch state {
-        case .active: nil
-        case .archived: .cantChange
-        case .trashed: .inBin
-        }
-    }
-
-    /// Why a command that writes the item's tags, properties or links leaves it alone.
-    var writeObstacle: BatchSkips.Reason? {
-        stateObstacle ?? (problem == nil ? (readOnly ? .readOnly : nil) : .cantChange)
     }
 }
 
@@ -91,8 +85,7 @@ extension ItemLibrary {
     }
 
     /// The items among `ids` that take Favorite or Unfavorite, and why the others do not. An item in the bin keeps
-    /// its tags, so it is left as it is. Favorite is a tag in the server's copy, so an item a connector keeps is left
-    /// alone too.
+    /// its tags, so it is left as it is.
     func favoritePlan(_ ids: Set<ItemID>, _ isFavorite: Bool) -> (changing: Set<ItemID>, skips: BatchSkips) {
         var skips = BatchSkips()
         var changing: Set<ItemID> = []
@@ -101,7 +94,7 @@ extension ItemLibrary {
                 skips.skip(.gone)
                 continue
             }
-            if let reason = item.stateObstacle ?? (item.readOnly ? .readOnly : nil) {
+            if let reason = item.obstacle(to: .favorite) {
                 skips.skip(reason)
             } else if item.isFavorite != isFavorite {
                 changing.insert(id)
@@ -111,20 +104,20 @@ extension ItemLibrary {
     }
 
     /// The items among `ids` that Delete moves to Recently Deleted, and why it leaves the others. An item a connector
-    /// keeps stays: it would be put back on the connector's next run. An item already in the bin or no longer held
-    /// is not skipped, since there is nothing to do for it.
+    /// keeps goes too: its next run leaves an item in the bin there (`items/natural-key-trashed`). An item already in
+    /// the bin or no longer held is not skipped, since there is nothing to do for it.
     func deletePlan(_ ids: Set<ItemID>) -> (moving: Set<ItemID>, skips: BatchSkips) {
         var skips = BatchSkips()
         var moving: Set<ItemID> = []
         for id in ids {
             guard let item = item(id), item.state != .trashed else { continue }
-            if item.readOnly { skips.skip(.readOnly) } else { moving.insert(id) }
+            if let reason = item.obstacle(to: .delete) { skips.skip(reason) } else { moving.insert(id) }
         }
         return (moving, skips)
     }
 
     /// The items among `ids` to file in `collection`, less those already in it, and why the others can't be: an
-    /// item in the bin, one with a problem, or one of a type a collection can't hold, a collection among them.
+    /// item in the bin, or one of a type a collection can't hold, a collection among them.
     func collectionPlan(_ ids: Set<ItemID>, joining collection: ItemID?) -> (joining: [Item], skips: BatchSkips) {
         var skips = BatchSkips()
         var joining: [Item] = []
@@ -134,7 +127,7 @@ extension ItemLibrary {
                 continue
             }
             if let collection, item.collectionIDs.contains(collection) { continue }
-            if let reason = item.writeObstacle {
+            if let reason = item.obstacle(to: .collections) {
                 skips.skip(reason)
             } else if catalogue.isCollection(item.type) {
                 skips.skip(.isCollection)

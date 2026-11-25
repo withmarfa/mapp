@@ -76,7 +76,7 @@ struct ItemCommandContext {
     }
 
     /// The visible item when it can be written to.
-    var editableItem: Item? { visibleItem.flatMap { $0.isWritable && pageIsEditable ? $0 : nil } }
+    var editableItem: Item? { visibleItem.flatMap { $0.allows(.text) && pageIsEditable ? $0 : nil } }
 
     /// The one item whose page the window shows, which Focus is on: any kind of item, a file included.
     var focusItem: Item? { showsPage ? item : nil }

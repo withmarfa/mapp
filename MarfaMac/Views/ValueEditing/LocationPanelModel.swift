@@ -85,7 +85,7 @@ final class LocationPanelModel {
     }
 
     /// Whether the person can change the item's Location. An item that cannot be edited shows its point and nothing more.
-    var canEdit: Bool { item?.isEditable ?? false }
+    var canEdit: Bool { item?.allows(.fields) ?? false }
 
     var reading: ItemLocation.Reading { item.map(spec.reading(of:)) ?? .none }
 

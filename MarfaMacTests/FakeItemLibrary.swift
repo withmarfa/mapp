@@ -431,7 +431,8 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func setItemProperties(_ id: ItemID, changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) -> Bool {
-        guard acceptsProperties, let index = items.firstIndex(where: { $0.id == id }), items[index].isEditable else { return false }
+        guard acceptsProperties, let index = items.firstIndex(where: { $0.id == id }),
+              changes.keys.allSatisfy({ items[index].obstacle(toField: $0) == nil }) else { return false }
         let old = Dictionary(uniqueKeysWithValues: changes.keys.map { ($0, items[index].value(of: $0)) })
         guard !changes.isEmpty, isWritingProperties(of: id) || changes.contains(where: { old[$0.key] != $0.value }) else { return true }
         write(id, changes, from: old, at: index, actionName: actionName, undoManager: undoManager)
@@ -542,7 +543,7 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func removeTag(_ tag: String, from ids: Set<ItemID>, undoManager: UndoManager?) {
-        let changing = Set(ids.filter { item($0).map { $0.canEditTags && $0.tags.contains(tag) } ?? false })
+        let changing = Set(ids.filter { item($0).map { $0.allows(.tags) && $0.tags.contains(tag) } ?? false })
         guard !reservedTags.contains(tag), !changing.isEmpty else { return }
         tagWrites.append((tag, false, changing))
         change(changing) { $0.tags.remove(tag) }
@@ -715,6 +716,43 @@ final class FakeItemLibrary: ItemLibrary {
         return id
     }
 
+    // MARK: Tier and state
+
+    func setTier(_ ids: Set<ItemID>, to tier: Tier, undoManager: UndoManager?, moved: ((CommandOutcome) -> Void)?) {
+        let move: ItemMove = tier == .library ? .keep : .moveToFeed
+        let plan = tierPlan(ids, to: tier)
+        tellSkipped(plan.skips, didChange: !plan.changing.isEmpty, failing: move.failing)
+        let before = Dictionary(uniqueKeysWithValues: plan.changing.compactMap { id in item(id).map { (id, $0.tier) } })
+        change(plan.changing) { $0.tier = tier }
+        undoManager?.registerUndo(withTarget: self) { library in
+            for (id, old) in before { library.change([id]) { $0.tier = old } }
+        }
+        undoManager?.setActionName(move.name)
+        moved?(CommandOutcome(plan.changing, skips: plan.skips))
+    }
+
+    func archive(_ ids: Set<ItemID>, beneath: Bool, undoManager: UndoManager?, moved: ((CommandOutcome) -> Void)?) {
+        let plan = archivePlan(ids)
+        let moving = beneath ? plan.archiving.union(plan.beneath) : plan.archiving
+        tellSkipped(plan.skips, didChange: !moving.isEmpty, failing: ItemMove.archive.failing)
+        moveState(moving, to: .archived, name: ItemMove.archive.name, undoManager: undoManager)
+        moved?(CommandOutcome(moving, skips: plan.skips))
+    }
+
+    func unarchive(_ ids: Set<ItemID>, undoManager: UndoManager?, moved: ((CommandOutcome) -> Void)?) {
+        let plan = unarchivePlan(ids)
+        tellSkipped(plan.skips, didChange: !plan.changing.isEmpty, failing: ItemMove.unarchive.failing)
+        moveState(plan.changing, to: .active, name: ItemMove.unarchive.name, undoManager: undoManager)
+        moved?(CommandOutcome(plan.changing, skips: plan.skips))
+    }
+
+    private func moveState(_ ids: Set<ItemID>, to state: ItemState, name: String, undoManager: UndoManager?) {
+        let back: ItemState = state == .archived ? .active : .archived
+        change(ids) { $0.state = state }
+        undoManager?.registerUndo(withTarget: self) { library in library.moveState(ids, to: back, name: name, undoManager: undoManager) }
+        undoManager?.setActionName(name)
+    }
+
     // MARK: Collections
 
     var collections: [Item] {
@@ -744,7 +782,7 @@ final class FakeItemLibrary: ItemLibrary {
         var skips = BatchSkips()
         for index in items.indices where ids.contains(items[index].id) {
             guard items[index].collectionIDs.contains(collection) else { continue }
-            if let reason = items[index].writeObstacle {
+            if let reason = items[index].obstacle(to: .collections) {
                 skips.skip(reason)
                 continue
             }

@@ -97,6 +97,15 @@ extension MarfaLibrary {
         }
     }
 
+    /// The step run reverses writes not yet answered, so it is not made: an undo goes back on its stack (`putBack`)
+    /// and a redo, which cannot, tells the person why it did not run.
+    func waitForEarlier(name: String) {
+        guard let run = undoRun else { return }
+        if run.undoing { return putBack(run, reason: Self.earlierNotAnswered) }
+        run.outcome.wasMade = false
+        notices.tell(name, Self.earlierNotAnswered)
+    }
+
     /// A property Undo that can be made once an earlier edit is answered, refused while it runs
     /// (`MarfaLibrary+PropertyEdits`). It goes back on the undo stack once its run has ended, as a held step given back
     /// does (`giveBack`), which empties the redo stack. Redoing what the run registered instead would make again every

@@ -92,7 +92,7 @@ struct ItemPageHeader: ViewModifier {
                 let value = PagePins.statusValue(of: item, in: field)
                 // With nothing to pick from, the pin only shows the status the item has.
                 return PageHeader.Pin(label: value.map { ItemTypeInfo.Field.label(ofOption: $0) } ?? "",
-                                      enabled: item.isEditable && field.isPicked, empty: value == nil, mark: .init(StatusSymbol(group: value.flatMap(field.statusGroup(of:)))))
+                                      enabled: item.allows(.fields) && field.isPicked, empty: value == nil, mark: .init(StatusSymbol(group: value.flatMap(field.statusGroup(of:)))))
             },
             parent: parent.flatMap { parent in
                 guard let target = parent.targets.first else { return nil }
@@ -148,7 +148,7 @@ struct ItemPageHeader: ViewModifier {
             case .menu(.parent, let id, let rect):
                 guard editor.isShowing(id), let item = library.item(id) else { return }
                 // An item that cannot be edited has no panel to change the parent in; the pin then only opens it.
-                guard item.isEditable else {
+                guard item.allows(.links) else {
                     if let target = Self.parent(in: library.relationships(for: id))?.targets.first?.itemID { editor.onOpenItem(target) }
                     return
                 }
@@ -190,9 +190,9 @@ struct ItemPageHeader: ViewModifier {
         let kind: ValueEditKind?
         switch row {
         case PagePlacement.tags:
-            kind = item.canEditTags ? .tags : nil
+            kind = item.allows(.tags) ? .tags : nil
         case PagePlacement.parent:
-            kind = item.isEditable ? .parent : nil
+            kind = item.allows(.links) ? .parent : nil
         case PagePlacement.type:
             kind = library.offersTypeChange(for: [id]) ? .type : nil
         case MarfaMapping.collectionEdge:
@@ -200,11 +200,11 @@ struct ItemPageHeader: ViewModifier {
         case ItemLocation.rowID:
             // A Location with no point and no way to set one has nothing to open.
             let location = ItemLocation.of(library.catalogue.itemTypes[item.type])
-            kind = location.flatMap { item.isEditable || $0.hasPoint(item) ? ValueEditKind.location($0) : nil }
+            kind = location.flatMap { item.allows(.fields) || $0.hasPoint(item) ? ValueEditKind.location($0) : nil }
         default:
             let field = library.catalogue.itemTypes[item.type]?.fields.first { $0.key == row }
             // A yes or no is a toggle, not a panel.
-            if let field, field.kind == .boolean, item.isEditable {
+            if let field, field.kind == .boolean, item.allows(.fields) {
                 library.setItemProperty(id, key: row, value: .bool(!InspectorFields.isYes(item.value(of: row))), undoManager: undoManager)
                 return
             }

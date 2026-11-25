@@ -87,7 +87,7 @@ import Testing
         source.clearWrites()
         toasts.undo()
         toasts.undo()
-        #expect(source.writes == [.transition(ItemID("a"), .active)], "one undo, once")
+        #expect(source.writes == [.restore(ItemID("a"))], "one undo, once")
         #expect(!undo.canUndo)
         #expect(toasts.current == nil)
     }
@@ -114,7 +114,7 @@ import Testing
         Browser.delete([ItemID("b")], in: library, undoManager: undo, toasts: toasts)
         source.clearWrites()
         undo.undo()
-        #expect(source.writes == [.transition(ItemID("b"), .active)])
+        #expect(source.writes == [.restore(ItemID("b"))])
         #expect(toasts.current == nil)
         source.clearWrites()
         toasts.undo()
@@ -153,7 +153,7 @@ import Testing
         #expect(toasts.current?.undo != nil)
         source.clearWrites()
         toasts.undo()
-        #expect(source.writes == [.transition(ItemID("a"), .active)])
+        #expect(source.writes == [.restore(ItemID("a"))])
         #expect(!undo.canUndo)
     }
 
@@ -192,7 +192,7 @@ import Testing
         #expect(toasts.current?.undo != nil, "the second delete's step is the latest, though the first's claim ended")
         source.clearWrites()
         toasts.undo()
-        #expect(source.writes == [.transition(ItemID("b"), .active)])
+        #expect(source.writes == [.restore(ItemID("b"))])
     }
 
     @Test func aWindowWithNoUndoManagerOffersNoUndo() async throws {

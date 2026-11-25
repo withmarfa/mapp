@@ -49,6 +49,17 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         }
     }
 
+    /// What the panel changes of the item, which `Item.obstacle(to:)` judges.
+    var change: ItemChange {
+        switch self {
+        case .tags: .tags
+        case .collections: .collections
+        case .parent: .links
+        case .type: .type
+        default: .fields
+        }
+    }
+
     /// The row's identifier on the page (`PagePlacement`): the field's key, or the one the tags and the parent have.
     var rowID: String {
         switch self {

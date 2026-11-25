@@ -190,7 +190,7 @@ struct ItemInspector: View {
                         .interfaceFont(.callout).foregroundStyle(.red)
                 }
                 if item.readOnly {
-                    Label("Read only. A connector manages this item, so changes made here would be overwritten.", systemImage: "lock")
+                    Label("A connector manages this item’s title, text, properties, and type.", systemImage: "lock")
                         .interfaceFont(.callout).foregroundStyle(.secondary)
                 }
                 ForEach(sections, id: \.id) { section in
@@ -251,7 +251,7 @@ struct ItemInspector: View {
                         spec: spec, item: item, shownOnPage: placement.showsOnPage(ItemLocation.rowID),
                         onShowOnPage: showOnPage(ItemLocation.rowID), startsEditing: adding == ItemLocation.rowID)
                 case .field(let field):
-                    ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
+                    ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.allows(.fields),
                                     // A property the person has touched stays listed, even once cleared.
                                     onChange: { revealed.insert(field.key); return onProperty(field.key, $0) },
                                     item: item.id,
@@ -314,12 +314,12 @@ struct ItemInspector: View {
 
     private var tagSection: some View {
         InspectorSectionView(.tags, title: "Tags", count: tags.count, boxed: false, add: { hovering in
-            if item.canEditTags {
+            if item.allows(.tags) {
                 InspectorPlusButton(accessibilityLabel: "Add Tag", identifier: "ItemTagAdd", isRowHovered: hovering, action: beginTags)
             }
         }) {
             InspectorTagsContent(
-                tags: tags, isEditable: item.canEditTags, onRemove: onRemoveTag, editor: tagEditor,
+                tags: tags, isEditable: item.allows(.tags), onRemove: onRemoveTag, editor: tagEditor,
                 begin: beginTags, finish: finishTags, cancel: { tagEditor = nil })
         }
         .onDisappear(perform: finishTags)
@@ -328,7 +328,7 @@ struct ItemInspector: View {
 
     /// Puts the text cursor in the Tags box, opening the section if it was folded.
     private func beginTags() {
-        guard let library, item.canEditTags, tagEditor == nil else { return }
+        guard let library, item.allows(.tags), tagEditor == nil else { return }
         ValueEditPresenter.shared.dismiss(restoringFocus: false)
         UserDefaults.standard.set(true, forKey: InspectorSectionKind.tags.key)
         let model = ValueEditModel(ValueEditRequest(kind: .tags, library: library, item: item.id, undoManager: undoManager))
@@ -455,7 +455,7 @@ struct ItemInspector: View {
     /// Whether the Add Property menu offers the Location, which the item does not show yet.
     private var offersLocation: Bool {
         guard let location else { return false }
-        return item.isEditable && !location.isListed(in: item, revealed: revealed)
+        return item.allows(.fields) && !location.isListed(in: item, revealed: revealed)
     }
 
     /// The properties that have a value, then any the person added or cleared since the inspector showed this item, with
@@ -476,7 +476,7 @@ struct ItemInspector: View {
     private var hasRelationships: Bool { !shownRelationships.isEmpty || !addable.isEmpty || !mentions.isEmpty || !linked.isEmpty }
 
     /// An item that can take a tag shows the section for adding one; one that can't shows it only if it has tags.
-    private var hasTags: Bool { item.canEditTags || !tags.isEmpty }
+    private var hasTags: Bool { item.allows(.tags) || !tags.isEmpty }
 
     private func addLocation() {
         withAnimation(.snappy(duration: 0.2)) {

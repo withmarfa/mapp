@@ -172,7 +172,7 @@ extension ItemLibrary {
         if item.isFile {
             return .unavailable(String(localized: "A file’s versions can be read here, but not restored."))
         }
-        guard item.isWritable else {
+        guard item.allows(.text) else {
             return .unavailable(String(localized: "This item can’t be changed right now."))
         }
         let current = catalogue.itemTypes[item.type]

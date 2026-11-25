@@ -198,6 +198,57 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
+    /// The engine queues a state or tier write only while the copy shows the item as the step left it, and skips
+    /// one it would make no change with, so nothing follows a write that was never taken.
+    @Test
+    func aStateOrTierWriteTheCopyNoLongerFitsIsSkippedNotTaken() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let id = ItemID.mint()
+        source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MARFAMACTEST judged", body: "One")), as: WriteID())
+        let item = try #require(await log.wait { $0.item(titled: "MARFAMACTEST judged") != nil }?.item(titled: "MARFAMACTEST judged"))
+
+        let skipped = MarfaEngine.skipped(.changedSince).problem
+        for write in [ItemWrite.restore(id), .transition(id, .active, from: .archived), .retier(id, .library, base: item.version)] {
+            let sent = WriteID()
+            source.submit(write, as: sent)
+            let answered = try #require(await log.wait { $0.answer(to: sent) != nil })
+            guard case .refused(let problem) = answered.answer(to: sent) else {
+                Issue.record("\(write) was answered \(String(describing: answered.answer(to: sent)))")
+                continue
+            }
+            #expect(problem.code == skipped.code, "\(write)")
+        }
+
+        // One that fits is queued, and the next is judged against the copy with it.
+        let archived = WriteID()
+        source.submit(.transition(id, .archived, from: .active), as: archived)
+        let unarchived = WriteID()
+        source.submit(.transition(id, .active, from: .archived), as: unarchived)
+        let taken = try #require(await log.wait { state in
+            state.changes.contains { if case .taken(unarchived) = $0 { true } else { false } }
+        })
+        #expect(taken.answer(to: archived) == nil)
+
+        // An item the copy shows in Recently Deleted is judged as there, never as one the copy does not hold.
+        source.submit(.transition(id, .trashed, from: .active), as: WriteID())
+        let inBin = MarfaEngine.skipped(.inBin).problem
+        for write in [ItemWrite.transition(id, .archived, from: .active), .retier(id, .feed, base: item.version)] {
+            let sent = WriteID()
+            source.submit(write, as: sent)
+            let answered = try #require(await log.wait { $0.answer(to: sent) != nil })
+            guard case .refused(let problem) = answered.answer(to: sent) else {
+                Issue.record("\(write) was answered \(String(describing: answered.answer(to: sent)))")
+                continue
+            }
+            #expect(problem.code == inBin.code, "\(write)")
+        }
+        await source.close()
+    }
+
     /// A copy an earlier version made is refused with what it holds that the server has not taken, and nothing in
     /// it is removed.
     @Test
@@ -1099,9 +1150,9 @@ extension LiveMarfaTests {
                 state = try await apply(.tag(item.id, ItemTag.favorite, on: false))
                 #expect(state.item(titled: title)?.isFavorite == false)
 
-                state = try await apply(.transition(item.id, .archived))
+                state = try await apply(.transition(item.id, .archived, from: .active))
                 #expect(state.item(titled: title)?.state == .archived)
-                state = try await apply(.transition(item.id, .active))
+                state = try await apply(.transition(item.id, .active, from: .archived))
                 #expect(state.item(titled: title)?.state == .active)
 
                 // The tier moves as an edit, and the item stays in the one copy at its new tier.
@@ -1113,18 +1164,18 @@ extension LiveMarfaTests {
 
                 // The server keeps the bin once the delete is sent, and the item stays shown from it.
                 let binned = WriteID()
-                source.submit(.transition(item.id, .trashed), as: binned)
+                source.submit(.transition(item.id, .trashed, from: .active), as: binned)
                 let inBin = try #require(await log.wait { $0.answer(to: binned) != nil && $0.item(titled: title)?.state == .trashed })
                 #expect(inBin.answer(to: binned) == .accepted)
                 #expect(try await source.body(of: item.id).text == "Edited by the app tests.")
 
                 // Restoring an item the copy let go of is made by its id, and the item arrives once it is answered.
-                state = try await apply(.transition(item.id, .active))
+                state = try await apply(.restore(item.id))
                 #expect(state.item(titled: title)?.state == .active)
 
                 // Permanently Delete destroys an item in the bin, at the version shown, and takes it out of the copy.
                 let again = WriteID()
-                source.submit(.transition(item.id, .trashed), as: again)
+                source.submit(.transition(item.id, .trashed, from: .active), as: again)
                 _ = try #require(await log.wait { $0.answer(to: again) != nil && $0.item(titled: title)?.state == .trashed })
                 let shown = try #require(log.current.item(titled: title))
                 let purge = WriteID()
@@ -1211,7 +1262,7 @@ extension LiveMarfaTests {
                 }
                 #expect(try await source.body(of: id).text == "Three")
                 #expect(answered.item(titled: title)?.value(of: "description") == .string("From another device"))
-                source.submit(.transition(id, .trashed), as: WriteID())
+                source.submit(.transition(id, .trashed, from: .active), as: WriteID())
                 await source.flush()
             }
         }
@@ -1342,7 +1393,7 @@ extension LiveMarfaTests {
                 source.engine.hooks.answering.set(nil)
                 _ = try #require(await log.wait { $0.answer(to: tagged) != nil })
                 #expect(await LiveMarfa.until { await source.engine.sync.hooks.drains == before + 2 })
-                source.submit(.transition(id, .trashed), as: WriteID())
+                source.submit(.transition(id, .trashed, from: .active), as: WriteID())
                 await source.flush()
             }
         }
