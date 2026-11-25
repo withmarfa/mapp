@@ -2,8 +2,8 @@ import SwiftUI
 
 /// The Marfa at the foot of the sidebar, below its places, types and views: its name with a line under it saying how
 /// the library stands with its server, a Refresh that shows while the pointer is over the row, and a cog that opens
-/// Settings. The row opens the Marfa's panel (`MarfaPanel`); a line that asks the person to act opens Problems in
-/// Settings instead.
+/// Settings. The row opens the Marfa's panel (`MarfaPanel`); a line that asks the person to act opens Settings'
+/// Connection page instead, where the problems are listed.
 struct SidebarFoot: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
@@ -142,7 +142,7 @@ struct SidebarFootRow: View {
     }
 
     /// One quiet line, a step below the name, and the small Refresh after it. Where the person has to act the line is
-    /// as strong as the name, after a warning mark, and opens Problems in Settings.
+    /// as strong as the name, after a warning mark, and opens Settings' Connection page.
     private func syncRow(_ line: SyncFootLine) -> some View {
         // Refresh takes no room until it shows, so a long line keeps the whole of its width.
         let showsRefresh = isHovering || focus == .refresh

@@ -47,7 +47,7 @@ struct MarfaPanelContent {
     }
 }
 
-/// The popover the sidebar's foot opens: the Marfa's name and size, its latest updates, and the Marfas the app is
+/// The popover the sidebar's foot opens: the Marfa's name and size, its latest updates, and the Marfa the app is
 /// connected to. A latest update opens its source's place.
 struct MarfaPanel: View {
     @State private var showsAll = false
