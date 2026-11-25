@@ -18,7 +18,7 @@ struct VersionHistoryWorkspace: View {
                 // The thread is the mode's whole left side, so there is nothing to hide it for. Removed in the column,
                 // where the split view adds the toggle.
                 .toolbar(removing: .sidebarToggle)
-                .navigationSplitViewColumnWidth(min: 260, ideal: 288, max: 360)
+                .navigationSplitViewColumnWidth(286)
         } detail: {
             VersionPageColumn(mode: mode, list: list)
                 .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {

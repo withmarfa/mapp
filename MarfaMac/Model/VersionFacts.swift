@@ -6,7 +6,7 @@ nonisolated struct VersionFactRow: Identifiable, Hashable, Sendable {
     let id: String
     let label: String
     let value: String
-    /// The symbol of a pin's key, as the item's page draws it. The sidebar's rows have none.
+    /// The symbol of a property row's name, as the item's page draws it. The facts' rows have none.
     var symbol: String?
 }
 
@@ -118,28 +118,22 @@ nonisolated extension ItemSnapshot.Writer {
     }
 }
 
-// MARK: Pins
+// MARK: Rows
 
 nonisolated extension VersionContent {
-    /// The properties the page would pin for this version, as the type's pins name them, so a version reads like the
-    /// page does. Only what a version holds is shown: the fields it has. The item's tags, parent and location are not in a
-    /// version, so those pins are left out rather than shown from the item as it is now.
-    func pins(
+    /// The property rows the page would list for this version, in the person's order for the type, as the head lists
+    /// them: a row the person hid, or that only a connector's bookkeeping needs, is left out, and so is one the version
+    /// holds no value for. The item's tags, parent and location are not in a version, so they are not shown from the item
+    /// as it is now.
+    func rows(
         placement: PagePlacement, in catalogue: Catalogue, format: DateFormat, now: Date = .now, calendar: Calendar = .current,
         locale: Locale = .current
     ) -> [VersionFactRow] {
-        let info = catalogue.itemTypes[type]
-        var rows: [VersionFactRow] = []
-        for pin in placement.pins {
-            switch pin {
-            case PagePlacement.tags, PagePlacement.linkedFrom, PagePlacement.parent, PagePlacement.location:
-                continue
-            default:
-                guard let field = info?.fields.first(where: { $0.key == pin }), let value = fields[pin], value != .null else { continue }
-                let text = VersionFacts.text(of: value, field: field, format: format, now: now, calendar: calendar, locale: locale)
-                if !text.isEmpty { rows.append(VersionFactRow(id: pin, label: field.label, value: text, symbol: PageLayout.symbol(of: field))) }
-            }
+        let fields = (catalogue.itemTypes[type]?.fields ?? []).filter { placement.showsOnPage($0.key) }
+        return placement.ordered(fields, id: \.key).compactMap { field in
+            guard let value = self.fields[field.key], value != .null else { return nil }
+            let text = VersionFacts.text(of: value, field: field, format: format, now: now, calendar: calendar, locale: locale)
+            return text.isEmpty ? nil : VersionFactRow(id: field.key, label: field.label, value: text, symbol: PageLayout.symbol(of: field))
         }
-        return rows
     }
 }

@@ -1,13 +1,14 @@
+import AppKit
 import SwiftUI
 
-/// The version chosen, read as a page: its title, the properties its type pins while Pinned Properties is on, and its
-/// text, with what it added since the version before it marked and what it dropped struck through.
+/// The version chosen, read as a page: its type, title, the property rows the head would list, and its text, with what
+/// it added since the version before it marked in green and what it dropped struck through.
 struct VersionPageColumn: View {
     @CurrentLibrary private var library
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
-    @AppStorage(PageKey.pinsProperties) private var pinsProperties = false
-    @Environment(\.interfaceTextSize) private var textSize
+    @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
+    @StoredPageStyle private var style
     let mode: VersionHistoryMode
     let list: VersionList?
 
@@ -56,21 +57,33 @@ struct VersionPageColumn: View {
     private var isDeleted: Bool { library.item(mode.item)?.state == .trashed }
 
     private func page(of entry: VersionEntry, older: VersionEntry?) -> some View {
-        let pins = !pinsProperties ? [] : entry.content.pins(
-            placement: placements.placement(of: entry.content.type, in: library.catalogue), in: library.catalogue, format: dateFormat)
+        let content = entry.content
+        let rows = content.rows(
+            placement: placements.placement(of: content.type, in: library.catalogue), in: library.catalogue, format: dateFormat)
+        let size = CGFloat(interfaceTextSize)
+        let titleSize = CGFloat(style.textSize) * 28 / 15
         return ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if let title = entry.content.title, !title.isEmpty {
-                    Text(verbatim: title).interfaceFont(.largeTitle.bold()).textSelection(.enabled)
-                } else if entry.content.title != nil {
-                    Text("Untitled").interfaceFont(.largeTitle.bold()).foregroundStyle(.tertiary)
+            VStack(alignment: .leading, spacing: 0) {
+                PageKicker(kicker: kicker(of: content.type)) {}
+                    .padding(.bottom, size * 6 / 13)
+                if let title = content.title, !title.isEmpty {
+                    Text(verbatim: title)
+                        .font(.system(size: titleSize, weight: .bold)).tracking(-titleSize * 0.022)
+                        .textSelection(.enabled)
+                        .accessibilityAddTraits(.isHeader)
+                } else if content.title != nil {
+                    Text("Untitled").font(.system(size: titleSize, weight: .bold)).tracking(-titleSize * 0.022)
+                        .foregroundStyle(.tertiary)
                 }
-                if !pins.isEmpty { pinRow(pins, of: entry.content.type) }
-                if let text = entry.content.text {
-                    VersionTextView(old: older?.content.text, new: text)
-                } else {
-                    Text("No text").foregroundStyle(.secondary)
+                if !rows.isEmpty { propertyRows(rows, size: size) }
+                Group {
+                    if let text = content.text {
+                        VersionTextView(old: older?.content.text, new: text)
+                    } else {
+                        Text("No text").foregroundStyle(.secondary)
+                    }
                 }
+                .padding(.top, rows.isEmpty ? 24 : 20)
             }
             .frame(maxWidth: 720, alignment: .leading)
             .padding(.horizontal, 40)
@@ -80,29 +93,37 @@ struct VersionPageColumn: View {
         .accessibilityIdentifier("VersionHistoryPage")
     }
 
-    /// The pins as the item's page draws them: each key above its value, in a slot of the same width.
-    private func pinRow(_ pins: [VersionFactRow], of type: TypeID) -> some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        return TagFlowLayout(spacing: 14 * scale) {
-            ForEach(pins) { pin in
-                VStack(alignment: .leading, spacing: 5 * scale) {
-                    HStack(spacing: 4 * scale) {
-                        if let symbol = pin.symbol {
-                            Image(systemName: symbol).font(.system(size: 11 * scale)).accessibilityHidden(true)
-                        }
-                        Text(LocalizedStringKey(pin.label)).font(.system(size: 12 * scale))
+    /// The type's mark and name over the title, as the head draws it, with no flags and nothing to change.
+    private func kicker(of type: TypeID) -> PageHead.Kicker {
+        let name = library.catalogue.itemTypes[type].map { PageHead.localized($0.label) } ?? library.catalogue.label(for: type)
+        return PageHead.Kicker(typeName: name, typeIcon: library.catalogue.icon(for: type), changesType: false, flags: [])
+    }
+
+    /// The rows as the item's page draws them: a symbol and the name in a column of one width, the value beside it,
+    /// over a hairline. Read only: a version is not edited here.
+    private func propertyRows(_ rows: [VersionFactRow], size: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(rows) { row in
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    HStack(spacing: size * 8 / 13) {
+                        Image(systemName: row.symbol ?? "text.alignleft")
+                            .frame(width: size * 16 / 13)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                        Text(verbatim: row.label).foregroundStyle(.secondary).lineLimit(1)
                     }
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    Text(verbatim: pin.value)
-                        .interfaceFont(.body)
-                        .lineLimit(1)
-                        .frame(minHeight: 22 * scale)
+                    .frame(width: size * 150 / 13, alignment: .leading)
+                    Text(verbatim: row.value).lineLimit(2).textSelection(.enabled).help(row.value)
+                    Spacer(minLength: 0)
                 }
-                .frame(width: 136 * scale, alignment: .leading)
-                .help(pin.value)
+                .frame(minHeight: size * 30 / 13)
+                .accessibilityElement(children: .combine)
             }
         }
+        .font(.system(size: size))
+        .padding(.top, size * 16 / 13)
+        .padding(.bottom, size * 8 / 13)
+        .overlay(alignment: .bottom) { Divider() }
     }
 }
 
@@ -251,7 +272,7 @@ private extension [ReadSpan] {
             if span.wikiLink { piece.foregroundColor = Color.accentColor }
             switch span.change {
             case .same: break
-            case .added: piece.backgroundColor = Color.accentColor.opacity(0.22)
+            case .added: piece.backgroundColor = VersionLooks.added
             case .removed:
                 piece.strikethroughStyle = .single
                 piece.foregroundColor = .secondary
@@ -260,4 +281,15 @@ private extension [ReadSpan] {
         }
         return result
     }
+}
+
+/// How Version History marks words a version added: green, since the accent marks what is chosen (`docs/look.md`).
+enum VersionLooks {
+    static let addedLightOpacity = 0.15
+    static let addedDarkOpacity = 0.26
+
+    static let added = Color(nsColor: NSColor(name: nil) { appearance in
+        let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return NSColor(srgbRed: 48 / 255, green: 164 / 255, blue: 108 / 255, alpha: isDark ? addedDarkOpacity : addedLightOpacity)
+    })
 }

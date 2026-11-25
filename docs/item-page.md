@@ -114,5 +114,5 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 ## Version history
 
 - **It takes the place of the left sidebar and the page** (`VersionHistoryWorkspace`), so nothing in it edits the item by mistake.
-- **The page shows the version as it was**, with the fields it pins while Pinned Properties is on, added words tinted and removed words struck through.
-- **Restoring is a new version**, and Restore Version is offered only when it can be done (`VersionHistoryMode`).
+- **The page shows the version as it was:** type, title, property rows and text, with added words green (`VersionLooks`) and removed words struck through. A version holds no tags or links, so none show.
+- **Restoring is a new version**, offered only when it can be done (`VersionHistoryMode`).

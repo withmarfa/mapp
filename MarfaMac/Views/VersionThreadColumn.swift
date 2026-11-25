@@ -1,7 +1,8 @@
+import AppKit
 import SwiftUI
 
-/// The versions of an item as a thread, newest first, in blocks. Each is a dot on a thin line, the time it was saved
-/// and what it changed; the newest is the item as it is now.
+/// The versions of an item as a thread, newest first, in blocks. Each has the mark of the kind of sign-in that wrote it,
+/// the time it was saved, what it changed and who wrote it; the newest is the item as it is now.
 struct VersionThreadColumn: View {
     @CurrentLibrary private var library
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
@@ -20,7 +21,7 @@ struct VersionThreadColumn: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Version History").interfaceFont(.title3.weight(.semibold))
+            Text("Version History").interfaceFont(.title3.weight(.bold))
             if let count = countText {
                 Text(count).interfaceFont(.callout).foregroundStyle(.secondary)
             }
@@ -71,7 +72,7 @@ struct VersionThreadColumn: View {
                     .accessibilityAddTraits(.isHeader)
                     .listRowSeparator(.hidden)
                 ForEach(block.elements) { entry in
-                    row(entry, in: block, list: list)
+                    row(entry, list: list)
                     if entry.isCurrent, !list.isComplete { gap }
                 }
             }
@@ -86,21 +87,26 @@ struct VersionThreadColumn: View {
                     if let details { details.restoreFromHistory(in: library, undoManager: undoManager) }
                 }
                 .disabled(mode.isRestoring || mode.restoreCheck(of: id, in: library)?.isReady != true)
+                Button("Copy Text") { copyText(of: id, in: list) }
+                    .disabled(list.entry(id)?.content.text == nil)
             }
         }
         .accessibilityIdentifier("VersionHistoryThread")
     }
 
-    private func row(_ entry: VersionEntry, in block: VersionBlock<VersionEntry>, list: VersionList) -> some View {
-        let isFirst = block.elements.first?.id == entry.id
-        // The line runs on through the stretch not read yet, which sits just under the newest version.
-        let isLast = block.elements.last?.id == entry.id && !(entry.isCurrent && !list.isComplete)
-        return VersionThreadRow(
+    /// Puts the version's text on the clipboard, exactly as the version holds it.
+    private func copyText(of id: String, in list: VersionList) {
+        guard let text = list.entry(id)?.content.text else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    private func row(_ entry: VersionEntry, list: VersionList) -> some View {
+        VersionThreadRow(
             entry: entry,
             when: entry.written.map { VersionBlocks.when($0, format: dateFormat, now: now, calendar: .autoupdatingCurrent) }
                 ?? String(localized: "Version \(entry.version)"),
-            summary: list.summary(of: entry, in: library.catalogue),
-            isSelected: mode.thread.selection == entry.id, isFirst: isFirst, isLast: isLast)
+            summary: list.summary(of: entry, in: library.catalogue))
             .tag(entry.id)
             .listRowSeparator(.hidden)
             .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
@@ -124,7 +130,7 @@ struct VersionThreadColumn: View {
             }
         }
         .interfaceFont(.callout)
-        .padding(.leading, 22)
+        .padding(.leading, 25)
         .padding(.vertical, 6)
         .selectionDisabled()
         .listRowSeparator(.hidden)
@@ -132,47 +138,41 @@ struct VersionThreadColumn: View {
     }
 }
 
-/// One version in the thread.
+/// One version in the thread: the mark of who wrote it, the time with Current beside the newest, what changed under it
+/// and the writer's name at the end.
 private struct VersionThreadRow: View {
     let entry: VersionEntry
     let when: String
     let summary: String
-    let isSelected: Bool
-    let isFirst: Bool
-    let isLast: Bool
-    /// How far down a row its dot sits: its padding and half of the time's line.
-    @ScaledMetric private var dotY: CGFloat = 15
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(when).interfaceFont(.body)
-                Text(summary).interfaceFont(.callout).foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: entry.isCurrent ? "clock" : PanelHistory.symbol(of: entry.writer))
+                .frame(width: 16, height: 18)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 7) {
+                    Text(when).interfaceFont(.body.weight(.medium)).lineLimit(1)
+                    if entry.isCurrent {
+                        Text("Current")
+                            .interfaceFont(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .frame(minHeight: 17)
+                            .background(SelectionLooks.chosen(for: scheme), in: RoundedRectangle(cornerRadius: 5))
+                    }
+                }
+                Text(summary).interfaceFont(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
-            if entry.isCurrent {
-                Text("Current").interfaceFont(.callout).foregroundStyle(.secondary)
+            if let writer = entry.writer {
+                Text(verbatim: writer.displayName).interfaceFont(.caption).foregroundStyle(.tertiary).lineLimit(1)
             }
         }
-        .padding(.leading, 22)
-        .padding(.vertical, 7)
-        .background(alignment: .leading) { rail }
+        .padding(.vertical, 3)
         .accessibilityElement(children: .combine)
     }
 
-    private var rail: some View {
-        GeometryReader { geometry in
-            let x: CGFloat = 5
-            Path { path in
-                path.move(to: CGPoint(x: x, y: isFirst ? dotY : 0))
-                path.addLine(to: CGPoint(x: x, y: isLast ? dotY : geometry.size.height))
-            }
-            .stroke(.separator, lineWidth: 1)
-            Circle()
-                .fill(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                .frame(width: 9, height: 9)
-                .position(x: x, y: dotY)
-        }
-        .frame(width: 10)
-    }
+    @Environment(\.colorScheme) private var scheme
 }
