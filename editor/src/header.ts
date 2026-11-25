@@ -9,7 +9,7 @@ const rowGrip = 'line.3.horizontal'
 export type HeaderTint = 'blue' | 'secondary' | 'tertiary'
 
 /** Every chip look as CSS custom properties, resolved by the app for light and for dark: the sizes and fills
- *  (`--chip-*`) and each tone's colors (`--tone-<name>`, `--tone-<name>-ink`, `--tone-<name>-mark`, `--tone-<name>-chip`). The page applies
+ *  (`--chip-*`) and each tone's colors (`--tone-<name>`, `--tone-<name>-ink`, `--tone-<name>-mark`). The page applies
  *  the set for the appearance it is in and never picks a color or a size of its own. */
 export interface HeaderChipStyle {
   light: Record<string, string>
@@ -247,7 +247,7 @@ function element<K extends keyof HTMLElementTagNameMap>(
 /** Gives a chip the tone the app named, from the custom properties the app sent (`--tone-<name>`); the page chooses no
  *  color. A name that is not a word leaves the chip with no tone. */
 function useTone(node: HTMLElement, name: string | null | undefined) {
-  const tones = ['--tone', '--tone-ink', '--tone-mark', '--tone-chip']
+  const tones = ['--tone', '--tone-ink', '--tone-mark']
   if (!name || !/^[a-z]+$/.test(name)) {
     for (const property of tones) node.style.removeProperty(property)
     return
@@ -255,7 +255,6 @@ function useTone(node: HTMLElement, name: string | null | undefined) {
   node.style.setProperty('--tone', `var(--tone-${name})`)
   node.style.setProperty('--tone-ink', `var(--tone-${name}-ink)`)
   node.style.setProperty('--tone-mark', `var(--tone-${name}-mark)`)
-  node.style.setProperty('--tone-chip', `var(--tone-${name}-chip)`)
 }
 
 /** A symbol the app drew, as a mask in the tone's color. */

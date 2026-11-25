@@ -411,7 +411,7 @@ body[data-text='none'] #editor {
 }
 
 .item-tool:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--inkkit-accent-color) 60%, transparent);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -440,6 +440,11 @@ body[data-text='none'] #editor {
     sans-serif;
 }
 
+/* The app's own keyboard focus ring: 3 points, grey (`AppButtonStyle.focusRing`). */
+:root {
+  --focus-ring: color-mix(in srgb, var(--label-primary) 26%, transparent);
+}
+
 /* Every chip, one look for each kind of value, drawn from the custom properties the app sends (`ChipLooks`,
    `TypeTone`): the sizes and fills as `--chip-*`, and each tone's colors as `--tone-<name>`. A chip names its tone and
    the page forwards the name; no color is chosen here. Each size is the app's value in points, scaled by
@@ -448,15 +453,15 @@ body[data-text='none'] #editor {
 #item-header {
   --chip-scale: 1;
   --c-height: calc(var(--chip-height, 22px) * var(--chip-scale));
-  --c-radius: calc(var(--chip-radius, 6px) * var(--chip-scale));
+  --c-radius: calc(var(--chip-radius, 7px) * var(--chip-scale));
   --c-text: calc(var(--chip-text-size, 12px) * var(--chip-scale));
   --c-padding: calc(var(--chip-padding, 8px) * var(--chip-scale));
   --c-gap: calc(var(--chip-gap, 5px) * var(--chip-scale));
   --c-type-start: calc(var(--chip-type-padding-start, 6px) * var(--chip-scale));
   --c-tag-start: calc(var(--chip-tag-padding-start, 7px) * var(--chip-scale));
-  --c-mark: calc(var(--chip-mark-size, 13px) * var(--chip-scale));
-  --c-person: calc(var(--chip-person-circle, 17px) * var(--chip-scale));
-  --c-initials: calc(var(--chip-person-initials-size, 8px) * var(--chip-scale));
+  --c-mark: calc(var(--chip-mark-size, 14px) * var(--chip-scale));
+  --c-person: calc(var(--chip-person-circle, 18px) * var(--chip-scale));
+  --c-initials: calc(var(--chip-person-initials-size, 8.5px) * var(--chip-scale));
   --c-person-gap: calc(var(--chip-person-gap, 6px) * var(--chip-scale));
   --c-dot: calc(7px * var(--chip-scale));
 }
@@ -474,10 +479,10 @@ body[data-text='none'] #editor {
   padding: 0 var(--c-padding);
   border: 0;
   border-radius: var(--c-radius);
-  background: var(--chip-option-fill, var(--label-quinary));
+  background: var(--chip-wash, var(--label-quinary));
   color: var(--label-primary);
   font:
-    400 var(--c-text) / normal -apple-system,
+    500 var(--c-text) / normal -apple-system,
     system-ui,
     sans-serif;
   text-align: start;
@@ -498,20 +503,17 @@ body[data-text='none'] #editor {
 
 .item-chip:focus-visible,
 .item-person:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--inkkit-accent-color) 60%, transparent);
-  outline-offset: 1px;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 0;
 }
 
-/* A fill means a type: tinted in the type's color, its symbol and name in its ink. */
-.item-chip[data-kind='type'] {
-  padding-inline-start: var(--c-type-start);
-  background: var(--tone-chip);
-  color: var(--tone-ink);
-}
-
-/* A linked item is its mark in color and its title on the chip's grey fill: a tint means a type. */
+/* A type or a linked item is a fact, not a value from a set: its mark in the tone and its name, with no chip round it. */
+.item-chip[data-kind='type'],
 .item-chip[data-kind='link'] {
-  padding-inline-start: var(--c-type-start);
+  padding-inline: 0;
+  background: transparent;
+  font-weight: 400;
+  font-size: calc(13px * var(--chip-scale));
 }
 
 .item-chip[data-kind='link']:not(:disabled):hover .item-chip-text {
@@ -527,11 +529,9 @@ body[data-text='none'] #editor {
   mask: center / contain no-repeat;
 }
 
-/* Status: a fine grey edge round its group's mark, and a faint fill in dark. */
+/* Status: its group's mark on the one wash, with no edge. */
 .item-chip[data-kind='status'] {
   padding-inline-start: var(--c-type-start);
-  background: var(--chip-status-fill, transparent);
-  box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
 }
 
 /* A status the item does not have yet reads as any empty value does: quiet text with no edge. Its fill, under the
@@ -555,8 +555,8 @@ body[data-text='none'] #editor {
 }
 
 .item-menu-pin:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--inkkit-accent-color) 60%, transparent);
-  outline-offset: 1px;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 0;
 }
 
 .item-menu-pin:disabled {
@@ -580,7 +580,6 @@ body[data-text='none'] #editor {
 /* A tag: grey, after a number sign. */
 .item-chip[data-kind='tag'] {
   padding-inline-start: var(--c-tag-start);
-  background: var(--chip-tag-fill, var(--label-quinary));
 }
 
 .item-chip-hash {
@@ -588,7 +587,7 @@ body[data-text='none'] #editor {
   color: var(--label-secondary);
 }
 
-/* A person: one or two initials in a pale circle, then the name. No chip round it. */
+/* A person: one or two initials in a pale purple circle with no edge, then the name. No chip round it. */
 .item-person {
   box-sizing: border-box;
   display: inline-flex;
@@ -604,7 +603,7 @@ body[data-text='none'] #editor {
   background: transparent;
   color: var(--label-primary);
   font:
-    400 var(--c-text) / normal -apple-system,
+    500 var(--c-text) / normal -apple-system,
     system-ui,
     sans-serif;
   white-space: nowrap;
@@ -620,11 +619,10 @@ body[data-text='none'] #editor {
   width: var(--c-person);
   height: var(--c-person);
   border-radius: 50%;
-  background: var(--chip-option-fill, var(--label-quinary));
-  box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
-  color: var(--label-secondary);
+  background: var(--chip-person-fill);
+  color: var(--chip-person-ink);
   font-size: var(--c-initials);
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0;
 }
 
@@ -1077,7 +1075,7 @@ body[data-text='none'] #editor {
 .item-linked-open:focus-visible,
 .item-more:focus-visible,
 .item-link:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--inkkit-accent-color) 60%, transparent);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

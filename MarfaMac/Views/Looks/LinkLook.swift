@@ -9,8 +9,6 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
     case mark
     /// The title underlined, with no icon.
     case underline
-    /// A chip in the type's tint, with the icon.
-    case tintedPill
     /// A neutral chip in the line, with the icon.
     case pill
     /// Body text with a fine underline and no icon.
@@ -31,7 +29,6 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .mark: String(localized: "Mark")
         case .underline: String(localized: "Underline")
-        case .tintedPill: String(localized: "Tinted Pill")
         case .pill: String(localized: "Pill")
         case .quiet: String(localized: "Quiet")
         case .text: String(localized: "Text")
@@ -41,15 +38,15 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
     /// Whether the type icon is drawn.
     var showsIcon: Bool {
         switch self {
-        case .mark, .tintedPill, .pill: true
+        case .mark, .pill: true
         case .underline, .quiet, .text: false
         }
     }
 
     /// Whether the icon takes the type's color; otherwise it takes the text's.
-    private var colorsIcon: Bool { self == .mark || self == .tintedPill }
+    private var colorsIcon: Bool { self == .mark }
 
-    private var isPill: Bool { self == .tintedPill || self == .pill }
+    private var isPill: Bool { self == .pill }
 
     /// The look's measures, in ems of the text it sits in so a link in a heading or at another text size keeps its
     /// proportions.
@@ -95,16 +92,14 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// The look as the page's custom properties: Inkkit's link and wiki link tokens, and for each tone the colors a link to
-    /// an item of a type with that tone takes (`--link-icon-<tone>`, `--link-tint-<tone>`), resolved for light and for
-    /// dark at once by `light-dark()` so an appearance change needs no resend. The tint is the tone's chip color
-    /// (`TypeTone.cssColors`), the same fill a chip in the item's header has.
+    /// an item of a type with that tone takes (`--link-icon-<tone>`), resolved for light and for
+    /// dark at once by `light-dark()` so an appearance change needs no resend.
     @MainActor
     func cssVariables(looks: ChipLooks = .current) -> [String: String] {
         var all: [String: String] = [:]
         for tone in TypeTone.allCases {
             let light = TypeTone.cssColors(for: tone, dark: false, looks: looks)
             let dark = TypeTone.cssColors(for: tone, dark: true, looks: looks)
-            all["--link-tint-\(tone.rawValue)"] = Self.appearance(light["--tone-chip"]!, dark["--tone-chip"]!)
             all["--link-icon-\(tone.rawValue)"] =
                 colorsIcon ? Self.appearance(light["--tone-ink"]!, dark["--tone-ink"]!) : "currentcolor"
         }
@@ -126,10 +121,8 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
             all[prefix + "padding-inline"] = Measure.pillPaddingInline
             all[prefix + "padding-block"] = Measure.pillPaddingBlock
             all[prefix + "radius"] = Measure.pillRadius
-            // A link with no known type has no tint, and its fill is then this neutral one, so it never reads as bare text.
+            // A pill is neutral whatever the type, so a tint always means a type being given.
             all[prefix + "background"] = Self.appearance(Neutral.fillLight, Neutral.fillDark)
-            // The tint is already the tone's chip fill, so a tinted pill takes it whole.
-            if self == .tintedPill { all[prefix + "tint-strength"] = "100%" }
         } else {
             all[prefix + "underline"] = "underline"
             all[prefix + "underline-thickness"] = Measure.underlineThickness

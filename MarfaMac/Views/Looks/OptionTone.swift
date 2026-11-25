@@ -9,7 +9,7 @@ nonisolated enum OptionTone {
     static let palette: [TypeTone] = [.blue, .green, .orange, .red, .purple, .teal, .yellow, .pink, .indigo]
 
     /// The colors of a priority from its lowest option to its highest.
-    static let prioritySteps: [TypeTone] = [.purple, .yellow, .red, .blue]
+    static let prioritySteps: [TypeTone] = [.purple, .yellow, .orange, .red]
 
     static func tone(for value: String) -> TypeTone {
         var hash: UInt32 = 2_166_136_261
