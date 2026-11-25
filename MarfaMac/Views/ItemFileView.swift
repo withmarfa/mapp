@@ -43,9 +43,14 @@ enum ItemFileResolution: Equatable {
     }
 }
 
-/// A file item's file, shown once it is fetched. An item the library has no file for shows that it has none.
+/// A file item's file, shown once it is fetched, under the page's notice (`PageNotice`) where it has one: a deleted item,
+/// a held write, and a file the library does not have. Its viewer keeps its own scroller, so the notice stays above it.
 struct ItemFileView: View {
     @CurrentLibrary private var library
+    @StoredPageStyle private var style
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
+    @State private var width: CGFloat = 0
     let id: ItemID
     /// The window the file's size and page are offered to once it is ready (`FileItemContent`).
     var details: DetailsPresentation?
@@ -55,6 +60,12 @@ struct ItemFileView: View {
     @State private var loader = ItemFileLoader()
 
     private var item: Item? { library.item(id) }
+
+    private var notice: PageNotice? {
+        guard let item else { return nil }
+        if case .unavailable? = loader.resolution(of: id) { return PageNotice.of(item, fileIsMissing: true) }
+        return PageNotice.of(item)
+    }
 
     var body: some View {
         // The task sits on one container. On the switch itself (`Group` hands a modifier to each branch) it would
@@ -66,8 +77,9 @@ struct ItemFileView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .ready(let url):
                 FileItemContent(url: url, title: item?.name ?? url.lastPathComponent, contentType: item?.fileType, item: id, details: details)
+            // The page's notice says so.
             case .unavailable:
-                ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
+                Color.clear
             case .failed(let reason):
                 ContentUnavailableView {
                     Label("Can’t Get This File", systemImage: "exclamationmark.icloud")
@@ -80,6 +92,16 @@ struct ItemFileView: View {
                 } actions: {
                     Button("Try Again") { Task { await load() } }
                 }
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let notice {
+                PageNoticeView(notice: notice) { action in
+                    action.run(for: id, in: library, undoManager: undoManager, openWindow: openWindow)
+                }
+                .padding(.horizontal, style.horizontalInset(for: width))
+                .padding(.vertical, 12)
             }
         }
         .task(id: id) { await load() }

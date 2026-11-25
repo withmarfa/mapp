@@ -103,14 +103,14 @@ body {
   --inkkit-table-header-font-weight: 500;
   /* A picture waiting for the person, Inkkit's file placeholder: one full-width row with a hairline outline, in the
      interface's own font and size, with the picture symbol, the description in the secondary color and, at the row's
-     trailing end, the same small gray Load button as the pictures banner's (the --picture-* values below feed both,
-     so the two cannot drift). The outline has no Inkkit token, so a rule below draws it. */
+     trailing end, a small gray Load button (the --picture-* values below). The outline has no Inkkit token, so a rule
+     below draws it. */
   --inkkit-file-placeholder-background: transparent;
-  --inkkit-file-placeholder-radius: calc(var(--step) * 2);
-  --inkkit-file-placeholder-min-height: 0px;
-  --inkkit-file-placeholder-padding: calc(var(--step) * 2) calc(var(--step) * 2.5)
-    calc(var(--step) * 2) calc(var(--step) * 3);
-  --inkkit-file-placeholder-gap: calc(var(--step) * 2);
+  --inkkit-file-placeholder-radius: calc(var(--interface-text-size) * 10 / 13);
+  --inkkit-file-placeholder-min-height: calc(var(--interface-text-size) * 38 / 13);
+  --inkkit-file-placeholder-padding: 0 calc(var(--interface-text-size) * 7 / 13) 0
+    calc(var(--interface-text-size) * 12 / 13);
+  --inkkit-file-placeholder-gap: calc(var(--interface-text-size) * 8 / 13);
   --inkkit-file-placeholder-color: var(--label-secondary);
   --inkkit-file-placeholder-font-size: var(--interface-text-size);
   --inkkit-file-placeholder-symbol-color: var(--label-secondary);
@@ -191,121 +191,121 @@ body:has(> #item-header:not([hidden])) {
 
 /* The interface text size the pictures' measures follow, as the header's do: the app sets it on the root, and every
    measure below is that size's share, so they scale with it. They are points at the default 13, and are the app's small
-   gray button (`AppButton`): 22 high with 7 point corners, 9 points of padding and 12 point medium text, on the
-   label's own gray, darker under the pointer. 22 is off the 4 point grid by design. */
+   gray button (`AppButton`): 24 high with 7 point corners, 10 points of padding and 12 point medium text, on the
+   label's own gray, darker under the pointer. */
 :root {
   --interface-text-size: 13px;
   --step: calc(var(--interface-text-size) * 4 / 13);
-  --picture-button-height: calc(var(--interface-text-size) * 22 / 13);
+  --picture-button-height: calc(var(--interface-text-size) * 24 / 13);
   --picture-button-radius: calc(var(--interface-text-size) * 7 / 13);
   --picture-button-text-size: calc(var(--interface-text-size) * 12 / 13);
-  --picture-button-padding: calc(var(--interface-text-size) * 9 / 13);
+  --picture-button-padding: calc(var(--interface-text-size) * 10 / 13);
   --picture-button-font-weight: 500;
   --picture-button-fill: color-mix(in srgb, CanvasText 6.5%, transparent);
   --picture-button-fill-hover: color-mix(in srgb, CanvasText 10%, transparent);
   --picture-button-fill-pressed: color-mix(in srgb, CanvasText 15%, transparent);
 }
 
-/* At the top of the page, above the title, while pictures at web addresses wait for the person: a quiet banner on the
-   text's margins, in the style of Mail's mailing-list banner, whose gray button loads them all. The header's own space
-   above its title is what separates it from the title. */
-#picture-bar {
-  padding: calc(var(--step) * 3) var(--inkkit-column-inset) 0;
+/* The page's notice (`PageNotice`): one quiet line at the top of the column, above the head, which scrolls with the
+   page. 13 points at the default text size, radius 10, a wash, and one action that has no fill. The app draws the same
+   line over a file page and a saved web page. */
+#page-notice {
+  padding: 0 var(--inkkit-column-inset);
   font-family: -apple-system, system-ui, sans-serif;
   font-size: var(--interface-text-size);
-  line-height: normal;
+  line-height: calc(var(--interface-text-size) * 18 / 13);
   -webkit-user-select: none;
   user-select: none;
 }
 
-#picture-bar[hidden] {
-  display: none;
+#page-notice:not(:empty) {
+  padding-top: calc(var(--step) * 3);
 }
 
-.picture-callout {
+.page-notice {
   display: flex;
-  align-items: center;
-  gap: calc(var(--step) * 3);
-  padding: calc(var(--interface-text-size) * 9 / 13) calc(var(--interface-text-size) * 10 / 13)
-    calc(var(--interface-text-size) * 9 / 13) calc(var(--interface-text-size) * 14 / 13);
+  align-items: flex-start;
+  gap: calc(var(--interface-text-size) * 7 / 13);
+  padding: calc(var(--interface-text-size) * 9 / 13) calc(var(--interface-text-size) * 12 / 13);
   border-radius: calc(var(--interface-text-size) * 10 / 13);
   background: var(--label-quinary);
+  color: var(--label-primary);
 }
 
-.picture-icon {
+.page-notice-icon {
   flex: none;
   background: var(--label-secondary);
   -webkit-mask: center / contain no-repeat;
   mask: center / contain no-repeat;
 }
 
-.picture-icon[hidden] {
-  display: none;
-}
-
-.picture-sentence {
+.page-notice-words {
   flex: 1;
   min-width: 0;
-  color: var(--label-primary);
 }
 
-#picture-bar button {
+.page-notice-action {
+  flex: none;
+  margin: 0 0 0 calc(var(--interface-text-size) * 14 / 13);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--label-primary);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.page-notice-action:active {
+  opacity: 0.6;
+}
+
+.page-notice-close {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: var(--picture-button-height);
-  padding: 0 var(--picture-button-padding);
+  width: calc(var(--interface-text-size) * 16 / 13);
+  height: calc(var(--interface-text-size) * 18 / 13);
+  margin: 0 0 0 calc(var(--interface-text-size) * 6 / 13);
+  padding: 0;
   border: 0;
-  border-radius: var(--picture-button-radius);
-  background: var(--picture-button-fill);
-  color: var(--label-primary);
-  font: inherit;
-  font-size: var(--picture-button-text-size);
-  font-weight: var(--picture-button-font-weight);
+  background: none;
+  color: var(--label-tertiary);
   cursor: default;
 }
 
-#picture-bar button[hidden] {
-  display: none;
-}
-
-#picture-bar button:hover {
-  background: var(--picture-button-fill-hover);
-}
-
-#picture-bar button:active {
-  background: var(--picture-button-fill-pressed);
-}
-
-/* The close button, the app's plain icon button: a circle as tall as the Load button with no fill until the pointer is
-   over it, and a little closer to Load than the other parts are to each other. It only hides the banner. */
-#picture-bar .picture-close {
-  width: var(--picture-button-height);
-  margin-inline-start: calc(var(--interface-text-size) * -2 / 13);
-  padding: 0;
-  border-radius: 50%;
-  background: transparent;
+.page-notice-close:hover {
   color: var(--label-secondary);
 }
 
-#picture-bar .picture-close:hover {
-  background: color-mix(in srgb, CanvasText 4.7%, transparent);
-  color: var(--label-primary);
-}
-
-#picture-bar .picture-close:active {
-  background: color-mix(in srgb, CanvasText 9.8%, transparent);
-}
-
-.picture-close-icon {
+.page-notice-close-icon {
   background: currentColor;
   -webkit-mask: center / contain no-repeat;
   mask: center / contain no-repeat;
 }
 
-.picture-close-icon[hidden] {
-  display: none;
+.page-notice-action:focus-visible,
+.page-notice-close:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: calc(var(--interface-text-size) * 4 / 13);
+}
+
+/* What the text says when it is withheld, where the text would be: under the head, in the secondary color. */
+#page-reason {
+  margin: 0;
+  padding: 0 var(--inkkit-column-inset);
+  color: var(--label-secondary);
+  font-family: -apple-system, system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+#page-reason:not(:empty) {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
 }
 
 /* A page with no text to write draws no editor, rather than an empty one that takes typing. An empty one would invite
