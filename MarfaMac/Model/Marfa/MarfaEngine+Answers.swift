@@ -150,7 +150,7 @@ nonisolated struct ParentRefusal: Hashable, Sendable {
     let listed: Bool
 }
 
-extension WriteOutcome {
+nonisolated extension WriteOutcome {
     /// Blocked or dead, so a release sends the write again.
     fileprivate var mayBeSentAgain: Bool {
         switch self {
