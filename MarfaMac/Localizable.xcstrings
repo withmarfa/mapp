@@ -4,6 +4,16 @@
     "" : {
 
     },
+    "%@  %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@  %2$@"
+          }
+        }
+      }
+    },
     "%@ %@" : {
       "localizations" : {
         "en" : {
@@ -366,6 +376,16 @@
     "%@ now comes from a plugin or from Marfa, so it wasn’t deleted." : {
 
     },
+    "%@ of %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@"
+          }
+        }
+      }
+    },
     "%@ of %@ selected" : {
 
     },
@@ -502,6 +522,36 @@
         }
       }
     },
+    "%@, %@ items" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ items"
+          }
+        }
+      }
+    },
+    "%@, %@ of %@ items" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ of %3$@ items"
+          }
+        }
+      }
+    },
+    "%@, %@ of ^[%lld item](inflect: true)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ of ^[%3$lld item](inflect: true)"
+          }
+        }
+      }
+    },
     "%@, %@, and %lld more." : {
       "localizations" : {
         "en" : {
@@ -522,7 +572,20 @@
         }
       }
     },
+    "%@, ^[%lld item](inflect: true)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, ^[%2$lld item](inflect: true)"
+          }
+        }
+      }
+    },
     "%@, Archived" : {
+
+    },
+    "%@, changed" : {
 
     },
     "%@, edited" : {
@@ -1354,6 +1417,9 @@
     "%lld more left out of search." : {
 
     },
+    "%lld more views" : {
+
+    },
     "%lld not started" : {
       "extractionState" : "manual"
     },
@@ -1385,16 +1451,6 @@
     },
     "%lld of %lld done" : {
       "extractionState" : "manual"
-    },
-    "%lld of %lld items" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld of %2$lld items"
-          }
-        }
-      }
     },
     "%lld or more versions" : {
 
@@ -2234,6 +2290,9 @@
     "All" : {
 
     },
+    "All %@" : {
+
+    },
     "All %lld" : {
 
     },
@@ -2795,6 +2854,9 @@
       }
     },
     "Brings in and sends out" : {
+
+    },
+    "Browse" : {
 
     },
     "Browser" : {
@@ -7331,6 +7393,9 @@
     "Opens a panel to add a value" : {
 
     },
+    "Opens the sidebar's places" : {
+
+    },
     "Opens this address" : {
       "extractionState" : "manual"
     },
@@ -8637,6 +8702,9 @@
       }
     },
     "Show All %lld Versions" : {
+
+    },
+    "Show All Items, the Library or the Feed" : {
 
     },
     "Show All Tabs" : {
@@ -11238,9 +11306,6 @@
     "View > Show Original switches it." : {
 
     },
-    "View As" : {
-
-    },
     "View Deleted" : {
 
     },
@@ -11301,6 +11366,9 @@
     },
     "View as Timeline" : {
       "extractionState" : "manual"
+    },
+    "View, %@" : {
+
     },
     "Views" : {
 
@@ -11733,9 +11801,6 @@
     "^[%lld change](inflect: true)" : {
 
     },
-    "^[%lld item](inflect: true)" : {
-
-    },
     "^[%lld item](inflect: true) can’t be added as a file." : {
       "extractionState" : "manual"
     },
@@ -11762,9 +11827,6 @@
 
     },
     "^[%lld removal](inflect: true)" : {
-
-    },
-    "^[%lld result](inflect: true)" : {
 
     },
     "^[%lld setting](inflect: true) use it." : {

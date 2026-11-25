@@ -10,14 +10,8 @@ extension View {
     /// background, or over `backdrop` where the table has none, so rows that scroll under them do not show through. The
     /// same view keeps the table as wide as its page (see `Probe.fit`), or, for a table whose column widths a person
     /// sets and keeps, leaves every width to the person's drags (`resizing`).
-    ///
-    /// A table that sits directly under the toolbar passes `isUnderToolbar` to be told when its rows have scrolled past the
-    /// headings, which stay pinned, and so under the toolbar, where the caller draws a `ToolbarBand`. A table in an index
-    /// page leaves that to the page (`indexScrollsAway`).
-    func quietTableHeader(
-        backdrop: NSColor = .windowBackgroundColor, isUnderToolbar: Binding<Bool>? = nil, resizing: ColumnResizing? = nil
-    ) -> some View {
-        background(QuietTableHeader(backdrop: backdrop, isUnderToolbar: isUnderToolbar, resizing: resizing))
+    func quietTableHeader(backdrop: NSColor = .windowBackgroundColor, resizing: ColumnResizing? = nil) -> some View {
+        background(QuietTableHeader(backdrop: backdrop, resizing: resizing))
     }
 }
 
@@ -61,27 +55,18 @@ final class ColumnResizing {
 
 private struct QuietTableHeader: NSViewRepresentable {
     let backdrop: NSColor
-    let isUnderToolbar: Binding<Bool>?
     let resizing: ColumnResizing?
 
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ probe: Probe, context: Context) {
         probe.backdrop = backdrop
-        probe.isUnderToolbar = isUnderToolbar
         probe.resizing = resizing
         probe.refresh()
     }
 
-    static func dismantleNSView(_ probe: Probe, coordinator: ()) {
-        probe.stop()
-    }
-
     final class Probe: NSView {
         var backdrop = NSColor.windowBackgroundColor
-        var isUnderToolbar: Binding<Bool>?
         var resizing: ColumnResizing?
-        private weak var followed: NSClipView?
-        private var observer: (any NSObjectProtocol)?
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -107,8 +92,6 @@ private struct QuietTableHeader: NSViewRepresentable {
             resizing?.widthsChanged = { [weak self] in self?.restoreAfterChange() }
             if let scrollView = table.enclosingScrollView { fit(table, in: scrollView) }
             table.headerView?.needsDisplay = true
-            follow(table)
-            report(table)
         }
 
         /// The width and columns the table was last fitted to.
@@ -152,35 +135,6 @@ private struct QuietTableHeader: NSViewRepresentable {
             guard key != fittedTo, NSEvent.pressedMouseButtons == 0 else { return }
             fittedTo = key
             table.sizeToFit()
-        }
-
-        func stop() {
-            if let observer { NotificationCenter.default.removeObserver(observer) }
-            observer = nil
-            followed = nil
-        }
-
-        private func follow(_ table: NSTableView) {
-            guard isUnderToolbar != nil, let clip = table.enclosingScrollView?.contentView, clip !== followed else { return }
-            stop()
-            followed = clip
-            clip.postsBoundsChangedNotifications = true
-            observer = NotificationCenter.default.addObserver(
-                forName: NSView.boundsDidChangeNotification, object: clip, queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    if let table = self?.nearestTable() { self?.report(table) }
-                }
-            }
-        }
-
-        /// The headings stay pinned under the toolbar, so the rows reach the toolbar only once they have scrolled by the
-        /// headings' height as well.
-        private func report(_ table: NSTableView) {
-            guard let isUnderToolbar, let clip = table.enclosingScrollView?.contentView else { return }
-            let scrolled = clip.bounds.origin.y + clip.contentInsets.top
-            let isUnder = scrolled > (table.headerView?.frame.height ?? 0) + 0.5
-            if isUnderToolbar.wrappedValue != isUnder { isUnderToolbar.wrappedValue = isUnder }
         }
     }
 }

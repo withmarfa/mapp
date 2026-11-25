@@ -41,7 +41,6 @@ struct ItemGallery: View {
         let _ = daysSeen
         let sections = browser.sections(in: library, order: order, now: library.now())
         let ids = Cost.measure(.galleryBody) { sections.flatMap { $0.items.map(\.id) } }
-        let count = browser.listedCount(in: library) ?? ids.count
         let title = browser.pageTitle(in: library)
         // The picture's opening lines are drawn on the card when the preview allows them, so the line under the title
         // does not say them again.
@@ -70,10 +69,6 @@ struct ItemGallery: View {
             }
         }
         .filteredEmptyState(browser)
-        .navigationTitle(title)
-        // Hidden and folded groups leave the gallery, not the place, so their items still count.
-        .navigationSubtitle(browser.countLine(count, in: library).editedSubtitle(browser.hasViewChanges))
-        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
         }
@@ -105,7 +100,7 @@ struct ItemGallery: View {
                         }
                 }
             }
-            .bandsToolbar()
+            .topRowScrolls()
             .focusable()
             .focusEffectDisabled()
             .focused(pane, equals: .list)

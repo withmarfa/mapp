@@ -36,8 +36,6 @@ struct ItemCalendar: View {
             case .month:
                 let month = CalendarMonth.make(entries: placed.entries, around: anchor, calendar: calendar, now: now)
                 CalendarMonthView(month: month, browser: browser, calendar: calendar, format: dateFormat, choose: choose, open: open)
-                    .navigationTitle(Self.title(of: month.interval, calendar: calendar))
-                    .navigationSubtitle(Text("^[\(month.itemCount) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
             }
         }
         .focusable()
@@ -78,7 +76,6 @@ struct ItemCalendar: View {
         }
         .filteredEmptyState(browser)
         .background(ChosenRowOpensSidebar(browser: browser))
-        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .accessibilityIdentifier("ItemCalendar")
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
@@ -95,35 +92,6 @@ struct ItemCalendar: View {
     }
 
     private func open(_ id: ItemID) { browser.open([id]) }
-
-    /// The month of the span, or both months where a week crosses two, with the year.
-    static func title(of interval: DateInterval, calendar: Calendar) -> String {
-        formatter(matching: calendar).string(from: interval.start, to: interval.end.addingTimeInterval(-1))
-    }
-
-    /// One formatter for the calendar and locale now in use. Scrolling the week asks for the title on each movement.
-    private static var titleFormatter: (key: FormatterKey, formatter: DateIntervalFormatter)?
-
-    private nonisolated struct FormatterKey: Equatable {
-        var identifier: Calendar.Identifier
-        var timeZone: String
-        var locale: String
-        var firstWeekday: Int
-    }
-
-    private static func formatter(matching calendar: Calendar) -> DateIntervalFormatter {
-        let key = FormatterKey(
-            identifier: calendar.identifier, timeZone: calendar.timeZone.identifier,
-            locale: (calendar.locale ?? .current).identifier, firstWeekday: calendar.firstWeekday)
-        if let titleFormatter, titleFormatter.key == key { return titleFormatter.formatter }
-        let formatter = DateIntervalFormatter()
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.locale = calendar.locale ?? .current
-        formatter.dateTemplate = "yMMMM"
-        titleFormatter = (key, formatter)
-        return formatter
-    }
 }
 
 // MARK: Parts shared by the week and the month

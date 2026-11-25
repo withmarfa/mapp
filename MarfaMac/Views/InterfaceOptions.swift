@@ -9,15 +9,13 @@ enum InterfaceKey {
     static let showsScrolledTitle = "showsScrolledTitle"
     /// Whether Back and Forward stand over the sidebar.
     static let showsSidebarHistory = "showsSidebarHistory"
-    /// What the toolbar's items show, chosen under Show in Customize Toolbar.
-    static let toolbarLabelStyle = "toolbarLabelStyle"
     /// Whether an item's page backs the toolbar with a blurred band while content scrolls under it.
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
     /// Whether the panels that edit a value are glass or a solid color.
     static let valuePanelStyle = "valuePanelStyle"
     /// What the command palette, Search Items and quick add stand on.
     static let paletteMaterial = "paletteMaterial"
-    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, showsScrolledTitle, showsSidebarHistory, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, showsScrolledTitle, showsSidebarHistory, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 /// What a value panel is made of. Glass lets the page show through; Solid is the window's own color.
@@ -44,6 +42,12 @@ enum PaletteMaterial: String, CaseIterable, Identifiable {
     static let standard = PaletteMaterial.glass
 
     var id: Self { self }
+}
+
+/// The right sidebar's width in every window: 300, which the person can drag out to the widest.
+enum PanelWidth {
+    static let standard: CGFloat = 300
+    static let widest: CGFloat = 440
 }
 
 enum InterfaceStyle {

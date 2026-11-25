@@ -6,10 +6,10 @@ import SwiftUI
 /// `searchable` cannot do this on macOS: it always goes to the window's end, never in a column, and has no
 /// minimized form there.
 ///
-/// One toolbar item whichever it shows, so a person's layout keeps its place. In a list column the field takes most of
-/// the column's toolbar in place of its title, ending before the view's controls (`ColumnSearchMetrics.share`).
+/// One toolbar item whichever it shows. In a list column the field takes most of the column's toolbar, ending before the
+/// view's controls (`ColumnSearchMetrics.share`), and the top row, which measures the toolbar, gives the field the room.
 /// Elsewhere it grows leftwards from the glass.
-struct ColumnSearch: CustomizableToolbarContent {
+struct ColumnSearch: ToolbarContent {
     enum Layout {
         /// Across a list column, whose width a toolbar item cannot tell, so the caller passes it.
         case column(width: CGFloat)
@@ -26,37 +26,26 @@ struct ColumnSearch: CustomizableToolbarContent {
     var onSubmit: () -> Void = {}
     /// Down Arrow in the field, which hands the keyboard to the list.
     var onDown: () -> Void = {}
-    /// Whether the window's title comes back when the field goes (`ColumnSearchField.restoresTitle`).
-    var restoresTitle = true
 
     /// - Parameter trailing: The space after the clear button. In a column the options sit in the same glass
     ///   just past the field, so the field keeps less there.
     private func field(trailing: CGFloat) -> some View {
         ColumnSearchField(
             text: $text, prompt: prompt, focusRequests: focusRequests, trailingPadding: trailing,
-            onSubmit: onSubmit, onDown: onDown, restoresTitle: restoresTitle
+            onSubmit: onSubmit, onDown: onDown
         ) {
             text = ""
-            setExpanded(false)
+            isExpanded = false
         }
     }
 
     private var button: some View {
-        Button("Search", systemImage: "magnifyingglass") { setExpanded(true) }
+        Button("Search", systemImage: "magnifyingglass") { isExpanded = true }
             .help("Search")
     }
 
-    /// The view that shows the field takes the title away (`toolbar(removing: .title)`), but SwiftUI hands that to the
-    /// window a pass after it sizes the field, so the toolbar would draw the wide field beside the title, past the
-    /// column's end, and slide it back. Opening, the title is hidden here first; closing, it comes back once the
-    /// field has gone (`ToolbarSearchTextField.viewWillMove(toWindow:)`).
-    private func setExpanded(_ expanded: Bool) {
-        if expanded, case .column = layout { NSApp.keyWindow?.titleVisibility = .hidden }
-        isExpanded = expanded
-    }
-
-    var body: some CustomizableToolbarContent {
-        ToolbarItem(id: "search") {
+    var body: some ToolbarContent {
+        ToolbarItem {
             if isExpanded {
                 switch layout {
                 case .column(let width): field(trailing: 2).frame(width: ColumnSearchMetrics.fieldWidth(inColumn: width))
@@ -79,7 +68,7 @@ enum ColumnSearchMetrics {
     /// What a field of its own takes of the room it could fill.
     static let share: CGFloat = 0.85
     /// The room a field could fill as an item of its own, before `share` narrows it.
-    private static let itemRoom: CGFloat = 260
+    private static let itemRoom: CGFloat = 420
     private static let minimum: CGFloat = 120
 
     /// In a list column, the field fills the column but for the toolbar's margins and the options beside it.
@@ -99,8 +88,6 @@ struct ColumnSearchField: View {
     let trailingPadding: CGFloat
     let onSubmit: () -> Void
     let onDown: () -> Void
-    /// Whether the window's title comes back when the field goes. A page that keeps its title out of the toolbar says no.
-    var restoresTitle = true
     let onEnd: () -> Void
     @State private var clears = 0
 
@@ -111,7 +98,7 @@ struct ColumnSearchField: View {
                 .accessibilityHidden(true)
             ToolbarSearchText(
                 text: $text, prompt: prompt, focusRequests: focusRequests + clears,
-                onSubmit: onSubmit, onDown: onDown, restoresTitle: restoresTitle, onEnd: onEnd
+                onSubmit: onSubmit, onDown: onDown, onEnd: onEnd
             )
             if !text.isEmpty {
                 Button("Clear Search", systemImage: "xmark.circle.fill") {
@@ -142,12 +129,10 @@ private struct ToolbarSearchText: NSViewRepresentable {
     let focusRequests: Int
     let onSubmit: () -> Void
     let onDown: () -> Void
-    let restoresTitle: Bool
     let onEnd: () -> Void
 
     func makeNSView(context: Context) -> ToolbarSearchTextField {
         let field = ToolbarSearchTextField()
-        field.restoresTitle = restoresTitle
         field.delegate = context.coordinator
         field.setAccessibilityIdentifier("ColumnSearch")
         field.onClickElsewhere = { [weak coordinator = context.coordinator] in coordinator?.parent.onEnd() }
@@ -205,10 +190,8 @@ private struct ToolbarSearchText: NSViewRepresentable {
 
 private final class ToolbarSearchTextField: NSTextField {
     /// Set until the field has had the keyboard once. The toolbar moves its items between windows (full screen,
-    /// Customize Toolbar, overflow), and an open field should not take the keyboard from the page each time.
+    /// overflow), and an open field should not take the keyboard from the page each time.
     private var isAwaitingKeyboard = true
-    /// Whether the window's title is shown again when the field leaves its window.
-    var restoresTitle = true
     /// Called once a click has finished that landed outside the field and the toolbar items beside it while the
     /// field was open and empty.
     var onClickElsewhere: () -> Void = {}
@@ -236,15 +219,6 @@ private final class ToolbarSearchTextField: NSTextField {
     required init?(coder: NSCoder) { fatalError() }
 
     isolated deinit { removeMonitor() }
-
-    /// The field leaving its window is the search closing, whatever closed it, so the title the search hid
-    /// (`ColumnSearch.setExpanded`) comes back, a pass later so the toolbar has narrowed the item first.
-    override func viewWillMove(toWindow newWindow: NSWindow?) {
-        if newWindow == nil, restoresTitle, let window {
-            DispatchQueue.main.async { [weak window] in window?.titleVisibility = .visible }
-        }
-        super.viewWillMove(toWindow: newWindow)
-    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()

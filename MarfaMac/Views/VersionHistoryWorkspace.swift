@@ -23,15 +23,13 @@ struct VersionHistoryWorkspace: View {
             VersionPageColumn(mode: mode, list: list)
                 .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
                     VersionFactsPanel(mode: mode, list: list)
-                        .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
+                        .inspectorColumnWidth(min: PanelWidth.standard, ideal: PanelWidth.standard, max: PanelWidth.widest)
                 }
-                // The thread's header already says it. The window keeps the title for Mission Control and VoiceOver.
-                .toolbar(removing: .title)
-                // Plain, not `toolbar(id:)`: the mode has nothing to arrange, so the window's toolbar is not customizable
-                // while it is on, and it names no saved layout to change or lose. The window's own layout comes back as it was.
                 .toolbar { toolbar }
         }
+        // The thread's header already says it. The window keeps the title for Mission Control and VoiceOver.
         .navigationTitle("Version History")
+        .hidesWindowTitle()
         .onExitCommand { details.leaveHistory() }
         .onChange(of: list == nil, initial: true) {
             // The item went while its history was open, so there is nothing left to read the versions against.

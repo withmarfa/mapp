@@ -16,14 +16,13 @@ nonisolated final class ItemToolbarTests: XCTestCase {
 
     @MainActor override func tearDown() async throws { app.terminate() }
 
-    @MainActor func testTheSidebarFootOffersNewItemAndThePageToolbarHoldsViewAsShareMoreAndDetails() {
-        let viewMode = control("ViewModeMenu")
+    @MainActor func testTheSidebarFootOffersNewItemAndTheToolbarsHoldViewOptionsThenSharedMoreAndDetails() {
         let viewOptions = control("ViewOptionsToolbar")
         let newItem = control("SidebarNew")
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
         let share = control("ShareToolbar")
-        for element in [viewMode, viewOptions, newItem, details, share, more] { XCTAssertTrue(element.exists) }
+        for element in [viewOptions, newItem, details, share, more] { XCTAssertTrue(element.exists) }
         XCTAssertFalse(control("NewItemToolbar").exists, "the toolbar has no New Item")
         XCTAssertFalse(control("BackToolbar").exists)
         XCTAssertFalse(control("ForwardToolbar").exists)
@@ -34,8 +33,7 @@ nonisolated final class ItemToolbarTests: XCTestCase {
         XCTAssertLessThan(newItem.frame.maxX, page.minX, "New Item belongs to the sidebar's foot")
         XCTAssertLessThan(newItem.frame.maxX, viewOptions.frame.minX)
         XCTAssertGreaterThan(newItem.frame.minY, details.frame.maxY, "New Item sits at the sidebar's foot, below the toolbar row")
-        XCTAssertLessThan(viewOptions.frame.maxX, viewMode.frame.minX, "View Options comes before View As")
-        XCTAssertLessThan(viewMode.frame.maxX, share.frame.minX)
+        XCTAssertLessThan(viewOptions.frame.maxX, share.frame.minX, "the list's buttons come before the page's")
         XCTAssertLessThan(share.frame.maxX, more.frame.minX)
         XCTAssertLessThan(more.frame.maxX, details.frame.minX, "Details is at the far right")
         XCTAssertGreaterThan(more.frame.minX, window.frame.midX)
@@ -69,46 +67,10 @@ nonisolated final class ItemToolbarTests: XCTestCase {
         XCTAssertEqual(count("ShareToolbar"), 1)
     }
 
-    @MainActor func testCustomizeToolbarIsAvailableInEveryView() {
-        let customize = app.menuBars.menuItems["Customize Toolbar…"]
-        XCTAssertTrue(customize.isEnabled, "one plain toolbar in the window would dim it")
-        app.typeKey("2", modifierFlags: .command)
-        XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 3))
-        XCTAssertTrue(customize.isEnabled)
-        control("DetailsToggle").click()
-        XCTAssertTrue(window.descendants(matching: .any)["ItemInspectorDetails"].waitForExistence(timeout: 3))
-        XCTAssertTrue(customize.isEnabled)
-    }
-
-    @MainActor func testChangingViewUnderTheOpenTrayWaitsForItToClose() {
-        app.menuBars.menuItems["Customize Toolbar…"].click()
-        let done = window.sheets.buttons["Done"]
-        XCTAssertTrue(done.waitForExistence(timeout: 3))
-        app.typeKey("2", modifierFlags: .command)
-        XCTAssertFalse(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 1), "the window keeps its shape under the tray")
-        done.click()
-        XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 3))
-    }
-
-    @MainActor func testVersionHistoryUnderTheOpenTrayWaitsForItToClose() {
-        assertVersionHistoryWaitsForTheTray()
-    }
-
-    @MainActor func testVersionHistoryUnderTheOpenTrayOfAnItemWindowWaitsForItToClose() {
-        app.menuBars.menuItems["Open in New Window"].click()
-        XCTAssertTrue(app.windows.element(boundBy: 1).waitForExistence(timeout: 5))
-        assertVersionHistoryWaitsForTheTray()
-    }
-
-    @MainActor private func assertVersionHistoryWaitsForTheTray() {
-        app.menuBars.menuItems["Customize Toolbar…"].click()
-        let done = window.sheets.buttons["Done"]
-        XCTAssertTrue(done.waitForExistence(timeout: 3))
-        app.menuBars.menuItems["Version History…"].click()
-        let exit = window.buttons["VersionHistoryExit"]
-        XCTAssertFalse(exit.waitForExistence(timeout: 1), "the window keeps its toolbar under the tray")
-        done.click()
-        XCTAssertTrue(exit.waitForExistence(timeout: 3))
+    @MainActor func testTheViewMenuHasNoCustomizeToolbar() {
+        app.menuBars.menuBarItems["View"].click()
+        XCTAssertFalse(app.menuBars.menuItems["Customize Toolbar…"].exists, "the buttons are fixed")
+        app.typeKey(.escape, modifierFlags: [])
     }
 
     @MainActor func testViewOptionsOffersSortByAndGroupBy() {
@@ -190,32 +152,23 @@ nonisolated final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 3))
         let viewOptions = control("ViewOptionsToolbar")
         let details = control("DetailsToggle")
-        let more = control("MoreToolbar")
-        let share = control("ShareToolbar")
         let newItem = control("SidebarNew")
-        let viewMode = control("ViewModeMenu")
-        XCTAssertTrue(viewMode.exists, "View As stays reachable in the gallery")
         XCTAssertTrue(viewOptions.exists, "View Options stays reachable in the gallery")
         XCTAssertTrue(newItem.exists, "New stays reachable in the gallery, from the sidebar")
-        XCTAssertTrue(details.exists, "the card selected in the list is still selected, so item actions have something to act on")
-        XCTAssertTrue(share.exists)
-        XCTAssertLessThan(newItem.frame.maxX, viewMode.frame.minX, "New Item stays at the sidebar's foot")
+        XCTAssertTrue(details.exists, "the card selected in the list is still selected, so the panel has something to show")
+        XCTAssertFalse(control("ShareToolbar").exists, "a layout that spans the window has only Search, View and Panel")
+        XCTAssertLessThan(newItem.frame.maxX, viewOptions.frame.minX, "New Item stays at the sidebar's foot")
         let search = window.toolbars.buttons["Search"].firstMatch
         XCTAssertTrue(search.exists)
         XCTAssertLessThan(search.frame.maxX, viewOptions.frame.minX, "Search leads the trailing controls")
-        XCTAssertLessThan(viewOptions.frame.maxX, viewMode.frame.minX)
-        XCTAssertLessThan(viewMode.frame.maxX, share.frame.minX)
-        XCTAssertLessThan(share.frame.maxX, more.frame.minX)
-        XCTAssertLessThan(more.frame.maxX, details.frame.minX, "Details is at the far right")
+        XCTAssertLessThan(viewOptions.frame.maxX, details.frame.minX, "Details is at the far right")
         // ⌘2 leaves the keyboard where it was, so the grid is given it before Escape clears the selection.
         window.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@", "GalleryItem-", "Selected")).firstMatch.click()
         app.typeKey(.escape, modifierFlags: [])
         let cleared = expectation(for: NSPredicate(format: "enabled == false"), evaluatedWith: details)
         wait(for: [cleared], timeout: 3)
-        for action in [details, share, more] {
-            XCTAssertTrue(action.exists, "item actions stay in place when selection clears")
-            XCTAssertFalse(action.isEnabled)
-        }
+        XCTAssertTrue(details.exists, "the panel's button stays in place when selection clears")
+        XCTAssertFalse(details.isEnabled)
         app.typeKey("1", modifierFlags: .command)
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForNonExistence(timeout: 3))
     }
@@ -226,7 +179,6 @@ nonisolated final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(table.waitForExistence(timeout: 3))
         XCTAssertFalse(window.outlines["ItemList"].exists, "the table spans the window")
         XCTAssertFalse(window.webViews.firstMatch.exists)
-        XCTAssertLessThan(control("ViewOptionsToolbar").frame.maxX, control("ViewModeMenu").frame.minX)
         control("ViewOptionsToolbar").click()
         for title in ["Sort by", "Group by", "Columns"] {
             XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), title)
@@ -252,12 +204,10 @@ nonisolated final class ItemToolbarTests: XCTestCase {
         }
     }
 
-    /// Chooses a view from the toolbar's View As pop-up.
+    /// Chooses a layout from the View menu.
     @MainActor private func show(_ title: String) {
-        let menu = control("ViewModeMenu")
-        XCTAssertTrue(menu.waitForExistence(timeout: 3))
-        menu.click()
-        let item = window.menuItems[title].firstMatch
+        app.menuBars.menuBarItems["View"].click()
+        let item = app.menuBars.menuItems[title]
         XCTAssertTrue(item.waitForExistence(timeout: 3), title)
         item.click()
     }
