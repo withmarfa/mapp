@@ -59,14 +59,14 @@ Two defaults name types: the sidebar's and toolbar's starting set for New, and t
 ## Places and views
 
 - **A window shows a place and one of its views** (`PlaceView`, `Place`, `ViewChoice`), each stored as a word. An unknown word is kept as written, and an unknown view reads as the place's own.
-- **A window left in a place this copy cannot read** opens where a new window would, and keeps that place until the person moves (`Browser.LaterPlace`).
+- **A window left in a place this copy cannot read** opens where a new window would, and keeps that place until the person moves (`Browser.laterPlace`).
 - **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, else the sole collection or source its filter requires. Collection membership uses the item's outbound edge. For the feed tier alone, use the Feed. Otherwise use the Library.
 - **A window follows its view to a new place,** with what it keeps for the view (`PlaceMemory`). Views sort by the app's order (`ViewOrders`), then title.
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
-- **Favorites has an ordinary From,** starting on Library; a person may choose All Items.
+- **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
-- **What earlier copies kept is read in once on each Mac** (`EarlierPlace.readIn`), to new keys; the earlier entries stay for those copies. The Library takes All Items' settings, filled from Recents'. Include Subtypes is not read in.
-- **A window's snapshot and Start With have slots of their own** (`window`, `opening`, `openingLastPlace`). An earlier window of a place that still exists keeps its open item and scroll position. Files is no place: the person is told once.
+- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`), at launch and after each settings sync, where the new keys leave it unset. Each earlier entry is read in once on each Mac, and stays for those copies. The Library takes All Items' settings, filled from Recents'. Include Subtypes is not read in.
+- **A window's snapshot and Start With have slots of their own** (`window`, `opening`, `openingLastPlace`). An earlier window of a place that still exists keeps its open item and scroll position, and one favorite opens where that item is listed. Files is no place: the person is told once.
 
 ## Vocabulary
 

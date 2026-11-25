@@ -383,7 +383,8 @@ struct MainView: View {
                 }
                 if let place = SampleLibrary.launchPlace {
                     // A type with no item yet has no place to stay on, so a server's copy still filling is waited for.
-                    for _ in 0..<60 where library.count(in: place) == 0 { try? await Task.sleep(for: .milliseconds(500)) }
+                    let scope = PlaceDefaults.favoritesScope(in: UserDefaults.standard.data(forKey: PlaceDefaults.key))
+                    for _ in 0..<60 where library.count(in: place, favoritesScope: scope) == 0 { try? await Task.sleep(for: .milliseconds(500)) }
                     browser.showing = place
                 }
                 if let layout = SampleLibrary.launchLayout { browser.set(layout: layout) }
