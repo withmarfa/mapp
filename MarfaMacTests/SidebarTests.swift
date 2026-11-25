@@ -79,32 +79,24 @@ struct SidebarTests {
     }
 
     @Test func aLayoutSavedWithoutCollapsedSectionsStillReads() throws {
-        let saved = Data(#"{"hidden":["favorites"],"order":["inbox"]}"#.utf8)
+        let saved = Data(#"{"hidden":["inbox"],"order":["inbox"]}"#.utf8)
         let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
-        #expect(layout.isHidden(.favorites))
-        #expect(!layout.isCollapsed(.favorites))
+        #expect(layout.isHidden(.feed))
+        #expect(!layout.isCollapsed(.feed))
     }
 
     @Test func hidingAPlaceTakesItOutOfWhatShowsButKeepsItListed() async throws {
         let library = try await marfaLibrary()
         var layout = SidebarLayout()
         layout.setHidden(.type(LibraryFixture.entity.rawValue), true)
-        layout.setHidden(.collections, true)
+        layout.setHidden(.feed, true)
         let plan = SidebarPlan(library, layout: layout)
         #expect(plan.types.contains { $0.type == LibraryFixture.entity })
         #expect(!plan.shownTypes.contains { $0.type == LibraryFixture.entity })
-        #expect(plan.shownLibrary == [.types])
-        layout.setHidden(.collections, false)
-        #expect(SidebarPlan(library, layout: layout).shownDestinations.contains(.collections))
-    }
-
-    @Test func hidingAPlaceTakesItOutOfBrowseWhileTheRestKeepTheirOrder() async throws {
-        let library = try await marfaLibrary()
-        var layout = SidebarLayout()
-        layout.setHidden(.sources, true)
-        let plan = SidebarPlan(library, layout: layout)
-        #expect(plan.shownDestinations == [.library, .collections])
-        #expect(plan.destinations == [.library, .sources, .collections])
+        #expect(plan.section(.places)?.shown == [.library])
+        #expect(plan.section(.places)?.members == [.library, .feed])
+        layout.setHidden(.feed, false)
+        #expect(SidebarPlan(library, layout: layout).section(.places)?.shown == [.library, .feed])
     }
 
     @Test func hidingARowHidesWhatIsUnderIt() async throws {
@@ -128,9 +120,9 @@ struct SidebarTests {
     @Test func aLayoutKeptForOneLibraryDoesNotChangeAnother() {
         let defaults = ThrowawayDefaults.make("SidebarTests.separate")
         let layouts = SidebarLayouts(defaults: defaults)
-        layouts.update("marfa:one") { $0.setHidden(.favorites, true) }
-        #expect(layouts.layout(for: "marfa:one").isHidden(.favorites))
-        #expect(!layouts.layout(for: "marfa:two").isHidden(.favorites))
+        layouts.update("marfa:one") { $0.setHidden(.feed, true) }
+        #expect(layouts.layout(for: "marfa:one").isHidden(.feed))
+        #expect(!layouts.layout(for: "marfa:two").isHidden(.feed))
     }
 
     @Test func aLayoutIsFoundAgainByANewStore() {
@@ -153,7 +145,7 @@ struct SidebarTests {
     @Test func aLayoutThatCannotBeReadIsKeptAsideAndLayoutsAreSavedAgain() throws {
         let defaults = ThrowawayDefaults.make("SidebarTests.unreadableKept")
         var two = SidebarLayout()
-        two.setHidden(.favorites, true)
+        two.setHidden(.feed, true)
         let readable = try JSONEncoder().encode(["marfa:two": two])
         var stored = try #require(JSONSerialization.jsonObject(with: readable) as? [String: Any])
         stored["marfa:one"] = ["hidden": 7]
@@ -161,13 +153,13 @@ struct SidebarTests {
         let sink = RecordingSink()
 
         let layouts = SidebarLayouts(defaults: defaults, reporting: Reporting(sink: sink))
-        #expect(layouts.layout(for: "marfa:two").isHidden(.favorites), "a readable layout went with the unreadable one")
+        #expect(layouts.layout(for: "marfa:two").isHidden(.feed), "a readable layout went with the unreadable one")
         #expect(layouts.layout(for: "marfa:one") == SidebarLayout())
         layouts.update("marfa:one") { $0.setCollapsed(.types, true) }
 
         let again = SidebarLayouts(defaults: defaults, reporting: Reporting(sink: RecordingSink()))
         #expect(again.layout(for: "marfa:one").isCollapsed(.types), "the change was not saved")
-        #expect(again.layout(for: "marfa:two").isHidden(.favorites))
+        #expect(again.layout(for: "marfa:two").isHidden(.feed))
         let aside = try #require(defaults.array(forKey: SidebarLayouts.setAsideKey) as? [Data])
         #expect(aside.count == 1, "what could not be read was not kept aside once")
         let kept = try #require(JSONSerialization.jsonObject(with: aside[0]) as? [String: [String: Int]])
@@ -183,9 +175,9 @@ struct SidebarTests {
         defaults.set(stored, forKey: "sidebarLayouts")
 
         let layouts = SidebarLayouts(defaults: defaults, reporting: Reporting(sink: RecordingSink()))
-        layouts.update("marfa:one") { $0.setHidden(.favorites, true) }
+        layouts.update("marfa:one") { $0.setHidden(.feed, true) }
 
-        #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isHidden(.favorites))
+        #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isHidden(.feed))
         #expect(defaults.array(forKey: SidebarLayouts.setAsideKey) as? [Data] == [earlier, stored])
     }
 }

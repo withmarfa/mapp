@@ -55,15 +55,13 @@ nonisolated struct SidebarGroupPlan: Identifiable, Equatable {
     }
 
     /// The places as the person ordered them. A section that holds only its default places keeps the sidebar's own
-    /// blocks in order, whatever `order` says: the Library and the Feed, then the Library's pages, then what is
-    /// pinned, each block in the person's order within it. Once something has been put in the section by hand
+    /// blocks in order, whatever `order` says: the Library and the Feed, in that order, then the Library's pages,
+    /// then what is pinned, each of those in the person's order within it. Once something has been put in the section by hand
     /// (`SidebarLayout.put`, or dragging its rows in place), the section is one list in the person's order.
     private static func ordered(_ places: [SidebarPlace], in group: String, layout: SidebarLayout) -> [SidebarPlace] {
         if places.contains(where: { layout.homes?[$0.key] == group }) { return layout.ordered(places) }
-        let blocks = [
-            SidebarPlace.places, SidebarPlace.pages,
-            places.filter(\.isPinnable),
-        ]
-        return blocks.flatMap { layout.ordered($0.filter(places.contains)) }
+        // An earlier copy kept the Library and the Feed in two sections, so their order there says nothing here.
+        return SidebarPlace.places.filter(places.contains)
+            + [SidebarPlace.pages, places.filter(\.isPinnable)].flatMap { layout.ordered($0.filter(places.contains)) }
     }
 }

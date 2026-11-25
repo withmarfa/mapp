@@ -17,7 +17,7 @@ struct SidebarNavigationTests {
         let layout = try JSONDecoder().decode(SidebarLayout.self, from: Data(json.utf8))
         let plan = SidebarPlan(FakeItemLibrary(items: []), layout: layout)
         #expect(!plan.isShown(.feed))
-        #expect(plan.destinations.contains(.library))
+        #expect(plan.section(.places)?.shown == [.library])
     }
 
     @Test func aSnapshotWithNoPlaceFailsToDecodeSoTheWindowOpensAtItsDefault() {
