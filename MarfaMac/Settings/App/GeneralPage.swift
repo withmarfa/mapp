@@ -80,9 +80,9 @@ struct GeneralPage: View {
 
     /// The pop-up's line for a stored place the library does not list, or nil where the choice is one the pop-up offers.
     private func missingStart(among types: [ItemTypeCount]) -> String? {
-        guard case .place(let place) = startWith else { return nil }
-        if [.library, .feed, .favorites].contains(place) { return nil }
-        if place.view == .own, case .type(let type) = place.place, types.contains(where: { $0.id == type }) { return nil }
+        guard case .place(let place, let item) = startWith else { return nil }
+        if item == nil, [.library, .feed, .favorites].contains(place) { return nil }
+        if item == nil, place.view == .own, case .type(let type) = place.place, types.contains(where: { $0.id == type }) { return nil }
         return missingName(MissingChoice.placeName(place))
     }
 

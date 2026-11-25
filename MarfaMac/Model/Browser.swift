@@ -27,6 +27,8 @@ final class Browser {
     @ObservationIgnored let sidebarMemory = ColumnMemory()
     /// How far the list, table or gallery is scrolled, kept for the same reasons and for the next launch (`snapshot()`).
     @ObservationIgnored let listMemory = ColumnMemory()
+    /// The place a later copy wrote for this window, kept as written while the window stays where it opened.
+    @ObservationIgnored var laterPlace: LaterPlace?
     /// The rows of the Items index under each tab, kept by the window so they survive an item's full page (`ItemIndexModel`).
     @ObservationIgnored let itemIndex = ItemIndexModel()
     /// The item whose row Items scrolls into view once it shows it, asked for by a reveal (`revealOnItems`).

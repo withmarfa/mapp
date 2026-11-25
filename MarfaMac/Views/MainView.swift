@@ -12,7 +12,9 @@ struct MainView: View {
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @StoredOrder private var order
-    @SceneStorage("browser") private var storedBrowser: Data?
+    @SceneStorage("window") private var storedBrowser: Data?
+    /// What earlier copies kept for the window, which they still read: read when the window has nothing newer, never written.
+    @SceneStorage("browser") private var earlierBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @AppStorage(InterfaceKey.showsSidebarHistory) private var showsSidebarHistory = true
     /// Kept with the window for the next launch, as the selection and the details are.
@@ -317,7 +319,7 @@ struct MainView: View {
         .onChange(of: browser.snapshotParts) {
             if restoresWindow {
                 browser.saveSnapshot { storedBrowser = $0 }
-                StartWith.remember(browser.shown)
+                if browser.keptLaterPlace == nil { StartWith.remember(browser.shown) }
             }
         }
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to
@@ -373,7 +375,7 @@ struct MainView: View {
             // After this update, not in it: chosen while the window's customizable toolbars are first mounted, the page
             // can miss the selection and stay on No Item Selected.
             Task {
-                if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order, start: StartWith.stored().startingPlace()) }
+                if restoresWindow { browser.restore(from: storedBrowser ?? earlierBrowser, in: library, order: order, start: StartWith.stored().start()) }
                 #if DEBUG
                 if SampleLibrary.isRequested, SampleLibrary.withCollections {
                     browser.showing = .type(TypeID("core.task"))

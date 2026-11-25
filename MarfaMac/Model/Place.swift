@@ -107,9 +107,15 @@ nonisolated enum ViewChoice: Hashable, Sendable {
 
     /// The choice a stored word names. A word this copy does not know reads as the place's own view.
     init(word: String) {
-        if word == "favorites" { self = .favorites }
+        self = ViewChoice(knownWord: word) ?? .own
+    }
+
+    /// The choice a stored word names, or nil for a word this copy does not know.
+    init?(knownWord word: String) {
+        if word == "own" { self = .own }
+        else if word == "favorites" { self = .favorites }
         else if word.hasPrefix("saved:"), word.count > 6 { self = .saved(ItemID(String(word.dropFirst(6)))) }
-        else { self = .own }
+        else { return nil }
     }
 
     var savedView: ItemID? {

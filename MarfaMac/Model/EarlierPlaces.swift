@@ -81,6 +81,7 @@ nonisolated enum EarlierPlace {
             PlaceDefaults.update(in: defaults) { $0 = PlaceDefaults(carried($0.places) { $0.filled(from: $1) }) }
         }
         ItemTableColumnLayouts.readIn(in: defaults)
+        StartWith.readIn(in: defaults)
     }
 
     /// Whether the person has been told that Files is no longer a place, on this Mac.

@@ -115,7 +115,7 @@ struct PlacesTests {
     @Test func filesIsToldOnceAndWhatWasKeptForItStaysReadable() throws {
         let defaults = ThrowawayDefaults.make("PlacesTests.files")
         let left = #"{"files":{}}"#
-        defaults.set(left, forKey: StartWith.lastPlaceKey)
+        defaults.set(left, forKey: StartWith.earlierLastPlaceKey)
         let library = FakeItemLibrary(items: [])
         for _ in 0..<2 {
             let browser = Browser()
@@ -124,11 +124,60 @@ struct PlacesTests {
             #expect(browser.shown == .library)
         }
         #expect(library.notices.waiting.count == 1)
-        #expect(defaults.string(forKey: StartWith.lastPlaceKey) == left, "an earlier copy still reads it")
+        #expect(defaults.string(forKey: StartWith.earlierLastPlaceKey) == left, "an earlier copy still reads it")
 
         let window = Data(#"{"place":{"files":{}},"selection":[]}"#.utf8)
         let snapshot = try JSONDecoder().decode(Browser.Snapshot.self, from: window)
         #expect(snapshot.place == .library && snapshot.leftFiles)
+    }
+
+    @Test func anEarlierWindowKeepsItsPositionWhereOnePlaceStandsForIt() throws {
+        func read(_ place: String) throws -> Browser.Snapshot {
+            let text = #"{"place":"# + place + #","selection":["n1"],"viewMode":"table","opensItem":true,"scrollOffset":420}"#
+            return try JSONDecoder().decode(Browser.Snapshot.self, from: Data(text.utf8))
+        }
+        let type = try read(#"{"itemType":{"_0":"core.task"}}"#)
+        #expect(type.place == .type(TypeID("core.task")) && type.opensItem == true && type.scrollOffset == 420)
+        #expect(try read(#"{"allNotes":{}}"#).scrollOffset == 420)
+        // Recents listed the Library in another order, and one favorite another list.
+        #expect(try read(#"{"recents":{}}"#).scrollOffset == nil)
+        #expect(try read(#"{"favoriteItem":{"_0":"n1"}}"#).opensItem == nil)
+    }
+
+    @Test func aPlaceALaterCopyWroteIsWrittenBackAsItWas() throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("One", modified: .now), FakeItemLibrary.note("Two", modified: .now)])
+        let written = #"{"place":{"place":"later:1","view":"own"},"selection":[]}"#
+        let browser = Browser()
+        browser.defaults = ThrowawayDefaults.make("PlacesTests.later")
+        browser.restore(from: Data(written.utf8), in: library, order: ItemOrder(), start: (.feed, nil))
+        #expect(browser.shown == .feed, "it opens where a new window would")
+        browser.selection = Set(library.items.map(\.id))
+        #expect(browser.snapshot().laterPlace == ["place": "later:1", "view": "own"])
+        let back = try #require(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(browser.snapshot())) as? [String: Any])
+        #expect(back["place"] as? [String: String] == ["place": "later:1", "view": "own"])
+        // A view word this copy does not know is kept the same way.
+        let view = try JSONDecoder().decode(Browser.Snapshot.self, from: Data(#"{"place":{"place":"feed","view":"pinned"},"selection":[]}"#.utf8))
+        #expect(view.place == .feed && view.laterPlace?["view"] == "pinned")
+        // Once the person moves, the window is where they are.
+        browser.showing = .library
+        #expect(browser.snapshot().laterPlace == nil)
+        // An order of views keeps a word it does not know.
+        var orders = ViewOrders(["library": ["pinned", "own"]])
+        #expect(orders.order(in: .library) == [.own])
+        orders.set([.favorites, .own], in: .library)
+        #expect(orders.places["library"] == ["pinned", "favorites", "own"])
+    }
+
+    @Test func startWithIsReadInToKeysOfItsOwnAndKeepsAFavoritesItem() throws {
+        let defaults = ThrowawayDefaults.make("PlacesTests.startWith")
+        defaults.set(#"{"itemType":{"_0":"core.task"}}"#, forKey: StartWith.earlierKey)
+        defaults.set(#"{"favoriteItem":{"_0":"n1"}}"#, forKey: StartWith.earlierLastPlaceKey)
+        EarlierPlace.readIn(in: defaults)
+        #expect(StartWith.stored(in: defaults) == .place(.type(TypeID("core.task"))))
+        #expect(StartWith.leftOff.start(in: defaults)?.selecting == ItemID("n1"))
+        StartWith.remember(.feed, in: defaults)
+        #expect(defaults.string(forKey: StartWith.earlierKey) == #"{"itemType":{"_0":"core.task"}}"#)
+        #expect(defaults.string(forKey: StartWith.earlierLastPlaceKey) == #"{"favoriteItem":{"_0":"n1"}}"#)
     }
 
     // MARK: Counts

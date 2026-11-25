@@ -14,9 +14,9 @@ nonisolated struct ViewOrders: Equatable, Sendable {
         self.places = places
     }
 
-    /// The views of `place` in the person's order.
+    /// The views of `place` in the person's order. A word this copy does not know is left out here and kept stored.
     func order(in place: Place) -> [ViewChoice] {
-        (places[place.word] ?? []).map(ViewChoice.init(word:))
+        (places[place.word] ?? []).compactMap(ViewChoice.init(knownWord:))
     }
 
     /// The saved views of `place` in the person's order, for `ItemLibrary.views(in:order:)`.
@@ -24,9 +24,13 @@ nonisolated struct ViewOrders: Equatable, Sendable {
         order(in: place).compactMap(\.savedView)
     }
 
-    /// Keeps `views` as the order of `place`; an empty list forgets it.
+    /// Keeps `views` as the order of `place`; an empty list forgets it. A word a later copy wrote stays at its position.
     mutating func set(_ views: [ViewChoice], in place: Place) {
-        places[place.word] = views.isEmpty ? nil : views.map(\.word)
+        var words = views.map(\.word)
+        for (index, word) in (places[place.word] ?? []).enumerated() where ViewChoice(knownWord: word) == nil {
+            words.insert(word, at: min(index, words.count))
+        }
+        places[place.word] = words.isEmpty ? nil : words
     }
 
     // MARK: Keeping
