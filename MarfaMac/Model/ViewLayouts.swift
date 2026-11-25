@@ -50,6 +50,8 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
     var quickActions: Bool?
     /// Where the view opens its items. Nil follows Settings.
     var opening: ItemOpening?
+    /// The map's Style and whether it groups markers that crowd. Nil follows the defaults.
+    var map: MapChoices?
 
     init(
         layout: ItemViewMode? = nil, properties: ViewProperties = ViewProperties(), hidesEmptyGroups: Bool = false,
@@ -67,7 +69,7 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
 
     /// The Properties list is stored under the key the table's columns used, so a view's choices carry over.
     private enum CodingKeys: String, CodingKey {
-        case layout, hidesEmptyGroups, cards, density, widths, calendarScale, quickActions, opening
+        case layout, hidesEmptyGroups, cards, density, widths, calendarScale, quickActions, opening, map
         case properties = "columns"
     }
 
@@ -83,6 +85,7 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         calendarScale = try? container.decodeIfPresent(CalendarScale.self, forKey: .calendarScale)
         quickActions = try? container.decodeIfPresent(Bool.self, forKey: .quickActions)
         opening = try? container.decodeIfPresent(ItemOpening.self, forKey: .opening)
+        map = try? container.decodeIfPresent(MapChoices.self, forKey: .map)
     }
 
     /// Whether a list offers its quick actions: as the person chose, else only at the Feed, the Archive and in a view

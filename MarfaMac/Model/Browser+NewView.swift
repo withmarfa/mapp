@@ -277,7 +277,7 @@ extension Browser {
             words += [String(localized: "where"), joined]
         }
         words += [String(localized: "as a"), viewMode.title]
-        if viewMode != .timeline, viewMode != .calendar, !keepsPlaceOrder {
+        if viewMode != .timeline, viewMode != .calendar, viewMode != .map, !keepsPlaceOrder {
             let sort = SavedViews.arrangement(self, content: content, order: storedOrder).sort
             if let first = sort.first {
                 let direction = first.order == .forward ? first.column.ascendingTitle : first.column.descendingTitle

@@ -20,7 +20,7 @@ nonisolated enum SampleLibrary {
     static var withCollections: Bool { ProcessInfo.processInfo.arguments.contains("-MarfaMacCollectionSample") }
 
     /// With the sample flag, `-MarfaMacOpenPlace <type id>` opens that type's place (`items` opens Items) and
-    /// `-MarfaMacLayout list|gallery|table|board|timeline|calendar` the layout, for a screenshot of one view.
+    /// `-MarfaMacLayout list|gallery|table|board|timeline|calendar|map` the layout, for a screenshot of one view.
     static var launchPlace: PlaceView? {
         argument(after: "-MarfaMacOpenPlace").map { $0 == "items" ? .library : .type(TypeID($0)) }
     }

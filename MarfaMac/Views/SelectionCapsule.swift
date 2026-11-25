@@ -289,9 +289,7 @@ extension View {
 /// handler for it. Several items ask first, as the capsule's Delete does. A choice outlives what a layout shows, as when
 /// the calendar moves to another week, so a key deletes only the chosen items `shown` names.
 private struct DeletesChosen: ViewModifier {
-    @CurrentLibrary private var library
-    @Environment(\.undoManager) private var undoManager
-    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
+    private var delete = ChosenItemDeletion()
     let browser: Browser
     let shown: () -> Set<ItemID>
 
@@ -310,6 +308,18 @@ private struct DeletesChosen: ViewModifier {
     }
 
     private func deleteChosen() {
+        delete(browser, shown: shown)
+    }
+}
+
+/// The focused layout deletes only its own chosen items, through the same write as the Delete command.
+struct ChosenItemDeletion: DynamicProperty {
+    @CurrentLibrary private var library
+    @Environment(\.undoManager) private var undoManager
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
+
+    func callAsFunction(_ browser: Browser, shown: () -> Set<ItemID>) {
+        guard !browser.selection.isEmpty else { return }
         let ids = browser.selection.intersection(shown())
         guard !ids.isEmpty else { return }
         library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)

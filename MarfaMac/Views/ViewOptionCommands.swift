@@ -17,6 +17,7 @@ struct ViewOptionCommand {
         case .board: return board(browser, library) + properties(browser, library)
         case .timeline: return timeline(browser, library) + properties(browser, library)
         case .calendar: return calendar(browser, library)
+        case .map: return map(browser)
         case .gallery: return gallery(browser) + sorting(browser, library) + grouping(browser, library) + properties(browser, library)
         case .list: return sorting(browser, library) + grouping(browser, library) + properties(browser, library)
         }
@@ -151,6 +152,18 @@ struct ViewOptionCommand {
             title: browser.showsCalendarMonth ? String(localized: "Hide Month") : String(localized: "Show Month"),
             systemImage: "calendar", key: .toggleMonth
         ) { browser.toggleCalendarMonth() })
+        return commands
+    }
+
+    private static func map(_ browser: Browser) -> [ViewOptionCommand] {
+        var commands = [ViewOptionCommand(title: String(localized: "Fit All Items"), systemImage: "scope") { browser.requestMapFit() }]
+        commands += ItemMapStyle.allCases.filter { $0 != browser.mapStyle }.map { style in
+            ViewOptionCommand(title: String(localized: "Map Style: \(style.title)"), systemImage: "square.2.layers.3d") { browser.setMapStyle(style) }
+        }
+        let groups = browser.groupsNearbyItems
+        commands.append(ViewOptionCommand(
+            title: groups ? String(localized: "Don’t Group Nearby Items") : String(localized: "Group Nearby Items"), systemImage: "circle.grid.2x2"
+        ) { browser.setGroupsNearbyItems(!groups) })
         return commands
     }
 

@@ -115,6 +115,8 @@ nonisolated enum SampleCastell {
             fields: [
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.entity"),
                 TypeField(name: "address", type: "string", declaredBy: Kind.place),
+                TypeField(name: "latitude", type: "number", declaredBy: Kind.place),
+                TypeField(name: "longitude", type: "number", declaredBy: Kind.place),
             ], titleField: "title", icon: "lucide:map-pin"),
         ItemType(
             id: Kind.issue, label: "GitHub Issue", description: "An issue on GitHub.",
@@ -448,7 +450,15 @@ nonisolated extension SampleCastell {
                 let starts = Self.stamp(now + ((index * 7) % 120 - 60) * 86_400 + (9 + n % 8) * 3600)
                 return ["title": .string(name), "starts_at": .string(starts)]
             case Kind.person: return ["title": .string("\(people[n % people.count]) \(surnames[(n / people.count) % surnames.count])\(n >= 120 ? " \(n / 120 + 1)" : "")")]
-            case Kind.place: return ["title": .string(name), "address": .string("\(1 + n % 90) High Street, Lewes")]
+            case Kind.place:
+                // Two places in three stand on the map, spread over the south of England and clustered round Lewes.
+                var properties: JSONObject = ["title": .string(name), "address": .string("\(1 + n % 90) High Street, Lewes")]
+                if n % 3 != 2 {
+                    let near = n % 2 == 0
+                    properties["latitude"] = .number(50.874 + Double((n * 7919) % 1000 - 500) / (near ? 40_000 : 400))
+                    properties["longitude"] = .number(0.012 + Double((n * 104_729) % 1000 - 500) / (near ? 25_000 : 250))
+                }
+                return properties
             case Kind.issue: return ["title": .string(name), "body": .string(quote), "status": .string(n % 3 == 0 ? "closed" : "open")]
             case Kind.pullRequest: return ["title": .string(name), "body": .string(quote), "status": .string(["open", "merged", "closed"][n % 3])]
             case Kind.media: return ["title": .string(name), "progress": .string(["wishlist", "in_progress", "finished"][n % 3]), "rating": .number(Double(1 + n % 5))]

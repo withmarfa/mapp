@@ -93,7 +93,7 @@ nonisolated extension SampleCastell.Maker {
         make("bm-finishes", Kind.bookmark, "Wood finishes compared", readwise, 5, "09:00", props: ["url": "https://example.com/finishes"])
         make("note-trust-comments", Kind.note, "Lewes Trust: comments on the draft", claude, 6, "09:00")
         make("person-ines", Kind.person, "Ines Barros", mfm, 7, "09:00", props: ["job_title": "Illustrator"])
-        make("place-calverts", Kind.place, "Calverts, the printers", mfm, 9, "09:00", props: ["address": "Calverts, 31 Cliffe High Street, Lewes"])
+        make("place-calverts", Kind.place, "Calverts, the printers", mfm, 9, "09:00", props: ["address": "Calverts, 31 Cliffe High Street, Lewes", "latitude": .number(50.8747), "longitude": .number(0.0121)])
         make("book-cliff", Kind.book, "The cliff path, by Alice Tarrant", readwise, 14, "09:00")
         make("pr-photos", Kind.pullRequest,
              "Load large photos in steps, so the gallery never waits for the largest one before it shows the rest", github, 6, "09:48",
